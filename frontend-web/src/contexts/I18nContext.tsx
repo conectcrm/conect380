@@ -1,0 +1,579 @@
+import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+import LanguageDetector from 'i18next-browser-languagedetector';
+
+// Configuração do i18next
+i18n
+  .use(LanguageDetector)
+  .use(initReactI18next)
+  .init({
+    fallbackLng: 'pt-BR',
+    debug: false,
+    interpolation: {
+      escapeValue: false,
+    },
+    resources: {
+      'pt-BR': {
+        translation: {
+          // Textos da aplicação em português
+          common: {
+            save: 'Salvar',
+            cancel: 'Cancelar',
+            delete: 'Excluir',
+            edit: 'Editar',
+            add: 'Adicionar',
+            search: 'Pesquisar',
+            loading: 'Carregando...',
+            error: 'Erro',
+            success: 'Sucesso',
+            actions: 'Ações',
+            filters: 'Filtros',
+            export: 'Exportar',
+            import: 'Importar',
+            refresh: 'Atualizar',
+            close: 'Fechar',
+            confirm: 'Confirmar',
+            all: 'Todos',
+            none: 'Nenhum',
+            view: 'Visualizar',
+            viewAll: 'Ver todos',
+          },
+          auth: {
+            login: 'Entrar',
+            logout: 'Sair',
+            email: 'E-mail',
+            password: 'Senha',
+            forgotPassword: 'Esqueci minha senha',
+            rememberMe: 'Lembrar de mim',
+          },
+          navigation: {
+            dashboard: 'Dashboard',
+            clients: 'Clientes',
+            proposals: 'Propostas',
+            products: 'Produtos',
+            contracts: 'Contratos',
+            financial: 'Financeiro',
+            settings: 'Configurações',
+          },
+          dashboard: {
+            title: 'Dashboard',
+            subtitle: 'Visão geral do seu negócio',
+            newProposal: 'Nova Proposta',
+            schedule: 'Agendar',
+            themes: 'Temas',
+            totalRevenue: 'Faturamento Total',
+            averageTicket: 'Ticket Médio',
+            closedSales: 'Vendas Fechadas',
+            inNegotiation: 'Em Negociação',
+            salesEvolution: 'Evolução de Vendas',
+            salesFunnel: 'Funil de Vendas',
+            proposalStatus: 'Status das Propostas',
+            quickActions: 'Ações Rápidas',
+            performance: 'Performance',
+            recentProposals: 'Propostas Recentes',
+            topSellers: 'Top Vendedores',
+            leads: 'Leads',
+            qualified: 'Qualificados',
+            proposals: 'Propostas',
+            negotiation: 'Negociação',
+            closed: 'Fechados',
+            pending: 'Pendentes',
+            approved: 'Aprovadas',
+            rejected: 'Rejeitadas',
+            monthlyGoal: 'Meta Mensal',
+            goalAchieved: 'Meta superada! Parabéns à equipe!',
+            vsLastMonth: 'vs mês anterior',
+            salesHighlight: 'Vendas em Destaque',
+            detailedPerformance: 'Performance detalhada com controles avançados',
+            currentMonth: 'Mês Atual',
+            quarter: 'Trimestre',
+            semester: 'Semestre',
+            fullYear: 'Ano Completo',
+            allSellers: 'Todos Vendedores',
+            allRegions: 'Todas Regiões',
+            northRegion: 'Norte',
+            southRegion: 'Sul',
+            southeastRegion: 'Sudeste',
+            northeastRegion: 'Nordeste',
+            centerwestRegion: 'Centro-Oeste',
+            lastUpdate: 'Última atualização',
+            // KPIs
+            newClients: 'Novos Clientes Mês',
+            qualifiedLeads: 'Leads Qualificados',
+            sentProposals: 'Propostas Enviadas',
+            successRate: 'Taxa Sucesso Geral',
+            // Seções extras
+            alerts: 'Alertas',
+            recentActivities: 'Atividades Recentes',
+          },
+          clients: {
+            title: 'Clientes',
+            add: 'Adicionar Cliente',
+            name: 'Nome',
+            email: 'E-mail',
+            phone: 'Telefone',
+            status: 'Status',
+            type: 'Tipo',
+            document: 'Documento',
+            company: 'Empresa',
+            position: 'Cargo',
+            source: 'Origem',
+            estimatedValue: 'Valor Estimado',
+            lastContact: 'Último Contato',
+            nextContact: 'Próximo Contato',
+            notes: 'Observações',
+          },
+          language: {
+            select: 'Selecionar Idioma',
+            choose: 'Escolha seu idioma preferido',
+            available: 'Idiomas Disponíveis',
+            applied: 'As alterações de idioma são aplicadas imediatamente',
+          },
+        },
+      },
+      'en-US': {
+        translation: {
+          common: {
+            save: 'Save',
+            cancel: 'Cancel',
+            delete: 'Delete',
+            edit: 'Edit',
+            add: 'Add',
+            search: 'Search',
+            loading: 'Loading...',
+            error: 'Error',
+            success: 'Success',
+            actions: 'Actions',
+            filters: 'Filters',
+            export: 'Export',
+            import: 'Import',
+            refresh: 'Refresh',
+            close: 'Close',
+            confirm: 'Confirm',
+            all: 'All',
+            none: 'None',
+            view: 'View',
+            viewAll: 'View all',
+          },
+          auth: {
+            login: 'Sign In',
+            logout: 'Sign Out',
+            email: 'Email',
+            password: 'Password',
+            forgotPassword: 'Forgot Password',
+            rememberMe: 'Remember Me',
+          },
+          navigation: {
+            dashboard: 'Dashboard',
+            clients: 'Clients',
+            proposals: 'Proposals',
+            products: 'Products',
+            contracts: 'Contracts',
+            financial: 'Financial',
+            settings: 'Settings',
+          },
+          dashboard: {
+            title: 'Dashboard',
+            subtitle: 'Overview of your business',
+            newProposal: 'New Proposal',
+            schedule: 'Schedule',
+            themes: 'Themes',
+            totalRevenue: 'Total Revenue',
+            averageTicket: 'Average Ticket',
+            closedSales: 'Closed Sales',
+            inNegotiation: 'In Negotiation',
+            salesEvolution: 'Sales Evolution',
+            salesFunnel: 'Sales Funnel',
+            proposalStatus: 'Proposal Status',
+            quickActions: 'Quick Actions',
+            performance: 'Performance',
+            recentProposals: 'Recent Proposals',
+            topSellers: 'Top Sellers',
+            leads: 'Leads',
+            qualified: 'Qualified',
+            proposals: 'Proposals',
+            negotiation: 'Negotiation',
+            closed: 'Closed',
+            pending: 'Pending',
+            approved: 'Approved',
+            rejected: 'Rejected',
+            monthlyGoal: 'Monthly Goal',
+            goalAchieved: 'Goal exceeded! Congratulations to the team!',
+            vsLastMonth: 'vs last month',
+            salesHighlight: 'Sales Highlight',
+            detailedPerformance: 'Detailed performance with advanced controls',
+            currentMonth: 'Current Month',
+            quarter: 'Quarter',
+            semester: 'Semester',
+            fullYear: 'Full Year',
+            allSellers: 'All Sellers',
+            allRegions: 'All Regions',
+            northRegion: 'North',
+            southRegion: 'South',
+            southeastRegion: 'Southeast',
+            northeastRegion: 'Northeast',
+            centerwestRegion: 'Center-West',
+            lastUpdate: 'Last update',
+            // KPIs
+            newClients: 'New Clients Month',
+            qualifiedLeads: 'Qualified Leads',
+            sentProposals: 'Sent Proposals',
+            successRate: 'Overall Success Rate',
+            // Seções extras
+            alerts: 'Alerts',
+            recentActivities: 'Recent Activities',
+          },
+          clients: {
+            title: 'Clients',
+            add: 'Add Client',
+            name: 'Name',
+            email: 'Email',
+            phone: 'Phone',
+            status: 'Status',
+            type: 'Type',
+            document: 'Document',
+            company: 'Company',
+            position: 'Position',
+            source: 'Source',
+            estimatedValue: 'Estimated Value',
+            lastContact: 'Last Contact',
+            nextContact: 'Next Contact',
+            notes: 'Notes',
+          },
+          language: {
+            select: 'Select Language',
+            choose: 'Choose your preferred language',
+            available: 'Available Languages',
+            applied: 'Language changes are applied immediately',
+          },
+        },
+      },
+      'es-ES': {
+        translation: {
+          common: {
+            save: 'Guardar',
+            cancel: 'Cancelar',
+            delete: 'Eliminar',
+            edit: 'Editar',
+            add: 'Añadir',
+            search: 'Buscar',
+            loading: 'Cargando...',
+            error: 'Error',
+            success: 'Éxito',
+            actions: 'Acciones',
+            filters: 'Filtros',
+            export: 'Exportar',
+            import: 'Importar',
+            refresh: 'Actualizar',
+            close: 'Cerrar',
+            confirm: 'Confirmar',
+            all: 'Todos',
+            none: 'Ninguno',
+            view: 'Ver',
+            viewAll: 'Ver todos',
+          },
+          auth: {
+            login: 'Iniciar Sesión',
+            logout: 'Cerrar Sesión',
+            email: 'Correo Electrónico',
+            password: 'Contraseña',
+            forgotPassword: 'Olvidé mi Contraseña',
+            rememberMe: 'Recordarme',
+          },
+          navigation: {
+            dashboard: 'Panel de Control',
+            clients: 'Clientes',
+            proposals: 'Propuestas',
+            products: 'Productos',
+            contracts: 'Contratos',
+            financial: 'Financiero',
+            settings: 'Configuración',
+          },
+          dashboard: {
+            title: 'Panel de Control',
+            subtitle: 'Visión general de su negocio',
+            newProposal: 'Nueva Propuesta',
+            schedule: 'Programar',
+            themes: 'Temas',
+            totalRevenue: 'Ingresos Totales',
+            averageTicket: 'Ticket Promedio',
+            closedSales: 'Ventas Cerradas',
+            inNegotiation: 'En Negociación',
+            salesEvolution: 'Evolución de Ventas',
+            salesFunnel: 'Embudo de Ventas',
+            proposalStatus: 'Estado de Propuestas',
+            quickActions: 'Acciones Rápidas',
+            performance: 'Rendimiento',
+            recentProposals: 'Propuestas Recientes',
+            topSellers: 'Mejores Vendedores',
+            leads: 'Leads',
+            qualified: 'Calificados',
+            proposals: 'Propuestas',
+            negotiation: 'Negociación',
+            closed: 'Cerrados',
+            pending: 'Pendientes',
+            approved: 'Aprobadas',
+            rejected: 'Rechazadas',
+            monthlyGoal: 'Meta Mensual',
+            goalAchieved: '¡Meta superada! ¡Felicidades al equipo!',
+            vsLastMonth: 'vs mes anterior',
+            salesHighlight: 'Destacado de Ventas',
+            detailedPerformance: 'Rendimiento detallado con controles avanzados',
+            currentMonth: 'Mes Actual',
+            quarter: 'Trimestre',
+            semester: 'Semestre',
+            fullYear: 'Año Completo',
+            allSellers: 'Todos los Vendedores',
+            allRegions: 'Todas las Regiones',
+            northRegion: 'Norte',
+            southRegion: 'Sur',
+            southeastRegion: 'Sureste',
+            northeastRegion: 'Noreste',
+            centerwestRegion: 'Centro-Oeste',
+            lastUpdate: 'Última actualización',
+            // KPIs
+            newClients: 'Nuevos Clientes Mes',
+            qualifiedLeads: 'Leads Calificados',
+            sentProposals: 'Propuestas Enviadas',
+            successRate: 'Tasa Éxito General',
+            // Seções extras
+            alerts: 'Alertas',
+            recentActivities: 'Actividades Recientes',
+          },
+          clients: {
+            title: 'Clientes',
+            add: 'Añadir Cliente',
+            name: 'Nombre',
+            email: 'Correo Electrónico',
+            phone: 'Teléfono',
+            status: 'Estado',
+            type: 'Tipo',
+            document: 'Documento',
+            company: 'Empresa',
+            position: 'Cargo',
+            source: 'Origen',
+            estimatedValue: 'Valor Estimado',
+            lastContact: 'Último Contacto',
+            nextContact: 'Próximo Contacto',
+            notes: 'Observaciones',
+          },
+          language: {
+            select: 'Seleccionar Idioma',
+            choose: 'Elija su idioma preferido',
+            available: 'Idiomas Disponibles',
+            applied: 'Los cambios de idioma se aplican inmediatamente',
+          },
+        },
+      },
+      'fr-FR': {
+        translation: {
+          common: {
+            save: 'Enregistrer',
+            cancel: 'Annuler',
+            delete: 'Supprimer',
+            edit: 'Modifier',
+            add: 'Ajouter',
+            search: 'Rechercher',
+            loading: 'Chargement...',
+            error: 'Erreur',
+            success: 'Succès',
+            actions: 'Actions',
+            filters: 'Filtres',
+            export: 'Exporter',
+            import: 'Importer',
+            refresh: 'Actualiser',
+            close: 'Fermer',
+            confirm: 'Confirmer',
+            all: 'Tous',
+            none: 'Aucun',
+            view: 'Voir',
+            viewAll: 'Voir tout',
+          },
+          auth: {
+            login: 'Se Connecter',
+            logout: 'Se Déconnecter',
+            email: 'E-mail',
+            password: 'Mot de Passe',
+            forgotPassword: 'Mot de Passe Oublié',
+            rememberMe: 'Se Souvenir de Moi',
+          },
+          navigation: {
+            dashboard: 'Tableau de Bord',
+            clients: 'Clients',
+            proposals: 'Propositions',
+            products: 'Produits',
+            contracts: 'Contrats',
+            financial: 'Financier',
+            settings: 'Paramètres',
+          },
+          dashboard: {
+            title: 'Tableau de Bord',
+            subtitle: 'Aperçu de votre entreprise',
+            newProposal: 'Nouvelle Proposition',
+            schedule: 'Planifier',
+            themes: 'Thèmes',
+            totalRevenue: 'Chiffre d\'Affaires Total',
+            averageTicket: 'Ticket Moyen',
+            closedSales: 'Ventes Fermées',
+            inNegotiation: 'En Négociation',
+            salesEvolution: 'Évolution des Ventes',
+            salesFunnel: 'Entonnoir de Ventes',
+            proposalStatus: 'Statut des Propositions',
+            quickActions: 'Actions Rapides',
+            performance: 'Performance',
+            recentProposals: 'Propositions Récentes',
+            topSellers: 'Meilleurs Vendeurs',
+            leads: 'Prospects',
+            qualified: 'Qualifiés',
+            proposals: 'Propositions',
+            negotiation: 'Négociation',
+            closed: 'Fermés',
+            pending: 'En Attente',
+            approved: 'Approuvées',
+            rejected: 'Rejetées',
+            monthlyGoal: 'Objectif Mensuel',
+            goalAchieved: 'Objectif dépassé ! Félicitations à l\'équipe !',
+            vsLastMonth: 'vs mois dernier',
+            salesHighlight: 'Point Fort des Ventes',
+            detailedPerformance: 'Performance détaillée avec contrôles avancés',
+            currentMonth: 'Mois Actuel',
+            quarter: 'Trimestre',
+            semester: 'Semestre',
+            fullYear: 'Année Complète',
+            allSellers: 'Tous les Vendeurs',
+            allRegions: 'Toutes les Régions',
+            northRegion: 'Nord',
+            southRegion: 'Sud',
+            southeastRegion: 'Sud-Est',
+            northeastRegion: 'Nord-Est',
+            centerwestRegion: 'Centre-Ouest',
+            lastUpdate: 'Dernière mise à jour',
+            // KPIs
+            newClients: 'Nouveaux Clients Mois',
+            qualifiedLeads: 'Prospects Qualifiés',
+            sentProposals: 'Propositions Envoyées',
+            successRate: 'Taux Succès Général',
+            // Seções extras
+            alerts: 'Alertes',
+            recentActivities: 'Activités Récentes',
+          },
+          clients: {
+            title: 'Clients',
+            add: 'Ajouter Client',
+            name: 'Nom',
+            email: 'E-mail',
+            phone: 'Téléphone',
+            status: 'Statut',
+            type: 'Type',
+            document: 'Document',
+            company: 'Entreprise',
+            position: 'Poste',
+            source: 'Source',
+            estimatedValue: 'Valeur Estimée',
+            lastContact: 'Dernier Contact',
+            nextContact: 'Prochain Contact',
+            notes: 'Notes',
+          },
+          language: {
+            select: 'Sélectionner la Langue',
+            choose: 'Choisissez votre langue préférée',
+            available: 'Langues Disponibles',
+            applied: 'Les changements de langue sont appliqués immédiatement',
+          },
+        },
+      },
+    },
+  });
+
+interface I18nContextData {
+  language: string;
+  changeLanguage: (lng: string) => Promise<void>;
+  t: (key: string) => string;
+  availableLanguages: Array<{
+    code: string;
+    name: string;
+    nativeName: string;
+    flag: string;
+  }>;
+}
+
+const I18nContext = createContext<I18nContextData>({} as I18nContextData);
+
+interface I18nProviderProps {
+  children: ReactNode;
+}
+
+export const I18nProvider: React.FC<I18nProviderProps> = ({ children }) => {
+  const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
+
+  const availableLanguages = [
+    {
+      code: 'pt-BR',
+      name: 'Português (Brasil)',
+      nativeName: 'Português',
+      flag: '🇧🇷'
+    },
+    {
+      code: 'en-US',
+      name: 'English (United States)',
+      nativeName: 'English',
+      flag: '🇺🇸'
+    },
+    {
+      code: 'es-ES',
+      name: 'Español (España)',
+      nativeName: 'Español',
+      flag: '🇪🇸'
+    },
+    {
+      code: 'fr-FR',
+      name: 'Français (France)',
+      nativeName: 'Français',
+      flag: '🇫🇷'
+    }
+  ];
+
+  useEffect(() => {
+    const handleLanguageChange = (lng: string) => {
+      setCurrentLanguage(lng);
+    };
+
+    i18n.on('languageChanged', handleLanguageChange);
+
+    return () => {
+      i18n.off('languageChanged', handleLanguageChange);
+    };
+  }, []);
+
+  const changeLanguage = async (lng: string) => {
+    try {
+      await i18n.changeLanguage(lng);
+      // Salvar preferência no localStorage
+      localStorage.setItem('preferred-language', lng);
+    } catch (error) {
+      console.error('Erro ao alterar idioma:', error);
+    }
+  };
+
+  const t = (key: string) => {
+    return i18n.t(key);
+  };
+
+  const value: I18nContextData = {
+    language: currentLanguage,
+    changeLanguage,
+    t,
+    availableLanguages,
+  };
+
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+};
+
+export const useI18n = () => {
+  const context = useContext(I18nContext);
+  if (!context) {
+    throw new Error('useI18n deve ser usado dentro de um I18nProvider');
+  }
+  return context;
+};

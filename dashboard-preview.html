@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fênix CRM - Dashboard Preview (Port 3900)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes countUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-count {
+            animation: countUp 0.6s ease-out;
+        }
+        
+        .progress-bar {
+            transition: width 1s ease-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="p-6">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-2xl font-bold">Dashboard</h1>
+                <p class="text-gray-600">Visão geral do seu negócio</p>
+            </div>
+            <div class="flex gap-3">
+                <button class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2">
+                    📅 Agendar
+                </button>
+                <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                    ➕ Nova Proposta
+                </button>
+            </div>
+        </div>
+        
+        <!-- Filtros -->
+        <div class="bg-white p-4 rounded-lg shadow-sm mb-6">
+            <div class="flex flex-wrap gap-4 items-center">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium text-gray-700">🔍 Filtros</span>
+                </div>
+                
+                <select class="px-3 py-1 border rounded text-sm">
+                    <option>2025</option>
+                    <option>2024</option>
+                    <option>Último mês</option>
+                </select>
+                
+                <select class="px-3 py-1 border rounded text-sm">
+                    <option>Todos os vendedores</option>
+                    <option>João Silva</option>
+                    <option>Maria Santos</option>
+                </select>
+                
+                <select class="px-3 py-1 border rounded text-sm">
+                    <option>Todas as regiões</option>
+                    <option>Norte</option>
+                    <option>Sul</option>
+                    <option>Sudeste</option>
+                </select>
+                
+                <button class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+                    📥 Exportar
+                </button>
+            </div>
+        </div>
+        
+        <!-- KPIs -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-l-gray-300 animate-count">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Total de Clientes</p>
+                        <p class="text-2xl font-bold text-gray-900">248</p>
+                        <div class="flex items-center mt-1 text-sm text-green-600">
+                            ↗️ +12% este mês
+                        </div>
+                    </div>
+                    <div class="p-3 rounded-full bg-gray-100">
+                        👥
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-l-gray-300 animate-count">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Propostas Ativas</p>
+                        <p class="text-2xl font-bold text-gray-900">32</p>
+                        <div class="flex items-center mt-1 text-sm text-green-600">
+                            ↗️ +5% esta semana
+                        </div>
+                    </div>
+                    <div class="p-3 rounded-full bg-gray-100">
+                        📄
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-blue-50 p-6 rounded-lg shadow-sm border-l-4 border-l-blue-500 animate-count">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Receita do Mês</p>
+                        <p class="text-2xl font-bold text-blue-700">R$ 125.000</p>
+                        <div class="flex items-center mt-1 text-sm text-green-600">
+                            ↗️ +23% vs mês anterior
+                        </div>
+                    </div>
+                    <div class="p-3 rounded-full bg-blue-100">
+                        💰
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-l-gray-300 animate-count">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Taxa de Conversão</p>
+                        <p class="text-2xl font-bold text-gray-900">68%</p>
+                        <div class="flex items-center mt-1 text-sm text-green-600">
+                            ↗️ +3% vs período anterior
+                        </div>
+                    </div>
+                    <div class="p-3 rounded-full bg-gray-100">
+                        🎯
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráficos -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Gráfico de Vendas -->
+            <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-sm">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">Evolução de Vendas</h3>
+                    <div class="flex gap-2">
+                        <button class="px-3 py-1 text-sm border rounded hover:bg-gray-50">Valor</button>
+                        <button class="px-3 py-1 text-sm bg-blue-600 text-white rounded">Quantidade</button>
+                    </div>
+                </div>
+                
+                <!-- Gráfico Simulado -->
+                <div class="h-64 flex items-end justify-center gap-4 px-4">
+                    <div class="flex flex-col items-center">
+                        <div class="text-xs font-medium mb-1">15</div>
+                        <div class="w-12 bg-blue-500 progress-bar" style="height: 80px; border-radius: 4px 4px 0 0;"></div>
+                        <div class="text-xs text-gray-600 mt-2">Jan</div>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="text-xs font-medium mb-1">22</div>
+                        <div class="w-12 bg-green-500 progress-bar" style="height: 117px; border-radius: 4px 4px 0 0;"></div>
+                        <div class="text-xs text-gray-600 mt-2">Fev</div>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="text-xs font-medium mb-1">18</div>
+                        <div class="w-12 bg-yellow-500 progress-bar" style="height: 96px; border-radius: 4px 4px 0 0;"></div>
+                        <div class="text-xs text-gray-600 mt-2">Mar</div>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="text-xs font-medium mb-1">28</div>
+                        <div class="w-12 bg-red-500 progress-bar" style="height: 149px; border-radius: 4px 4px 0 0;"></div>
+                        <div class="text-xs text-gray-600 mt-2">Abr</div>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="text-xs font-medium mb-1">35</div>
+                        <div class="w-12 bg-purple-500 progress-bar" style="height: 187px; border-radius: 4px 4px 0 0;"></div>
+                        <div class="text-xs text-gray-600 mt-2">Mai</div>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="text-xs font-medium mb-1">32</div>
+                        <div class="w-12 bg-cyan-500 progress-bar" style="height: 171px; border-radius: 4px 4px 0 0;"></div>
+                        <div class="text-xs text-gray-600 mt-2">Jun</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Funil de Vendas -->
+            <div class="bg-white p-6 rounded-lg shadow-sm">
+                <h3 class="text-lg font-semibold mb-4">Funil de Vendas</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-4 h-4 rounded bg-blue-500"></div>
+                            <span class="text-sm font-medium">Leads</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-24 bg-gray-200 rounded-full h-2">
+                                <div class="h-2 rounded-full bg-blue-500 progress-bar" style="width: 100%"></div>
+                            </div>
+                            <span class="text-sm font-medium w-8">150</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-4 h-4 rounded bg-green-500"></div>
+                            <span class="text-sm font-medium">Qualificados</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-24 bg-gray-200 rounded-full h-2">
+                                <div class="h-2 rounded-full bg-green-500 progress-bar" style="width: 59%"></div>
+                            </div>
+                            <span class="text-sm font-medium w-8">89</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-4 h-4 rounded bg-yellow-500"></div>
+                            <span class="text-sm font-medium">Propostas</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-24 bg-gray-200 rounded-full h-2">
+                                <div class="h-2 rounded-full bg-yellow-500 progress-bar" style="width: 30%"></div>
+                            </div>
+                            <span class="text-sm font-medium w-8">45</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-4 h-4 rounded bg-orange-500"></div>
+                            <span class="text-sm font-medium">Negociação</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-24 bg-gray-200 rounded-full h-2">
+                                <div class="h-2 rounded-full bg-orange-500 progress-bar" style="width: 15%"></div>
+                            </div>
+                            <span class="text-sm font-medium w-8">23</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-4 h-4 rounded bg-purple-500"></div>
+                            <span class="text-sm font-medium">Fechados</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-24 bg-gray-200 rounded-full h-2">
+                                <div class="h-2 rounded-full bg-purple-500 progress-bar" style="width: 10%"></div>
+                            </div>
+                            <span class="text-sm font-medium w-8">15</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabelas e Ranking -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <!-- Propostas Recentes -->
+            <div class="lg:col-span-2 bg-white rounded-lg shadow-sm">
+                <div class="p-4 border-b">
+                    <h3 class="text-lg font-semibold">Propostas Recentes</h3>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 text-sm font-medium">Empresa ABC Ltda</td>
+                                <td class="px-4 py-3 text-sm font-medium">R$ 25.000</td>
+                                <td class="px-4 py-3">
+                                    <span class="text-sm px-2 py-1 rounded-full bg-green-100 text-green-800">
+                                        ✅ Aprovada
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-sm text-gray-500">15/01/2025</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 text-sm font-medium">Tech Solutions</td>
+                                <td class="px-4 py-3 text-sm font-medium">R$ 18.500</td>
+                                <td class="px-4 py-3">
+                                    <span class="text-sm px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                                        🎯 Negociação
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-sm text-gray-500">14/01/2025</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 text-sm font-medium">Digital Marketing Pro</td>
+                                <td class="px-4 py-3 text-sm font-medium">R$ 12.000</td>
+                                <td class="px-4 py-3">
+                                    <span class="text-sm px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
+                                        ⏰ Pendente
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-sm text-gray-500">13/01/2025</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Ranking de Vendedores -->
+            <div class="bg-white p-6 rounded-lg shadow-sm">
+                <h3 class="text-lg font-semibold mb-4">🏆 Ranking de Vendedores</h3>
+                
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold bg-yellow-500">
+                                1
+                            </div>
+                            <div>
+                                <p class="font-medium">João Silva</p>
+                                <p class="text-sm text-gray-500">15 vendas</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-medium">R$ 125.000</p>
+                            <div class="flex items-center gap-2">
+                                <div class="w-20 bg-gray-200 rounded-full h-2">
+                                    <div class="h-2 rounded-full bg-green-500 progress-bar" style="width: 100%"></div>
+                                </div>
+                                <span class="text-xs text-green-600">125%</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold bg-gray-400">
+                                2
+                            </div>
+                            <div>
+                                <p class="font-medium">Maria Santos</p>
+                                <p class="text-sm text-gray-500">12 vendas</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-medium">R$ 98.000</p>
+                            <div class="flex items-center gap-2">
+                                <div class="w-20 bg-gray-200 rounded-full h-2">
+                                    <div class="h-2 rounded-full bg-green-500 progress-bar" style="width: 90%"></div>
+                                </div>
+                                <span class="text-xs text-green-600">123%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alertas e Atividades -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Alertas -->
+            <div class="bg-white p-6 rounded-lg shadow-sm">
+                <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                    ⚠️ Alertas
+                </h3>
+                
+                <div class="space-y-3">
+                    <div class="flex items-start gap-3 p-3 bg-red-50 border-l-4 border-red-400 rounded">
+                        <div>
+                            <p class="text-sm font-medium text-red-800">Proposta vencida</p>
+                            <p class="text-xs text-red-600">Tech Solutions - Proposta venceu há 3 dias</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start gap-3 p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+                        <div>
+                            <p class="text-sm font-medium text-yellow-800">Follow-up pendente</p>
+                            <p class="text-xs text-yellow-600">Empresa ABC - Último contato há 5 dias</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Atividades Recentes -->
+            <div class="bg-white p-6 rounded-lg shadow-sm">
+                <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                    📝 Atividades Recentes
+                </h3>
+                
+                <div class="space-y-4">
+                    <div class="flex items-start gap-3 pb-3 border-b border-gray-100">
+                        <div class="p-2 bg-gray-100 rounded-full">
+                            ✅
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium">Proposta aprovada</p>
+                            <p class="text-xs text-gray-600">Empresa ABC aprovou proposta de R$ 25.000</p>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="text-xs text-gray-500">2 horas atrás</span>
+                                <span class="text-xs text-gray-400">•</span>
+                                <span class="text-xs text-gray-500">João Silva</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start gap-3 pb-3 border-b border-gray-100">
+                        <div class="p-2 bg-gray-100 rounded-full">
+                            ➕
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium">Novo cliente cadastrado</p>
+                            <p class="text-xs text-gray-600">Digital Marketing Pro foi adicionado</p>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="text-xs text-gray-500">4 horas atrás</span>
+                                <span class="text-xs text-gray-400">•</span>
+                                <span class="text-xs text-gray-500">Maria Santos</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Animação simples para demonstrar o dashboard
+        setTimeout(() => {
+            document.querySelectorAll('.progress-bar').forEach(bar => {
+                bar.style.opacity = '1';
+            });
+        }, 500);
+    </script>
+</body>
+</html>

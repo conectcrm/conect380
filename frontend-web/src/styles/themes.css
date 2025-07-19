@@ -1,0 +1,199 @@
+/* Variáveis CSS para temas dinâmicos */
+:root {
+  /* Cores padrão - serão sobrescritas pelo sistema de temas */
+  --color-primary: #3b82f6;
+  --color-primaryHover: #2563eb;
+  --color-primaryLight: #dbeafe;
+  --color-primaryDark: #1e40af;
+  --color-secondary: #6b7280;
+  --color-secondaryLight: #f3f4f6;
+  --color-accent: #1e40af;
+  --color-accentLight: #eff6ff;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-neutral: #6b7280;
+  --color-neutralLight: #f9fafb;
+  --color-neutralDark: #374151;
+  --color-background: #ffffff;
+  --color-backgroundSecondary: #f8fafc;
+  --color-text: #111827;
+  --color-textSecondary: #6b7280;
+  --color-border: #e5e7eb;
+  --color-borderLight: #f3f4f6;
+  
+  /* Gradientes */
+  --gradient-primary: from-gray-50 to-slate-100;
+  --gradient-secondary: from-blue-50 to-blue-100;
+  --gradient-accent: from-gray-100 to-gray-200;
+}
+
+/* Classes utilitárias para usar as cores do tema */
+.theme-primary {
+  color: var(--color-primary) !important;
+}
+
+.theme-bg-primary {
+  background-color: var(--color-primary) !important;
+}
+
+.theme-border-primary {
+  border-color: var(--color-primary) !important;
+}
+
+.theme-text {
+  color: var(--color-text) !important;
+}
+
+.theme-text-secondary {
+  color: var(--color-textSecondary) !important;
+}
+
+.theme-bg {
+  background-color: var(--color-background) !important;
+}
+
+.theme-bg-secondary {
+  background-color: var(--color-backgroundSecondary) !important;
+}
+
+.theme-border {
+  border-color: var(--color-border) !important;
+}
+
+.theme-success {
+  color: var(--color-success) !important;
+}
+
+.theme-warning {
+  color: var(--color-warning) !important;
+}
+
+.theme-error {
+  color: var(--color-error) !important;
+}
+
+/* Gradientes dinâmicos */
+.theme-gradient-primary {
+  background: linear-gradient(to bottom right, var(--color-primaryLight), var(--color-neutralLight));
+}
+
+.theme-gradient-card {
+  background: linear-gradient(to bottom right, var(--color-background), var(--color-backgroundSecondary));
+}
+
+/* Botões com tema dinâmico */
+.theme-button-primary {
+  background-color: var(--color-primary);
+  color: white;
+  border: 1px solid var(--color-primary);
+  transition: all 0.2s ease;
+}
+
+.theme-button-primary:hover {
+  background-color: var(--color-primaryHover);
+  border-color: var(--color-primaryHover);
+}
+
+.theme-button-secondary {
+  background-color: transparent;
+  color: var(--color-primary);
+  border: 1px solid var(--color-border);
+  transition: all 0.2s ease;
+}
+
+.theme-button-secondary:hover {
+  background-color: var(--color-primaryLight);
+  border-color: var(--color-primary);
+}
+
+/* Inputs com tema dinâmico */
+.theme-input {
+  border: 1px solid var(--color-border);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  transition: all 0.2s ease;
+}
+
+.theme-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primaryLight);
+  outline: none;
+}
+
+/* Cards com tema dinâmico */
+.theme-card {
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  transition: all 0.2s ease;
+}
+
+.theme-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Alertas com tema dinâmico */
+.theme-alert-success {
+  background-color: color-mix(in srgb, var(--color-success) 10%, transparent);
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.theme-alert-warning {
+  background-color: color-mix(in srgb, var(--color-warning) 10%, transparent);
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.theme-alert-error {
+  background-color: color-mix(in srgb, var(--color-error) 10%, transparent);
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+/* Badges com tema dinâmico */
+.theme-badge-primary {
+  background-color: var(--color-primaryLight);
+  color: var(--color-primary);
+}
+
+.theme-badge-secondary {
+  background-color: var(--color-neutralLight);
+  color: var(--color-neutral);
+}
+
+.theme-badge-success {
+  background-color: color-mix(in srgb, var(--color-success) 15%, transparent);
+  color: var(--color-success);
+}
+
+/* Links com tema dinâmico */
+.theme-link {
+  color: var(--color-primary);
+  transition: color 0.2s ease;
+}
+
+.theme-link:hover {
+  color: var(--color-primaryHover);
+}
+
+/* Animações para transições de tema */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Responsividade para o seletor de paleta */
+@media (max-width: 768px) {
+  .theme-palette-modal {
+    margin: 1rem;
+    max-height: calc(100vh - 2rem);
+  }
+}
+
+/* Melhorias de acessibilidade */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
