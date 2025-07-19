@@ -152,7 +152,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         {/* Conteúdo da página */}
         <main className="flex-1 relative overflow-y-auto focus:outline-none">
           <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+            <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6">
               {children}
             </div>
           </div>
