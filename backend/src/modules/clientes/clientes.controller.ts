@@ -64,6 +64,17 @@ export class ClientesController {
     };
   }
 
+  @Get('estatisticas')
+  @ApiOperation({ summary: 'Obter estatísticas dos clientes' })
+  @ApiResponse({ status: 200, description: 'Estatísticas retornadas com sucesso' })
+  async getEstatisticas(@CurrentUser() user: User) {
+    const estatisticas = await this.clientesService.getEstatisticas(user.empresa_id);
+    return {
+      success: true,
+      data: estatisticas,
+    };
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Obter cliente por ID' })
   @ApiResponse({ status: 200, description: 'Cliente retornado com sucesso' })

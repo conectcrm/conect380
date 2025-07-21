@@ -102,4 +102,47 @@ export class ClientesService {
       order: { proximo_contato: 'ASC' },
     });
   }
+
+  async getEstatisticas(empresaId: string) {
+    const totalClientes = await this.clienteRepository.count({
+      where: { empresa_id: empresaId, ativo: true }
+    });
+
+    const clientesAtivos = await this.clienteRepository.count({
+      where: { empresa_id: empresaId, ativo: true, status: StatusCliente.CLIENTE }
+    });
+
+    const leads = await this.clienteRepository.count({
+      where: { empresa_id: empresaId, ativo: true, status: StatusCliente.LEAD }
+    });
+
+    const prospects = await this.clienteRepository.count({
+      where: { empresa_id: empresaId, ativo: true, status: StatusCliente.PROSPECT }
+    });
+
+    const inativos = await this.clienteRepository.count({
+      where: { empresa_id: empresaId, ativo: true, status: StatusCliente.INATIVO }
+    });
+
+    // Novos clientes no mês atual
+    const inicioMes = new Date();
+    inicioMes.setDate(1);
+    inicioMes.setHours(0, 0, 0, 0);
+
+    const novosClientesMes = await this.clienteRepository
+      .createQueryBuilder('cliente')
+      .where('cliente.empresa_id = :empresaId', { empresaId })
+      .andWhere('cliente.ativo = :ativo', { ativo: true })
+      .andWhere('cliente.created_at >= :inicioMes', { inicioMes })
+      .getCount();
+
+    return {
+      totalClientes,
+      clientesAtivos,
+      leads,
+      prospects,
+      inativos,
+      novosClientesMes
+    };
+  }
 }

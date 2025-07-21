@@ -1,0 +1,529 @@
+/* 
+ * Sistema de Tipografia Moderno - Fênix CRM
+ * Baseado nos padrões dos CRMs mais conceituados do mercado
+ * Referências: Salesforce Lightning, HubSpot, Zoho, Pipedrive
+ */
+
+/* =================================
+   CONFIGURAÇÕES FUNDAMENTAIS
+   ================================= */
+
+/* Import de fontes modernas */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* Reset tipográfico */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  /* Base font-size moderna: 16px para melhor acessibilidade */
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  font-weight: 400;
+  color: #1f2937; /* Gray-800 mais suave para leitura */
+  background-color: #ffffff;
+}
+
+/* =================================
+   ESCALA TIPOGRÁFICA MODERNA
+   ================================= */
+
+/* Headings - Seguindo padrão dos CRMs líderes */
+h1 {
+  font-size: clamp(1.75rem, 4vw, 2.5rem); /* 28px → 40px */
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  color: #111827; /* Gray-900 */
+}
+
+h2 {
+  font-size: clamp(1.5rem, 3.5vw, 2rem); /* 24px → 32px */
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  color: #111827;
+}
+
+h3 {
+  font-size: clamp(1.25rem, 3vw, 1.5rem); /* 20px → 24px */
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: #1f2937;
+}
+
+h4 {
+  font-size: clamp(1.125rem, 2.5vw, 1.25rem); /* 18px → 20px */
+  font-weight: 600;
+  line-height: 1.4;
+  color: #1f2937;
+}
+
+h5 {
+  font-size: clamp(1rem, 2vw, 1.125rem); /* 16px → 18px */
+  font-weight: 600;
+  line-height: 1.4;
+  color: #374151;
+}
+
+h6 {
+  font-size: clamp(0.875rem, 1.5vw, 1rem); /* 14px → 16px */
+  font-weight: 600;
+  line-height: 1.4;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* =================================
+   TEXTO CORPO RESPONSIVO
+   ================================= */
+
+/* Texto base - otimizado para leitura */
+p, .text-base {
+  font-size: clamp(0.875rem, 2vw, 1rem); /* 14px → 16px */
+  line-height: 1.6;
+  color: #374151; /* Gray-700 */
+  margin-bottom: 1rem;
+}
+
+/* Texto pequeno - labels, hints, metadados */
+.text-sm, small {
+  font-size: clamp(0.75rem, 1.5vw, 0.875rem); /* 12px → 14px */
+  line-height: 1.5;
+  color: #6b7280; /* Gray-500 */
+}
+
+/* Texto muito pequeno - códigos, timestamps */
+.text-xs {
+  font-size: clamp(0.6875rem, 1.2vw, 0.75rem); /* 11px → 12px */
+  line-height: 1.4;
+  color: #6b7280;
+}
+
+/* Texto grande - destaque, lead paragraphs */
+.text-lg {
+  font-size: clamp(1rem, 2.5vw, 1.125rem); /* 16px → 18px */
+  line-height: 1.6;
+  color: #374151;
+}
+
+/* Texto extra grande - números, KPIs */
+.text-xl {
+  font-size: clamp(1.25rem, 3vw, 1.5rem); /* 20px → 24px */
+  line-height: 1.4;
+  color: #1f2937;
+}
+
+/* =================================
+   PESOS E ESTILOS DE FONTE
+   ================================= */
+
+.font-light { font-weight: 300; }
+.font-normal { font-weight: 400; }
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+.font-extrabold { font-weight: 800; }
+
+/* =================================
+   ELEMENTOS ESPECÍFICOS DE CRM
+   ================================= */
+
+/* Labels de formulário */
+.form-label {
+  font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.5rem;
+  display: block;
+  letter-spacing: 0.025em;
+}
+
+/* Inputs e campos de formulário */
+.form-input {
+  font-size: clamp(0.875rem, 2vw, 1rem);
+  line-height: 1.5;
+  color: #1f2937;
+  font-weight: 400;
+}
+
+.form-input::placeholder {
+  color: #9ca3af; /* Gray-400 */
+  font-weight: 400;
+}
+
+/* Textos de erro */
+.error-text {
+  font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+  color: #dc2626; /* Red-600 */
+  font-weight: 500;
+  margin-top: 0.25rem;
+}
+
+/* Textos de sucesso */
+.success-text {
+  font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+  color: #16a34a; /* Green-600 */
+  font-weight: 500;
+  margin-top: 0.25rem;
+}
+
+/* Textos de aviso */
+.warning-text {
+  font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+  color: #d97706; /* Amber-600 */
+  font-weight: 500;
+  margin-top: 0.25rem;
+}
+
+/* =================================
+   BADGES E STATUS
+   ================================= */
+
+.badge {
+  font-size: clamp(0.6875rem, 1.2vw, 0.75rem);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.375rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* =================================
+   BOTÕES E INTERAÇÃO
+   ================================= */
+
+.btn-text {
+  font-size: clamp(0.875rem, 2vw, 1rem);
+  font-weight: 500;
+  letter-spacing: 0.025em;
+}
+
+.btn-text-sm {
+  font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+  font-weight: 500;
+  letter-spacing: 0.025em;
+}
+
+.btn-text-lg {
+  font-size: clamp(1rem, 2.5vw, 1.125rem);
+  font-weight: 600;
+  letter-spacing: 0.025em;
+}
+
+/* =================================
+   NAVEGAÇÃO E MENU
+   ================================= */
+
+.nav-link {
+  font-size: clamp(0.875rem, 2vw, 1rem);
+  font-weight: 500;
+  color: #6b7280;
+  transition: color 0.2s ease;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  color: #2563eb; /* Blue-600 */
+}
+
+.nav-title {
+  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  font-weight: 700;
+  color: #111827;
+}
+
+/* =================================
+   TABELAS E DADOS
+   ================================= */
+
+.table-header {
+  font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.table-cell {
+  font-size: clamp(0.875rem, 2vw, 1rem);
+  color: #1f2937;
+  line-height: 1.5;
+}
+
+.table-cell-numeric {
+  font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+  font-size: clamp(0.875rem, 2vw, 1rem);
+  font-weight: 500;
+  color: #1f2937;
+}
+
+/* =================================
+   CARDS E PAINÉIS
+   ================================= */
+
+.card-title {
+  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.5rem;
+  line-height: 1.3;
+}
+
+.card-subtitle {
+  font-size: clamp(0.875rem, 2vw, 1rem);
+  color: #6b7280;
+  font-weight: 400;
+  margin-bottom: 1rem;
+}
+
+.card-content {
+  font-size: clamp(0.875rem, 2vw, 1rem);
+  line-height: 1.6;
+  color: #374151;
+}
+
+/* =================================
+   DASHBOARD E MÉTRICAS
+   ================================= */
+
+.metric-value {
+  font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.1;
+}
+
+.metric-label {
+  font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.metric-change {
+  font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+  font-weight: 600;
+}
+
+.metric-change.positive { color: #16a34a; }
+.metric-change.negative { color: #dc2626; }
+.metric-change.neutral { color: #6b7280; }
+
+/* =================================
+   CÓDIGO E MONOSPACE
+   ================================= */
+
+code, pre, .code {
+  font-family: 'JetBrains Mono', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+  color: #1f2937;
+  background-color: #f3f4f6;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+}
+
+pre {
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  line-height: 1.6;
+}
+
+/* =================================
+   RESPONSIVIDADE ESPECÍFICA
+   ================================= */
+
+/* Mobile First - Otimizações para telas pequenas */
+@media (max-width: 640px) {
+  .mobile-text-sm {
+    font-size: 0.875rem !important;
+  }
+  
+  .mobile-hide-text {
+    font-size: 0 !important;
+    overflow: hidden;
+  }
+  
+  .mobile-compact {
+    line-height: 1.3 !important;
+  }
+}
+
+/* Tablet - Ajustes para telas médias */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .tablet-text-md {
+    font-size: 1rem !important;
+  }
+}
+
+/* Desktop - Otimizações para telas grandes */
+@media (min-width: 1025px) {
+  .desktop-text-lg {
+    font-size: 1.125rem !important;
+  }
+  
+  .desktop-comfortable {
+    line-height: 1.7 !important;
+  }
+}
+
+/* =================================
+   ACESSIBILIDADE
+   ================================= */
+
+/* Melhora a legibilidade para usuários com dislexia */
+.dyslexia-friendly {
+  font-family: 'OpenDyslexic', 'Inter', sans-serif;
+  letter-spacing: 0.05em;
+  word-spacing: 0.1em;
+  line-height: 1.8;
+}
+
+/* Suporte para modo de alto contraste */
+@media (prefers-contrast: high) {
+  body {
+    color: #000000;
+  }
+  
+  .text-muted {
+    color: #333333 !important;
+  }
+}
+
+/* Suporte para preferência de movimento reduzido */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* =================================
+   MODO ESCURO - DESABILITADO TEMPORARIAMENTE
+   Nota: Removido detecção automática que estava causando texto invisível
+   ================================= */
+
+/* 
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #111827;
+    color: #f9fafb;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    color: #ffffff;
+  }
+  
+  .text-muted,
+  .form-label {
+    color: #d1d5db;
+  }
+  
+  .form-input {
+    background-color: #374151;
+    color: #f9fafb;
+    border-color: #4b5563;
+  }
+  
+  .form-input::placeholder {
+    color: #9ca3af;
+  }
+}
+*/
+
+/* Modo escuro manual - quando ativamente selecionado */
+[data-theme="dark"] body {
+  background-color: #111827;
+  color: #f9fafb;
+}
+
+[data-theme="dark"] h1, 
+[data-theme="dark"] h2, 
+[data-theme="dark"] h3, 
+[data-theme="dark"] h4, 
+[data-theme="dark"] h5, 
+[data-theme="dark"] h6 {
+  color: #ffffff;
+}
+
+[data-theme="dark"] .text-muted,
+[data-theme="dark"] .form-label {
+  color: #d1d5db;
+}
+
+[data-theme="dark"] .form-input,
+[data-theme="dark"] .input-field {
+  background-color: #374151;
+  color: #f9fafb;
+  border-color: #4b5563;
+}
+
+[data-theme="dark"] .form-input::placeholder,
+[data-theme="dark"] .input-field::placeholder {
+  color: #9ca3af;
+}
+
+/* =================================
+   UTILIDADES ESPECIAIS
+   ================================= */
+
+/* Truncate text with ellipsis */
+.text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Quebra de texto inteligente */
+.text-break {
+  word-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+  overflow-wrap: break-word;
+}
+
+/* Texto responsivo que se adapta ao container */
+.text-fluid {
+  font-size: clamp(0.75rem, 2.5vw, 1.25rem);
+  line-height: 1.5;
+}
+
+/* Texto de destaque */
+.text-highlight {
+  background: linear-gradient(120deg, #a7f3d0 0%, #a7f3d0 100%);
+  background-repeat: no-repeat;
+  background-size: 100% 0.2em;
+  background-position: 0 88%;
+  padding: 0.125rem 0;
+}
+
+/* =================================
+   PERFORMANCE
+   ================================= */
+
+/* Otimização de rendering para textos longos */
+.text-optimized {
+  contain: layout style;
+  will-change: auto;
+}
+
+/* Preload crítico para fontes */
+.font-preload {
+  font-display: swap;
+}

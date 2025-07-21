@@ -2,18 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import './styles/typography.css';
 @import './styles/accessibility.css';
 @import './styles/themes.css';
+@import './styles/responsive.css';
+@import './styles/fix-input-visibility.css';
 
-/* Estilos globais */
+/* Estilos globais modernos */
 body {
   margin: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* A tipografia agora é gerenciada pelo typography.css */
 }
 
 code {
@@ -44,6 +42,8 @@ code {
 
 .input-field {
   @apply w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200;
+  color: #111827 !important; /* Gray-900 - garantia de texto visível */
+  background-color: #ffffff !important; /* Fundo branco sempre */
 }
 
 .card {

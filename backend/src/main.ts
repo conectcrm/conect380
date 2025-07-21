@@ -32,7 +32,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);
 
-  const port = process.env.APP_PORT || 3001;
+  const port = process.env.APP_PORT || 3002;
   await app.listen(port);
   
   console.log(`🔥 Fênix CRM Backend rodando na porta ${port}`);

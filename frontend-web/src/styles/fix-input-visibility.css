@@ -1,0 +1,168 @@
+/* 
+ * CORREÇÃO URGENTE: Visibilidade de Texto em Inputs
+ * Arquivo: fix-input-visibility.css
+ * 
+ * Este arquivo corrige o problema de texto branco (invisível) nos campos de input
+ * onde o texto aparece na mesma cor do fundo, tornando-se ilegível.
+ */
+
+/* =================================
+   CORREÇÃO GLOBAL PARA INPUTS
+   ================================= */
+
+/* Força cor escura em todos os inputs para garantir visibilidade */
+input[type="text"],
+input[type="email"], 
+input[type="password"],
+input[type="number"],
+input[type="tel"],
+input[type="url"],
+input[type="search"],
+textarea,
+select {
+  color: #111827 !important; /* Gray-900 - texto escuro */
+  background-color: #ffffff !important; /* Fundo branco */
+}
+
+/* Garante visibilidade em inputs com classes específicas */
+.input-field,
+.form-input {
+  color: #111827 !important; /* Gray-900 - texto escuro */
+  background-color: #ffffff !important; /* Fundo branco */
+}
+
+/* Placeholder com cor adequada */
+input::placeholder,
+textarea::placeholder {
+  color: #6b7280 !important; /* Gray-500 - visível mas não muito forte */
+  opacity: 1;
+}
+
+/* =================================
+   CORREÇÃO PARA MODO ESCURO MANUAL
+   ================================= */
+
+/* Se modo escuro for aplicado manualmente, sobrescreve as cores */
+[data-theme="dark"] input[type="text"],
+[data-theme="dark"] input[type="email"], 
+[data-theme="dark"] input[type="password"],
+[data-theme="dark"] input[type="number"],
+[data-theme="dark"] input[type="tel"],
+[data-theme="dark"] input[type="url"],
+[data-theme="dark"] input[type="search"],
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  color: #f9fafb !important; /* Gray-50 - texto claro */
+  background-color: #374151 !important; /* Gray-700 - fundo escuro */
+  border-color: #4b5563 !important; /* Gray-600 */
+}
+
+[data-theme="dark"] .input-field,
+[data-theme="dark"] .form-input {
+  color: #f9fafb !important; /* Gray-50 - texto claro */
+  background-color: #374151 !important; /* Gray-700 - fundo escuro */
+  border-color: #4b5563 !important; /* Gray-600 */
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: #9ca3af !important; /* Gray-400 */
+}
+
+/* =================================
+   CORREÇÃO PARA SELECTS ESPECÍFICOS
+   ================================= */
+
+/* SelectField customizado */
+.select-field select,
+.select-field > select {
+  color: #111827 !important; /* Gray-900 - texto escuro */
+  background-color: #ffffff !important; /* Fundo branco */
+}
+
+[data-theme="dark"] .select-field select,
+[data-theme="dark"] .select-field > select {
+  color: #f9fafb !important; /* Gray-50 - texto claro */
+  background-color: #374151 !important; /* Gray-700 - fundo escuro */
+}
+
+/* =================================
+   CORREÇÃO PARA REACT-HOOK-FORM
+   ================================= */
+
+/* Inputs controlados pelo React Hook Form */
+input[data-testid],
+input[aria-invalid],
+textarea[aria-invalid] {
+  color: #111827 !important; /* Gray-900 */
+  background-color: #ffffff !important; /* Fundo branco */
+}
+
+[data-theme="dark"] input[data-testid],
+[data-theme="dark"] input[aria-invalid],
+[data-theme="dark"] textarea[aria-invalid] {
+  color: #f9fafb !important; /* Gray-50 */
+  background-color: #374151 !important; /* Gray-700 */
+}
+
+/* =================================
+   CORREÇÃO PARA ESTADOS DE ERRO
+   ================================= */
+
+/* Inputs com erro mantêm texto visível */
+input.error,
+input[aria-invalid="true"],
+textarea.error,
+textarea[aria-invalid="true"] {
+  color: #111827 !important; /* Mantém texto visível mesmo com erro */
+  background-color: #fef2f2 !important; /* Fundo levemente vermelho */
+  border-color: #dc2626 !important; /* Borda vermelha */
+}
+
+[data-theme="dark"] input.error,
+[data-theme="dark"] input[aria-invalid="true"],
+[data-theme="dark"] textarea.error,
+[data-theme="dark"] textarea[aria-invalid="true"] {
+  color: #f9fafb !important; /* Texto claro */
+  background-color: #431d1d !important; /* Fundo escuro com tom vermelho */
+  border-color: #dc2626 !important; /* Borda vermelha */
+}
+
+/* =================================
+   CORREÇÃO PARA FOCUS
+   ================================= */
+
+/* Garante visibilidade durante o focus */
+input:focus,
+textarea:focus,
+select:focus {
+  color: #111827 !important; /* Texto sempre visível */
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] textarea:focus,
+[data-theme="dark"] select:focus {
+  color: #f9fafb !important; /* Texto claro no modo escuro */
+}
+
+/* =================================
+   OBSERVAÇÕES TÉCNICAS
+   ================================= */
+
+/*
+ * PROBLEMA IDENTIFICADO:
+ * - O CSS do modo escuro (@media (prefers-color-scheme: dark)) estava sendo aplicado
+ * - Inputs não tinham cor de texto definida explicitamente
+ * - Herança CSS estava causando texto branco em fundo branco
+ * 
+ * SOLUÇÃO IMPLEMENTADA:
+ * - Força cores específicas com !important
+ * - Cobre todos os tipos de input
+ * - Inclui suporte para modo escuro manual
+ * - Mantém acessibilidade e legibilidade
+ * 
+ * COMO USAR:
+ * - Importar este arquivo no index.css após os outros imports
+ * - Testar em navegadores que detectam modo escuro automaticamente
+ * - Verificar se componentes customizados funcionam corretamente
+ */

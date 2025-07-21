@@ -12,7 +12,7 @@ END $$;
 INSERT INTO empresas (id, nome, slug, cnpj, email, telefone, endereco, cidade, estado, cep, created_at, updated_at)
 VALUES (
     '00000000-0000-0000-0000-000000000001',
-    'Fênix CRM Empresa Demo',
+    'Fênix CRM Demo',
     'fenix-crm-demo',
     '00.000.000/0001-00',
     'contato@fenixcrm.com',

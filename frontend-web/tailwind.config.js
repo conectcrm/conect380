@@ -70,6 +70,27 @@ module.exports = {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Consolas', 'Monaco', 'monospace'],
+      },
+      fontSize: {
+        'xs': ['0.75rem', { lineHeight: '1.4' }],
+        'sm': ['0.875rem', { lineHeight: '1.5' }],
+        'base': ['1rem', { lineHeight: '1.6' }],
+        'lg': ['1.125rem', { lineHeight: '1.6' }],
+        'xl': ['1.25rem', { lineHeight: '1.4' }],
+        '2xl': ['1.5rem', { lineHeight: '1.3' }],
+        '3xl': ['1.875rem', { lineHeight: '1.25' }],
+        '4xl': ['2.25rem', { lineHeight: '1.2' }],
+        '5xl': ['3rem', { lineHeight: '1.1' }],
+        '6xl': ['3.75rem', { lineHeight: '1' }],
+        // Tamanhos fluidos para responsividade
+        'fluid-xs': 'clamp(0.6875rem, 1.2vw, 0.75rem)',
+        'fluid-sm': 'clamp(0.75rem, 1.5vw, 0.875rem)',
+        'fluid-base': 'clamp(0.875rem, 2vw, 1rem)',
+        'fluid-lg': 'clamp(1rem, 2.5vw, 1.125rem)',
+        'fluid-xl': 'clamp(1.25rem, 3vw, 1.5rem)',
+        'fluid-2xl': 'clamp(1.5rem, 4vw, 2rem)',
+        'fluid-3xl': 'clamp(1.75rem, 5vw, 2.5rem)',
       },
       spacing: {
         '18': '4.5rem',

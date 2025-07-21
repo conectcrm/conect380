@@ -28,15 +28,9 @@ export const ResponsiveFilters: React.FC<ResponsiveFiltersProps> = ({
     );
   };
 
-  const handleFilterChange = (filterType: string, value: string) => {
-    setFiltros({ ...filtros, [filterType]: value });
-    announceToScreenReader(`Filtro ${filterType} alterado para ${value}`, 'polite');
-  };
-
   return (
     <section 
       className="bg-white rounded-lg shadow-sm border mb-4 sm:mb-6"
-      role="region"
       aria-label="Filtros do dashboard"
     >
       {/* Mobile Toggle */}

@@ -100,9 +100,13 @@ const LoginPage: React.FC = () => {
               </div>
 
               <div className="text-sm">
-                <a href="#" className="font-medium text-primary-600 hover:text-primary-500">
+                <button 
+                  type="button"
+                  onClick={() => {/* TODO: Implementar recuperação de senha */}}
+                  className="font-medium text-primary-600 hover:text-primary-500 focus:outline-none focus:underline"
+                >
                   {t('auth.forgotPassword')}
-                </a>
+                </button>
               </div>
             </div>
 

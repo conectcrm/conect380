@@ -3,15 +3,11 @@ import { useI18n } from '../../contexts/I18nContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { KPICard } from '../../components/common/KPICard';
 import { ResponsiveFilters } from '../../components/common/ResponsiveFilters';
-import { ResponsiveDashboardLayout } from '../../components/layout/ResponsiveDashboardLayout';
 import ColorPaletteSelector from '../../components/common/ColorPaletteSelector';
-import LanguageSelector from '../../components/common/LanguageSelector';
 import { 
-  Plus, AlertTriangle, Activity, Target,
-  Calendar, Bell, Users, FileText, DollarSign,
-  TrendingUp, UserPlus, BarChart3, ChevronRight,
-  Palette, Filter, ArrowUp, CheckSquare, Clock,
-  Eye, Edit
+  AlertTriangle, Activity, Target, Users, FileText, DollarSign,
+  TrendingUp, UserPlus, BarChart3, ChevronRight, Filter, ArrowUp, 
+  CheckSquare, Clock, Eye, Edit, Plus, Calendar, Bell
 } from 'lucide-react';
 
 const DashboardPage: React.FC = () => {
@@ -25,8 +21,6 @@ const DashboardPage: React.FC = () => {
   });
 
   const [showPaletteSelector, setShowPaletteSelector] = useState(false);
-  const [showLanguageSelector, setShowLanguageSelector] = useState(false);
-  
   const [loading, setLoading] = useState(false);
 
   // Dados estáticos para demonstração
@@ -102,42 +96,7 @@ const DashboardPage: React.FC = () => {
   }
 
   return (
-    <ResponsiveDashboardLayout
-      title={t('dashboard.title')}
-      subtitle={t('dashboard.subtitle')}
-      actions={
-        <>
-          <LanguageSelector />
-          <button 
-            onClick={() => setShowPaletteSelector(true)}
-            className="px-3 py-2 sm:px-4 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-sm transition-colors"
-            title={t('dashboard.themes')}
-          >
-            <Palette className="w-4 h-4" />
-            <span className="hidden sm:inline">{t('dashboard.themes')}</span>
-          </button>
-          <button className="px-3 py-2 sm:px-4 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-sm">
-            <Calendar className="w-4 h-4" />
-            <span className="hidden sm:inline">{t('dashboard.schedule')}</span>
-          </button>
-          <button 
-            className="px-3 py-2 sm:px-4 rounded-lg text-white flex items-center gap-2 text-sm transition-colors"
-            style={{ 
-              backgroundColor: currentPalette.colors.primary,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = currentPalette.colors.primaryHover;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = currentPalette.colors.primary;
-            }}
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">{t('dashboard.newProposal')}</span>
-          </button>
-        </>
-      }
-    >
+    <div className="p-6">
       {/* Filtros */}
       <ResponsiveFilters filtros={filtros} setFiltros={setFiltros} />
       
@@ -1099,15 +1058,7 @@ const DashboardPage: React.FC = () => {
           onClose={() => setShowPaletteSelector(false)}
         />
       )}
-      
-      {/* Modal de Seleção de Idioma */}
-      {showLanguageSelector && (
-        <LanguageSelector 
-          showAsModal={true}
-          onClose={() => setShowLanguageSelector(false)}
-        />
-      )}
-    </ResponsiveDashboardLayout>
+    </div>
   );
 };
 
