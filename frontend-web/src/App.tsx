@@ -7,6 +7,8 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { I18nProvider } from './contexts/I18nContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import LoginPage from './features/auth/LoginPage';
+import RegistroEmpresaPage from './features/auth/RegistroEmpresaPage';
+import VerificacaoEmailPage from './features/auth/VerificacaoEmailPage';
 import DashboardLayout from './components/layout/DashboardLayout';
 import DashboardPage from './features/dashboard/DashboardPage';
 import ClientesPage from './features/clientes/ClientesPage';
@@ -197,6 +199,8 @@ const AppRoutes: React.FC = () => {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/registro" element={<RegistroEmpresaPage />} />
+      <Route path="/verificar-email" element={<VerificacaoEmailPage />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
