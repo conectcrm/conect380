@@ -11,6 +11,14 @@ interface Cliente {
   tipoPessoa: 'fisica' | 'juridica';
 }
 
+interface Vendedor {
+  id: string;
+  nome: string;
+  email: string;
+  tipo: 'vendedor' | 'gerente' | 'admin';
+  ativo: boolean;
+}
+
 interface Produto {
   id: string;
   nome: string;
@@ -18,6 +26,10 @@ interface Produto {
   categoria: string;
   descricao?: string;
   unidade: string;
+  tipo?: 'produto' | 'combo'; // Novo campo para distinguir produto de combo
+  produtosCombo?: Produto[]; // Para combos, lista dos produtos inclusos
+  precoOriginal?: number; // Para combos, preço original antes do desconto
+  desconto?: number; // Para combos, percentual de desconto
 }
 
 interface ProdutoProposta {
@@ -28,6 +40,8 @@ interface ProdutoProposta {
 }
 
 interface PropostaFormData {
+  titulo?: string; // Novo campo opcional para título da proposta
+  vendedor: Vendedor | null; // Novo campo obrigatório para vendedor responsável
   cliente: Cliente | null;
   produtos: ProdutoProposta[];
   descontoGlobal: number;
@@ -54,6 +68,242 @@ interface PropostaCompleta extends PropostaFormData {
 class PropostasService {
   private baseUrl = '/api/propostas';
   private propostas: PropostaCompleta[] = []; // Armazenamento em memória para simulação
+
+  // Método para obter produtos do sistema
+  async obterProdutos(): Promise<Produto[]> {
+    // Simular delay de API
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    const todosProdutos: Produto[] = [];
+    
+    try {
+      // 1. Carregar produtos individuais do backend
+      const { produtosService } = await import('../../../services/produtosService');
+      
+      const produtosAPI = await produtosService.findAll();
+      
+      if (produtosAPI && produtosAPI.length > 0) {
+        console.log('📦 Produtos individuais carregados do backend:', produtosAPI.length);
+        
+        // Converter produtos da API para o formato de propostas
+        const produtosFormatados: Produto[] = produtosAPI.map((produto: any) => ({
+          id: produto.id || `prod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          nome: produto.nome || 'Produto sem nome',
+          preco: produto.preco || 0,
+          categoria: produto.categoria || 'Geral',
+          descricao: produto.descricao || '',
+          unidade: produto.unidadeMedida || 'unidade',
+          tipo: 'produto'
+        }));
+        
+        todosProdutos.push(...produtosFormatados);
+      }
+    } catch (error) {
+      console.warn('Erro ao carregar produtos do backend:', error);
+    }
+    
+    try {
+      // 2. Carregar combos disponíveis
+      const { combosService } = await import('../../../services/combosService');
+      
+      const combosAPI = await combosService.listarCombos();
+      
+      if (combosAPI && combosAPI.length > 0) {
+        console.log('🎁 Combos carregados:', combosAPI.length);
+        
+        // Converter combos para formato de produtos de proposta
+        const combosFormatados: Produto[] = combosAPI
+          .filter(combo => combo.status === 'ativo') // Apenas combos ativos
+          .map((combo: any) => ({
+            id: `combo_${combo.id}`,
+            nome: `${combo.nome} (Combo)`,
+            preco: combo.precoCombo || combo.precoOriginal,
+            categoria: `Combos - ${combo.categoria}`,
+            descricao: `${combo.descricao} | Desconto: ${combo.desconto.toFixed(1)}% | Produtos: ${combo.produtos.map((p: any) => p.produto.nome).join(', ')}`,
+            unidade: 'pacote',
+            tipo: 'combo',
+            precoOriginal: combo.precoOriginal,
+            desconto: combo.desconto,
+            produtosCombo: combo.produtos.map((produtoCombo: any) => ({
+              id: produtoCombo.produto.id,
+              nome: produtoCombo.produto.nome,
+              preco: produtoCombo.produto.preco,
+              categoria: produtoCombo.produto.categoria,
+              descricao: produtoCombo.produto.descricao,
+              unidade: produtoCombo.produto.unidade,
+              quantidade: produtoCombo.quantidade
+            }))
+          }));
+        
+        todosProdutos.push(...combosFormatados);
+      }
+    } catch (error) {
+      console.warn('Erro ao carregar combos:', error);
+    }
+    
+    
+    // 3. Se não há produtos do backend, tentar localStorage como fallback
+    if (todosProdutos.length === 0) {
+      try {
+        const produtosSalvos = localStorage.getItem('fenixcrm_produtos');
+        if (produtosSalvos) {
+          const produtosParsed = JSON.parse(produtosSalvos);
+          console.log('📦 Produtos carregados do localStorage (fallback):', produtosParsed.length);
+          
+          // Converter produtos do formato do sistema para o formato de propostas
+          const produtosFormatados: Produto[] = produtosParsed.map((produto: any) => ({
+            id: produto.id || `prod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            nome: produto.nome || 'Produto sem nome',
+            preco: produto.preco || produto.precoUnitario || 0,
+            categoria: produto.categoria || 'Geral',
+            descricao: produto.descricao || '',
+            unidade: produto.unidadeMedida || produto.unidade || 'unidade',
+            tipo: 'produto'
+          }));
+          
+          todosProdutos.push(...produtosFormatados);
+        }
+      } catch (error) {
+        console.warn('Erro ao carregar produtos do localStorage:', error);
+      }
+    }
+    
+    // 4. Se ainda não há produtos, usar mock data
+    if (todosProdutos.length === 0) {
+      const produtosMock: Produto[] = [
+        {
+          id: 'soft1',
+          nome: 'Sistema ERP - Licença Básica',
+          preco: 2500.00,
+          categoria: 'Software',
+          descricao: 'Sistema de gestão empresarial básico',
+          unidade: 'licença',
+          tipo: 'produto'
+        },
+        {
+          id: 'soft2',
+          nome: 'Sistema ERP - Licença Premium',
+          preco: 4500.00,
+          categoria: 'Software',
+          descricao: 'Sistema de gestão empresarial completo',
+          unidade: 'licença',
+          tipo: 'produto'
+        },
+        {
+          id: 'cons1',
+          nome: 'Consultoria Gestão Empresarial',
+          preco: 300.00,
+          categoria: 'Consultoria',
+          descricao: 'Consultoria especializada em gestão',
+          unidade: 'hora',
+          tipo: 'produto'
+        },
+        {
+          id: 'combo1',
+          nome: 'Pacote Startup (Combo)',
+          preco: 750.00,
+          categoria: 'Combos - Startup',
+          descricao: 'ERP Básico + 8h Consultoria | Desconto: 16.6% | Economia: R$ 149,00',
+          unidade: 'pacote',
+          tipo: 'combo',
+          precoOriginal: 899.00,
+          desconto: 16.6
+        }
+      ];
+      
+      console.log('📦 Usando produtos mock (nenhum produto cadastrado encontrado)');
+      todosProdutos.push(...produtosMock);
+    }
+    
+    console.log(`🎯 Total de itens disponíveis: ${todosProdutos.length} (${todosProdutos.filter(p => p.tipo === 'produto').length} produtos + ${todosProdutos.filter(p => p.tipo === 'combo').length} combos)`);
+    return todosProdutos;
+    
+    // Em produção: fazer chamada para API
+    // const response = await fetch('/api/produtos');
+    // return response.json();
+  }
+
+  // Método para obter vendedores (simulação)
+  async obterVendedores(): Promise<Vendedor[]> {
+    // Simular delay de API
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Dados simulados de vendedores
+    const vendedores: Vendedor[] = [
+      {
+        id: 'vend_001',
+        nome: 'Carlos Silva',
+        email: 'carlos.silva@fenixcrm.com',
+        tipo: 'vendedor',
+        ativo: true
+      },
+      {
+        id: 'vend_002',
+        nome: 'Ana Costa',
+        email: 'ana.costa@fenixcrm.com',
+        tipo: 'vendedor',
+        ativo: true
+      },
+      {
+        id: 'vend_003',
+        nome: 'Roberto Santos',
+        email: 'roberto.santos@fenixcrm.com',
+        tipo: 'gerente',
+        ativo: true
+      },
+      {
+        id: 'vend_004',
+        nome: 'Maria Oliveira',
+        email: 'maria.oliveira@fenixcrm.com',
+        tipo: 'vendedor',
+        ativo: true
+      },
+      {
+        id: 'vend_005',
+        nome: 'João Pereira',
+        email: 'joao.pereira@fenixcrm.com',
+        tipo: 'admin',
+        ativo: true
+      }
+    ];
+
+    // Em produção: fazer chamada para API
+    // const response = await fetch('/api/vendedores');
+    // return response.json();
+
+    return vendedores.filter(v => v.ativo);
+  }
+
+  // Método para obter vendedor atual (usuário logado)
+  async obterVendedorAtual(): Promise<Vendedor | null> {
+    // Simular delay de API
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    // Simulação do usuário logado - em produção, pegar do contexto de autenticação
+    const vendedorAtual: Vendedor = {
+      id: 'vend_001',
+      nome: 'Carlos Silva',
+      email: 'carlos.silva@fenixcrm.com',
+      tipo: 'vendedor',
+      ativo: true
+    };
+
+    // Em produção: pegar do token JWT ou contexto de auth
+    // const response = await fetch('/api/auth/me');
+    // return response.json();
+
+    return vendedorAtual;
+  }
+
+  // Método para gerar título automático da proposta
+  gerarTituloAutomatico(cliente: Cliente | null): string {
+    if (!cliente) {
+      return `Nova Proposta - ${new Date().toLocaleDateString('pt-BR')}`;
+    }
+    
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
+    return `${cliente.nome} - ${dataAtual}`;
+  }
 
   async criarProposta(dados: PropostaCompleta): Promise<PropostaCompleta> {
     // Simular delay de API
@@ -233,6 +483,10 @@ class PropostasService {
       erros.push('Cliente é obrigatório');
     }
 
+    if (!dados.vendedor) {
+      erros.push('Vendedor responsável é obrigatório');
+    }
+
     if (!dados.produtos || dados.produtos.length === 0) {
       erros.push('Pelo menos um produto deve ser adicionado');
     }
@@ -255,4 +509,4 @@ export const propostasService = new PropostasService();
 export default propostasService;
 
 // Exportar tipos para uso em outras partes da aplicação
-export type { Cliente, Produto, ProdutoProposta, PropostaFormData, PropostaCompleta };
+export type { Cliente, Vendedor, Produto, ProdutoProposta, PropostaFormData, PropostaCompleta };

@@ -22,6 +22,15 @@ export interface ProdutoSelecionado {
   subtotal: number;
 }
 
+export interface ProdutoProposta {
+  id: string;
+  nome: string;
+  categoria: string;
+  preco: number;
+  unidade: string;
+  disponivel: boolean;
+}
+
 export interface Proposta {
   id?: string;
   numero?: string;
@@ -77,6 +86,34 @@ export interface PropostaEstatisticas {
 
 class PropostasService {
   private baseURL = '/propostas';
+
+  // Produtos mock como fallback
+  private produtosMock: ProdutoProposta[] = [
+    {
+      id: 'mock-1',
+      nome: 'Sistema ERP',
+      categoria: 'Software',
+      preco: 2500.00,
+      unidade: 'licença',
+      disponivel: true
+    },
+    {
+      id: 'mock-2',
+      nome: 'Consultoria em TI',
+      categoria: 'Serviços',
+      preco: 5000.00,
+      unidade: 'hora',
+      disponivel: true
+    },
+    {
+      id: 'mock-3',
+      nome: 'Suporte Técnico',
+      categoria: 'Serviços',
+      preco: 150.00,
+      unidade: 'hora',
+      disponivel: true
+    }
+  ];
 
   // Listar propostas com filtros
   async findAll(filters?: PropostaFilters): Promise<Proposta[]> {
@@ -288,6 +325,72 @@ class PropostasService {
       observacoes: data.observacoes,
       incluirImpostosPDF: data.incluirImpostosPDF || false
     };
+  }
+
+  // Método para obter produtos disponíveis do backend
+  async obterProdutos(): Promise<ProdutoProposta[]> {
+    try {
+      // Tentar importar o serviço de produtos dinamicamente
+      const { produtosService } = await import('./produtosService');
+      
+      // Buscar produtos do backend
+      const produtosAPI = await produtosService.findAll();
+      
+      if (produtosAPI && produtosAPI.length > 0) {
+        // Converter formato da API para formato da proposta
+        const produtosConvertidos = produtosAPI.map((produto: any) => ({
+          id: produto.id,
+          nome: produto.nome,
+          categoria: produto.categoria,
+          preco: produto.preco,
+          unidade: produto.unidadeMedida || 'unidade',
+          disponivel: produto.status === 'ativo'
+        }));
+        
+        return produtosConvertidos;
+      }
+      
+      // Fallback: tentar localStorage se backend falhar
+      const produtosSalvos = localStorage.getItem('fenixcrm_produtos');
+      if (produtosSalvos) {
+        const produtos = JSON.parse(produtosSalvos);
+        const produtosConvertidos = produtos.map((produto: any) => ({
+          id: produto.id,
+          nome: produto.nome,
+          categoria: produto.categoria,
+          preco: produto.preco || produto.precoUnitario,
+          unidade: produto.unidadeMedida || 'unidade',
+          disponivel: produto.status === 'ativo' || produto.status === true
+        }));
+        return [...produtosConvertidos, ...this.produtosMock];
+      }
+      
+      // Retornar apenas produtos mock se não houver produtos
+      return this.produtosMock;
+    } catch (error) {
+      console.error('Erro ao carregar produtos:', error);
+      
+      // Fallback para localStorage em caso de erro
+      try {
+        const produtosSalvos = localStorage.getItem('fenixcrm_produtos');
+        if (produtosSalvos) {
+          const produtos = JSON.parse(produtosSalvos);
+          const produtosConvertidos = produtos.map((produto: any) => ({
+            id: produto.id,
+            nome: produto.nome,
+            categoria: produto.categoria,
+            preco: produto.preco || produto.precoUnitario,
+            unidade: produto.unidadeMedida || 'unidade',
+            disponivel: produto.status === 'ativo' || produto.status === true
+          }));
+          return [...produtosConvertidos, ...this.produtosMock];
+        }
+      } catch (localStorageError) {
+        console.error('Erro ao acessar localStorage:', localStorageError);
+      }
+      
+      return this.produtosMock;
+    }
   }
 }
 

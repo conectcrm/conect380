@@ -1,0 +1,343 @@
+/* =============================================================================
+   AJUSTES GLOBAIS DE RESPONSIVIDADE E LEGIBILIDADE
+   =============================================================================
+   
+   Este arquivo contém melhorias globais para:
+   - Fontes mais compactas e legíveis
+   - Responsividade de tabelas e modais
+   - Tratamento de texto longo
+   - Layout otimizado para diferentes telas
+*/
+
+/* 1. VARIÁVEIS DE FONTE E CORES
+   ========================================================================= */
+:root {
+  --font-base: 14px;
+  --font-secondary: 12px;
+  --color-text-secondary: #666;
+  --color-text-muted: #777;
+  --modal-max-height: 90vh;
+  --table-padding: 8px 12px;
+  --ellipsis-max-width: 200px;
+}
+
+/* 2. AJUSTES PARA MODAIS
+   ========================================================================= */
+.modal-content {
+  font-size: var(--font-base);
+}
+
+.modal-content .subtext,
+.modal-content .label,
+.modal-content small,
+.modal-content .text-sm {
+  font-size: var(--font-secondary) !important;
+  color: var(--color-text-secondary);
+}
+
+/* Modal com altura dinâmica */
+.modal,
+.modal-overlay {
+  max-height: var(--modal-max-height);
+  overflow-y: auto;
+}
+
+/* Melhor espaçamento em modais */
+.modal-body {
+  padding: 1rem;
+}
+
+.modal-body h3,
+.modal-body h4 {
+  margin-bottom: 0.75rem;
+  font-size: 1.1rem;
+}
+
+/* 3. TABELAS DE PROPOSTAS E CARDS
+   ========================================================================= */
+.table-propostas {
+  font-size: var(--font-base);
+  table-layout: auto;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+.table-propostas th,
+.table-propostas td {
+  padding: var(--table-padding);
+  font-size: var(--font-base);
+  vertical-align: middle;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.table-propostas th {
+  font-weight: 600;
+  background-color: #f9fafb;
+  white-space: nowrap;
+}
+
+.table-propostas td {
+  white-space: nowrap;
+}
+
+/* Informações secundárias em tabelas */
+.table-propostas td .subinfo,
+.table-propostas .text-secondary {
+  font-size: var(--font-secondary);
+  color: var(--color-text-muted);
+  display: block;
+  margin-top: 2px;
+}
+
+/* 4. LAYOUT RESPONSIVO
+   ========================================================================= */
+.table-wrapper {
+  overflow-x: auto;
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: white;
+}
+
+/* Scroll horizontal suave */
+.table-wrapper::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* 5. TEXTO LONGO COM RETICÊNCIAS
+   ========================================================================= */
+.ellipsis-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: var(--ellipsis-max-width);
+  display: inline-block;
+}
+
+/* Variações para diferentes tamanhos */
+.ellipsis-sm {
+  max-width: 120px;
+}
+
+.ellipsis-md {
+  max-width: 200px;
+}
+
+.ellipsis-lg {
+  max-width: 300px;
+}
+
+/* 6. CARDS E COMPONENTES
+   ========================================================================= */
+.card-compact {
+  padding: 0.75rem;
+}
+
+.card-compact .card-title {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.card-compact .card-subtitle {
+  font-size: var(--font-secondary);
+  color: var(--color-text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+/* 7. FORMULÁRIOS E INPUTS
+   ========================================================================= */
+.form-compact .form-label {
+  font-size: var(--font-secondary);
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.form-compact .form-input {
+  font-size: var(--font-base);
+  padding: 0.5rem 0.75rem;
+}
+
+.form-compact .form-help {
+  font-size: var(--font-secondary);
+  color: var(--color-text-secondary);
+  margin-top: 0.25rem;
+}
+
+/* 8. BADGES E TAGS
+   ========================================================================= */
+.badge-compact {
+  font-size: 11px;
+  padding: 0.25rem 0.5rem;
+  line-height: 1.2;
+}
+
+/* 9. RESPONSIVIDADE MÓVEL
+   ========================================================================= */
+@media (max-width: 768px) {
+  /* Ocultar colunas menos importantes no mobile */
+  .table-propostas .col-hide-mobile {
+    display: none;
+  }
+  
+  /* Ajustar tabelas para stack vertical no mobile */
+  .table-responsive-stack {
+    display: block;
+  }
+  
+  .table-responsive-stack thead {
+    display: none;
+  }
+  
+  .table-responsive-stack tbody,
+  .table-responsive-stack tr,
+  .table-responsive-stack td {
+    display: block;
+    width: 100%;
+  }
+  
+  .table-responsive-stack tr {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: white;
+  }
+  
+  .table-responsive-stack td {
+    border: none;
+    padding: 0.25rem 0;
+    text-align: left;
+  }
+  
+  .table-responsive-stack td:before {
+    content: attr(data-label) ": ";
+    font-weight: 600;
+    font-size: var(--font-secondary);
+    color: var(--color-text-secondary);
+  }
+  
+  /* Modais ocupam tela toda no mobile */
+  .modal-content {
+    margin: 0;
+    border-radius: 0;
+    max-height: 100vh;
+    height: 100vh;
+  }
+  
+  /* Ajustar font-base para mobile */
+  :root {
+    --font-base: 13px;
+    --font-secondary: 11px;
+  }
+}
+
+/* 10. RESPONSIVIDADE TABLET
+   ========================================================================= */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .table-propostas {
+    font-size: 13px;
+  }
+  
+  .table-propostas th,
+  .table-propostas td {
+    padding: 6px 10px;
+  }
+  
+  .ellipsis-text {
+    max-width: 150px;
+  }
+}
+
+/* 11. UTILITÁRIOS AUXILIARES
+   ========================================================================= */
+.text-truncate {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.no-wrap {
+  white-space: nowrap;
+}
+
+.wrap-text {
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.compact-spacing > * {
+  margin-bottom: 0.5rem;
+}
+
+.compact-spacing > *:last-child {
+  margin-bottom: 0;
+}
+
+/* 12. MELHORIAS ESPECÍFICAS PARA COMPONENTES EXISTENTES
+   ========================================================================= */
+   
+/* Ajustes para ModalNovaProposta */
+.modal-nova-proposta .wizard-step {
+  font-size: var(--font-base);
+}
+
+.modal-nova-proposta .product-card {
+  padding: 0.75rem;
+}
+
+.modal-nova-proposta .product-card .product-name {
+  font-size: var(--font-base);
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.modal-nova-proposta .product-card .product-description {
+  font-size: var(--font-secondary);
+  color: var(--color-text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+/* Ajustes para PropostasPage */
+.propostas-page .status-badge {
+  font-size: var(--font-secondary);
+  padding: 0.25rem 0.5rem;
+}
+
+.propostas-page .valor-proposta {
+  font-weight: 600;
+  color: #059669;
+}
+
+.propostas-page .data-proposta {
+  font-size: var(--font-secondary);
+  color: var(--color-text-muted);
+}
+
+/* Melhor contrast para leitura */
+.high-contrast {
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.medium-contrast {
+  color: #4b5563;
+}
+
+.low-contrast {
+  color: #6b7280;
+  font-size: var(--font-secondary);
+}

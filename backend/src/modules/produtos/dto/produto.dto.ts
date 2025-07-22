@@ -25,7 +25,7 @@ export class CreateProdutoDto {
 
   @IsOptional()
   @IsString()
-  @IsEnum(['produto', 'servico', 'licenca', 'modulo', 'plano'])
+  @IsEnum(['produto', 'servico', 'licenca', 'modulo', 'plano', 'aplicativo'])
   tipoItem?: string;
 
   @IsOptional()

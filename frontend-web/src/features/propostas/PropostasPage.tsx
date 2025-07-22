@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useI18n } from '../../contexts/I18nContext';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import { ModalProposta } from '../../components/modals/ModalProposta';
-import { propostasService } from './services/propostasService';
+import { ModalNovaProposta } from '../../components/modals/ModalNovaProposta';
+import { propostasService, PropostaCompleta } from './services/propostasService';
 import { 
   FileText, 
   Plus, 
@@ -24,6 +25,26 @@ import {
   TrendingUp,
   Settings
 } from 'lucide-react';
+
+// Função para converter PropostaCompleta para o formato da UI
+const converterPropostaParaUI = (proposta: PropostaCompleta) => {
+  return {
+    id: proposta.id || '',
+    numero: proposta.numero || '',
+    cliente: proposta.cliente?.nome || 'Cliente não informado',
+    cliente_contato: proposta.cliente?.email || '',
+    titulo: `Proposta para ${proposta.cliente?.nome || 'Cliente'}`,
+    valor: proposta.total || 0,
+    status: proposta.status || 'rascunho',
+    data_criacao: proposta.criadaEm ? new Date(proposta.criadaEm).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+    data_vencimento: proposta.dataValidade ? new Date(proposta.dataValidade).toISOString().split('T')[0] : '',
+    data_aprovacao: proposta.status === 'aprovada' ? new Date().toISOString().split('T')[0] : null,
+    vendedor: 'Sistema',
+    descricao: proposta.observacoes || `Proposta com ${proposta.produtos?.length || 0} produtos`,
+    probabilidade: proposta.status === 'aprovada' ? 100 : proposta.status === 'enviada' ? 70 : proposta.status === 'rejeitada' ? 0 : 30,
+    categoria: 'proposta'
+  };
+};
 
 // Dados mock para desenvolvimento
 const mockPropostas = [
@@ -104,6 +125,7 @@ const PropostasPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingCreate, setIsLoadingCreate] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showWizardModal, setShowWizardModal] = useState(false);
 
   // Carregar propostas reais do serviço
   useEffect(() => {
@@ -118,22 +140,7 @@ const PropostasPage: React.FC = () => {
         
         if (propostasReais && propostasReais.length > 0) {
           // Converter formato do serviço para formato da interface
-          const propostasFormatadas = propostasReais.map(proposta => ({
-            id: proposta.id || '',
-            numero: proposta.numero || '',
-            cliente: proposta.cliente?.nome || 'Cliente não informado',
-            cliente_contato: proposta.cliente?.nome || '',
-            titulo: 'Proposta ' + (proposta.numero || proposta.id || 'N/A'),
-            valor: proposta.total || 0,
-            status: proposta.status as any || 'rascunho',
-            data_criacao: proposta.criadaEm ? new Date(proposta.criadaEm).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-            data_vencimento: proposta.dataValidade ? new Date(proposta.dataValidade).toISOString().split('T')[0] : '',
-            data_aprovacao: null,
-            vendedor: 'Sistema',
-            descricao: proposta.observacoes || 'Proposta criada via sistema',
-            probabilidade: 50,
-            categoria: 'geral'
-          }));
+          const propostasFormatadas = propostasReais.map(converterPropostaParaUI);
           
           // Combinar propostas reais com propostas mock
           const todasPropostas = [...propostasFormatadas, ...mockPropostas];
@@ -386,13 +393,15 @@ const PropostasPage: React.FC = () => {
                 <Download className="w-4 h-4" />
                 Exportar
               </button>
-            <button 
-              onClick={() => navigate('/propostas/nova')}
-              className="px-4 py-2 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg flex items-center gap-2 text-sm transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              Nova Proposta
-            </button>
+            <div className="flex space-x-2">
+              <button 
+                onClick={() => setShowWizardModal(true)}
+                className="px-4 py-2 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg flex items-center gap-2 text-sm transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                Nova Proposta
+              </button>
+            </div>
           </div>
         </div>
 
@@ -504,9 +513,9 @@ const PropostasPage: React.FC = () => {
       </div>
 
       {/* Lista de Propostas */}
-      <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+      <div className="bg-white rounded-lg border shadow-sm overflow-hidden propostas-page">
+        <div className="table-wrapper">
+          <table className="table-propostas min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -515,16 +524,16 @@ const PropostasPage: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Cliente
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile">
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Valor
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile">
                   Vendedor
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile">
                   Vencimento
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -535,57 +544,57 @@ const PropostasPage: React.FC = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredPropostas.map((proposta) => (
                 <tr key={proposta.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 whitespace-nowrap" data-label="Proposta">
                     <div>
                       <div className="text-sm font-medium text-gray-900">{proposta.numero}</div>
-                      <div className="text-sm text-gray-500">{proposta.titulo}</div>
-                      <div className="text-xs text-gray-400 flex items-center mt-1">
+                      <div className="subinfo ellipsis-text">{proposta.titulo}</div>
+                      <div className="subinfo flex items-center mt-1">
                         <Calendar className="w-3 h-3 mr-1" />
                         Criada em {formatDate(proposta.data_criacao)}
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 whitespace-nowrap" data-label="Cliente">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">{proposta.cliente}</div>
-                      <div className="text-sm text-gray-500 flex items-center">
+                      <div className="text-sm font-medium text-gray-900 ellipsis-text">{proposta.cliente}</div>
+                      <div className="subinfo flex items-center">
                         <User className="w-4 h-4 mr-1" />
-                        {proposta.cliente_contato}
+                        <span className="ellipsis-sm">{proposta.cliente_contato}</span>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(proposta.status)}`}>
+                  <td className="px-6 py-4 whitespace-nowrap col-hide-mobile" data-label="Status">
+                    <span className={`status-badge inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(proposta.status)}`}>
                       {getStatusIcon(proposta.status)}
                       <span className="ml-1">{getStatusText(proposta.status)}</span>
                     </span>
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className="subinfo mt-1">
                       {proposta.probabilidade}% de chance
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap" data-label="Valor">
+                    <div className="valor-proposta text-sm font-medium">
                       {formatCurrency(proposta.valor)}
                     </div>
-                    <div className="text-xs text-gray-500 capitalize">
+                    <div className="subinfo capitalize">
                       {proposta.categoria}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 col-hide-mobile" data-label="Vendedor">
                     {proposta.vendedor}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap col-hide-mobile" data-label="Vencimento">
+                    <div className="data-proposta text-sm text-gray-900">
                       {formatDate(proposta.data_vencimento)}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="subinfo">
                       {new Date(proposta.data_vencimento) < new Date() ? 
                         <span className="text-red-600">Vencida</span> : 
                         `${Math.ceil((new Date(proposta.data_vencimento).getTime() - new Date().getTime()) / (1000 * 3600 * 24))} dias`
                       }
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" data-label="Ações">
                     <div className="flex items-center justify-end space-x-2">
                       <button className="text-blue-600 hover:text-blue-900 p-1" title="Visualizar">
                         <Eye className="w-4 h-4" />
@@ -635,6 +644,30 @@ const PropostasPage: React.FC = () => {
         onClose={() => setShowCreateModal(false)}
         onSave={handleSaveProposta}
         isLoading={isLoadingCreate}
+      />
+
+      {/* Modal Wizard Nova Proposta */}
+      <ModalNovaProposta
+        isOpen={showWizardModal}
+        onClose={() => setShowWizardModal(false)}
+        onPropostaCriada={(proposta) => {
+          console.log('✅ Nova proposta criada via wizard:', proposta);
+          // Recarregar a lista de propostas
+          const carregarPropostas = async () => {
+            try {
+              const propostasReais = await propostasService.listarPropostas();
+              if (propostasReais && propostasReais.length > 0) {
+                const propostasFormatadas = propostasReais.map(converterPropostaParaUI);
+                const todasPropostas = [...propostasFormatadas, ...mockPropostas];
+                setPropostas(todasPropostas);
+                setFilteredPropostas(todasPropostas);
+              }
+            } catch (error) {
+              console.error('❌ Erro ao recarregar propostas:', error);
+            }
+          };
+          carregarPropostas();
+        }}
       />
       </div>
     </div>

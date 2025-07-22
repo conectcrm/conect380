@@ -206,7 +206,7 @@ const CentralOperacoesPage: React.FC = () => {
         setShowProdutoModal(true);
         break;
       case 'proposta':
-        navigate('/propostas/nova');
+        navigate('/propostas');
         break;
       case 'negociacao':
         toast('Módulo de negociação em desenvolvimento', {
@@ -443,7 +443,7 @@ const CentralOperacoesPage: React.FC = () => {
                 </button>
                 
                 <button
-                  onClick={() => navigate('/propostas/nova')}
+                  onClick={() => navigate('/propostas')}
                   className="w-full flex items-center space-x-3 p-4 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors text-left"
                 >
                   <FileText className="w-5 h-5 text-orange-600" />

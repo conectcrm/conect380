@@ -10,7 +10,6 @@ import DashboardLayout from './components/layout/DashboardLayout';
 import DashboardPage from './features/dashboard/DashboardPage';
 import ClientesPage from './features/clientes/ClientesPage';
 import PropostasPage from './features/propostas/PropostasPage';
-import NovaPropostaPage from './features/propostas/NovaPropostaPage';
 import CategoriasProdutosPage from './features/produtos/CategoriasProdutosPage';
 import ProdutosPage from './features/produtos/ProdutosPage';
 import FinanceiroPage from './features/financeiro/FinanceiroPage';
@@ -88,7 +87,6 @@ const AppRoutes: React.FC = () => {
           {/* Rotas dos módulos existentes */}
           <Route path="/clientes" element={<ClientesPage />} />
           <Route path="/propostas" element={<PropostasPage />} />
-          <Route path="/propostas/nova" element={<NovaPropostaPage />} />
           <Route path="/produtos" element={<ProdutosPage />} />
           <Route path="/produtos/categorias" element={<CategoriasProdutosPage />} />
           
