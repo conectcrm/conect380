@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -20,7 +20,8 @@ import {
 
 // Hooks e Services
 import { useCalculosProposta } from './hooks/useCalculosProposta';
-import { propostasService } from './services/propostasService';
+import { propostasService, PropostaCompleta } from './services/propostasService';
+import { clientesService, Cliente as ClienteService } from '../../services/clientesService';
 
 // Shared adapters para integração entre páginas
 import { 
@@ -123,8 +124,8 @@ const propostaSchema = yup.object().shape({
   })
 });
 
-// Dados mock dos clientes
-const clientesMock: Cliente[] = [
+// Dados mock dos clientes (usado como fallback)
+const clientesMockFallback: Cliente[] = [
   {
     id: '1',
     nome: 'João Silva Santos',
@@ -196,6 +197,8 @@ const NovaPropostaPage: React.FC = () => {
   
   // Estados principais
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [isLoadingClientes, setIsLoadingClientes] = useState(true);
   const [buscarCliente, setBuscarCliente] = useState('');
   const [buscarProduto, setBuscarProduto] = useState('');
   const [buscarCombo, setBuscarCombo] = useState('');
@@ -203,6 +206,42 @@ const NovaPropostaPage: React.FC = () => {
   const [showProdutoSearch, setShowProdutoSearch] = useState(false);
   const [showComboSearch, setShowComboSearch] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
+  // Carregar clientes do serviço
+  useEffect(() => {
+    const carregarClientes = async () => {
+      try {
+        setIsLoadingClientes(true);
+        const response = await clientesService.getClientes({ limit: 100 }); // Carregar mais clientes
+        
+        // Converter clientes do serviço para o formato esperado
+        const clientesFormatados: Cliente[] = response.data.map((cliente: ClienteService) => ({
+          id: cliente.id || '',
+          nome: cliente.nome,
+          documento: cliente.documento || '',
+          email: cliente.email,
+          telefone: cliente.telefone || '',
+          endereco: cliente.endereco || '',
+          cidade: cliente.cidade || '',
+          estado: cliente.estado || '',
+          cep: cliente.cep || '',
+          tipoPessoa: cliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica'
+        }));
+        
+        setClientes(clientesFormatados);
+        console.log('✅ Clientes carregados:', clientesFormatados.length);
+      } catch (error) {
+        console.error('❌ Erro ao carregar clientes:', error);
+        toastNotify.error('Erro ao carregar clientes. Usando dados de exemplo.');
+        // Usar dados mock como fallback
+        setClientes(clientesMockFallback);
+      } finally {
+        setIsLoadingClientes(false);
+      }
+    };
+
+    carregarClientes();
+  }, []);
   
   // Estados para filtros de categoria hierárquica
   const [categoriaSelecionada, setCategoriaSelecionada] = useState('');
@@ -270,7 +309,7 @@ const NovaPropostaPage: React.FC = () => {
 
   // Filtros de busca
   const clientesFiltrados = useMemo(() => {
-    let clientesOrdenados = [...clientesMock].sort((a, b) => a.nome.localeCompare(b.nome));
+    let clientesOrdenados = [...clientes].sort((a, b) => a.nome.localeCompare(b.nome));
     
     if (!buscarCliente) return clientesOrdenados;
     
@@ -279,7 +318,7 @@ const NovaPropostaPage: React.FC = () => {
       cliente.documento.includes(buscarCliente) ||
       cliente.email.toLowerCase().includes(buscarCliente.toLowerCase())
     );
-  }, [buscarCliente]);
+  }, [buscarCliente, clientes]);
 
   const produtosFiltrados = useMemo(() => {
     return buscarProdutos({
@@ -393,48 +432,20 @@ const NovaPropostaPage: React.FC = () => {
         total: totaisCombinados.total,
         dataValidade: new Date(Date.now() + data.validadeDias * 24 * 60 * 60 * 1000),
         dataCriacao: new Date(),
-        status: 'rascunho',
+        status: 'rascunho' as const,
         numero: `PROP-${Date.now().toString().slice(-6)}`
       };
 
       console.log('📋 Dados da proposta a serem salvos:', propostaData);
 
-      // Simulação de API call com sucesso garantido (para desenvolvimento)
-      await new Promise((resolve, reject) => {
-        setTimeout(() => {
-          try {
-            // Simulação de validação de dados no servidor
-            if (!propostaData.cliente) {
-              reject(new Error('Cliente não encontrado'));
-              return;
-            }
-            
-            if (!propostaData.produtos?.length && !propostaData.combos?.length) {
-              reject(new Error('Proposta deve conter pelo menos um produto ou combo'));
-              return;
-            }
-            
-            if (propostaData.total <= 0) {
-              reject(new Error('Valor total da proposta deve ser maior que zero'));
-              return;
-            }
-            
-            // Simulação de sucesso - apenas falha se houver problemas reais nos dados
-            console.log('✅ Validação do servidor bem-sucedida');
-            resolve(propostaData);
-            
-          } catch (validationError) {
-            console.error('❌ Erro na validação:', validationError);
-            reject(validationError);
-          }
-        }, 1500); // Reduzido de 2000ms para 1500ms
-      });
+      // Usar o serviço real de propostas
+      const propostaCriada = await propostasService.criarProposta(propostaData);
       
-      console.log('✅ Proposta criada com sucesso!');
+      console.log('✅ Proposta criada com sucesso:', propostaCriada);
       
       // Remover toast de loading e mostrar sucesso
       toastNotify.dismiss(loadingToastId);
-      toastNotify.success(`Proposta ${propostaData.numero} criada com sucesso!`);
+      toastNotify.success(`Proposta ${propostaCriada.numero} criada com sucesso!`);
       
       // Reset do formulário
       reset();
@@ -445,11 +456,11 @@ const NovaPropostaPage: React.FC = () => {
       setBuscarProduto('');
       setBuscarCombo('');
       
-      // Simular navegação (em um app real, usaria navigate)
+      // Navegar para lista de propostas
       console.log('🔄 Redirecionando para lista de propostas...');
       setTimeout(() => {
-        toastNotify.success('Redirecionamento concluído!');
-      }, 1000);
+        navigate('/propostas');
+      }, 1500);
       
     } catch (error) {
       console.error('❌ Erro ao criar proposta:', error);
@@ -549,17 +560,27 @@ const NovaPropostaPage: React.FC = () => {
                 {/* Dropdown de clientes */}
                 {showClienteDropdown && (
                   <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {clientesFiltrados.map((cliente) => (
-                      <div
-                        key={cliente.id}
-                        onClick={() => handleSelecionarCliente(cliente)}
-                        className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                      >
-                        <div className="font-medium text-gray-900">{safeRender(cliente.nome)}</div>
-                        <div className="text-sm text-gray-600">{safeRender(cliente.documento)}</div>
-                        <div className="text-sm text-gray-500">{safeRender(cliente.email)}</div>
+                    {isLoadingClientes ? (
+                      <div className="p-4 text-center text-gray-500">
+                        Carregando clientes...
                       </div>
-                    ))}
+                    ) : clientesFiltrados.length === 0 ? (
+                      <div className="p-4 text-center text-gray-500">
+                        {buscarCliente ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
+                      </div>
+                    ) : (
+                      clientesFiltrados.map((cliente) => (
+                        <div
+                          key={cliente.id}
+                          onClick={() => handleSelecionarCliente(cliente)}
+                          className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                        >
+                          <div className="font-medium text-gray-900">{safeRender(cliente.nome)}</div>
+                          <div className="text-sm text-gray-600">{safeRender(cliente.documento)}</div>
+                          <div className="text-sm text-gray-500">{safeRender(cliente.email)}</div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 )}
               </div>

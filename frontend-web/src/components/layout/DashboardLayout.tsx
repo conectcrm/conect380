@@ -23,7 +23,8 @@ import {
   ChevronRight,
   TrendingUp,
   ShoppingBag,
-  DollarSign
+  DollarSign,
+  Target
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -44,6 +45,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       '/dashboard': {
         title: 'Dashboard',
         subtitle: 'Visão geral do seu negócio'
+      },
+      '/central-operacoes': {
+        title: 'Central de Operações',
+        subtitle: 'Fluxo integrado de vendas completo'
       },
       '/nuclei/principal': {
         title: 'Principal',
@@ -76,6 +81,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       '/produtos': {
         title: 'Produtos',
         subtitle: 'Catálogo de produtos e serviços'
+      },
+      '/combos': {
+        title: 'Combos',
+        subtitle: 'Gestão de combos e pacotes de produtos'
+      },
+      '/combos/novo': {
+        title: 'Novo Combo',
+        subtitle: 'Criar um novo combo de produtos'
       },
       '/financeiro/contas-receber': {
         title: 'Contas a Receber',
@@ -113,6 +126,15 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       color: 'blue',
       totalNotifications: 0,
       description: 'Visão geral do negócio'
+    },
+    {
+      id: 'central-operacoes',
+      title: 'Central de Operações',
+      icon: Target,
+      href: '/central-operacoes',
+      color: 'purple',
+      totalNotifications: 0,
+      description: 'Fluxo integrado de vendas'
     },
     {
       id: 'crm',

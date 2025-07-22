@@ -19,6 +19,9 @@ import ContasReceberPage from './features/financeiro/ContasReceberPage';
 import ContasPagarPage from './features/financeiro/ContasPagarPage';
 import { AgendaPage } from './features/agenda/AgendaPage';
 import { ExemploModalProduto } from './examples/ExemploModalProduto';
+import CombosPage from './features/combos/CombosPage';
+import NovoComboPage from './features/combos/NovoComboPage';
+import CentralOperacoesPage from './pages/CentralOperacoesPage';
 // Importar páginas de núcleos
 import { 
   CrmNucleusPage, 
@@ -70,6 +73,9 @@ const AppRoutes: React.FC = () => {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           
+          {/* Central de Operações - Fluxo Integrado */}
+          <Route path="/central-operacoes" element={<CentralOperacoesPage />} />
+          
           {/* Rotas das páginas de núcleos */}
           <Route path="/nuclei/crm" element={<CrmNucleusPage />} />
           <Route path="/nuclei/vendas" element={<VendasNucleusPage />} />
@@ -85,6 +91,12 @@ const AppRoutes: React.FC = () => {
           <Route path="/propostas/nova" element={<NovaPropostaPage />} />
           <Route path="/produtos" element={<ProdutosPage />} />
           <Route path="/produtos/categorias" element={<CategoriasProdutosPage />} />
+          
+          {/* Rotas dos Combos */}
+          <Route path="/combos" element={<CombosPage />} />
+          <Route path="/combos/novo" element={<NovoComboPage />} />
+          <Route path="/combos/:id/editar" element={<NovoComboPage />} />
+          
           <Route path="/agenda" element={<AgendaPage />} />
           
           {/* Rotas do Núcleo Financeiro */}

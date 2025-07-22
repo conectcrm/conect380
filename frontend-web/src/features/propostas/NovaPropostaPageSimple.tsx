@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -19,7 +19,8 @@ import {
 
 // Hooks e Services
 import { useCalculosProposta } from './hooks/useCalculosProposta';
-import { propostasService } from './services/propostasService';
+import { propostasService, PropostaCompleta } from './services/propostasService';
+import { clientesService, Cliente as ClienteService } from '../../services/clientesService';
 
 // Toast simples para demonstração
 const toast = {
@@ -117,7 +118,7 @@ const propostaSchema = yup.object().shape({
 });
 
 // Dados mock dos clientes
-const clientesMock: Cliente[] = [
+const clientesMockFallback: Cliente[] = [
   {
     id: '1',
     nome: 'João Silva Santos',
@@ -314,6 +315,8 @@ const NovaPropostaPage: React.FC = () => {
   
   // Estados principais
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [isLoadingClientes, setIsLoadingClientes] = useState(true);
   const [buscarCliente, setBuscarCliente] = useState('');
   const [buscarProduto, setBuscarProduto] = useState('');
   const [buscarCombo, setBuscarCombo] = useState('');
@@ -321,6 +324,40 @@ const NovaPropostaPage: React.FC = () => {
   const [showProdutoSearch, setShowProdutoSearch] = useState(false);
   const [showComboSearch, setShowComboSearch] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
+  // Carregar clientes do serviço
+  useEffect(() => {
+    const carregarClientes = async () => {
+      try {
+        setIsLoadingClientes(true);
+        const response = await clientesService.getClientes({ limit: 100 });
+        
+        const clientesFormatados: Cliente[] = response.data.map((cliente: ClienteService) => ({
+          id: cliente.id || '',
+          nome: cliente.nome,
+          documento: cliente.documento || '',
+          email: cliente.email,
+          telefone: cliente.telefone || '',
+          endereco: cliente.endereco || '',
+          cidade: cliente.cidade || '',
+          estado: cliente.estado || '',
+          cep: cliente.cep || '',
+          tipoPessoa: cliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica'
+        }));
+        
+        setClientes(clientesFormatados);
+        console.log('✅ Clientes carregados:', clientesFormatados.length);
+      } catch (error) {
+        console.error('❌ Erro ao carregar clientes:', error);
+        toast.error('Erro ao carregar clientes. Usando dados de exemplo.');
+        setClientes(clientesMockFallback);
+      } finally {
+        setIsLoadingClientes(false);
+      }
+    };
+
+    carregarClientes();
+  }, []);
   
   // React Hook Form
   const { control, handleSubmit, watch, setValue, reset, formState: { errors, isValid } } = useForm<PropostaFormData>({
@@ -384,7 +421,7 @@ const NovaPropostaPage: React.FC = () => {
 
   // Filtros de busca
   const clientesFiltrados = useMemo(() => {
-    let clientesOrdenados = [...clientesMock].sort((a, b) => a.nome.localeCompare(b.nome));
+    let clientesOrdenados = [...clientes].sort((a, b) => a.nome.localeCompare(b.nome));
     
     if (!buscarCliente) return clientesOrdenados;
     
@@ -393,7 +430,7 @@ const NovaPropostaPage: React.FC = () => {
       cliente.documento.includes(buscarCliente) ||
       cliente.email.toLowerCase().includes(buscarCliente.toLowerCase())
     );
-  }, [buscarCliente]);
+  }, [buscarCliente, clientes]);
 
   const produtosFiltrados = useMemo(() => {
     if (!buscarProduto) return produtosMock;
@@ -462,15 +499,21 @@ const NovaPropostaPage: React.FC = () => {
       
       const propostaData = {
         ...data,
+        cliente: clienteSelecionado,
         subtotal: totaisCombinados.subtotal,
         total: totaisCombinados.total,
-        dataValidade: new Date(Date.now() + data.validadeDias * 24 * 60 * 60 * 1000)
+        dataValidade: new Date(Date.now() + data.validadeDias * 24 * 60 * 60 * 1000),
+        dataCriacao: new Date(),
+        status: 'rascunho' as const
       };
 
-      // Simulação de API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('📝 Criando proposta via serviço real...', propostaData);
       
-      toast.success('Proposta criada com sucesso!');
+      // Usar o serviço real de propostas
+      const propostaCriada = await propostasService.criarProposta(propostaData);
+      
+      console.log('✅ Proposta criada com sucesso:', propostaCriada);
+      toast.success(`Proposta ${propostaCriada.numero} criada com sucesso!`);
       
       // Reset do formulário
       reset();
@@ -481,7 +524,7 @@ const NovaPropostaPage: React.FC = () => {
       navigate('/propostas');
       
     } catch (error) {
-      console.error('Erro ao criar proposta:', error);
+      console.error('❌ Erro ao criar proposta:', error);
       toast.error('Erro ao criar proposta. Tente novamente.');
     } finally {
       setIsGeneratingPDF(false);
@@ -541,17 +584,27 @@ const NovaPropostaPage: React.FC = () => {
                 {/* Dropdown de clientes */}
                 {showClienteDropdown && (
                   <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {clientesFiltrados.map((cliente) => (
-                      <div
-                        key={cliente.id}
-                        onClick={() => handleSelecionarCliente(cliente)}
-                        className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                      >
-                        <div className="font-medium text-gray-900">{cliente.nome}</div>
-                        <div className="text-sm text-gray-600">{cliente.documento}</div>
-                        <div className="text-sm text-gray-500">{cliente.email}</div>
+                    {isLoadingClientes ? (
+                      <div className="p-4 text-center text-gray-500">
+                        Carregando clientes...
                       </div>
-                    ))}
+                    ) : clientesFiltrados.length === 0 ? (
+                      <div className="p-4 text-center text-gray-500">
+                        {buscarCliente ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
+                      </div>
+                    ) : (
+                      clientesFiltrados.map((cliente) => (
+                        <div
+                          key={cliente.id}
+                          onClick={() => handleSelecionarCliente(cliente)}
+                          className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                        >
+                          <div className="font-medium text-gray-900">{cliente.nome}</div>
+                          <div className="text-sm text-gray-600">{cliente.documento}</div>
+                          <div className="text-sm text-gray-500">{cliente.email}</div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 )}
               </div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useI18n } from '../../contexts/I18nContext';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import { ModalProposta } from '../../components/modals/ModalProposta';
+import { propostasService } from './services/propostasService';
 import { 
   FileText, 
   Plus, 
@@ -100,33 +101,140 @@ const PropostasPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('todos');
   const [selectedVendedor, setSelectedVendedor] = useState('todos');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingCreate, setIsLoadingCreate] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Carregar propostas reais do serviço
+  useEffect(() => {
+    const carregarPropostas = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Tentar carregar propostas do serviço real
+        const propostasReais = await propostasService.listarPropostas();
+        
+        console.log('🔄 Propostas carregadas do serviço:', propostasReais.length);
+        
+        if (propostasReais && propostasReais.length > 0) {
+          // Converter formato do serviço para formato da interface
+          const propostasFormatadas = propostasReais.map(proposta => ({
+            id: proposta.id || '',
+            numero: proposta.numero || '',
+            cliente: proposta.cliente?.nome || 'Cliente não informado',
+            cliente_contato: proposta.cliente?.nome || '',
+            titulo: 'Proposta ' + (proposta.numero || proposta.id || 'N/A'),
+            valor: proposta.total || 0,
+            status: proposta.status as any || 'rascunho',
+            data_criacao: proposta.criadaEm ? new Date(proposta.criadaEm).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            data_vencimento: proposta.dataValidade ? new Date(proposta.dataValidade).toISOString().split('T')[0] : '',
+            data_aprovacao: null,
+            vendedor: 'Sistema',
+            descricao: proposta.observacoes || 'Proposta criada via sistema',
+            probabilidade: 50,
+            categoria: 'geral'
+          }));
+          
+          // Combinar propostas reais com propostas mock
+          const todasPropostas = [...propostasFormatadas, ...mockPropostas];
+          setPropostas(todasPropostas);
+          setFilteredPropostas(todasPropostas);
+          console.log('✅ Propostas carregadas:', propostasFormatadas.length, 'reais +', mockPropostas.length, 'mock');
+        } else {
+          // Se não há propostas reais, usar apenas mock
+          setPropostas(mockPropostas);
+          setFilteredPropostas(mockPropostas);
+          console.log('📝 Usando apenas propostas mock:', mockPropostas.length);
+        }
+      } catch (error) {
+        console.error('❌ Erro ao carregar propostas:', error);
+        // Em caso de erro, usar propostas mock como fallback
+        setPropostas(mockPropostas);
+        setFilteredPropostas(mockPropostas);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    carregarPropostas();
+  }, []);
+
+  // Atualizar lista quando página voltar ao foco (ex: voltar de nova proposta)
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('🔄 Página voltou ao foco, recarregando propostas...');
+      // Pequeno delay para garantir que a navegação foi concluída
+      setTimeout(async () => {
+        try {
+          setIsLoading(true);
+          const propostasReais = await propostasService.listarPropostas();
+          
+          if (propostasReais && propostasReais.length > 0) {
+            const propostasFormatadas = propostasReais.map(proposta => ({
+              id: proposta.id || '',
+              numero: proposta.numero || '',
+              cliente: proposta.cliente?.nome || 'Cliente não informado',
+              cliente_contato: proposta.cliente?.nome || '',
+              titulo: 'Proposta ' + (proposta.numero || proposta.id || 'N/A'),
+              valor: proposta.total || 0,
+              status: proposta.status as any || 'rascunho',
+              data_criacao: proposta.criadaEm ? new Date(proposta.criadaEm).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+              data_vencimento: proposta.dataValidade ? new Date(proposta.dataValidade).toISOString().split('T')[0] : '',
+              data_aprovacao: null,
+              vendedor: 'Sistema',
+              descricao: proposta.observacoes || 'Proposta criada via sistema',
+              probabilidade: 50,
+              categoria: 'geral'
+            }));
+            
+            const todasPropostas = [...propostasFormatadas, ...mockPropostas];
+            setPropostas(todasPropostas);
+            setFilteredPropostas(todasPropostas);
+            console.log('🔄 Lista atualizada com', propostasFormatadas.length, 'propostas reais');
+          }
+        } catch (error) {
+          console.error('❌ Erro ao atualizar propostas:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      }, 500);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
 
   // Função para salvar proposta
   const handleSaveProposta = async (data: any) => {
-    // Simulação de API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    const novaProposta = {
-      id: String(propostas.length + 1),
-      numero: `PROP-${String(propostas.length + 1).padStart(3, '0')}`,
-      titulo: data.titulo,
-      cliente: data.cliente,
-      cliente_contato: data.cliente,
-      valor: data.valor,
-      status: 'rascunho',
-      data_criacao: new Date().toISOString().split('T')[0],
-      data_vencimento: data.data_vencimento,
-      data_aprovacao: null,
-      vendedor: data.vendedor,
-      descricao: data.descricao,
-      probabilidade: data.probabilidade,
-      categoria: data.categoria
-    };
+    try {
+      setIsLoadingCreate(true);
+      
+      // Simulação de API call
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      const novaProposta = {
+        id: String(propostas.length + 1).padStart(3, '0'),
+        numero: `PROP-2025-${String(propostas.length + 1).padStart(3, '0')}`,
+        titulo: data.titulo,
+        cliente: data.cliente,
+        cliente_contato: data.cliente,
+        valor: data.valor,
+        status: 'rascunho' as const,
+        data_criacao: new Date().toISOString().split('T')[0],
+        data_vencimento: data.data_vencimento,
+        data_aprovacao: null,
+        vendedor: data.vendedor,
+        descricao: data.descricao,
+        probabilidade: data.probabilidade,
+        categoria: data.categoria
+      };
 
-    setPropostas(prev => [novaProposta, ...prev]);
-    setFilteredPropostas(prev => [novaProposta, ...prev]);
+      setPropostas(prev => [novaProposta, ...prev]);
+      setFilteredPropostas(prev => [novaProposta, ...prev]);
+      console.log('✅ Nova proposta adicionada:', novaProposta);
+    } finally {
+      setIsLoadingCreate(false);
+    }
   };
 
   // Aplicar filtros
@@ -217,14 +325,67 @@ const PropostasPage: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-[#002333]">Propostas</h1>
-              <p className="mt-2 text-[#B4BEC9]">Acompanhe suas propostas comerciais</p>
+              <h1 className="text-3xl font-bold text-[#002333] flex items-center">
+                <FileText className="h-8 w-8 mr-3 text-[#159A9C]" />
+                Propostas
+                {isLoading && (
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#159A9C] ml-3"></div>
+                )}
+              </h1>
+              <p className="mt-2 text-[#B4BEC9]">
+                {isLoading ? 'Carregando propostas...' : `Acompanhe suas ${propostas.length} propostas comerciais`}
+              </p>
             </div>
-          <div className="mt-4 sm:mt-0 flex gap-3">
-            <button className="px-4 py-2 border border-[#B4BEC9] rounded-lg hover:bg-[#DEEFE7] flex items-center gap-2 text-sm text-[#002333] transition-colors">
-              <Download className="w-4 h-4" />
-              Exportar
-            </button>
+            <div className="mt-4 sm:mt-0 flex gap-3">
+              <button 
+                onClick={async () => {
+                  setIsLoading(true);
+                  try {
+                    const propostasReais = await propostasService.listarPropostas();
+                    if (propostasReais && propostasReais.length > 0) {
+                      const propostasFormatadas = propostasReais.map(proposta => ({
+                        id: proposta.id || '',
+                        numero: proposta.numero || '',
+                        cliente: proposta.cliente?.nome || 'Cliente não informado',
+                        cliente_contato: proposta.cliente?.nome || '',
+                        titulo: 'Proposta ' + (proposta.numero || proposta.id || 'N/A'),
+                        valor: proposta.total || 0,
+                        status: proposta.status as any || 'rascunho',
+                        data_criacao: proposta.criadaEm ? new Date(proposta.criadaEm).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                        data_vencimento: proposta.dataValidade ? new Date(proposta.dataValidade).toISOString().split('T')[0] : '',
+                        data_aprovacao: null,
+                        vendedor: 'Sistema',
+                        descricao: proposta.observacoes || 'Proposta criada via sistema',
+                        probabilidade: 50,
+                        categoria: 'geral'
+                      }));
+                      const todasPropostas = [...propostasFormatadas, ...mockPropostas];
+                      setPropostas(todasPropostas);
+                      setFilteredPropostas(todasPropostas);
+                    } else {
+                      setPropostas(mockPropostas);
+                      setFilteredPropostas(mockPropostas);
+                    }
+                  } catch (error) {
+                    console.error('❌ Erro ao atualizar:', error);
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                className="px-4 py-2 border border-[#B4BEC9] rounded-lg hover:bg-[#DEEFE7] flex items-center gap-2 text-sm text-[#002333] transition-colors"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#159A9C]"></div>
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                {isLoading ? 'Atualizando...' : 'Atualizar'}
+              </button>
+              <button className="px-4 py-2 border border-[#B4BEC9] rounded-lg hover:bg-[#DEEFE7] flex items-center gap-2 text-sm text-[#002333] transition-colors">
+                <Download className="w-4 h-4" />
+                Exportar
+              </button>
             <button 
               onClick={() => navigate('/propostas/nova')}
               className="px-4 py-2 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg flex items-center gap-2 text-sm transition-all"
@@ -473,7 +634,7 @@ const PropostasPage: React.FC = () => {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onSave={handleSaveProposta}
-        isLoading={isLoading}
+        isLoading={isLoadingCreate}
       />
       </div>
     </div>

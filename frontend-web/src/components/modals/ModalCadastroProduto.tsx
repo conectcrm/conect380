@@ -14,7 +14,7 @@ import { MoneyInput } from '../common/MoneyInput';
 // Tipos de dados
 interface ProdutoFormData {
   nome: string;
-  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'plano';
+  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'aplicativo';
   categoria: string;
   precoUnitario: number;
   frequencia: 'unico' | 'mensal' | 'anual';

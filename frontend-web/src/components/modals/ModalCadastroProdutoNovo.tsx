@@ -108,6 +108,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
   loading = false,
 }) => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isFormInitialized, setIsFormInitialized] = useState(false);
   const [tagInput, setTagInput] = useState('');
   const [showVariacoes, setShowVariacoes] = useState(false);
 

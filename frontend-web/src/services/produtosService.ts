@@ -1,4 +1,5 @@
 import { api } from './api';
+import axios from 'axios';
 
 export interface Produto {
   id: string;
@@ -125,24 +126,42 @@ class ProdutosService {
 
   // Transformar dados do formulário para API
   transformFormToApi(formData: any): CreateProdutoData {
-    return {
-      nome: formData.nome,
-      categoria: formData.categoria,
-      preco: formData.precoUnitario || formData.preco,
-      custoUnitario: formData.custoUnitario,
-      tipoItem: formData.tipoItem,
-      frequencia: formData.frequencia,
-      unidadeMedida: formData.unidadeMedida,
-      status: formData.status === true ? 'ativo' : formData.status === false ? 'inativo' : formData.status,
-      descricao: formData.descricao,
-      sku: formData.sku,
-      fornecedor: formData.fornecedor,
-      estoqueAtual: formData.estoque || formData.estoqueAtual,
-      estoqueMinimo: formData.estoqueMinimo,
-      estoqueMaximo: formData.estoqueMaximo,
-      tags: formData.tags,
-      variacoes: formData.variacoes,
+    // Validação básica dos campos obrigatórios
+    if (!formData.nome || formData.nome.trim() === '') {
+      throw new Error('Nome é obrigatório');
+    }
+    if (!formData.categoria || formData.categoria.trim() === '') {
+      throw new Error('Categoria é obrigatória');
+    }
+    if (!formData.precoUnitario && !formData.preco) {
+      throw new Error('Preço é obrigatório');
+    }
+    
+    const preco = formData.precoUnitario || formData.preco;
+    if (isNaN(preco) || preco < 0) {
+      throw new Error('Preço deve ser um número válido maior ou igual a zero');
+    }
+    
+    const transformed = {
+      nome: formData.nome.trim(),
+      categoria: formData.categoria.trim(),
+      preco: Number(preco),
+      custoUnitario: formData.custoUnitario ? Number(formData.custoUnitario) : undefined,
+      tipoItem: formData.tipoItem || 'produto',
+      frequencia: formData.frequencia || 'unico',
+      unidadeMedida: formData.unidadeMedida || 'unidade',
+      status: formData.status === true ? 'ativo' : formData.status === false ? 'inativo' : formData.status || 'ativo',
+      descricao: formData.descricao?.trim() || undefined,
+      sku: formData.sku?.trim() || undefined,
+      fornecedor: formData.fornecedor?.trim() || undefined,
+      estoqueAtual: formData.estoque ? Number(formData.estoque) : formData.estoqueAtual ? Number(formData.estoqueAtual) : undefined,
+      estoqueMinimo: formData.estoqueMinimo ? Number(formData.estoqueMinimo) : undefined,
+      estoqueMaximo: formData.estoqueMaximo ? Number(formData.estoqueMaximo) : undefined,
+      tags: Array.isArray(formData.tags) ? formData.tags : undefined,
+      variacoes: Array.isArray(formData.variacoes) ? formData.variacoes : undefined,
     };
+    
+    return transformed;
   }
 
   // Transformar dados da API para o formato legado do frontend

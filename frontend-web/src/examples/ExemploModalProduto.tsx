@@ -8,7 +8,7 @@ import { ModalCadastroProduto } from '../components/modals/ModalCadastroProdutoL
 interface ProdutoFormData {
   id?: number;
   nome: string;
-  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'plano';
+  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'aplicativo';
   categoria: string;
   precoUnitario: number;
   frequencia: 'unico' | 'mensal' | 'anual';

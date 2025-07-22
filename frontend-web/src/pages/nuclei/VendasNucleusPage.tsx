@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, Package, TrendingUp, Target } from 'lucide-react';
+import { FileText, Package, TrendingUp, Target, PackageOpen } from 'lucide-react';
 import ModulesScreen, { NucleusModulesData } from '../../components/navigation/ModulesScreen';
 
 const VendasNucleusPage: React.FC = () => {
@@ -28,6 +28,17 @@ const VendasNucleusPage: React.FC = () => {
         href: '/produtos',
         icon: Package,
         notifications: 0,
+        status: 'active'
+      },
+      {
+        id: 'combos',
+        name: 'Combos',
+        description: 'Criação e gestão de combos e pacotes de produtos com descontos especiais.',
+        href: '/combos',
+        icon: PackageOpen,
+        notifications: 0,
+        badge: 'Novo',
+        badgeColor: 'green',
         status: 'active'
       },
       {

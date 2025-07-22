@@ -27,7 +27,7 @@ import toast from 'react-hot-toast';
 // Interface para o novo modal
 interface ProdutoFormData {
   nome: string;
-  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'plano';
+  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'aplicativo';
   categoria: string;
   precoUnitario: number;
   frequencia: 'unico' | 'mensal' | 'anual';
@@ -643,8 +643,8 @@ const ProdutosPage: React.FC = () => {
           setProdutoParaEditar(null);
         }}
         onSubmit={handleSaveProduto}
-        produtoParaEditar={produtoParaEditar}
-        isLoading={isLoadingSave}
+        produtoEditando={produtoParaEditar}
+        loading={isLoadingSave}
       />
 
       {/* Modal de Confirmação de Exclusão */}

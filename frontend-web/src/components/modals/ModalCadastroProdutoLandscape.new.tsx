@@ -8,12 +8,9 @@ import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { X, Tag, Package, DollarSign, AlertTriangle, Keyboard } from 'lucide-react';
+import { X, Tag, Package, DollarSign, AlertTriangle } from 'lucide-react';
 import { MoneyInput } from '../common/MoneyInput';
 import { useProdutosParaPropostas } from '../../shared/produtosAdapter';
-import { useAutoSave } from '../../hooks/useAutoSave';
-import { useModalKeyboardShortcuts } from '../../hooks/useModalKeyboardShortcuts';
-import { SaveStatus } from '../SaveStatus';
 
 // Tipos de dados
 interface ProdutoFormData {
@@ -123,7 +120,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
     setValue,
     watch,
     reset,
-    formState: { errors, isValid, isSubmitting, isDirty }
+    formState: { errors, isValid, isSubmitting }
   } = useForm<ProdutoFormData>({
     resolver: yupResolver(schema),
     mode: 'onChange',
@@ -142,54 +139,6 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
   });
 
   const watchedFields = watch();
-
-  // Primeiro vou declarar as funções que serão usadas nos hooks
-  const onFormSubmit = async (data: ProdutoFormData) => {
-    try {
-      if (loading) return;
-      
-      await onSubmit(data);
-      setHasUnsavedChanges(false);
-      setIsFormInitialized(false);
-    } catch (error) {
-      console.error('Erro ao salvar produto:', error);
-    }
-  };
-
-  const handleClose = () => {
-    if (hasUnsavedChanges && isFormInitialized) {
-      setShowUnsavedChangesModal(true);
-    } else {
-      onClose();
-    }
-  };
-
-  // Hook de Auto-Save
-  const { lastSaveAttempt } = useAutoSave({
-    delay: 30000, // 30 segundos
-    enabled: isOpen && !loading,
-    onSave: async () => {
-      if (isValid && hasUnsavedChanges) {
-        const data = watchedFields as ProdutoFormData;
-        await onSubmit(data);
-        setHasUnsavedChanges(false);
-      }
-    },
-    hasUnsavedChanges,
-    isFormValid: isValid
-  });
-
-  // Hook de Atalhos de Teclado
-  useModalKeyboardShortcuts({
-    isOpen,
-    onSave: () => {
-      if (isValid && !isSubmitting) {
-        handleSubmit(onFormSubmit)();
-      }
-    },
-    onClose: handleClose,
-    canSave: isValid && !isSubmitting
-  });
 
   // Efeito para detectar mudanças - só após inicialização
   useEffect(() => {
@@ -242,6 +191,18 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
     }
   }, [produtoEditando, isOpen, reset]);
 
+  const handleClose = () => {
+    if (!isSubmitting) {
+      if (hasUnsavedChanges) {
+        setShowUnsavedChangesModal(true);
+      } else {
+        onClose();
+        setHasUnsavedChanges(false);
+        setIsFormInitialized(false);
+      }
+    }
+  };
+
   const handleConfirmClose = () => {
     setHasUnsavedChanges(false);
     setIsFormInitialized(false);
@@ -251,6 +212,12 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
   const handleCancelClose = () => {
     setShowUnsavedChangesModal(false);
+  };
+
+  const onFormSubmit = (data: ProdutoFormData) => {
+    onSubmit(data);
+    setHasUnsavedChanges(false);
+    setIsFormInitialized(false);
   };
 
   const adicionarTag = () => {
@@ -329,21 +296,13 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                   </p>
                 </div>
               </div>
-              
-              <div className="flex items-center space-x-4">
-                <SaveStatus 
-                  isDirty={hasUnsavedChanges}
-                  isSaving={isSubmitting}
-                  lastSaved={isFormInitialized ? undefined : (lastSaveAttempt ? new Date(lastSaveAttempt) : undefined)}
-                />
-                <button
-                  onClick={handleClose}
-                  disabled={isSubmitting}
-                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:cursor-not-allowed"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+              <button
+                onClick={handleClose}
+                disabled={isSubmitting}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:cursor-not-allowed"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             {/* Formulário em Grid */}

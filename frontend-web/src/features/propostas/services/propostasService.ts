@@ -53,6 +53,7 @@ interface PropostaCompleta extends PropostaFormData {
 // Simulação de API - substituir por chamadas reais
 class PropostasService {
   private baseUrl = '/api/propostas';
+  private propostas: PropostaCompleta[] = []; // Armazenamento em memória para simulação
 
   async criarProposta(dados: PropostaCompleta): Promise<PropostaCompleta> {
     // Simular delay de API
@@ -67,6 +68,16 @@ class PropostasService {
       atualizadaEm: new Date()
     };
 
+    // Armazenar proposta na lista em memória
+    this.propostas.unshift(proposta); // Adicionar no início da lista
+    
+    // Também salvar no localStorage para persistência entre reloads
+    try {
+      localStorage.setItem('fenixcrm_propostas', JSON.stringify(this.propostas));
+    } catch (error) {
+      console.warn('Não foi possível salvar no localStorage:', error);
+    }
+
     // Em produção: fazer chamada para API
     // const response = await fetch(`${this.baseUrl}`, {
     //   method: 'POST',
@@ -75,7 +86,8 @@ class PropostasService {
     // });
     // return response.json();
 
-    console.log('Proposta criada:', proposta);
+    console.log('✅ Proposta criada e armazenada:', proposta);
+    console.log(`📋 Total de propostas armazenadas: ${this.propostas.length}`);
     return proposta;
   }
 
@@ -83,22 +95,65 @@ class PropostasService {
     // Simular delay de API
     await new Promise(resolve => setTimeout(resolve, 500));
     
+    // Carregar propostas do localStorage se ainda não carregadas
+    if (this.propostas.length === 0) {
+      try {
+        const storedPropostas = localStorage.getItem('fenixcrm_propostas');
+        if (storedPropostas) {
+          this.propostas = JSON.parse(storedPropostas);
+          console.log(`📋 Propostas carregadas do localStorage: ${this.propostas.length}`);
+        }
+      } catch (error) {
+        console.warn('Erro ao carregar do localStorage:', error);
+      }
+    }
+    
     // Em produção: fazer chamada para API
     // const response = await fetch(`${this.baseUrl}`);
     // return response.json();
     
-    return [];
+    console.log(`📋 Listando ${this.propostas.length} propostas:`, this.propostas);
+    return this.propostas;
   }
 
   async obterProposta(id: string): Promise<PropostaCompleta | null> {
     // Simular delay de API
     await new Promise(resolve => setTimeout(resolve, 300));
     
+    // Buscar proposta na lista em memória
+    const proposta = this.propostas.find(p => p.id === id);
+    
     // Em produção: fazer chamada para API
     // const response = await fetch(`${this.baseUrl}/${id}`);
     // return response.json();
     
-    return null;
+    return proposta || null;
+  }
+
+  // Método para limpar propostas (útil para desenvolvimento/testes)
+  async limparPropostas(): Promise<void> {
+    this.propostas = [];
+    try {
+      localStorage.removeItem('fenixcrm_propostas');
+    } catch (error) {
+      console.warn('Erro ao limpar localStorage:', error);
+    }
+    console.log('🗑️ Todas as propostas foram removidas');
+  }
+
+  // Método para obter estatísticas (útil para debug)
+  getEstatisticas(): { total: number; status: Record<string, number> } {
+    const stats = {
+      total: this.propostas.length,
+      status: {} as Record<string, number>
+    };
+    
+    this.propostas.forEach(proposta => {
+      const status = proposta.status || 'rascunho';
+      stats.status[status] = (stats.status[status] || 0) + 1;
+    });
+    
+    return stats;
   }
 
   async atualizarProposta(id: string, dados: Partial<PropostaCompleta>): Promise<PropostaCompleta> {
@@ -197,3 +252,7 @@ class PropostasService {
 }
 
 export const propostasService = new PropostasService();
+export default propostasService;
+
+// Exportar tipos para uso em outras partes da aplicação
+export type { Cliente, Produto, ProdutoProposta, PropostaFormData, PropostaCompleta };
