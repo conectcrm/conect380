@@ -14,10 +14,13 @@ import { useProdutosParaPropostas } from '../../shared/produtosAdapter';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { useModalKeyboardShortcuts } from '../../hooks/useModalKeyboardShortcuts';
 import { SaveStatus } from '../SaveStatus';
+import { useProdutoSoftware } from '../../hooks/useProdutoSoftware';
+import { camposSoftware, precisaCamposSoftware, validarDadosSoftware } from '../../config/camposSoftware';
 
 // Tipos de dados
 interface ProdutoFormData {
   nome: string;
+  tipo?: 'produto' | 'servico' | 'software'; // Novo campo para detectar software
   tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'aplicativo';
   categoria: string;
   precoUnitario: number;
@@ -27,6 +30,11 @@ interface ProdutoFormData {
   descricao?: string;
   tags?: string[];
   variacoes?: string[];
+  // Campos específicos para software
+  tipoLicenciamento?: string;
+  periodicidadeLicenca?: string;
+  renovacaoAutomatica?: boolean;
+  quantidadeLicencas?: number;
 }
 
 interface ModalCadastroProdutoProps {
@@ -38,7 +46,7 @@ interface ModalCadastroProdutoProps {
 }
 
 // Schema de validação
-const schema = yup.object({
+const schema = yup.object().shape({
   nome: yup
     .string()
     .required('Nome do produto é obrigatório')
@@ -75,7 +83,32 @@ const schema = yup.object({
   variacoes: yup
     .array()
     .of(yup.string())
-    .default([])
+    .default([]),
+  // Validação condicional para campos de software
+  tipoLicenciamento: yup
+    .string()
+    .when('tipoItem', {
+      is: (tipoItem: string) => ['licenca', 'modulo', 'aplicativo'].includes(tipoItem),
+      then: (schema) => schema.required('Tipo de licenciamento é obrigatório para produtos de software'),
+      otherwise: (schema) => schema.optional()
+    }),
+  periodicidadeLicenca: yup
+    .string()
+    .when('tipoItem', {
+      is: (tipoItem: string) => ['licenca', 'modulo', 'aplicativo'].includes(tipoItem),
+      then: (schema) => schema.required('Periodicidade da licença é obrigatória para produtos de software'),
+      otherwise: (schema) => schema.optional()
+    }),
+  renovacaoAutomatica: yup
+    .boolean()
+    .optional(),
+  quantidadeLicencas: yup
+    .number()
+    .when('tipoItem', {
+      is: (tipoItem: string) => ['licenca', 'modulo', 'aplicativo'].includes(tipoItem),
+      then: (schema) => schema.min(1, 'Quantidade de licenças deve ser maior que zero'),
+      otherwise: (schema) => schema.optional()
+    })
 });
 
 // Opções
@@ -137,9 +170,19 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
       status: true,
       descricao: '',
       tags: [],
-      variacoes: []
+      variacoes: [],
+      // Valores padrão para campos de software
+      tipoLicenciamento: '',
+      periodicidadeLicenca: '',
+      renovacaoAutomatica: false,
+      quantidadeLicencas: 1
     }
   });
+
+  // Hook para produtos de software (após declaração do watch)
+  const tipoAtual = watch('tipoItem') || 'produto';
+  const tipoGeral = watch('tipo'); // Para capturar se tipo === "software"
+  const { campos, isSoftware, TIPOS_LICENCIAMENTO, PERIODICIDADES_LICENCA } = useProdutoSoftware(tipoAtual, tipoGeral);
 
   const watchedFields = watch();
 
@@ -348,7 +391,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
             {/* Formulário em Grid */}
             <form onSubmit={handleSubmit(onFormSubmit)} className="p-4 sm:p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className={`grid grid-cols-1 gap-6 ${isSoftware ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
                 
                 {/* Coluna 1: Informações Básicas */}
                 <div className="space-y-4">
@@ -539,6 +582,127 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                     )}
                   </div>
                 </div>
+
+                {/* Coluna 2.5: Campos Específicos para Software (Condicional) */}
+                {isSoftware && (
+                  <div className="space-y-4 lg:col-span-1">
+                    <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                      <Keyboard className="w-5 h-5 mr-2 text-indigo-600" />
+                      Configurações de Software
+                    </h3>
+                    
+                    {/* Alerta informativo */}
+                    {campos.alertaEspecial && (
+                      <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                        <p className="text-sm text-indigo-700">{campos.alertaEspecial}</p>
+                      </div>
+                    )}
+
+                    {/* Tipo de Licenciamento */}
+                    <div>
+                      <label htmlFor="tipoLicenciamento" className="block text-sm font-medium text-gray-700 mb-1">
+                        Tipo de Licenciamento *
+                      </label>
+                      <select
+                        {...register('tipoLicenciamento')}
+                        id="tipoLicenciamento"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Selecione o tipo</option>
+                        {TIPOS_LICENCIAMENTO.map((tipo) => (
+                          <option key={tipo.value} value={tipo.value} title={tipo.descricao}>
+                            {tipo.label}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.tipoLicenciamento && (
+                        <p className="mt-1 text-sm text-red-600">{errors.tipoLicenciamento.message}</p>
+                      )}
+                    </div>
+
+                    {/* Periodicidade da Licença */}
+                    <div>
+                      <label htmlFor="periodicidadeLicenca" className="block text-sm font-medium text-gray-700 mb-1">
+                        Periodicidade da Licença *
+                      </label>
+                      <select
+                        {...register('periodicidadeLicenca')}
+                        id="periodicidadeLicenca"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Selecione a periodicidade</option>
+                        {PERIODICIDADES_LICENCA.map((periodo) => (
+                          <option key={periodo.value} value={periodo.value} title={periodo.descricao}>
+                            {periodo.label}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.periodicidadeLicenca && (
+                        <p className="mt-1 text-sm text-red-600">{errors.periodicidadeLicenca.message}</p>
+                      )}
+                    </div>
+
+                    {/* Quantidade de Licenças */}
+                    <div>
+                      <label htmlFor="quantidadeLicencas" className="block text-sm font-medium text-gray-700 mb-1">
+                        {campos.labelQuantidade}
+                      </label>
+                      <input
+                        {...register('quantidadeLicencas', { 
+                          valueAsNumber: true,
+                          setValueAs: (value) => value === '' ? undefined : Number(value)
+                        })}
+                        type="number"
+                        id="quantidadeLicencas"
+                        min="1"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Ex: 10"
+                      />
+                      {errors.quantidadeLicencas && (
+                        <p className="mt-1 text-sm text-red-600">{errors.quantidadeLicencas.message}</p>
+                      )}
+                      {campos.tooltipInfo && (
+                        <p className="mt-1 text-xs text-gray-500">{campos.tooltipInfo}</p>
+                      )}
+                    </div>
+
+                    {/* Renovação Automática */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Renovação Automática
+                      </label>
+                      <Controller
+                        name="renovacaoAutomatica"
+                        control={control}
+                        render={({ field }) => (
+                          <div className="flex items-center space-x-4">
+                            <label className="flex items-center">
+                              <input
+                                type="radio"
+                                checked={field.value === true}
+                                onChange={() => field.onChange(true)}
+                                className="mr-2 text-green-600 focus:ring-green-500"
+                              />
+                              <span className="text-sm text-gray-700">Sim</span>
+                            </label>
+                            <label className="flex items-center">
+                              <input
+                                type="radio"
+                                checked={field.value === false}
+                                onChange={() => field.onChange(false)}
+                                className="mr-2 text-red-600 focus:ring-red-500"
+                              />
+                              <span className="text-sm text-gray-700">Não</span>
+                            </label>
+                          </div>
+                        )}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Define se a licença será renovada automaticamente no vencimento
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Coluna 3: Tags e Variações */}
                 <div className="space-y-4">

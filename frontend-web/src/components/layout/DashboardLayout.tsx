@@ -5,6 +5,7 @@ import { useI18n } from '../../contexts/I18nContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { formatCompanyName, formatUserName } from '../../utils/textUtils';
 import SimpleNavGroup, { NavigationNucleus } from '../navigation/SimpleNavGroup';
+import NotificationCenter from '../notifications/NotificationCenter';
 import { 
   Menu, 
   X, 
@@ -176,12 +177,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
   // Estados para funcionalidades da barra superior
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [notifications] = useState([
-    { id: 1, type: 'info', message: 'Nova proposta recebida', time: '2 min' },
-    { id: 2, type: 'warning', message: 'Cliente aguarda retorno', time: '15 min' },
-    { id: 3, type: 'success', message: 'Venda concluída', time: '1h' }
-  ]);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   
   // Estados para sistema de busca
@@ -216,10 +211,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
       
-      if (showNotifications && !target.closest('[data-dropdown="notifications"]')) {
-        setShowNotifications(false);
-      }
-      
       if (showUserMenu && !target.closest('[data-dropdown="user-menu"]')) {
         setShowUserMenu(false);
       }
@@ -229,12 +220,12 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       }
     };
 
-    if (showNotifications || showUserMenu || showSearchResults) {
+    if (showUserMenu || showSearchResults) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showNotifications, showUserMenu, showSearchResults]);
+  }, [showUserMenu, showSearchResults]);
 
   // Effect para atalho de teclado da busca
   useEffect(() => {
@@ -485,67 +476,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 </div>
               </div>
 
-                {/* Notificações Compactas */}
-                <div className="relative" data-dropdown="notifications">
-                  <button 
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className="relative p-2 rounded-lg hover:bg-gray-100/80 transition-colors group"
-                    title="Notificações"
-                  >
-                    <Bell className="w-5 h-5 text-gray-600 group-hover:text-blue-600 transition-colors" />
-                    {notifications.length > 0 && (
-                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-sm">
-                        {notifications.length > 9 ? '9+' : notifications.length}
-                      </span>
-                    )}
-                  </button>
-
-                  {/* Dropdown de Notificações */}
-                  {showNotifications && (
-                    <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border shadow-xl z-50 overflow-hidden">
-                      <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-semibold text-gray-900">Notificações</h3>
-                          {notifications.length > 0 && (
-                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
-                              {notifications.length} nova{notifications.length !== 1 ? 's' : ''}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="max-h-64 overflow-y-auto">
-                        {notifications.length > 0 ? (
-                          notifications.map((notification) => (
-                            <div key={notification.id} className="p-3 border-b last:border-b-0 hover:bg-gray-50 transition-colors cursor-pointer">
-                              <div className="flex items-start gap-3">
-                                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm text-gray-900 leading-relaxed">{notification.message}</p>
-                                  <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="p-6 text-center">
-                            <Bell className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                            <p className="text-sm text-gray-500">Nenhuma notificação</p>
-                            <p className="text-xs text-gray-400">Você está em dia!</p>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {notifications.length > 0 && (
-                        <div className="p-3 border-t bg-gray-50">
-                          <button className="w-full text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors">
-                            Ver todas as notificações
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                {/* Notificações - Sistema Novo */}
+                <NotificationCenter className="relative" />
 
                 {/* Avatar/Menu do Usuário Compacto */}
                 <div className="relative" data-dropdown="user-menu">

@@ -5,6 +5,13 @@ import { KPICard } from '../../components/common/KPICard';
 import { ResponsiveFilters } from '../../components/common/ResponsiveFilters';
 import ColorPaletteSelector from '../../components/common/ColorPaletteSelector';
 import { 
+  VendasChart, 
+  PropostasChart, 
+  FunnelChart, 
+  VendedoresChart, 
+  AtividadesChart 
+} from '../../components/charts/DashboardCharts';
+import { 
   AlertTriangle, Activity, Target, Users, FileText, DollarSign,
   TrendingUp, UserPlus, BarChart3, ChevronRight, Filter, ArrowUp, 
   CheckSquare, Clock, Eye, Edit, Plus, Calendar, Bell
@@ -524,229 +531,35 @@ const DashboardPage: React.FC = () => {
         />
       </div>
 
-      {/* Área de Gráficos e Widgets - Layout Responsivo */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6 mb-6">
-        {/* Gráfico de Evolução de Vendas */}
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold mb-2 sm:mb-0">{t('dashboard.salesEvolution')}</h3>
-            <div className="flex items-center gap-2 text-sm">
-              <button className="px-3 py-1 text-blue-600 bg-blue-50 rounded border border-blue-200 hover:bg-blue-100 transition-colors">
-                Valor
-              </button>
-              <button className="px-3 py-1 text-gray-600 hover:bg-gray-50 rounded transition-colors">
-                Quantidade
-              </button>
-            </div>
-          </div>
-          
-          {/* Gráfico de Linha Responsivo */}
-          <div className="h-64 sm:h-80 relative">
-            <div className="absolute inset-0 flex items-end justify-between bg-gray-50 rounded p-2">
-              {[
-                { mes: 'Jan', valor: 180000, altura: '45%' },
-                { mes: 'Fev', valor: 220000, altura: '55%' },
-                { mes: 'Mar', valor: 190000, altura: '47%' },
-                { mes: 'Abr', valor: 250000, altura: '62%' },
-                { mes: 'Mai', valor: 280000, altura: '70%' },
-                { mes: 'Jun', valor: 240000, altura: '60%' },
-                { mes: 'Jul', valor: 300000, altura: '75%' },
-                { mes: 'Ago', valor: 320000, altura: '80%' },
-                { mes: 'Set', valor: 290000, altura: '72%' },
-                { mes: 'Out', valor: 340000, altura: '85%' },
-                { mes: 'Nov', valor: 360000, altura: '90%' },
-                { mes: 'Dez', valor: 400000, altura: '100%' }
-              ].map((item, index) => (
-                <div key={index} className="flex flex-col items-center flex-1 group cursor-pointer">
-                  <div 
-                    className="w-full mx-1 bg-blue-500 hover:bg-blue-600 transition-all duration-300 rounded-t relative group-hover:shadow-lg"
-                    style={{ height: item.altura }}
-                    title={`${item.mes}: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.valor)}`}
-                  >
-                    {/* Tooltip */}
-                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact' }).format(item.valor)}
-                    </div>
-                  </div>
-                  <span className="text-xs text-gray-600 mt-2 font-medium">{item.mes}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          {/* Resumo */}
-          <div className="mt-4 pt-4 border-t flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-            <div className="text-sm text-gray-600">
-              <span className="font-medium">Total: </span>
-              <span className="text-blue-600 font-semibold">R$ 2.600.000</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-blue-500 rounded"></div>
-                <span className="text-gray-600">Vendas (R$)</span>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Área de Gráficos Reais - Layout Responsivo */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+        {/* Gráfico de Vendas vs Meta */}
+        <VendasChart />
         
-        {/* Funil de Vendas Responsivo */}
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold">{t('dashboard.salesFunnel')}</h3>
-            <button className="text-sm text-blue-600 hover:underline">Ver detalhes</button>
-          </div>
-          
-          <div className="space-y-4">
-            {[
-              { etapa: 'Leads', total: 150, conversao: 100, cor: 'bg-gray-600', corFundo: 'bg-gray-50' },
-              { etapa: 'Qualificados', total: 89, conversao: 59.3, cor: 'bg-gray-500', corFundo: 'bg-gray-50' },
-              { etapa: 'Propostas', total: 45, conversao: 50.6, cor: 'bg-blue-500', corFundo: 'bg-blue-50' },
-              { etapa: 'Negociação', total: 23, conversao: 51.1, cor: 'bg-blue-600', corFundo: 'bg-blue-50' },
-              { etapa: 'Fechados', total: 15, conversao: 65.2, cor: 'bg-slate-600', corFundo: 'bg-slate-50' }
-            ].map((item, index) => (
-              <div key={index} className={`p-3 rounded-lg ${item.corFundo} border border-opacity-20`}>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${item.cor}`}></div>
-                    <span className="font-medium text-gray-800">{item.etapa}</span>
-                  </div>
-                  
-                  <div className="flex items-center gap-4">
-                    <span className="text-2xl font-bold text-gray-900">{item.total}</span>
-                    <span className="text-sm text-gray-500">({item.conversao.toFixed(1)}%)</span>
-                  </div>
-                </div>
-                
-                {/* Barra de Progresso */}
-                <div className="mt-3">
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className={`h-2 rounded-full ${item.cor} transition-all duration-500`}
-                      style={{ width: `${(item.total / 150) * 100}%` }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          {/* Conversão Geral */}
-          <div className="mt-6 pt-4 border-t bg-gray-50 rounded-lg p-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-700">Taxa de Conversão Geral</span>
-              <span className="text-lg font-bold text-green-600">10%</span>
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              15 fechamentos de 150 leads iniciais
-            </div>
-          </div>
+        {/* Gráfico de Status das Propostas */}
+        <PropostasChart />
+      </div>
+
+      {/* Segunda linha de gráficos */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+        {/* Funil de Vendas */}
+        <FunnelChart />
+        
+        {/* Performance dos Vendedores */}
+        <div className="xl:col-span-2">
+          <VendedoresChart />
         </div>
       </div>
 
+      {/* Gráfico de atividades */}
+      <div className="mb-8">
+        <AtividadesChart />
+      </div>
       {/* Seção de Análises e Status - Layout Responsivo */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
         {/* Status das Propostas - Gráfico Circular */}
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">{t('dashboard.proposalStatus')}</h3>
-            <button className="text-sm text-blue-600 hover:underline">Ver todas</button>
-          </div>
-          
-          {/* Gráfico Circular Responsivo */}
-          <div className="flex flex-col items-center">
-            <div className="relative w-32 h-32 sm:w-40 sm:h-40">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                {/* Background circle */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="#f3f4f6"
-                  strokeWidth="8"
-                />
-                
-                {/* Pendentes - 41.4% */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="#6b7280"
-                  strokeWidth="8"
-                  strokeDasharray={`${41.4 * 2.51} 251.2`}
-                  strokeDashoffset="0"
-                  className="transition-all duration-500"
-                />
-                
-                {/* Aprovadas - 27.6% */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="#3b82f6"
-                  strokeWidth="8"
-                  strokeDasharray={`${27.6 * 2.51} 251.2`}
-                  strokeDashoffset={`-${41.4 * 2.51}`}
-                  className="transition-all duration-500"
-                />
-                
-                {/* Negociação - 20.7% */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="#1e40af"
-                  strokeWidth="8"
-                  strokeDasharray={`${20.7 * 2.51} 251.2`}
-                  strokeDashoffset={`-${(41.4 + 27.6) * 2.51}`}
-                  className="transition-all duration-500"
-                />
-                
-                {/* Rejeitadas - 10.3% */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="#94a3b8"
-                  strokeWidth="8"
-                  strokeDasharray={`${10.3 * 2.51} 251.2`}
-                  strokeDashoffset={`-${(41.4 + 27.6 + 20.7) * 2.51}`}
-                  className="transition-all duration-500"
-                />
-              </svg>
-              
-              {/* Centro com total */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl sm:text-3xl font-bold text-gray-900">29</span>
-                <span className="text-xs text-gray-500 font-medium">Total</span>
-              </div>
-            </div>
-            
-            {/* Legenda Responsiva */}
-            <div className="mt-4 space-y-2 w-full">
-              {[
-                { label: 'Pendentes', valor: 12, percent: '41.4%', cor: 'bg-gray-500' },
-                { label: 'Aprovadas', valor: 8, percent: '27.6%', cor: 'bg-blue-500' },
-                { label: 'Negociação', valor: 6, percent: '20.7%', cor: 'bg-blue-700' },
-                { label: 'Rejeitadas', valor: 3, percent: '10.3%', cor: 'bg-slate-400' }
-              ].map((item, index) => (
-                <div key={index} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${item.cor}`}></div>
-                    <span className="text-gray-700">{item.label}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-900">{item.valor}</span>
-                    <span className="text-gray-500">{item.percent}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <PropostasChart />
         </div>
         
         {/* Ações Rápidas Melhoradas */}

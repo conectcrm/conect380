@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { I18nProvider } from './contexts/I18nContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import LoginPage from './features/auth/LoginPage';
 import DashboardLayout from './components/layout/DashboardLayout';
 import DashboardPage from './features/dashboard/DashboardPage';
@@ -21,6 +22,7 @@ import { ExemploModalProduto } from './examples/ExemploModalProduto';
 import CombosPage from './features/combos/CombosPage';
 import NovoComboPage from './features/combos/NovoComboPage';
 import CentralOperacoesPage from './pages/CentralOperacoesPage';
+import NotificationsPage from './pages/NotificationsPage';
 // Importar páginas de núcleos
 import { 
   CrmNucleusPage, 
@@ -29,6 +31,7 @@ import {
   SistemaNucleusPage 
 } from './pages/nuclei';
 import ModuleUnderConstruction from './components/common/ModuleUnderConstruction';
+import { UploadDemoPage } from './pages/UploadDemoPage';
 import { useAuth } from './hooks/useAuth';
 
 // Configuração do React Query
@@ -72,6 +75,9 @@ const AppRoutes: React.FC = () => {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           
+          {/* Página de Notificações */}
+          <Route path="/notifications" element={<NotificationsPage />} />
+          
           {/* Central de Operações - Fluxo Integrado */}
           <Route path="/central-operacoes" element={<CentralOperacoesPage />} />
           
@@ -96,6 +102,9 @@ const AppRoutes: React.FC = () => {
           <Route path="/combos/:id/editar" element={<NovoComboPage />} />
           
           <Route path="/agenda" element={<AgendaPage />} />
+          
+          {/* Upload Demo */}
+          <Route path="/upload-demo" element={<UploadDemoPage />} />
           
           {/* Rotas do Núcleo Financeiro */}
           <Route path="/financeiro" element={<FinanceiroPage />} />
@@ -199,21 +208,23 @@ const App: React.FC = () => {
       <I18nProvider>
         <ThemeProvider>
           <AuthProvider>
-            <Router>
-              <div className="App">
-                <AppRoutes />
-                <Toaster
-                  position="top-right"
-                  toastOptions={{
-                    duration: 4000,
-                    style: {
-                      background: '#363636',
-                      color: '#fff',
-                    },
-                  }}
-                />
-              </div>
-            </Router>
+            <NotificationProvider>
+              <Router>
+                <div className="App">
+                  <AppRoutes />
+                  <Toaster
+                    position="top-right"
+                    toastOptions={{
+                      duration: 4000,
+                      style: {
+                        background: '#363636',
+                        color: '#fff',
+                      },
+                    }}
+                  />
+                </div>
+              </Router>
+            </NotificationProvider>
           </AuthProvider>
         </ThemeProvider>
       </I18nProvider>

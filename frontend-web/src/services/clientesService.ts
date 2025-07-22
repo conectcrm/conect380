@@ -55,7 +55,9 @@ class ClientesService {
       }
     });
 
-    const response = await api.get(`${this.baseUrl}?${params.toString()}`);
+    const queryString = params.toString();
+    const response = await api.get(`${this.baseUrl}?${queryString}`);
+    
     return response.data;
   }
 

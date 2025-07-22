@@ -26,10 +26,16 @@ interface Produto {
   categoria: string;
   descricao?: string;
   unidade: string;
-  tipo?: 'produto' | 'combo'; // Novo campo para distinguir produto de combo
+  tipo?: 'produto' | 'combo' | 'software'; // Adicionando software
   produtosCombo?: Produto[]; // Para combos, lista dos produtos inclusos
   precoOriginal?: number; // Para combos, preço original antes do desconto
   desconto?: number; // Para combos, percentual de desconto
+  // Campos específicos para software
+  tipoItem?: 'produto' | 'servico' | 'licenca' | 'modulo' | 'aplicativo';
+  tipoLicenciamento?: string;
+  periodicidadeLicenca?: string;
+  renovacaoAutomatica?: boolean;
+  quantidadeLicencas?: number;
 }
 
 interface ProdutoProposta {

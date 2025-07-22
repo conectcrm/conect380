@@ -20,4 +20,6 @@ export interface PaginationParams {
   search?: string;
   sortBy?: string;
   sortOrder?: 'ASC' | 'DESC';
+  status?: string;
+  tipo?: string;
 }

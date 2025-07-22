@@ -20,7 +20,7 @@ export class ClientesService {
     empresaId: string,
     params: PaginationParams,
   ): Promise<PaginatedResponse<Cliente>> {
-    const { page = 1, limit = 10, search, sortBy = 'created_at', sortOrder = 'DESC' } = params;
+    const { page = 1, limit = 10, search, status, tipo, sortBy = 'created_at', sortOrder = 'DESC' } = params;
     
     const queryBuilder = this.clienteRepository
       .createQueryBuilder('cliente')
@@ -32,6 +32,16 @@ export class ClientesService {
         '(cliente.nome ILIKE :search OR cliente.email ILIKE :search OR cliente.empresa ILIKE :search)',
         { search: `%${search}%` }
       );
+    }
+
+    // Filtro por status
+    if (status) {
+      queryBuilder.andWhere('cliente.status = :status', { status });
+    }
+
+    // Filtro por tipo
+    if (tipo) {
+      queryBuilder.andWhere('cliente.tipo = :tipo', { tipo });
     }
 
     queryBuilder

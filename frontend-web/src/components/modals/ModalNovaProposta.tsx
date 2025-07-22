@@ -25,6 +25,7 @@ import { toast } from 'react-hot-toast';
 import { useCalculosProposta } from '../../features/propostas/hooks/useCalculosProposta';
 import { propostasService, PropostaCompleta, Vendedor } from '../../features/propostas/services/propostasService';
 import { clientesService, Cliente as ClienteService } from '../../services/clientesService';
+import { BadgeProdutoSoftware } from '../common/BadgeProdutoSoftware';
 
 // Interfaces
 interface Cliente {
@@ -46,9 +47,19 @@ interface Produto {
   preco: number;
   categoria: string;
   subcategoria?: string;
-  tipo?: string;
+  tipo?: 'produto' | 'combo' | 'software'; // Adicionando software
   descricao?: string;
-  unidade: string;
+  unidade: string; // Mudando para obrigatório para compatibilidade
+  // Campos específicos para software
+  tipoItem?: 'produto' | 'servico' | 'licenca' | 'modulo' | 'aplicativo';
+  tipoLicenciamento?: string;
+  periodicidadeLicenca?: string;
+  renovacaoAutomatica?: boolean;
+  quantidadeLicencas?: number;
+  // Campos para combos
+  precoOriginal?: number;
+  desconto?: number;
+  produtosCombo?: Produto[];
 }
 
 interface ProdutoProposta {
@@ -71,6 +82,12 @@ interface PropostaFormData {
   observacoes: string;
   incluirImpostosPDF: boolean;
 }
+
+// Função auxiliar para detectar se é produto de software
+const isProdutoSoftware = (produto: Produto): boolean => {
+  return produto.tipo === 'software' || 
+         (produto.tipoItem && ['licenca', 'modulo', 'aplicativo'].includes(produto.tipoItem));
+};
 
 // Schema de validação por etapa
 const etapaSchemas = {
@@ -878,6 +895,8 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         className={`product-card p-4 border rounded-lg hover:bg-white cursor-pointer transition-colors ${
                           produto.tipo === 'combo' 
                             ? 'border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50' 
+                            : isProdutoSoftware(produto)
+                            ? 'border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50'
                             : 'border-gray-200'
                         }`}
                       >
@@ -890,6 +909,13 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                 COMBO
                               </span>
                             )}
+                            {produto.tipoItem && (
+                              <BadgeProdutoSoftware 
+                                tipoItem={produto.tipoItem} 
+                                tamanho="sm" 
+                                showLabel={false}
+                              />
+                            )}
                           </div>
                           <div className="text-right">
                             <div className="text-lg font-bold text-[#159A9C]">
@@ -898,6 +924,11 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                             {produto.tipo === 'combo' && produto.precoOriginal && (
                               <div className="text-sm text-gray-500 line-through">
                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(produto.precoOriginal)}
+                              </div>
+                            )}
+                            {isProdutoSoftware(produto) && produto.periodicidadeLicenca && (
+                              <div className="text-xs text-purple-600">
+                                / {produto.periodicidadeLicenca}
                               </div>
                             )}
                           </div>
@@ -910,6 +941,8 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                             <span className={`px-2 py-1 text-xs rounded ${
                               produto.tipo === 'combo' 
                                 ? 'bg-amber-100 text-amber-800' 
+                                : isProdutoSoftware(produto)
+                                ? 'bg-purple-100 text-purple-800'
                                 : 'bg-gray-100 text-gray-700'
                             }`}>
                               {produto.categoria}
@@ -924,9 +957,14 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                 -{produto.desconto.toFixed(1)}%
                               </span>
                             )}
+                            {isProdutoSoftware(produto) && produto.tipoLicenciamento && (
+                              <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded">
+                                {produto.tipoLicenciamento}
+                              </span>
+                            )}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {produto.unidade}
+                            {produto.unidade || (isProdutoSoftware(produto) ? 'licenças' : 'unid')}
                           </div>
                         </div>
                       </div>
@@ -963,7 +1001,10 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  Quantidade
+                                  {field.produto.tipoItem && ['licenca', 'modulo', 'aplicativo'].includes(field.produto.tipoItem) 
+                                    ? 'Quantidade de Licenças' 
+                                    : 'Quantidade'
+                                  }
                                 </label>
                                 <Controller
                                   name={`produtos.${index}.quantidade`}
@@ -974,6 +1015,10 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                       type="number"
                                       min="1"
                                       step="1"
+                                      placeholder={field.produto.tipoItem && ['licenca', 'modulo', 'aplicativo'].includes(field.produto.tipoItem) 
+                                        ? 'Ex: 10 licenças' 
+                                        : 'Ex: 1'
+                                      }
                                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                                       onChange={(e) => {
                                         const quantidade = parseInt(e.target.value) || 1;
@@ -1247,7 +1292,13 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                 <div className="space-y-2">
                   {produtos.map((produto, index) => (
                     <div key={produto.id} className="flex justify-between text-sm">
-                      <span>{produto.produto.nome} (x{produto.quantidade})</span>
+                      <span>
+                        {produto.produto.nome} (x{produto.quantidade}{' '}
+                        {produto.produto.tipoItem && ['licenca', 'modulo', 'aplicativo'].includes(produto.produto.tipoItem) 
+                          ? 'licenças' 
+                          : produto.produto.unidade || 'unidades'
+                        })
+                      </span>
                       <span className="font-medium">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(produto.subtotal)}
                       </span>
