@@ -4,6 +4,7 @@ import { useI18n } from '../../contexts/I18nContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Eye, EyeOff, Loader2, Mail, Lock, ArrowRight, Check } from 'lucide-react';
+import ConectCRMLogoFinal from '../../components/ui/ConectCRMLogoFinal';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -81,11 +82,8 @@ const LoginPage: React.FC = () => {
         <div className="relative z-10 flex flex-col justify-center p-12 text-white">
           {/* Logo */}
           <div className="mb-8">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center">
-                <span className="text-2xl font-bold text-[#159A9C]">F</span>
-              </div>
-              <span className="text-3xl font-bold">Fênix CRM</span>
+            <div className="flex items-center justify-center mb-6">
+              <ConectCRMLogoFinal size="2xl" variant="full" />
             </div>
             <h2 className="text-4xl font-bold mb-4">
               Transforme seus<br />
@@ -137,11 +135,8 @@ const LoginPage: React.FC = () => {
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
-            <div className="inline-flex items-center space-x-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] rounded-xl flex items-center justify-center">
-                <span className="text-lg font-bold text-white">F</span>
-              </div>
-              <span className="text-2xl font-bold text-[#002333]">Fênix CRM</span>
+            <div className="inline-flex items-center justify-center mb-4">
+              <ConectCRMLogoFinal size="lg" variant="full" />
             </div>
           </div>
 
@@ -261,7 +256,7 @@ const LoginPage: React.FC = () => {
                 </div>
                 <div className="relative flex justify-center text-sm">
                   <span className="px-4 bg-white text-[#B4BEC9] font-medium">
-                    Novo no Fênix CRM?
+                    Novo no Conect CRM?
                   </span>
                 </div>
               </div>

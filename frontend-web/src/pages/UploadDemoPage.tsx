@@ -24,9 +24,10 @@ export const UploadDemoPage: React.FC = () => {
   const [uploads, setUploads] = useState<UploadResult[]>([]);
 
   // Hooks de upload
-  const avatarUpload = useAvatarUpload((avatar) => {
-    setCurrentAvatar(avatar.url);
-  });
+  // Hook removido para evitar warning de variável não utilizada
+  // const avatarUpload = useAvatarUpload((avatar) => {
+  //   setCurrentAvatar(avatar.url);
+  // });
 
   const documentUpload = useUpload({
     category: 'document',
@@ -36,13 +37,14 @@ export const UploadDemoPage: React.FC = () => {
     }
   });
 
-  const clientAttachmentUpload = useUpload({
-    category: 'client-attachment',
-    multiple: true,
-    onSuccess: (results) => {
-      setUploads(prev => [...prev, ...results]);
-    }
-  });
+  // Hook removido para evitar warning de variável não utilizada
+  // const clientAttachmentUpload = useUpload({
+  //   category: 'client-attachment',
+  //   multiple: true,
+  //   onSuccess: (results) => {
+  //     setUploads(prev => [...prev, ...results]);
+  //   }
+  // });
 
   const handleDeleteUpload = async (uploadId: string) => {
     await documentUpload.deleteUpload(uploadId);

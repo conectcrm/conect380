@@ -6,7 +6,7 @@ export class MailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
-    this.transporter = nodemailer.createTransporter({
+    this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.SMTP_PORT || '587'),
       secure: false,
@@ -30,7 +30,7 @@ export class MailService {
       <html>
       <head>
         <meta charset="UTF-8">
-        <title>Ativar Conta - Fênix CRM</title>
+        <title>Ativar Conta - Conect CRM</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -51,13 +51,13 @@ export class MailService {
       <body>
         <div class="container">
           <div class="header">
-            <h1>🎉 Bem-vindo ao Fênix CRM!</h1>
+            <h1>🎉 Bem-vindo ao Conect CRM!</h1>
           </div>
           
           <div class="content">
             <p>Olá <strong>${usuario}</strong>,</p>
             
-            <p>Obrigado por escolher o Fênix CRM para <strong>${empresa}</strong>!</p>
+            <p>Obrigado por escolher o Conect CRM para <strong>${empresa}</strong>!</p>
             
             <p>Para ativar sua conta e começar a usar nosso sistema, clique no botão abaixo:</p>
             
@@ -72,7 +72,7 @@ export class MailService {
             
             <hr style="margin: 30px 0;">
             
-            <h3>🚀 O que você pode fazer com o Fênix CRM:</h3>
+            <h3>🚀 O que você pode fazer com o Conect CRM:</h3>
             <ul>
               <li>✅ Gerenciar seus clientes de forma inteligente</li>
               <li>✅ Controlar produtos e estoque</li>
@@ -85,8 +85,8 @@ export class MailService {
           </div>
           
           <div class="footer">
-            <p>Fênix CRM - Sistema de Gestão Inteligente</p>
-            <p>Precisa de ajuda? <a href="mailto:suporte@fenixcrm.com" style="color: #159A9C;">suporte@fenixcrm.com</a></p>
+            <p>Conect CRM - Sistema de Gestão Inteligente</p>
+            <p>Precisa de ajuda? <a href="mailto:suporte@conectcrm.com" style="color: #159A9C;">suporte@conectcrm.com</a></p>
           </div>
         </div>
       </body>
@@ -94,9 +94,9 @@ export class MailService {
     `;
 
     const mailOptions = {
-      from: `"Fênix CRM" <${process.env.SMTP_USER}>`,
+      from: `"Conect CRM" <${process.env.SMTP_USER}>`,
       to,
-      subject: `🎉 Ative sua conta no Fênix CRM - ${empresa}`,
+      subject: `🎉 Ative sua conta no Conect CRM - ${empresa}`,
       html: htmlContent,
     };
 
@@ -122,7 +122,7 @@ export class MailService {
       <html>
       <head>
         <meta charset="UTF-8">
-        <title>Conta Ativada - Fênix CRM</title>
+        <title>Conta Ativada - Conect CRM</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -156,7 +156,7 @@ export class MailService {
               <h3>📋 Informações da sua conta:</h3>
               <ul>
                 <li><strong>Empresa:</strong> ${empresa}</li>
-                <li><strong>Subdomínio:</strong> ${subdominio}.fenixcrm.com</li>
+                <li><strong>Subdomínio:</strong> ${subdominio}.conectcrm.com</li>
                 <li><strong>Status:</strong> Trial (30 dias grátis)</li>
                 <li><strong>Acesso:</strong> Administrador</li>
               </ul>
@@ -179,8 +179,8 @@ export class MailService {
           </div>
           
           <div class="footer">
-            <p>Fênix CRM - Sistema de Gestão Inteligente</p>
-            <p>Precisa de ajuda? <a href="mailto:suporte@fenixcrm.com" style="color: #159A9C;">suporte@fenixcrm.com</a></p>
+            <p>Conect CRM - Sistema de Gestão Inteligente</p>
+            <p>Precisa de ajuda? <a href="mailto:suporte@conectcrm.com" style="color: #159A9C;">suporte@conectcrm.com</a></p>
           </div>
         </div>
       </body>
@@ -188,9 +188,9 @@ export class MailService {
     `;
 
     const mailOptions = {
-      from: `"Fênix CRM" <${process.env.SMTP_USER}>`,
+      from: `"Conect CRM" <${process.env.SMTP_USER}>`,
       to,
-      subject: `🚀 Bem-vindo ao Fênix CRM - ${empresa}`,
+      subject: `🚀 Bem-vindo ao Conect CRM - ${empresa}`,
       html: htmlContent,
     };
 

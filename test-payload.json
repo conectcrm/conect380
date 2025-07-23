@@ -1,0 +1,14 @@
+{
+  "titulo": "Teste Manual",
+  "descricao": "Teste de criacao",
+  "valor": 1000.00,
+  "probabilidade": 50,
+  "estagio": "leads",
+  "prioridade": "medium",
+  "origem": "website",
+  "responsavel_id": "mock-user",
+  "nomeContato": "João Teste",
+  "emailContato": "joao@teste.com",
+  "telefoneContato": "(11) 99999-9999",
+  "empresaContato": "Empresa Teste"
+}

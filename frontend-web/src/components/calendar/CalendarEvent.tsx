@@ -67,10 +67,17 @@ export const CalendarEventComponent: React.FC<CalendarEventComponentProps> = ({
     }
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleDragStart = (e: React.DragEvent) => {
     if (onDragStart) {
-      e.preventDefault();
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', event.id);
       onDragStart(event.id);
+    }
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    if (onDragEnd) {
+      onDragEnd();
     }
   };
 
@@ -97,9 +104,9 @@ export const CalendarEventComponent: React.FC<CalendarEventComponentProps> = ({
         ...style
       }}
       onClick={handleClick}
-      onMouseDown={handleMouseDown}
-      onMouseUp={onDragEnd}
-      draggable={false}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      draggable={true}
     >
       {/* Conteúdo principal */}
       <div className={`p-2 ${compact ? 'space-y-1' : 'space-y-2'}`}>

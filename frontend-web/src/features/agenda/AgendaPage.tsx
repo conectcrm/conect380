@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import { MonthView } from '../../components/calendar/MonthView';
 import { WeekView } from '../../components/calendar/WeekView';
-import { GoogleEventModal } from '../../components/calendar/GoogleEventModalOptimized';
+import { CreateEventModal } from '../../components/calendar/CreateEventModal';
 import { useCalendarEvents, useCalendarView, useCalendarDragDrop } from '../../hooks/useCalendar';
+import { useNotifications } from '../../contexts/NotificationContext';
 import { CalendarEvent } from '../../types/calendar';
 import { getMonthName, formatDate } from '../../utils/calendarUtils';
 import {
@@ -22,6 +23,9 @@ import {
 } from 'lucide-react';
 
 export const AgendaPage: React.FC = () => {
+  // Hook de notificações
+  const { addNotification, showSuccess, showWarning } = useNotifications();
+  
   const {
     events,
     selectedEvent,
@@ -60,6 +64,24 @@ export const AgendaPage: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [filterCollaborator, setFilterCollaborator] = useState<string>('');
 
+  // Função para verificar conflitos de horário
+  const checkEventConflicts = (newEvent: any, existingEvents: CalendarEvent[]) => {
+    if (newEvent.allDay) return []; // Eventos de dia todo não geram conflito
+    
+    const newStart = new Date(newEvent.start);
+    const newEnd = new Date(newEvent.end);
+    
+    return existingEvents.filter(event => {
+      if (event.allDay) return false;
+      
+      const eventStart = new Date(event.start);
+      const eventEnd = new Date(event.end);
+      
+      // Verificar sobreposição de horários
+      return (newStart < eventEnd && newEnd > eventStart);
+    });
+  };
+
   // Handlers
   const handleEventClick = (event: CalendarEvent) => {
     setSelectedEvent(event);
@@ -79,40 +101,174 @@ export const AgendaPage: React.FC = () => {
   };
 
   const handleSaveEvent = async (eventData: any) => {
-    // Converter dados do GoogleEventModal para o formato CalendarEvent
+    // Converter dados do CreateEventModal para o formato CalendarEvent
     const calendarEventData: Omit<CalendarEvent, 'id'> = {
       title: eventData.title,
       description: eventData.description || '',
-      start: new Date(eventData.start),
-      end: new Date(eventData.end),
+      start: eventData.start,
+      end: eventData.end,
       location: eventData.location || '',
       allDay: eventData.allDay || false,
-      type: eventData.category || 'reuniao',
-      priority: eventData.priority || 'normal',
-      status: 'confirmed',
-      collaborator: eventData.collaborator || '',
-      category: eventData.category || '',
-      color: eventData.color || 'blue'
+      type: 'meeting',
+      priority: 'normal',
+      status: eventData.status || 'confirmed',
+      collaborator: '',
+      category: 'meeting',
+      color: 'blue',
+      attendees: eventData.attendees || []
     };
 
-    if (selectedEvent) {
-      updateEvent(selectedEvent.id, calendarEventData);
-    } else {
-      addEvent(calendarEventData);
+    try {
+      if (selectedEvent) {
+        updateEvent(selectedEvent.id, calendarEventData);
+      } else {
+        addEvent(calendarEventData);
+        
+        // Verificar conflitos de horário para novos eventos
+        const conflicts = checkEventConflicts(eventData, events);
+        if (conflicts.length > 0) {
+          showWarning(
+            '⚠️ Conflito de Horário',
+            `Este evento conflita com ${conflicts.length} outro(s) evento(s)`
+          );
+        }
+      }
+    } catch (error) {
+      addNotification({
+        title: '❌ Erro na Agenda',
+        message: 'Não foi possível salvar o evento. Tente novamente.',
+        type: 'error',
+        priority: 'high'
+      });
     }
   };
 
   const handleDeleteEvent = async (eventId: string) => {
-    deleteEvent(eventId);
+    try {
+      deleteEvent(eventId);
+    } catch (error) {
+      addNotification({
+        title: '❌ Erro ao Excluir',
+        message: 'Não foi possível excluir o evento. Tente novamente.',
+        type: 'error',
+        priority: 'high'
+      });
+    }
   };
 
   const handleDuplicateEvent = (eventId: string) => {
-    duplicateEvent(eventId);
+    try {
+      duplicateEvent(eventId);
+      showSuccess(
+        'Evento Duplicado',
+        'Uma cópia do evento foi criada com sucesso'
+      );
+      
+      addNotification({
+        title: '📋 Evento Duplicado',
+        message: 'Uma cópia do evento foi adicionada à agenda',
+        type: 'success',
+        priority: 'low'
+      });
+    } catch (error) {
+      addNotification({
+        title: '❌ Erro ao Duplicar',
+        message: 'Não foi possível duplicar o evento. Tente novamente.',
+        type: 'error',
+        priority: 'high'
+      });
+    }
   };
 
   const handleDrop = (targetDate: Date) => {
+    if (draggedEvent) {
+      // Notificação de movimento bem-sucedido
+      showSuccess(
+        'Evento Movido',
+        `"${draggedEvent.title}" foi movido para ${targetDate.toLocaleDateString('pt-BR')}`
+      );
+      
+      addNotification({
+        title: '🔄 Evento Reagendado',
+        message: `"${draggedEvent.title}" foi movido para ${targetDate.toLocaleDateString('pt-BR')}`,
+        type: 'info',
+        priority: 'medium',
+        entityType: 'agenda',
+        entityId: draggedEvent.id
+      });
+    }
     setDrop(targetDate);
   };
+
+  // Verificar eventos próximos a cada 5 minutos
+  useEffect(() => {
+    const checkUpcomingEvents = () => {
+      const now = new Date();
+      const next15Minutes = new Date(now.getTime() + 15 * 60 * 1000);
+      const next60Minutes = new Date(now.getTime() + 60 * 60 * 1000);
+
+      events.forEach(event => {
+        const eventStart = new Date(event.start);
+        
+        // Alertas para eventos em 15 minutos
+        if (eventStart > now && eventStart <= next15Minutes && !event.allDay) {
+          addNotification({
+            title: '⏰ Evento em 15 minutos!',
+            message: `"${event.title}" começará em breve${event.location ? ` - ${event.location}` : ''}`,
+            type: 'warning',
+            priority: 'high',
+            entityType: 'agenda',
+            entityId: event.id,
+            autoClose: false
+          });
+        }
+        
+        // Alertas para eventos em 1 hora
+        if (eventStart > next15Minutes && eventStart <= next60Minutes && !event.allDay) {
+          addNotification({
+            title: '🔔 Evento em 1 hora',
+            message: `"${event.title}" está programado para ${eventStart.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+            type: 'info',
+            priority: 'medium',
+            entityType: 'agenda',
+            entityId: event.id
+          });
+        }
+      });
+    };
+
+    // Verificar imediatamente e depois a cada 5 minutos
+    checkUpcomingEvents();
+    const interval = setInterval(checkUpcomingEvents, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [events, addNotification]);
+
+  // Notificação de boas-vindas e resumo da agenda
+  useEffect(() => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+    
+    // Eventos de hoje
+    const todayEvents = events.filter(event => {
+      const eventDate = new Date(event.start);
+      return eventDate >= today && eventDate < tomorrow;
+    });
+    
+    // Eventos pendentes
+    const pendingEvents = events.filter(event => event.status === 'pending');
+    
+    // Notificação de resumo
+    setTimeout(() => {
+      addNotification({
+        title: '📅 Agenda Carregada',
+        message: `${todayEvents.length} eventos hoje • ${pendingEvents.length} pendentes`,
+        type: 'info',
+        priority: 'low'
+      });
+    }, 1000);
+  }, []); // Só executar uma vez ao carregar
 
   const handleCloseModal = () => {
     setShowEventModal(false);
@@ -523,30 +679,13 @@ export const AgendaPage: React.FC = () => {
       </div>
 
       {/* Modal de Evento */}
-      <GoogleEventModal
+      <CreateEventModal
         isOpen={showEventModal}
         onClose={handleCloseModal}
         onSave={handleSaveEvent}
         onDelete={handleDeleteEvent}
         event={selectedEvent}
-        isLoading={false}
-        availableCalendars={[
-          { id: 'primary', name: 'Principal', color: '#159A9C' },
-          { id: 'work', name: 'Trabalho', color: '#137333' },
-          { id: 'personal', name: 'Pessoal', color: '#9334e6' },
-          { id: 'meetings', name: 'Reuniões', color: '#d93025' },
-          { id: 'events', name: 'Eventos', color: '#f57c00' }
-        ]}
-        currentUser={{
-          id: 'current-user',
-          name: 'Você',
-          email: 'usuario@empresa.com',
-          status: 'accepted',
-          role: 'organizer',
-          canModifyEvent: true,
-          canInviteOthers: true,
-          canSeeGuestList: true
-        }}
+        selectedDate={eventModalDate}
       />
     </div>
   );

@@ -22,6 +22,17 @@ const VendasNucleusPage: React.FC = () => {
         status: 'active'
       },
       {
+        id: 'funil-vendas',
+        name: 'Funil de Vendas',
+        description: 'Pipeline visual de oportunidades com Kanban drag-and-drop e gestão completa do ciclo de vendas.',
+        href: '/funil-vendas',
+        icon: TrendingUp,
+        notifications: 0,
+        badge: 'Novo',
+        badgeColor: 'green',
+        status: 'active'
+      },
+      {
         id: 'produtos',
         name: 'Produtos',
         description: 'Catálogo de produtos e serviços com preços dinâmicos e configurações personalizadas.',

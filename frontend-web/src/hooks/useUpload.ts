@@ -210,10 +210,10 @@ export const useClientAttachments = (clientId: string) => {
     // Aqui você pode adicionar lógica para associar os uploads ao cliente
     // Por exemplo, salvar no localStorage com o clientId
     if (results.length > 0) {
-      const clientUploads = localStorage.getItem(`fenixcrm_client_uploads_${clientId}`);
+      const clientUploads = localStorage.getItem(`conectcrm_client_uploads_${clientId}`);
       const existing = clientUploads ? JSON.parse(clientUploads) : [];
       const updated = [...existing, ...results.map(r => r.id)];
-      localStorage.setItem(`fenixcrm_client_uploads_${clientId}`, JSON.stringify(updated));
+      localStorage.setItem(`conectcrm_client_uploads_${clientId}`, JSON.stringify(updated));
     }
     
     return results;

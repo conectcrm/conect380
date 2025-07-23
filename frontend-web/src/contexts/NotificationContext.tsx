@@ -92,9 +92,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
   // Carregar dados do localStorage na inicialização
   useEffect(() => {
-    const savedNotifications = localStorage.getItem('fenix-notifications');
-    const savedReminders = localStorage.getItem('fenix-reminders');
-    const savedSettings = localStorage.getItem('fenix-notification-settings');
+    const savedNotifications = localStorage.getItem('conect-notifications');
+    const savedReminders = localStorage.getItem('conect-reminders');
+    const savedSettings = localStorage.getItem('conect-notification-settings');
 
     if (savedNotifications) {
       try {
@@ -139,17 +139,17 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
   // Salvar notificações no localStorage
   useEffect(() => {
-    localStorage.setItem('fenix-notifications', JSON.stringify(notifications));
+    localStorage.setItem('conect-notifications', JSON.stringify(notifications));
   }, [notifications]);
 
   // Salvar lembretes no localStorage
   useEffect(() => {
-    localStorage.setItem('fenix-reminders', JSON.stringify(reminders));
+    localStorage.setItem('conect-reminders', JSON.stringify(reminders));
   }, [reminders]);
 
   // Salvar configurações no localStorage
   useEffect(() => {
-    localStorage.setItem('fenix-notification-settings', JSON.stringify(settings));
+    localStorage.setItem('conect-notification-settings', JSON.stringify(settings));
   }, [settings]);
 
   // Verificar lembretes periodicamente

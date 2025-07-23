@@ -1,0 +1,327 @@
+/* Estilos personalizados para o Modal de Criação de Oportunidade */
+
+/* Animações suaves */
+.modal-criar-oportunidade {
+  animation: fadeInScale 0.3s ease-out;
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Estilo do slider de probabilidade */
+.probability-slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 8px;
+  border-radius: 5px;
+  outline: none;
+  transition: opacity 0.2s;
+}
+
+.probability-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #159A9C;
+  cursor: pointer;
+  border: 3px solid white;
+  box-shadow: 0 2px 8px rgba(21, 154, 156, 0.3);
+  transition: all 0.2s ease;
+}
+
+.probability-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(21, 154, 156, 0.5);
+}
+
+.probability-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #159A9C;
+  cursor: pointer;
+  border: 3px solid white;
+  box-shadow: 0 2px 8px rgba(21, 154, 156, 0.3);
+  transition: all 0.2s ease;
+}
+
+/* Estilo para o dropdown de clientes */
+.cliente-dropdown {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.cliente-dropdown-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.cliente-dropdown-item:hover {
+  background-color: #f9fafb;
+}
+
+.cliente-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+/* Estilo para tags */
+.tag-input {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: white;
+  align-items: center;
+}
+
+.tag-item {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  background: rgba(21, 154, 156, 0.1);
+  color: #159A9C;
+  border: 1px solid rgba(21, 154, 156, 0.2);
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.tag-remove {
+  margin-left: 6px;
+  color: #159A9C;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.tag-remove:hover {
+  color: #dc2626;
+}
+
+/* Estilo para cards de preview */
+.preview-card {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.3s ease;
+}
+
+.preview-card:hover {
+  border-color: #159A9C;
+  background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
+}
+
+/* Estilo para o progress bar */
+.progress-step {
+  transition: all 0.3s ease;
+}
+
+.progress-step.active {
+  background-color: #159A9C;
+  color: white;
+  box-shadow: 0 0 0 4px rgba(21, 154, 156, 0.2);
+}
+
+.progress-step.completed {
+  background-color: #10b981;
+  color: white;
+}
+
+.progress-line {
+  height: 2px;
+  background-color: #e5e7eb;
+  transition: all 0.3s ease;
+}
+
+.progress-line.completed {
+  background-color: #159A9C;
+}
+
+/* Estilo para campos de input focus */
+.form-input {
+  transition: all 0.2s ease;
+  border: 1px solid #d1d5db;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #159A9C;
+  box-shadow: 0 0 0 3px rgba(21, 154, 156, 0.1);
+}
+
+.form-input.error {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+/* Estilo para botões de tipo de contato */
+.contact-type-button {
+  transition: all 0.2s ease;
+  transform: translateY(0);
+}
+
+.contact-type-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.contact-type-button.active {
+  background-color: #159A9C;
+  color: white;
+  box-shadow: 0 4px 12px rgba(21, 154, 156, 0.3);
+}
+
+/* Estilo para seções coloridas */
+.section-blue {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  border: 1px solid #93c5fd;
+}
+
+.section-green {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  border: 1px solid #6ee7b7;
+}
+
+.section-gray {
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  border: 1px solid #e5e7eb;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .modal-criar-oportunidade {
+    margin: 16px;
+    max-height: calc(100vh - 32px);
+  }
+  
+  .modal-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .progress-step {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
+  }
+  
+  .progress-line {
+    width: 40px;
+  }
+}
+
+/* Scrollbar personalizada */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Estilo para ícones de status */
+.status-icon {
+  transition: all 0.2s ease;
+}
+
+.status-icon:hover {
+  transform: scale(1.1);
+}
+
+/* Estilo para área de drop (se necessário para futuras funcionalidades) */
+.drop-zone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 24px;
+  text-align: center;
+  background: #f8fafc;
+  transition: all 0.2s ease;
+}
+
+.drop-zone.active {
+  border-color: #159A9C;
+  background: #f0fdfa;
+}
+
+/* Estilo para loading states */
+.loading-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Estilo para mensagens de sucesso/erro */
+.error-message {
+  color: #dc2626;
+  font-size: 14px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.success-message {
+  color: #059669;
+  font-size: 14px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Estilo para o header gradient */
+.header-gradient {
+  background: linear-gradient(135deg, #159A9C 0%, #0F7B7E 100%);
+}
+
+/* Micro-interações */
+.interactive-element {
+  transition: all 0.2s ease;
+}
+
+.interactive-element:hover {
+  transform: translateY(-1px);
+}
+
+.interactive-element:active {
+  transform: translateY(0);
+}

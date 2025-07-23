@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Categorias - FenixCRM</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #159A9C;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0d7a7d;
+        }
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+        }
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .success {
+            color: #155724;
+            background: #d4edda;
+            border-color: #c3e6cb;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste de Integração - Categorias de Produtos</h1>
+    
+    <div class="card">
+        <h2>📡 Teste de Conexão com Backend</h2>
+        <button onclick="testarConexao()">Testar Conexão</button>
+        <button onclick="listarCategorias()">Listar Categorias</button>
+        <button onclick="criarCategoriaTestet()">Criar Categoria de Teste</button>
+        <div id="resultado-conexao" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="card">
+        <h2>📝 Resultado dos Testes</h2>
+        <div id="log-testes"></div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:3001/api';
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log-testes');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'result error' : 
+                             type === 'success' ? 'result success' : 'result';
+            
+            logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        async function testarConexao() {
+            log('🔍 Testando conexão com o backend...');
+            
+            try {
+                const response = await fetch(`${BASE_URL}/categorias-produtos`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                log(`✅ Conexão estabelecida! Status: ${response.status}`, 'success');
+                log(`📊 Resposta: ${JSON.stringify(data, null, 2)}`);
+                
+            } catch (error) {
+                log(`❌ Erro de conexão: ${error.message}`, 'error');
+                log(`💡 Verifique se o backend está rodando em ${BASE_URL}`, 'error');
+            }
+        }
+
+        async function listarCategorias() {
+            log('📋 Listando categorias cadastradas...');
+            
+            try {
+                const response = await fetch(`${BASE_URL}/categorias-produtos`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    if (data.data.length === 0) {
+                        log('📪 Nenhuma categoria encontrada no banco de dados', 'info');
+                        log('💡 Isso explica por que o dropdown está vazio!', 'info');
+                    } else {
+                        log(`✅ ${data.data.length} categorias encontradas:`, 'success');
+                        data.data.forEach((categoria, index) => {
+                            log(`${index + 1}. ${categoria.nome} (ID: ${categoria.id})`);
+                        });
+                    }
+                } else {
+                    log(`⚠️ Resposta inesperada: ${JSON.stringify(data)}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro ao listar categorias: ${error.message}`, 'error');
+            }
+        }
+
+        async function criarCategoriaTestet() {
+            log('🆕 Criando categoria de teste...');
+            
+            const categoriaTeste = {
+                nome: 'Categoria Teste',
+                descricao: 'Categoria criada para teste de integração',
+                ativo: true
+            };
+            
+            try {
+                const response = await fetch(`${BASE_URL}/categorias-produtos`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(categoriaTeste)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    log(`✅ Categoria criada com sucesso!`, 'success');
+                    log(`📝 Dados: ${JSON.stringify(data.data, null, 2)}`);
+                    log('🔄 Agora teste novamente o modal de produtos!', 'success');
+                } else {
+                    log(`❌ Falha ao criar categoria: ${data.message}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro ao criar categoria: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-executar teste básico
+        window.onload = function() {
+            log('🚀 Página de teste carregada');
+            log('💡 Clique nos botões acima para executar os testes');
+        };
+    </script>
+</body>
+</html>

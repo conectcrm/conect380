@@ -16,6 +16,7 @@ import { useModalKeyboardShortcuts } from '../../hooks/useModalKeyboardShortcuts
 import { SaveStatus } from '../SaveStatus';
 import { useProdutoSoftware } from '../../hooks/useProdutoSoftware';
 import { camposSoftware, precisaCamposSoftware, validarDadosSoftware } from '../../config/camposSoftware';
+import { categoriasProdutosService } from '../../services/categoriasProdutosService';
 
 // Tipos de dados
 interface ProdutoFormData {
@@ -146,8 +147,56 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
   const [isFormInitialized, setIsFormInitialized] = useState(false);
   const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
 
-  // Integração com adapter para categorias dinâmicas
-  const { categorias: categoriasDisponiveis } = useProdutosParaPropostas();
+  // Estado para categorias carregadas do backend
+  const [categorias, setCategorias] = useState<string[]>([]);
+  const [loadingCategorias, setLoadingCategorias] = useState(false);
+
+  // Carregar categorias do backend quando o modal abrir
+  useEffect(() => {
+    const carregarCategorias = async () => {
+      if (!isOpen) return;
+
+      try {
+        setLoadingCategorias(true);
+        const categoriasData = await categoriasProdutosService.listarCategorias();
+        const categoriasNomes = categoriasData.map(cat => cat.nome);
+        
+        // Se há categorias cadastradas, usa elas
+        if (categoriasNomes.length > 0) {
+          setCategorias(categoriasNomes);
+        } else {
+          // Senão, usa categorias padrão como fallback
+          setCategorias([
+            'Software',
+            'Hardware',
+            'Consultoria',
+            'Marketing',
+            'Vendas',
+            'Suporte',
+            'Treinamento',
+            'Licenciamento'
+          ]);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar categorias:', error);
+        // Em caso de erro, usa categorias padrão
+        setCategorias([
+          'Software',
+          'Hardware',
+          'Consultoria',
+          'Marketing',
+          'Vendas',
+          'Suporte',
+          'Treinamento',
+          'Licenciamento'
+        ]);
+      } finally {
+        setLoadingCategorias(false);
+      }
+    };
+
+    carregarCategorias();
+  }, [isOpen]);
 
   const {
     register,
@@ -443,13 +492,24 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                     <label htmlFor="categoria" className="block text-sm font-medium text-gray-700 mb-1">
                       Categoria *
                     </label>
-                    <input
-                      {...register('categoria')}
-                      type="text"
-                      id="categoria"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Digite a categoria"
-                    />
+                    {loadingCategorias ? (
+                      <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                        Carregando categorias...
+                      </div>
+                    ) : (
+                      <select
+                        {...register('categoria')}
+                        id="categoria"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Selecione uma categoria</option>
+                        {categorias.map((categoria) => (
+                          <option key={categoria} value={categoria}>
+                            {categoria}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     {errors.categoria && (
                       <p className="mt-1 text-sm text-red-600">{errors.categoria.message}</p>
                     )}

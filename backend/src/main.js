@@ -61,8 +61,8 @@ function bootstrap() {
                         transform: true
                     }));
                     config = new swagger_1.DocumentBuilder()
-                        .setTitle('Fênix CRM API')
-                        .setDescription('API completa do sistema Fênix CRM')
+                        .setTitle('Conect CRM API')
+                        .setDescription('API completa do sistema Conect CRM')
                         .setVersion('1.0')
                         .addBearerAuth()
                         .build();

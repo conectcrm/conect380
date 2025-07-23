@@ -6,6 +6,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { formatCompanyName, formatUserName } from '../../utils/textUtils';
 import SimpleNavGroup, { NavigationNucleus } from '../navigation/SimpleNavGroup';
 import NotificationCenter from '../notifications/NotificationCenter';
+import ConectCRMLogoFinal from '../ui/ConectCRMLogoFinal';
 import { 
   Menu, 
   X, 
@@ -79,6 +80,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         title: 'Propostas',
         subtitle: 'Acompanhe suas propostas comerciais'
       },
+      '/funil-vendas': {
+        title: 'Funil de Vendas',
+        subtitle: 'Pipeline de oportunidades e negociações'
+      },
       '/produtos': {
         title: 'Produtos',
         subtitle: 'Catálogo de produtos e serviços'
@@ -110,7 +115,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     };
 
     return routeMap[pathname] || {
-      title: 'Fênix CRM',
+      title: 'Conect CRM',
       subtitle: 'Sistema de gestão empresarial'
     };
   };
@@ -267,11 +272,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
             <div className="flex-shrink-0 flex items-center px-4 mb-6">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] rounded-xl flex items-center justify-center text-white font-bold shadow-lg transition-all duration-200 hover:shadow-xl">
-                  F
-                </div>
+                <ConectCRMLogoFinal size="sm" variant="full" />
                 <div>
-                  <h1 className="text-lg font-bold text-gray-900">Fênix CRM</h1>
                   <p className="text-xs text-blue-600 font-medium">
                     {formatCompanyName(user?.empresa?.nome || 'Demo Corp')}
                   </p>
@@ -301,7 +303,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                       F
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h1 className="text-lg font-bold text-gray-900 truncate">Fênix CRM</h1>
+                      <ConectCRMLogoFinal size="sm" variant="text" />
                       <p className="text-xs text-blue-600 font-medium truncate">
                         {formatCompanyName(user?.empresa?.nome || 'Demo Corp')}
                       </p>
@@ -317,10 +319,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 ) : (
                   // Layout quando colapsada - centralizado
                   <div className="flex flex-col items-center gap-2 w-full">
-                    <div className="w-8 h-8 bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] rounded-xl flex items-center justify-center text-white font-bold shadow-lg transition-all duration-200 hover:shadow-xl group relative">
-                      F
+                    <div className="relative group">
+                      <ConectCRMLogoFinal size="sm" variant="icon" />
                       <div className="absolute left-full ml-3 px-3 py-2 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[60] shadow-lg">
-                        <div className="font-semibold">Fênix CRM</div>
+                        <div className="font-semibold">Conect CRM</div>
                         <div className="text-xs text-gray-300">
                           {formatCompanyName(user?.empresa?.nome || 'Demo Corp')}
                         </div>
@@ -365,7 +367,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
                 <div className="flex items-center gap-3">
                   <h1 className="text-lg font-semibold text-gray-900">
-                    {formatCompanyName(user?.empresa?.nome || 'Fênix CRM Demo')}
+                    {formatCompanyName(user?.empresa?.nome || 'Conect CRM Demo')}
                   </h1>
                   
                   {/* Status Online Unificado */}
@@ -506,7 +508,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                               {formatUserName(user?.nome || 'Admin Sistema')}
                             </p>
                             <p className="text-sm text-gray-600 truncate">
-                              {user?.email || 'admin@fenixcrm.com'}
+                              {user?.email || 'admin@conectcrm.com'}
                             </p>
                           </div>
                         </div>

@@ -17,11 +17,33 @@ import {
 } from '../types/produtos';
 
 const BASE_URL = 'http://localhost:3001/api';
+const STORAGE_KEY = 'fenixcrm_categorias';
 
 class CategoriasProdutosService {
+  // Método auxiliar para obter categorias do localStorage
+  private obterCategoriasDoStorage(): CategoriaProduto[] {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.error('Erro ao ler categorias do localStorage:', error);
+      return [];
+    }
+  }
+
+  // Método auxiliar para salvar categorias no localStorage
+  private salvarCategoriasNoStorage(categorias: CategoriaProduto[]): void {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(categorias));
+    } catch (error) {
+      console.error('Erro ao salvar categorias no localStorage:', error);
+    }
+  }
+
   // CATEGORIAS
   async listarCategorias(filtros?: FiltrosCategorias): Promise<CategoriaProduto[]> {
     try {
+      // Primeiro tenta buscar do backend
       const params = new URLSearchParams();
       if (filtros?.ativo !== undefined) params.append('ativo', filtros.ativo.toString());
       if (filtros?.busca) params.append('busca', filtros.busca);
@@ -29,29 +51,58 @@ class CategoriasProdutosService {
       if (filtros?.direcao) params.append('direcao', filtros.direcao);
 
       const response = await fetch(`${BASE_URL}/categorias-produtos?${params}`);
-      const data: ApiResponse<CategoriaProduto[]> = await response.json();
       
-      if (!data.success) {
-        throw new Error(data.message || 'Erro ao buscar categorias');
+      if (response.ok) {
+        const data: ApiResponse<CategoriaProduto[]> = await response.json();
+        
+        if (data.success && data.data) {
+          return data.data;
+        }
       }
       
-      return data.data || [];
+      // Se falhar, usa localStorage como fallback
+      const categoriasLocal = this.obterCategoriasDoStorage();
+      
+      if (filtros?.busca) {
+        return categoriasLocal.filter(cat => 
+          cat.nome.toLowerCase().includes(filtros.busca!.toLowerCase()) ||
+          cat.descricao.toLowerCase().includes(filtros.busca!.toLowerCase())
+        );
+      }
+      
+      if (filtros?.ativo !== undefined) {
+        return categoriasLocal.filter(cat => cat.ativo === filtros.ativo);
+      }
+      
+      return categoriasLocal;
     } catch (error) {
-      console.error('Erro ao listar categorias:', error);
-      throw error;
+      console.error('Erro ao listar categorias, usando localStorage:', error);
+      // Em caso de erro, sempre retorna do localStorage
+      return this.obterCategoriasDoStorage();
     }
   }
 
   async obterCategoria(id: string): Promise<CategoriaProduto> {
     try {
       const response = await fetch(`${BASE_URL}/categorias-produtos/${id}`);
-      const data: ApiResponse<CategoriaProduto> = await response.json();
       
-      if (!data.success) {
-        throw new Error(data.message || 'Erro ao buscar categoria');
+      if (response.ok) {
+        const data: ApiResponse<CategoriaProduto> = await response.json();
+        
+        if (data.success && data.data) {
+          return data.data;
+        }
       }
       
-      return data.data!;
+      // Fallback para localStorage
+      const categorias = this.obterCategoriasDoStorage();
+      const categoria = categorias.find(cat => cat.id === id);
+      
+      if (!categoria) {
+        throw new Error('Categoria não encontrada');
+      }
+      
+      return categoria;
     } catch (error) {
       console.error('Erro ao obter categoria:', error);
       throw error;
@@ -60,6 +111,7 @@ class CategoriasProdutosService {
 
   async criarCategoria(categoria: CriarCategoriaProdutoRequest): Promise<CategoriaProduto> {
     try {
+      // Tenta criar no backend primeiro
       const response = await fetch(`${BASE_URL}/categorias-produtos`, {
         method: 'POST',
         headers: {
@@ -68,16 +120,53 @@ class CategoriasProdutosService {
         body: JSON.stringify(categoria),
       });
       
-      const data: ApiResponse<CategoriaProduto> = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.message || 'Erro ao criar categoria');
+      if (response.ok) {
+        const data: ApiResponse<CategoriaProduto> = await response.json();
+        
+        if (data.success && data.data) {
+          return data.data;
+        }
       }
       
-      return data.data!;
+      // Fallback para localStorage
+      const categorias = this.obterCategoriasDoStorage();
+      const novaCategoria: CategoriaProduto = {
+        id: Date.now().toString(),
+        nome: categoria.nome,
+        descricao: categoria.descricao || '',
+        icone: categoria.icone || '📁',
+        cor: categoria.cor || 'blue',
+        ativo: categoria.ativo !== false,
+        subcategorias: [],
+        criadoEm: new Date().toISOString(),
+        atualizadoEm: new Date().toISOString()
+      };
+      
+      categorias.push(novaCategoria);
+      this.salvarCategoriasNoStorage(categorias);
+      
+      return novaCategoria;
     } catch (error) {
-      console.error('Erro ao criar categoria:', error);
-      throw error;
+      console.error('Erro ao criar categoria, usando localStorage:', error);
+      
+      // Em caso de erro de rede, sempre usa localStorage
+      const categorias = this.obterCategoriasDoStorage();
+      const novaCategoria: CategoriaProduto = {
+        id: Date.now().toString(),
+        nome: categoria.nome,
+        descricao: categoria.descricao || '',
+        icone: categoria.icone || '📁',
+        cor: categoria.cor || 'blue',
+        ativo: categoria.ativo !== false,
+        subcategorias: [],
+        criadoEm: new Date().toISOString(),
+        atualizadoEm: new Date().toISOString()
+      };
+      
+      categorias.push(novaCategoria);
+      this.salvarCategoriasNoStorage(categorias);
+      
+      return novaCategoria;
     }
   }
 

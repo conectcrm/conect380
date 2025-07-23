@@ -9,7 +9,7 @@ exports.__esModule = true;
 exports.DatabaseConfig = void 0;
 var common_1 = require("@nestjs/common");
 var user_entity_1 = require("../modules/users/user.entity");
-var empresa_entity_1 = require("../modules/users/empresa.entity");
+var empresa_entity_1 = require("../empresas/entities/empresa.entity");
 var cliente_entity_1 = require("../modules/clientes/cliente.entity");
 var DatabaseConfig = /** @class */ (function () {
     function DatabaseConfig(configService) {

@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { Empresa } from '../users/empresa.entity';
+import { Empresa } from '../../empresas/entities/empresa.entity';
 
 export enum StatusCliente {
   LEAD = 'lead',

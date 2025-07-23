@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proposta Simples - {{numeroProposta}}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 2px solid #159A9C;
+            margin-bottom: 30px;
+        }
+
+        .company-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #159A9C;
+            margin-bottom: 10px;
+        }
+
+        .proposal-title {
+            font-size: 20px;
+            margin: 20px 0;
+            color: #333;
+        }
+
+        .info-section {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+            gap: 20px;
+        }
+
+        .info-box {
+            flex: 1;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+
+        .info-title {
+            font-weight: bold;
+            color: #159A9C;
+            margin-bottom: 10px;
+        }
+
+        .info-item {
+            margin: 5px 0;
+        }
+
+        .products-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .products-table th {
+            background: #159A9C;
+            color: white;
+            padding: 10px;
+            text-align: left;
+        }
+
+        .products-table td {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .total-section {
+            text-align: right;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f0f8ff;
+            border-radius: 5px;
+        }
+
+        .total-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #159A9C;
+        }
+
+        .signature-section {
+            margin-top: 50px;
+            display: flex;
+            justify-content: space-around;
+        }
+
+        .signature-box {
+            text-align: center;
+            width: 250px;
+        }
+
+        .signature-line {
+            border-top: 1px solid #333;
+            margin: 40px 0 10px 0;
+        }
+
+        @media print {
+            body {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="company-name">{{empresa.nome}}</div>
+            <div>{{empresa.telefone}} | {{empresa.email}}</div>
+            <div class="proposal-title">PROPOSTA COMERCIAL Nº {{numeroProposta}}</div>
+            <div>{{dataEmissao}}</div>
+        </div>
+
+        <div class="info-section">
+            <div class="info-box">
+                <div class="info-title">CLIENTE</div>
+                <div class="info-item"><strong>Nome:</strong> {{cliente.nome}}</div>
+                <div class="info-item"><strong>E-mail:</strong> {{cliente.email}}</div>
+                {{#if cliente.telefone}}<div class="info-item"><strong>Telefone:</strong> {{cliente.telefone}}</div>{{/if}}
+            </div>
+            <div class="info-box">
+                <div class="info-title">VENDEDOR</div>
+                <div class="info-item"><strong>Nome:</strong> {{vendedor.nome}}</div>
+                <div class="info-item"><strong>E-mail:</strong> {{vendedor.email}}</div>
+                <div class="info-item"><strong>Validade:</strong> {{dataValidade}}</div>
+            </div>
+        </div>
+
+        {{#if descricao}}
+        <div style="margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 5px;">
+            <strong>Descrição:</strong> {{descricao}}
+        </div>
+        {{/if}}
+
+        <table class="products-table">
+            <thead>
+                <tr>
+                    <th>Descrição</th>
+                    <th style="width: 80px;">Qtd</th>
+                    <th style="width: 120px;">Valor Unit.</th>
+                    <th style="width: 120px;">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each itens}}
+                <tr>
+                    <td>{{nome}}</td>
+                    <td style="text-align: center;">{{quantidade}}</td>
+                    <td style="text-align: right;">{{valorUnitario}}</td>
+                    <td style="text-align: right;">{{valorTotal}}</td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+
+        <div class="total-section">
+            <div>Forma de Pagamento: {{formaPagamento}}</div>
+            <div>Prazo de Entrega: {{prazoEntrega}}</div>
+            <div style="margin-top: 10px;">
+                <span class="total-value">TOTAL: {{valorTotal}}</span>
+            </div>
+        </div>
+
+        <div class="signature-section">
+            <div class="signature-box">
+                <div><strong>CLIENTE</strong></div>
+                <div class="signature-line"></div>
+                <div>{{cliente.nome}}</div>
+                <div>Data: ___/___/______</div>
+            </div>
+            <div class="signature-box">
+                <div><strong>VENDEDOR</strong></div>
+                <div class="signature-line"></div>
+                <div>{{vendedor.nome}}</div>
+                <div>Data: ___/___/______</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

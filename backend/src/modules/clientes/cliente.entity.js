@@ -8,7 +8,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 exports.__esModule = true;
 exports.Cliente = exports.TipoCliente = exports.StatusCliente = void 0;
 var typeorm_1 = require("typeorm");
-var empresa_entity_1 = require("../users/empresa.entity");
+var empresa_entity_1 = require("../../empresas/entities/empresa.entity");
 var StatusCliente;
 (function (StatusCliente) {
     StatusCliente["LEAD"] = "lead";

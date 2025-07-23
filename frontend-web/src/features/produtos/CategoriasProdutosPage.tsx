@@ -16,12 +16,8 @@ import {
 import ModalCategoria from '../../components/modals/ModalCategoria';
 import ModalSubcategoria from '../../components/modals/ModalSubcategoria';
 import ModalConfiguracao from '../../components/modais/ModalConfiguracao';
-
-// Toast simples para demonstração
-const toast = {
-  success: (message: string) => console.log('✅', message),
-  error: (message: string) => console.error('❌', message)
-};
+import { categoriasProdutosService } from '../../services/categoriasProdutosService';
+import toast from 'react-hot-toast';
 
 // Interfaces
 interface Categoria {
@@ -159,7 +155,8 @@ const CategoriasProdutosPage: React.FC = () => {
   const navigate = useNavigate();
   
   // Estados
-  const [categorias, setCategorias] = useState<Categoria[]>(mockCategorias);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'categorias' | 'subcategorias' | 'configuracoes'>('categorias');
   const [selectedCategoria, setSelectedCategoria] = useState<Categoria | null>(null);
@@ -170,6 +167,74 @@ const CategoriasProdutosPage: React.FC = () => {
   const [showModalSubcategoria, setShowModalSubcategoria] = useState(false);
   const [showModalConfiguracao, setShowModalConfiguracao] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
+
+  // Carregar categorias do service
+  useEffect(() => {
+    carregarCategorias();
+  }, []);
+
+  const carregarCategorias = async () => {
+    try {
+      setLoading(true);
+      const categoriasData = await categoriasProdutosService.listarCategorias();
+      
+      // Converter para formato da interface local
+      const categoriasConvertidas: Categoria[] = categoriasData.map(cat => ({
+        id: cat.id,
+        nome: cat.nome,
+        descricao: cat.descricao,
+        cor: cat.cor || 'blue',
+        ativa: cat.ativo,
+        subcategorias: cat.subcategorias ? cat.subcategorias.map(sub => ({
+          id: sub.id,
+          nome: sub.nome,
+          descricao: sub.descricao || '',
+          categoriaId: cat.id,
+          ativa: sub.ativo,
+          configuracoes: sub.configuracoes ? sub.configuracoes.map(conf => ({
+            id: conf.id,
+            nome: conf.nome,
+            descricao: conf.descricao || '',
+            subcategoriaId: sub.id,
+            precoBase: conf.precoBase || 0,
+            ativa: conf.ativo
+          })) : []
+        })) : []
+      }));
+      
+      setCategorias(categoriasConvertidas);
+      
+      // Se não há categorias, adicionar algumas padrão
+      if (categoriasConvertidas.length === 0) {
+        await criarCategoriasIniciais();
+      }
+    } catch (error) {
+      console.error('Erro ao carregar categorias:', error);
+      toast.error('Erro ao carregar categorias');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const criarCategoriasIniciais = async () => {
+    try {
+      const categoriasIniciais = [
+        { nome: 'Software', descricao: 'Produtos de software', icone: '💻', cor: 'blue' },
+        { nome: 'Hardware', descricao: 'Equipamentos e hardware', icone: '🖥️', cor: 'green' },
+        { nome: 'Consultoria', descricao: 'Serviços de consultoria', icone: '🎯', cor: 'purple' },
+        { nome: 'Treinamento', descricao: 'Cursos e treinamentos', icone: '📚', cor: 'orange' }
+      ];
+
+      for (const categoria of categoriasIniciais) {
+        await categoriasProdutosService.criarCategoria(categoria);
+      }
+      
+      toast.success('Categorias iniciais criadas!');
+      await carregarCategorias();
+    } catch (error) {
+      console.error('Erro ao criar categorias iniciais:', error);
+    }
+  };
 
   // Formatação de moeda
   const formatCurrency = (value: number) => {
@@ -233,24 +298,48 @@ const CategoriasProdutosPage: React.FC = () => {
     try {
       if (editingItem) {
         // Editar categoria existente
+        const categoriaAtualizada = await categoriasProdutosService.atualizarCategoria({
+          id: editingItem.id,
+          nome: categoriaData.nome,
+          descricao: categoriaData.descricao,
+          icone: categoriaData.icone,
+          cor: categoriaData.cor
+        });
+        
         setCategorias(prev => prev.map(cat => 
           cat.id === editingItem.id 
             ? { ...cat, ...categoriaData }
             : cat
         ));
+        
+        toast.success('Categoria atualizada com sucesso!');
       } else {
         // Criar nova categoria
-        const novaCategoria: Categoria = {
-          id: Date.now().toString(),
-          ...categoriaData,
+        const novaCategoria = await categoriasProdutosService.criarCategoria({
+          nome: categoriaData.nome,
+          descricao: categoriaData.descricao,
+          icone: categoriaData.icone || '📁',
+          cor: categoriaData.cor || 'blue'
+        });
+        
+        const categoriaNormalizada: Categoria = {
+          id: novaCategoria.id,
+          nome: novaCategoria.nome,
+          descricao: novaCategoria.descricao,
+          cor: novaCategoria.cor || 'blue',
+          ativa: novaCategoria.ativo,
           subcategorias: []
         };
-        setCategorias(prev => [...prev, novaCategoria]);
+        
+        setCategorias(prev => [...prev, categoriaNormalizada]);
+        toast.success('Categoria criada com sucesso!');
       }
+      
       setShowModalCategoria(false);
       setEditingItem(null);
     } catch (error) {
       console.error('Erro ao salvar categoria:', error);
+      toast.error('Erro ao salvar categoria');
     }
   };
 

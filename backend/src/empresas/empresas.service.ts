@@ -2,7 +2,7 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Empresa } from './entities/empresa.entity';
-import { User } from '../modules/users/user.entity';
+import { User, UserRole } from '../modules/users/user.entity';
 import { CreateEmpresaDto } from './dto/empresas.dto';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
@@ -71,6 +71,7 @@ export class EmpresasService {
       // Criar empresa
       const novaEmpresa = this.empresaRepository.create({
         nome: empresa.nome,
+        slug: this.gerarSlug(empresa.nome),
         cnpj: empresa.cnpj.replace(/\D/g, ''),
         email: empresa.email,
         telefone: empresa.telefone.replace(/\D/g, ''),
@@ -80,7 +81,7 @@ export class EmpresasService {
         cep: empresa.cep.replace(/\D/g, ''),
         plano: plano,
         subdominio: subdominio,
-        status: 'trial', // Empresa inicia em período trial
+        ativo: true, // Empresa ativa por padrão
         data_expiracao: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 dias de trial
         email_verificado: false,
         token_verificacao: crypto.randomBytes(32).toString('hex'),
@@ -98,7 +99,7 @@ export class EmpresasService {
         email: usuario.email,
         senha: senhaHash,
         telefone: usuario.telefone.replace(/\D/g, ''),
-        role: 'admin',
+        role: UserRole.ADMIN,
         empresa_id: empresaSalva.id,
         ativo: false, // Usuário fica inativo até verificar email
       });
@@ -307,7 +308,7 @@ export class EmpresasService {
     return {
       id: empresa.id,
       nome: empresa.nome,
-      status: empresa.status,
+      ativo: empresa.ativo,
       plano: empresa.plano,
       email_verificado: empresa.email_verificado,
       data_expiracao: empresa.data_expiracao,
@@ -353,5 +354,17 @@ export class EmpresasService {
       console.error('Erro ao enviar email de verificação:', error);
       // Não interromper o processo se o email falhar
     }
+  }
+
+  private gerarSlug(nome: string): string {
+    return nome
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/[^a-z0-9\s-]/g, '') // Remove caracteres especiais
+      .trim()
+      .replace(/\s+/g, '-') // Substitui espaços por hífens
+      .replace(/-+/g, '-') // Remove hífens duplicados
+      .slice(0, 100); // Limita a 100 caracteres
   }
 }

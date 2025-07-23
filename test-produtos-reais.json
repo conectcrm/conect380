@@ -1,0 +1,70 @@
+{
+  "numeroProposta": "PROP-2025-008",
+  "titulo": "Pacote Startup Digital",
+  "dataEmissao": "23/07/2025",
+  "dataValidade": "23/08/2025",
+  "status": "draft",
+  "statusText": "Rascunho",
+  "empresa": {
+    "nome": "FenixCRM",
+    "endereco": "Rua da Tecnologia, 123",
+    "cidade": "São Paulo",
+    "estado": "SP",
+    "cep": "01234-567",
+    "telefone": "(11) 1234-5678",
+    "email": "contato@fenixcrm.com",
+    "cnpj": "12.345.678/0001-90"
+  },
+  "cliente": {
+    "nome": "Nova Startup Ltda",
+    "empresa": "Nova Startup Ltda",
+    "email": "contato@novastartup.com",
+    "telefone": "(11) 9876-5432",
+    "documento": "34.567.890/0001-12",
+    "tipoDocumento": "CNPJ",
+    "endereco": "Av. Inovação, 456 - Tecnópolis, São Paulo/SP"
+  },
+  "vendedor": {
+    "nome": "Pedro Costa",
+    "email": "pedro@fenixcrm.com",
+    "telefone": "(11) 9999-6666",
+    "cargo": "Especialista em Startups"
+  },
+  "descricao": "Pacote completo para startups em fase inicial, incluindo desenvolvimento web básico e consultoria estratégica para acelerar o crescimento do negócio.",
+  "itens": [
+    {
+      "nome": "Pacote Startup Digital (Combo)",
+      "descricao": "Solução completa para startups - Software Web + Consultoria inicial | Desconto: 16,6% | Produtos: Sistema Web Básico, Consultoria Júnior - 8h",
+      "quantidade": 1,
+      "valorUnitario": 10200,
+      "desconto": 16.6,
+      "valorTotal": 8400
+    },
+    {
+      "nome": "Hospedagem e Domínio Premium",
+      "descricao": "Hospedagem em servidor dedicado, domínio personalizado, SSL, backup automático e CDN",
+      "quantidade": 1,
+      "valorUnitario": 3600,
+      "desconto": 0,
+      "valorTotal": 3600
+    }
+  ],
+  "subtotal": 13800,
+  "descontoGeral": 1800,
+  "percentualDesconto": 13,
+  "impostos": 0,
+  "valorTotal": 12000,
+  "formaPagamento": "50% na assinatura, 25% em 30 dias, 25% na entrega",
+  "prazoEntrega": "30 dias úteis após aprovação",
+  "garantia": "6 meses de garantia e suporte",
+  "validadeProposta": "15 dias",
+  "condicoesGerais": [
+    "Proposta especial para startups válida por 15 dias",
+    "Inclui treinamento básico da equipe",
+    "Suporte técnico durante período de garantia",
+    "Hospedagem gratuita por 12 meses",
+    "Backup automático diário incluído"
+  ],
+  "observacoes": "Esta proposta foi desenvolvida especialmente para startups em crescimento, oferecendo a melhor relação custo-benefício do mercado com desconto especial para novos empreendedores.",
+  "dataGeracao": "23/07/2025 às 04:15"
+}

@@ -10,6 +10,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { X, Tag, Package, DollarSign } from 'lucide-react';
 import { MoneyInput } from '../common/MoneyInput';
+import { categoriasProdutosService } from '../../services/categoriasProdutosService';
 
 // Tipos de dados
 interface ProdutoFormData {
@@ -110,6 +111,47 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [tagInput, setTagInput] = useState('');
   const [showVariacoes, setShowVariacoes] = useState(false);
+  const [categorias, setCategorias] = useState<Array<{value: string, label: string}>>([]);
+  const [loadingCategorias, setLoadingCategorias] = useState(false);
+
+  // Carregar categorias do backend
+  useEffect(() => {
+    const carregarCategorias = async () => {
+      try {
+        setLoadingCategorias(true);
+        const categoriasData = await categoriasProdutosService.listarCategorias();
+        const categoriasFormatadas = categoriasData.map(cat => ({
+          value: cat.nome.toLowerCase().replace(/\s+/g, '-'),
+          label: cat.nome
+        }));
+        
+        // Se não há categorias no backend, usar as sugeridas como fallback
+        if (categoriasFormatadas.length === 0) {
+          const categoriasFallback = categoriasSugeridas.map(cat => ({
+            value: cat.toLowerCase().replace(/\s+/g, '-'),
+            label: cat
+          }));
+          setCategorias(categoriasFallback);
+        } else {
+          setCategorias(categoriasFormatadas);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar categorias:', error);
+        // Em caso de erro, usar categorias fallback
+        const categoriasFallback = categoriasSugeridas.map(cat => ({
+          value: cat.toLowerCase().replace(/\s+/g, '-'),
+          label: cat
+        }));
+        setCategorias(categoriasFallback);
+      } finally {
+        setLoadingCategorias(false);
+      }
+    };
+
+    if (isOpen) {
+      carregarCategorias();
+    }
+  }, [isOpen]);
 
   const {
     control,

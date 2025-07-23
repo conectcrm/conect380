@@ -9,6 +9,9 @@ export class Empresa {
   @Column()
   nome: string;
 
+  @Column({ unique: true, length: 100 })
+  slug: string;
+
   @Column({ unique: true })
   cnpj: string;
 
@@ -33,15 +36,14 @@ export class Empresa {
   @Column({ unique: true })
   subdominio: string;
 
+  @Column({ default: true })
+  ativo: boolean;
+
   @Column({ default: 'starter' })
   plano: string;
 
-  @Column({ 
-    type: 'enum', 
-    enum: ['ativa', 'inativa', 'trial', 'suspensa'],
-    default: 'trial'
-  })
-  status: string;
+  @Column({ type: 'text', nullable: true })
+  logo_url: string;
 
   @Column({ type: 'timestamp', nullable: true })
   data_expiracao: Date;

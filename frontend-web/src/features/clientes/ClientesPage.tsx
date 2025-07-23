@@ -157,7 +157,7 @@ const ClientesPage: React.FC = () => {
     loadEstatisticas();
     
     // Notificação de boas-vindas (apenas uma vez)
-    const hasWelcomeNotification = localStorage.getItem('fenix_welcome_notification');
+    const hasWelcomeNotification = localStorage.getItem('conect_welcome_notification');
     if (!hasWelcomeNotification) {
       setTimeout(() => {
         addNotification({
@@ -166,7 +166,7 @@ const ClientesPage: React.FC = () => {
           type: 'success',
           priority: 'high'
         });
-        localStorage.setItem('fenix_welcome_notification', 'true');
+        localStorage.setItem('conect_welcome_notification', 'true');
       }, 1000);
     }
   }, []);

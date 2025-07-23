@@ -6,14 +6,12 @@ import {
   Bell, 
   Check, 
   Trash2, 
-  Filter, 
   Calendar,
   AlertCircle,
   Info,
   CheckCircle,
   AlertTriangle,
   Clock,
-  Eye,
   Settings
 } from 'lucide-react';
 

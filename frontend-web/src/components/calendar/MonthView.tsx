@@ -36,14 +36,17 @@ export const MonthView: React.FC<MonthViewProps> = ({
     }
   };
 
-  const handleDrop = (day: CalendarDay) => {
-    if (draggedEvent) {
+  const handleDrop = (e: React.DragEvent, day: CalendarDay) => {
+    e.preventDefault();
+    const eventId = e.dataTransfer.getData('text/plain');
+    if (eventId && draggedEvent) {
       onDrop(day.date);
     }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
   };
 
   return (
@@ -81,7 +84,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
                 ${isDropTarget ? 'bg-green-50 border-green-300' : ''}
               `}
               onClick={(e) => handleDayClick(day, e)}
-              onDrop={() => handleDrop(day)}
+              onDrop={(e) => handleDrop(e, day)}
               onDragOver={handleDragOver}
             >
               {/* Número do dia */}

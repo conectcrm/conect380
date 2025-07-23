@@ -25,13 +25,12 @@ import CombosPage from './features/combos/CombosPage';
 import NovoComboPage from './features/combos/NovoComboPage';
 import CentralOperacoesPage from './pages/CentralOperacoesPage';
 import NotificationsPage from './pages/NotificationsPage';
+import FunilVendas from './pages/FunilVendas';
 // Importar páginas de núcleos
-import { 
-  CrmNucleusPage, 
-  VendasNucleusPage,
-  FinanceiroNucleusPage, 
-  SistemaNucleusPage 
-} from './pages/nuclei';
+import CrmNucleusPage from './pages/nuclei/CrmNucleusPage';
+import VendasNucleusPage from './pages/nuclei/VendasNucleusPage';
+import FinanceiroNucleusPage from './pages/nuclei/FinanceiroNucleusPage';
+import SistemaNucleusPage from './pages/nuclei/SistemaNucleusPage';
 import ModuleUnderConstruction from './components/common/ModuleUnderConstruction';
 import { UploadDemoPage } from './pages/UploadDemoPage';
 import { useAuth } from './hooks/useAuth';
@@ -56,9 +55,9 @@ const AppRoutes: React.FC = () => {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md w-full mx-4">
           <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-2xl shadow-lg mx-auto mb-4">
-            F
+            C
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Fênix CRM</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Conect CRM</h2>
           <p className="text-gray-600 mb-6">Carregando aplicação...</p>
           
           {/* Loading spinner */}
@@ -95,6 +94,7 @@ const AppRoutes: React.FC = () => {
           {/* Rotas dos módulos existentes */}
           <Route path="/clientes" element={<ClientesPage />} />
           <Route path="/propostas" element={<PropostasPage />} />
+          <Route path="/funil-vendas" element={<FunilVendas />} />
           <Route path="/produtos" element={<ProdutosPage />} />
           <Route path="/produtos/categorias" element={<CategoriasProdutosPage />} />
           

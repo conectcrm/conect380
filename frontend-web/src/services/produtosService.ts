@@ -1,5 +1,4 @@
 import { api } from './api';
-import axios from 'axios';
 
 export interface Produto {
   id: string;

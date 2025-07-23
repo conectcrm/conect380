@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
+import { PdfController } from './pdf.controller';
+import { PdfService } from './pdf.service';
 
 @Module({
-  providers: [],
-  controllers: [],
-  exports: [],
+  providers: [PdfService],
+  controllers: [PdfController],
+  exports: [PdfService],
 })
 export class PropostasModule {}

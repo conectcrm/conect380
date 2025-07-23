@@ -86,6 +86,7 @@ interface PropostaFormData {
 // Função auxiliar para detectar se é produto de software
 const isProdutoSoftware = (produto: Produto): boolean => {
   return produto.tipo === 'software' || 
+         produto.categoria?.toLowerCase().includes('software') ||
          (produto.tipoItem && ['licenca', 'modulo', 'aplicativo'].includes(produto.tipoItem));
 };
 
@@ -100,7 +101,12 @@ const etapaSchemas = {
   }),
   condicoes: yup.object().shape({
     formaPagamento: yup.string().required('Forma de pagamento é obrigatória'),
-    validadeDias: yup.number().min(1, 'Validade deve ser pelo menos 1 dia').required(),
+    validadeDias: yup.number().when('produtos', {
+      is: (produtos: ProdutoProposta[]) => 
+        produtos && produtos.some(produto => isProdutoSoftware(produto.produto)),
+      then: () => yup.number().optional(), // Opcional para software
+      otherwise: () => yup.number().min(1, 'Validade deve ser pelo menos 1 dia').required()
+    }),
   }),
   resumo: yup.object().shape({
     // Validação final opcional
@@ -166,7 +172,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       descontoGlobal: 0,
       impostos: 12,
       formaPagamento: 'avista',
-      validadeDias: 15,
+      validadeDias: 15, // Valor padrão, será opcional para software
       observacoes: '',
       incluirImpostosPDF: true
     },
@@ -399,11 +405,18 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     try {
       setIsLoading(true);
       
+      // Verificar se há produtos de software
+      const temProdutosSoftware = data.produtos?.some(produto => isProdutoSoftware(produto.produto));
+      
+      // Para produtos de software, usar validade padrão de 30 dias se não especificado
+      const validadeDias = temProdutosSoftware && !data.validadeDias ? 30 : (data.validadeDias || 15);
+      
       const propostaData: PropostaCompleta = {
         ...data,
+        validadeDias,
         subtotal: totaisCombinados.subtotal,
         total: totaisCombinados.total,
-        dataValidade: new Date(Date.now() + data.validadeDias * 24 * 60 * 60 * 1000),
+        dataValidade: new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000),
         status: 'rascunho'
       };
 
@@ -1179,28 +1192,48 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     )}
                   </div>
 
-                  {/* Validade */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Validade (dias) *
-                    </label>
-                    <Controller
-                      name="validadeDias"
-                      control={control}
-                      render={({ field }) => (
-                        <input
-                          {...field}
-                          type="number"
-                          min="1"
-                          max="365"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                        />
+                  {/* Validade - Oculto para produtos Software */}
+                  {!watchedProdutos?.some(produto => isProdutoSoftware(produto.produto)) && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Validade (dias) *
+                      </label>
+                      <Controller
+                        name="validadeDias"
+                        control={control}
+                        render={({ field }) => (
+                          <input
+                            {...field}
+                            type="number"
+                            min="1"
+                            max="365"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                          />
+                        )}
+                      />
+                      {errors.validadeDias && (
+                        <p className="text-red-500 text-sm mt-1">{errors.validadeDias.message}</p>
                       )}
-                    />
-                    {errors.validadeDias && (
-                      <p className="text-red-500 text-sm mt-1">{errors.validadeDias.message}</p>
-                    )}
-                  </div>
+                    </div>
+                  )}
+                  
+                  {/* Mensagem informativa para produtos Software */}
+                  {watchedProdutos?.some(produto => isProdutoSoftware(produto.produto)) && (
+                    <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-purple-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm text-purple-700">
+                            <strong>Produtos de Software detectados:</strong> A validade e garantia são gerenciadas pela periodicidade da licença (mensal/anual).
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Observações */}
                   <div>
@@ -1341,7 +1374,12 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                   <div><strong>Forma de Pagamento:</strong> {watch('formaPagamento')}</div>
-                  <div><strong>Validade:</strong> {watch('validadeDias')} dias</div>
+                  {!watchedProdutos?.some(produto => isProdutoSoftware(produto.produto)) && (
+                    <div><strong>Validade:</strong> {watch('validadeDias')} dias</div>
+                  )}
+                  {watchedProdutos?.some(produto => isProdutoSoftware(produto.produto)) && (
+                    <div><strong>Licenciamento:</strong> Conforme periodicidade dos produtos</div>
+                  )}
                   {watch('observacoes') && (
                     <div className="md:col-span-2"><strong>Observações:</strong> {watch('observacoes')}</div>
                   )}

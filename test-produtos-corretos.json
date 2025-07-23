@@ -1,0 +1,70 @@
+{
+  "numeroProposta": "PROP-2025-002",
+  "titulo": "Sistema CRM Personalizado",
+  "dataEmissao": "23/07/2025",
+  "dataValidade": "23/08/2025",
+  "status": "draft",
+  "statusText": "Rascunho",
+  "empresa": {
+    "nome": "FenixCRM",
+    "endereco": "Rua da Tecnologia, 123",
+    "cidade": "São Paulo",
+    "estado": "SP",
+    "cep": "01234-567",
+    "telefone": "(11) 1234-5678",
+    "email": "contato@fenixcrm.com",
+    "cnpj": "12.345.678/0001-90"
+  },
+  "cliente": {
+    "nome": "Empresa ABC Ltda",
+    "empresa": "Empresa ABC Ltda",
+    "email": "contato@empresaabc.com",
+    "telefone": "(11) 9876-5432",
+    "documento": "12.345.678/0001-90",
+    "tipoDocumento": "CNPJ",
+    "endereco": "Av. Comercial, 789 - Centro, São Paulo/SP"
+  },
+  "vendedor": {
+    "nome": "Ana Silva",
+    "email": "ana@fenixcrm.com",
+    "telefone": "(11) 9999-7777",
+    "cargo": "Consultora Comercial"
+  },
+  "descricao": "Desenvolvimento de sistema CRM personalizado para gestão completa de vendas e relacionamento com clientes.",
+  "itens": [
+    {
+      "nome": "Sistema de Gestão Empresarial",
+      "descricao": "Desenvolvimento de plataforma web personalizada com módulos financeiro, vendas, estoque e relatórios analíticos integrados",
+      "quantidade": 1,
+      "valorUnitario": 35000,
+      "desconto": 0,
+      "valorTotal": 35000
+    },
+    {
+      "nome": "Implementação e Treinamento",
+      "descricao": "Instalação, configuração, migração de dados, treinamento da equipe e suporte técnico por 3 meses",
+      "quantidade": 1,
+      "valorUnitario": 15000,
+      "desconto": 5,
+      "valorTotal": 14250
+    }
+  ],
+  "subtotal": 50000,
+  "descontoGeral": 750,
+  "percentualDesconto": 1.5,
+  "impostos": 0,
+  "valorTotal": 49250,
+  "formaPagamento": "50% na assinatura, 50% na entrega",
+  "prazoEntrega": "60 dias úteis após aprovação",
+  "garantia": "12 meses de garantia e suporte",
+  "validadeProposta": "30 dias",
+  "condicoesGerais": [
+    "Os valores apresentados são válidos por 30 dias",
+    "Garantia de 12 meses para todo o sistema",
+    "Suporte técnico incluso durante período de garantia",
+    "Treinamento da equipe incluído no pacote",
+    "Backups automáticos e segurança garantidos"
+  ],
+  "observacoes": "Esta proposta inclui desenvolvimento completo do sistema CRM com funcionalidades específicas para o segmento da empresa.",
+  "dataGeracao": "23/07/2025 às 03:30"
+}

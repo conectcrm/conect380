@@ -207,13 +207,22 @@ export const useCalendarDragDrop = (
       if (event) {
         const duration = event.end.getTime() - event.start.getTime();
         const newStart = new Date(dropTarget);
-        newStart.setHours(event.start.getHours(), event.start.getMinutes());
+        
+        // Mantém o horário original se for o mesmo dia
+        if (dropTarget.toDateString() === event.start.toDateString()) {
+          newStart.setHours(event.start.getHours(), event.start.getMinutes());
+        } else {
+          // Se for dia diferente, mantém o horário
+          newStart.setHours(event.start.getHours(), event.start.getMinutes());
+        }
+        
         const newEnd = new Date(newStart.getTime() + duration);
         
         onMoveEvent(draggedEvent.eventId, newStart, newEnd);
       }
     }
     
+    // Reset states
     setDraggedEvent(null);
     setDropTarget(null);
   }, [draggedEvent, dropTarget, events, onMoveEvent]);
@@ -225,7 +234,13 @@ export const useCalendarDragDrop = (
 
   const setDrop = useCallback((date: Date) => {
     setDropTarget(date);
-  }, []);
+    // Chama endDrag automaticamente quando um drop target é definido
+    setTimeout(() => {
+      if (draggedEvent) {
+        endDrag();
+      }
+    }, 0);
+  }, [draggedEvent, endDrag]);
 
   return {
     draggedEvent,

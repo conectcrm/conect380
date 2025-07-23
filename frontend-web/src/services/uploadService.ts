@@ -200,7 +200,7 @@ class UploadService {
 
   // Salvar resultado no localStorage
   private saveUploadResult(result: UploadResult): void {
-    const key = `fenixcrm_uploads`;
+    const key = `conectcrm_uploads`;
     const stored = localStorage.getItem(key);
     const uploads: UploadResult[] = stored ? JSON.parse(stored) : [];
     
@@ -210,7 +210,7 @@ class UploadService {
 
   // Listar arquivos por categoria
   getUploads(category?: string): UploadResult[] {
-    const key = `fenixcrm_uploads`;
+    const key = `conectcrm_uploads`;
     const stored = localStorage.getItem(key);
     const uploads: UploadResult[] = stored ? JSON.parse(stored) : [];
     
@@ -223,7 +223,7 @@ class UploadService {
 
   // Deletar arquivo
   async deleteFile(uploadId: string): Promise<boolean> {
-    const key = `fenixcrm_uploads`;
+    const key = `conectcrm_uploads`;
     const stored = localStorage.getItem(key);
     const uploads: UploadResult[] = stored ? JSON.parse(stored) : [];
     

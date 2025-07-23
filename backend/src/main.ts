@@ -23,8 +23,8 @@ async function bootstrap() {
 
   // Configuração Swagger
   const config = new DocumentBuilder()
-    .setTitle('Fênix CRM API')
-    .setDescription('API completa do sistema Fênix CRM')
+    .setTitle('Conect CRM API')
+    .setDescription('API completa do sistema Conect CRM')
     .setVersion('1.0')
     .addBearerAuth()
     .build();
@@ -32,10 +32,10 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);
 
-  const port = process.env.APP_PORT || 3002;
+  const port = process.env.APP_PORT || 3001;
   await app.listen(port);
   
-  console.log(`🔥 Fênix CRM Backend rodando na porta ${port}`);
+  console.log(`� Conect CRM Backend rodando na porta ${port}`);
   console.log(`📖 Documentação disponível em: http://localhost:${port}/api-docs`);
 }
 
