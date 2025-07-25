@@ -3,6 +3,8 @@ import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 import { useUsuarios, useEstatisticasUsuarios } from './hooks/useUsuarios';
 import { useAtividadesUsuarios } from './hooks/useAtividadesUsuarios';
 import { Usuario, UserRole } from '../../../types/usuarios/index';
+import { useConfirmation } from '../../../hooks/useConfirmation';
+import { ConfirmationModal } from '../../../components/common/ConfirmationModal';
 import { 
   EstatisticasCards, 
   FiltrosUsuarios, 
@@ -31,6 +33,7 @@ export const UsuariosPage: React.FC = () => {
   const [usuarioSelecionado, setUsuarioSelecionado] = useState<Usuario | null>(null);
   const [mostrarResetSenha, setMostrarResetSenha] = useState<Usuario | null>(null);
   const [mostrarMeuPerfil, setMostrarMeuPerfil] = useState(false);
+  const { confirmationState, showConfirmation } = useConfirmation();
   const [mostrarPerfilUsuario, setMostrarPerfilUsuario] = useState<Usuario | null>(null);
   const [termoBusca, setTermoBusca] = useState('');
 
@@ -96,18 +99,36 @@ export const UsuariosPage: React.FC = () => {
   };
 
   const handleExcluirUsuario = async (usuario: Usuario) => {
-    if (window.confirm(`Tem certeza que deseja excluir o usuário "${usuario.nome}"?`)) {
-      await excluirUsuario(usuario.id);
-    }
+    showConfirmation({
+      title: 'Excluir usuário',
+      message: `Tem certeza que deseja excluir o usuário "${usuario.nome}"? Esta ação não pode ser desfeita.`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      icon: 'danger',
+      confirmButtonClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+      onConfirm: async () => {
+        await excluirUsuario(usuario.id);
+      }
+    });
   };
 
   const handleAlterarStatus = async (usuario: Usuario) => {
     const novoStatus = !usuario.ativo;
     const acao = novoStatus ? 'ativar' : 'desativar';
     
-    if (window.confirm(`Tem certeza que deseja ${acao} o usuário "${usuario.nome}"?`)) {
-      await alterarStatusUsuario(usuario.id, novoStatus);
-    }
+    showConfirmation({
+      title: `${acao.charAt(0).toUpperCase() + acao.slice(1)} usuário`,
+      message: `Tem certeza que deseja ${acao} o usuário "${usuario.nome}"?`,
+      confirmText: acao.charAt(0).toUpperCase() + acao.slice(1),
+      cancelText: 'Cancelar',
+      icon: novoStatus ? 'success' : 'warning',
+      confirmButtonClass: novoStatus 
+        ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500'
+        : 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+      onConfirm: async () => {
+        await alterarStatusUsuario(usuario.id, novoStatus);
+      }
+    });
   };
 
   const handleAcaoMassa = async (acao: 'ativar' | 'desativar' | 'excluir', usuarios: Usuario[]) => {
@@ -116,12 +137,25 @@ export const UsuariosPage: React.FC = () => {
       : `${usuarios.slice(0, 2).map(u => u.nome).join(', ')} e mais ${usuarios.length - 2} usuários`;
     
     const mensagem = acao === 'excluir' 
-      ? `Tem certeza que deseja excluir os usuários: ${nomes}?`
+      ? `Tem certeza que deseja excluir os usuários: ${nomes}? Esta ação não pode ser desfeita.`
       : `Tem certeza que deseja ${acao} os usuários: ${nomes}?`;
     
-    if (window.confirm(mensagem)) {
-      try {
-        if (acao === 'excluir') {
+    const title = acao === 'excluir' 
+      ? `Excluir ${usuarios.length} usuário${usuarios.length > 1 ? 's' : ''}`
+      : `${acao.charAt(0).toUpperCase() + acao.slice(1)} ${usuarios.length} usuário${usuarios.length > 1 ? 's' : ''}`;
+    
+    showConfirmation({
+      title,
+      message: mensagem,
+      confirmText: acao === 'excluir' ? 'Excluir' : acao.charAt(0).toUpperCase() + acao.slice(1),
+      cancelText: 'Cancelar',
+      icon: acao === 'excluir' ? 'danger' : acao === 'ativar' ? 'success' : 'warning',
+      confirmButtonClass: acao === 'excluir' || acao === 'desativar'
+        ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
+        : 'bg-green-600 hover:bg-green-700 focus:ring-green-500',
+      onConfirm: async () => {
+        try {
+          if (acao === 'excluir') {
           for (const usuario of usuarios) {
             await excluirUsuario(usuario.id);
           }
@@ -136,7 +170,8 @@ export const UsuariosPage: React.FC = () => {
       } catch (error) {
         toast.error(`Erro ao ${acao} usuários em massa`);
       }
-    }
+      }
+    });
   };
 
   const getCountFiltrosAtivos = () => {
@@ -368,6 +403,9 @@ export const UsuariosPage: React.FC = () => {
           onSave={handleAtualizarPerfil}
         />
       )}
+      
+      {/* Modal de Confirmação */}
+      <ConfirmationModal confirmationState={confirmationState} />
     </div>
   );
 };

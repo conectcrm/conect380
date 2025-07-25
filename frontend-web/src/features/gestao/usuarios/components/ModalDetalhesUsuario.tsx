@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { Usuario, ROLE_LABELS, ROLE_COLORS } from '../../../../types/usuarios/index';
+import { useConfirmation } from '../../../../hooks/useConfirmation';
+import { ConfirmationModal } from '../../../../components/common/ConfirmationModal';
 import { 
   X, 
   User, 
@@ -58,6 +60,7 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
   const [modoEdicao, setModoEdicao] = useState(false);
   const [dadosUsuario, setDadosUsuario] = useState<Usuario>(usuario);
   const [isLoading, setIsLoading] = useState(false);
+  const { confirmationState, showConfirmation } = useConfirmation();
 
   if (!isOpen) return null;
 
@@ -125,37 +128,55 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
     const novoStatus = !usuario.ativo;
     const acao = novoStatus ? 'ativar' : 'inativar';
     
-    if (window.confirm(`Tem certeza que deseja ${acao} este usuário?`)) {
-      setIsLoading(true);
-      try {
-        await onAlterarStatus(usuario, novoStatus);
-        toast.success(`Usuário ${acao}do com sucesso!`);
-      } catch (error) {
-        toast.error(`Erro ao ${acao} usuário`);
-        console.error('Erro:', error);
-      } finally {
-        setIsLoading(false);
+    showConfirmation({
+      title: `${acao.charAt(0).toUpperCase() + acao.slice(1)} usuário`,
+      message: `Tem certeza que deseja ${acao} o usuário "${usuario.nome}"?`,
+      confirmText: acao.charAt(0).toUpperCase() + acao.slice(1),
+      cancelText: 'Cancelar',
+      icon: novoStatus ? 'success' : 'warning',
+      confirmButtonClass: novoStatus 
+        ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500'
+        : 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+      onConfirm: async () => {
+        setIsLoading(true);
+        try {
+          await onAlterarStatus(usuario, novoStatus);
+          toast.success(`Usuário ${acao}do com sucesso!`);
+        } catch (error) {
+          toast.error(`Erro ao ${acao} usuário`);
+          console.error('Erro:', error);
+        } finally {
+          setIsLoading(false);
+        }
       }
-    }
+    });
   };
 
   // Função para excluir usuário
   const handleExcluir = async () => {
     if (!onExcluirUsuario) return;
     
-    if (window.confirm('⚠️ ATENÇÃO: Esta ação não pode ser desfeita!\n\nTem certeza que deseja excluir permanentemente este usuário?')) {
-      setIsLoading(true);
-      try {
-        await onExcluirUsuario(usuario);
-        toast.success('Usuário excluído com sucesso!');
-        onClose();
-      } catch (error) {
-        toast.error('Erro ao excluir usuário');
-        console.error('Erro:', error);
-      } finally {
-        setIsLoading(false);
+    showConfirmation({
+      title: 'Excluir usuário permanentemente',
+      message: `⚠️ ATENÇÃO: Esta ação não pode ser desfeita!\n\nTem certeza que deseja excluir permanentemente o usuário "${usuario.nome}"? Todos os dados relacionados serão perdidos.`,
+      confirmText: 'Excluir permanentemente',
+      cancelText: 'Cancelar',
+      icon: 'danger',
+      confirmButtonClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+      onConfirm: async () => {
+        setIsLoading(true);
+        try {
+          await onExcluirUsuario(usuario);
+          toast.success('Usuário excluído com sucesso!');
+          onClose();
+        } catch (error) {
+          toast.error('Erro ao excluir usuário');
+          console.error('Erro:', error);
+        } finally {
+          setIsLoading(false);
+        }
       }
-    }
+    });
   };
 
   const renderDetalhes = () => (
@@ -520,6 +541,9 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
           </div>
         </div>
       </div>
+      
+      {/* Modal de Confirmação */}
+      <ConfirmationModal confirmationState={confirmationState} />
     </div>
   );
 };

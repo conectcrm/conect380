@@ -33,6 +33,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Usuario, NovoUsuario, AtualizarUsuario, UserRole, ROLE_LABELS } from '../../../../types/usuarios/index';
+import { useConfirmation } from '../../../../hooks/useConfirmation';
+import { ConfirmationModal } from '../../../../components/common/ConfirmationModal';
 
 // Funções utilitárias para formatação de telefone
 const formatarTelefone = (value: string): string => {
@@ -197,6 +199,7 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
   const isEdit = !!usuario;
   const [showSenha, setShowSenha] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { confirmationState, showConfirmation } = useConfirmation();
 
   // Importa o contexto de autenticação
   // @ts-ignore
@@ -255,13 +258,21 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
   // Função para fechar modal com confirmação se houver mudanças
   const handleClose = useCallback(() => {
     if (isDirty) {
-      if (window.confirm('Existem alterações não salvas. Deseja realmente sair?')) {
-        onClose();
-      }
+      showConfirmation({
+        title: 'Descartar alterações?',
+        message: 'Existem alterações não salvas no formulário. Se você fechar agora, todas as informações digitadas serão perdidas. Tem certeza que deseja continuar?',
+        confirmText: 'Descartar alterações',
+        cancelText: 'Continuar editando',
+        icon: 'warning',
+        confirmButtonClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+        onConfirm: () => {
+          onClose();
+        }
+      });
     } else {
       onClose();
     }
-  }, [isDirty, onClose]);
+  }, [isDirty, onClose, showConfirmation]);
 
   // Atalhos de teclado
   useEffect(() => {
@@ -761,6 +772,9 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
           </form>
         </div>
       </div>
+      
+      {/* Modal de Confirmação */}
+      <ConfirmationModal confirmationState={confirmationState} />
     </div>
   );
 };
