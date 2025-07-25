@@ -245,7 +245,6 @@ const ContasReceberPage: React.FC = () => {
     <div className="min-h-screen bg-[#DEEFE7]">
       {/* Back to Nucleus */}
       <BackToNucleus 
-        title="Contas a Receber"
         nucleusName="Financeiro" 
         nucleusPath="/nuclei/financeiro"
         currentModuleName="Contas a Receber"
@@ -256,7 +255,6 @@ const ContasReceberPage: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-[#002333] mb-2">Contas a Receber</h1>
               <p className="text-[#B4BEC9]">Gerencie recebimentos e controle inadimplência</p>
             </div>
             

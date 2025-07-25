@@ -245,7 +245,6 @@ const ClientesPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#DEEFE7]">
       <BackToNucleus 
-        title="Clientes"
         nucleusName="CRM" 
         nucleusPath="/nuclei/crm"
         currentModuleName="Clientes"
@@ -255,7 +254,6 @@ const ClientesPage: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-[#002333]">Clientes</h1>
               <p className="mt-2 text-[#B4BEC9]">Gerencie seus clientes e contatos</p>
             </div>
             <div className="mt-4 sm:mt-0 flex gap-3">

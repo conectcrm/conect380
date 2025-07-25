@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useI18n } from '../../contexts/I18nContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import ModalCadastroCliente from '../../components/modals/ModalCadastroCliente';
 import { ModalDetalhesCliente } from '../../components/modals/ModalDetalhesCliente';
 import { ClienteCard } from '../../components/clientes';
@@ -318,7 +319,7 @@ const ClientesPage: React.FC = () => {
         // Criar lembrete para primeiro contato
         addReminder({
           title: 'Primeiro Contato',
-          entityType: 'client',
+          entityType: 'cliente',
           entityId: clienteData.nome, // Temporário até ter ID
           dateTime: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 horas
           isRecurring: false
@@ -468,15 +469,13 @@ const ClientesPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#DEEFE7]">
-      {/* Navigation Button */}
+      {/* Header */}
       <div className="bg-white border-b px-6 py-4">
-        <button 
-          onClick={() => navigate('/dashboard')}
-          className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span>Voltar ao Dashboard</span>
-        </button>
+        <BackToNucleus
+          nucleusName="CRM"
+          nucleusPath="/nuclei/crm"
+          currentModuleName="Clientes"
+        />
       </div>
       
       <div className="p-6">
@@ -484,7 +483,6 @@ const ClientesPage: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-[#002333]">Clientes</h1>
               <p className="mt-2 text-[#B4BEC9]">Gerencie seus clientes e contatos</p>
             </div>
             <div className="mt-4 sm:mt-0 flex gap-3">

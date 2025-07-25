@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from './user.entity';
+import { User, UserRole } from './user.entity';
 import { Empresa } from '../../empresas/entities/empresa.entity';
 
 @Injectable()
@@ -46,5 +46,118 @@ export class UsersService {
 
   async updateLastLogin(id: string): Promise<void> {
     await this.userRepository.update(id, { ultimo_login: new Date() });
+  }
+  
+  async listarComFiltros(filtros: any): Promise<{usuarios: User[], total: number}> {
+    try {
+      console.log('Service - Filtros recebidos:', filtros);
+      const query = this.userRepository.createQueryBuilder('user')
+        .where('user.empresa_id = :empresa_id', { empresa_id: filtros.empresa_id });
+      if (filtros.busca) {
+        query.andWhere('(user.nome LIKE :busca OR user.email LIKE :busca)', { busca: `%${filtros.busca}%` });
+      }
+      if (filtros.role) {
+        query.andWhere('user.role = :role', { role: filtros.role });
+      }
+      if (typeof filtros.ativo === 'boolean') {
+        query.andWhere('user.ativo = :ativo', { ativo: filtros.ativo });
+      }
+      const total = await query.getCount();
+      
+      // Garantir que a direção seja em maiúsculas para o TypeORM
+      const direcaoUpper = (filtros.direcao || 'ASC').toUpperCase() as 'ASC' | 'DESC';
+      query.orderBy(`user.${filtros.ordenacao || 'nome'}`, direcaoUpper);
+      query.skip((filtros.pagina - 1) * filtros.limite).take(filtros.limite);
+      const usuarios = await query.getMany();
+      console.log('Service - Usuários encontrados:', usuarios.length);
+      return { usuarios: usuarios || [], total: total || 0 };
+    } catch (err) {
+      console.error('Erro ao listar usuários:', err);
+      return { usuarios: [], total: 0 };
+    }
+  }
+
+  async obterEstatisticas(empresa_id: string): Promise<any> {
+    const total = await this.userRepository.count({ where: { empresa_id } });
+    const ativos = await this.userRepository.count({ where: { empresa_id, ativo: true } });
+    const inativos = await this.userRepository.count({ where: { empresa_id, ativo: false } });
+    
+    // Calcular distribuição por perfil
+    const adminCount = await this.userRepository.count({ 
+      where: { empresa_id, role: UserRole.ADMIN } 
+    });
+    const managerCount = await this.userRepository.count({ 
+      where: { empresa_id, role: UserRole.MANAGER } 
+    });
+    const vendedorCount = await this.userRepository.count({ 
+      where: { empresa_id, role: UserRole.VENDEDOR } 
+    });
+    const userCount = await this.userRepository.count({ 
+      where: { empresa_id, role: UserRole.USER } 
+    });
+    
+    return {
+      total,
+      ativos, 
+      inativos,
+      por_perfil: {
+        admin: adminCount,
+        manager: managerCount,
+        vendedor: vendedorCount,
+        user: userCount
+      }
+    };
+  }
+
+  async criar(userData: Partial<User>): Promise<User> {
+    console.log('🚀 UsersService.criar - Recebendo dados:', userData);
+    
+    // Validação de campos obrigatórios
+    if (!userData.nome || !userData.email || !userData.senha || !userData.empresa_id) {
+      console.error('❌ Campos obrigatórios ausentes:', { nome: !!userData.nome, email: !!userData.email, senha: !!userData.senha, empresa_id: !!userData.empresa_id });
+      throw new Error('Campos obrigatórios ausentes: nome, email, senha, empresa_id');
+    }
+    
+    const user = this.userRepository.create(userData);
+    console.log('📝 Usuário criado em memória:', user);
+    
+    try {
+      const savedUser = await this.userRepository.save(user);
+      console.log('✅ Usuário salvo no banco:', savedUser);
+      return savedUser;
+    } catch (err: any) {
+      console.error('❌ Erro ao salvar usuário:', err);
+      if (err.code === '23505' && String(err.detail).includes('email')) {
+        throw new Error('Já existe um usuário cadastrado com este e-mail.');
+      }
+      throw err;
+    }
+  }
+
+  async atualizar(id: string, userData: Partial<User>, empresa_id: string): Promise<User> {
+    await this.userRepository.update({ id, empresa_id }, userData);
+    return this.userRepository.findOne({ where: { id, empresa_id } });
+  }
+
+  async excluir(id: string, empresa_id: string): Promise<void> {
+    await this.userRepository.delete({ id, empresa_id });
+  }
+
+  async resetarSenha(id: string, empresa_id: string): Promise<string> {
+    const novaSenha = Math.random().toString(36).slice(-8);
+    await this.userRepository.update({ id, empresa_id }, { senha: novaSenha });
+    return novaSenha;
+  }
+
+  async ativarEmMassa(ids: string[], empresa_id: string): Promise<void> {
+    for (const id of ids) {
+      await this.userRepository.update({ id, empresa_id }, { ativo: true });
+    }
+  }
+
+  async desativarEmMassa(ids: string[], empresa_id: string): Promise<void> {
+    for (const id of ids) {
+      await this.userRepository.update({ id, empresa_id }, { ativo: false });
+    }
   }
 }

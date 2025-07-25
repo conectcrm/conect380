@@ -24,6 +24,7 @@ import {
 import ConectCRMLogoFinal from '../components/ui/ConectCRMLogoFinal';
 import OpportunityModal from '../components/OpportunityModal';
 import { ModalCriarOportunidade } from '../components/modals/ModalCriarOportunidade';
+import { BackToNucleus } from '../components/navigation/BackToNucleus';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { opportunitiesService } from '../services/opportunitiesService';
 import toast from 'react-hot-toast';
@@ -330,16 +331,21 @@ const FunilVendas = () => {
   );
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <ConectCRMLogoFinal variant="icon" size="sm" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Funil de Vendas</h1>
-            <p className="text-gray-600">Gerencie suas oportunidades de vendas</p>
+    <div className="min-h-screen bg-gray-50">
+      <BackToNucleus 
+        nucleusName="Vendas" 
+        nucleusPath="/nuclei/vendas"
+      />
+      <div className="p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <ConectCRMLogoFinal variant="icon" size="sm" />
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Funil de Vendas</h1>
+              <p className="text-gray-600">Gerencie suas oportunidades de vendas</p>
+            </div>
           </div>
-        </div>
         
         <div className="flex items-center gap-3">
           <button
@@ -539,6 +545,7 @@ const FunilVendas = () => {
         onSave={handleCreateOpportunity}
         isLoading={createOpportunityMutation.isLoading}
       />
+      </div>
     </div>
   );
 };

@@ -923,10 +923,8 @@ const PropostasPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#DEEFE7]">
       <BackToNucleus 
-        title="Propostas"
         nucleusName="Vendas" 
         nucleusPath="/nuclei/vendas"
-        currentModuleName="Propostas"
       />
       <div className="p-6">
         {/* Header */}

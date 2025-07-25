@@ -1,0 +1,13 @@
+📚 ORGANIZAÇÃO DE DOCUMENTOS
+===========================
+
+⚠️  ANTES DE CRIAR QUALQUER ARQUIVO .MD:
+
+1. 🎯 Vá para a pasta docs/
+2. 📂 Escolha a categoria apropriada
+3. 📝 Consulte docs/TEMPLATE_NOVOS_DOCUMENTOS.md
+4. ✅ Crie o arquivo na pasta correta
+
+🚫 NÃO CRIAR ARQUIVOS .MD NA RAIZ!
+
+📖 Detalhes: docs/README.md

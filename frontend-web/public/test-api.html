@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de API - ConectCRM</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background-color: #d4edda; border-left: 4px solid #28a745; }
+        .error { background-color: #f8d7da; border-left: 4px solid #dc3545; }
+        .info { background-color: #d1ecf1; border-left: 4px solid #007bff; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Teste de Conexão API - ConectCRM</h1>
+        <p>Este teste verifica se o frontend consegue se comunicar com o backend.</p>
+        
+        <button onclick="executarTestes()">▶️ Executar Testes</button>
+        
+        <div id="resultados"></div>
+    </div>
+
+    <script>
+        const baseURL = 'http://localhost:3001';
+        const resultadosDiv = document.getElementById('resultados');
+
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = message;
+            resultadosDiv.appendChild(div);
+            console.log(message);
+        }
+
+        async function executarTestes() {
+            resultadosDiv.innerHTML = '';
+            log('🔍 Iniciando testes de conectividade...', 'info');
+            
+            try {
+                // Teste 1: Listar oportunidades
+                log('📋 Teste 1: Listando oportunidades...', 'info');
+                const response = await fetch(`${baseURL}/oportunidades`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const oportunidades = await response.json();
+                log(`✅ Oportunidades carregadas: ${oportunidades.length} encontradas`, 'success');
+                
+                if (oportunidades.length > 0) {
+                    log(`<pre>Primeira oportunidade:\n${JSON.stringify(oportunidades[0], null, 2)}</pre>`, 'info');
+                }
+                
+                // Teste 2: Obter métricas
+                log('📊 Teste 2: Obtendo métricas...', 'info');
+                const metricsResponse = await fetch(`${baseURL}/oportunidades/metricas`);
+                const metricas = await metricsResponse.json();
+                
+                log(`✅ Métricas obtidas: ${metricas.totalOportunidades} oportunidades no pipeline`, 'success');
+                log(`<pre>Métricas completas:\n${JSON.stringify(metricas, null, 2)}</pre>`, 'info');
+                
+                // Teste 3: Obter dados do pipeline
+                log('🔄 Teste 3: Obtendo dados do pipeline...', 'info');
+                const pipelineResponse = await fetch(`${baseURL}/oportunidades/pipeline`);
+                const pipeline = await pipelineResponse.json();
+                
+                log('✅ Pipeline obtido com sucesso', 'success');
+                log(`<pre>Pipeline:\n${JSON.stringify(pipeline, null, 2)}</pre>`, 'info');
+                
+                log('🎉 Todos os testes passaram! A API está funcionando corretamente.', 'success');
+                
+            } catch (error) {
+                log(`❌ Erro durante os testes: ${error.message}`, 'error');
+                log('🔧 Possíveis soluções:', 'error');
+                log('• Verifique se o backend está rodando na porta 3001', 'error');
+                log('• Verifique se não há bloqueios de CORS', 'error');
+                log('• Verifique a conexão de rede', 'error');
+                
+                console.error('Erro completo:', error);
+            }
+        }
+
+        // Executar automaticamente ao carregar a página
+        window.addEventListener('load', () => {
+            setTimeout(executarTestes, 1000);
+        });
+    </script>
+</body>
+</html>

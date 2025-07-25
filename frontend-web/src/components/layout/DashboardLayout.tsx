@@ -7,6 +7,7 @@ import { formatCompanyName, formatUserName } from '../../utils/textUtils';
 import SimpleNavGroup, { NavigationNucleus } from '../navigation/SimpleNavGroup';
 import NotificationCenter from '../notifications/NotificationCenter';
 import ConectCRMLogoFinal from '../ui/ConectCRMLogoFinal';
+import { SupportWidget } from '../suporte/SupportWidget';
 import { 
   Menu, 
   X, 
@@ -26,7 +27,8 @@ import {
   TrendingUp,
   ShoppingBag,
   DollarSign,
-  Target
+  Target,
+  Building2
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -72,6 +74,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         title: 'Sistema',
         subtitle: 'Configurações e administração'
       },
+      '/nuclei/gestao': {
+        title: 'Gestão',
+        subtitle: 'Administração empresarial e controle operacional'
+      },
       '/clientes': {
         title: 'Clientes',
         subtitle: 'Gerencie seus clientes e contatos'
@@ -111,6 +117,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       '/configuracoes': {
         title: 'Configurações',
         subtitle: 'Configurações do sistema'
+      },
+      '/admin/empresas': {
+        title: 'Gestão de Empresas',
+        subtitle: 'Administração e monitoramento de empresas'
       }
     };
 
@@ -175,8 +185,17 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       icon: Settings,
       href: '/nuclei/sistema',
       color: 'purple',
-      totalNotifications: 1,
+      totalNotifications: 1, // 1 configurações
       description: 'Configurações e administração'
+    },
+    {
+      id: 'gestao',
+      title: 'Gestão',
+      icon: Building2,
+      href: '/nuclei/gestao',
+      color: 'blue',
+      totalNotifications: 6, // 3 empresas + 1 usuários + 2 compliance
+      description: 'Administração empresarial e controle operacional'
     }
   ];
 
@@ -299,9 +318,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 {!sidebarCollapsed ? (
                   // Layout quando expandida
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-8 h-8 bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] rounded-xl flex items-center justify-center text-white font-bold shadow-lg flex-shrink-0 transition-all duration-200 hover:shadow-xl">
-                      F
-                    </div>
+                    <ConectCRMLogoFinal size="sm" variant="icon" />
                     <div className="min-w-0 flex-1">
                       <ConectCRMLogoFinal size="sm" variant="text" />
                       <p className="text-xs text-blue-600 font-medium truncate">
@@ -320,17 +337,25 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                   // Layout quando colapsada - centralizado
                   <div className="flex flex-col items-center gap-2 w-full">
                     <div className="relative group">
-                      <ConectCRMLogoFinal size="sm" variant="icon" />
-                      <div className="absolute left-full ml-3 px-3 py-2 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[60] shadow-lg">
+                      <div className="transform transition-all duration-300 ease-out hover:scale-110 hover:-translate-y-1">
+                        <ConectCRMLogoFinal 
+                          size="sm" 
+                          variant="icon" 
+                          className="transition-transform duration-300 ease-out group-hover:scale-125" 
+                        />
+                      </div>
+                      <div className="absolute left-full ml-3 px-3 py-2 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-all duration-300 ease-out pointer-events-none whitespace-nowrap z-[60] shadow-lg transform translate-x-2 group-hover:translate-x-0">
                         <div className="font-semibold">Conect CRM</div>
                         <div className="text-xs text-gray-300">
                           {formatCompanyName(user?.empresa?.nome || 'Demo Corp')}
                         </div>
+                        {/* Seta do tooltip */}
+                        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-1 w-0 h-0 border-t-4 border-b-4 border-r-4 border-transparent border-r-gray-800"></div>
                       </div>
                     </div>
                     <button
                       onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                      className="p-1.5 rounded-lg bg-gradient-to-r from-gray-50 to-gray-100 hover:from-blue-50 hover:to-blue-100 border border-gray-200 hover:border-blue-200 shadow-sm transition-all duration-200 hover:shadow-md group"
+                      className="p-1.5 rounded-lg bg-gradient-to-r from-gray-50 to-gray-100 hover:from-blue-50 hover:to-blue-100 border border-gray-200 hover:border-blue-200 shadow-sm transition-all duration-300 ease-out hover:shadow-md hover:scale-110 group"
                       title="Expandir sidebar"
                     >
                       <ChevronRight className="h-3 w-3 text-gray-600 group-hover:text-blue-600 transition-colors" />
@@ -536,10 +561,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                           </div>
                         </div>
                         
-                        <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors">
+                        <Link 
+                          to="/suporte"
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                          onClick={() => setShowUserMenu(false)}
+                        >
                           <HelpCircle className="w-4 h-4 text-gray-400" />
                           Ajuda e Suporte
-                        </button>
+                        </Link>
                       </div>
                       
                       {/* Ações críticas */}
@@ -570,6 +599,12 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           </div>
         </main>
       </div>
+
+      {/* Widget de Suporte Flutuante */}
+      <SupportWidget 
+        position="bottom-right"
+        hideOnPages={['/suporte']} // Não mostrar na própria página de suporte
+      />
     </div>
   );
 };

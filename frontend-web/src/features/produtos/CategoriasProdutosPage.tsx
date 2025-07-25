@@ -13,6 +13,7 @@ import {
   Save,
   X
 } from 'lucide-react';
+import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import ModalCategoria from '../../components/modals/ModalCategoria';
 import ModalSubcategoria from '../../components/modals/ModalSubcategoria';
 import ModalConfiguracao from '../../components/modais/ModalConfiguracao';
@@ -626,15 +627,12 @@ const CategoriasProdutosPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <button
-                onClick={() => navigate('/produtos')}
-                className="flex items-center text-[#159A9C] hover:text-[#0F7B7D] transition-colors"
-              >
-                <ArrowLeft className="h-5 w-5 mr-1" />
-                Voltar para Produtos
-              </button>
+              <BackToNucleus 
+                nucleusName="Produtos"
+                nucleusPath="/produtos"
+                currentModuleName="Gestão de Categorias"
+              />
               <div>
-                <h1 className="text-2xl font-bold text-[#002333]">Gestão de Categorias</h1>
                 <p className="text-[#B4BEC9]">Configure categorias, subcategorias e tipos de produtos</p>
               </div>
             </div>

@@ -588,7 +588,7 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
         origem: formData.origem, // 'website', 'indicacao', etc.
         tags: formData.tags.length > 0 ? formData.tags : undefined,
         dataFechamentoEsperado: formData.dataFechamentoEsperado || undefined,
-        responsavel_id: 'a47ac10b-58cc-4372-a567-0e02b2c3d480', // ID do usuário admin
+        responsavel_id: 'a47ac10b-58cc-4372-a567-0e02b2c3d480', // ID do usuário admin (string)
         cliente_id: formData.clienteExistente?.id || undefined,
         nomeContato: tipoContato === 'novo' ? formData.nomeContato : undefined,
         emailContato: tipoContato === 'novo' ? formData.emailContato : undefined,
@@ -596,7 +596,19 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
         empresaContato: tipoContato === 'novo' ? formData.empresaContato : undefined,
       };
       
-      console.log('Dados a serem enviados:', oportunidadeData);
+      console.log('🔍 Dados detalhados a serem enviados:', {
+        ...oportunidadeData,
+        tipos: {
+          titulo: typeof oportunidadeData.titulo,
+          valor: typeof oportunidadeData.valor,
+          probabilidade: typeof oportunidadeData.probabilidade,
+          estagio: typeof oportunidadeData.estagio,
+          prioridade: typeof oportunidadeData.prioridade,
+          origem: typeof oportunidadeData.origem,
+          responsavel_id: typeof oportunidadeData.responsavel_id,
+          cliente_id: typeof oportunidadeData.cliente_id,
+        }
+      });
       onSave(oportunidadeData);
     }
   };

@@ -28,7 +28,9 @@ export const BackToNucleus: React.FC<BackToNucleusProps> = ({
           <span>Voltar para {nucleusName}</span>
         </Link>
       </div>
-      <h1 className="text-2xl font-bold text-[#002333]">{displayTitle}</h1>
+      {displayTitle && (
+        <h1 className="text-2xl font-bold text-[#002333]">{displayTitle}</h1>
+      )}
     </div>
   );
 };

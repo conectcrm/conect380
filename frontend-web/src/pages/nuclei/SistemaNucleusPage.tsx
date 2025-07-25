@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, Building2 } from 'lucide-react';
 import ModulesScreen, { NucleusModulesData } from '../../components/navigation/ModulesScreen';
 
 const SistemaNucleusPage: React.FC = () => {

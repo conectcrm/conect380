@@ -110,7 +110,7 @@ export const AgendaPage: React.FC = () => {
       location: eventData.location || '',
       allDay: eventData.allDay || false,
       type: 'meeting',
-      priority: 'normal',
+      priority: 'medium',
       status: eventData.status || 'confirmed',
       collaborator: '',
       category: 'meeting',
@@ -207,34 +207,70 @@ export const AgendaPage: React.FC = () => {
       const next15Minutes = new Date(now.getTime() + 15 * 60 * 1000);
       const next60Minutes = new Date(now.getTime() + 60 * 60 * 1000);
 
-      events.forEach(event => {
+      // Agrupar eventos por período para evitar notificações duplicadas
+      const upcomingEvents15min = events.filter(event => {
         const eventStart = new Date(event.start);
+        return eventStart > now && eventStart <= next15Minutes && !event.allDay;
+      });
+
+      const upcomingEvents1hour = events.filter(event => {
+        const eventStart = new Date(event.start);
+        return eventStart > next15Minutes && eventStart <= next60Minutes && !event.allDay;
+      });
+
+      // Criar uma única notificação para eventos em 15 minutos
+      if (upcomingEvents15min.length > 0) {
+        const eventCount = upcomingEvents15min.length;
+        const firstEvent = upcomingEvents15min[0];
         
-        // Alertas para eventos em 15 minutos
-        if (eventStart > now && eventStart <= next15Minutes && !event.allDay) {
+        if (eventCount === 1) {
           addNotification({
             title: '⏰ Evento em 15 minutos!',
-            message: `"${event.title}" começará em breve${event.location ? ` - ${event.location}` : ''}`,
+            message: `"${firstEvent.title}" começará em breve${firstEvent.location ? ` - ${firstEvent.location}` : ''}`,
             type: 'warning',
             priority: 'high',
             entityType: 'agenda',
-            entityId: event.id,
+            entityId: `urgent-${Date.now()}`,
+            autoClose: false
+          });
+        } else {
+          addNotification({
+            title: `⏰ ${eventCount} eventos em 15 minutos!`,
+            message: `Próximos eventos: ${upcomingEvents15min.map(e => e.title).join(', ')}`,
+            type: 'warning',
+            priority: 'high',
+            entityType: 'agenda',
+            entityId: `urgent-batch-${Date.now()}`,
             autoClose: false
           });
         }
+      }
+      
+      // Criar uma única notificação para eventos em 1 hora
+      if (upcomingEvents1hour.length > 0) {
+        const eventCount = upcomingEvents1hour.length;
+        const firstEvent = upcomingEvents1hour[0];
         
-        // Alertas para eventos em 1 hora
-        if (eventStart > next15Minutes && eventStart <= next60Minutes && !event.allDay) {
+        if (eventCount === 1) {
           addNotification({
             title: '🔔 Evento em 1 hora',
-            message: `"${event.title}" está programado para ${eventStart.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+            message: `"${firstEvent.title}" está programado para ${new Date(firstEvent.start).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
             type: 'info',
             priority: 'medium',
             entityType: 'agenda',
-            entityId: event.id
+            entityId: `reminder-${Date.now()}`
+          });
+        } else {
+          addNotification({
+            title: `🔔 ${eventCount} eventos em 1 hora`,
+            message: `Próximos eventos: ${upcomingEvents1hour.map(e => e.title).join(', ')}`,
+            type: 'info',
+            priority: 'medium',
+            entityType: 'agenda',
+            entityId: `reminder-batch-${Date.now()}`
           });
         }
-      });
+      }
     };
 
     // Verificar imediatamente e depois a cada 5 minutos
@@ -259,16 +295,28 @@ export const AgendaPage: React.FC = () => {
     // Eventos pendentes
     const pendingEvents = events.filter(event => event.status === 'pending');
     
-    // Notificação de resumo
-    setTimeout(() => {
-      addNotification({
-        title: '📅 Agenda Carregada',
-        message: `${todayEvents.length} eventos hoje • ${pendingEvents.length} pendentes`,
-        type: 'info',
-        priority: 'low'
-      });
-    }, 1000);
-  }, []); // Só executar uma vez ao carregar
+    // Notificação de resumo - evitar duplicatas usando um ID único baseado na data
+    const summaryId = `agenda-summary-${today.toDateString()}`;
+    
+    // Verificar se já foi mostrada hoje
+    const hasShownToday = sessionStorage.getItem(summaryId);
+    
+    if (!hasShownToday) {
+      setTimeout(() => {
+        addNotification({
+          title: '📅 Agenda Carregada',
+          message: `${todayEvents.length} eventos hoje • ${pendingEvents.length} pendentes`,
+          type: 'info',
+          priority: 'low',
+          entityType: 'agenda',
+          entityId: summaryId
+        });
+        
+        // Marcar como mostrada para evitar duplicatas na mesma sessão
+        sessionStorage.setItem(summaryId, 'true');
+      }, 1000);
+    }
+  }, [events, addNotification]); // Dependência de events para atualizar quando eventos mudarem
 
   const handleCloseModal = () => {
     setShowEventModal(false);
@@ -327,7 +375,6 @@ export const AgendaPage: React.FC = () => {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Calendar className="w-6 h-6 text-[#159A9C]" />
-              <h1 className="text-2xl font-bold text-gray-900">Agenda</h1>
             </div>
           </div>
 

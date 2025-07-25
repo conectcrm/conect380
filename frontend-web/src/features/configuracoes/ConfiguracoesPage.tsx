@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import {
   Settings,
   User,
@@ -422,12 +423,21 @@ const ConfiguracoesPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Configurações</h1>
-        <p className="text-gray-600">Gerencie suas preferências e configurações do sistema</p>
+      <div className="bg-white border-b px-6 py-4">
+        <BackToNucleus
+          nucleusName="CRM"
+          nucleusPath="/nuclei/crm"
+          currentModuleName="Configurações"
+        />
       </div>
+      
+      <div className="p-6 space-y-6">
+        {/* Header */}
+        <div>
+          <p className="text-gray-600">Gerencie suas preferências e configurações do sistema</p>
+        </div>
 
       <div className="bg-white shadow-sm rounded-lg border overflow-hidden">
         <div className="flex">
@@ -469,6 +479,7 @@ const ConfiguracoesPage: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

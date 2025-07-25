@@ -20,6 +20,7 @@ import ConfiguracoesPage from './features/configuracoes/ConfiguracoesPage';
 import ContasReceberPage from './features/financeiro/ContasReceberPage';
 import ContasPagarPage from './features/financeiro/ContasPagarPage';
 import { AgendaPage } from './features/agenda/AgendaPage';
+import { OportunidadesPage } from './features/oportunidades/OportunidadesPage';
 import { ExemploModalProduto } from './examples/ExemploModalProduto';
 import CombosPage from './features/combos/CombosPage';
 import NovoComboPage from './features/combos/NovoComboPage';
@@ -31,8 +32,13 @@ import CrmNucleusPage from './pages/nuclei/CrmNucleusPage';
 import VendasNucleusPage from './pages/nuclei/VendasNucleusPage';
 import FinanceiroNucleusPage from './pages/nuclei/FinanceiroNucleusPage';
 import SistemaNucleusPage from './pages/nuclei/SistemaNucleusPage';
+import GestaoNucleusPage from './pages/nuclei/GestaoNucleusPage';
 import ModuleUnderConstruction from './components/common/ModuleUnderConstruction';
 import { UploadDemoPage } from './pages/UploadDemoPage';
+import { EmpresasListPage } from './features/admin/empresas/EmpresasListPage';
+import { ContatosPage } from './features/contatos/ContatosPageNova';
+import { SuportePage } from './features/suporte/SuportePageNova';
+import { UsuariosPage } from './features/gestao/usuarios/UsuariosPage';
 import { useAuth } from './hooks/useAuth';
 
 // Configuração do React Query
@@ -87,12 +93,22 @@ const AppRoutes: React.FC = () => {
           <Route path="/nuclei/vendas" element={<VendasNucleusPage />} />
           <Route path="/nuclei/financeiro" element={<FinanceiroNucleusPage />} />
           <Route path="/nuclei/sistema" element={<SistemaNucleusPage />} />
+          <Route path="/nuclei/gestao" element={<GestaoNucleusPage />} />
+          
+          {/* Rotas administrativas do sistema */}
+          <Route path="/admin/empresas" element={<EmpresasListPage />} />
+          <Route path="/gestao/empresas" element={<EmpresasListPage />} />
+          <Route path="/gestao/usuarios" element={<UsuariosPage />} />
+          
+          {/* Sistema de Suporte */}
+          <Route path="/suporte" element={<SuportePage />} />
           
           {/* Exemplo Modal Produto */}
           <Route path="/exemplo-produto" element={<ExemploModalProduto />} />
           
           {/* Rotas dos módulos existentes */}
           <Route path="/clientes" element={<ClientesPage />} />
+          <Route path="/contatos" element={<ContatosPage />} />
           <Route path="/propostas" element={<PropostasPage />} />
           <Route path="/funil-vendas" element={<FunilVendas />} />
           <Route path="/produtos" element={<ProdutosPage />} />
@@ -104,6 +120,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/combos/:id/editar" element={<NovoComboPage />} />
           
           <Route path="/agenda" element={<AgendaPage />} />
+          <Route path="/oportunidades" element={<OportunidadesPage />} />
           
           {/* Upload Demo */}
           <Route path="/upload-demo" element={<UploadDemoPage />} />

@@ -4,7 +4,7 @@
   "description": "Frontend Web do Conect CRM - Interface moderna e responsiva",
   "private": true,
   "dependencies": {
-    "@hookform/resolvers": "^2.9.11",
+    "@hookform/resolvers": "2.9.11",
     "@types/jest": "^27.5.2",
     "@types/node": "^16.11.64",
     "@types/puppeteer": "5.4.7",
@@ -28,7 +28,7 @@
     "react-beautiful-dnd": "13.1.1",
     "react-datepicker": "^4.8.0",
     "react-dom": "^18.3.1",
-    "react-hook-form": "^7.37.0",
+    "react-hook-form": "7.61.0",
     "react-hot-toast": "^2.4.0",
     "react-i18next": "^12.0.0",
     "react-icons": "^5.5.0",
@@ -40,7 +40,7 @@
     "tailwindcss": "^3.2.1",
     "typescript": "^4.8.4",
     "web-vitals": "^2.1.4",
-    "yup": "^0.32.11"
+    "yup": "0.32.11"
   },
   "scripts": {
     "start": "set PORT=3900 && set NODE_OPTIONS=--max_old_space_size=4096 && react-scripts --openssl-legacy-provider start",

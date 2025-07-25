@@ -69,7 +69,7 @@ export interface CreateOpportunityDto {
   origem: string;
   tags?: string[];
   dataFechamentoEsperado?: string;
-  responsavel_id: number;
+  responsavel_id: string; // Corrigido: deve ser string, não number
   cliente_id?: number;
   nomeContato?: string;
   emailContato?: string;

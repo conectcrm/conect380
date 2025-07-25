@@ -210,9 +210,9 @@ const ContasPagarPage: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-6">
             <div className="flex-1 min-w-0">
               <BackToNucleus 
-                title="Contas a Pagar"
                 nucleusName="Financeiro"
                 nucleusPath="/nuclei/financeiro"
+                currentModuleName="Contas a Pagar"
               />
               <p className="mt-1 text-sm text-gray-500">
                 Controle e gestão de todas as contas a pagar da empresa

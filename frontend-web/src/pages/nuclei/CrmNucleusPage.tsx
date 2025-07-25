@@ -28,9 +28,9 @@ const CrmNucleusPage: React.FC = () => {
         href: '/contatos',
         icon: UserCheck,
         notifications: 0,
-        badge: 'Em Breve',
-        badgeColor: 'yellow',
-        status: 'coming_soon'
+        badge: 'Ativo',
+        badgeColor: 'green',
+        status: 'active'
       },
       {
         id: 'interacoes',

@@ -11,7 +11,7 @@ import {
   ParseIntPipe
 } from '@nestjs/common';
 import { OportunidadesService } from './oportunidades.service';
-import { CreateOportunidadeDto, UpdateOportunidadeDto, UpdateEstagioDto } from './dto/oportunidade.dto';
+import { CreateOportunidadeDto, UpdateOportunidadeDto, UpdateEstagioDto, MetricasQueryDto } from './dto/oportunidade.dto';
 import { CreateAtividadeDto } from './dto/atividade.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -25,11 +25,11 @@ export class OportunidadesController {
 
   @Post()
   create(@Body() createOportunidadeDto: CreateOportunidadeDto, @CurrentUser() user?: User) {
-    // Mock user para teste
+    // Mock user para teste com UUID válido
     const mockUser = user || { 
-      id: 'mock-user', 
+      id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479', // UUID fixo para teste
       role: 'admin', 
-      empresa_id: '1',
+      empresa_id: 'f47ac10b-58cc-4372-a567-0e02b2c3d480',
       nome: 'Admin Teste'
     } as User;
     return this.oportunidadesService.create(createOportunidadeDto, mockUser);
@@ -78,8 +78,7 @@ export class OportunidadesController {
   @Get('metricas')
   getMetricas(
     @CurrentUser() user?: User,
-    @Query('dataInicio') dataInicio?: string,
-    @Query('dataFim') dataFim?: string,
+    @Query() queryDto?: MetricasQueryDto,
   ) {
     // Mock user para teste
     const mockUser = user || { 
@@ -88,7 +87,7 @@ export class OportunidadesController {
       empresa_id: '1',
       nome: 'Admin Teste'
     } as User;
-    return this.oportunidadesService.getMetricas(mockUser, { dataInicio, dataFim });
+    return this.oportunidadesService.getMetricas(mockUser, queryDto);
   }
 
   @Get(':id')

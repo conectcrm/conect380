@@ -55,13 +55,13 @@ const VendasNucleusPage: React.FC = () => {
       {
         id: 'oportunidades',
         name: 'Oportunidades',
-        description: 'Gestão de oportunidades de negócio e acompanhamento do pipeline.',
+        description: 'Gestão completa de oportunidades com Kanban, estatísticas e pipeline de vendas.',
         href: '/oportunidades',
         icon: Target,
         notifications: 0,
-        badge: 'Em Breve',
-        badgeColor: 'yellow',
-        status: 'coming_soon'
+        badge: 'Ativo',
+        badgeColor: 'blue',
+        status: 'active'
       },
       {
         id: 'relatorios-vendas',

@@ -374,6 +374,26 @@ Cada empresa cliente pode personalizar:
 - **Acessibilidade**: Seguir padrões WCAG 2.1
 - **Performance**: Otimizar imagens e assets
 
+## 📚 Documentação e Organização
+
+### 📁 Estrutura de Documentação
+Toda documentação está organizada na pasta `docs/` por categoria:
+
+- 📋 `docs/changelog/` - Correções, bugs e status
+- 📖 `docs/guides/` - Guias e manuais de configuração  
+- 🔧 `docs/implementation/` - Funcionalidades implementadas
+- 🐛 `docs/debug/` - Logs de debug e diagnósticos
+
+### ⚠️ **IMPORTANTE: Novos Documentos**
+**Antes de criar qualquer arquivo .md:**
+
+1. **Determine a categoria** e crie na pasta apropriada em `docs/`
+2. **Se não houver categoria adequada**, crie uma nova pasta descritiva
+3. **NÃO criar arquivos .md na raiz** - mantém a organização
+4. **Use nomenclatura descritiva**: `NOVA_FUNCIONALIDADE.md`
+
+📖 **Consulte:** `docs/README.md` para orientações detalhadas
+
 ### 🔧 Convenções Técnicas
 - **TypeScript**: Tipagem estrita obrigatória
 - **Componentes**: Reutilização máxima via design system

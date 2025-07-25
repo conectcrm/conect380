@@ -189,6 +189,23 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   const generateId = () => `notification-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
   const addNotification = (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
+    // Verificar se já existe uma notificação similar muito recente (últimos 2 minutos para erros)
+    const timeWindow = notification.type === 'error' ? 2 * 60 * 1000 : 5 * 60 * 1000;
+    const recentTimeAgo = new Date(Date.now() - timeWindow);
+    const recentSimilar = notifications.find(existing => 
+      existing.title === notification.title &&
+      existing.type === notification.type &&
+      existing.message === notification.message &&
+      existing.entityType === notification.entityType &&
+      existing.timestamp > recentTimeAgo
+    );
+
+    // Se encontrou notificação similar recente, não criar nova
+    if (recentSimilar) {
+      console.log('Notificação duplicada evitada:', notification.title);
+      return;
+    }
+
     const newNotification: Notification = {
       ...notification,
       id: generateId(),

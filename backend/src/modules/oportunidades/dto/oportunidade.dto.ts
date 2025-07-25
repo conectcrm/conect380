@@ -135,3 +135,13 @@ export class UpdateEstagioDto {
   @IsDateString()
   dataFechamentoReal?: string;
 }
+
+export class MetricasQueryDto {
+  @IsOptional()
+  @IsDateString()
+  dataInicio?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dataFim?: string;
+}

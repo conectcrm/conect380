@@ -17,6 +17,7 @@ import {
   ArrowLeft,
   Layers
 } from 'lucide-react';
+import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 
 // Hooks e Services
 import { useCalculosProposta } from './hooks/useCalculosProposta';
@@ -514,15 +515,12 @@ const NovaPropostaPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <button
-                onClick={() => navigate(-1)}
-                className="flex items-center text-[#159A9C] hover:text-[#0F7B7D] transition-colors"
-              >
-                <ArrowLeft className="h-5 w-5 mr-1" />
-                Voltar
-              </button>
+              <BackToNucleus 
+                nucleusName="Propostas"
+                nucleusPath="/propostas"
+                currentModuleName="Nova Proposta"
+              />
               <div>
-                <h1 className="text-2xl font-bold text-[#002333]">Nova Proposta</h1>
                 <p className="text-[#B4BEC9]">Crie uma proposta comercial personalizada</p>
               </div>
             </div>
