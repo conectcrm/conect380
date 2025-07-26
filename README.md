@@ -1,4 +1,4 @@
-# 🔥 Fênix CRM
+# Conect CRM
 
 Um sistema CRM completo, moderno e escalável, desenvolvido para ser comercializado como SaaS (Software as a Service).
 
