@@ -164,18 +164,38 @@ export const opportunitiesService = {
     return response.data;
   },
 
-  async getMetrics(filters?: { dataInicio?: string; dataFim?: string }): Promise<PipelineMetrics> {
-    const params = new URLSearchParams();
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          params.append(key, value);
+  async getMetrics(params?: any): Promise<PipelineMetrics> {
+    try {
+      // Se params for uma object com queryKey ou signal, ignorar (metadados do React Query)
+      let filters: { dataInicio?: string; dataFim?: string } | undefined;
+      
+      if (params && typeof params === 'object' && !params.queryKey && !params.signal) {
+        filters = params;
+      }
+      
+      let url = '/oportunidades/metricas';
+      
+      if (filters && Object.keys(filters).length > 0) {
+        const urlParams = new URLSearchParams();
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            urlParams.append(key, String(value));
+          }
+        });
+        
+        const queryString = urlParams.toString();
+        if (queryString) {
+          url += `?${queryString}`;
         }
-      });
+      }
+      
+      console.log('Fazendo requisição para:', url); // Debug
+      const response = await api.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar métricas:', error);
+      throw error;
     }
-    
-    const response = await api.get(`/oportunidades/metricas?${params.toString()}`);
-    return response.data;
   },
 
   // Atividades

@@ -46,7 +46,7 @@ const FunilVendas = () => {
   // Queries para dados da API
   const { data: pipelineData, isLoading: loadingPipeline, error: pipelineError } = useQuery(
     'pipeline',
-    opportunitiesService.getPipelineData,
+    () => opportunitiesService.getPipelineData(),
     { 
       refetchInterval: 30000,
       retry: 3,
@@ -56,7 +56,7 @@ const FunilVendas = () => {
 
   const { data: metrics, isLoading: loadingMetrics, error: metricsError } = useQuery(
     'metrics',
-    opportunitiesService.getMetrics,
+    () => opportunitiesService.getMetrics(),
     { 
       refetchInterval: 30000,
       retry: 3,

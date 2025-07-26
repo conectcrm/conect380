@@ -18,7 +18,7 @@ import ProdutosPage from './features/produtos/ProdutosPage';
 import FinanceiroPage from './features/financeiro/FinanceiroPage';
 import ConfiguracoesPage from './features/configuracoes/ConfiguracoesPage';
 import ContasReceberPage from './features/financeiro/ContasReceberPage';
-import ContasPagarPage from './features/financeiro/ContasPagarPage';
+import ContasPagarPage from './pages/gestao/financeiro/ContasPagarSimplificada';
 import { AgendaPage } from './features/agenda/AgendaPage';
 import { OportunidadesPage } from './features/oportunidades/OportunidadesPage';
 import { ExemploModalProduto } from './examples/ExemploModalProduto';

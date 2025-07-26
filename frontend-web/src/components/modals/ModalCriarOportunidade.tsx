@@ -726,8 +726,9 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                         </label>
                         <div className="relative">
                           <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                          {/* PADRÃO OBRIGATÓRIO: Formatação automática igual à documentação do sistema */}
                           <input
-                            type="text"
+                            type="text" // SEMPRE text, nunca number para campos monetários
                             value={formData.valor}
                             onChange={(e) => handleInputChange('valor', e.target.value)}
                             className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${

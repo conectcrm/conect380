@@ -78,6 +78,27 @@ export const TabelaUsuarios: React.FC<TabelaUsuariosProps> = ({
     }
   };
 
+  // Funções para analisar status dos usuários selecionados
+  const getUsuariosSelecionadosData = () => {
+    return usuarios.filter(usuario => usuariosSelecionados.includes(usuario.id));
+  };
+
+  const getStatusUsuariosSelecionados = () => {
+    const usuariosData = getUsuariosSelecionadosData();
+    const ativos = usuariosData.filter(u => u.ativo).length;
+    const inativos = usuariosData.filter(u => !u.ativo).length;
+    const total = usuariosData.length;
+
+    return {
+      todosAtivos: ativos === total,
+      todosInativos: inativos === total,
+      mixtos: ativos > 0 && inativos > 0,
+      ativos,
+      inativos,
+      total
+    };
+  };
+
   // Função para copiar informações do usuário
   const copiarInformacoes = (usuario: Usuario) => {
     const info = `Nome: ${usuario.nome}\nEmail: ${usuario.email}\nPerfil: ${ROLE_LABELS[usuario.role]}\nStatus: ${usuario.ativo ? 'Ativo' : 'Inativo'}${usuario.telefone ? `\nTelefone: ${usuario.telefone}` : ''}`;
@@ -117,7 +138,26 @@ export const TabelaUsuarios: React.FC<TabelaUsuariosProps> = ({
 
   const executarAcaoMassa = (acao: 'ativar' | 'desativar' | 'excluir') => {
     if (onAcaoMassa && usuariosSelecionados.length > 0) {
-      const usuariosParaAcao = usuarios.filter(u => usuariosSelecionados.includes(u.id));
+      let usuariosParaAcao = usuarios.filter(u => usuariosSelecionados.includes(u.id));
+      
+      // Filtrar usuários baseado na ação e status atual
+      if (acao === 'ativar') {
+        // Apenas usuários inativos podem ser ativados
+        usuariosParaAcao = usuariosParaAcao.filter(u => !u.ativo);
+      } else if (acao === 'desativar') {
+        // Apenas usuários ativos podem ser desativados
+        usuariosParaAcao = usuariosParaAcao.filter(u => u.ativo);
+      }
+      
+      // Se não há usuários elegíveis para a ação
+      if (usuariosParaAcao.length === 0 && acao !== 'excluir') {
+        toast.error(`Nenhum usuário selecionado pode ser ${acao === 'ativar' ? 'ativado' : 'desativado'}`, {
+          icon: '⚠️',
+          duration: 3000
+        });
+        return;
+      }
+
       onAcaoMassa(acao, usuariosParaAcao);
       setUsuariosSelecionados([]);
       setMostrarAcoesMassa(false);
@@ -175,25 +215,70 @@ export const TabelaUsuarios: React.FC<TabelaUsuariosProps> = ({
               <span className="text-sm font-medium text-blue-900">
                 {usuariosSelecionados.length} usuário(s) selecionado(s)
               </span>
+              {(() => {
+                const status = getStatusUsuariosSelecionados();
+                if (status.mixtos) {
+                  return (
+                    <span className="text-xs text-blue-700 bg-blue-100 px-2 py-1 rounded">
+                      {status.ativos} ativo(s) • {status.inativos} inativo(s)
+                    </span>
+                  );
+                } else if (status.todosAtivos) {
+                  return (
+                    <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded">
+                      Todos ativos
+                    </span>
+                  );
+                } else {
+                  return (
+                    <span className="text-xs text-red-700 bg-red-100 px-2 py-1 rounded">
+                      Todos inativos
+                    </span>
+                  );
+                }
+              })()}
             </div>
             <div className="flex items-center space-x-2">
-              <button
-                onClick={() => executarAcaoMassa('ativar')}
-                className="px-3 py-1.5 text-sm bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors flex items-center space-x-1"
-              >
-                <UserCheck className="w-4 h-4" />
-                <span>Ativar</span>
-              </button>
-              <button
-                onClick={() => executarAcaoMassa('desativar')}
-                className="px-3 py-1.5 text-sm bg-yellow-100 text-yellow-700 rounded-md hover:bg-yellow-200 transition-colors flex items-center space-x-1"
-              >
-                <UserX className="w-4 h-4" />
-                <span>Desativar</span>
-              </button>
+              {(() => {
+                const status = getStatusUsuariosSelecionados();
+                const botoes = [];
+
+                // Mostra botão "Ativar" apenas se há usuários inativos
+                if (!status.todosAtivos) {
+                  botoes.push(
+                    <button
+                      key="ativar"
+                      onClick={() => executarAcaoMassa('ativar')}
+                      className="px-3 py-1.5 text-sm bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors flex items-center space-x-1"
+                      title={status.mixtos ? `Ativar ${status.inativos} usuário(s) inativo(s)` : `Ativar ${status.total} usuário(s)`}
+                    >
+                      <UserCheck className="w-4 h-4" />
+                      <span>Ativar{status.mixtos ? ` (${status.inativos})` : ''}</span>
+                    </button>
+                  );
+                }
+
+                // Mostra botão "Desativar" apenas se há usuários ativos
+                if (!status.todosInativos) {
+                  botoes.push(
+                    <button
+                      key="desativar"
+                      onClick={() => executarAcaoMassa('desativar')}
+                      className="px-3 py-1.5 text-sm bg-yellow-100 text-yellow-700 rounded-md hover:bg-yellow-200 transition-colors flex items-center space-x-1"
+                      title={status.mixtos ? `Desativar ${status.ativos} usuário(s) ativo(s)` : `Desativar ${status.total} usuário(s)`}
+                    >
+                      <UserX className="w-4 h-4" />
+                      <span>Desativar{status.mixtos ? ` (${status.ativos})` : ''}</span>
+                    </button>
+                  );
+                }
+
+                return botoes;
+              })()}
               <button
                 onClick={() => executarAcaoMassa('excluir')}
                 className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors flex items-center space-x-1"
+                title={`Excluir ${usuariosSelecionados.length} usuário(s) selecionado(s)`}
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Excluir</span>

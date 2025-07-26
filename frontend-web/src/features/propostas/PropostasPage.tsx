@@ -24,7 +24,17 @@ import {
   XCircle,
   AlertCircle,
   TrendingUp,
-  Settings
+  Settings,
+  Grid,
+  List,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Check,
+  X,
+  BarChart3,
+  Target,
+  TrendingDown
 } from 'lucide-react';
 
 // Função para converter PropostaCompleta para o formato da UI
@@ -175,6 +185,16 @@ const PropostasPage: React.FC = () => {
   const [isLoadingCreate, setIsLoadingCreate] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showWizardModal, setShowWizardModal] = useState(false);
+  
+  // Novos estados para funcionalidades avançadas
+  const [selectedPropostas, setSelectedPropostas] = useState<string[]>([]);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [sortBy, setSortBy] = useState<'data_criacao' | 'valor' | 'cliente' | 'status'>('data_criacao');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [valueRange, setValueRange] = useState({ min: '', max: '' });
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
 
   // Carregar propostas reais do serviço
   useEffect(() => {
@@ -317,8 +337,145 @@ const PropostasPage: React.FC = () => {
       filtered = filtered.filter(proposta => proposta.vendedor === selectedVendedor);
     }
 
+    // Filtros avançados - range de datas
+    if (dateRange.start && dateRange.end) {
+      filtered = filtered.filter(proposta => {
+        const dataCreated = new Date(proposta.data_criacao);
+        const startDate = new Date(dateRange.start);
+        const endDate = new Date(dateRange.end);
+        return dataCreated >= startDate && dataCreated <= endDate;
+      });
+    }
+
+    // Filtros avançados - range de valores
+    if (valueRange.min || valueRange.max) {
+      filtered = filtered.filter(proposta => {
+        const valor = proposta.valor;
+        const min = valueRange.min ? parseFloat(valueRange.min) : 0;
+        const max = valueRange.max ? parseFloat(valueRange.max) : Infinity;
+        return valor >= min && valor <= max;
+      });
+    }
+
+    // Aplicar ordenação
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortBy) {
+        case 'data_criacao':
+          comparison = new Date(a.data_criacao).getTime() - new Date(b.data_criacao).getTime();
+          break;
+        case 'valor':
+          comparison = a.valor - b.valor;
+          break;
+        case 'cliente':
+          comparison = a.cliente.localeCompare(b.cliente);
+          break;
+        case 'status':
+          comparison = a.status.localeCompare(b.status);
+          break;
+        default:
+          comparison = 0;
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
     setFilteredPropostas(filtered);
-  }, [propostas, searchTerm, selectedStatus, selectedVendedor]);
+  }, [propostas, searchTerm, selectedStatus, selectedVendedor, dateRange, valueRange, sortBy, sortOrder]);
+
+  // Funções para seleção em massa
+  const handleSelectProposta = (propostaId: string) => {
+    setSelectedPropostas(prev => 
+      prev.includes(propostaId) 
+        ? prev.filter(id => id !== propostaId)
+        : [...prev, propostaId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedPropostas.length === filteredPropostas.length) {
+      setSelectedPropostas([]);
+    } else {
+      setSelectedPropostas(filteredPropostas.map(p => p.id));
+    }
+  };
+
+  // Ações em massa
+  const handleBulkDelete = async () => {
+    if (window.confirm(`Deseja excluir ${selectedPropostas.length} proposta(s) selecionada(s)?`)) {
+      setPropostas(prev => prev.filter(p => !selectedPropostas.includes(p.id)));
+      setSelectedPropostas([]);
+      setShowBulkActions(false);
+    }
+  };
+
+  const handleBulkStatusChange = async (newStatus: string) => {
+    setPropostas(prev => prev.map(p => 
+      selectedPropostas.includes(p.id) 
+        ? { ...p, status: newStatus as any }
+        : p
+    ));
+    setSelectedPropostas([]);
+    setShowBulkActions(false);
+  };
+
+  const handleBulkExport = async () => {
+    const selectedData = propostas.filter(p => selectedPropostas.includes(p.id));
+    
+    // Criar CSV
+    const headers = ['Número', 'Cliente', 'Título', 'Valor', 'Status', 'Data Criação', 'Vendedor'];
+    const csvContent = [
+      headers.join(','),
+      ...selectedData.map(p => [
+        p.numero,
+        p.cliente,
+        p.titulo,
+        p.valor,
+        p.status,
+        p.data_criacao,
+        p.vendedor
+      ].join(','))
+    ].join('\n');
+
+    // Download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `propostas_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    setSelectedPropostas([]);
+    setShowBulkActions(false);
+  };
+
+  // Calcular métricas do dashboard
+  const calcularMetricas = () => {
+    const total = filteredPropostas.length;
+    const aprovadas = filteredPropostas.filter(p => p.status === 'aprovada').length;
+    const emNegociacao = filteredPropostas.filter(p => p.status === 'negociacao').length;
+    const valorTotal = filteredPropostas.reduce((sum, p) => sum + p.valor, 0);
+    const valorAprovado = filteredPropostas
+      .filter(p => p.status === 'aprovada')
+      .reduce((sum, p) => sum + p.valor, 0);
+    
+    const taxaConversao = total > 0 ? (aprovadas / total) * 100 : 0;
+    
+    return {
+      total,
+      aprovadas,
+      emNegociacao,
+      valorTotal,
+      valorAprovado,
+      taxaConversao
+    };
+  };
+
+  const metricas = calcularMetricas();
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -1111,131 +1268,199 @@ const PropostasPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Lista de Propostas */}
-      <div className="bg-white rounded-lg border shadow-sm overflow-hidden propostas-page">
-        <div className="table-wrapper">
-          <table className="table-propostas min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Proposta
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Cliente
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Valor
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile">
-                  Vendedor
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile">
-                  Vencimento
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ações
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredPropostas.map((proposta) => (
-                <tr key={proposta.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap" data-label="Proposta">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{proposta.numero}</div>
-                      <div className="subinfo ellipsis-text">{proposta.titulo}</div>
-                      <div className="subinfo flex items-center mt-1">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        Criada em {formatDate(proposta.data_criacao)}
-                      </div>
+        {/* Lista de Propostas com Seleção */}
+        <div className="bg-white rounded-lg border shadow-sm overflow-hidden propostas-page">
+          <div className="table-wrapper">
+            <table className="table-propostas min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  {/* Checkbox para selecionar todas */}
+                  <th className="px-6 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={selectedPropostas.length === filteredPropostas.length && filteredPropostas.length > 0}
+                      onChange={handleSelectAll}
+                      className="rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
+                    />
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => {
+                        if (sortBy === 'data_criacao') {
+                          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setSortBy('data_criacao');
+                          setSortOrder('desc');
+                        }
+                      }}>
+                    <div className="flex items-center space-x-1">
+                      <span>Proposta</span>
+                      {sortBy === 'data_criacao' && (
+                        sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                      )}
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap" data-label="Cliente">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900 ellipsis-text">{proposta.cliente}</div>
-                      <div className="subinfo flex items-center">
-                        <User className="w-4 h-4 mr-1" />
-                        <span className="ellipsis-sm">{proposta.cliente_contato}</span>
-                      </div>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => {
+                        if (sortBy === 'cliente') {
+                          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setSortBy('cliente');
+                          setSortOrder('asc');
+                        }
+                      }}>
+                    <div className="flex items-center space-x-1">
+                      <span>Cliente</span>
+                      {sortBy === 'cliente' && (
+                        sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                      )}
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap col-hide-mobile" data-label="Status">
-                    <span className={`status-badge inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(proposta.status)}`}>
-                      {getStatusIcon(proposta.status)}
-                      <span className="ml-1">{getStatusText(proposta.status)}</span>
-                    </span>
-                    <div className="subinfo mt-1">
-                      {proposta.probabilidade}% de chance
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile cursor-pointer hover:bg-gray-100"
+                      onClick={() => {
+                        if (sortBy === 'status') {
+                          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setSortBy('status');
+                          setSortOrder('asc');
+                        }
+                      }}>
+                    <div className="flex items-center space-x-1">
+                      <span>Status</span>
+                      {sortBy === 'status' && (
+                        sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                      )}
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap" data-label="Valor">
-                    <div className="valor-proposta text-sm font-medium">
-                      {formatCurrency(proposta.valor)}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => {
+                        if (sortBy === 'valor') {
+                          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setSortBy('valor');
+                          setSortOrder('desc');
+                        }
+                      }}>
+                    <div className="flex items-center space-x-1">
+                      <span>Valor</span>
+                      {sortBy === 'valor' && (
+                        sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                      )}
                     </div>
-                    <div className="subinfo capitalize">
-                      {proposta.categoria}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 col-hide-mobile" data-label="Vendedor">
-                    {proposta.vendedor}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap col-hide-mobile" data-label="Vencimento">
-                    <div className="data-proposta text-sm text-gray-900">
-                      {formatDate(proposta.data_vencimento)}
-                    </div>
-                    <div className="subinfo">
-                      {new Date(proposta.data_vencimento) < new Date() ? 
-                        <span className="text-red-600">Vencida</span> : 
-                        `${Math.ceil((new Date(proposta.data_vencimento).getTime() - new Date().getTime()) / (1000 * 3600 * 24))} dias`
-                      }
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" data-label="Ações">
-                    <div className="flex items-center justify-end space-x-2">
-                      <button 
-                        onClick={() => handleViewProposta(proposta)}
-                        className="text-blue-600 hover:text-blue-900 p-1 transition-colors disabled:opacity-50" 
-                        title="Visualizar"
-                        disabled={isLoading}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleEditProposta(proposta)}
-                        className="text-green-600 hover:text-green-900 p-1 transition-colors disabled:opacity-50" 
-                        title="Editar"
-                        disabled={isLoading}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteProposta(proposta)}
-                        className="text-red-600 hover:text-red-900 p-1 transition-colors disabled:opacity-50" 
-                        title="Excluir"
-                        disabled={isLoading}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleMoreOptions(proposta)}
-                        className="text-gray-400 hover:text-gray-600 p-1 transition-colors disabled:opacity-50" 
-                        title="Mais opções"
-                        disabled={isLoading}
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile">
+                    Vendedor
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile">
+                    Vencimento
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Ações
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Paginação */}
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredPropostas.map((proposta) => (
+                  <tr key={proposta.id} className={`hover:bg-gray-50 ${selectedPropostas.includes(proposta.id) ? 'bg-blue-50' : ''}`}>
+                    {/* Checkbox */}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={selectedPropostas.includes(proposta.id)}
+                        onChange={() => handleSelectProposta(proposta.id)}
+                        className="rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
+                      />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap" data-label="Proposta">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{proposta.numero}</div>
+                        <div className="subinfo ellipsis-text">{proposta.titulo}</div>
+                        <div className="subinfo flex items-center mt-1">
+                          <Calendar className="w-3 h-3 mr-1" />
+                          Criada em {formatDate(proposta.data_criacao)}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap" data-label="Cliente">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 ellipsis-text">{proposta.cliente}</div>
+                        <div className="subinfo flex items-center">
+                          <User className="w-4 h-4 mr-1" />
+                          <span className="ellipsis-sm">{proposta.cliente_contato}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap col-hide-mobile" data-label="Status">
+                      <span className={`status-badge inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(proposta.status)}`}>
+                        {getStatusIcon(proposta.status)}
+                        <span className="ml-1">{getStatusText(proposta.status)}</span>
+                      </span>
+                      <div className="subinfo mt-1">
+                        {proposta.probabilidade}% de chance
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap" data-label="Valor">
+                      <div className="valor-proposta text-sm font-medium">
+                        {formatCurrency(proposta.valor)}
+                      </div>
+                      <div className="subinfo capitalize">
+                        {proposta.categoria}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 col-hide-mobile" data-label="Vendedor">
+                      {proposta.vendedor}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap col-hide-mobile" data-label="Vencimento">
+                      <div className="data-proposta text-sm text-gray-900">
+                        {formatDate(proposta.data_vencimento)}
+                      </div>
+                      <div className="subinfo">
+                        {new Date(proposta.data_vencimento) < new Date() ? 
+                          <span className="text-red-600">Vencida</span> : 
+                          `${Math.ceil((new Date(proposta.data_vencimento).getTime() - new Date().getTime()) / (1000 * 3600 * 24))} dias`
+                        }
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" data-label="Ações">
+                      <div className="flex items-center justify-end space-x-2">
+                        <button 
+                          onClick={() => handleViewProposta(proposta)}
+                          className="text-blue-600 hover:text-blue-900 p-1 transition-colors disabled:opacity-50" 
+                          title="Visualizar"
+                          disabled={isLoading}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleEditProposta(proposta)}
+                          className="text-green-600 hover:text-green-900 p-1 transition-colors disabled:opacity-50" 
+                          title="Editar"
+                          disabled={isLoading}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteProposta(proposta)}
+                          className="text-red-600 hover:text-red-900 p-1 transition-colors disabled:opacity-50" 
+                          title="Excluir"
+                          disabled={isLoading}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleMoreOptions(proposta)}
+                          className="text-gray-400 hover:text-gray-600 p-1 transition-colors disabled:opacity-50" 
+                          title="Mais opções"
+                          disabled={isLoading}
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>        {/* Paginação */}
         <div className="bg-white px-6 py-3 border-t border-gray-200 sm:px-6">
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-700">
