@@ -6,15 +6,21 @@ import { ModalProposta } from '../../components/modals/ModalProposta';
 import { ModalNovaProposta } from '../../components/modals/ModalNovaProposta';
 import { propostasService, PropostaCompleta } from './services/propostasService';
 import { pdfPropostasService, DadosProposta } from '../../services/pdfPropostasService';
-import { 
-  FileText, 
-  Plus, 
-  Search, 
-  Filter, 
-  Download, 
-  Eye, 
-  Edit, 
-  Trash2, 
+import DashboardPropostas from './components/DashboardPropostas';
+import BulkActions from './components/BulkActions';
+import FiltrosAvancados from './components/FiltrosAvancados';
+import PropostaActions from './components/PropostaActions';
+import ModalVisualizarProposta from './components/ModalVisualizarProposta';
+import { safeRender } from '../../utils/safeRender';
+import {
+  FileText,
+  Plus,
+  Search,
+  Filter,
+  Download,
+  Eye,
+  Edit,
+  Trash2,
   MoreVertical,
   DollarSign,
   Calendar,
@@ -33,151 +39,41 @@ import {
   Check,
   X,
   BarChart3,
+  RefreshCw,
   Target,
-  TrendingDown
+  TrendingDown,
+  Users,
+  Copy
 } from 'lucide-react';
 
 // Função para converter PropostaCompleta para o formato da UI
 const converterPropostaParaUI = (proposta: PropostaCompleta) => {
   return {
-    id: proposta.id || '',
-    numero: proposta.numero || '',
-    cliente: proposta.cliente?.nome || 'Cliente não informado',
-    cliente_contato: proposta.cliente?.email || '',
-    titulo: `Proposta para ${proposta.cliente?.nome || 'Cliente'}`,
-    valor: proposta.total || 0,
-    status: proposta.status || 'rascunho',
+    id: safeRender(proposta.id) || '',
+    numero: safeRender(proposta.numero) || '',
+    cliente: safeRender(proposta.cliente?.nome) || 'Cliente não informado',
+    cliente_contato: safeRender(proposta.cliente?.email) || '',
+    titulo: `Proposta para ${safeRender(proposta.cliente?.nome) || 'Cliente'}`,
+    valor: Number(proposta.total) || 0,
+    status: safeRender(proposta.status) || 'rascunho',
     data_criacao: proposta.criadaEm ? new Date(proposta.criadaEm).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
     data_vencimento: proposta.dataValidade ? new Date(proposta.dataValidade).toISOString().split('T')[0] : '',
     data_aprovacao: proposta.status === 'aprovada' ? new Date().toISOString().split('T')[0] : null,
-    vendedor: 'Sistema',
-    descricao: proposta.observacoes || `Proposta com ${proposta.produtos?.length || 0} produtos`,
+    vendedor: safeRender(proposta.vendedor?.nome) || 'Sistema', // Usando vendedor real
+    descricao: safeRender(proposta.observacoes) || `Proposta com ${proposta.produtos?.length || 0} produtos`,
     probabilidade: proposta.status === 'aprovada' ? 100 : proposta.status === 'enviada' ? 70 : proposta.status === 'rejeitada' ? 0 : 30,
     categoria: 'proposta'
   };
 };
 
-// Dados mock para desenvolvimento
-const mockPropostas = [
-  {
-    id: '001',
-    numero: 'PROP-2025-001',
-    cliente: 'Tech Solutions Ltda',
-    cliente_contato: 'João Silva Santos',
-    titulo: 'Sistema de Gestão Empresarial',
-    valor: 85000,
-    status: 'aprovada',
-    data_criacao: '2025-01-10',
-    data_vencimento: '2025-02-10',
-    data_aprovacao: '2025-01-18',
-    vendedor: 'Maria Santos',
-    descricao: 'Desenvolvimento de sistema completo de gestão empresarial com módulos financeiro, RH e vendas.',
-    probabilidade: 95,
-    categoria: 'software'
-  },
-  {
-    id: '002',
-    numero: 'PROP-2025-002', 
-    cliente: 'StartupXYZ',
-    cliente_contato: 'Maria Santos Oliveira',
-    titulo: 'Consultoria em Marketing Digital',
-    valor: 25000,
-    status: 'negociacao',
-    data_criacao: '2025-01-15',
-    data_vencimento: '2025-02-15',
-    data_aprovacao: null,
-    vendedor: 'Pedro Costa',
-    descricao: 'Consultoria especializada em estratégias de marketing digital e crescimento.',
-    probabilidade: 70,
-    categoria: 'consultoria'
-  },
-  {
-    id: '003',
-    numero: 'PROP-2025-003',
-    cliente: 'Empresa ABC',
-    cliente_contato: 'Carlos Mendes',
-    titulo: 'Treinamento Corporativo',
-    valor: 15000,
-    status: 'enviada',
-    data_criacao: '2025-01-18',
-    data_vencimento: '2025-02-18',
-    data_aprovacao: null,
-    vendedor: 'Ana Silva',
-    descricao: 'Programa de treinamento corporativo em liderança e gestão de equipes.',
-    probabilidade: 50,
-    categoria: 'treinamento'
-  },
-  {
-    id: '004',
-    numero: 'PROP-2025-004',
-    cliente: 'Freelancer Design',
-    cliente_contato: 'Pedro Costa Lima',
-    titulo: 'Identidade Visual Completa',
-    valor: 8000,
-    status: 'rejeitada',
-    data_criacao: '2025-01-05',
-    data_vencimento: '2025-01-20',
-    data_aprovacao: null,
-    vendedor: 'Maria Santos',
-    descricao: 'Criação de identidade visual completa incluindo logo, manual de marca e materiais gráficos.',
-    probabilidade: 20,
-    categoria: 'design'
-  },
-  {
-    id: '005',
-    numero: 'PROP-2025-005',
-    cliente: 'E-commerce Plus',
-    cliente_contato: 'Ana Rodriguez',
-    titulo: 'Loja Virtual Premium',
-    valor: 45000,
-    status: 'aprovada',
-    data_criacao: '2025-01-20',
-    data_vencimento: '2025-02-20',
-    data_aprovacao: '2025-01-25',
-    vendedor: 'Carlos Silva',
-    descricao: 'Desenvolvimento de e-commerce completo com integração de pagamentos e gestão de estoque.',
-    probabilidade: 90,
-    categoria: 'ecommerce'
-  },
-  {
-    id: '006',
-    numero: 'PROP-2025-006',
-    cliente: 'Startup Básica',
-    cliente_contato: 'Roberto Machado',
-    titulo: 'Pacote Startup Digital',
-    valor: 12000,
-    status: 'negociacao',
-    data_criacao: '2025-01-22',
-    data_vencimento: '2025-02-22',
-    data_aprovacao: null,
-    vendedor: 'Pedro Costa',
-    descricao: 'Solução básica para startups com website e consultoria inicial.',
-    probabilidade: 65,
-    categoria: 'software'
-  },
-  {
-    id: '007',
-    numero: 'PROP-2025-007',
-    cliente: 'Mega Corporation',
-    cliente_contato: 'Fernanda Lima',
-    titulo: 'Sistema Enterprise Completo',
-    valor: 150000,
-    status: 'enviada',
-    data_criacao: '2025-01-25',
-    data_vencimento: '2025-02-25',
-    data_aprovacao: null,
-    vendedor: 'Maria Santos',
-    descricao: 'Plataforma enterprise com múltiplas integrações e módulos avançados.',
-    probabilidade: 80,
-    categoria: 'software'
-  }
-];
+// Dados removidos - sistema agora trabalha apenas com dados reais do banco
 
 const PropostasPage: React.FC = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [propostas, setPropostas] = useState(mockPropostas);
-  const [filteredPropostas, setFilteredPropostas] = useState(mockPropostas);
+  // Estados inicializados com arrays vazios - dados vêm do banco
+  const [propostas, setPropostas] = useState<any[]>([]);
+  const [filteredPropostas, setFilteredPropostas] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('todos');
   const [selectedVendedor, setSelectedVendedor] = useState('todos');
@@ -185,7 +81,12 @@ const PropostasPage: React.FC = () => {
   const [isLoadingCreate, setIsLoadingCreate] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showWizardModal, setShowWizardModal] = useState(false);
-  
+
+  // Debug: Log sempre que showWizardModal mudar
+  useEffect(() => {
+    console.log('🔄 PropostasPage: showWizardModal mudou para:', showWizardModal);
+  }, [showWizardModal]);
+
   // Novos estados para funcionalidades avançadas
   const [selectedPropostas, setSelectedPropostas] = useState<string[]>([]);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -194,44 +95,14 @@ const PropostasPage: React.FC = () => {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [valueRange, setValueRange] = useState({ min: '', max: '' });
   const [showBulkActions, setShowBulkActions] = useState(false);
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [viewMode, setViewMode] = useState<'table' | 'cards' | 'dashboard'>('dashboard'); // Novo modo dashboard
+  const [filtrosAvancados, setFiltrosAvancados] = useState<any>({});
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedPropostaForView, setSelectedPropostaForView] = useState<PropostaCompleta | null>(null);
 
   // Carregar propostas reais do serviço
   useEffect(() => {
-    const carregarPropostas = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Tentar carregar propostas do serviço real
-        const propostasReais = await propostasService.listarPropostas();
-        
-        console.log('🔄 Propostas carregadas do serviço:', propostasReais.length);
-        
-        if (propostasReais && propostasReais.length > 0) {
-          // Converter formato do serviço para formato da interface
-          const propostasFormatadas = propostasReais.map(converterPropostaParaUI);
-          
-          // Combinar propostas reais com propostas mock
-          const todasPropostas = [...propostasFormatadas, ...mockPropostas];
-          setPropostas(todasPropostas);
-          setFilteredPropostas(todasPropostas);
-          console.log('✅ Propostas carregadas:', propostasFormatadas.length, 'reais +', mockPropostas.length, 'mock');
-        } else {
-          // Se não há propostas reais, usar apenas mock
-          setPropostas(mockPropostas);
-          setFilteredPropostas(mockPropostas);
-          console.log('📝 Usando apenas propostas mock:', mockPropostas.length);
-        }
-      } catch (error) {
-        console.error('❌ Erro ao carregar propostas:', error);
-        // Em caso de erro, usar propostas mock como fallback
-        setPropostas(mockPropostas);
-        setFilteredPropostas(mockPropostas);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     carregarPropostas();
   }, []);
 
@@ -239,75 +110,71 @@ const PropostasPage: React.FC = () => {
   useEffect(() => {
     const handleFocus = () => {
       console.log('🔄 Página voltou ao foco, recarregando propostas...');
-      // Pequeno delay para garantir que a navegação foi concluída
-      setTimeout(async () => {
-        try {
-          setIsLoading(true);
-          const propostasReais = await propostasService.listarPropostas();
-          
-          if (propostasReais && propostasReais.length > 0) {
-            const propostasFormatadas = propostasReais.map(proposta => ({
-              id: proposta.id || '',
-              numero: proposta.numero || '',
-              cliente: proposta.cliente?.nome || 'Cliente não informado',
-              cliente_contato: proposta.cliente?.nome || '',
-              titulo: 'Proposta ' + (proposta.numero || proposta.id || 'N/A'),
-              valor: proposta.total || 0,
-              status: proposta.status as any || 'rascunho',
-              data_criacao: proposta.criadaEm ? new Date(proposta.criadaEm).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-              data_vencimento: proposta.dataValidade ? new Date(proposta.dataValidade).toISOString().split('T')[0] : '',
-              data_aprovacao: null,
-              vendedor: 'Sistema',
-              descricao: proposta.observacoes || 'Proposta criada via sistema',
-              probabilidade: 50,
-              categoria: 'geral'
-            }));
-            
-            const todasPropostas = [...propostasFormatadas, ...mockPropostas];
-            setPropostas(todasPropostas);
-            setFilteredPropostas(todasPropostas);
-            console.log('🔄 Lista atualizada com', propostasFormatadas.length, 'propostas reais');
-          }
-        } catch (error) {
-          console.error('❌ Erro ao atualizar propostas:', error);
-        } finally {
-          setIsLoading(false);
-        }
-      }, 500);
+      setTimeout(() => carregarPropostas(), 500);
     };
 
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  // Função para salvar proposta
+  // 🆕 Escutar eventos de atualização de propostas vindos do portal
+  useEffect(() => {
+    const handlePropostaAtualizada = (event: CustomEvent) => {
+      console.log('🔄 Evento de atualização recebido do portal:', event.detail);
+      const { propostaId, novoStatus, fonte } = event.detail;
+
+      // Atualizar a proposta localmente em tempo real
+      setPropostas(prev =>
+        prev.map(p =>
+          p.numero === propostaId || p.id === propostaId
+            ? { ...p, status: novoStatus, updatedAt: new Date().toISOString() }
+            : p
+        )
+      );
+
+      // Aplicar também ao array filtrado
+      setFilteredPropostas(prev =>
+        prev.map(p =>
+          p.numero === propostaId || p.id === propostaId
+            ? { ...p, status: novoStatus, updatedAt: new Date().toISOString() }
+            : p
+        )
+      );
+
+      // Recarregar todas as propostas após um delay para garantir sincronização completa
+      setTimeout(() => {
+        console.log('♻️ Recarregando propostas após atualização do portal...');
+        carregarPropostas();
+      }, 2000);
+    };
+
+    // Adicionar listener para atualizações do portal
+    window.addEventListener('propostaAtualizada', handlePropostaAtualizada as EventListener);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('propostaAtualizada', handlePropostaAtualizada as EventListener);
+    };
+  }, []);
+
+  // Função para salvar proposta usando serviço real
   const handleSaveProposta = async (data: any) => {
     try {
       setIsLoadingCreate(true);
-      
-      // Simulação de API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      const novaProposta = {
-        id: String(propostas.length + 1).padStart(3, '0'),
-        numero: `PROP-2025-${String(propostas.length + 1).padStart(3, '0')}`,
-        titulo: data.titulo,
-        cliente: data.cliente,
-        cliente_contato: data.cliente,
-        valor: data.valor,
-        status: 'rascunho' as const,
-        data_criacao: new Date().toISOString().split('T')[0],
-        data_vencimento: data.data_vencimento,
-        data_aprovacao: null,
-        vendedor: data.vendedor,
-        descricao: data.descricao,
-        probabilidade: data.probabilidade,
-        categoria: data.categoria
-      };
+      console.log('💾 Salvando proposta no banco de dados...', data);
 
-      setPropostas(prev => [novaProposta, ...prev]);
-      setFilteredPropostas(prev => [novaProposta, ...prev]);
-      console.log('✅ Nova proposta adicionada:', novaProposta);
+      // Usar o serviço real para criar a proposta
+      const novaProposta = await propostasService.criarProposta(data);
+      
+      console.log('✅ Proposta criada com sucesso:', novaProposta);
+      
+      // Recarregar a lista de propostas para incluir a nova
+      await carregarPropostas();
+      
+      showNotification('Proposta criada com sucesso!', 'success');
+    } catch (error) {
+      console.error('❌ Erro ao criar proposta:', error);
+      showNotification('Erro ao criar proposta. Tente novamente.', 'error');
     } finally {
       setIsLoadingCreate(false);
     }
@@ -319,7 +186,7 @@ const PropostasPage: React.FC = () => {
 
     // Filtro por busca
     if (searchTerm) {
-      filtered = filtered.filter(proposta => 
+      filtered = filtered.filter(proposta =>
         proposta.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
         proposta.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
         proposta.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -357,10 +224,38 @@ const PropostasPage: React.FC = () => {
       });
     }
 
+    // Filtros avançados do componente FiltrosAvancados
+    if (filtrosAvancados.status) {
+      filtered = filtered.filter(p => p.status === filtrosAvancados.status);
+    }
+    if (filtrosAvancados.vendedor) {
+      filtered = filtered.filter(p => p.vendedor === filtrosAvancados.vendedor);
+    }
+    if (filtrosAvancados.dataInicio && filtrosAvancados.dataFim) {
+      filtered = filtered.filter(p => {
+        const dataProposta = new Date(p.data_criacao);
+        const inicio = new Date(filtrosAvancados.dataInicio);
+        const fim = new Date(filtrosAvancados.dataFim);
+        return dataProposta >= inicio && dataProposta <= fim;
+      });
+    }
+    if (filtrosAvancados.valorMin !== undefined) {
+      filtered = filtered.filter(p => p.valor >= filtrosAvancados.valorMin);
+    }
+    if (filtrosAvancados.valorMax !== undefined) {
+      filtered = filtered.filter(p => p.valor <= filtrosAvancados.valorMax);
+    }
+    if (filtrosAvancados.categoria) {
+      filtered = filtered.filter(p => p.categoria === filtrosAvancados.categoria);
+    }
+    if (filtrosAvancados.probabilidadeMin !== undefined) {
+      filtered = filtered.filter(p => p.probabilidade >= filtrosAvancados.probabilidadeMin);
+    }
+
     // Aplicar ordenação
     filtered.sort((a, b) => {
       let comparison = 0;
-      
+
       switch (sortBy) {
         case 'data_criacao':
           comparison = new Date(a.data_criacao).getTime() - new Date(b.data_criacao).getTime();
@@ -377,17 +272,17 @@ const PropostasPage: React.FC = () => {
         default:
           comparison = 0;
       }
-      
+
       return sortOrder === 'asc' ? comparison : -comparison;
     });
 
     setFilteredPropostas(filtered);
-  }, [propostas, searchTerm, selectedStatus, selectedVendedor, dateRange, valueRange, sortBy, sortOrder]);
+  }, [propostas, searchTerm, selectedStatus, selectedVendedor, dateRange, valueRange, sortBy, sortOrder, filtrosAvancados]);
 
   // Funções para seleção em massa
   const handleSelectProposta = (propostaId: string) => {
-    setSelectedPropostas(prev => 
-      prev.includes(propostaId) 
+    setSelectedPropostas(prev =>
+      prev.includes(propostaId)
         ? prev.filter(id => id !== propostaId)
         : [...prev, propostaId]
     );
@@ -401,28 +296,144 @@ const PropostasPage: React.FC = () => {
     }
   };
 
-  // Ações em massa
+  // Função para mostrar notificações
+  const showNotification = (message: string, type: 'success' | 'error') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
+  // Função para lidar com ações em lote
+  const handleBulkAction = (action: string, success: boolean) => {
+    showNotification(action, success ? 'success' : 'error');
+    if (success) {
+      // Recarregar propostas após ação bem-sucedida
+      carregarPropostas();
+    }
+  };
+
+  // Função para limpar seleção
+  const clearSelection = () => {
+    setSelectedPropostas([]);
+  };
+
+  // Função para aplicar filtros avançados
+  const handleAdvancedFilters = (filtros: any) => {
+    setFiltrosAvancados(filtros);
+  };
+
+  // Função para clonar proposta
+  const handleCloneProposta = async (propostaId: string) => {
+    try {
+      const propostaClonada = await propostasService.clonarProposta(propostaId);
+      showNotification('Proposta clonada com sucesso!', 'success');
+      carregarPropostas();
+    } catch (error) {
+      console.error('Erro ao clonar proposta:', error);
+      showNotification('Erro ao clonar proposta', 'error');
+    }
+  };
+
+  // Função principal para carregar propostas
+  const carregarPropostas = async () => {
+    try {
+      setIsLoading(true);
+      console.log('🔄 Carregando propostas do banco de dados...');
+      
+      const propostasReais = await propostasService.listarPropostas();
+
+      console.log('🔄 Propostas carregadas do serviço:', propostasReais.length);
+
+      if (propostasReais && propostasReais.length > 0) {
+        const propostasFormatadas = propostasReais.map(converterPropostaParaUI);
+
+        // Validar que todas as propostas têm campos string
+        const propostasValidadas = propostasFormatadas.map(proposta => ({
+          ...proposta,
+          numero: safeRender(proposta.numero),
+          cliente: safeRender(proposta.cliente),
+          cliente_contato: safeRender(proposta.cliente_contato),
+          titulo: safeRender(proposta.titulo),
+          status: safeRender(proposta.status),
+          vendedor: safeRender(proposta.vendedor),
+          categoria: safeRender(proposta.categoria),
+          descricao: safeRender(proposta.descricao),
+          data_criacao: safeRender(proposta.data_criacao),
+          data_vencimento: safeRender(proposta.data_vencimento),
+          data_aprovacao: proposta.data_aprovacao ? safeRender(proposta.data_aprovacao) : null,
+          valor: Number(proposta.valor) || 0,
+          probabilidade: Number(proposta.probabilidade) || 0
+        }));
+
+        setPropostas(propostasValidadas);
+        setFilteredPropostas(propostasValidadas);
+        console.log('✅ Propostas carregadas do banco:', propostasValidadas.length);
+      } else {
+        setPropostas([]);
+        setFilteredPropostas([]);
+        console.log('📝 Nenhuma proposta encontrada no banco de dados');
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar propostas:', error);
+      setPropostas([]);
+      setFilteredPropostas([]);
+      showNotification('Erro ao carregar propostas do banco de dados', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Ações em massa usando serviços reais
   const handleBulkDelete = async () => {
     if (window.confirm(`Deseja excluir ${selectedPropostas.length} proposta(s) selecionada(s)?`)) {
-      setPropostas(prev => prev.filter(p => !selectedPropostas.includes(p.id)));
-      setSelectedPropostas([]);
-      setShowBulkActions(false);
+      try {
+        setIsLoading(true);
+        console.log('🗑️ Excluindo propostas em lote:', selectedPropostas);
+        
+        // Usar o serviço real para exclusão em lote
+        await propostasService.excluirEmLote(selectedPropostas);
+        
+        showNotification(`${selectedPropostas.length} proposta(s) excluída(s) com sucesso!`, 'success');
+        setSelectedPropostas([]);
+        setShowBulkActions(false);
+        
+        // Recarregar dados
+        await carregarPropostas();
+      } catch (error) {
+        console.error('❌ Erro ao excluir propostas em lote:', error);
+        showNotification('Erro ao excluir propostas. Tente novamente.', 'error');
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
   const handleBulkStatusChange = async (newStatus: string) => {
-    setPropostas(prev => prev.map(p => 
-      selectedPropostas.includes(p.id) 
-        ? { ...p, status: newStatus as any }
-        : p
-    ));
-    setSelectedPropostas([]);
-    setShowBulkActions(false);
+    try {
+      setIsLoading(true);
+      console.log('📝 Alterando status em lote:', selectedPropostas, 'para:', newStatus);
+      
+      // Para cada proposta selecionada, alterar o status
+      for (const propostaId of selectedPropostas) {
+        await propostasService.atualizarStatus(propostaId, newStatus);
+      }
+      
+      showNotification(`Status de ${selectedPropostas.length} proposta(s) alterado com sucesso!`, 'success');
+      setSelectedPropostas([]);
+      setShowBulkActions(false);
+      
+      // Recarregar dados
+      await carregarPropostas();
+    } catch (error) {
+      console.error('❌ Erro ao alterar status em lote:', error);
+      showNotification('Erro ao alterar status das propostas. Tente novamente.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleBulkExport = async () => {
     const selectedData = propostas.filter(p => selectedPropostas.includes(p.id));
-    
+
     // Criar CSV
     const headers = ['Número', 'Cliente', 'Título', 'Valor', 'Status', 'Data Criação', 'Vendedor'];
     const csvContent = [
@@ -448,7 +459,7 @@ const PropostasPage: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     setSelectedPropostas([]);
     setShowBulkActions(false);
   };
@@ -462,9 +473,9 @@ const PropostasPage: React.FC = () => {
     const valorAprovado = filteredPropostas
       .filter(p => p.status === 'aprovada')
       .reduce((sum, p) => sum + p.valor, 0);
-    
+
     const taxaConversao = total > 0 ? (aprovadas / total) * 100 : 0;
-    
+
     return {
       total,
       aprovadas,
@@ -511,11 +522,181 @@ const PropostasPage: React.FC = () => {
   };
 
   // Manipuladores dos botões de ações
-  const converterPropostaParaPDF = (proposta: any): DadosProposta => {
+  const converterPropostaParaPDF = async (proposta: any): Promise<DadosProposta> => {
+    console.log('🔄 Convertendo proposta para PDF:', proposta);
+
+    // Verificar se a proposta tem dados reais do sistema
+    const temDadosReais = proposta.id && proposta.id.startsWith('prop_');
+
+    if (temDadosReais) {
+      console.log('📋 Usando dados reais da proposta criada no sistema');
+
+      try {
+        // Buscar dados completos da proposta
+        const propostaCompleta = await propostasService.obterProposta(proposta.id);
+
+        if (!propostaCompleta) {
+          throw new Error('Proposta não encontrada');
+        }
+
+        console.log('🎯 Proposta completa encontrada:', propostaCompleta);
+
+        // Converter produtos reais para formato PDF
+        const itensReais = propostaCompleta.produtos.map((produtoProposta, index) => {
+          const produto = produtoProposta.produto;
+          const quantidade = produtoProposta.quantidade;
+          const desconto = produtoProposta.desconto || 0;
+          const valorUnitario = produto.preco;
+          const valorComDesconto = valorUnitario * (1 - desconto / 100);
+          const valorTotal = valorComDesconto * quantidade;
+
+          // Criar descrição detalhada do produto
+          let descricaoDetalhada = produto.descricao || '';
+
+          // Adicionar informações específicas por tipo
+          if (produto.tipo === 'software') {
+            descricaoDetalhada += descricaoDetalhada ? '\n' : '';
+            descricaoDetalhada += `• Categoria: Software/Tecnologia`;
+            if (produto.tipoItem) {
+              descricaoDetalhada += `\n• Tipo: ${produto.tipoItem}`;
+            }
+            if (produto.tipoLicenciamento) {
+              descricaoDetalhada += `\n• Licenciamento: ${produto.tipoLicenciamento}`;
+            }
+            if (produto.periodicidadeLicenca) {
+              descricaoDetalhada += `\n• Periodicidade: ${produto.periodicidadeLicenca}`;
+            }
+            if (produto.quantidadeLicencas) {
+              descricaoDetalhada += `\n• Licenças incluídas: ${produto.quantidadeLicencas}`;
+            }
+            if (produto.renovacaoAutomatica) {
+              descricaoDetalhada += `\n• Renovação automática ativada`;
+            }
+          } else if (produto.tipo === 'combo') {
+            descricaoDetalhada += descricaoDetalhada ? '\n' : '';
+            descricaoDetalhada += `• Categoria: Pacote Promocional`;
+            descricaoDetalhada += `\n• Pacote com ${produto.produtosCombo?.length || 0} itens incluídos`;
+            if (produto.precoOriginal && produto.desconto) {
+              const economia = produto.precoOriginal - produto.preco;
+              descricaoDetalhada += `\n• Economia: R$ ${economia.toFixed(2)} (${produto.desconto.toFixed(1)}% OFF)`;
+            }
+            if (produto.produtosCombo && produto.produtosCombo.length > 0) {
+              descricaoDetalhada += `\n• Itens inclusos: ${produto.produtosCombo.map(p => p.nome).join(', ')}`;
+            }
+          } else {
+            descricaoDetalhada += descricaoDetalhada ? '\n' : '';
+            descricaoDetalhada += `• Categoria: ${produto.categoria}`;
+          }
+
+          // Adicionar unidade de medida
+          descricaoDetalhada += `\n• Unidade de medida: ${produto.unidade}`;
+
+          return {
+            nome: produto.nome,
+            descricao: descricaoDetalhada.trim(),
+            quantidade: quantidade,
+            valorUnitario: valorUnitario,
+            desconto: desconto,
+            valorTotal: valorTotal
+          };
+        });
+
+        // Calcular totais reais
+        const subtotal = propostaCompleta.subtotal;
+        const descontoGlobal = (propostaCompleta.descontoGlobal || 0);
+        const impostos = propostaCompleta.impostos || 0;
+        const valorTotal = propostaCompleta.total;
+
+        // Obter dados do cliente real
+        const clienteReal = propostaCompleta.cliente;
+        const vendedorReal = propostaCompleta.vendedor;
+
+        // Mapear status para o formato correto
+        const statusMap = {
+          'rascunho': 'draft',
+          'enviada': 'sent',
+          'aprovada': 'approved',
+          'rejeitada': 'rejected'
+        } as const;
+
+        return {
+          numeroProposta: propostaCompleta.numero || `PROP-${Date.now()}`,
+          titulo: propostaCompleta.titulo || `Proposta para ${clienteReal?.nome || 'Cliente'}`,
+          descricao: propostaCompleta.observacoes || 'Proposta comercial com produtos/serviços selecionados conforme necessidades específicas do cliente.',
+          status: statusMap[propostaCompleta.status || 'rascunho'],
+          dataEmissao: propostaCompleta.criadaEm ? new Date(propostaCompleta.criadaEm).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR'),
+          dataValidade: propostaCompleta.dataValidade ? new Date(propostaCompleta.dataValidade).toLocaleDateString('pt-BR') : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR'),
+          empresa: {
+            nome: 'FenixCRM Solutions',
+            endereco: 'Rua das Inovações, 123 - Centro Empresarial',
+            cidade: 'São Paulo',
+            estado: 'SP',
+            cep: '01234-567',
+            telefone: '(11) 3333-4444',
+            email: 'contato@fenixcrm.com.br',
+            cnpj: '12.345.678/0001-90'
+          },
+          cliente: {
+            nome: clienteReal?.nome || 'Cliente Não Informado',
+            empresa: clienteReal?.tipoPessoa === 'juridica' ? clienteReal.nome : undefined,
+            email: clienteReal?.email || 'cliente@email.com',
+            telefone: clienteReal?.telefone || 'Não informado',
+            documento: clienteReal?.documento || 'Não informado',
+            tipoDocumento: clienteReal?.tipoPessoa === 'juridica' ? 'CNPJ' : 'CPF',
+            endereco: clienteReal?.endereco ?
+              `${clienteReal.endereco}${clienteReal.cidade ? `, ${clienteReal.cidade}` : ''}${clienteReal.estado ? `/${clienteReal.estado}` : ''}${clienteReal.cep ? ` - CEP: ${clienteReal.cep}` : ''}` :
+              'Endereço não informado'
+          },
+          vendedor: {
+            nome: vendedorReal?.nome || 'Consultor FenixCRM',
+            email: vendedorReal?.email || 'vendedor@fenixcrm.com.br',
+            telefone: '(11) 98765-4321',
+            cargo: vendedorReal?.tipo === 'gerente' ? 'Gerente de Vendas' :
+              vendedorReal?.tipo === 'admin' ? 'Diretor Comercial' :
+                'Consultor de Vendas'
+          },
+          itens: itensReais,
+          subtotal: subtotal,
+          descontoGeral: descontoGlobal,
+          percentualDesconto: subtotal > 0 ? (descontoGlobal / subtotal * 100) : 0,
+          impostos: impostos,
+          valorTotal: valorTotal,
+          formaPagamento: propostaCompleta.formaPagamento === 'avista' ? 'À vista com desconto especial' :
+            propostaCompleta.formaPagamento === 'parcelado' ? `Parcelado em até ${propostaCompleta.parcelas || 3}x sem juros` :
+              propostaCompleta.formaPagamento === 'boleto' ? 'Boleto bancário' :
+                propostaCompleta.formaPagamento === 'cartao' ? 'Cartão de crédito' :
+                  'Conforme acordo comercial',
+          prazoEntrega: `${propostaCompleta.validadeDias || 30} dias úteis`,
+          garantia: '12 meses de garantia e suporte técnico especializado',
+          validadeProposta: `${propostaCompleta.validadeDias || 30} dias corridos`,
+          condicoesGerais: [
+            `Proposta válida por ${propostaCompleta.validadeDias || 30} dias corridos a partir da data de emissão`,
+            'Pagamento mediante apresentação de nota fiscal',
+            'Entrega conforme cronograma acordado entre as partes',
+            'Garantia e suporte técnico conforme especificações técnicas',
+            'Valores já incluem todos os impostos aplicáveis',
+            'Alterações no escopo podem gerar custos adicionais'
+          ],
+          observacoes: propostaCompleta.observacoes || `Esta proposta foi elaborada especialmente para ${clienteReal?.nome || 'o cliente'}, incluindo produtos/serviços selecionados conforme suas necessidades específicas. Estamos à disposição para esclarecimentos e ajustes necessários.`
+        };
+
+      } catch (error) {
+        console.error('❌ Erro ao converter proposta real:', error);
+        throw new Error('Não foi possível converter a proposta. Verifique os dados.');
+      }
+    } else {
+      throw new Error('Proposta não encontrada ou dados incompletos.');
+    }
+  };
+
+  // Função removida - sistema agora trabalha apenas com dados reais do banco
+  // const converterPropostaMockParaPDF = ...
+    const valorTotal = proposta.valor || 5000;
+
     // Criar itens detalhados baseados na categoria e valor da proposta
     const criarItensDetalhados = (proposta: any) => {
       const valorTotal = proposta.valor || 0;
-      
+
       switch (proposta.categoria) {
         case 'software':
           // Produtos reais de software/desenvolvimento
@@ -585,7 +766,7 @@ const PropostasPage: React.FC = () => {
               }
             ];
           }
-          
+
         case 'consultoria':
           return [
             {
@@ -613,7 +794,7 @@ const PropostasPage: React.FC = () => {
               valorTotal: valorTotal * 0.2
             }
           ];
-          
+
         case 'treinamento':
           return [
             {
@@ -633,7 +814,7 @@ const PropostasPage: React.FC = () => {
               valorTotal: valorTotal * 0.4
             }
           ];
-          
+
         case 'design':
           return [
             {
@@ -689,7 +870,7 @@ const PropostasPage: React.FC = () => {
               valorTotal: valorTotal * 0.25
             }
           ];
-          
+
         default:
           return [
             {
@@ -763,35 +944,64 @@ const PropostasPage: React.FC = () => {
 
   const handleViewProposta = async (proposta: any) => {
     console.log('👁️ Visualizar proposta:', proposta.numero);
-    
+
     try {
-      // Converter dados da proposta para o formato do PDF
-      const dadosPdf = converterPropostaParaPDF(proposta);
-      
-      // Tentar gerar HTML da proposta via API
-      let htmlContent: string;
-      
-      try {
-        htmlContent = await pdfPropostasService.previewHtml('proposta-comercial', dadosPdf);
-      } catch (apiError) {
-        console.warn('⚠️ API não disponível, usando template local');
-        
-        // Fallback: criar HTML básico usando template local
-        htmlContent = gerarHtmlLocal(dadosPdf);
-      }
-      
-      // Criar uma nova aba com o HTML
-      const newWindow = window.open('', '_blank');
-      if (newWindow) {
-        newWindow.document.write(htmlContent);
-        newWindow.document.close();
-        console.log('✅ Proposta aberta em nova aba');
-      } else {
-        alert('Não foi possível abrir nova aba. Verifique se o bloqueador de pop-ups está ativado.');
-      }
+      // Converter dados da proposta para o formato PropostaCompleta
+      const propostaCompleta: PropostaCompleta = {
+        id: proposta.id || `prop_${Date.now()}`,
+        numero: proposta.numero || 'N/A',
+        titulo: proposta.titulo || 'Proposta comercial',
+        subtotal: proposta.valor || 0,
+        total: proposta.valor || 0,
+        dataValidade: new Date(proposta.data_vencimento || Date.now()),
+        status: proposta.status as 'rascunho' | 'enviada' | 'aprovada' | 'rejeitada',
+        criadaEm: new Date(proposta.data_criacao || Date.now()),
+        descontoGlobal: 0,
+        impostos: 0,
+        formaPagamento: 'avista',
+        validadeDias: 30,
+        incluirImpostosPDF: false,
+        cliente: {
+          id: `cliente_${proposta.id}`,
+          nome: proposta.cliente || 'Cliente não informado',
+          documento: '',
+          email: `${proposta.cliente?.toLowerCase().replace(/\s+/g, '.')}@email.com`,
+          telefone: proposta.cliente_contato?.includes('(') ? proposta.cliente_contato : '(62) 99999-9999',
+          tipoPessoa: 'juridica' as const
+        },
+        vendedor: {
+          id: `vendedor_${proposta.id}`,
+          nome: proposta.vendedor || 'Vendedor',
+          email: 'vendedor@conectcrm.com',
+          telefone: '(62) 99668-9991',
+          tipo: 'vendedor' as const,
+          ativo: true
+        },
+        produtos: [
+          {
+            produto: {
+              id: `produto_${proposta.id}`,
+              nome: proposta.titulo || 'Serviço/Produto',
+              preco: proposta.valor || 0,
+              categoria: proposta.categoria || 'Geral',
+              descricao: proposta.descricao || 'Produto/serviço da proposta',
+              unidade: 'un'
+            },
+            quantidade: 1,
+            desconto: 0,
+            subtotal: proposta.valor || 0
+          }
+        ],
+        observacoes: `Esta proposta foi elaborada especialmente para ${proposta.cliente}, considerando as necessidades específicas do projeto "${proposta.titulo}". Estamos à disposição para esclarecimentos e ajustes necessários.`
+      };
+
+      setSelectedPropostaForView(propostaCompleta);
+      setShowViewModal(true);
+
+      console.log('✅ Modal de visualização aberto');
     } catch (error) {
-      console.error('❌ Erro ao visualizar proposta:', error);
-      alert('Erro ao gerar visualização da proposta. Tente novamente.');
+      console.error('❌ Erro ao preparar visualização da proposta:', error);
+      alert('Erro ao preparar visualização da proposta. Tente novamente.');
     }
   };
 
@@ -826,7 +1036,8 @@ const PropostasPage: React.FC = () => {
         .text-right { text-align: right; }
         .currency { font-weight: 600; color: #159A9C; }
         .product-name { font-weight: 600; color: #333; margin-bottom: 3px; }
-        .product-desc { font-size: 10px; color: #666; line-height: 1.3; }
+        .product-desc { font-size: 10px; color: #666; line-height: 1.3; white-space: pre-line; }
+        .product-features { font-size: 9px; color: #159A9C; background: #f0f9f9; padding: 4px 6px; margin-top: 4px; border-radius: 3px; border-left: 2px solid #159A9C; }
         .totals-section { margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 3px solid #159A9C; }
         .totals-table { width: 100%; max-width: 350px; margin-left: auto; font-size: 12px; }
         .totals-table td { padding: 5px 10px; border-bottom: 1px solid #ddd; }
@@ -912,19 +1123,27 @@ const PropostasPage: React.FC = () => {
                     </tr>
                 </thead>
                 <tbody>
-                    ${dados.itens.map((item, index) => `
+                    ${dados.itens.map((item, index) => {
+      // Separar descrição dos detalhes técnicos
+      const descricaoLinhas = (item.descricao || '').split('\n');
+      const descricaoPrincipal = descricaoLinhas.find(linha => !linha.startsWith('•')) || '';
+      const detalhes = descricaoLinhas.filter(linha => linha.startsWith('•'));
+
+      return `
                     <tr>
                         <td class="text-center">${index + 1}</td>
                         <td>
                             <div class="product-name">${item.nome}</div>
-                            ${item.descricao ? `<div class="product-desc">${item.descricao}</div>` : ''}
+                            ${descricaoPrincipal ? `<div class="product-desc">${descricaoPrincipal}</div>` : ''}
+                            ${detalhes.length > 0 ? `<div class="product-features">${detalhes.join('\n')}</div>` : ''}
                         </td>
                         <td class="text-center">${item.quantidade}</td>
                         <td class="text-right currency">R$ ${item.valorUnitario.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td class="text-center">${item.desconto ? `${item.desconto}%` : '-'}</td>
+                        <td class="text-center">${item.desconto ? `${item.desconto.toFixed(1)}%` : '-'}</td>
                         <td class="text-right currency">R$ ${item.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     </tr>
-                    `).join('')}
+                    `;
+    }).join('')}
                 </tbody>
             </table>
         </div>
@@ -1011,24 +1230,23 @@ const PropostasPage: React.FC = () => {
 
   const handleDeleteProposta = async (proposta: any) => {
     console.log('🗑️ Excluir proposta:', proposta.numero);
-    
+
     if (window.confirm(`Tem certeza que deseja excluir a proposta ${proposta.numero}?`)) {
       try {
         setIsLoading(true);
-        
-        // Simular chamada de API para excluir
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Remover da lista local
-        const novasPropostas = propostas.filter(p => p.id !== proposta.id);
-        setPropostas(novasPropostas);
-        setFilteredPropostas(novasPropostas);
-        
+        console.log('🗑️ Excluindo proposta do banco de dados...', proposta.id);
+
+        // Usar o serviço real para excluir
+        await propostasService.removerProposta(proposta.id);
+
         console.log('✅ Proposta excluída com sucesso');
-        alert('Proposta excluída com sucesso!');
+        showNotification('Proposta excluída com sucesso!', 'success');
+        
+        // Recarregar a lista para refletir a exclusão
+        await carregarPropostas();
       } catch (error) {
         console.error('❌ Erro ao excluir proposta:', error);
-        alert('Erro ao excluir proposta. Tente novamente.');
+        showNotification('Erro ao excluir proposta. Tente novamente.', 'error');
       } finally {
         setIsLoading(false);
       }
@@ -1037,7 +1255,7 @@ const PropostasPage: React.FC = () => {
 
   const handleMoreOptions = (proposta: any) => {
     console.log('⚙️ Mais opções para proposta:', proposta.numero);
-    
+
     // Criar um menu de contexto simples
     const opcoes = [
       'Duplicar Proposta',
@@ -1046,13 +1264,13 @@ const PropostasPage: React.FC = () => {
       'Histórico',
       'Alterar Status'
     ];
-    
+
     const opcaoEscolhida = window.prompt(
       `Selecione uma opção para ${proposta.numero}:\n\n` +
       opcoes.map((opcao, index) => `${index + 1}. ${opcao}`).join('\n') +
       '\n\nDigite o número da opção:'
     );
-    
+
     if (opcaoEscolhida && opcaoEscolhida !== '') {
       const opcaoIndex = parseInt(opcaoEscolhida) - 1;
       if (opcaoIndex >= 0 && opcaoIndex < opcoes.length) {
@@ -1079,10 +1297,49 @@ const PropostasPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#DEEFE7]">
-      <BackToNucleus 
-        nucleusName="Vendas" 
+      <ModalNovaProposta
+        key={`modal-${showWizardModal ? 'open' : 'closed'}-${Date.now()}`}
+        isOpen={showWizardModal}
+        onClose={() => {
+          console.log('🔘 Modal onClose chamado - setShowWizardModal(false)');
+          setShowWizardModal(false);
+        }}
+        onPropostaCriada={(proposta) => {
+          console.log('✅ Nova proposta criada via wizard:', proposta);
+          // Recarregar a lista de propostas
+          carregarPropostas();
+          setShowWizardModal(false);
+        }}
+      />
+
+      <BackToNucleus
+        nucleusName="Vendas"
         nucleusPath="/nuclei/vendas"
       />
+
+      {/* Notificação */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${notification.type === 'success'
+          ? 'bg-green-100 border border-green-400 text-green-700'
+          : 'bg-red-100 border border-red-400 text-red-700'
+          }`}>
+          <div className="flex items-center">
+            {notification.type === 'success' ? (
+              <CheckCircle className="h-5 w-5 mr-2" />
+            ) : (
+              <XCircle className="h-5 w-5 mr-2" />
+            )}
+            {notification.message}
+            <button
+              onClick={() => setNotification(null)}
+              className="ml-2 text-gray-500 hover:text-gray-700"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="p-6">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -1099,42 +1356,57 @@ const PropostasPage: React.FC = () => {
                 {isLoading ? 'Carregando propostas...' : `Acompanhe suas ${propostas.length} propostas comerciais`}
               </p>
             </div>
-            <div className="mt-4 sm:mt-0 flex gap-3">
-              <button 
-                onClick={async () => {
-                  setIsLoading(true);
-                  try {
-                    const propostasReais = await propostasService.listarPropostas();
-                    if (propostasReais && propostasReais.length > 0) {
-                      const propostasFormatadas = propostasReais.map(proposta => ({
-                        id: proposta.id || '',
-                        numero: proposta.numero || '',
-                        cliente: proposta.cliente?.nome || 'Cliente não informado',
-                        cliente_contato: proposta.cliente?.nome || '',
-                        titulo: 'Proposta ' + (proposta.numero || proposta.id || 'N/A'),
-                        valor: proposta.total || 0,
-                        status: proposta.status as any || 'rascunho',
-                        data_criacao: proposta.criadaEm ? new Date(proposta.criadaEm).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-                        data_vencimento: proposta.dataValidade ? new Date(proposta.dataValidade).toISOString().split('T')[0] : '',
-                        data_aprovacao: null,
-                        vendedor: 'Sistema',
-                        descricao: proposta.observacoes || 'Proposta criada via sistema',
-                        probabilidade: 50,
-                        categoria: 'geral'
-                      }));
-                      const todasPropostas = [...propostasFormatadas, ...mockPropostas];
-                      setPropostas(todasPropostas);
-                      setFilteredPropostas(todasPropostas);
-                    } else {
-                      setPropostas(mockPropostas);
-                      setFilteredPropostas(mockPropostas);
-                    }
-                  } catch (error) {
-                    console.error('❌ Erro ao atualizar:', error);
-                  } finally {
-                    setIsLoading(false);
-                  }
+
+            {/* Controles de visualização e ações */}
+            <div className="mt-4 sm:mt-0 flex items-center gap-3">
+              {/* Botão de atualizar */}
+              <button
+                onClick={() => {
+                  console.log('🔄 Atualizando propostas manualmente...');
+                  carregarPropostas();
                 }}
+                disabled={isLoading}
+                className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                title="Atualizar lista de propostas"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Atualizar</span>
+              </button>
+
+              {/* Modos de visualização */}
+              <div className="flex bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('dashboard')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'dashboard'
+                    ? 'bg-white text-blue-700 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                >
+                  <BarChart3 className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'table'
+                    ? 'bg-white text-blue-700 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                >
+                  <List className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('cards')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'cards'
+                    ? 'bg-white text-blue-700 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                >
+                  <Grid className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Botão atualizar */}
+              <button
+                onClick={carregarPropostas}
                 className="px-4 py-2 border border-[#B4BEC9] rounded-lg hover:bg-[#DEEFE7] flex items-center gap-2 text-sm text-[#002333] transition-colors"
                 disabled={isLoading}
               >
@@ -1143,15 +1415,23 @@ const PropostasPage: React.FC = () => {
                 ) : (
                   <Download className="w-4 h-4" />
                 )}
-                {isLoading ? 'Atualizando...' : 'Atualizar'}
+                Atualizar
               </button>
+
+              {/* Botão exportar */}
               <button className="px-4 py-2 border border-[#B4BEC9] rounded-lg hover:bg-[#DEEFE7] flex items-center gap-2 text-sm text-[#002333] transition-colors">
                 <Download className="w-4 h-4" />
                 Exportar
               </button>
-            <div className="flex space-x-2">
-              <button 
-                onClick={() => setShowWizardModal(true)}
+
+              {/* Botão nova proposta */}
+              <button
+                onClick={() => {
+                  console.log('🔔 Botão Nova Proposta clicado!');
+                  console.log('📊 Estado atual showWizardModal:', showWizardModal);
+                  setShowWizardModal(true);
+                  console.log('✅ setShowWizardModal(true) executado');
+                }}
                 className="px-4 py-2 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg flex items-center gap-2 text-sm transition-all"
               >
                 <Plus className="w-4 h-4" />
@@ -1161,358 +1441,336 @@ const PropostasPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Estatísticas rápidas */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-white p-4 rounded-lg border border-[#DEEFE7] shadow-sm">
-            <div className="flex items-center">
-              <div className="p-2 bg-[#DEEFE7] rounded-lg">
-                <FileText className="w-6 h-6 text-[#159A9C]" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-[#B4BEC9]">Total de Propostas</p>
-                <p className="text-2xl font-bold text-[#002333]">{propostas.length}</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white p-4 rounded-lg border shadow-sm">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircle className="w-6 h-6 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Aprovadas</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {propostas.filter(p => p.status === 'aprovada').length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg border shadow-sm">
-            <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-yellow-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Em Negociação</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {propostas.filter(p => p.status === 'negociacao').length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg border shadow-sm">
-            <div className="flex items-center">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <DollarSign className="w-6 h-6 text-purple-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Valor Total</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {formatCurrency(totalValorPropostas)}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filtros */}
-      <div className="bg-white p-6 rounded-lg border shadow-sm mb-6">
-        <div className="flex flex-col lg:flex-row gap-4">
-          {/* Busca */}
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Buscar por número, cliente ou título..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        {/* Renderização condicional por modo de visualização */}
+        {viewMode === 'dashboard' ? (
+          <DashboardPropostas onRefresh={carregarPropostas} />
+        ) : (
+          <>
+            {/* Filtros Avançados */}
+            <div className="mb-6">
+              <FiltrosAvancados
+                onFiltersChange={handleAdvancedFilters}
+                isOpen={showAdvancedFilters}
+                onToggle={() => setShowAdvancedFilters(!showAdvancedFilters)}
               />
             </div>
-          </div>
 
-          {/* Filtro Status */}
-          <div className="lg:w-48">
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="todos">Todos os Status</option>
-              <option value="rascunho">Rascunho</option>
-              <option value="enviada">Enviada</option>
-              <option value="negociacao">Em Negociação</option>
-              <option value="aprovada">Aprovada</option>
-              <option value="rejeitada">Rejeitada</option>
-            </select>
-          </div>
+            {/* Estatísticas rápidas */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+              <div className="bg-white p-4 rounded-lg border border-[#DEEFE7] shadow-sm">
+                <div className="flex items-center">
+                  <div className="p-2 bg-[#DEEFE7] rounded-lg">
+                    <FileText className="w-6 h-6 text-[#159A9C]" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-[#B4BEC9]">Total de Propostas</p>
+                    <p className="text-2xl font-bold text-[#002333]">{propostas.length}</p>
+                  </div>
+                </div>
+              </div>
 
-          {/* Filtro Vendedor */}
-          <div className="lg:w-48">
-            <select
-              value={selectedVendedor}
-              onChange={(e) => setSelectedVendedor(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="todos">Todos os Vendedores</option>
-              <option value="Maria Santos">Maria Santos</option>
-              <option value="Pedro Costa">Pedro Costa</option>
-              <option value="Ana Silva">Ana Silva</option>
-            </select>
-          </div>
-        </div>
-      </div>
+              <div className="bg-white p-4 rounded-lg border shadow-sm">
+                <div className="flex items-center">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <CheckCircle className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Aprovadas</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {propostas.filter(p => p.status === 'aprovada').length}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-        {/* Lista de Propostas com Seleção */}
-        <div className="bg-white rounded-lg border shadow-sm overflow-hidden propostas-page">
-          <div className="table-wrapper">
-            <table className="table-propostas min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  {/* Checkbox para selecionar todas */}
-                  <th className="px-6 py-3 text-left">
+              <div className="bg-white p-4 rounded-lg border shadow-sm">
+                <div className="flex items-center">
+                  <div className="p-2 bg-yellow-100 rounded-lg">
+                    <TrendingUp className="w-6 h-6 text-yellow-600" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Em Negociação</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {propostas.filter(p => p.status === 'negociacao').length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-lg border shadow-sm">
+                <div className="flex items-center">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <DollarSign className="w-6 h-6 text-purple-600" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Valor Total</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {formatCurrency(totalValorPropostas)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Filtros básicos */}
+            <div className="bg-white p-6 rounded-lg border shadow-sm mb-6">
+              <div className="flex flex-col lg:flex-row gap-4">
+                {/* Busca */}
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                     <input
-                      type="checkbox"
-                      checked={selectedPropostas.length === filteredPropostas.length && filteredPropostas.length > 0}
-                      onChange={handleSelectAll}
-                      className="rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
+                      type="text"
+                      placeholder="Buscar por número, cliente ou título..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => {
-                        if (sortBy === 'data_criacao') {
-                          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setSortBy('data_criacao');
-                          setSortOrder('desc');
-                        }
-                      }}>
-                    <div className="flex items-center space-x-1">
-                      <span>Proposta</span>
-                      {sortBy === 'data_criacao' && (
-                        sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => {
-                        if (sortBy === 'cliente') {
-                          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setSortBy('cliente');
-                          setSortOrder('asc');
-                        }
-                      }}>
-                    <div className="flex items-center space-x-1">
-                      <span>Cliente</span>
-                      {sortBy === 'cliente' && (
-                        sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile cursor-pointer hover:bg-gray-100"
-                      onClick={() => {
-                        if (sortBy === 'status') {
-                          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setSortBy('status');
-                          setSortOrder('asc');
-                        }
-                      }}>
-                    <div className="flex items-center space-x-1">
-                      <span>Status</span>
-                      {sortBy === 'status' && (
-                        sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => {
-                        if (sortBy === 'valor') {
-                          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setSortBy('valor');
-                          setSortOrder('desc');
-                        }
-                      }}>
-                    <div className="flex items-center space-x-1">
-                      <span>Valor</span>
-                      {sortBy === 'valor' && (
-                        sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile">
-                    Vendedor
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile">
-                    Vencimento
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPropostas.map((proposta) => (
-                  <tr key={proposta.id} className={`hover:bg-gray-50 ${selectedPropostas.includes(proposta.id) ? 'bg-blue-50' : ''}`}>
-                    {/* Checkbox */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={selectedPropostas.includes(proposta.id)}
-                        onChange={() => handleSelectProposta(proposta.id)}
-                        className="rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap" data-label="Proposta">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{proposta.numero}</div>
-                        <div className="subinfo ellipsis-text">{proposta.titulo}</div>
-                        <div className="subinfo flex items-center mt-1">
-                          <Calendar className="w-3 h-3 mr-1" />
-                          Criada em {formatDate(proposta.data_criacao)}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap" data-label="Cliente">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 ellipsis-text">{proposta.cliente}</div>
-                        <div className="subinfo flex items-center">
-                          <User className="w-4 h-4 mr-1" />
-                          <span className="ellipsis-sm">{proposta.cliente_contato}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap col-hide-mobile" data-label="Status">
-                      <span className={`status-badge inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(proposta.status)}`}>
-                        {getStatusIcon(proposta.status)}
-                        <span className="ml-1">{getStatusText(proposta.status)}</span>
-                      </span>
-                      <div className="subinfo mt-1">
-                        {proposta.probabilidade}% de chance
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap" data-label="Valor">
-                      <div className="valor-proposta text-sm font-medium">
-                        {formatCurrency(proposta.valor)}
-                      </div>
-                      <div className="subinfo capitalize">
-                        {proposta.categoria}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 col-hide-mobile" data-label="Vendedor">
-                      {proposta.vendedor}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap col-hide-mobile" data-label="Vencimento">
-                      <div className="data-proposta text-sm text-gray-900">
-                        {formatDate(proposta.data_vencimento)}
-                      </div>
-                      <div className="subinfo">
-                        {new Date(proposta.data_vencimento) < new Date() ? 
-                          <span className="text-red-600">Vencida</span> : 
-                          `${Math.ceil((new Date(proposta.data_vencimento).getTime() - new Date().getTime()) / (1000 * 3600 * 24))} dias`
-                        }
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" data-label="Ações">
-                      <div className="flex items-center justify-end space-x-2">
-                        <button 
-                          onClick={() => handleViewProposta(proposta)}
-                          className="text-blue-600 hover:text-blue-900 p-1 transition-colors disabled:opacity-50" 
-                          title="Visualizar"
-                          disabled={isLoading}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleEditProposta(proposta)}
-                          className="text-green-600 hover:text-green-900 p-1 transition-colors disabled:opacity-50" 
-                          title="Editar"
-                          disabled={isLoading}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteProposta(proposta)}
-                          className="text-red-600 hover:text-red-900 p-1 transition-colors disabled:opacity-50" 
-                          title="Excluir"
-                          disabled={isLoading}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleMoreOptions(proposta)}
-                          className="text-gray-400 hover:text-gray-600 p-1 transition-colors disabled:opacity-50" 
-                          title="Mais opções"
-                          disabled={isLoading}
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>        {/* Paginação */}
-        <div className="bg-white px-6 py-3 border-t border-gray-200 sm:px-6">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-700">
-              Mostrando <span className="font-medium">1</span> a <span className="font-medium">{filteredPropostas.length}</span> de{' '}
-              <span className="font-medium">{filteredPropostas.length}</span> resultados
-            </div>
-            <div className="flex space-x-2">
-              <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
-                Anterior
-              </button>
-              <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm">
-                1
-              </button>
-              <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
-                Próximo
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+                  </div>
+                </div>
 
-      {/* Modal de Proposta */}
-      <ModalProposta
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSave={handleSaveProposta}
-        isLoading={isLoadingCreate}
-      />
+                {/* Filtro Status */}
+                <div className="lg:w-48">
+                  <select
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="todos">Todos os Status</option>
+                    <option value="rascunho">Rascunho</option>
+                    <option value="enviada">Enviada</option>
+                    <option value="negociacao">Em Negociação</option>
+                    <option value="aprovada">Aprovada</option>
+                    <option value="rejeitada">Rejeitada</option>
+                  </select>
+                </div>
 
-      {/* Modal Wizard Nova Proposta */}
-      <ModalNovaProposta
-        isOpen={showWizardModal}
-        onClose={() => setShowWizardModal(false)}
-        onPropostaCriada={(proposta) => {
-          console.log('✅ Nova proposta criada via wizard:', proposta);
-          // Recarregar a lista de propostas
-          const carregarPropostas = async () => {
-            try {
-              const propostasReais = await propostasService.listarPropostas();
-              if (propostasReais && propostasReais.length > 0) {
-                const propostasFormatadas = propostasReais.map(converterPropostaParaUI);
-                const todasPropostas = [...propostasFormatadas, ...mockPropostas];
-                setPropostas(todasPropostas);
-                setFilteredPropostas(todasPropostas);
-              }
-            } catch (error) {
-              console.error('❌ Erro ao recarregar propostas:', error);
-            }
-          };
-          carregarPropostas();
-        }}
-      />
+                {/* Filtro Vendedor */}
+                <div className="lg:w-48">
+                  <select
+                    value={selectedVendedor}
+                    onChange={(e) => setSelectedVendedor(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="todos">Todos os Vendedores</option>
+                    <option value="Maria Santos">Maria Santos</option>
+                    <option value="Pedro Costa">Pedro Costa</option>
+                    <option value="Ana Silva">Ana Silva</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Lista de Propostas com Seleção */}
+            <div className="bg-white rounded-lg border shadow-sm overflow-hidden propostas-page">
+              <div className="table-wrapper">
+                <table className="table-propostas min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {/* Checkbox para selecionar todas */}
+                      <th className="px-6 py-3 text-left">
+                        <input
+                          type="checkbox"
+                          checked={selectedPropostas.length === filteredPropostas.length && filteredPropostas.length > 0}
+                          onChange={handleSelectAll}
+                          className="rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
+                        />
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => {
+                          if (sortBy === 'data_criacao') {
+                            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setSortBy('data_criacao');
+                            setSortOrder('desc');
+                          }
+                        }}>
+                        <div className="flex items-center space-x-1">
+                          <span>Proposta</span>
+                          {sortBy === 'data_criacao' && (
+                            sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                          )}
+                        </div>
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => {
+                          if (sortBy === 'cliente') {
+                            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setSortBy('cliente');
+                            setSortOrder('asc');
+                          }
+                        }}>
+                        <div className="flex items-center space-x-1">
+                          <span>Cliente</span>
+                          {sortBy === 'cliente' && (
+                            sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                          )}
+                        </div>
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile cursor-pointer hover:bg-gray-100"
+                        onClick={() => {
+                          if (sortBy === 'status') {
+                            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setSortBy('status');
+                            setSortOrder('asc');
+                          }
+                        }}>
+                        <div className="flex items-center space-x-1">
+                          <span>Status</span>
+                          {sortBy === 'status' && (
+                            sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                          )}
+                        </div>
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => {
+                          if (sortBy === 'valor') {
+                            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setSortBy('valor');
+                            setSortOrder('desc');
+                          }
+                        }}>
+                        <div className="flex items-center space-x-1">
+                          <span>Valor</span>
+                          {sortBy === 'valor' && (
+                            sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                          )}
+                        </div>
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile">
+                        Vendedor
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile">
+                        Vencimento
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ações
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredPropostas.map((proposta) => (
+                      <tr key={proposta.id} className={`hover:bg-gray-50 ${selectedPropostas.includes(proposta.id) ? 'bg-blue-50' : ''}`}>
+                        {/* Checkbox */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={selectedPropostas.includes(proposta.id)}
+                            onChange={() => handleSelectProposta(proposta.id)}
+                            className="rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap" data-label="Proposta">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{safeRender(proposta.numero)}</div>
+                            <div className="subinfo ellipsis-text">{safeRender(proposta.titulo)}</div>
+                            <div className="subinfo flex items-center mt-1">
+                              <Calendar className="w-3 h-3 mr-1" />
+                              Criada em {formatDate(safeRender(proposta.data_criacao))}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap" data-label="Cliente">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 ellipsis-text">{safeRender(proposta.cliente)}</div>
+                            <div className="subinfo flex items-center">
+                              <User className="w-4 h-4 mr-1" />
+                              <span className="ellipsis-sm">{safeRender(proposta.cliente_contato)}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap col-hide-mobile" data-label="Status">
+                          <span className={`status-badge inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(safeRender(proposta.status))}`}>
+                            {getStatusIcon(safeRender(proposta.status))}
+                            <span className="ml-1">{getStatusText(safeRender(proposta.status))}</span>
+                          </span>
+                          <div className="subinfo mt-1">
+                            {safeRender(proposta.probabilidade)}% de chance
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap" data-label="Valor">
+                          <div className="valor-proposta text-sm font-medium">
+                            {formatCurrency(Number(proposta.valor) || 0)}
+                          </div>
+                          <div className="subinfo capitalize">
+                            {safeRender(proposta.categoria)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 col-hide-mobile" data-label="Vendedor">
+                          {safeRender(proposta.vendedor)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap col-hide-mobile" data-label="Vencimento">
+                          <div className="data-proposta text-sm text-gray-900">
+                            {formatDate(safeRender(proposta.data_vencimento))}
+                          </div>
+                          <div className="subinfo">
+                            {new Date(proposta.data_vencimento) < new Date() ?
+                              <span className="text-red-600">Vencida</span> :
+                              `${Math.ceil((new Date(proposta.data_vencimento).getTime() - new Date().getTime()) / (1000 * 3600 * 24))} dias`
+                            }
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" data-label="Ações">
+                          <PropostaActions
+                            proposta={proposta}
+                            onViewProposta={handleViewProposta}
+                            className="justify-end"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>        {/* Paginação */}
+              <div className="bg-white px-6 py-3 border-t border-gray-200 sm:px-6">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-700">
+                    Mostrando <span className="font-medium">1</span> a <span className="font-medium">{filteredPropostas.length}</span> de{' '}
+                    <span className="font-medium">{filteredPropostas.length}</span> resultados
+                  </div>
+                  <div className="flex space-x-2">
+                    <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
+                      Anterior
+                    </button>
+                    <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm">
+                      1
+                    </button>
+                    <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
+                      Próximo
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal de Proposta */}
+            <ModalProposta
+              isOpen={showCreateModal}
+              onClose={() => setShowCreateModal(false)}
+              onSave={handleSaveProposta}
+              isLoading={isLoadingCreate}
+            />
+
+            {/* Modal de Visualização de Proposta */}
+            <ModalVisualizarProposta
+              isOpen={showViewModal}
+              onClose={() => setShowViewModal(false)}
+              proposta={selectedPropostaForView}
+            />
+
+            {/* Modal Wizard removido daqui - movido para o início do JSX */}
+
+            {/* Componentes adicionais */}
+            <BulkActions
+              selectedIds={selectedPropostas}
+              onAction={handleBulkAction}
+              onClearSelection={clearSelection}
+            />
+          </>
+        )}
       </div>
     </div>
   );

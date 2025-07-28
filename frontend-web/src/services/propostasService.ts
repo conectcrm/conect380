@@ -119,7 +119,7 @@ class PropostasService {
   async findAll(filters?: PropostaFilters): Promise<Proposta[]> {
     try {
       const params = new URLSearchParams();
-      
+
       if (filters) {
         Object.entries(filters).forEach(([key, value]) => {
           if (value !== undefined && value !== null && value !== '') {
@@ -235,6 +235,44 @@ class PropostasService {
     }
   }
 
+  // Alias para compatibilidade
+  async obterEstatisticas(): Promise<any> {
+    try {
+      // Implementação que calcula estatísticas das propostas carregadas
+      const propostas = await this.findAll();
+
+      const totalPropostas = propostas.length;
+      const valorTotalPipeline = propostas.reduce((total, p) => total + (p.total || 0), 0);
+      const propostasAprovadas = propostas.filter(p => p.status === 'aprovada').length;
+      const taxaConversao = totalPropostas > 0 ? (propostasAprovadas / totalPropostas) * 100 : 0;
+
+      // Estatísticas por status
+      const estatisticasPorStatus: Record<string, number> = {};
+      propostas.forEach(p => {
+        estatisticasPorStatus[p.status] = (estatisticasPorStatus[p.status] || 0) + 1;
+      });
+
+      // Estatísticas por vendedor (usando mock por enquanto)
+      const estatisticasPorVendedor: Record<string, number> = {
+        'João Silva': Math.floor(totalPropostas * 0.4),
+        'Maria Santos': Math.floor(totalPropostas * 0.35),
+        'Pedro Costa': Math.floor(totalPropostas * 0.25)
+      };
+
+      return {
+        totalPropostas,
+        valorTotalPipeline,
+        taxaConversao,
+        propostasAprovadas,
+        estatisticasPorStatus,
+        estatisticasPorVendedor
+      };
+    } catch (error) {
+      console.error('Erro ao calcular estatísticas:', error);
+      throw error;
+    }
+  }
+
   // Obter próximo número da proposta
   async getProximoNumero(): Promise<string> {
     try {
@@ -332,10 +370,10 @@ class PropostasService {
     try {
       // Tentar importar o serviço de produtos dinamicamente
       const { produtosService } = await import('./produtosService');
-      
+
       // Buscar produtos do backend
       const produtosAPI = await produtosService.findAll();
-      
+
       if (produtosAPI && produtosAPI.length > 0) {
         // Converter formato da API para formato da proposta
         const produtosConvertidos = produtosAPI.map((produto: any) => ({
@@ -346,10 +384,10 @@ class PropostasService {
           unidade: produto.unidadeMedida || 'unidade',
           disponivel: produto.status === 'ativo'
         }));
-        
+
         return produtosConvertidos;
       }
-      
+
       // Fallback: tentar localStorage se backend falhar
       const produtosSalvos = localStorage.getItem('fenixcrm_produtos');
       if (produtosSalvos) {
@@ -364,12 +402,12 @@ class PropostasService {
         }));
         return [...produtosConvertidos, ...this.produtosMock];
       }
-      
+
       // Retornar apenas produtos mock se não houver produtos
       return this.produtosMock;
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
-      
+
       // Fallback para localStorage em caso de erro
       try {
         const produtosSalvos = localStorage.getItem('fenixcrm_produtos');
@@ -388,7 +426,7 @@ class PropostasService {
       } catch (localStorageError) {
         console.error('Erro ao acessar localStorage:', localStorageError);
       }
-      
+
       return this.produtosMock;
     }
   }

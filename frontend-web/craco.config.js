@@ -42,4 +42,14 @@ module.exports = {
       return webpackConfig;
     },
   },
+  devServer: {
+    historyApiFallback: {
+      // Redirecionar todas as rotas para index.html (SPA behavior)
+      index: '/index.html',
+      // Configuração específica para o portal
+      rewrites: [
+        { from: /^\/portal\/.*$/, to: '/index.html' }
+      ]
+    }
+  },
 };

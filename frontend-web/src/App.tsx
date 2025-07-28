@@ -40,6 +40,10 @@ import { ContatosPage } from './features/contatos/ContatosPageNova';
 import { SuportePage } from './features/suporte/SuportePageNova';
 import { UsuariosPage } from './features/gestao/usuarios/UsuariosPage';
 import { useAuth } from './hooks/useAuth';
+import PortalRoutes from './routes/PortalRoutes';
+import TestePortalPage from './pages/TestePortalPage';
+import PortalClientePage from './pages/PortalClientePage';
+import ConfiguracaoEmailPage from './pages/ConfiguracaoEmailPage';
 
 // Configuração do React Query
 const queryClient = new QueryClient({
@@ -65,7 +69,7 @@ const AppRoutes: React.FC = () => {
           </div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Conect CRM</h2>
           <p className="text-gray-600 mb-6">Carregando aplicação...</p>
-          
+
           {/* Loading spinner */}
           <div className="flex justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
@@ -81,31 +85,31 @@ const AppRoutes: React.FC = () => {
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
-          
+
           {/* Página de Notificações */}
           <Route path="/notifications" element={<NotificationsPage />} />
-          
+
           {/* Central de Operações - Fluxo Integrado */}
           <Route path="/central-operacoes" element={<CentralOperacoesPage />} />
-          
+
           {/* Rotas das páginas de núcleos */}
           <Route path="/nuclei/crm" element={<CrmNucleusPage />} />
           <Route path="/nuclei/vendas" element={<VendasNucleusPage />} />
           <Route path="/nuclei/financeiro" element={<FinanceiroNucleusPage />} />
           <Route path="/nuclei/sistema" element={<SistemaNucleusPage />} />
           <Route path="/nuclei/gestao" element={<GestaoNucleusPage />} />
-          
+
           {/* Rotas administrativas do sistema */}
           <Route path="/admin/empresas" element={<EmpresasListPage />} />
           <Route path="/gestao/empresas" element={<EmpresasListPage />} />
           <Route path="/gestao/usuarios" element={<UsuariosPage />} />
-          
+
           {/* Sistema de Suporte */}
           <Route path="/suporte" element={<SuportePage />} />
-          
+
           {/* Exemplo Modal Produto */}
           <Route path="/exemplo-produto" element={<ExemploModalProduto />} />
-          
+
           {/* Rotas dos módulos existentes */}
           <Route path="/clientes" element={<ClientesPage />} />
           <Route path="/contatos" element={<ContatosPage />} />
@@ -113,26 +117,32 @@ const AppRoutes: React.FC = () => {
           <Route path="/funil-vendas" element={<FunilVendas />} />
           <Route path="/produtos" element={<ProdutosPage />} />
           <Route path="/produtos/categorias" element={<CategoriasProdutosPage />} />
-          
+
           {/* Rotas dos Combos */}
           <Route path="/combos" element={<CombosPage />} />
           <Route path="/combos/novo" element={<NovoComboPage />} />
           <Route path="/combos/:id/editar" element={<NovoComboPage />} />
-          
+
           <Route path="/agenda" element={<AgendaPage />} />
           <Route path="/oportunidades" element={<OportunidadesPage />} />
-          
+
           {/* Upload Demo */}
           <Route path="/upload-demo" element={<UploadDemoPage />} />
-          
+
+          {/* Teste do Portal do Cliente */}
+          <Route path="/teste-portal" element={<TestePortalPage />} />
+
+          {/* Portal do Cliente - Gestão */}
+          <Route path="/portal" element={<PortalClientePage />} />
+
           {/* Rotas do Núcleo Financeiro */}
           <Route path="/financeiro" element={<FinanceiroPage />} />
           <Route path="/financeiro/contas-receber" element={<ContasReceberPage />} />
           <Route path="/financeiro/contas-pagar" element={<ContasPagarPage />} />
-          
+
           {/* Módulos financeiros em desenvolvimento */}
           <Route path="/financeiro/faturamento" element={
-            <ModuleUnderConstruction 
+            <ModuleUnderConstruction
               moduleName="Faturamento"
               description="Sistema completo de emissão e controle de notas fiscais"
               estimatedCompletion="Q1 2025"
@@ -145,9 +155,9 @@ const AppRoutes: React.FC = () => {
               ]}
             />
           } />
-          
+
           <Route path="/financeiro/relatorios" element={
-            <ModuleUnderConstruction 
+            <ModuleUnderConstruction
               moduleName="Relatórios Financeiros"
               description="Análises e indicadores financeiros avançados"
               estimatedCompletion="Q2 2025"
@@ -160,9 +170,9 @@ const AppRoutes: React.FC = () => {
               ]}
             />
           } />
-          
+
           <Route path="/financeiro/conciliacao" element={
-            <ModuleUnderConstruction 
+            <ModuleUnderConstruction
               moduleName="Conciliação Bancária"
               description="Conciliação automática de extratos bancários"
               estimatedCompletion="Q2 2025"
@@ -175,9 +185,9 @@ const AppRoutes: React.FC = () => {
               ]}
             />
           } />
-          
+
           <Route path="/financeiro/centro-custos" element={
-            <ModuleUnderConstruction 
+            <ModuleUnderConstruction
               moduleName="Centro de Custos"
               description="Organização e controle detalhado de custos"
               estimatedCompletion="Q1 2025"
@@ -190,9 +200,9 @@ const AppRoutes: React.FC = () => {
               ]}
             />
           } />
-          
+
           <Route path="/financeiro/tesouraria" element={
-            <ModuleUnderConstruction 
+            <ModuleUnderConstruction
               moduleName="Tesouraria"
               description="Gestão avançada de caixa e investimentos"
               estimatedCompletion="Q3 2025"
@@ -205,7 +215,7 @@ const AppRoutes: React.FC = () => {
               ]}
             />
           } />
-          
+
           <Route path="/configuracoes" element={<ConfiguracoesPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
@@ -215,6 +225,13 @@ const AppRoutes: React.FC = () => {
 
   return (
     <Routes>
+      {/* Rotas públicas do portal do cliente */}
+      <Route path="/portal/*" element={<PortalRoutes />} />
+
+      {/* Página de configuração de e-mail - pública para facilitar configuração */}
+      <Route path="/configuracao-email" element={<ConfiguracaoEmailPage />} />
+
+      {/* Rotas de autenticação */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/registro" element={<RegistroEmpresaPage />} />
       <Route path="/verificar-email" element={<VerificacaoEmailPage />} />

@@ -1,9 +1,9 @@
 import React from 'react';
-import { 
-  Mail, 
-  Phone, 
-  Building, 
-  MapPin, 
+import {
+  Mail,
+  Phone,
+  Building,
+  MapPin,
   Calendar,
   Star,
   MoreVertical,
@@ -15,6 +15,7 @@ import {
   Clock
 } from 'lucide-react';
 import { Contato } from '../../features/contatos/services/contatosService';
+import { safeRender, validateAndSanitizeContact } from '../../utils/safeRender';
 
 interface ContatoCardProps {
   contato: Contato;
@@ -35,10 +36,32 @@ export const ContatoCard: React.FC<ContatoCardProps> = ({
 }) => {
   const [showActions, setShowActions] = React.useState(false);
 
+  // Validate and sanitize contact data to prevent object rendering errors
+  const safeContato = React.useMemo(() => {
+    const sanitized = validateAndSanitizeContact(contato);
+    if (!sanitized) {
+      console.error('❌ Invalid contact data in ContatoCard:', contato);
+      return {
+        id: '',
+        nome: 'Contato Inválido',
+        email: '',
+        telefone: '',
+        empresa: '',
+        cargo: '',
+        status: 'inativo',
+        tipo: 'lead',
+        endereco: null,
+        tags: [],
+        data_ultima_interacao: new Date().toISOString()
+      } as Contato;
+    }
+    return sanitized;
+  }, [contato]);
+
   // Fechar menu quando clicar fora
   React.useEffect(() => {
     const handleClickOutside = () => setShowActions(false);
-    
+
     if (showActions) {
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
@@ -94,11 +117,10 @@ export const ContatoCard: React.FC<ContatoCardProps> = ({
   };
 
   return (
-    <div 
-      className={`bg-white rounded-lg border-2 transition-all duration-200 hover:shadow-lg cursor-pointer ${
-        isSelected ? 'border-[#159A9C] shadow-md' : 'border-gray-200 hover:border-gray-300'
-      }`}
-      onClick={() => onView(contato)}
+    <div
+      className={`bg-white rounded-lg border-2 transition-all duration-200 hover:shadow-lg cursor-pointer ${isSelected ? 'border-[#159A9C] shadow-md' : 'border-gray-200 hover:border-gray-300'
+        }`}
+      onClick={() => onView(safeContato)}
     >
       {/* Header do Card */}
       <div className="p-4 border-b border-gray-100">
@@ -110,7 +132,7 @@ export const ContatoCard: React.FC<ContatoCardProps> = ({
               checked={isSelected}
               onChange={(e) => {
                 e.stopPropagation();
-                onToggleSelect(contato.id);
+                onToggleSelect(safeContato.id);
               }}
               onClick={(e) => e.stopPropagation()}
               className="mt-1 w-4 h-4 text-[#159A9C] bg-gray-100 border-gray-300 rounded focus:ring-[#159A9C] focus:ring-2"
@@ -118,38 +140,38 @@ export const ContatoCard: React.FC<ContatoCardProps> = ({
 
             {/* Avatar */}
             <div className="w-12 h-12 bg-gradient-to-br from-[#159A9C] to-[#0d7a7d] rounded-full flex items-center justify-center text-white font-semibold text-lg">
-              {contato.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
+              {safeRender(safeContato.nome).split(' ').map(n => n[0]).join('').slice(0, 2)}
             </div>
 
             {/* Informações Principais */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <h3 className="text-lg font-semibold text-[#002333] truncate">
-                  {contato.nome}
+                  {safeRender(safeContato.nome)}
                 </h3>
-                {contato.tipo && (
+                {safeContato.tipo && (
                   <div className="flex items-center gap-1 text-gray-500">
-                    {getTipoIcon(contato.tipo)}
+                    {getTipoIcon(safeContato.tipo)}
                   </div>
                 )}
               </div>
-              
-              {contato.empresa && (
+
+              {safeContato.empresa && (
                 <p className="text-sm text-gray-600 mb-1 flex items-center gap-1">
                   <Building className="w-4 h-4" />
-                  {contato.empresa}
+                  {safeRender(safeContato.empresa)}
                 </p>
               )}
 
               <div className="flex items-center gap-3">
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(contato.status)}`}>
-                  {contato.status}
+                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(safeContato.status)}`}>
+                  {safeRender(safeContato.status)}
                 </span>
-                
-                {contato.pontuacao_lead && contato.pontuacao_lead > 0 && (
+
+                {safeContato.pontuacao_lead && safeContato.pontuacao_lead > 0 && (
                   <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
                     <Star className="w-3 h-3" />
-                    {contato.pontuacao_lead}
+                    {safeContato.pontuacao_lead}
                   </span>
                 )}
               </div>
@@ -169,14 +191,14 @@ export const ContatoCard: React.FC<ContatoCardProps> = ({
             </button>
 
             {showActions && (
-              <div 
+              <div
                 className="absolute right-0 top-10 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onView(contato);
+                    onView(safeContato);
                     setShowActions(false);
                   }}
                   className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -184,11 +206,11 @@ export const ContatoCard: React.FC<ContatoCardProps> = ({
                   <Eye className="w-4 h-4" />
                   Visualizar
                 </button>
-                
+
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onEdit(contato);
+                    onEdit(safeContato);
                     setShowActions(false);
                   }}
                   className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -198,11 +220,11 @@ export const ContatoCard: React.FC<ContatoCardProps> = ({
                 </button>
 
                 <hr className="my-1" />
-                
+
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onDelete(contato.id);
+                    onDelete(safeContato.id);
                     setShowActions(false);
                   }}
                   className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
@@ -220,57 +242,57 @@ export const ContatoCard: React.FC<ContatoCardProps> = ({
       <div className="p-4">
         {/* Informações de Contato */}
         <div className="space-y-2 mb-4">
-          {contato.email && (
+          {safeContato.email && (
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Mail className="w-4 h-4" />
-              <a 
-                href={`mailto:${contato.email}`} 
+              <a
+                href={`mailto:${safeRender(safeContato.email)}`}
                 onClick={(e) => e.stopPropagation()}
                 className="hover:text-[#159A9C] transition-colors"
               >
-                {contato.email}
+                {safeRender(safeContato.email)}
               </a>
             </div>
           )}
 
-          {contato.telefone && (
+          {safeContato.telefone && (
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Phone className="w-4 h-4" />
-              <a 
-                href={`tel:${contato.telefone}`} 
+              <a
+                href={`tel:${safeRender(safeContato.telefone)}`}
                 onClick={(e) => e.stopPropagation()}
                 className="hover:text-[#159A9C] transition-colors"
               >
-                {formatarTelefone(contato.telefone)}
+                {formatarTelefone(safeRender(safeContato.telefone))}
               </a>
             </div>
           )}
 
-          {contato.endereco && (
+          {safeContato.endereco && typeof safeContato.endereco === 'object' && (
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <MapPin className="w-4 h-4" />
               <span className="truncate">
-                {`${contato.endereco.rua}, ${contato.endereco.cidade} - ${contato.endereco.estado}`}
+                {`${safeRender(safeContato.endereco.rua)}, ${safeRender(safeContato.endereco.cidade)} - ${safeRender(safeContato.endereco.estado)}`}
               </span>
             </div>
           )}
         </div>
 
         {/* Tags */}
-        {contato.tags && contato.tags.length > 0 && (
+        {safeContato.tags && safeContato.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-4">
-            {contato.tags.slice(0, 3).map((tag, index) => (
+            {safeContato.tags.slice(0, 3).map((tag, index) => (
               <span
                 key={index}
                 className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
               >
                 <Tag className="w-3 h-3" />
-                {tag}
+                {safeRender(tag)}
               </span>
             ))}
-            {contato.tags.length > 3 && (
+            {safeContato.tags.length > 3 && (
               <span className="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
-                +{contato.tags.length - 3} mais
+                +{safeContato.tags.length - 3} mais
               </span>
             )}
           </div>
@@ -280,26 +302,26 @@ export const ContatoCard: React.FC<ContatoCardProps> = ({
         <div className="flex items-center justify-between text-xs text-gray-500 pt-3 border-t border-gray-100">
           <div className="flex items-center gap-1">
             <User className="w-3 h-3" />
-            {contato.proprietario}
+            {safeRender(safeContato.proprietario)}
           </div>
 
-          {contato.data_ultima_interacao && (
+          {safeContato.data_ultima_interacao && (
             <div className="flex items-center gap-1">
               <Clock className="w-3 h-3" />
-              {calcularDiasDesdeUltimoContato(contato.data_ultima_interacao)}d atrás
+              {calcularDiasDesdeUltimoContato(safeContato.data_ultima_interacao)}d atrás
             </div>
           )}
         </div>
 
         {/* Valor Potencial */}
-        {contato.valor_potencial && contato.valor_potencial > 0 && (
+        {safeContato.valor_potencial && safeContato.valor_potencial > 0 && (
           <div className="mt-2 pt-2 border-t border-gray-100">
             <div className="text-sm font-medium text-[#002333]">
               Valor Potencial: <span className="text-[#159A9C]">
                 {new Intl.NumberFormat('pt-BR', {
                   style: 'currency',
                   currency: 'BRL'
-                }).format(contato.valor_potencial)}
+                }).format(safeContato.valor_potencial)}
               </span>
             </div>
           </div>

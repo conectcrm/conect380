@@ -140,8 +140,8 @@ const ModulesScreen: React.FC<ModulesScreenProps> = ({ nucleusData }) => {
                 className={`
                   bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-full
                   transition-all duration-200 ease-in-out
-                  ${isClickable 
-                    ? 'hover:shadow-md hover:border-gray-300 cursor-pointer transform hover:-translate-y-1' 
+                  ${isClickable
+                    ? 'hover:shadow-md hover:border-gray-300 cursor-pointer transform hover:-translate-y-1'
                     : 'opacity-60 cursor-not-allowed'
                   }
                 `}
@@ -150,7 +150,7 @@ const ModulesScreen: React.FC<ModulesScreenProps> = ({ nucleusData }) => {
                   <div className={`p-3 rounded-lg ${colorClasses.bg}`}>
                     <ModuleIcon className={`w-6 h-6 ${colorClasses.icon}`} />
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     {/* Badge de notificações */}
                     {module.notifications > 0 && (
@@ -161,7 +161,7 @@ const ModulesScreen: React.FC<ModulesScreenProps> = ({ nucleusData }) => {
                         {module.notifications > 99 ? '99+' : module.notifications}
                       </span>
                     )}
-                    
+
                     {/* Badge de status */}
                     {getStatusBadge(module)}
                   </div>
@@ -188,7 +188,12 @@ const ModulesScreen: React.FC<ModulesScreenProps> = ({ nucleusData }) => {
             );
 
             return isClickable ? (
-              <Link key={module.id} to={module.href} className="block h-full">
+              <Link
+                key={module.id}
+                to={module.href}
+                className="block h-full"
+                onClick={() => console.log('DEBUG: Navegando para:', module.href)}
+              >
                 {moduleCard}
               </Link>
             ) : (

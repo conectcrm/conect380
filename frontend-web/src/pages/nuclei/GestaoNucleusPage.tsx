@@ -1,15 +1,16 @@
 import React from 'react';
-import { 
-  Building2, 
-  Users, 
-  Settings, 
-  Shield, 
-  BarChart3, 
+import {
+  Building2,
+  Users,
+  Settings,
+  Shield,
+  BarChart3,
   Database,
   UserCheck,
   Calendar,
   FileText,
-  Zap
+  Zap,
+  Globe
 } from 'lucide-react';
 import ModulesScreen, { NucleusModulesData } from '../../components/navigation/ModulesScreen';
 
@@ -49,6 +50,17 @@ const GestaoNucleusPage: React.FC = () => {
         icon: Shield,
         notifications: 0,
         status: 'beta'
+      },
+      {
+        id: 'portal-cliente',
+        name: 'Portal do Cliente',
+        description: 'Gestão e configuração do portal de acesso dos clientes às propostas.',
+        href: '/portal',
+        icon: Globe,
+        notifications: 0,
+        badge: 'Ativo',
+        badgeColor: 'green',
+        status: 'active'
       },
       {
         id: 'auditoria',

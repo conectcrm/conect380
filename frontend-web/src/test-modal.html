@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teste Modal Nova Proposta</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    .test-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn {
+      background: linear-gradient(to right, #159A9C, #0F7B7D);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 5px;
+    }
+
+    .btn:hover {
+      opacity: 0.9;
+    }
+
+    .log {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      padding: 10px;
+      margin: 10px 0;
+      font-family: monospace;
+      white-space: pre-wrap;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="test-container">
+    <h1>🧪 Teste do Modal Nova Proposta</h1>
+    <p>Este arquivo ajuda a testar se há problemas básicos com o modal.</p>
+
+    <div>
+      <button class="btn" onclick="testLocalStorage()">🗄️ Testar localStorage</button>
+      <button class="btn" onclick="testConsole()">📝 Testar Console</button>
+      <button class="btn" onclick="clearLog()">🗑️ Limpar Log</button>
+    </div>
+
+    <div id="log" class="log">📋 Log de testes aparecerá aqui...\n</div>
+
+    <h3>📋 Checklist de Verificação:</h3>
+    <ul>
+      <li>✅ Abrir DevTools (F12)</li>
+      <li>✅ Ir para Console</li>
+      <li>✅ Navegar para /propostas no CRM</li>
+      <li>✅ Clicar em "Nova Proposta"</li>
+      <li>🔍 Verificar se aparecem logs no console</li>
+      <li>🔍 Verificar se o modal aparece</li>
+    </ul>
+
+    <h3>🐛 Possíveis Problemas:</h3>
+    <ul>
+      <li>🚫 Estado showWizardModal não está mudando</li>
+      <li>🚫 Modal renderiza mas fica invisível (CSS/z-index)</li>
+      <li>🚫 Erro JavaScript impede renderização</li>
+      <li>🚫 React re-render não está funcionando</li>
+    </ul>
+  </div>
+
+  <script>
+    function log(message) {
+      const logDiv = document.getElementById('log');
+      const timestamp = new Date().toLocaleTimeString();
+      logDiv.textContent += `[${timestamp}] ${message}\n`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function testLocalStorage() {
+      try {
+        localStorage.setItem('test_modal', 'funcionando');
+        const value = localStorage.getItem('test_modal');
+        log(`✅ localStorage funcionando: ${value}`);
+        localStorage.removeItem('test_modal');
+      } catch (error) {
+        log(`❌ Erro no localStorage: ${error.message}`);
+      }
+    }
+
+    function testConsole() {
+      console.log('🧪 Teste do console funcionando!');
+      console.warn('⚠️ Warning de teste');
+      console.error('❌ Error de teste');
+      log('✅ Comandos enviados para console - verifique DevTools');
+    }
+
+    function clearLog() {
+      document.getElementById('log').textContent = '📋 Log limpo...\n';
+    }
+
+    // Auto-test
+    log('🚀 Arquivo de teste carregado');
+    log('🌐 URL: ' + window.location.href);
+    log('👤 UserAgent: ' + navigator.userAgent.substring(0, 50) + '...');
+  </script>
+</body>
+
+</html>

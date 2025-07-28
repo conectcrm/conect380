@@ -4,14 +4,14 @@ import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { toast as toastNotify } from 'react-hot-toast';
-import { 
-  Plus, 
-  Search, 
-  X, 
-  FileText, 
-  Calculator, 
-  User, 
-  Package, 
+import {
+  Plus,
+  Search,
+  X,
+  FileText,
+  Calculator,
+  User,
+  Package,
   Trash2,
   CreditCard,
   ArrowLeft,
@@ -23,12 +23,13 @@ import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import { useCalculosProposta } from './hooks/useCalculosProposta';
 import { propostasService, PropostaCompleta } from './services/propostasService';
 import { clientesService, Cliente as ClienteService } from '../../services/clientesService';
+import usuariosService from '../../services/usuariosService';
 
 // Shared adapters para integração entre páginas
-import { 
-  ProdutoPropostaBase, 
+import {
+  ProdutoPropostaBase,
   useProdutosParaPropostas,
-  sincronizarProdutos 
+  sincronizarProdutos
 } from '../../shared/produtosAdapter';
 
 // Redefinir tipos específicos para propostas
@@ -38,6 +39,14 @@ type ProdutoPropostaLocal = {
   desconto: number;
   subtotal: number;
 };
+
+interface Vendedor {
+  id: string;
+  nome: string;
+  email: string;
+  avatar_url?: string;
+  ativo: boolean;
+}
 
 // Helper function to safely render values
 const safeRender = (value: any): string => {
@@ -85,6 +94,7 @@ interface ComboSelecionado {
 }
 
 interface PropostaFormData {
+  vendedor: Vendedor | null;
   cliente: Cliente | null;
   tipoSelecao: 'personalizado' | 'combo';
   produtos: ProdutoPropostaLocal[];
@@ -100,6 +110,7 @@ interface PropostaFormData {
 
 // Schema de validação
 const propostaSchema = yup.object().shape({
+  vendedor: yup.object().nullable().required('Vendedor responsável é obrigatório'),
   cliente: yup.object().nullable().required('Cliente é obrigatório'),
   tipoSelecao: yup.string().oneOf(['personalizado', 'combo']).required('Tipo de seleção é obrigatório'),
   produtos: yup.array().when('tipoSelecao', {
@@ -124,46 +135,6 @@ const propostaSchema = yup.object().shape({
     otherwise: (schema) => schema.optional()
   })
 });
-
-// Dados mock dos clientes (usado como fallback)
-const clientesMockFallback: Cliente[] = [
-  {
-    id: '1',
-    nome: 'João Silva Santos',
-    documento: '123.456.789-00',
-    email: 'joao@email.com',
-    telefone: '(11) 99999-9999',
-    endereco: 'Rua das Flores, 123',
-    cidade: 'São Paulo',
-    estado: 'SP',
-    cep: '01234-567',
-    tipoPessoa: 'fisica'
-  },
-  {
-    id: '2',
-    nome: 'Maria Santos',
-    documento: '987.654.321-00',
-    email: 'maria@email.com',
-    telefone: '(11) 88888-8888',
-    endereco: 'Av. Paulista, 456',
-    cidade: 'São Paulo',
-    estado: 'SP',
-    cep: '01310-100',
-    tipoPessoa: 'fisica'
-  },
-  {
-    id: '3',
-    nome: 'Empresa ABC Ltda',
-    documento: '12.345.678/0001-90',
-    email: 'contato@empresaabc.com',
-    telefone: '(11) 3333-3333',
-    endereco: 'Rua Comercial, 789',
-    cidade: 'São Paulo',
-    estado: 'SP',
-    cep: '04567-890',
-    tipoPessoa: 'juridica'
-  }
-];
 
 // Dados mock dos combos (temporário - será integrado ao adapter em futuras versões)
 const combosMock: Combo[] = [
@@ -192,12 +163,45 @@ const combosMock: Combo[] = [
 const NovaPropostaPage: React.FC = () => {
   // Hooks
   const navigate = useNavigate();
-  
+
   // Integração com adapter de produtos
   const { produtos: produtosDisponiveis, buscarProdutos, categorias, subcategoriasPorCategoria } = useProdutosParaPropostas();
-  
+
   // Estados principais
+  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
+  const [isLoadingVendedores, setIsLoadingVendedores] = useState(true);
+  const [vendedorSelecionado, setVendedorSelecionado] = useState<Vendedor | null>(null);
+  const [showVendedorDropdown, setShowVendedorDropdown] = useState(false);
+  const [buscarVendedor, setBuscarVendedor] = useState('');
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
+  // Carregar vendedores reais do backend
+  useEffect(() => {
+    const carregarVendedores = async () => {
+      try {
+        setIsLoadingVendedores(true);
+        // Usar o método padronizado do propostasService
+        const vendedoresCarregados = await propostasService.obterVendedores();
+
+        // Converter para o formato esperado pela interface
+        const vendedoresFormatados = vendedoresCarregados.map((vendedor: any) => ({
+          id: vendedor.id,
+          nome: vendedor.nome,
+          email: vendedor.email,
+          role: 'vendedor', // Manter compatibilidade com interface
+          ativo: vendedor.ativo
+        }));
+
+        setVendedores(vendedoresFormatados);
+        console.log(`👥 ${vendedoresFormatados.length} vendedores carregados para nova proposta`);
+      } catch (error) {
+        console.error('❌ Erro ao carregar vendedores:', error);
+        setVendedores([]);
+      } finally {
+        setIsLoadingVendedores(false);
+      }
+    };
+    carregarVendedores();
+  }, []);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [isLoadingClientes, setIsLoadingClientes] = useState(true);
   const [buscarCliente, setBuscarCliente] = useState('');
@@ -214,7 +218,7 @@ const NovaPropostaPage: React.FC = () => {
       try {
         setIsLoadingClientes(true);
         const response = await clientesService.getClientes({ limit: 100 }); // Carregar mais clientes
-        
+
         // Converter clientes do serviço para o formato esperado
         const clientesFormatados: Cliente[] = response.data.map((cliente: ClienteService) => ({
           id: cliente.id || '',
@@ -228,7 +232,7 @@ const NovaPropostaPage: React.FC = () => {
           cep: cliente.cep || '',
           tipoPessoa: cliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica'
         }));
-        
+
         setClientes(clientesFormatados);
         console.log('✅ Clientes carregados:', clientesFormatados.length);
       } catch (error) {
@@ -243,15 +247,16 @@ const NovaPropostaPage: React.FC = () => {
 
     carregarClientes();
   }, []);
-  
+
   // Estados para filtros de categoria hierárquica
   const [categoriaSelecionada, setCategoriaSelecionada] = useState('');
   const [subcategoriaSelecionada, setSubcategoriaSelecionada] = useState('');
-  
+
   // React Hook Form
   const { control, handleSubmit, watch, setValue, reset, formState: { errors, isValid } } = useForm<PropostaFormData>({
     resolver: yupResolver(propostaSchema),
     defaultValues: {
+      vendedor: null,
       tipoSelecao: 'personalizado',
       produtos: [],
       combos: [],
@@ -281,6 +286,7 @@ const NovaPropostaPage: React.FC = () => {
   const watchedCombos = watch('combos');
   const watchedDescontoGlobal = watch('descontoGlobal');
   const watchedImpostos = watch('impostos');
+  const watchedVendedor = watch('vendedor');
 
   // Hook de cálculos da proposta
   const { totais, calcularSubtotalProduto } = useCalculosProposta(
@@ -294,7 +300,7 @@ const NovaPropostaPage: React.FC = () => {
     const subtotalProdutos = (watchedProdutos || []).reduce((sum, item) => sum + (item.subtotal || 0), 0);
     const subtotalCombos = (watchedCombos || []).reduce((sum, item) => sum + (item.subtotal || 0), 0);
     const subtotalGeral = subtotalProdutos + subtotalCombos;
-    
+
     const descontoValor = (subtotalGeral * (watchedDescontoGlobal || 0)) / 100;
     const subtotalComDesconto = subtotalGeral - descontoValor;
     const impostosValor = (subtotalComDesconto * (watchedImpostos || 0)) / 100;
@@ -311,9 +317,9 @@ const NovaPropostaPage: React.FC = () => {
   // Filtros de busca
   const clientesFiltrados = useMemo(() => {
     let clientesOrdenados = [...clientes].sort((a, b) => a.nome.localeCompare(b.nome));
-    
+
     if (!buscarCliente) return clientesOrdenados;
-    
+
     return clientesOrdenados.filter(cliente =>
       cliente.nome.toLowerCase().includes(buscarCliente.toLowerCase()) ||
       cliente.documento.includes(buscarCliente) ||
@@ -384,7 +390,7 @@ const NovaPropostaPage: React.FC = () => {
     setCategoriaSelecionada('');
     setSubcategoriaSelecionada('');
     toastNotify.success(`${produto.nome} adicionado à proposta!`);
-    
+
     // Sincronizar com outras páginas
     sincronizarProdutos();
   };
@@ -404,30 +410,25 @@ const NovaPropostaPage: React.FC = () => {
 
   const onSubmit = async (data: PropostaFormData) => {
     try {
-      console.log('📝 Iniciando criação da proposta...');
-      console.log('💾 Dados do formulário:', data);
-      
-      // Validação adicional antes de enviar
+      if (!data.vendedor) {
+        toastNotify.error('Selecione o vendedor responsável!');
+        return;
+      }
       if (!clienteSelecionado) {
         toastNotify.error('Selecione um cliente para continuar!');
         return;
       }
-      
       const produtosCount = data.produtos?.length || 0;
       const combosCount = data.combos?.length || 0;
-      
       if (produtosCount === 0 && combosCount === 0) {
         toastNotify.error('Adicione pelo menos um produto ou combo à proposta!');
         return;
       }
-      
       setIsGeneratingPDF(true);
-      
-      // Toast de loading
       const loadingToastId = toastNotify.loading('Criando proposta...');
-      
       const propostaData = {
         ...data,
+        vendedor: data.vendedor,
         cliente: clienteSelecionado,
         subtotal: totaisCombinados.subtotal,
         total: totaisCombinados.total,
@@ -436,75 +437,25 @@ const NovaPropostaPage: React.FC = () => {
         status: 'rascunho' as const,
         numero: `PROP-${Date.now().toString().slice(-6)}`
       };
-
-      console.log('📋 Dados da proposta a serem salvos:', propostaData);
-
-      // Usar o serviço real de propostas
       const propostaCriada = await propostasService.criarProposta(propostaData);
-      
-      console.log('✅ Proposta criada com sucesso:', propostaCriada);
-      
-      // Remover toast de loading e mostrar sucesso
       toastNotify.dismiss(loadingToastId);
       toastNotify.success(`Proposta ${propostaCriada.numero} criada com sucesso!`);
-      
-      // Reset do formulário
       reset();
+      setVendedorSelecionado(null);
       setClienteSelecionado(null);
+      setBuscarVendedor('');
       setBuscarCliente('');
       setCategoriaSelecionada('');
       setSubcategoriaSelecionada('');
       setBuscarProduto('');
       setBuscarCombo('');
-      
-      // Navegar para lista de propostas
-      console.log('🔄 Redirecionando para lista de propostas...');
       setTimeout(() => {
         navigate('/propostas');
       }, 1500);
-      
     } catch (error) {
-      console.error('❌ Erro ao criar proposta:', error);
-      
-      // Remover toast de loading se ainda estiver ativo
-      try {
-        toastNotify.dismiss();
-      } catch (dismissError) {
-        console.log('Toast já foi removido');
-      }
-      
-      let errorMessage = 'Erro inesperado ao criar proposta. Tente novamente.';
-      
-      if (error instanceof Error) {
-        // Tratar erros específicos
-        if (error.message.includes('Cliente não encontrado')) {
-          errorMessage = 'Cliente não encontrado. Selecione um cliente válido.';
-        } else if (error.message.includes('pelo menos um produto')) {
-          errorMessage = 'Adicione pelo menos um produto ou combo à proposta.';
-        } else if (error.message.includes('maior que zero')) {
-          errorMessage = 'O valor total da proposta deve ser maior que zero.';
-        } else if (error.message.includes('comunicação')) {
-          errorMessage = 'Falha na comunicação com o servidor. Verifique sua conexão e tente novamente.';
-        } else {
-          errorMessage = error.message;
-        }
-      }
-      
-      // Mostrar erro com toast e alert para debug
-      toastNotify.error(errorMessage);
-      
-      // Log detalhado para debug
-      console.log('🔍 Debug - Informações do erro:', {
-        errorType: error?.constructor?.name,
-        errorMessage: error?.message,
-        clienteValido: !!clienteSelecionado,
-        totalProdutos: watchedProdutos?.length || 0,
-        totalCombos: watchedCombos?.length || 0,
-        valorTotal: totaisCombinados.total
-      });
+      toastNotify.error('Erro ao criar proposta. Tente novamente.');
     } finally {
       setIsGeneratingPDF(false);
-      console.log('🔄 Processo finalizado');
     }
   };
 
@@ -515,7 +466,7 @@ const NovaPropostaPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <BackToNucleus 
+              <BackToNucleus
                 nucleusName="Propostas"
                 nucleusPath="/propostas"
                 currentModuleName="Nova Proposta"
@@ -532,17 +483,75 @@ const NovaPropostaPage: React.FC = () => {
         <form onSubmit={handleSubmit(onSubmit)}>
           {/* Layout em 3 colunas - Paisagem/Panorâmico */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            
-            {/* COLUNA 1: Seleção de Cliente */}
+
+            {/* COLUNA 1: Seleção de Vendedor e Cliente */}
             <div className="bg-white rounded-lg shadow-sm p-6">
+              {/* Seleção de Vendedor */}
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <User className="h-5 w-5 mr-2 text-green-600" />
+                  Vendedor Responsável *
+                </h2>
+              </div>
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar vendedor..."
+                  value={buscarVendedor}
+                  onChange={(e) => setBuscarVendedor(e.target.value)}
+                  onFocus={() => setShowVendedorDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowVendedorDropdown(false), 200)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
+                {showVendedorDropdown && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {isLoadingVendedores ? (
+                      <div className="p-4 text-center text-gray-500">Carregando vendedores...</div>
+                    ) : vendedores.length === 0 ? (
+                      <div className="p-4 text-center text-gray-500">Nenhum vendedor cadastrado</div>
+                    ) : (
+                      vendedores
+                        .filter(v => v.nome.toLowerCase().includes(buscarVendedor.toLowerCase()) || v.email.toLowerCase().includes(buscarVendedor.toLowerCase()))
+                        .map((vendedor) => (
+                          <div
+                            key={vendedor.id}
+                            onClick={() => {
+                              setVendedorSelecionado(vendedor);
+                              setValue('vendedor', vendedor);
+                              setBuscarVendedor(vendedor.nome);
+                              setShowVendedorDropdown(false);
+                            }}
+                            className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                          >
+                            <div className="font-medium text-gray-900">{safeRender(vendedor.nome)}</div>
+                            <div className="text-sm text-gray-500">{safeRender(vendedor.email)}</div>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                )}
+              </div>
+              {errors.vendedor && (
+                <p className="text-red-500 text-sm mt-2">{errors.vendedor.message}</p>
+              )}
+              {/* Informações do vendedor selecionado */}
+              {vendedorSelecionado && (
+                <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
+                  <h3 className="font-medium text-green-900 mb-2">Vendedor Selecionado</h3>
+                  <div className="space-y-1 text-sm">
+                    <div><strong>Nome:</strong> {safeRender(vendedorSelecionado.nome)}</div>
+                    <div><strong>Email:</strong> {safeRender(vendedorSelecionado.email)}</div>
+                  </div>
+                </div>
+              )}
+              {/* Seleção de Cliente (mantém o bloco original) */}
               <div className="mb-6">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                   <User className="h-5 w-5 mr-2 text-blue-600" />
                   Cliente *
                 </h2>
               </div>
-
-              {/* Campo de busca do cliente */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
@@ -554,18 +563,12 @@ const NovaPropostaPage: React.FC = () => {
                   onBlur={() => setTimeout(() => setShowClienteDropdown(false), 200)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
-                
-                {/* Dropdown de clientes */}
                 {showClienteDropdown && (
                   <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                     {isLoadingClientes ? (
-                      <div className="p-4 text-center text-gray-500">
-                        Carregando clientes...
-                      </div>
+                      <div className="p-4 text-center text-gray-500">Carregando clientes...</div>
                     ) : clientesFiltrados.length === 0 ? (
-                      <div className="p-4 text-center text-gray-500">
-                        {buscarCliente ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
-                      </div>
+                      <div className="p-4 text-center text-gray-500">{buscarCliente ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}</div>
                     ) : (
                       clientesFiltrados.map((cliente) => (
                         <div
@@ -582,12 +585,9 @@ const NovaPropostaPage: React.FC = () => {
                   </div>
                 )}
               </div>
-
               {errors.cliente && (
                 <p className="text-red-500 text-sm mt-2">{errors.cliente.message}</p>
               )}
-
-              {/* Informações do cliente selecionado */}
               {clienteSelecionado && (
                 <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <h3 className="font-medium text-blue-900 mb-2">Cliente Selecionado</h3>
@@ -623,11 +623,10 @@ const NovaPropostaPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => field.onChange('personalizado')}
-                        className={`flex-1 flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                          field.value === 'personalizado'
-                            ? 'bg-white text-green-600 shadow-sm'
-                            : 'text-gray-600 hover:text-gray-800'
-                        }`}
+                        className={`flex-1 flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${field.value === 'personalizado'
+                          ? 'bg-white text-green-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-800'
+                          }`}
                       >
                         <Package className="h-4 w-4 mr-2" />
                         Personalizado
@@ -635,11 +634,10 @@ const NovaPropostaPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => field.onChange('combo')}
-                        className={`flex-1 flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                          field.value === 'combo'
-                            ? 'bg-white text-green-600 shadow-sm'
-                            : 'text-gray-600 hover:text-gray-800'
-                        }`}
+                        className={`flex-1 flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${field.value === 'combo'
+                          ? 'bg-white text-green-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-800'
+                          }`}
                       >
                         <Layers className="h-4 w-4 mr-2" />
                         Combos
@@ -799,7 +797,7 @@ const NovaPropostaPage: React.FC = () => {
                           <div className="flex-1">
                             <h4 className="font-medium text-gray-900">{safeRender(field.produto.nome)}</h4>
                             <p className="text-sm text-gray-600 mb-2">{safeRender(field.produto.descricao)}</p>
-                            
+
                             {/* Tags com informações do produto */}
                             <div className="flex flex-wrap gap-1">
                               <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
@@ -963,12 +961,12 @@ const NovaPropostaPage: React.FC = () => {
                                 </div>
                               </div>
                             </div>
-                            
+
                             <div className="border-t border-gray-200 pt-2">
                               <div className="text-xs text-gray-500 mb-1">Inclui:</div>
                               <div className="flex flex-wrap gap-1">
                                 {combo.produtos.map((item, idx) => (
-                                  <span 
+                                  <span
                                     key={idx}
                                     className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800"
                                   >
@@ -992,13 +990,13 @@ const NovaPropostaPage: React.FC = () => {
                             <h4 className="font-medium text-gray-900">{safeRender(field.combo.nome)}</h4>
                             <p className="text-sm text-gray-600">{safeRender(field.combo.categoria)}</p>
                             <div className="text-xs text-gray-500 mt-1">{safeRender(field.combo.descricao)}</div>
-                            
+
                             {/* Produtos incluídos no combo */}
                             <div className="mt-2 pt-2 border-t border-gray-100">
                               <div className="text-xs text-gray-500 mb-1">Produtos incluídos:</div>
                               <div className="flex flex-wrap gap-1">
                                 {field.combo.produtos.map((item, idx) => (
-                                  <span 
+                                  <span
                                     key={idx}
                                     className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800"
                                   >
@@ -1086,7 +1084,7 @@ const NovaPropostaPage: React.FC = () => {
 
             {/* COLUNA 3: Totais e Condições */}
             <div className="space-y-6">
-              
+
               {/* Card de Totais */}
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center mb-6">
@@ -1281,7 +1279,7 @@ const NovaPropostaPage: React.FC = () => {
                   <div>Formulário válido: {isValid ? '✅' : '❌'}</div>
                   <div>Total: {formatCurrency(totaisCombinados.total)}</div>
                 </div>
-                
+
                 <div className="space-y-3">
                   <button
                     type="submit"
@@ -1329,7 +1327,7 @@ const NovaPropostaPage: React.FC = () => {
                   >
                     Limpar Formulário
                   </button>
-                  
+
                   {/* Botão de debug para testar validação */}
                   <button
                     type="button"
@@ -1338,13 +1336,13 @@ const NovaPropostaPage: React.FC = () => {
                       console.log('❌ Erros atuais:', errors);
                       console.log('📋 Dados do formulário:', watch());
                       console.log('✅ Formulário válido:', isValid);
-                      
+
                       // Exibir erros específicos
                       if (Object.keys(errors).length > 0) {
                         Object.entries(errors).forEach(([field, error]) => {
                           console.log(`❌ Campo ${field}: ${error?.message}`);
                         });
-                        
+
                         toastNotify.error(`Encontrados ${Object.keys(errors).length} erro(s) no formulário. Verifique o console.`);
                       } else {
                         toastNotify.success('Nenhum erro encontrado no formulário!');

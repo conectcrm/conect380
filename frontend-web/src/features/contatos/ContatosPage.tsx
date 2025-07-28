@@ -2,21 +2,22 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useI18n } from '../../contexts/I18nContext';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
-import { ModalContato } from '../../components/modals/ModalContato';
-import { ModalNovoContato } from '../../components/modals/ModalNovoContato';
+import { ModalContato } from '../../components/contatos/ModalContato';
+import { ModalNovoContato } from '../../components/contatos/ModalNovoContato';
 import { ContatoCard } from '../../components/contatos/ContatoCard';
 import { ContatoFilters } from '../../components/contatos/ContatoFilters';
 import { ContatoMetrics } from '../../components/contatos/ContatoMetrics';
 import { contatosService, Contato } from './services/contatosService';
-import { 
-  Users, 
-  Plus, 
-  Search, 
-  Filter, 
-  Download, 
-  Eye, 
-  Edit, 
-  Trash2, 
+import { safeRender, validateAndSanitizeContact } from '../../utils/safeRender';
+import {
+  Users,
+  Plus,
+  Search,
+  Filter,
+  Download,
+  Eye,
+  Edit,
+  Trash2,
   MoreVertical,
   Phone,
   Mail,
@@ -357,7 +358,7 @@ const ContatosPage: React.FC = () => {
     // Filtro de busca
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(contato => 
+      filtered = filtered.filter(contato =>
         contato.nome.toLowerCase().includes(term) ||
         contato.email.toLowerCase().includes(term) ||
         contato.empresa.toLowerCase().includes(term) ||
@@ -474,8 +475,8 @@ const ContatosPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#DEEFE7]">
       {/* Header com Back to Nucleus */}
-      <BackToNucleus 
-        nucleusName="CRM" 
+      <BackToNucleus
+        nucleusName="CRM"
         nucleusPath="/nuclei/crm"
         currentModuleName="Contatos"
       />
@@ -490,7 +491,7 @@ const ContatosPage: React.FC = () => {
             <div>
               <p className="text-[#B4BEC9]">Gerencie todos os seus contatos e relacionamentos</p>
             </div>
-            
+
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => setShowFilters(!showFilters)}
@@ -499,22 +500,22 @@ const ContatosPage: React.FC = () => {
                 <Filter className="w-4 h-4" />
                 Filtros
               </button>
-              
-              <button 
+
+              <button
                 className="flex items-center gap-2 px-4 py-2 border border-[#B4BEC9] text-[#002333] rounded-lg hover:bg-[#DEEFE7] transition-colors"
               >
                 <Download className="w-4 h-4" />
                 Exportar
               </button>
-              
-              <button 
+
+              <button
                 className="flex items-center gap-2 px-4 py-2 border border-[#B4BEC9] text-[#002333] rounded-lg hover:bg-[#DEEFE7] transition-colors"
               >
                 <Import className="w-4 h-4" />
                 Importar
               </button>
-              
-              <button 
+
+              <button
                 onClick={() => setShowNewModal(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg transition-all"
               >
@@ -665,18 +666,31 @@ const ContatosPage: React.FC = () => {
                         className="rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
                       />
                       <div>
-                        <h3 className="font-semibold text-gray-900">{contato.nome}</h3>
-                        <p className="text-sm text-gray-600">{contato.empresa} • {contato.cargo}</p>
+                        <h3 className="font-semibold text-gray-900">{(() => {
+                          try {
+                            const safeContato = validateAndSanitizeContact(contato);
+                            return safeRender(safeContato.nome);
+                          } catch {
+                            return 'Nome não disponível';
+                          }
+                        })()}</h3>
+                        <p className="text-sm text-gray-600">{safeRender(contato.empresa)} • {safeRender(contato.cargo)}</p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        contato.status === 'cliente' ? 'bg-green-100 text-green-800' :
-                        contato.status === 'prospecto' ? 'bg-blue-100 text-blue-800' :
-                        contato.status === 'ativo' ? 'bg-green-100 text-green-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {contato.status}
+                      <span className={`px-2 py-1 text-xs rounded-full ${contato.status === 'cliente' ? 'bg-green-100 text-green-800' :
+                          contato.status === 'prospecto' ? 'bg-blue-100 text-blue-800' :
+                            contato.status === 'ativo' ? 'bg-green-100 text-green-800' :
+                              'bg-gray-100 text-gray-800'
+                        }`}>
+                        {(() => {
+                          try {
+                            const safeContato = validateAndSanitizeContact(contato);
+                            return safeRender(safeContato.status);
+                          } catch {
+                            return 'Status não disponível';
+                          }
+                        })()}
                       </span>
                       <button
                         onClick={() => handleSelectContato(contato)}
