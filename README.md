@@ -1,15 +1,17 @@
-# Conect CRM
+# ConectCRM 🚀
 
-Um sistema CRM completo, moderno e escalável, desenvolvido para ser comercializado como SaaS (Software as a Service).
+Sistema completo de CRM com portal do cliente integrado, desenvolvido com NestJS (backend) e React (frontend). 
+
+Sistema especializado em gestão de propostas comerciais com sincronização automática em tempo real entre o CRM e o portal do cliente.
 
 ## 🚀 Características Principais
 
-- **Multi-empresa (Multi-tenant)**: Suporte a múltiplas empresas com isolamento de dados
-- **Multi-idioma (i18n)**: Internacionalização completa com i18next
-- **Multi-plataforma**: Web e Mobile (React Native)
-- **Temas personalizáveis**: Personalização visual por cliente
-- **Autenticação JWT**: Sistema seguro de autenticação
-- **Módulos completos**: Vendas, Financeiro, Dashboard e muito mais
+- **Portal do Cliente Integrado**: Sistema completo de visualização e aprovação de propostas
+- **Sincronização em Tempo Real**: Atualizações automáticas entre portal e CRM
+- **Sistema de Email Automatizado**: Envio e rastreamento de propostas por email
+- **Interface Responsiva**: Design mobile-first e totalmente responsivo
+- **Autenticação JWT**: Sistema seguro de autenticação e autorização
+- **Debug e Monitoramento**: Ferramentas completas de debug e teste
 
 ## 🛠️ Stack Tecnológica
 
@@ -18,392 +20,328 @@ Um sistema CRM completo, moderno e escalável, desenvolvido para ser comercializ
 - **NestJS** (Framework)
 - **PostgreSQL** (Banco de dados)
 - **JWT** (Autenticação)
-- **Docker** (Containerização)
+- **TypeORM** (ORM)
+- **Nodemailer** (Sistema de emails)
 
 ### Frontend Web
 - **React** + **TypeScript**
 - **Tailwind CSS** (Estilização)
-- **i18next** (Internacionalização)
+- **React Router** (Roteamento)
+- **Custom Hooks** (Lógica reutilizável)
 
-### Mobile
-- **React Native** (Expo)
+### Portal do Cliente
+- **Links únicos** por proposta
+- **Interface dedicada** para clientes
+- **Sistema de ações** (visualizar, aprovar, rejeitar)
+- **Notificações automáticas**
 
-### Ferramentas Adicionais
-- **html-pdf-node** (Exportação PDF)
-- **Docker Compose** (Orquestração)
+## 📋 Funcionalidades Implementadas
 
-### 🎨 Padrões de Design
-- **Ícones**: Exclusivamente em formato SVG para máxima qualidade e personalização
-- **Responsividade**: Mobile-first design
-- **Acessibilidade**: Seguindo padrões WCAG 2.1
+### ✅ Sistema de Propostas
+- [x] Criação e edição de propostas comerciais
+- [x] Sistema de status (enviada, visualizada, aprovada, rejeitada)
+- [x] Envio automático por email
+- [x] Portal do cliente integrado
+- [x] Sincronização em tempo real
 
-### ♿ Recursos de Acessibilidade
-- **Labels ARIA**: Todos os elementos interativos possuem labels descritivos
-- **Navegação por Teclado**: Suporte completo a Tab, Shift+Tab, setas e teclas de escape
-- **Leitores de Tela**: Anúncios automáticos de mudanças de estado e ações
-- **Contraste**: Cores atendem ao padrão WCAG AA (4.5:1)
-- **Estrutura Semântica**: HTML5 com roles e landmarks apropriados
-- **Estados de Loading**: Indicadores acessíveis para operações assíncronas
-- **Focus Management**: Controle de foco em modais e componentes interativos
+### ✅ Portal do Cliente
+- [x] Links únicos e seguros por proposta
+- [x] Interface responsiva de visualização
+- [x] Botões de ação (aprovar/rejeitar/visualizar)
+- [x] Atualizações em tempo real
+- [x] Sistema de notificações
 
-## 🎨 Sistema de Componentes Base
+### ✅ Sistema de Email
+- [x] Templates responsivos
+- [x] Envio automático de propostas
+- [x] Sistema de rastreamento
+- [x] Notificações de status
 
-O Fênix CRM possui um **sistema de componentes base padronizados** para garantir consistência visual e de experiência do usuário em toda a aplicação.
+### ✅ Sincronização Automática
+- [x] Eventos customizados (propostaAtualizada, atualizarPropostas)
+- [x] Polling automático a cada 30 segundos
+- [x] Atualização visual em tempo real
+- [x] Monitoramento de status
 
-### 📋 Componentes Disponíveis
-- **BaseModal**: Modal padronizado com header, footer e animações
-- **FormField**: Campo de formulário com label, erro e hint
-- **BaseInput**: Input padronizado com validação visual
-- **BaseSelect**: Select padronizado
-- **BaseTextarea**: Textarea padronizado  
-- **BaseButton**: Botão com variants e estados de loading
-- **ThreeColumnLayout**: Layout em 3 colunas para modais complexos
-- **StatusBadge**: Badge para status com cores padronizadas
-- **StatusPanel**: Painel lateral para informações adicionais
-
-### 📚 Documentação Completa
-- **[Padrão de Modais](frontend-web/docs/PADRAO-MODAIS.md)**: Guia completo para criação de modais
-- **[Template de Modal](frontend-web/docs/TEMPLATE-MODAL.md)**: Template pronto para uso
-- **[Exemplo Prático](frontend-web/src/examples/ModalCadastroProduto.tsx)**: Modal de exemplo implementado
-
-### ✨ Características dos Componentes
-- **React Hook Form + Yup**: Validação robusta e em tempo real
-- **Design Responsivo**: Mobile-first em todos os componentes
-- **Acessibilidade**: WCAG 2.1 AA compliance
-- **Temas Consistentes**: Cores e estilos padronizados do Fênix CRM
-- **TypeScript**: Tipagem completa para melhor DX
+### ✅ Ferramentas de Debug
+- [x] Scripts de teste completos
+- [x] Console de debug frontend
+- [x] APIs de teste backend
+- [x] Monitoramento de eventos
+- [x] Verificação de sincronização
 
 ## 📁 Estrutura do Projeto
 
 ```
-fenix-crm/
+conectcrm/
 ├── backend/                 # API Backend (NestJS)
 │   ├── src/
 │   │   ├── modules/        # Módulos da aplicação
-│   │   │   ├── auth/       # Autenticação
-│   │   │   ├── users/      # Usuários
-│   │   │   ├── clientes/   # Clientes
-│   │   │   ├── propostas/  # Propostas comerciais
-│   │   │   ├── produtos/   # Catálogo de produtos
-│   │   │   ├── contratos/  # Contratos
-│   │   │   ├── financeiro/ # Módulo financeiro
-│   │   │   └── dashboard/  # Dashboard e KPIs
-│   │   ├── common/         # Utilitários comuns
-│   │   ├── config/         # Configurações
-│   │   └── main.ts         # Ponto de entrada
-│   ├── .env                # Variáveis de ambiente
-│   ├── Dockerfile          # Container do backend
-│   └── docker-compose.yml  # Orquestração completa
-├── frontend-web/           # Interface Web (React)
-│   ├── public/             # Arquivos públicos
+│   │   │   ├── propostas/  # Sistema de propostas
+│   │   │   │   ├── propostas.controller.ts
+│   │   │   │   ├── propostas.service.ts
+│   │   │   │   ├── portal.controller.ts    # 🆕 Portal do cliente
+│   │   │   │   ├── portal.service.ts       # 🆕 Lógica do portal
+│   │   │   │   └── email.controller.ts     # 🆕 Sistema de email
+│   │   │   ├── users/      # Gestão de usuários
+│   │   │   └── contatos/   # Gestão de contatos
+│   │   └── config/         # Configurações
+├── frontend-web/           # Interface React
 │   ├── src/
-│   │   ├── assets/         # Recursos estáticos
 │   │   ├── components/     # Componentes reutilizáveis
-│   │   ├── features/       # Features por módulo
-│   │   │   ├── clientes/   # Telas de clientes
-│   │   │   ├── propostas/  # Telas de propostas
-│   │   │   └── dashboard/  # Dashboard
-│   │   ├── contexts/       # Contextos React
-│   │   ├── i18n/           # Configuração de idiomas
-│   │   ├── themes/         # Temas personalizáveis
-│   │   └── App.tsx         # Componente principal
-│   ├── Dockerfile          # Container do frontend
-│   └── .env                # Variáveis de ambiente
-├── mobile/                 # App Mobile (React Native)
-│   ├── src/                # Código fonte mobile
-│   ├── App.tsx             # Componente principal
-│   └── app.json            # Configuração Expo
-└── README.md               # Este arquivo
+│   │   ├── features/       # Funcionalidades principais
+│   │   │   ├── propostas/  # Gestão de propostas
+│   │   │   ├── contatos/   # Gestão de contatos
+│   │   │   └── portal/     # 🆕 Portal do cliente
+│   │   └── services/       # Serviços de API
+├── docs/                   # Documentação completa
+│   ├── implementation/     # Funcionalidades implementadas
+│   ├── debug/             # Logs de debug
+│   └── guides/            # Guias técnicos
+├── scripts/               # Scripts de automação e debug
+│   ├── debug-frontend-console.js    # 🆕 Debug frontend
+│   ├── teste-apis-backend.js        # 🆕 Teste APIs
+│   ├── iniciar-sistema-completo.bat # 🆕 Inicialização
+│   └── teste-portal-api.js          # 🆕 Teste portal
+└── README.md              # Este arquivo
 ```
 
-## 🏗️ Módulos do Sistema
-
-### 🔐 Autenticação
-- Login/logout multi-empresa
-- JWT com refresh tokens
-- Controle de permissões por função (RBAC)
-
-### 👥 Clientes
-- Cadastro completo de clientes
-- Histórico de interações
-- Segmentação e tags
-- **✅ IMPLEMENTADO** - Interface completa com padrão Crevasse
-
-### 💼 Propostas
-- Criação de propostas comerciais
-- Funil de vendas
-- Exportação em PDF
-- **✅ IMPLEMENTADO** - Sistema de gestão comercial
-
-### 📦 Produtos
-- Catálogo de produtos/serviços
-- Preços dinâmicos
-- Configurações por empresa
-- **✅ IMPLEMENTADO** - Controle de estoque e performance
-
-### 📋 Contratos
-- Gestão de contratos
-- Assinaturas digitais
-- Renovações automáticas
-
-### 💰 Financeiro
-- Controle de pagamentos
-- Alertas de vencimento
-- Relatórios financeiros
-- **✅ IMPLEMENTADO** - Contas a Receber e Contas a Pagar
-
-## 📊 Dashboard
-
-O dashboard implementado possui:
-
-### 🎯 KPIs Animados
-- Contador animado de vendas
-- Métricas de receita em tempo real
-- Indicadores de performance
-
-### 📈 Gráficos Interativos
-- Vendas por período
-- Performance de vendedores
-- Análise de funil
-
-### 📋 Widgets Funcionais
-- Tabela de vendas filtráveis
-- Ranking de vendedores
-- Sistema de alertas
-- Cards de status por categoria
-
-### 🔥 Características Avançadas
-- Interface moderna e responsiva
-- Animações suaves
-- Filtros dinâmicos
-- Dados em tempo real
-
-## 🎯 Módulos Implementados
-
-### 👥 **Clientes** (✅ Concluído)
-- **Dashboard completo** com estatísticas de clientes
-- **Sistema de busca** por nome, email e telefone
-- **Filtros avançados** por status (ativo, inativo, lead, prospect)
-- **Tabela responsiva** com informações detalhadas
-- **Modal completo** para visualização de detalhes
-- **5 clientes mock** para demonstração
-
-### 📦 **Produtos** (✅ Concluído)
-- **Dashboard de catálogo** com estatísticas de vendas
-- **Controle de estoque** com alertas de nível baixo
-- **Categorização** por Software, Hardware e Serviços
-- **Análise financeira** com margem de lucro
-- **Performance de vendas** com métricas mensais
-- **5 produtos/serviços mock** com dados completos
-
-### 💰 **Contas a Receber** (✅ Concluído)
-- **Dashboard financeiro** com valores totais e pendentes
-- **Filtros por status** (pendente, pago, vencido, cancelado)
-- **Alertas de vencimento** com indicadores visuais
-- **Sistema de pesquisa** por cliente e número da conta
-- **Modal detalhado** com histórico de pagamentos
-- **6 contas mock** com diferentes status
-
-### 💸 **Contas a Pagar** (✅ Concluído)
-- **Gestão de fornecedores** e pagamentos
-- **Controle de vencimentos** com alertas automáticos
-- **Categorização** por tipo de despesa
-- **Filtros avançados** por status e período
-- **Modal completo** com detalhes do fornecedor
-- **5 contas de fornecedores** para demonstração
-
-### 🎨 **Padrão de Design Crevasse Aplicado**
-- **Cores consistentes** em todos os módulos
-- **Componente BackToNucleus** para navegação
-- **Ícones Lucide React** padronizados
-- **Layout responsivo** mobile-first
-- **Animações suaves** e transições
-
-## 🐳 Executando com Docker
-
-```bash
-# Clone o repositório
-git clone [URL_DO_REPO]
-cd fenix-crm
-
-# Execute o ambiente completo
-docker-compose up -d
-
-# O sistema estará disponível em:
-# - Frontend: http://localhost:3900
-# - Backend API: http://localhost:3001
-# - PostgreSQL: localhost:5433 (para evitar conflitos)
-```
-
-## 🔑 Credenciais de Acesso
-
-### Usuários Pré-configurados
-
-| Usuário | E-mail | Senha | Função |
-|---------|--------|-------|--------|
-| **Admin** | admin@fenixcrm.com | admin123 | Administrador |
-| **Manager** | manager@fenixcrm.com | manager123 | Gerente |
-| **Vendedor** | vendedor@fenixcrm.com | vendedor123 | Vendedor |
-
-### Banco de Dados PostgreSQL
-
-```
-Host: localhost
-Porta: 5433
-Usuário: fenixcrm
-Senha: fenixcrm123
-Database: fenixcrm_db
-```
-
-## 🚀 Desenvolvimento Local
+## 🚀 Instalação e Configuração
 
 ### Pré-requisitos
-- Node.js 18+ instalado
-- PostgreSQL rodando (Docker recomendado)
-- Git
+- Node.js 18+
+- PostgreSQL 12+
+- npm ou yarn
 
-### Backend
+### 1. Clone o repositório
+```bash
+git clone https://github.com/dhonlenofreitas/conectcrm.git
+cd conectcrm
+```
+
+### 2. Configuração do Backend
 ```bash
 cd backend
 npm install
 
-# Configurar variáveis de ambiente (.env já configurado)
-# DATABASE_PORT=5433 (configurado para evitar conflitos)
-
-npm run start:dev
-# Backend rodará em http://localhost:3001
+# Configurar variáveis de ambiente
+cp .env.example .env
+# Edite o arquivo .env com suas configurações de banco
 ```
 
-### Frontend Web
+### 3. Configuração do Frontend
 ```bash
 cd frontend-web
 npm install
-npm start
-# Frontend rodará em http://localhost:3900
 ```
 
-### Mobile
+### 4. Configuração do Banco de Dados
 ```bash
-cd mobile
-npm install
-npx expo start
+# No diretório backend
+npm run migration:run
 ```
 
-## ✅ Status de Desenvolvimento
+### 5. Iniciar os serviços
 
-### ✅ Concluído
-- [x] **Estrutura completa** do projeto
-- [x] **Backend NestJS** com autenticação JWT
-- [x] **Frontend React** compilando sem erros
-- [x] **PostgreSQL** via Docker configurado
-- [x] **Login funcional** com usuários pré-cadastrados
-- [x] **Dashboard animado** com KPIs e gráficos
-- [x] **Sistema multi-tenant** configurado
-- [x] **Documentação Swagger** disponível
-- [x] **Sistema de ícones SVG** personalizado
-- [x] **Design responsivo** mobile-first
-- [x] **Acessibilidade WCAG 2.1** implementada
-  - Labels ARIA completos
-  - Navegação por teclado
-  - Suporte a leitores de tela
-  - Estados de loading acessíveis
-  - Contraste de cores adequado
-  - Estrutura semântica HTML5
-- [x] **Módulos CRM funcionais** implementados
-  - **Clientes**: Gestão completa com filtros e busca
-  - **Produtos**: Catálogo com controle de estoque e vendas
-  - **Contas a Receber**: Sistema financeiro completo
-  - **Contas a Pagar**: Controle de fornecedores e pagamentos
-- [x] **Padrão de Design Crevasse** aplicado consistentemente
-- [x] **Navegação integrada** entre módulos e núcleos
-- [x] **Dependências corrigidas** e sistema compilando sem erros
+**Opção 1: Script automatizado (Recomendado)**
+```bash
+# Execute o script na raiz do projeto
+.\iniciar-sistema-completo.bat
+```
 
-### 🔄 Em Desenvolvimento
-- [x] **Módulos específicos** (clientes, propostas, produtos, financeiro) - **CONCLUÍDO**
-- [ ] **Testes automatizados** (cobertura 80%)
-- [ ] **Widgets avançados** do dashboard
-- [ ] **Módulos adicionais** (contratos, configurações)
-- [ ] Mobile React Native (estrutura criada)
-- [ ] Docker Compose completo
+**Opção 2: Manual**
+```bash
+# Backend (porta 3001)
+cd backend
+npm run start:dev
 
-## � Acesso ao Sistema
+# Frontend (porta 3000) - novo terminal
+cd frontend-web
+npm start
+```
 
-### URLs Principais
+## 🔧 URLs do Sistema
 
 | Serviço | URL | Descrição |
 |---------|-----|-----------|
-| **Frontend** | http://localhost:3900 | Interface principal do usuário |
+| **Frontend CRM** | http://localhost:3000 | Interface principal do CRM |
 | **Backend API** | http://localhost:3001 | API REST do sistema |
-| **Swagger Docs** | http://localhost:3001/api-docs | Documentação interativa da API |
-| **PostgreSQL** | localhost:5433 | Banco de dados |
+| **Portal Cliente** | http://localhost:3000/portal/:token | Portal do cliente (link único) |
 
-### 🎮 Como Usar
+## 🧪 Testes e Debug
 
-1. **Acesse o frontend**: http://localhost:3900
-2. **Faça login** com qualquer credencial da tabela acima
-3. **Explore o dashboard** com gráficos e KPIs
-4. **Teste a API** através do Swagger: http://localhost:3001/api-docs
+### Scripts de Debug Disponíveis
 
-## �🌍 Configuração Multi-idioma
+#### Frontend (Execute no console do navegador)
+```javascript
+// Sincronizar frontend com backend
+sincronizarFrontendComBackend("PROP-2025-051")
 
-O sistema suporta múltiplos idiomas através do i18next:
-- Português (pt-BR) - Padrão
-- Inglês (en-US)
-- Espanhol (es-ES)
+// Verificar status visual na interface
+verificarStatusVisualInterface("PROP-2025-051")
 
-## 🎨 Personalização de Temas
+// Teste completo do ciclo
+testarCicloCompletoComVerificacao("PROP-2025-051")
 
-Cada empresa cliente pode personalizar:
-- Cores primárias e secundárias
-- Logo da empresa
-- Fontes customizadas
-- Layout preferences
+// Monitorar estado do React
+monitorarEstadoReact()
 
-## 📐 Padrões de Desenvolvimento
+// Monitorar requisições de rede
+monitorarRequisicoes()
+```
 
-### 🎨 Design System
-- **Ícones**: Usar exclusivamente formato SVG
-  - Escalabilidade perfeita em qualquer resolução
-  - Customização total de cores via CSS
-  - Performance superior (não requer bibliotecas externas)
-  - Controle completo sobre animações e interações
+#### Backend (PowerShell)
+```powershell
+# Testar APIs do backend
+node teste-apis-backend.js
 
-### 🖌️ UI/UX Guidelines
-- **Consistência Visual**: Manter padrão de cores, espaçamentos e tipografia
-- **Responsividade**: Design mobile-first obrigatório
-- **Acessibilidade**: Seguir padrões WCAG 2.1
-- **Performance**: Otimizar imagens e assets
+# Testar ação específica do portal
+Invoke-RestMethod -Uri "http://localhost:3001/api/portal/proposta/PROP-2025-051/acao" -Method POST -ContentType "application/json" -Body '{"acao":"visualizada"}'
 
-## 📚 Documentação e Organização
+# Verificar propostas
+Invoke-RestMethod -Uri "http://localhost:3001/propostas" -Method GET
+```
 
-### 📁 Estrutura de Documentação
-Toda documentação está organizada na pasta `docs/` por categoria:
+## � Fluxo do Sistema
 
-- 📋 `docs/changelog/` - Correções, bugs e status
-- 📖 `docs/guides/` - Guias e manuais de configuração  
-- 🔧 `docs/implementation/` - Funcionalidades implementadas
-- 🐛 `docs/debug/` - Logs de debug e diagnósticos
+### � Portal do Cliente - Fluxo Completo
+1. **Criação da Proposta**: Usuário cria proposta no CRM
+2. **Envio por Email**: Sistema envia email com link único do portal
+3. **Acesso do Cliente**: Cliente acessa portal via link único
+4. **Ações do Cliente**: Cliente pode visualizar, aprovar ou rejeitar
+5. **Sincronização Automática**: Status atualiza automaticamente no CRM
+6. **Notificações**: Sistema notifica sobre mudanças de status
 
-### ⚠️ **IMPORTANTE: Novos Documentos**
-**Antes de criar qualquer arquivo .md:**
+### � Tecnologias de Sincronização
+- **CustomEvents**: Eventos personalizados para comunicação
+- **Polling**: Verificação automática a cada 30 segundos
+- **UUID Mapping**: Sistema de tokens únicos para segurança
+- **Real-time Updates**: Atualizações visuais instantâneas
 
-1. **Determine a categoria** e crie na pasta apropriada em `docs/`
-2. **Se não houver categoria adequada**, crie uma nova pasta descritiva
-3. **NÃO criar arquivos .md na raiz** - mantém a organização
-4. **Use nomenclatura descritiva**: `NOVA_FUNCIONALIDADE.md`
+## � Como Usar o Sistema
 
-📖 **Consulte:** `docs/README.md` para orientações detalhadas
+### 1. **Acesso ao CRM**
+```
+URL: http://localhost:3000
+Login: Use as credenciais configuradas no sistema
+```
 
-### 🔧 Convenções Técnicas
-- **TypeScript**: Tipagem estrita obrigatória
-- **Componentes**: Reutilização máxima via design system
-- **Estados**: Loading, error e empty states em todos os componentes
-- **Testes**: Cobertura mínima de 80%
+### 2. **Criar Nova Proposta**
+- Acesse a seção "Propostas"
+- Clique em "Nova Proposta"
+- Preencha os dados do cliente e detalhes
+- Salve a proposta
 
-## 📝 Licença
+### 3. **Enviar para Cliente**
+- Na lista de propostas, clique no botão "Enviar Email"
+- Sistema enviará email com link único do portal
+- Cliente receberá link seguro: `http://localhost:3000/portal/PROP-2025-XXX`
 
-Este projeto é proprietário e destinado à comercialização como SaaS.
+### 4. **Acompanhar Status**
+- Status é atualizado automaticamente quando cliente acessa portal
+- Disponível: `enviada`, `visualizada`, `aprovada`, `rejeitada`
+- Interface atualiza em tempo real
+
+## 🔐 Segurança e Tokens
+
+### Sistema de Tokens Únicos
+- Cada proposta recebe um token único (ex: PROP-2025-051)
+- Tokens são mapeados para UUIDs no banco de dados
+- Acesso ao portal requer token válido
+- Sistema de validação no backend
+
+### Exemplo de Mapeamento
+```typescript
+// Portal Service - Token Mappings
+const tokenMappings = {
+  'PROP-2025-049': 'bff61bbe-b645-4581-a3d1-d8447b8c2b75',
+  'PROP-2025-051': 'e0003dcb-f81a-4ac5-9661-76233446bfa8'
+};
+```
+
+## �️ Scripts de Automação
+
+### Inicialização do Sistema
+```bash
+# Windows
+.\iniciar-sistema-completo.bat
+.\iniciar-sistema-completo.ps1
+
+# Inicia backend e frontend simultaneamente
+```
+
+### Scripts de Debug
+```bash
+# Debug específico do frontend
+node debug-frontend-console.js
+
+# Teste das APIs do backend  
+node teste-apis-backend.js
+
+# Teste do portal do cliente
+node teste-portal-api.js
+```
+
+## 📊 Monitoramento e Debug
+
+### Console do Frontend
+Execute no console do navegador para debug avançado:
+
+```javascript
+// Funções principais disponíveis
+sincronizarFrontendComBackend()     // Sincroniza com backend
+verificarStatusVisualInterface()    // Verifica interface visual
+testarCicloCompletoComVerificacao() // Teste completo do sistema
+monitorarEstadoReact()             // Monitora componentes React
+monitorarRequisicoes()             // Monitora requisições de rede
+```
+
+### APIs de Teste Backend
+```powershell
+# Testar ação do portal
+$body = '{"acao":"visualizada"}'
+Invoke-RestMethod -Uri "http://localhost:3001/api/portal/proposta/PROP-2025-051/acao" -Method POST -ContentType "application/json" -Body $body
+
+# Listar propostas
+Invoke-RestMethod -Uri "http://localhost:3001/propostas" -Method GET
+```
+
+## ✅ Status do Projeto
+
+### � Funcionalidades Prontas para Produção
+- ✅ **Sistema de Propostas**: Criação, edição e gestão completa
+- ✅ **Portal do Cliente**: Interface responsiva e funcional
+- ✅ **Sistema de Email**: Envio automático com templates
+- ✅ **Sincronização**: Tempo real entre portal e CRM
+- ✅ **Segurança**: Tokens únicos e validação
+- ✅ **Debug Tools**: Ferramentas completas de teste e monitoramento
+
+### 🔧 Últimas Correções Implementadas
+- ✅ **UUID Mapping**: Resolvido problema de mapeamento de tokens
+- ✅ **Frontend Sync**: Sincronização visual funcionando perfeitamente
+- ✅ **Portal Service**: Todos os endpoints validados e funcionais
+- ✅ **Real-time Events**: Eventos customizados operacionais
+- ✅ **Status Updates**: Atualizações de status persistindo corretamente
+
+## 🤝 Contribuição
+
+1. Fork o projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/NovaFuncionalidade`)
+3. Commit suas mudanças (`git commit -m 'Adiciona nova funcionalidade'`)
+4. Push para a branch (`git push origin feature/NovaFuncionalidade`)
+5. Abra um Pull Request
 
 ## 👨‍💻 Desenvolvedor
 
-Desenvolvido com ❤️ para revolucionar a gestão de relacionamento com clientes.
+**Dhonleno Freitas**
+- Sistema desenvolvido com foco em propostas comerciais
+- Portal do cliente integrado
+- Sincronização em tempo real implementada
+
+---
+
+## 🚀 **Sistema Pronto para Uso!**
+
+O ConectCRM está completamente funcional com todas as funcionalidades principais implementadas e testadas. O sistema de propostas com portal do cliente está operacional e sincronizando perfeitamente em tempo real.
+
+⭐ **Dê uma estrela se este projeto foi útil para você!**
