@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { propostasService } from '../services/propostasService';
+import './dashboard-responsive.css';
 import {
   TrendingUp,
   TrendingDown,
@@ -76,11 +77,11 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white p-6 rounded-lg shadow-sm border animate-pulse">
+            <div key={i} className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border animate-pulse">
               <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-              <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+              <div className="h-6 sm:h-8 bg-gray-200 rounded w-1/2"></div>
             </div>
           ))}
         </div>
@@ -110,52 +111,58 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
   return (
     <div className="space-y-6">
       {/* Métricas principais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border kip-card">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total de Propostas</p>
-              <p className="text-2xl font-bold text-gray-900">{metricas.totalPropostas}</p>
+            <div className="text-container mr-3">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total de Propostas</p>
+              <p className="currency-value font-bold text-gray-900 break-currency">
+                {metricas.totalPropostas}
+              </p>
             </div>
-            <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
+            <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 card-icon">
               <FileText className="h-4 w-4 text-blue-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border kip-card">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Pipeline Total</p>
-              <p className="text-2xl font-bold text-gray-900">{formatarMoeda(metricas.valorTotalPipeline)}</p>
+            <div className="text-container mr-3">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Pipeline Total</p>
+              <p className="currency-value font-bold text-gray-900 break-currency">
+                {formatarMoeda(metricas.valorTotalPipeline)}
+              </p>
             </div>
-            <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
+            <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 card-icon">
               <DollarSign className="h-4 w-4 text-green-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border kip-card">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Valor Médio</p>
-              <p className="text-2xl font-bold text-gray-900">
+            <div className="text-container mr-3">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Valor Médio</p>
+              <p className="currency-value font-bold text-gray-900 break-currency">
                 {formatarMoeda(metricas.totalPropostas > 0 ? metricas.valorTotalPipeline / metricas.totalPropostas : 0)}
               </p>
             </div>
-            <div className="h-8 w-8 bg-purple-100 rounded-full flex items-center justify-center">
+            <div className="h-8 w-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0 card-icon">
               <BarChart3 className="h-4 w-4 text-purple-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border kip-card">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Taxa de Conversão</p>
-              <p className="text-2xl font-bold text-gray-900">{metricas.taxaConversao.toFixed(1)}%</p>
+            <div className="text-container mr-3">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Taxa de Conversão</p>
+              <p className="currency-value font-bold text-gray-900 break-currency">
+                {metricas.taxaConversao.toFixed(1)}%
+              </p>
             </div>
-            <div className="h-8 w-8 bg-orange-100 rounded-full flex items-center justify-center">
+            <div className="h-8 w-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 card-icon">
               {metricas.taxaConversao >= 50 ? (
                 <TrendingUp className="h-4 w-4 text-orange-600" />
               ) : (
@@ -167,8 +174,8 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
       </div>
 
       {/* Propostas por Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Propostas por Status</h3>
           <div className="space-y-3">
             {Object.entries(metricas.estatisticasPorStatus).map(([status, quantidade]) => {
@@ -176,18 +183,20 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
               const Icon = config.icon;
               const valorEstimado = quantidade * (metricas.valorTotalPipeline / metricas.totalPropostas);
               return (
-                <div key={status} className="flex items-center justify-between p-3 rounded-lg border">
+                <div key={status} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg border stacked-card-content">
                   <div className="flex items-center">
-                    <div className={`h-8 w-8 ${config.bg} rounded-full flex items-center justify-center mr-3`}>
+                    <div className={`h-8 w-8 ${config.bg} rounded-full flex items-center justify-center mr-3 flex-shrink-0`}>
                       <Icon className={`h-4 w-4 ${config.color}`} />
                     </div>
-                    <div>
+                    <div className="text-container">
                       <p className="font-medium text-gray-900">{config.label}</p>
                       <p className="text-sm text-gray-500">{quantidade} propostas</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900">{formatarMoeda(valorEstimado)}</p>
+                  <div className="text-left sm:text-right ml-11 sm:ml-0">
+                    <p className="font-semibold text-gray-900 text-sm sm:text-base break-currency">
+                      {formatarMoeda(valorEstimado)}
+                    </p>
                     <p className="text-sm text-gray-500">
                       {metricas.totalPropostas > 0 ? ((quantidade / metricas.totalPropostas) * 100).toFixed(1) : 0}%
                     </p>
@@ -199,7 +208,7 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
         </div>
 
         {/* Performance por Vendedor */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Performance por Vendedor</h3>
           <div className="space-y-3">
             {Object.entries(metricas.estatisticasPorVendedor)
@@ -208,19 +217,23 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
               .map(([vendedorNome, quantidade]) => {
                 const valorEstimado = quantidade * (metricas.valorTotalPipeline / metricas.totalPropostas);
                 return (
-                  <div key={vendedorNome} className="flex items-center justify-between p-3 rounded-lg border">
+                  <div key={vendedorNome} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg border stacked-card-content">
                     <div className="flex items-center">
-                      <div className="h-8 w-8 bg-indigo-100 rounded-full flex items-center justify-center mr-3">
+                      <div className="h-8 w-8 bg-indigo-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
                         <Users className="h-4 w-4 text-indigo-600" />
                       </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{vendedorNome}</p>
+                      <div className="text-container">
+                        <p className="font-medium text-gray-900 vendor-name" title={vendedorNome}>
+                          {vendedorNome}
+                        </p>
                         <p className="text-sm text-gray-500">{quantidade} propostas</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-gray-900">{formatarMoeda(valorEstimado)}</p>
-                      <p className="text-sm text-gray-500">
+                    <div className="text-left sm:text-right ml-11 sm:ml-0">
+                      <p className="font-semibold text-gray-900 text-sm sm:text-base break-currency">
+                        {formatarMoeda(valorEstimado)}
+                      </p>
+                      <p className="text-sm text-gray-500 break-currency">
                         {formatarMoeda(quantidade > 0 ? valorEstimado / quantidade : 0)} médio
                       </p>
                     </div>
@@ -232,43 +245,43 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
       </div>
 
       {/* Métricas Adicionais */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Status das Propostas</h3>
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-lg border">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg border space-y-2 sm:space-y-0">
               <div className="flex items-center">
-                <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
                   <CheckCircle className="h-4 w-4 text-green-600" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="font-medium text-gray-900">Propostas Aprovadas</p>
                   <p className="text-sm text-gray-500">Status: Aprovadas</p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-green-600">{metricas.propostasAprovadas}</p>
+              <div className="text-left sm:text-right ml-11 sm:ml-0">
+                <p className="text-xl sm:text-2xl font-bold text-green-600">{metricas.propostasAprovadas}</p>
                 <p className="text-sm text-gray-500">de {metricas.totalPropostas}</p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Métricas de Performance</h3>
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 bg-gray-50 rounded-lg space-y-2 sm:space-y-0">
               <div className="flex items-center">
-                <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
                   <Target className="h-5 w-5 text-green-600" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="font-medium text-gray-900">Meta de Conversão</p>
                   <p className="text-sm text-gray-500">Objetivo: 60%</p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className={`text-2xl font-bold ${metricas.taxaConversao >= 60 ? 'text-green-600' : 'text-orange-600'}`}>
+              <div className="text-left sm:text-right ml-13 sm:ml-0">
+                <p className={`text-xl sm:text-2xl font-bold ${metricas.taxaConversao >= 60 ? 'text-green-600' : 'text-orange-600'}`}>
                   {metricas.taxaConversao >= 60 ? '✓' : '○'}
                 </p>
                 <p className="text-sm text-gray-500">

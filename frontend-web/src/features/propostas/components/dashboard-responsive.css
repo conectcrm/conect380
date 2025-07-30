@@ -1,0 +1,88 @@
+/* Utilitários de responsividade para KIP cards */
+
+/* Força quebra de palavras em valores monetários longos */
+.break-currency {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Container flexível para texto longo */
+.text-container {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Valores monetários responsivos */
+.currency-value {
+  word-break: break-word;
+  line-height: 1.2;
+}
+
+/* Cards responsivos melhorados */
+.kip-card {
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* Melhor alinhamento em telas pequenas */
+@media (max-width: 640px) {
+  .currency-value {
+    font-size: 1.125rem; /* text-lg */
+    line-height: 1.3;
+  }
+  
+  .kip-card {
+    min-height: 100px;
+  }
+  
+  .card-icon {
+    width: 2rem;
+    height: 2rem;
+  }
+}
+
+/* Ajustes para telas médias */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .currency-value {
+    font-size: 1.25rem; /* text-xl */
+  }
+}
+
+/* Telas grandes */
+@media (min-width: 1025px) {
+  .currency-value {
+    font-size: 1.5rem; /* text-2xl */
+  }
+  
+  .kip-card {
+    min-height: 140px;
+  }
+}
+
+/* Truncar nomes de vendedores muito longos */
+.vendor-name {
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 640px) {
+  .vendor-name {
+    max-width: 120px;
+  }
+}
+
+/* Espaçamento consistente em cards empilhados */
+.stacked-card-content {
+  gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .stacked-card-content {
+    gap: 0;
+  }
+}
