@@ -20,12 +20,14 @@ interface ModalVisualizarPropostaProps {
   isOpen: boolean;
   onClose: () => void;
   proposta: PropostaCompleta | null;
+  onPropostaUpdated?: () => void; // Callback opcional para recarregar dados
 }
 
 const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
   isOpen,
   onClose,
-  proposta
+  proposta,
+  onPropostaUpdated
 }) => {
   if (!isOpen || !proposta) return null;
 
@@ -99,6 +101,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
           <PropostaActions
             proposta={proposta}
             onViewProposta={() => { }}
+            onPropostaUpdated={onPropostaUpdated}
             showLabels={true}
             className="flex-wrap"
           />

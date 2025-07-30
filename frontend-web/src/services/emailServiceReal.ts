@@ -73,34 +73,59 @@ class EmailServiceReal {
    */
   async enviarPropostaParaCliente(data: PropostaEmailData): Promise<EmailResponse> {
     try {
-      // Gerar conteúdo do e-mail
-      const emailHtml = this.gerarEmailProposta(data);
-      const emailText = this.gerarTextoSimplesProposta(data);
-
-      const emailData: EmailData = {
-        to: data.cliente.email,
-        cc: data.vendedor.email, // Vendedor recebe cópia
-        subject: `Proposta Comercial #${data.proposta.numero} - ${data.empresa.nome}`,
-        html: emailHtml,
-        text: emailText
-      };
-
       if (this.isDebugMode) {
-        console.log('📧 [EMAIL DEBUG] Dados do e-mail:', {
-          provider: this.provider,
-          to: emailData.to,
-          cc: emailData.cc,
-          subject: emailData.subject,
+        console.log('📧 [EMAIL DEBUG] Enviando proposta via API /email/enviar-proposta:', {
+          propostaNumero: data.proposta.numero,
+          clienteEmail: data.cliente.email,
           tokenFormatado: formatarTokenParaExibicao(data.proposta.token)
         });
       }
 
       if (this.isTestMode) {
-        return this.simularEnvio(emailData);
+        return this.simularEnvio({
+          to: data.cliente.email,
+          subject: `Proposta Comercial #${data.proposta.numero} - ${data.empresa.nome}`,
+          html: 'Email de teste'
+        });
       }
 
-      // Enviar e-mail usando o provedor configurado
-      return await this.enviarEmail(emailData);
+      // ✅ CORREÇÃO: Chamar API específica para propostas que faz sincronização automática
+      const response = await fetch(`${this.emailServerUrl}/email/enviar-proposta`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          proposta: {
+            id: data.proposta.numero, // Usar número da proposta como ID
+            numero: data.proposta.numero,
+            valorTotal: data.proposta.valorTotal,
+            dataValidade: data.proposta.dataValidade,
+            token: data.proposta.numero // ✅ CORREÇÃO: Usar número da proposta como token
+          },
+          emailCliente: data.cliente.email,
+          linkPortal: data.portalUrl ? `${data.portalUrl}/proposta/${data.proposta.numero}` : `${window.location.origin}/portal/proposta/${data.proposta.numero}`, // ✅ CORREÇÃO: Usar número da proposta
+          registrarToken: true // ✅ Solicitar que o backend registre o token
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro na API /email/enviar-proposta: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('✅ Proposta enviada com sincronização automática:', result);
+        return {
+          success: true,
+          messageId: result.timestamp,
+          provider: 'backend-integrado-proposta',
+          timestamp: new Date()
+        };
+      } else {
+        throw new Error(result.message || 'Erro desconhecido na API');
+      }
 
     } catch (error) {
       console.error('❌ Erro ao enviar e-mail de proposta:', error);
@@ -117,17 +142,17 @@ class EmailServiceReal {
    */
   async enviarEmail(emailData: EmailData): Promise<EmailResponse> {
     try {
-      // ✅ CORREÇÃO: Usar endpoint do backend integrado
+      // ✅ FORMATO CORRETO: Usar novo formato que o backend aceita
       const response = await fetch(`${this.emailServerUrl}/email/enviar`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          para: [emailData.to],
-          assunto: emailData.subject,
-          corpo: emailData.html || emailData.text,
-          anexos: emailData.attachments || []
+          to: [emailData.to],                    // ✅ Novo formato: 'to'
+          subject: emailData.subject,            // ✅ Novo formato: 'subject' 
+          message: emailData.html || emailData.text, // ✅ Novo formato: 'message'
+          attachments: emailData.attachments || []   // ✅ Novo formato: 'attachments'
         })
       });
 
@@ -141,8 +166,7 @@ class EmailServiceReal {
         success: result.success || true,
         messageId: result.id,
         provider: 'backend-integrado',
-        timestamp: new Date(),
-        response: result
+        timestamp: new Date()
       };
 
     } catch (error) {

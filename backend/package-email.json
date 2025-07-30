@@ -1,0 +1,33 @@
+{
+  "name": "conectcrm-email-server",
+  "version": "1.0.0",
+  "description": "Servidor de e-mail para ConectCRM - Envio de propostas e notificações",
+  "main": "email-server.js",
+  "scripts": {
+    "start": "node email-server.js",
+    "dev": "nodemon email-server.js",
+    "install-deps": "npm install express cors nodemailer @sendgrid/mail aws-sdk dotenv",
+    "test": "node -e \"console.log('Email server test OK')\""
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "nodemailer": "^6.9.7",
+    "@sendgrid/mail": "^7.7.0",
+    "aws-sdk": "^2.1489.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "email",
+    "smtp",
+    "sendgrid",
+    "aws-ses",
+    "conectcrm",
+    "propostas"
+  ],
+  "author": "ConectCRM Team",
+  "license": "MIT"
+}

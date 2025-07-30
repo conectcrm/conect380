@@ -380,6 +380,8 @@ class PortalClienteService {
    */
   private async registrarVisualizacao(token: string): Promise<void> {
     try {
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
       const log: LogVisualizacao = {
         propostaId: token,
         ip: await this.obterIP(),
@@ -387,17 +389,26 @@ class PortalClienteService {
         timestamp: new Date()
       };
 
-      await fetch('/api/portal/log/visualizacao', {
-        method: 'POST',
+      // ✅ CORRIGIDO: Usar o endpoint correto do portal
+      await fetch(`${API_URL}/api/portal/proposta/${token}/view`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(log),
+        body: JSON.stringify({
+          ip: log.ip,
+          userAgent: log.userAgent,
+          timestamp: log.timestamp.toISOString(),
+          resolucaoTela: `${window.screen.width}x${window.screen.height}`,
+          referrer: document.referrer
+        }),
       });
+
+      console.log(`✅ Visualização registrada para token: ${token}`);
 
     } catch (error) {
       // Log de visualização não deve bloquear a experiência
-      console.warn('Erro ao registrar visualização:', error);
+      console.warn('⚠️ Erro ao registrar visualização:', error);
     }
   }
 

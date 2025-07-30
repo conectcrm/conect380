@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -10,7 +10,7 @@ import { User } from './user.entity';
 @UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   @Get('profile')
   @ApiOperation({ summary: 'Obter perfil do usuário logado' })
@@ -119,14 +119,14 @@ export class UsersController {
   ) {
     console.log('🚀 UsersController.criarUsuario - Recebendo dados:', dadosUsuario);
     console.log('🚀 Usuário logado:', user.id, user.email);
-    
+
     const novoUsuario = await this.usersService.criar({
       ...dadosUsuario,
       empresa_id: user.empresa_id,
     });
-    
+
     console.log('✅ Usuário criado com sucesso:', novoUsuario.id);
-    
+
     return {
       success: true,
       data: novoUsuario,
@@ -141,17 +141,17 @@ export class UsersController {
     @Body() dadosUsuario: any,
   ) {
     console.log('🚀 UsersController.criarUsuarioDebug - Recebendo dados:', dadosUsuario);
-    
+
     // Usar empresa padrão para teste
     const empresa_id_padrao = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
-    
+
     const novoUsuario = await this.usersService.criar({
       ...dadosUsuario,
       empresa_id: empresa_id_padrao,
     });
-    
+
     console.log('✅ Usuário DEBUG criado com sucesso:', novoUsuario.id);
-    
+
     return {
       success: true,
       data: novoUsuario,
@@ -201,6 +201,22 @@ export class UsersController {
       success: true,
       data: { novaSenha },
       message: 'Senha resetada com sucesso',
+    };
+  }
+
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Alterar status do usuário (ativar/desativar)' })
+  @ApiResponse({ status: 200, description: 'Status do usuário alterado com sucesso' })
+  async alterarStatusUsuario(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body('ativo') ativo: boolean,
+  ) {
+    const usuarioAtualizado = await this.usersService.alterarStatus(id, ativo, user.empresa_id);
+    return {
+      success: true,
+      data: usuarioAtualizado,
+      message: `Usuário ${ativo ? 'ativado' : 'desativado'} com sucesso`,
     };
   }
 

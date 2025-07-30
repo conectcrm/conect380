@@ -155,20 +155,25 @@ class PropostasService {
     try {
       // Como não temos vendedoresService, vamos usar usuários como vendedores
       const { usuariosService } = await import('../../../services/usuariosService');
-      const usuariosData = await usuariosService.listarUsuarios();
+
+      // Filtrar apenas usuários ativos
+      const usuariosData = await usuariosService.listarUsuarios({ ativo: true });
 
       if (usuariosData && usuariosData.length > 0) {
-        console.log('👨‍💼 Usuários carregados como vendedores:', usuariosData.length);
+        console.log('👨‍💼 Usuários ativos carregados como vendedores:', usuariosData.length);
 
-        const vendedoresFormatados: Vendedor[] = usuariosData.map((usuario: any) => ({
-          id: usuario.id || `vend_${Date.now()}`,
-          nome: usuario.nome || usuario.name || 'Vendedor sem nome',
-          email: usuario.email || '',
-          telefone: usuario.telefone || '',
-          tipo: 'vendedor',
-          ativo: usuario.ativo !== false
-        }));
+        const vendedoresFormatados: Vendedor[] = usuariosData
+          .filter((usuario: any) => usuario.ativo === true) // Dupla verificação
+          .map((usuario: any) => ({
+            id: usuario.id || `vend_${Date.now()}`,
+            nome: usuario.nome || usuario.name || 'Vendedor sem nome',
+            email: usuario.email || '',
+            telefone: usuario.telefone || '',
+            tipo: 'vendedor',
+            ativo: true // Já filtrado, então todos são ativos
+          }));
 
+        console.log(`✅ ${vendedoresFormatados.length} vendedores ativos disponíveis para propostas`);
         return vendedoresFormatados;
       }
     } catch (error) {

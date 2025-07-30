@@ -65,16 +65,16 @@ interface PropostaPublica {
 }
 
 const PortalClienteProposta: React.FC = () => {
-  const { propostaId, propostaNumero, token } = useParams<{ 
-    propostaId?: string; 
-    propostaNumero?: string; 
-    token?: string; 
+  const { propostaId, propostaNumero, token } = useParams<{
+    propostaId?: string;
+    propostaNumero?: string;
+    token?: string;
   }>();
   const navigate = useNavigate();
 
   // Usar propostaNumero se disponível, senão usar propostaId
   const identificadorProposta = propostaNumero || propostaId;
-  
+
   // Token para aceite: usar token específico ou identificador da proposta
   const tokenParaAceite = token || identificadorProposta;
 
@@ -84,12 +84,125 @@ const PortalClienteProposta: React.FC = () => {
   const [erro, setErro] = useState<string | null>(null);
   const [aceiteRealizado, setAceiteRealizado] = useState(false);
   const [showConfirmReject, setShowConfirmReject] = useState(false);
+  const [tempoVisualizacao, setTempoVisualizacao] = useState<number>(0);
+  const [acoes, setAcoes] = useState<Array<{ acao: string, timestamp: string }>>([]);
 
   useEffect(() => {
     if (identificadorProposta) {
       carregarProposta();
     }
   }, [identificadorProposta]);
+
+  // ✅ Hook para rastrear tempo de visualização
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    if (proposta && proposta.status !== 'aprovada' && proposta.status !== 'rejeitada') {
+      interval = setInterval(() => {
+        setTempoVisualizacao(prev => prev + 1);
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [proposta]);
+
+  // ✅ Registrar visualização quando a página carrega
+  useEffect(() => {
+    if (proposta && tokenParaAceite) {
+      registrarAcao('visualizacao_inicial');
+    }
+  }, [proposta, tokenParaAceite]);
+
+  // ✅ Rastrear eventos de interação adicional
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      registrarAcao('saida_pagina', {
+        tempoVisualizacao: tempoVisualizacao,
+        scrollPosition: window.scrollY
+      });
+    };
+
+    const handleScroll = () => {
+      const scrollPercent = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100;
+      if (scrollPercent > 50) {
+        registrarAcao('scroll_50_porcento', { scrollPercent });
+      }
+      if (scrollPercent > 90) {
+        registrarAcao('scroll_completo', { scrollPercent });
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        registrarAcao('aba_inativa', { tempoVisualizacao });
+      } else {
+        registrarAcao('aba_ativa', { tempoVisualizacao });
+      }
+    };
+
+    // Adicionar listeners
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('scroll', handleScroll);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [tempoVisualizacao, tokenParaAceite]);
+
+  // ✅ Função para registrar ações do cliente
+  const registrarAcao = async (tipoAcao: string, dados?: any) => {
+    if (!tokenParaAceite) return;
+
+    const acao = {
+      acao: tipoAcao,
+      timestamp: new Date().toISOString(),
+      dados
+    };
+
+    // Adicionar à lista local
+    setAcoes(prev => [...prev, acao]);
+
+    try {
+      // ✅ Enviar para backend via portal API
+      await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/portal/proposta/${tokenParaAceite}/acao`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          acao: tipoAcao,
+          timestamp: acao.timestamp,
+          ip: await obterIP(),
+          userAgent: navigator.userAgent,
+          dados: dados || {
+            tempoVisualizacao: tempoVisualizacao,
+            resolucaoTela: `${window.screen.width}x${window.screen.height}`,
+            navegador: navigator.userAgent.split(' ')[0]
+          }
+        }),
+      });
+
+      console.log(`📊 Ação registrada: ${tipoAcao}`, acao);
+    } catch (error) {
+      console.warn('⚠️ Erro ao registrar ação:', error);
+    }
+  };
+
+  // ✅ Função auxiliar para obter IP
+  const obterIP = async (): Promise<string> => {
+    try {
+      const response = await fetch('https://api.ipify.org?format=json');
+      const data = await response.json();
+      return data.ip;
+    } catch {
+      return '127.0.0.1';
+    }
+  };
 
   const carregarProposta = async () => {
     try {
@@ -107,17 +220,40 @@ const PortalClienteProposta: React.FC = () => {
 
       if (agora > dataValidade && dados.status === 'enviada') {
         dados.status = 'expirada';
-        // Para propostas expiradas, apenas atualizar localmente por enquanto
         console.log('Proposta expirada, atualizando status localmente');
       }
 
       setProposta(dados);
 
-      // Marcar como visualizada se ainda não foi
-      if (dados.status === 'enviada') {
-        // Marcar como visualizada localmente por enquanto
-        console.log('Proposta visualizada, atualizando status localmente');
-        setProposta(prev => prev ? { ...prev, status: 'visualizada' } : null);
+      // ✅ Registrar visualização automaticamente se ainda não foi visualizada
+      if (dados.status === 'enviada' && tokenParaAceite) {
+        console.log('🔄 Registrando visualização automática...');
+
+        try {
+          // Registrar via portal API para sincronização automática
+          await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/portal/proposta/${tokenParaAceite}/view`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              ip: await obterIP(),
+              userAgent: navigator.userAgent,
+              timestamp: new Date().toISOString(),
+              resolucaoTela: `${window.screen.width}x${window.screen.height}`,
+              referrer: document.referrer
+            }),
+          });
+
+          // Atualizar status local para "visualizada"
+          setProposta(prev => prev ? { ...prev, status: 'visualizada' } : null);
+          console.log('✅ Status atualizado para "visualizada"');
+
+        } catch (error) {
+          console.warn('⚠️ Erro ao registrar visualização, continuando:', error);
+          // Atualizar localmente mesmo se a API falhar
+          setProposta(prev => prev ? { ...prev, status: 'visualizada' } : null);
+        }
       }
 
     } catch (error) {
@@ -136,14 +272,26 @@ const PortalClienteProposta: React.FC = () => {
 
       console.log('🚀 Iniciando processo de aceitação da proposta...');
 
+      // ✅ Registrar ação de aceite
+      await registrarAcao('aceite_iniciado', {
+        valorProposta: proposta.valorTotal,
+        tempoVisualizacao: tempoVisualizacao
+      });
+
       // 1. Atualizar status via portal do cliente
       await portalClienteService.atualizarStatus(tokenParaAceite, 'aprovada');
       console.log('✅ Status atualizado via portal');
 
+      // ✅ Registrar conclusão do aceite
+      await registrarAcao('aceite_concluido', {
+        novoStatus: 'aprovada',
+        metodoPagamento: 'pendente'
+      });
+
       // 2. Tentar sincronizar com o CRM principal
       try {
         const syncResult = await portalClienteService.sincronizarComCRM(identificadorProposta!, 'aprovada');
-        
+
         if (syncResult.success) {
           console.log('✅ Status sincronizado com CRM principal');
         } else {
@@ -176,10 +324,10 @@ const PortalClienteProposta: React.FC = () => {
       // 6. Simular atualização no "CRM" local (localStorage)
       try {
         const propostas = JSON.parse(localStorage.getItem('propostas') || '[]');
-        const index = propostas.findIndex((p: any) => 
+        const index = propostas.findIndex((p: any) =>
           p.numero === identificadorProposta || p.id === identificadorProposta
         );
-        
+
         if (index >= 0) {
           propostas[index].status = 'aprovada';
           propostas[index].updatedAt = new Date().toISOString();
@@ -193,10 +341,10 @@ const PortalClienteProposta: React.FC = () => {
             numero: identificadorProposta,
             status: 'aprovada',
             cliente: proposta.cliente,
-            valor: proposta.valor,
+            valor: proposta.valorTotal,
             updatedAt: new Date().toISOString(),
             approvedViaPortal: true,
-            createdAt: proposta.createdAt || new Date().toISOString()
+            createdAt: proposta.dataEnvio || new Date().toISOString()
           };
           propostas.push(novaProposta);
           localStorage.setItem('propostas', JSON.stringify(propostas));
@@ -217,22 +365,40 @@ const PortalClienteProposta: React.FC = () => {
   };
 
   const handleRejeitarProposta = async () => {
-    if (!proposta) return;
+    if (!proposta || !tokenParaAceite) return;
+
+    // ✅ Registrar ação de rejeição iniciada
+    await registrarAcao('rejeicao_iniciada', {
+      valorProposta: proposta.valorTotal,
+      tempoVisualizacao: tempoVisualizacao
+    });
 
     setShowConfirmReject(true);
   };
 
   const confirmarRejeicao = async () => {
-    if (!proposta) return;
+    if (!proposta || !tokenParaAceite) return;
 
     try {
-      // Marcar como rejeitada localmente por enquanto
-      console.log('Proposta rejeitada, atualizando status localmente');
-      setProposta(prev => prev ? { ...prev, status: 'rejeitada' } : null);
+      console.log('🚫 Rejeitando proposta...');
+
+      // ✅ Atualizar status via portal
+      await portalClienteService.atualizarStatus(tokenParaAceite, 'rejeitada');
+
+      // ✅ Registrar ação de rejeição concluída
+      await registrarAcao('rejeicao_concluida', {
+        novoStatus: 'rejeitada',
+        motivoRejeicao: 'cliente_rejeitou'
+      });
+
+      // Atualizar estado local
       setProposta(prev => prev ? { ...prev, status: 'rejeitada' } : null);
       setShowConfirmReject(false);
+
+      console.log('✅ Proposta rejeitada com sucesso');
+
     } catch (error) {
-      console.error('Erro ao rejeitar proposta:', error);
+      console.error('❌ Erro ao rejeitar proposta:', error);
       setErro('Erro ao rejeitar a proposta. Tente novamente.');
       setShowConfirmReject(false);
     }
@@ -324,7 +490,7 @@ const PortalClienteProposta: React.FC = () => {
           <p className="text-gray-600 mb-6">
             Sua proposta foi aceita com sucesso. Em breve você receberá o contrato para assinatura.
           </p>
-          
+
           {/* Status de sincronização */}
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
             <div className="space-y-2 text-sm mb-4">
@@ -337,18 +503,18 @@ const PortalClienteProposta: React.FC = () => {
                 <span>✅ Notificação enviada por email</span>
               </div>
             </div>
-            
+
             {/* Indicador de sincronização */}
-            <StatusSyncIndicator 
-              propostaId={identificadorProposta || proposta?.numero || ''} 
+            <StatusSyncIndicator
+              propostaId={identificadorProposta || proposta?.numero || ''}
             />
-            
+
             <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
-              <strong>Próximos passos:</strong> Nossa equipe entrará em contato em até 2 horas úteis 
+              <strong>Próximos passos:</strong> Nossa equipe entrará em contato em até 2 horas úteis
               para iniciar o processo de contrato e definir os próximos passos do projeto.
             </div>
           </div>
-          
+
           <div className="space-y-3">
             <button
               onClick={handleDownloadPDF}

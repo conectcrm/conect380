@@ -563,61 +563,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
 
       toast.success(`Proposta ${propostaCriada.numero} criada com sucesso!`);
 
-      // Enviar e-mail para o cliente (opcional)
-      try {
-        const enviarEmail = window.confirm(
-          '📧 Deseja enviar a proposta por e-mail para o cliente agora?\n\n' +
-          `Cliente: ${data.cliente?.nome}\n` +
-          `E-mail: ${data.cliente?.email}\n` +
-          `Token: ${tokenPortal}`
-        );
-
-        if (enviarEmail && data.cliente && data.vendedor) {
-          toast.loading('📧 Enviando e-mail para o cliente...', { id: 'email-envio' });
-
-          const emailData = {
-            cliente: {
-              nome: data.cliente.nome,
-              email: data.cliente.email
-            },
-            proposta: {
-              numero: propostaCriada.numero,
-              valorTotal: totaisCombinados.total,
-              dataValidade: new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR'),
-              token: tokenPortal
-            },
-            vendedor: {
-              nome: data.vendedor.nome,
-              email: data.vendedor.email,
-              telefone: data.vendedor.telefone || '(11) 99999-9999'
-            },
-            empresa: {
-              nome: process.env.REACT_APP_EMPRESA_NOME || 'ConectCRM',
-              email: process.env.REACT_APP_EMPRESA_EMAIL || 'contato@conectcrm.com',
-              telefone: process.env.REACT_APP_EMPRESA_TELEFONE || '(11) 99999-9999',
-              endereco: process.env.REACT_APP_EMPRESA_ENDERECO || 'São Paulo/SP'
-            },
-            portalUrl: process.env.REACT_APP_PORTAL_URL || window.location.origin + '/portal'
-          };
-
-          const resultadoEmail = await emailServiceReal.enviarPropostaParaCliente(emailData);
-
-          if (resultadoEmail.success) {
-            toast.success('✅ E-mail enviado com sucesso!', { id: 'email-envio' });
-            console.log('📧 E-mail enviado:', {
-              messageId: resultadoEmail.messageId,
-              provider: resultadoEmail.provider,
-              timestamp: resultadoEmail.timestamp
-            });
-          } else {
-            toast.error(`❌ Erro ao enviar e-mail: ${resultadoEmail.error}`, { id: 'email-envio' });
-            console.error('❌ Erro no envio:', resultadoEmail);
-          }
-        }
-      } catch (emailError) {
-        console.error('❌ Erro ao enviar e-mail:', emailError);
-        toast.error('⚠️ Proposta criada, mas houve erro no envio do e-mail.', { id: 'email-envio' });
-      }
+      // Email removido - usuário pode enviar manualmente pela interface de propostas
 
       if (onPropostaCriada) {
         onPropostaCriada(propostaCriada);

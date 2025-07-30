@@ -35,11 +35,19 @@ export interface Proposta {
   id?: string;
   numero?: string;
   cliente: Cliente;
+  vendedor?: {
+    id: string;
+    nome: string;
+    email: string;
+    tipo: string;
+    ativo: boolean;
+  };
   produtos: ProdutoSelecionado[];
   subtotal: number;
   descontoGlobal: number;
   impostos: number;
   total: number;
+  valor?: number;
   formaPagamento: 'avista' | 'boleto' | 'cartao' | 'pix' | 'recorrente';
   validadeDias: number;
   observacoes?: string;
@@ -129,7 +137,16 @@ class PropostasService {
       }
 
       const response = await api.get(`${this.baseURL}?${params.toString()}`);
-      return response.data;
+
+      // ✅ CORREÇÃO: Backend retorna { success: true, propostas: [...] }
+      if (response.data && response.data.propostas) {
+        return response.data.propostas;
+      } else if (Array.isArray(response.data)) {
+        return response.data;
+      } else {
+        console.warn('Estrutura de dados inesperada:', response.data);
+        return [];
+      }
     } catch (error) {
       console.error('Erro ao buscar propostas:', error);
       throw error;
@@ -140,7 +157,16 @@ class PropostasService {
   async findById(id: string): Promise<Proposta> {
     try {
       const response = await api.get(`${this.baseURL}/${id}`);
-      return response.data;
+
+      // ✅ CORREÇÃO: Backend retorna { success: true, proposta: {...} }
+      if (response.data && response.data.proposta) {
+        return response.data.proposta;
+      } else if (response.data && !response.data.success) {
+        return response.data;
+      } else {
+        console.warn('Estrutura de dados inesperada para proposta:', response.data);
+        return response.data;
+      }
     } catch (error) {
       console.error('Erro ao buscar proposta:', error);
       throw error;
@@ -182,7 +208,7 @@ class PropostasService {
   // Atualizar status da proposta
   async updateStatus(id: string, status: Proposta['status']): Promise<Proposta> {
     try {
-      const response = await api.patch(`${this.baseURL}/${id}/status`, { status });
+      const response = await api.put(`${this.baseURL}/${id}/status`, { status });
       return response.data;
     } catch (error) {
       console.error('Erro ao atualizar status da proposta:', error);

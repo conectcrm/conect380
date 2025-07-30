@@ -4,7 +4,7 @@ import { useI18n } from '../../contexts/I18nContext';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import { ModalProposta } from '../../components/modals/ModalProposta';
 import { ModalNovaProposta } from '../../components/modals/ModalNovaProposta';
-import { propostasService, PropostaCompleta } from './services/propostasService';
+import { propostasService, Proposta as PropostaCompleta } from '../../services/propostasService';
 import { pdfPropostasService, DadosProposta } from '../../services/pdfPropostasService';
 import DashboardPropostas from './components/DashboardPropostas';
 import BulkActions from './components/BulkActions';
@@ -46,24 +46,159 @@ import {
   Copy
 } from 'lucide-react';
 
+// 🔧 Função auxiliar para buscar dados reais do cliente
+const buscarDadosReaisDoCliente = async (nome: string, emailFicticio: string = '') => {
+  if (!nome || nome === 'Cliente não informado') return null;
+
+  try {
+    console.log(`🔍 [GRID] Buscando dados reais para: "${nome}"`);
+
+    // Tentar buscar no serviço de clientes
+    const response = await import('../../../services/clientesService').then(module =>
+      module.clientesService.getClientes({ search: nome, limit: 100 })
+    );
+
+    if (response?.data) {
+      const clienteReal = response.data.find(c =>
+        c.nome?.toLowerCase().includes(nome.toLowerCase()) ||
+        nome.toLowerCase().includes(c.nome?.toLowerCase())
+      );
+
+      if (clienteReal && clienteReal.email && clienteReal.email !== emailFicticio) {
+        console.log(`✅ [GRID] Dados reais encontrados:`, {
+          nome: clienteReal.nome,
+          email: clienteReal.email,
+          telefone: clienteReal.telefone
+        });
+
+        return {
+          nome: clienteReal.nome,
+          email: clienteReal.email,
+          telefone: clienteReal.telefone
+        };
+      }
+    }
+  } catch (error) {
+    console.log(`⚠️ [GRID] Erro ao buscar dados reais para "${nome}":`, error);
+  }
+
+  return null;
+};
+
 // Função para converter PropostaCompleta para o formato da UI
-const converterPropostaParaUI = (proposta: PropostaCompleta) => {
-  return {
+const converterPropostaParaUI = async (proposta: any) => {
+  // Log detalhado para debug
+  console.log(`🔄 [CONVERTER] Processando proposta ${proposta.numero}:`);
+  console.log(`   - ID: ${proposta.id}`);
+  console.log(`   - Status: "${proposta.status}"`);
+  console.log(`   - Cliente original:`, proposta.cliente);
+  console.log(`   - Tipo do cliente:`, typeof proposta.cliente);
+
+  // Extrair dados do cliente de forma mais robusta
+  let clienteNome = 'Cliente não informado';
+  let clienteEmail = '';
+  let clienteTelefone = '';
+
+  if (typeof proposta.cliente === 'object' && proposta.cliente) {
+    // Cliente como objeto (formato correto)
+    clienteNome = safeRender(proposta.cliente.nome) || 'Cliente não informado';
+    clienteEmail = safeRender(proposta.cliente.email) || '';
+    clienteTelefone = safeRender(proposta.cliente.telefone) || '';
+
+    console.log(`   📦 Cliente OBJETO - Nome: "${clienteNome}", Email: "${clienteEmail}"`);
+
+    // � DETECTAR E BUSCAR DADOS REAIS PARA O GRID
+    const isEmailFicticio = clienteEmail && (
+      clienteEmail.includes('@cliente.com') ||
+      clienteEmail.includes('@cliente.temp') ||
+      clienteEmail.includes('@email.com')
+    );
+
+    if (isEmailFicticio) {
+      console.log(`   ⚠️  EMAIL FICTÍCIO DETECTADO: ${clienteEmail}`);
+      console.log(`   🔍 Buscando dados REAIS para o GRID...`);
+
+      // ✅ BUSCAR DADOS REAIS PARA MOSTRAR NO GRID
+      const dadosReais = await buscarDadosReaisDoCliente(clienteNome, clienteEmail);
+
+      if (dadosReais) {
+        console.log(`   ✅ SUBSTITUINDO por dados REAIS no grid:`);
+        console.log(`      Email: ${clienteEmail} → ${dadosReais.email}`);
+        console.log(`      Telefone: ${clienteTelefone} → ${dadosReais.telefone}`);
+
+        clienteNome = dadosReais.nome;
+        clienteEmail = dadosReais.email;
+        clienteTelefone = dadosReais.telefone;
+      } else {
+        console.log(`   ⚠️  Dados reais não encontrados, mantendo originais`);
+      }
+    } else if (clienteEmail) {
+      console.log(`   🔒 EMAIL REAL PROTEGIDO: ${clienteEmail}`);
+    }
+  } else if (typeof proposta.cliente === 'string') {
+    // Cliente como string (formato antigo)
+    clienteNome = safeRender(proposta.cliente);
+    console.log(`   📝 Cliente STRING - Nome original: "${clienteNome}"`);
+
+    // 🔍 BUSCAR DADOS REAIS PARA CLIENTES STRING TAMBÉM
+    console.log(`   🔍 Buscando dados reais para cliente STRING...`);
+    const dadosReais = await buscarDadosReaisDoCliente(clienteNome);
+
+    if (dadosReais) {
+      console.log(`   ✅ Dados reais encontrados para cliente STRING:`);
+      console.log(`      Email: ${dadosReais.email}`);
+      console.log(`      Telefone: ${dadosReais.telefone}`);
+
+      clienteNome = dadosReais.nome;
+      clienteEmail = dadosReais.email;
+      clienteTelefone = dadosReais.telefone;
+    } else {
+      console.log(`   ⚠️  Dados reais não encontrados para cliente STRING`);
+      clienteEmail = ''; // Deixar vazio se não encontrou
+    }
+  }
+
+  // 🔧 CORREÇÃO DE DATAS - Garantir que as datas sejam válidas
+  const criadaEm = proposta.criadaEm ? new Date(proposta.criadaEm) : new Date();
+  const dataValidade = proposta.dataValidade ? new Date(proposta.dataValidade) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 dias por padrão
+
+  // Validar se as datas são válidas
+  const dataCreated = !isNaN(criadaEm.getTime()) ? criadaEm.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+  const dataExpiry = !isNaN(dataValidade.getTime()) ? dataValidade.toISOString().split('T')[0] : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  // Calcular dias restantes
+  const hoje = new Date();
+  const diasRestantes = Math.ceil((dataValidade.getTime() - hoje.getTime()) / (1000 * 3600 * 24));
+
+  const resultado = {
     id: safeRender(proposta.id) || '',
     numero: safeRender(proposta.numero) || '',
-    cliente: safeRender(proposta.cliente?.nome) || 'Cliente não informado',
-    cliente_contato: safeRender(proposta.cliente?.email) || '',
-    titulo: `Proposta para ${safeRender(proposta.cliente?.nome) || 'Cliente'}`,
+    cliente: clienteNome,
+    cliente_contato: clienteEmail, // ✅ Agora contém dados reais quando possível
+    cliente_telefone: clienteTelefone, // ✅ Incluir telefone real
+    titulo: `Proposta para ${clienteNome}`,
     valor: Number(proposta.total) || 0,
     status: safeRender(proposta.status) || 'rascunho',
-    data_criacao: proposta.criadaEm ? new Date(proposta.criadaEm).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-    data_vencimento: proposta.dataValidade ? new Date(proposta.dataValidade).toISOString().split('T')[0] : '',
+    data_criacao: dataCreated,
+    data_vencimento: dataExpiry,
+    dias_restantes: diasRestantes, // ✅ Campo calculado para mostrar dias restantes
     data_aprovacao: proposta.status === 'aprovada' ? new Date().toISOString().split('T')[0] : null,
-    vendedor: safeRender(proposta.vendedor?.nome) || 'Sistema', // Usando vendedor real
+    vendedor: typeof proposta.vendedor === 'object' && proposta.vendedor?.nome
+      ? safeRender(proposta.vendedor.nome)
+      : typeof proposta.vendedor === 'string'
+        ? safeRender(proposta.vendedor)
+        : 'Sistema', // Usando vendedor real quando disponível
     descricao: safeRender(proposta.observacoes) || `Proposta com ${proposta.produtos?.length || 0} produtos`,
     probabilidade: proposta.status === 'aprovada' ? 100 : proposta.status === 'enviada' ? 70 : proposta.status === 'rejeitada' ? 0 : 30,
-    categoria: 'proposta'
+    categoria: 'proposta',
+    urgencia: diasRestantes <= 3 ? 'alta' : diasRestantes <= 7 ? 'media' : 'baixa' // ✅ Indicador de urgência
   };
+
+  console.log(`   ✅ RESULTADO final:`, resultado);
+  console.log(`   ✅ cliente_contato final: "${resultado.cliente_contato}"`);
+  console.log(`   ✅ cliente_telefone final: "${resultado.cliente_telefone}"`);
+
+  return resultado;
 };
 
 // Dados removidos - sistema agora trabalha apenas com dados reais do banco
@@ -106,6 +241,22 @@ const PropostasPage: React.FC = () => {
     carregarPropostas();
   }, []);
 
+  // 🔄 POLLING AUTOMÁTICO - Atualização em tempo real a cada 30 segundos
+  useEffect(() => {
+    console.log('⏰ Iniciando polling automático para atualização em tempo real...');
+
+    const intervalo = setInterval(() => {
+      console.log('🔄 Polling: Verificando atualizações...');
+      carregarPropostas();
+    }, 30000); // 30 segundos
+
+    // Cleanup
+    return () => {
+      console.log('🛑 Parando polling automático');
+      clearInterval(intervalo);
+    };
+  }, []);
+
   // Atualizar lista quando página voltar ao foco (ex: voltar de nova proposta)
   useEffect(() => {
     const handleFocus = () => {
@@ -117,7 +268,7 @@ const PropostasPage: React.FC = () => {
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  // 🆕 Escutar eventos de atualização de propostas vindos do portal
+  // 🆕 Escutar eventos de atualização de propostas vindos do portal e botões
   useEffect(() => {
     const handlePropostaAtualizada = (event: CustomEvent) => {
       console.log('🔄 Evento de atualização recebido do portal:', event.detail);
@@ -148,12 +299,21 @@ const PropostasPage: React.FC = () => {
       }, 2000);
     };
 
-    // Adicionar listener para atualizações do portal
+    const handleAtualizarPropostas = (event: CustomEvent) => {
+      console.log('🔄 Evento de atualização geral recebido:', event.detail);
+
+      // Atualização imediata
+      carregarPropostas();
+    };
+
+    // Adicionar listeners para atualizações
     window.addEventListener('propostaAtualizada', handlePropostaAtualizada as EventListener);
+    window.addEventListener('atualizarPropostas', handleAtualizarPropostas as EventListener);
 
     // Cleanup
     return () => {
       window.removeEventListener('propostaAtualizada', handlePropostaAtualizada as EventListener);
+      window.removeEventListener('atualizarPropostas', handleAtualizarPropostas as EventListener);
     };
   }, []);
 
@@ -165,12 +325,12 @@ const PropostasPage: React.FC = () => {
 
       // Usar o serviço real para criar a proposta
       const novaProposta = await propostasService.criarProposta(data);
-      
+
       console.log('✅ Proposta criada com sucesso:', novaProposta);
-      
+
       // Recarregar a lista de propostas para incluir a nova
       await carregarPropostas();
-      
+
       showNotification('Proposta criada com sucesso!', 'success');
     } catch (error) {
       console.error('❌ Erro ao criar proposta:', error);
@@ -237,6 +397,24 @@ const PropostasPage: React.FC = () => {
         const inicio = new Date(filtrosAvancados.dataInicio);
         const fim = new Date(filtrosAvancados.dataFim);
         return dataProposta >= inicio && dataProposta <= fim;
+      });
+    }
+
+    // ✅ NOVO: Filtro por urgência
+    if (filtrosAvancados.urgencia && filtrosAvancados.urgencia !== 'todas') {
+      filtered = filtered.filter(p => {
+        switch (filtrosAvancados.urgencia) {
+          case 'vencidas':
+            return p.dias_restantes <= 0;
+          case 'urgentes':
+            return p.dias_restantes > 0 && p.dias_restantes <= 3;
+          case 'próximas':
+            return p.dias_restantes > 3 && p.dias_restantes <= 7;
+          case 'normais':
+            return p.dias_restantes > 7;
+          default:
+            return true;
+        }
       });
     }
     if (filtrosAvancados.valorMin !== undefined) {
@@ -338,13 +516,33 @@ const PropostasPage: React.FC = () => {
     try {
       setIsLoading(true);
       console.log('🔄 Carregando propostas do banco de dados...');
-      
-      const propostasReais = await propostasService.listarPropostas();
+
+      const propostasReais = await propostasService.findAll();
 
       console.log('🔄 Propostas carregadas do serviço:', propostasReais.length);
 
       if (propostasReais && propostasReais.length > 0) {
-        const propostasFormatadas = propostasReais.map(converterPropostaParaUI);
+        console.log('🔄 Convertendo propostas com busca de dados reais...');
+
+        // ✅ CONVERTER TODAS AS PROPOSTAS COM BUSCA DE DADOS REAIS
+        const propostasFormatadas = await Promise.all(
+          propostasReais.map(async (proposta) => {
+            // Converter proposta do backend para o formato esperado
+            const propostaFormatada = {
+              id: proposta.id,
+              numero: proposta.numero,
+              cliente: proposta.cliente, // O backend já retorna o objeto cliente correto
+              total: proposta.valor || proposta.total,
+              status: proposta.status,
+              observacoes: proposta.observacoes,
+              criadaEm: proposta.createdAt || proposta.criadaEm,
+              dataValidade: proposta.dataVencimento || proposta.dataValidade,
+              vendedor: proposta.vendedor,
+              produtos: proposta.produtos || []
+            };
+            return await converterPropostaParaUI(propostaFormatada);
+          })
+        );
 
         // Validar que todas as propostas têm campos string
         const propostasValidadas = propostasFormatadas.map(proposta => ({
@@ -367,6 +565,13 @@ const PropostasPage: React.FC = () => {
         setPropostas(propostasValidadas);
         setFilteredPropostas(propostasValidadas);
         console.log('✅ Propostas carregadas do banco:', propostasValidadas.length);
+
+        // Log específico para verificar status das propostas enviadas
+        const propostasEnviadas = propostasValidadas.filter(p => p.status === 'enviada');
+        console.log(`📧 Propostas com status "enviada": ${propostasEnviadas.length}`);
+        propostasEnviadas.forEach(p => {
+          console.log(`  - ${p.numero}: ${p.status} (${p.data_atualizacao || p.updatedAt})`);
+        });
       } else {
         setPropostas([]);
         setFilteredPropostas([]);
@@ -388,14 +593,14 @@ const PropostasPage: React.FC = () => {
       try {
         setIsLoading(true);
         console.log('🗑️ Excluindo propostas em lote:', selectedPropostas);
-        
+
         // Usar o serviço real para exclusão em lote
         await propostasService.excluirEmLote(selectedPropostas);
-        
+
         showNotification(`${selectedPropostas.length} proposta(s) excluída(s) com sucesso!`, 'success');
         setSelectedPropostas([]);
         setShowBulkActions(false);
-        
+
         // Recarregar dados
         await carregarPropostas();
       } catch (error) {
@@ -411,16 +616,16 @@ const PropostasPage: React.FC = () => {
     try {
       setIsLoading(true);
       console.log('📝 Alterando status em lote:', selectedPropostas, 'para:', newStatus);
-      
+
       // Para cada proposta selecionada, alterar o status
       for (const propostaId of selectedPropostas) {
         await propostasService.atualizarStatus(propostaId, newStatus);
       }
-      
+
       showNotification(`Status de ${selectedPropostas.length} proposta(s) alterado com sucesso!`, 'success');
       setSelectedPropostas([]);
       setShowBulkActions(false);
-      
+
       // Recarregar dados
       await carregarPropostas();
     } catch (error) {
@@ -687,259 +892,6 @@ const PropostasPage: React.FC = () => {
     } else {
       throw new Error('Proposta não encontrada ou dados incompletos.');
     }
-  };
-
-  // Função removida - sistema agora trabalha apenas com dados reais do banco
-  // const converterPropostaMockParaPDF = ...
-    const valorTotal = proposta.valor || 5000;
-
-    // Criar itens detalhados baseados na categoria e valor da proposta
-    const criarItensDetalhados = (proposta: any) => {
-      const valorTotal = proposta.valor || 0;
-
-      switch (proposta.categoria) {
-        case 'software':
-          // Produtos reais de software/desenvolvimento
-          if (valorTotal <= 30000) {
-            return [
-              {
-                nome: 'Pacote Startup Digital (Combo)',
-                descricao: 'Solução completa para startups - Software Web + Consultoria inicial | Desconto: 16,6% | Produtos: Sistema Web Básico, Consultoria Júnior - 8h',
-                quantidade: 1,
-                valorUnitario: valorTotal * 0.85,
-                desconto: 16.6,
-                valorTotal: valorTotal * 0.7
-              },
-              {
-                nome: 'Hospedagem e Domínio Premium',
-                descricao: 'Hospedagem em servidor dedicado, domínio personalizado, SSL, backup automático e CDN',
-                quantidade: 1,
-                valorUnitario: valorTotal * 0.3,
-                desconto: 0,
-                valorTotal: valorTotal * 0.3
-              }
-            ];
-          } else if (valorTotal <= 80000) {
-            return [
-              {
-                nome: 'Pacote Empresarial Completo (Combo)',
-                descricao: 'Solução enterprise com múltiplas licenças, app mobile e treinamento | Desconto: 16,7% | Produtos: Sistema Web Premium, App Mobile, Treinamento Liderança',
-                quantidade: 1,
-                valorUnitario: valorTotal * 0.75,
-                desconto: 16.7,
-                valorTotal: valorTotal * 0.65
-              },
-              {
-                nome: 'Integração e Migração de Dados',
-                descricao: 'Migração completa de dados legados, integração com sistemas terceiros, APIs customizadas',
-                quantidade: 1,
-                valorUnitario: valorTotal * 0.35,
-                desconto: 5,
-                valorTotal: valorTotal * 0.35
-              }
-            ];
-          } else {
-            return [
-              {
-                nome: 'Pacote E-commerce Plus (Combo)',
-                descricao: 'Plataforma completa de e-commerce com recursos avançados | Produtos: Loja Virtual Premium, Gateway de Pagamento, Sistema de Gestão',
-                quantidade: 1,
-                valorUnitario: valorTotal * 0.6,
-                desconto: 12,
-                valorTotal: valorTotal * 0.55
-              },
-              {
-                nome: 'Marketing Digital Integrado',
-                descricao: 'SEO otimizado, integração com redes sociais, email marketing automático, analytics avançado',
-                quantidade: 1,
-                valorUnitario: valorTotal * 0.25,
-                desconto: 0,
-                valorTotal: valorTotal * 0.25
-              },
-              {
-                nome: 'Suporte Premium 24/7',
-                descricao: 'Suporte técnico especializado, monitoramento, atualizações automáticas e backup em tempo real',
-                quantidade: 1,
-                valorUnitario: valorTotal * 0.2,
-                desconto: 0,
-                valorTotal: valorTotal * 0.2
-              }
-            ];
-          }
-
-        case 'consultoria':
-          return [
-            {
-              nome: 'Consultoria em Marketing Digital',
-              descricao: 'Análise completa de mercado, desenvolvimento de personas, estratégia de conteúdo e funil de vendas',
-              quantidade: 1,
-              valorUnitario: valorTotal * 0.6,
-              desconto: 10,
-              valorTotal: valorTotal * 0.55
-            },
-            {
-              nome: 'Auditoria e Otimização SEO',
-              descricao: 'Auditoria técnica completa, otimização on-page, estratégia de link building e relatórios mensais',
-              quantidade: 1,
-              valorUnitario: valorTotal * 0.25,
-              desconto: 0,
-              valorTotal: valorTotal * 0.25
-            },
-            {
-              nome: 'Gestão de Campanhas Pagas',
-              descricao: 'Configuração e gestão de Google Ads, Facebook Ads, relatórios de performance e otimização contínua',
-              quantidade: 1,
-              valorUnitario: valorTotal * 0.2,
-              desconto: 5,
-              valorTotal: valorTotal * 0.2
-            }
-          ];
-
-        case 'treinamento':
-          return [
-            {
-              nome: 'Programa de Liderança Executiva',
-              descricao: 'Curso intensivo de 40h, certificação internacional, coaching individual e plataforma EAD vitalícia',
-              quantidade: 1,
-              valorUnitario: valorTotal * 0.7,
-              desconto: 15,
-              valorTotal: valorTotal * 0.6
-            },
-            {
-              nome: 'Workshop Gestão de Equipes',
-              descricao: 'Treinamento prático de 16h, dinâmicas de grupo, kit de ferramentas e mentorias de acompanhamento',
-              quantidade: 1,
-              valorUnitario: valorTotal * 0.4,
-              desconto: 10,
-              valorTotal: valorTotal * 0.4
-            }
-          ];
-
-        case 'design':
-          return [
-            {
-              nome: 'Identidade Visual Premium',
-              descricao: 'Logotipo profissional, manual de marca completo, aplicações em diversos formatos e registro de marca',
-              quantidade: 1,
-              valorUnitario: valorTotal * 0.65,
-              desconto: 8,
-              valorTotal: valorTotal * 0.6
-            },
-            {
-              nome: 'Kit Digital Completo',
-              descricao: 'Templates para redes sociais, banners web, cartões digitais, apresentações e mockups em alta resolução',
-              quantidade: 1,
-              valorUnitario: valorTotal * 0.4,
-              desconto: 12,
-              valorTotal: valorTotal * 0.35
-            },
-            {
-              nome: 'Website Institucional',
-              descricao: 'Site responsivo de até 5 páginas, otimizado para SEO, formulários de contato e integração com redes sociais',
-              quantidade: 1,
-              valorUnitario: valorTotal * 0.05,
-              desconto: 0,
-              valorTotal: valorTotal * 0.05
-            }
-          ];
-
-        case 'ecommerce':
-          return [
-            {
-              nome: 'Loja Virtual Profissional',
-              descricao: 'E-commerce completo com catálogo de produtos, carrinho de compras, checkout seguro e painel administrativo',
-              quantidade: 1,
-              valorUnitario: valorTotal * 0.55,
-              desconto: 10,
-              valorTotal: valorTotal * 0.5
-            },
-            {
-              nome: 'Gateway de Pagamento Integrado',
-              descricao: 'Integração com principais gateways (PagSeguro, Mercado Pago, PayPal), PIX automático e boleto bancário',
-              quantidade: 1,
-              valorUnitario: valorTotal * 0.25,
-              desconto: 0,
-              valorTotal: valorTotal * 0.25
-            },
-            {
-              nome: 'Sistema de Gestão de Estoque',
-              descricao: 'Controle automático de estoque, alertas de reposição, relatórios de vendas e integração com fornecedores',
-              quantidade: 1,
-              valorUnitario: valorTotal * 0.25,
-              desconto: 5,
-              valorTotal: valorTotal * 0.25
-            }
-          ];
-
-        default:
-          return [
-            {
-              nome: proposta.titulo || 'Solução Personalizada',
-              descricao: proposta.descricao || 'Solução personalizada desenvolvida especificamente para atender às necessidades do cliente',
-              quantidade: 1,
-              valorUnitario: valorTotal,
-              desconto: 0,
-              valorTotal: valorTotal
-            }
-          ];
-      }
-    };
-
-    const itens = criarItensDetalhados(proposta);
-    const subtotal = itens.reduce((sum, item) => sum + item.valorTotal, 0);
-
-    return {
-      numeroProposta: proposta.numero || `PROP-${Date.now()}`,
-      titulo: proposta.titulo || `Proposta para ${proposta.cliente}`,
-      descricao: proposta.descricao || 'Proposta comercial personalizada com soluções sob medida para atender às necessidades específicas do seu negócio.',
-      status: proposta.status || 'draft',
-      dataEmissao: proposta.data_criacao || new Date().toISOString().split('T')[0],
-      dataValidade: proposta.data_vencimento || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      empresa: {
-        nome: 'FenixCRM',
-        endereco: 'Rua das Empresas, 123 - Centro',
-        cidade: 'São Paulo',
-        estado: 'SP',
-        cep: '01234-567',
-        telefone: '(11) 9999-9999',
-        email: 'contato@fenixcrm.com',
-        cnpj: '12.345.678/0001-90'
-      },
-      cliente: {
-        nome: proposta.cliente || 'Cliente Não Informado',
-        empresa: proposta.categoria === 'software' ? `${proposta.cliente} Tecnologia` : proposta.cliente,
-        email: proposta.cliente_contato ? `${proposta.cliente_contato.toLowerCase().replace(/\s+/g, '.')}@${proposta.cliente.toLowerCase().replace(/\s+/g, '')}.com` : 'cliente@email.com',
-        telefone: '(11) 8888-8888',
-        documento: '123.456.789-00',
-        tipoDocumento: 'CPF',
-        endereco: 'Rua do Cliente, 456 - Bairro Comercial'
-      },
-      vendedor: {
-        nome: proposta.vendedor || 'Sistema FenixCRM',
-        email: 'vendedor@fenixcrm.com',
-        telefone: '(11) 7777-7777',
-        cargo: 'Consultor Comercial Sênior'
-      },
-      itens: itens,
-      subtotal: subtotal,
-      descontoGeral: subtotal * 0.05, // 5% de desconto geral
-      percentualDesconto: 5,
-      impostos: subtotal * 0.1, // 10% de impostos
-      valorTotal: subtotal * 1.05, // subtotal + impostos - desconto
-      formaPagamento: 'Parcelado em até 3x sem juros ou à vista com 5% de desconto',
-      prazoEntrega: proposta.categoria === 'software' ? '45 dias úteis' : proposta.categoria === 'consultoria' ? '30 dias úteis' : '15 dias úteis',
-      garantia: proposta.categoria === 'software' ? '12 meses de garantia e suporte técnico' : proposta.categoria === 'treinamento' ? '6 meses de suporte pós-treinamento' : '6 meses de garantia',
-      validadeProposta: '30 dias corridos',
-      condicoesGerais: [
-        'Proposta válida por 30 dias corridos a partir da data de emissão',
-        'Pagamento mediante apresentação de nota fiscal',
-        'Entrega conforme cronograma acordado entre as partes',
-        'Garantia e suporte técnico conforme especificações técnicas',
-        'Valores não incluem despesas de viagem, se necessárias',
-        'Alterações no escopo podem gerar custos adicionais'
-      ],
-      observacoes: `Esta proposta foi elaborada especialmente para ${proposta.cliente}, considerando as necessidades específicas do projeto "${proposta.titulo}". Estamos à disposição para esclarecimentos e ajustes necessários.`
-    };
   };
 
   const handleViewProposta = async (proposta: any) => {
@@ -1241,7 +1193,7 @@ const PropostasPage: React.FC = () => {
 
         console.log('✅ Proposta excluída com sucesso');
         showNotification('Proposta excluída com sucesso!', 'success');
-        
+
         // Recarregar a lista para refletir a exclusão
         await carregarPropostas();
       } catch (error) {
@@ -1456,7 +1408,7 @@ const PropostasPage: React.FC = () => {
             </div>
 
             {/* Estatísticas rápidas */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
               <div className="bg-white p-4 rounded-lg border border-[#DEEFE7] shadow-sm">
                 <div className="flex items-center">
                   <div className="p-2 bg-[#DEEFE7] rounded-lg">
@@ -1492,6 +1444,21 @@ const PropostasPage: React.FC = () => {
                     <p className="text-sm font-medium text-gray-600">Em Negociação</p>
                     <p className="text-2xl font-bold text-gray-900">
                       {propostas.filter(p => p.status === 'negociacao').length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ✅ NOVA: Estatística de Urgentes */}
+              <div className="bg-white p-4 rounded-lg border shadow-sm">
+                <div className="flex items-center">
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <AlertCircle className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Urgentes/Vencidas</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {propostas.filter(p => p.dias_restantes <= 3).length}
                     </p>
                   </div>
                 </div>
@@ -1558,11 +1525,82 @@ const PropostasPage: React.FC = () => {
                     <option value="Ana Silva">Ana Silva</option>
                   </select>
                 </div>
+
+                {/* Filtro por Urgência */}
+                <div className="lg:w-48">
+                  <select
+                    value={filtrosAvancados.urgencia || 'todas'}
+                    onChange={(e) => setFiltrosAvancados({ ...filtrosAvancados, urgencia: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="todas">Todas as Urgências</option>
+                    <option value="vencidas">🔴 Vencidas</option>
+                    <option value="urgentes">🟠 Urgentes (≤3 dias)</option>
+                    <option value="próximas">🟡 Próximas (≤7 dias)</option>
+                    <option value="normais">🟢 Normais</option>
+                  </select>
+                </div>
+
+                {/* Botão Filtros Avançados */}
+                <button
+                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                  className={`px-4 py-2 border rounded-lg flex items-center gap-2 text-sm transition-colors ${showAdvancedFilters
+                    ? 'bg-blue-50 border-blue-300 text-blue-700'
+                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                >
+                  <Filter className="w-4 h-4" />
+                  Filtros
+                  {Object.keys(filtrosAvancados).length > 0 && (
+                    <span className="bg-blue-500 text-white text-xs rounded-full px-2 py-0.5 ml-1">
+                      {Object.keys(filtrosAvancados).length}
+                    </span>
+                  )}
+                </button>
               </div>
             </div>
 
             {/* Lista de Propostas com Seleção */}
             <div className="bg-white rounded-lg border shadow-sm overflow-hidden propostas-page">
+              {/* Header da tabela com informações de filtros */}
+              <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <h3 className="text-lg font-medium text-gray-900">
+                      Lista de Propostas ({filteredPropostas.length})
+                    </h3>
+                    {/* Indicadores de filtros ativos */}
+                    <div className="flex items-center space-x-2">
+                      {selectedStatus !== 'todos' && (
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                          Status: {selectedStatus}
+                        </span>
+                      )}
+                      {filtrosAvancados.urgencia && filtrosAvancados.urgencia !== 'todas' && (
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">
+                          {filtrosAvancados.urgencia === 'vencidas' && '🔴 Vencidas'}
+                          {filtrosAvancados.urgencia === 'urgentes' && '🟠 Urgentes'}
+                          {filtrosAvancados.urgencia === 'próximas' && '🟡 Próximas'}
+                          {filtrosAvancados.urgencia === 'normais' && '🟢 Normais'}
+                        </span>
+                      )}
+                      {searchTerm && (
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                          Busca: "{searchTerm}"
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {selectedPropostas.length > 0 && (
+                      <span className="text-sm text-gray-600">
+                        {selectedPropostas.length} selecionada(s)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="table-wrapper">
                 <table className="table-propostas min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
@@ -1683,12 +1721,23 @@ const PropostasPage: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap col-hide-mobile" data-label="Status">
-                          <span className={`status-badge inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(safeRender(proposta.status))}`}>
-                            {getStatusIcon(safeRender(proposta.status))}
-                            <span className="ml-1">{getStatusText(safeRender(proposta.status))}</span>
-                          </span>
-                          <div className="subinfo mt-1">
-                            {safeRender(proposta.probabilidade)}% de chance
+                          <div className="flex items-center space-x-2">
+                            <span className={`status-badge inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full border ${getStatusColor(safeRender(proposta.status))}`}>
+                              {getStatusIcon(safeRender(proposta.status))}
+                              <span className="ml-1">{getStatusText(safeRender(proposta.status))}</span>
+                            </span>
+                            {proposta.urgencia === 'alta' && (
+                              <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 border border-red-200">
+                                <AlertCircle className="w-3 h-3 mr-1" />
+                                Urgente
+                              </span>
+                            )}
+                          </div>
+                          <div className="subinfo mt-1 flex items-center justify-between">
+                            <span>{safeRender(proposta.probabilidade)}% de chance</span>
+                            {proposta.status === 'enviada' && (
+                              <span className="text-blue-600 text-xs">📧 Enviada</span>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap" data-label="Valor">
@@ -1706,17 +1755,37 @@ const PropostasPage: React.FC = () => {
                           <div className="data-proposta text-sm text-gray-900">
                             {formatDate(safeRender(proposta.data_vencimento))}
                           </div>
-                          <div className="subinfo">
-                            {new Date(proposta.data_vencimento) < new Date() ?
-                              <span className="text-red-600">Vencida</span> :
-                              `${Math.ceil((new Date(proposta.data_vencimento).getTime() - new Date().getTime()) / (1000 * 3600 * 24))} dias`
-                            }
+                          <div className={`subinfo ${proposta.dias_restantes <= 0
+                            ? 'text-red-600 font-semibold'
+                            : proposta.dias_restantes <= 3
+                              ? 'text-orange-600 font-semibold'
+                              : proposta.dias_restantes <= 7
+                                ? 'text-yellow-600'
+                                : 'text-green-600'
+                            }`}>
+                            {proposta.dias_restantes <= 0 ? (
+                              <span className="flex items-center">
+                                <AlertCircle className="w-3 h-3 mr-1" />
+                                Vencida há {Math.abs(proposta.dias_restantes)} dias
+                              </span>
+                            ) : proposta.dias_restantes <= 3 ? (
+                              <span className="flex items-center">
+                                <Clock className="w-3 h-3 mr-1" />
+                                Vence em {proposta.dias_restantes} dias
+                              </span>
+                            ) : (
+                              <span className="flex items-center">
+                                <Calendar className="w-3 h-3 mr-1" />
+                                {proposta.dias_restantes} dias restantes
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" data-label="Ações">
                           <PropostaActions
                             proposta={proposta}
                             onViewProposta={handleViewProposta}
+                            onPropostaUpdated={carregarPropostas}
                             className="justify-end"
                           />
                         </td>
@@ -1759,6 +1828,7 @@ const PropostasPage: React.FC = () => {
               isOpen={showViewModal}
               onClose={() => setShowViewModal(false)}
               proposta={selectedPropostaForView}
+              onPropostaUpdated={carregarPropostas}
             />
 
             {/* Modal Wizard removido daqui - movido para o início do JSX */}

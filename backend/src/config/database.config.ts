@@ -7,10 +7,11 @@ import { Cliente } from '../modules/clientes/cliente.entity';
 import { Produto } from '../modules/produtos/produto.entity';
 import { Oportunidade } from '../modules/oportunidades/oportunidade.entity';
 import { Atividade } from '../modules/oportunidades/atividade.entity';
+import { Proposta } from '../modules/propostas/proposta.entity';
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
-  constructor(private configService: ConfigService) {}
+  constructor(private configService: ConfigService) { }
 
   createTypeOrmOptions(): TypeOrmModuleOptions {
     const config = {
@@ -20,14 +21,14 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       username: this.configService.get('DATABASE_USERNAME', 'conectcrm'),
       password: this.configService.get('DATABASE_PASSWORD', 'conectcrm123'),
       database: this.configService.get('DATABASE_NAME', 'conectcrm_db'),
-      entities: [User, Empresa, Cliente, Produto, Oportunidade, Atividade],
+      entities: [User, Empresa, Cliente, Produto, Oportunidade, Atividade, Proposta],
       synchronize: true, // Habilitado para criar tabelas automaticamente em desenvolvimento
       logging: this.configService.get('APP_ENV') === 'development',
       ssl: this.configService.get('APP_ENV') === 'production' ? {
         rejectUnauthorized: false,
       } : false,
     };
-    
+
     // Debug log
     console.log('📊 Database Config:', {
       host: config.host,
@@ -36,7 +37,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       password: config.password?.substr(0, 3) + '***',
       database: config.database
     });
-    
+
     return config as TypeOrmModuleOptions;
   }
 }

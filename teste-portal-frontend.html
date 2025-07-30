@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧪 Teste Portal do Cliente</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-50">
+  <div class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-8">
+      <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">🧪 Teste Portal do Cliente</h1>
+        <p class="text-gray-600">Testando integração com backend do portal</p>
+      </div>
+
+      <div class="space-y-6">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Token da Proposta:</label>
+          <input type="text" id="tokenInput" value="PROP-001"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Digite o token da proposta">
+        </div>
+
+        <button onclick="testarProposta()"
+          class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-200 font-medium">
+          🔍 Testar Proposta
+        </button>
+
+        <div id="resultado" class="hidden">
+          <div class="bg-gray-50 rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">📋 Resultado do Teste:</h3>
+            <div id="conteudoResultado"></div>
+          </div>
+        </div>
+
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h4 class="font-medium text-blue-900 mb-2">🎯 URLs de Teste:</h4>
+          <div class="space-y-2 text-sm">
+            <div><strong>PROP-001:</strong> <a href="http://localhost:3900/portal/proposta/PROP-001" target="_blank"
+                class="text-blue-600 hover:underline">http://localhost:3900/portal/proposta/PROP-001</a></div>
+            <div><strong>PROP-002:</strong> <a href="http://localhost:3900/portal/proposta/PROP-002" target="_blank"
+                class="text-blue-600 hover:underline">http://localhost:3900/portal/proposta/PROP-002</a></div>
+            <div><strong>TEST-001:</strong> <a href="http://localhost:3900/portal/proposta/TEST-001" target="_blank"
+                class="text-blue-600 hover:underline">http://localhost:3900/portal/proposta/TEST-001</a></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function testarProposta() {
+      const token = document.getElementById('tokenInput').value;
+      const resultadoDiv = document.getElementById('resultado');
+      const conteudoDiv = document.getElementById('conteudoResultado');
+
+      if (!token) {
+        alert('Por favor, digite um token!');
+        return;
+      }
+
+      try {
+        // Testar endpoint do backend
+        const response = await fetch(`http://localhost:3001/api/portal/proposta/${token}`);
+        const data = await response.json();
+
+        resultadoDiv.classList.remove('hidden');
+
+        if (response.ok) {
+          conteudoDiv.innerHTML = `
+                        <div class="text-green-800">
+                            <p><strong>✅ Status:</strong> Sucesso (${response.status})</p>
+                            <p><strong>📋 Título:</strong> ${data.titulo || 'N/A'}</p>
+                            <p><strong>🏢 Cliente:</strong> ${data.cliente || 'N/A'}</p>
+                            <p><strong>📊 Status:</strong> ${data.status || 'N/A'}</p>
+                            <p><strong>💰 Valor:</strong> ${data.valor ? 'R$ ' + data.valor.toLocaleString() : 'N/A'}</p>
+                            <p><strong>📝 Observações:</strong> ${data.observacoes || 'N/A'}</p>
+                        </div>
+                        <div class="mt-4 pt-4 border-t border-gray-200">
+                            <p class="text-sm text-gray-600"><strong>🔗 URL React:</strong></p>
+                            <a href="http://localhost:3900/portal/proposta/${token}" target="_blank" 
+                               class="text-blue-600 hover:underline text-sm">
+                               http://localhost:3900/portal/proposta/${token}
+                            </a>
+                        </div>
+                    `;
+        } else {
+          conteudoDiv.innerHTML = `
+                        <div class="text-red-800">
+                            <p><strong>❌ Erro:</strong> ${response.status} - ${response.statusText}</p>
+                            <p><strong>📝 Mensagem:</strong> ${data.message || 'Erro desconhecido'}</p>
+                        </div>
+                    `;
+        }
+      } catch (error) {
+        resultadoDiv.classList.remove('hidden');
+        conteudoDiv.innerHTML = `
+                    <div class="text-red-800">
+                        <p><strong>❌ Erro de Conexão:</strong> ${error.message}</p>
+                        <p><strong>🔧 Verificar:</strong> Backend rodando na porta 3001?</p>
+                    </div>
+                `;
+      }
+    }
+
+    // Carregar automaticamente ao abrir a página
+    document.addEventListener('DOMContentLoaded', function () {
+      testarProposta();
+    });
+  </script>
+</body>
+
+</html>

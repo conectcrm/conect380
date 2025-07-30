@@ -8,7 +8,7 @@ async function bootstrap() {
 
   // Configuração CORS
   app.enableCors({
-    origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
+    origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3900', 'http://localhost:3000'],
     credentials: true,
   });
 
@@ -32,10 +32,10 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);
 
-  const port = process.env.APP_PORT || 3001;
+  const port = process.env.APP_PORT || 3000;
   await app.listen(port);
-  
-  console.log(`� Conect CRM Backend rodando na porta ${port}`);
+
+  console.log(`🚀 Conect CRM Backend rodando na porta ${port}`);
   console.log(`📖 Documentação disponível em: http://localhost:${port}/api-docs`);
 }
 

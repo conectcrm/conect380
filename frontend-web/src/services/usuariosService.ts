@@ -43,7 +43,7 @@ class UsuariosService {
 
   async criarUsuario(usuario: NovoUsuario): Promise<Usuario> {
     console.log('Service - Dados recebidos:', usuario);
-    
+
     const dadosBackend = {
       nome: usuario.nome,
       email: usuario.email,
@@ -63,16 +63,16 @@ class UsuariosService {
       },
       ativo: usuario.ativo !== undefined ? usuario.ativo : true
     };
-    
+
     console.log('Service - Dados transformados:', dadosBackend);
-    
+
     const response = await this.api.post('/', dadosBackend);
-    return this.formatarUsuario(response.data);
+    return this.formatarUsuario(response.data.data);
   }
 
   async atualizarUsuario(usuario: AtualizarUsuario): Promise<Usuario> {
     const { id, ...dados } = usuario;
-    
+
     const dadosBackend = {
       nome: dados.nome,
       email: dados.email,
@@ -84,9 +84,9 @@ class UsuariosService {
       configuracoes: dados.configuracoes,
       ativo: dados.ativo
     };
-    
+
     const response = await this.api.put(`/${id}`, dadosBackend);
-    return this.formatarUsuario(response.data);
+    return this.formatarUsuario(response.data.data);
   }
 
   async excluirUsuario(id: string): Promise<void> {
@@ -95,7 +95,7 @@ class UsuariosService {
 
   async alterarStatusUsuario(id: string, ativo: boolean): Promise<Usuario> {
     const response = await this.api.patch(`/${id}/status`, { ativo });
-    return this.formatarUsuario(response.data);
+    return this.formatarUsuario(response.data.data);
   }
 
   async resetarSenha(id: string): Promise<{ novaSenha: string }> {
@@ -107,10 +107,10 @@ class UsuariosService {
   async obterEstatisticas(): Promise<EstatisticasUsuarios> {
     try {
       const response = await this.api.get('/estatisticas');
-      
+
       // O backend retorna um objeto com {success: true, data: {...}}
       const backendData = response.data.data || response.data;
-      
+
       // Mapear os dados do backend para o formato esperado pelo frontend
       return {
         totalUsuarios: backendData.total || 0,

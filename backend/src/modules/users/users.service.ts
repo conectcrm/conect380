@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserRole } from './user.entity';
@@ -11,7 +11,7 @@ export class UsersService {
     private userRepository: Repository<User>,
     @InjectRepository(Empresa)
     private empresaRepository: Repository<Empresa>,
-  ) {}
+  ) { }
 
   async findByEmail(email: string): Promise<User | undefined> {
     return this.userRepository.findOne({
@@ -47,8 +47,8 @@ export class UsersService {
   async updateLastLogin(id: string): Promise<void> {
     await this.userRepository.update(id, { ultimo_login: new Date() });
   }
-  
-  async listarComFiltros(filtros: any): Promise<{usuarios: User[], total: number}> {
+
+  async listarComFiltros(filtros: any): Promise<{ usuarios: User[], total: number }> {
     try {
       console.log('Service - Filtros recebidos:', filtros);
       const query = this.userRepository.createQueryBuilder('user')
@@ -63,7 +63,7 @@ export class UsersService {
         query.andWhere('user.ativo = :ativo', { ativo: filtros.ativo });
       }
       const total = await query.getCount();
-      
+
       // Garantir que a direção seja em maiúsculas para o TypeORM
       const direcaoUpper = (filtros.direcao || 'ASC').toUpperCase() as 'ASC' | 'DESC';
       query.orderBy(`user.${filtros.ordenacao || 'nome'}`, direcaoUpper);
@@ -81,24 +81,24 @@ export class UsersService {
     const total = await this.userRepository.count({ where: { empresa_id } });
     const ativos = await this.userRepository.count({ where: { empresa_id, ativo: true } });
     const inativos = await this.userRepository.count({ where: { empresa_id, ativo: false } });
-    
+
     // Calcular distribuição por perfil
-    const adminCount = await this.userRepository.count({ 
-      where: { empresa_id, role: UserRole.ADMIN } 
+    const adminCount = await this.userRepository.count({
+      where: { empresa_id, role: UserRole.ADMIN }
     });
-    const managerCount = await this.userRepository.count({ 
-      where: { empresa_id, role: UserRole.MANAGER } 
+    const managerCount = await this.userRepository.count({
+      where: { empresa_id, role: UserRole.MANAGER }
     });
-    const vendedorCount = await this.userRepository.count({ 
-      where: { empresa_id, role: UserRole.VENDEDOR } 
+    const vendedorCount = await this.userRepository.count({
+      where: { empresa_id, role: UserRole.VENDEDOR }
     });
-    const userCount = await this.userRepository.count({ 
-      where: { empresa_id, role: UserRole.USER } 
+    const userCount = await this.userRepository.count({
+      where: { empresa_id, role: UserRole.USER }
     });
-    
+
     return {
       total,
-      ativos, 
+      ativos,
       inativos,
       por_perfil: {
         admin: adminCount,
@@ -111,16 +111,16 @@ export class UsersService {
 
   async criar(userData: Partial<User>): Promise<User> {
     console.log('🚀 UsersService.criar - Recebendo dados:', userData);
-    
+
     // Validação de campos obrigatórios
     if (!userData.nome || !userData.email || !userData.senha || !userData.empresa_id) {
       console.error('❌ Campos obrigatórios ausentes:', { nome: !!userData.nome, email: !!userData.email, senha: !!userData.senha, empresa_id: !!userData.empresa_id });
       throw new Error('Campos obrigatórios ausentes: nome, email, senha, empresa_id');
     }
-    
+
     const user = this.userRepository.create(userData);
     console.log('📝 Usuário criado em memória:', user);
-    
+
     try {
       const savedUser = await this.userRepository.save(user);
       console.log('✅ Usuário salvo no banco:', savedUser);
@@ -147,6 +147,33 @@ export class UsersService {
     const novaSenha = Math.random().toString(36).slice(-8);
     await this.userRepository.update({ id, empresa_id }, { senha: novaSenha });
     return novaSenha;
+  }
+
+  async alterarStatus(id: string, ativo: boolean, empresa_id: string): Promise<User> {
+    console.log(`🔧 UsersService.alterarStatus - ID: ${id}, Ativo: ${ativo}, Empresa: ${empresa_id}`);
+
+    // Verificar se o usuário existe e pertence à empresa
+    const usuario = await this.userRepository.findOne({
+      where: { id, empresa_id },
+      relations: ['empresa']
+    });
+
+    if (!usuario) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    // Atualizar o status
+    await this.userRepository.update({ id, empresa_id }, { ativo });
+
+    // Buscar o usuário atualizado
+    const usuarioAtualizado = await this.userRepository.findOne({
+      where: { id, empresa_id },
+      relations: ['empresa']
+    });
+
+    console.log(`✅ Status do usuário ${id} alterado para: ${ativo ? 'ATIVO' : 'INATIVO'}`);
+
+    return usuarioAtualizado;
   }
 
   async ativarEmMassa(ids: string[], empresa_id: string): Promise<void> {
