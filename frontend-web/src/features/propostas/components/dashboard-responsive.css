@@ -1,22 +1,26 @@
 /* Utilitários de responsividade para KIP cards */
 
-/* Força quebra de palavras em valores monetários longos */
+/* Evita quebras indesejadas em valores monetários */
 .break-currency {
-  word-break: break-word;
-  overflow-wrap: break-word;
-  hyphens: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* Container flexível para texto longo */
 .text-container {
   min-width: 0;
   flex: 1;
+  overflow: hidden;
 }
 
-/* Valores monetários responsivos */
+/* Valores monetários responsivos - sem quebra de linha */
 .currency-value {
-  word-break: break-word;
+  white-space: nowrap;
   line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Cards responsivos melhorados */
@@ -30,33 +34,45 @@
 /* Melhor alinhamento em telas pequenas */
 @media (max-width: 640px) {
   .currency-value {
-    font-size: 1.125rem; /* text-lg */
+    font-size: 1rem;
+    /* Reduzido para caber melhor */
     line-height: 1.3;
+    max-width: 100%;
   }
-  
+
   .kip-card {
     min-height: 100px;
+    padding: 0.75rem;
+    /* Padding menor em telas pequenas */
   }
-  
+
   .card-icon {
-    width: 2rem;
-    height: 2rem;
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
+  /* Ajusta container do texto para não overflow */
+  .text-container {
+    max-width: calc(100% - 3rem);
+    /* Deixa espaço para o ícone */
   }
 }
 
 /* Ajustes para telas médias */
 @media (min-width: 641px) and (max-width: 1024px) {
   .currency-value {
-    font-size: 1.25rem; /* text-xl */
+    font-size: 1.25rem;
+    /* text-xl */
   }
 }
 
 /* Telas grandes */
 @media (min-width: 1025px) {
   .currency-value {
-    font-size: 1.5rem; /* text-2xl */
+    font-size: 1.5rem;
+    /* text-2xl */
   }
-  
+
   .kip-card {
     min-height: 140px;
   }
@@ -84,5 +100,32 @@
 @media (min-width: 640px) {
   .stacked-card-content {
     gap: 0;
+  }
+}
+
+/* Formatação especial para valores monetários muito grandes */
+@media (max-width: 640px) {
+  .currency-large {
+    font-size: 0.875rem;
+    /* text-sm */
+    font-weight: 600;
+  }
+}
+
+/* Força display em linha única para números */
+.number-display {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* Responsividade específica para KIP cards principais */
+@media (max-width: 480px) {
+  .kip-card .currency-value {
+    font-size: 0.875rem;
+    /* Ainda menor em telas muito pequenas */
+  }
+
+  .kip-card {
+    min-height: 90px;
   }
 }

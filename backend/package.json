@@ -30,8 +30,10 @@
     "@nestjs/typeorm": "^10.0.0",
     "@sendgrid/mail": "^8.1.5",
     "@types/handlebars": "^4.0.40",
+    "@types/multer": "^2.0.0",
     "@types/nodemailer": "^6.4.17",
     "@types/puppeteer": "^5.4.7",
+    "@types/qrcode": "^1.5.5",
     "aws-sdk": "^2.1692.0",
     "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",
@@ -52,10 +54,12 @@
     "passport-local": "^1.0.0",
     "pg": "^8.11.0",
     "puppeteer": "^24.14.0",
+    "qrcode": "^1.5.4",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.1",
     "typeorm": "^0.3.17",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "whatsapp-web.js": "^1.31.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",

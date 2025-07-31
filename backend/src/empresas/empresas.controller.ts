@@ -6,7 +6,7 @@ import { CreateEmpresaDto, VerificarEmailDto } from './dto/empresas.dto';
 @ApiTags('empresas')
 @Controller('empresas')
 export class EmpresasController {
-  constructor(private readonly empresasService: EmpresasService) {}
+  constructor(private readonly empresasService: EmpresasService) { }
 
   @Post('registro')
   @ApiOperation({ summary: 'Registrar nova empresa' })
@@ -138,6 +138,55 @@ export class EmpresasController {
     } catch (error) {
       throw new HttpException(
         'Erro ao verificar status da empresa',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+}
+
+@Controller('minhas-empresas')
+@ApiTags('minhas-empresas')
+export class MinhasEmpresasController {
+  constructor(private readonly empresasService: EmpresasService) { }
+
+  @Get()
+  @ApiOperation({ summary: 'Obter empresas do usuário' })
+  @ApiResponse({ status: 200, description: 'Lista de empresas retornada com sucesso' })
+  async getMinhasEmpresas() {
+    try {
+      // Por enquanto vamos retornar dados mock
+      // TODO: Implementar busca real baseada no usuário autenticado
+      const empresasMock = [
+        {
+          id: '1',
+          nome: 'Empresa Exemplo',
+          cnpj: '12.345.678/0001-90',
+          email: 'contato@empresa.com',
+          telefone: '(11) 99999-9999',
+          endereco: {
+            logradouro: 'Rua Exemplo, 123',
+            cidade: 'São Paulo',
+            estado: 'SP',
+            cep: '01234-567'
+          },
+          plano: 'premium',
+          status: 'ativa',
+          dataVencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          configuracoes: {
+            whatsapp: true,
+            email: true,
+            sms: false
+          }
+        }
+      ];
+
+      return {
+        success: true,
+        empresas: empresasMock
+      };
+    } catch (error) {
+      throw new HttpException(
+        'Erro ao buscar empresas',
         HttpStatus.INTERNAL_SERVER_ERROR
       );
     }

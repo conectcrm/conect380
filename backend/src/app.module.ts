@@ -11,6 +11,8 @@ import { FinanceiroModule } from './modules/financeiro/financeiro.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { OportunidadesModule } from './modules/oportunidades/oportunidades.module';
 import { EmpresasModule } from './empresas/empresas.module';
+import { ChatwootModule } from './modules/chatwoot/chatwoot.module';
+import { MetasModule } from './modules/metas/metas.module';
 import { DatabaseConfig } from './config/database.config';
 
 @Module({
@@ -32,6 +34,8 @@ import { DatabaseConfig } from './config/database.config';
     DashboardModule,
     OportunidadesModule,
     EmpresasModule,
+    ChatwootModule,
+    MetasModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }

@@ -12,6 +12,8 @@ import {
 import { emailServiceReal } from '../../../services/emailServiceReal';
 import { PropostaCompleta } from '../services/propostasService';
 import { clientesService } from '../../../services/clientesService';
+import ModalEnviarWhatsApp from '../../../components/whatsapp/ModalEnviarWhatsApp';
+import { pdfPropostasService } from '../../../services/pdfPropostasService';
 
 // Tipo união para aceitar tanto PropostaCompleta quanto o formato da UI
 type PropostaUI = {
@@ -47,6 +49,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const [sendingEmail, setSendingEmail] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [clienteData, setClienteData] = useState<{ nome: string, email: string, telefone: string } | null>(null);
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [propostaPdfBuffer, setPropostaPdfBuffer] = useState<Uint8Array | null>(null);
 
   // Carregar dados do cliente quando o componente for montado
   React.useEffect(() => {
@@ -425,56 +429,38 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const handleSendWhatsApp = async () => {
     const clienteData = await getClienteData();
 
-    console.log('🔍 [handleSendWhatsApp] Dados do cliente:', clienteData);
-
-    if (!clienteData.telefone) {
+    if (!clienteData?.telefone) {
       toast.error('Cliente não possui telefone cadastrado');
       return;
     }
 
-    // Validar formato do telefone (remover caracteres não numéricos)
-    const phoneNumber = clienteData.telefone.replace(/\D/g, '');
+    // Gerar PDF para anexar
+    try {
+      const propostaData = getPropostaData();
+      const pdfBlob = await pdfPropostasService.gerarPdf({
+        numero: propostaData.numero,
+        cliente: {
+          nome: clienteData.nome,
+          email: clienteData.email || '',
+          telefone: clienteData.telefone
+        },
+        empresa: { nome: 'ConectCRM' },
+        valorTotal: propostaData.total,
+        produtos: [],
+        observacoes: propostaData.titulo
+      });
 
-    if (phoneNumber.length < 10) {
-      toast.error('Telefone do cliente é inválido: ' + clienteData.telefone);
-      return;
+      // Converter Blob para Uint8Array
+      const arrayBuffer = await pdfBlob.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      setPropostaPdfBuffer(uint8Array);
+    } catch (error) {
+      console.warn('⚠️ Erro ao gerar PDF, enviando sem anexo:', error);
+      setPropostaPdfBuffer(null);
     }
 
-    const token = generateAccessToken();
-    const propostaData = getPropostaData();
-    const portalUrl = `${window.location.origin}/portal-cliente/${propostaData.numero}/${token}`;
-
-    const message = `🔔 *Proposta Comercial #${propostaData.numero}*
-
-Olá *${clienteData.nome}*! 👋
-
-Temos o prazer de enviar nossa proposta comercial para sua análise.
-
-📋 *Detalhes:*
-• Proposta: #${propostaData.numero}
-• Valor: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(propostaData.total)}
-• Válida até: ${new Date(propostaData.dataValidade).toLocaleDateString('pt-BR')}
-
-🔐 *Código de Acesso:* \`${token}\`
-
-🌐 *Acesse o portal:* ${portalUrl}
-
-*Como acessar:*
-1️⃣ Clique no link acima
-2️⃣ Digite o código: ${token}
-3️⃣ Visualize todos os detalhes
-4️⃣ Aceite ou solicite alterações
-
-Em caso de dúvidas, estamos à disposição! 😊
-
-Atenciosamente,
-*ConectCRM*`;
-
-    const whatsappUrl = `https://wa.me/55${phoneNumber}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
-
-    toast.success(`📱 Abrindo WhatsApp para ${clienteData.nome}`);
-    console.log('📱 Token de acesso gerado para WhatsApp:', token);
+    // Abrir modal do WhatsApp
+    setShowWhatsAppModal(true);
   };
 
   // Download da proposta em PDF
@@ -603,6 +589,32 @@ Atenciosamente,
         <Share2 className="w-4 h-4" />
         {showLabels && <span>Compartilhar</span>}
       </button>
+
+      {/* Modal WhatsApp */}
+      {showWhatsAppModal && clienteData && (
+        <ModalEnviarWhatsApp
+          isOpen={showWhatsAppModal}
+          onClose={() => setShowWhatsAppModal(false)}
+          proposta={{
+            id: getPropostaData().numero,
+            numero: getPropostaData().numero,
+            cliente: {
+              nome: clienteData.nome,
+              whatsapp: clienteData.telefone,
+              telefone: clienteData.telefone
+            },
+            valorTotal: getPropostaData().total,
+            empresa: {
+              nome: 'ConectCRM'
+            }
+          }}
+          pdfBuffer={propostaPdfBuffer}
+          onSuccess={() => {
+            toast.success('Proposta enviada via WhatsApp!');
+            setShowWhatsAppModal(false);
+          }}
+        />
+      )}
     </div>
   );
 };

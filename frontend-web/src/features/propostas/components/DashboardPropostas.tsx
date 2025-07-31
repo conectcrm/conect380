@@ -116,7 +116,7 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
           <div className="flex items-center justify-between">
             <div className="text-container mr-3">
               <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total de Propostas</p>
-              <p className="currency-value font-bold text-gray-900 break-currency">
+              <p className="currency-value font-bold text-gray-900 number-display">
                 {metricas.totalPropostas}
               </p>
             </div>
@@ -130,7 +130,7 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
           <div className="flex items-center justify-between">
             <div className="text-container mr-3">
               <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Pipeline Total</p>
-              <p className="currency-value font-bold text-gray-900 break-currency">
+              <p className="currency-value font-bold text-gray-900 number-display">
                 {formatarMoeda(metricas.valorTotalPipeline)}
               </p>
             </div>
@@ -144,7 +144,7 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
           <div className="flex items-center justify-between">
             <div className="text-container mr-3">
               <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Valor Médio</p>
-              <p className="currency-value font-bold text-gray-900 break-currency">
+              <p className="currency-value font-bold text-gray-900 number-display">
                 {formatarMoeda(metricas.totalPropostas > 0 ? metricas.valorTotalPipeline / metricas.totalPropostas : 0)}
               </p>
             </div>
@@ -158,7 +158,7 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
           <div className="flex items-center justify-between">
             <div className="text-container mr-3">
               <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Taxa de Conversão</p>
-              <p className="currency-value font-bold text-gray-900 break-currency">
+              <p className="currency-value font-bold text-gray-900 number-display">
                 {metricas.taxaConversao.toFixed(1)}%
               </p>
             </div>
@@ -194,7 +194,7 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
                     </div>
                   </div>
                   <div className="text-left sm:text-right ml-11 sm:ml-0">
-                    <p className="font-semibold text-gray-900 text-sm sm:text-base break-currency">
+                    <p className="font-semibold text-gray-900 text-sm sm:text-base number-display">
                       {formatarMoeda(valorEstimado)}
                     </p>
                     <p className="text-sm text-gray-500">
@@ -230,10 +230,10 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
                       </div>
                     </div>
                     <div className="text-left sm:text-right ml-11 sm:ml-0">
-                      <p className="font-semibold text-gray-900 text-sm sm:text-base break-currency">
+                      <p className="font-semibold text-gray-900 text-sm sm:text-base number-display">
                         {formatarMoeda(valorEstimado)}
                       </p>
-                      <p className="text-sm text-gray-500 break-currency">
+                      <p className="text-sm text-gray-500 number-display">
                         {formatarMoeda(quantidade > 0 ? valorEstimado / quantidade : 0)} médio
                       </p>
                     </div>

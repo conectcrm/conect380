@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Building2 } from 'lucide-react';
+import { Settings, Building2, MessageCircle } from 'lucide-react';
 import ModulesScreen, { NucleusModulesData } from '../../components/navigation/ModulesScreen';
 
 const SistemaNucleusPage: React.FC = () => {
@@ -17,6 +17,15 @@ const SistemaNucleusPage: React.FC = () => {
         href: '/configuracoes',
         icon: Settings,
         notifications: 1,
+        status: 'active'
+      },
+      {
+        id: 'chatwoot',
+        name: 'Chatwoot',
+        description: 'Configurações de integração com Chatwoot para atendimento via WhatsApp.',
+        href: '/configuracoes/chatwoot',
+        icon: MessageCircle,
+        notifications: 0,
         status: 'active'
       }
     ]

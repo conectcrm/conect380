@@ -6,6 +6,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { I18nProvider } from './contexts/I18nContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { EmpresaProvider } from './contexts/EmpresaContextAPIReal';
 import LoginPage from './features/auth/LoginPage';
 import RegistroEmpresaPage from './features/auth/RegistroEmpresaPage';
 import VerificacaoEmailPage from './features/auth/VerificacaoEmailPage';
@@ -31,16 +32,24 @@ import FunilVendas from './pages/FunilVendas';
 import CrmNucleusPage from './pages/nuclei/CrmNucleusPage';
 import VendasNucleusPage from './pages/nuclei/VendasNucleusPage';
 import FinanceiroNucleusPage from './pages/nuclei/FinanceiroNucleusPage';
-import SistemaNucleusPage from './pages/nuclei/SistemaNucleusPage';
-import GestaoNucleusPage from './pages/nuclei/GestaoNucleusPage';
+import ConfiguracoesNucleusPage from './pages/nuclei/ConfiguracoesNucleusPage';
+import AdministracaoNucleusPage from './pages/nuclei/AdministracaoNucleusPage';
 import ModuleUnderConstruction from './components/common/ModuleUnderConstruction';
 import { UploadDemoPage } from './pages/UploadDemoPage';
 import { EmpresasListPage } from './features/admin/empresas/EmpresasListPage';
+import { MinhasEmpresasPage } from './features/empresas/MinhasEmpresasPage';
 import { ContatosPage } from './features/contatos/ContatosPageNova';
 import { SuportePage } from './features/suporte/SuportePageNova';
 import { UsuariosPage } from './features/gestao/usuarios/UsuariosPage';
+// Importar novas páginas do sistema de empresas
+import { ConfiguracaoEmpresaPage } from './pages/empresas/ConfiguracaoEmpresaPage';
+import { RelatoriosAnalyticsPage } from './pages/empresas/RelatoriosAnalyticsPage';
+import { SistemaPermissoesPage } from './pages/empresas/SistemaPermissoesPage';
+import { BackupSincronizacaoPage } from './pages/empresas/BackupSincronizacaoPage';
 import { useAuth } from './hooks/useAuth';
 import PortalRoutes from './routes/PortalRoutes';
+import ChatwootConfiguracao from './pages/configuracoes/ChatwootConfiguracao';
+import MetasConfiguracao from './pages/configuracoes/MetasConfiguracao';
 import TestePortalPage from './pages/TestePortalPage';
 import PortalClientePage from './pages/PortalClientePage';
 import ConfiguracaoEmailPage from './pages/ConfiguracaoEmailPage';
@@ -89,20 +98,32 @@ const AppRoutes: React.FC = () => {
           {/* Página de Notificações */}
           <Route path="/notifications" element={<NotificationsPage />} />
 
-          {/* Central de Operações - Fluxo Integrado */}
-          <Route path="/central-operacoes" element={<CentralOperacoesPage />} />
-
           {/* Rotas das páginas de núcleos */}
           <Route path="/nuclei/crm" element={<CrmNucleusPage />} />
           <Route path="/nuclei/vendas" element={<VendasNucleusPage />} />
           <Route path="/nuclei/financeiro" element={<FinanceiroNucleusPage />} />
-          <Route path="/nuclei/sistema" element={<SistemaNucleusPage />} />
-          <Route path="/nuclei/gestao" element={<GestaoNucleusPage />} />
+          <Route path="/nuclei/configuracoes" element={<ConfiguracoesNucleusPage />} />
+          <Route path="/nuclei/administracao" element={<AdministracaoNucleusPage />} />
 
           {/* Rotas administrativas do sistema */}
           <Route path="/admin/empresas" element={<EmpresasListPage />} />
           <Route path="/gestao/empresas" element={<EmpresasListPage />} />
           <Route path="/gestao/usuarios" element={<UsuariosPage />} />
+
+          {/* Gerenciamento de Empresas do Usuário */}
+          <Route path="/empresas/minhas" element={<MinhasEmpresasPage />} />
+          <Route path="/empresas/:empresaId/configuracoes" element={<ConfiguracaoEmpresaPage />} />
+          <Route path="/empresas/:empresaId/relatorios" element={<RelatoriosAnalyticsPage />} />
+          <Route path="/empresas/:empresaId/permissoes" element={<SistemaPermissoesPage />} />
+          <Route path="/empresas/:empresaId/backup" element={<BackupSincronizacaoPage />} />
+
+          {/* Configurações globais da empresa ativa */}
+          <Route path="/configuracoes/empresa" element={<ConfiguracaoEmpresaPage />} />
+          <Route path="/configuracoes/chatwoot" element={<ChatwootConfiguracao />} />
+          <Route path="/configuracoes/metas" element={<MetasConfiguracao />} />
+          <Route path="/relatorios/analytics" element={<RelatoriosAnalyticsPage />} />
+          <Route path="/gestao/permissoes" element={<SistemaPermissoesPage />} />
+          <Route path="/sistema/backup" element={<BackupSincronizacaoPage />} />
 
           {/* Sistema de Suporte */}
           <Route path="/suporte" element={<SuportePage />} />
@@ -247,21 +268,23 @@ const App: React.FC = () => {
         <ThemeProvider>
           <AuthProvider>
             <NotificationProvider>
-              <Router>
-                <div className="App">
-                  <AppRoutes />
-                  <Toaster
-                    position="top-right"
-                    toastOptions={{
-                      duration: 4000,
-                      style: {
-                        background: '#363636',
-                        color: '#fff',
-                      },
-                    }}
-                  />
-                </div>
-              </Router>
+              <EmpresaProvider>
+                <Router>
+                  <div className="App">
+                    <AppRoutes />
+                    <Toaster
+                      position="top-right"
+                      toastOptions={{
+                        duration: 4000,
+                        style: {
+                          background: '#363636',
+                          color: '#fff',
+                        },
+                      }}
+                    />
+                  </div>
+                </Router>
+              </EmpresaProvider>
             </NotificationProvider>
           </AuthProvider>
         </ThemeProvider>

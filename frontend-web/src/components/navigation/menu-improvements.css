@@ -1,0 +1,321 @@
+/* Melhorias de Design para o Menu Lateral */
+
+/* Container principal da navegação */
+nav.sidebar-collapsed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem;
+}
+
+/* 1. Espaçamento e hierarquia visual melhorada */
+.menu-item-improved {
+  position: relative;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.25rem;
+  border-radius: 0.75rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: transparent;
+}
+
+.menu-item-improved:hover {
+  background: rgba(21, 154, 156, 0.08);
+  transform: translateX(4px);
+}
+
+.menu-item-improved.active {
+  background: linear-gradient(135deg, rgba(21, 154, 156, 0.15) 0%, rgba(222, 239, 231, 0.8) 100%);
+  border-left: 3px solid #159A9C;
+  box-shadow: 0 2px 8px rgba(21, 154, 156, 0.15);
+}
+
+/* 2. Ícones mais expressivos */
+.menu-icon-improved {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #B4BEC9;
+  transition: all 0.2s ease-in-out;
+  margin-right: 0.75rem;
+  flex-shrink: 0;
+}
+
+.menu-item-improved:hover .menu-icon-improved {
+  color: #159A9C;
+  transform: scale(1.1);
+}
+
+.menu-item-improved.active .menu-icon-improved {
+  color: #159A9C;
+}
+
+/* 3. Textos com melhor tipografia */
+.menu-text-improved {
+  color: #002333;
+  font-weight: 500;
+  font-size: 0.875rem;
+  line-height: 1.25;
+}
+
+/* 4. Sidebar colapsada melhorada */
+.sidebar-collapsed .menu-item-improved {
+  padding: 0;
+  margin: 0.375rem auto;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 3rem;
+  height: 3rem;
+  min-width: 3rem;
+  min-height: 3rem;
+}
+
+.sidebar-collapsed .menu-icon-improved {
+  margin: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+}
+
+.sidebar-collapsed .menu-item-improved:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 4px 12px rgba(21, 154, 156, 0.2);
+}
+
+/* 5. Tooltip melhorado para sidebar colapsada */
+.tooltip-improved {
+  position: absolute;
+  left: calc(100% + 0.75rem);
+  top: 50%;
+  transform: translateY(-50%);
+  background: linear-gradient(135deg, #002333 0%, #374151 100%);
+  color: white;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 60;
+}
+
+.tooltip-improved::before {
+  content: '';
+  position: absolute;
+  left: -0.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0.25rem solid transparent;
+  border-right-color: #002333;
+}
+
+.sidebar-collapsed .menu-item-improved:hover .tooltip-improved {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) translateX(0.25rem);
+}
+
+/* 7. Seção do header melhorada */
+.sidebar-header-improved {
+  padding: 1.5rem 1rem 1rem;
+  border-bottom: 1px solid rgba(222, 239, 231, 0.6);
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(222, 239, 231, 0.05) 100%);
+  position: relative;
+}
+
+.sidebar-header-improved::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(21, 154, 156, 0.2), transparent);
+}
+
+/* 8. Container da logo aprimorado */
+.logo-container-improved {
+  position: relative;
+  z-index: 10;
+}
+
+.logo-container-improved::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  background: linear-gradient(135deg, rgba(21, 154, 156, 0.08) 0%, rgba(222, 239, 231, 0.2) 100%);
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  transform: scale(0.8);
+}
+
+.logo-container-improved:hover::before {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* 9. Container de texto da logo */
+.text-container-improved {
+  position: relative;
+  z-index: 5;
+}
+
+.text-container-improved::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #159A9C, #0F7B7D);
+  transition: width 0.3s ease;
+  border-radius: 1px;
+}
+
+.sidebar-header-improved:hover .text-container-improved::after {
+  width: 100%;
+}
+
+/* 10. Melhorias específicas para o nome da marca */
+.brand-name-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.brand-conect {
+  position: relative;
+  background: linear-gradient(135deg, #002333 0%, #1e293b 30%, #002333 60%, #0f172a 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-size: 200% 100%;
+  animation: brand-shimmer 4s ease-in-out infinite;
+  text-shadow: 0 2px 4px rgba(0, 35, 51, 0.1);
+  transition: all 0.3s ease;
+}
+
+.brand-crm {
+  position: relative;
+  background: linear-gradient(135deg, #159A9C 0%, #1DB5B8 40%, #0F7B7D 80%, #159A9C 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-size: 150% 100%;
+  text-shadow: 0 1px 3px rgba(21, 154, 156, 0.15);
+  animation: brand-crm-pulse 3s ease-in-out infinite alternate;
+}
+
+.brand-highlight {
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-header-improved:hover .brand-highlight {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.brand-subtitle {
+  opacity: 0.8;
+  transition: all 0.3s ease;
+  text-shadow: 0 1px 2px rgba(107, 114, 128, 0.1);
+}
+
+.sidebar-header-improved:hover .brand-subtitle {
+  opacity: 1;
+  transform: translateY(-1px);
+  color: #4B5563;
+}
+
+.sidebar-header-improved:hover .brand-conect {
+  transform: scale(1.02);
+}
+
+.sidebar-header-improved:hover .brand-crm {
+  transform: scale(1.02);
+}
+
+@keyframes brand-shimmer {
+
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes brand-crm-pulse {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  100% {
+    background-position: 100% 50%;
+  }
+}
+
+/* 9. Responsividade aprimorada */
+@media (max-width: 768px) {
+  .menu-item-improved {
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .menu-icon-improved {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .menu-text-improved {
+    font-size: 1rem;
+  }
+
+  .notification-badge-modern {
+    right: 1rem;
+    transform: scale(1.1);
+  }
+}
+
+/* 10. Estados de focus melhorados para acessibilidade */
+.menu-item-improved:focus {
+  outline: 2px solid #159A9C;
+  outline-offset: 2px;
+}
+
+.menu-item-improved:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* 11. Loading state para itens do menu */
+.menu-item-loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.menu-item-loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(21, 154, 156, 0.1), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  100% {
+    left: 100%;
+  }
+}

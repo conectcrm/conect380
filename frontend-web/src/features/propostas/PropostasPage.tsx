@@ -54,7 +54,7 @@ const buscarDadosReaisDoCliente = async (nome: string, emailFicticio: string = '
     console.log(`🔍 [GRID] Buscando dados reais para: "${nome}"`);
 
     // Tentar buscar no serviço de clientes
-    const response = await import('../../../services/clientesService').then(module =>
+    const response = await import('../../services/clientesService').then(module =>
       module.clientesService.getClientes({ search: nome, limit: 100 })
     );
 

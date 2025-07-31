@@ -1,0 +1,339 @@
+import { api } from './api';
+
+export interface EmpresaCompleta {
+  id: string;
+  nome: string;
+  cnpj: string;
+  email: string;
+  telefone: string;
+  endereco: {
+    rua: string;
+    numero: string;
+    complemento?: string;
+    bairro: string;
+    cidade: string;
+    estado: string;
+    cep: string;
+  };
+  plano: {
+    id: string;
+    nome: 'Starter' | 'Professional' | 'Enterprise';
+    preco: number;
+    features: string[];
+    limitesUsuarios: number;
+    limitesClientes: number;
+    limitesArmazenamento: string; // "5GB", "50GB", "Ilimitado"
+  };
+  status: 'ativa' | 'trial' | 'suspensa' | 'inativa';
+  isActive: boolean;
+  dataVencimento: string;
+  dataCriacao: string;
+  ultimoAcesso: string;
+  configuracoes: {
+    notificacoesEmail: boolean;
+    notificacoesSMS: boolean;
+    backupAutomatico: boolean;
+    integracaoAPI: boolean;
+    suportePersonalizado: boolean;
+    whiteLabel: boolean;
+    relatoriosAvancados: boolean;
+  };
+  estatisticas: {
+    usuariosAtivos: number;
+    totalUsuarios: number;
+    clientesCadastrados: number;
+    propostasEsteAno: number;
+    propostasEsteMes: number;
+    faturaAcumulada: number;
+    crescimentoMensal: number;
+    armazenamentoUsado: string; // "2.1GB"
+    armazenamentoTotal: string; // "5GB"
+    ultimasAtividades: Array<{
+      id: string;
+      tipo: 'login' | 'proposta' | 'cliente' | 'configuracao';
+      descricao: string;
+      usuario: string;
+      data: string;
+    }>;
+  };
+  permissoes: {
+    podeEditarConfiguracoes: boolean;
+    podeGerenciarUsuarios: boolean;
+    podeVerRelatorios: boolean;
+    podeExportarDados: boolean;
+    podeAlterarPlano: boolean;
+  };
+}
+
+export interface NovaEmpresaRequest {
+  nome: string;
+  cnpj: string;
+  email: string;
+  telefone: string;
+  endereco: {
+    rua: string;
+    numero: string;
+    complemento?: string;
+    bairro: string;
+    cidade: string;
+    estado: string;
+    cep: string;
+  };
+  planoId: string;
+  usuarioAdmin: {
+    nome: string;
+    email: string;
+    telefone: string;
+  };
+}
+
+export interface EmpresaUpdate {
+  nome?: string;
+  email?: string;
+  telefone?: string;
+  endereco?: Partial<EmpresaCompleta['endereco']>;
+  configuracoes?: Partial<EmpresaCompleta['configuracoes']>;
+}
+
+export interface SwitchEmpresaResponse {
+  success: boolean;
+  empresaId: string;
+  token?: string; // Novo token com contexto da empresa
+  configuracoes: any;
+}
+
+class MinhasEmpresasService {
+
+  /**
+   * Buscar todas as empresas do usuário atual
+   */
+  async getMinhasEmpresas(): Promise<EmpresaCompleta[]> {
+    try {
+      const response = await api.get<{ empresas: EmpresaCompleta[] }>('/minhas-empresas');
+      return response.data.empresas;
+    } catch (error) {
+      console.error('Erro ao buscar empresas:', error);
+      throw new Error('Não foi possível carregar suas empresas');
+    }
+  }
+
+  /**
+   * Buscar detalhes de uma empresa específica
+   */
+  async getEmpresaById(empresaId: string): Promise<EmpresaCompleta> {
+    try {
+      const response = await api.get<EmpresaCompleta>(`/minhas-empresas/${empresaId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar empresa:', error);
+      throw new Error('Não foi possível carregar os dados da empresa');
+    }
+  }
+
+  /**
+   * Alternar para uma empresa (switch de contexto)
+   */
+  async switchEmpresa(empresaId: string): Promise<SwitchEmpresaResponse> {
+    try {
+      const response = await api.post<SwitchEmpresaResponse>('/minhas-empresas/switch', {
+        empresaId
+      });
+
+      // Atualizar token se fornecido
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        api.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+      }
+
+      // Salvar empresa ativa
+      localStorage.setItem('empresaAtiva', empresaId);
+
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao alternar empresa:', error);
+      throw new Error('Não foi possível alternar para esta empresa');
+    }
+  }
+
+  /**
+   * Criar uma nova empresa
+   */
+  async criarEmpresa(dadosEmpresa: NovaEmpresaRequest): Promise<EmpresaCompleta> {
+    try {
+      const response = await api.post<EmpresaCompleta>('/minhas-empresas', dadosEmpresa);
+      return response.data;
+    } catch (error: any) {
+      console.error('Erro ao criar empresa:', error);
+      if (error.response?.status === 409) {
+        throw new Error('CNPJ já cadastrado no sistema');
+      }
+      if (error.response?.status === 422) {
+        throw new Error('Dados inválidos. Verifique as informações fornecidas');
+      }
+      throw new Error('Não foi possível criar a empresa');
+    }
+  }
+
+  /**
+   * Atualizar dados da empresa
+   */
+  async atualizarEmpresa(empresaId: string, dados: EmpresaUpdate): Promise<EmpresaCompleta> {
+    try {
+      const response = await api.put<EmpresaCompleta>(`/minhas-empresas/${empresaId}`, dados);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao atualizar empresa:', error);
+      throw new Error('Não foi possível atualizar os dados da empresa');
+    }
+  }
+
+  /**
+   * Atualizar configurações específicas da empresa
+   */
+  async atualizarConfiguracoes(
+    empresaId: string,
+    configuracoes: Partial<EmpresaCompleta['configuracoes']>
+  ): Promise<EmpresaCompleta['configuracoes']> {
+    try {
+      const response = await api.patch<{ configuracoes: EmpresaCompleta['configuracoes'] }>(
+        `/minhas-empresas/${empresaId}/configuracoes`,
+        { configuracoes }
+      );
+      return response.data.configuracoes;
+    } catch (error) {
+      console.error('Erro ao atualizar configurações:', error);
+      throw new Error('Não foi possível atualizar as configurações');
+    }
+  }
+
+  /**
+   * Buscar estatísticas detalhadas da empresa
+   */
+  async getEstatisticasEmpresa(empresaId: string, periodo?: 'mes' | 'trimestre' | 'ano'): Promise<EmpresaCompleta['estatisticas']> {
+    try {
+      const response = await api.get<{ estatisticas: EmpresaCompleta['estatisticas'] }>(
+        `/minhas-empresas/${empresaId}/estatisticas`,
+        { params: { periodo: periodo || 'mes' } }
+      );
+      return response.data.estatisticas;
+    } catch (error) {
+      console.error('Erro ao buscar estatísticas:', error);
+      throw new Error('Não foi possível carregar as estatísticas');
+    }
+  }
+
+  /**
+   * Suspender empresa (apenas admin master)
+   */
+  async suspenderEmpresa(empresaId: string, motivo: string): Promise<void> {
+    try {
+      await api.post(`/minhas-empresas/${empresaId}/suspender`, { motivo });
+    } catch (error) {
+      console.error('Erro ao suspender empresa:', error);
+      throw new Error('Não foi possível suspender a empresa');
+    }
+  }
+
+  /**
+   * Reativar empresa (apenas admin master)
+   */
+  async reativarEmpresa(empresaId: string): Promise<void> {
+    try {
+      await api.post(`/minhas-empresas/${empresaId}/reativar`);
+    } catch (error) {
+      console.error('Erro ao reativar empresa:', error);
+      throw new Error('Não foi possível reativar a empresa');
+    }
+  }
+
+  /**
+   * Excluir empresa (apenas owner)
+   */
+  async excluirEmpresa(empresaId: string, confirmacao: string): Promise<void> {
+    try {
+      await api.delete(`/minhas-empresas/${empresaId}`, {
+        data: { confirmacao }
+      });
+    } catch (error) {
+      console.error('Erro ao excluir empresa:', error);
+      throw new Error('Não foi possível excluir a empresa');
+    }
+  }
+
+  /**
+   * Buscar planos disponíveis
+   */
+  async getPlanosDisponiveis(): Promise<EmpresaCompleta['plano'][]> {
+    try {
+      const response = await api.get<{ planos: EmpresaCompleta['plano'][] }>('/planos');
+      return response.data.planos;
+    } catch (error) {
+      console.error('Erro ao buscar planos:', error);
+      throw new Error('Não foi possível carregar os planos disponíveis');
+    }
+  }
+
+  /**
+   * Alterar plano da empresa
+   */
+  async alterarPlano(empresaId: string, novoPlanoId: string): Promise<EmpresaCompleta> {
+    try {
+      const response = await api.post<EmpresaCompleta>(
+        `/minhas-empresas/${empresaId}/alterar-plano`,
+        { planoId: novoPlanoId }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao alterar plano:', error);
+      throw new Error('Não foi possível alterar o plano');
+    }
+  }
+
+  /**
+   * Buscar atividades recentes da empresa
+   */
+  async getAtividadesRecentes(empresaId: string, limit: number = 10): Promise<EmpresaCompleta['estatisticas']['ultimasAtividades']> {
+    try {
+      const response = await api.get<{ atividades: EmpresaCompleta['estatisticas']['ultimasAtividades'] }>(
+        `/minhas-empresas/${empresaId}/atividades`,
+        { params: { limit } }
+      );
+      return response.data.atividades;
+    } catch (error) {
+      console.error('Erro ao buscar atividades:', error);
+      throw new Error('Não foi possível carregar as atividades');
+    }
+  }
+
+  /**
+   * Gerar backup da empresa
+   */
+  async gerarBackup(empresaId: string): Promise<{ backupId: string; downloadUrl: string }> {
+    try {
+      const response = await api.post<{ backupId: string; downloadUrl: string }>(
+        `/minhas-empresas/${empresaId}/backup`
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao gerar backup:', error);
+      throw new Error('Não foi possível gerar o backup');
+    }
+  }
+
+  /**
+   * Validar CNPJ
+   */
+  async validarCNPJ(cnpj: string): Promise<{ valido: boolean; empresa?: any }> {
+    try {
+      const response = await api.post<{ valido: boolean; empresa?: any }>('/validar-cnpj', {
+        cnpj: cnpj.replace(/\D/g, '')
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao validar CNPJ:', error);
+      return { valido: false };
+    }
+  }
+}
+
+export const minhasEmpresasService = new MinhasEmpresasService();
