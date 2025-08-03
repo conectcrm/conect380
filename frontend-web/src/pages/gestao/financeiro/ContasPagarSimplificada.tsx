@@ -36,8 +36,8 @@ import {
 } from '../../../types/financeiro';
 
 // Importar os novos componentes aprimorados
-import FiltrosAvancados from './components/FiltrosAvancados';
-import ModalContaPagar from './components/ModalContaPagarNovo';
+import FiltrosAvancados from '../../../features/financeiro/components/FiltrosAvancados';
+import ModalContaPagar from '../../../features/financeiro/components/ModalContaPagarNovo';
 
 interface ContasPagarPageProps {
   className?: string;

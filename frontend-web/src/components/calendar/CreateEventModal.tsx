@@ -4,6 +4,8 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { CalendarEvent } from '../../types/calendar';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { useAuth } from '../../contexts/AuthContext';
+import usuariosService from '../../services/usuariosService';
 import {
   X,
   Clock,
@@ -14,12 +16,20 @@ import {
   Plus,
   Trash2,
   Edit,
-  UserCheck
+  UserCheck,
+  FileText,
+  Phone,
+  Calendar,
+  CheckSquare,
+  Monitor,
+  MapPin as MapPinIcon
 } from 'lucide-react';
 
 // Schema de validação
 const eventSchema = yup.object({
   title: yup.string().required('Título é obrigatório'),
+  eventType: yup.string().oneOf(['reuniao', 'tarefa', 'evento', 'follow-up']).required('Tipo de evento é obrigatório'),
+  responsavel: yup.string().required('Responsável é obrigatório'),
   isAllDay: yup.boolean(),
   startDate: yup.string().required('Data do evento é obrigatória'),
   startTime: yup.string().when('isAllDay', {
@@ -42,8 +52,10 @@ const eventSchema = yup.object({
     then: (schema) => schema.min(0).max(59),
     otherwise: (schema) => schema.notRequired()
   }),
+  locationType: yup.string().oneOf(['presencial', 'virtual']).required('Tipo de local é obrigatório'),
   location: yup.string(),
   description: yup.string(),
+  status: yup.string().oneOf(['confirmed', 'pending', 'cancelled']).required('Status é obrigatório'),
   reminderTime: yup.number(),
   reminderType: yup.string(),
   emailOffline: yup.boolean(),
@@ -70,18 +82,22 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
   event,
   selectedDate
 }) => {
-  const [isConfirmed, setIsConfirmed] = useState(true);
   const [participants, setParticipants] = useState<string[]>([]);
   const [newParticipantEmail, setNewParticipantEmail] = useState('');
   const [showAddParticipant, setShowAddParticipant] = useState(false);
-  
+  const [usuarios, setUsuarios] = useState<{ id: string; nome: string; email: string }[]>([]);
+  const [loadingUsuarios, setLoadingUsuarios] = useState(false);
+
   // Hook de notificações
   const { addNotification, addReminder, showSuccess, showError } = useNotifications();
+
+  // Hook de autenticação para obter usuário atual
+  const { user: usuarioAtual } = useAuth();
 
   // Função para calcular horário de término
   const calculateEndTime = (startTime: string, duration: string, customHours?: number, customMinutes?: number) => {
     if (!startTime) return '';
-    
+
     const [hours, minutes] = startTime.split(':').map(Number);
     let durationMinutes = 0;
 
@@ -110,14 +126,18 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
     resolver: yupResolver(eventSchema),
     defaultValues: {
       title: '',
+      eventType: 'reuniao',
+      responsavel: usuarioAtual?.id || '',
       isAllDay: false,
       startDate: '',
       startTime: '09:00',
       duration: '60',
       customDurationHours: 0,
       customDurationMinutes: 0,
+      locationType: 'presencial',
       location: '',
       description: '',
+      status: 'pending',
       reminderTime: 10,
       reminderType: 'notification',
       emailOffline: false,
@@ -128,6 +148,29 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
 
   const isAllDay = watch('isAllDay');
 
+  // Carregar usuários quando o modal abrir
+  useEffect(() => {
+    if (isOpen && !loadingUsuarios && usuarios.length === 0) {
+      const carregarUsuarios = async () => {
+        setLoadingUsuarios(true);
+        try {
+          const listaUsuarios = await usuariosService.listarUsuarios();
+          setUsuarios(listaUsuarios.map(user => ({
+            id: user.id,
+            nome: user.nome,
+            email: user.email
+          })));
+        } catch (error) {
+          console.error('Erro ao carregar usuários:', error);
+          showError('Erro ao carregar lista de usuários', 'Não foi possível carregar os usuários disponíveis');
+        } finally {
+          setLoadingUsuarios(false);
+        }
+      };
+      carregarUsuarios();
+    }
+  }, [isOpen, loadingUsuarios, usuarios.length, showError]);
+
   // Inicializar dados quando o modal abrir
   useEffect(() => {
     if (isOpen) {
@@ -135,7 +178,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
         // Editando evento existente
         const startDate = new Date(event.start);
         const endDate = new Date(event.end);
-        
+
         // Calcular duração em minutos
         const durationMinutes = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60));
         let durationValue = '60';
@@ -151,49 +194,55 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
           customHours = Math.floor(durationMinutes / 60);
           customMinutes = durationMinutes % 60;
         }
-        
+
         reset({
           title: event.title,
+          eventType: 'reuniao',
+          responsavel: (event as any).responsavelId || usuarioAtual?.id || '',
           isAllDay: event.allDay || false,
           startDate: startDate.toISOString().split('T')[0],
           startTime: startDate.toTimeString().slice(0, 5),
           duration: durationValue,
           customDurationHours: customHours,
           customDurationMinutes: customMinutes,
+          locationType: (event as any).locationType || 'presencial',
           location: event.location || '',
           description: event.description || '',
+          status: event.status || 'pending',
           reminderTime: 10,
           reminderType: 'notification',
           emailOffline: false,
           participants: event.attendees || [],
           attachments: []
         });
-        
-        setIsConfirmed(event.status === 'confirmed');
+
         setParticipants(event.attendees || []);
       } else {
         // Novo evento
         const defaultDate = selectedDate || new Date();
         const dateStr = defaultDate.toISOString().split('T')[0];
-        
+
         reset({
           title: '',
+          eventType: 'reuniao',
+          responsavel: usuarioAtual?.id || '',
           isAllDay: false,
           startDate: dateStr,
           startTime: '09:00',
           duration: '60',
           customDurationHours: 0,
           customDurationMinutes: 0,
+          locationType: 'presencial',
           location: '',
           description: '',
+          status: 'pending',
           reminderTime: 10,
           reminderType: 'notification',
           emailOffline: false,
           participants: [],
           attachments: []
         });
-        
-        setIsConfirmed(true);
+
       }
     }
   }, [isOpen, event, selectedDate, reset]);
@@ -201,7 +250,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
   const onSubmit = async (data: EventFormData) => {
     try {
       let endDate: Date;
-      
+
       if (data.isAllDay) {
         endDate = new Date(data.startDate);
       } else {
@@ -218,16 +267,23 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
         endDate = new Date(startDateTime.getTime() + durationMinutes * 60 * 1000);
       }
 
+      // Encontrar o nome do usuário responsável
+      const responsavelUsuario = usuarios.find(u => u.id === data.responsavel);
+
       const eventData = {
         title: data.title,
+        eventType: data.eventType,
+        responsavel: responsavelUsuario?.nome || data.responsavel,
+        responsavelId: data.responsavel,
         allDay: data.isAllDay,
-        start: data.isAllDay 
+        start: data.isAllDay
           ? new Date(data.startDate)
           : new Date(`${data.startDate}T${data.startTime}`),
         end: endDate,
+        locationType: data.locationType,
         location: data.location || '',
         description: data.description || '',
-        status: isConfirmed ? 'confirmed' : 'pending',
+        status: data.status,
         attendees: participants,
         reminderTime: data.reminderTime,
         reminderType: data.reminderType,
@@ -240,7 +296,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
       const isEditing = !!event;
       showSuccess(
         isEditing ? 'Evento Atualizado' : 'Evento Criado',
-        isEditing 
+        isEditing
           ? `Evento "${data.title}" foi atualizado com sucesso`
           : `Evento "${data.title}" foi criado para ${new Date(data.startDate).toLocaleDateString('pt-BR')}`
       );
@@ -248,7 +304,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
       // Adicionar notificação ao sistema
       addNotification({
         title: isEditing ? '📅 Evento Atualizado' : '📅 Novo Evento',
-        message: isEditing 
+        message: isEditing
           ? `Evento "${data.title}" foi modificado`
           : `Evento "${data.title}" agendado para ${new Date(data.startDate).toLocaleDateString('pt-BR')}`,
         type: 'success',
@@ -270,7 +326,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
       // Criar lembrete automático se configurado
       if (data.reminderTime && data.reminderType && !data.isAllDay) {
         const reminderDateTime = new Date(eventData.start.getTime() - (data.reminderTime * 60 * 1000));
-        
+
         // Só criar lembrete se for no futuro
         if (reminderDateTime > new Date()) {
           addReminder({
@@ -279,7 +335,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
             entityType: 'agenda',
             entityId: eventData.start.getTime().toString(),
             scheduledFor: reminderDateTime,
-            recurring: false
+            active: true
           });
 
           // Notificação sobre o lembrete criado
@@ -310,11 +366,11 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
         showError('Email Inválido', 'Por favor, insira um email válido');
         return;
       }
-      
+
       setParticipants([...participants, email]);
       setNewParticipantEmail('');
       setShowAddParticipant(false);
-      
+
       showSuccess('Participante Adicionado', `${email} foi adicionado ao evento`);
     }
   };
@@ -363,31 +419,31 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[95vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-semibold text-gray-900">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="text-lg font-semibold text-gray-900">
             {event ? 'Editar evento' : 'Criar evento'}
           </h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Form em formato paisagem */}
-        <form onSubmit={handleSubmit(onSubmit)} className="p-6">
-          <div className="grid grid-cols-3 gap-8">
+        <form onSubmit={handleSubmit(onSubmit)} className="p-4">
+          <div className="grid grid-cols-3 gap-6">
             {/* Coluna 1 - Informações Básicas */}
-            <div className="space-y-6">
-              <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Informações Básicas</h3>
-              
+            <div className="space-y-4">
+              <h3 className="text-md font-medium text-gray-900 border-b pb-1">Informações Básicas</h3>
+
               {/* Título */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Título *
                 </label>
                 <Controller
@@ -398,65 +454,230 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                       {...field}
                       type="text"
                       placeholder="Adicionar título"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                     />
                   )}
                 />
                 {errors.title && (
-                  <p className="text-red-500 text-sm mt-1">{errors.title.message}</p>
+                  <p className="text-red-500 text-xs mt-0.5">{errors.title.message}</p>
                 )}
               </div>
 
-              {/* Toggle Dia todo / Confirmado */}
-              <div className="flex items-center justify-between py-3 border border-gray-200 rounded-lg px-4">
-                <div className="flex items-center space-x-4">
-                  <span className="text-sm text-gray-700">Dia todo</span>
-                  <Controller
-                    name="isAllDay"
-                    control={control}
-                    render={({ field }) => (
+              {/* Tipo de Evento */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tipo de Evento *
+                </label>
+                <Controller
+                  name="eventType"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="grid grid-cols-2 gap-1">
                       <button
                         type="button"
-                        onClick={() => field.onChange(!field.value)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          field.value ? 'bg-blue-600' : 'bg-gray-200'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            field.value ? 'translate-x-6' : 'translate-x-1'
+                        onClick={() => field.onChange('reuniao')}
+                        className={`flex items-center gap-1 p-2 border rounded-md transition-colors ${field.value === 'reuniao'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
                           }`}
-                        />
+                      >
+                        <Users className="w-3 h-3" />
+                        <span className="text-xs font-medium">Reunião</span>
                       </button>
-                    )}
-                  />
-                  <span className="text-sm text-gray-700">Confirmado</span>
-                </div>
+                      <button
+                        type="button"
+                        onClick={() => field.onChange('tarefa')}
+                        className={`flex items-center gap-1 p-2 border rounded-md transition-colors ${field.value === 'tarefa'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                          }`}
+                      >
+                        <CheckSquare className="w-3 h-3" />
+                        <span className="text-xs font-medium">Tarefa</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => field.onChange('evento')}
+                        className={`flex items-center gap-1 p-2 border rounded-md transition-colors ${field.value === 'evento'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                          }`}
+                      >
+                        <Calendar className="w-3 h-3" />
+                        <span className="text-xs font-medium">Evento</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => field.onChange('follow-up')}
+                        className={`flex items-center gap-1 p-2 border rounded-md transition-colors ${field.value === 'follow-up'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                          }`}
+                      >
+                        <Phone className="w-3 h-3" />
+                        <span className="text-xs font-medium">Follow-up</span>
+                      </button>
+                    </div>
+                  )}
+                />
+                {errors.eventType && (
+                  <p className="text-red-500 text-sm mt-1">{errors.eventType.message}</p>
+                )}
+              </div>
+
+              {/* Responsável */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Responsável *
+                </label>
+                <Controller
+                  name="responsavel"
+                  control={control}
+                  render={({ field }) => (
+                    <select
+                      {...field}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      disabled={loadingUsuarios}
+                    >
+                      {loadingUsuarios ? (
+                        <option value="">Carregando usuários...</option>
+                      ) : (
+                        <>
+                          <option value="">Selecionar responsável</option>
+                          {usuarios.map((usuario) => (
+                            <option key={usuario.id} value={usuario.id}>
+                              {usuario.nome} ({usuario.email})
+                            </option>
+                          ))}
+                        </>
+                      )}
+                    </select>
+                  )}
+                />
+                {errors.responsavel && (
+                  <p className="text-red-500 text-xs mt-0.5">{errors.responsavel.message}</p>
+                )}
+              </div>
+
+              {/* Status do Evento */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status do Evento *
+                </label>
+                <Controller
+                  name="status"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="grid grid-cols-3 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => field.onChange('pending')}
+                        className={`flex items-center justify-center gap-1 p-2 border rounded-md transition-colors ${field.value === 'pending'
+                          ? 'border-yellow-500 bg-yellow-50 text-yellow-700'
+                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                          }`}
+                      >
+                        <Clock className="w-3 h-3" />
+                        <span className="text-xs font-medium">Pendente</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => field.onChange('confirmed')}
+                        className={`flex items-center justify-center gap-1 p-2 border rounded-md transition-colors ${field.value === 'confirmed'
+                          ? 'border-green-500 bg-green-50 text-green-700'
+                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                          }`}
+                      >
+                        <CheckSquare className="w-3 h-3" />
+                        <span className="text-xs font-medium">Confirmado</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => field.onChange('cancelled')}
+                        className={`flex items-center justify-center gap-1 p-2 border rounded-md transition-colors ${field.value === 'cancelled'
+                          ? 'border-red-500 bg-red-50 text-red-700'
+                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                          }`}
+                      >
+                        <X className="w-3 h-3" />
+                        <span className="text-xs font-medium">Cancelado</span>
+                      </button>
+                    </div>
+                  )}
+                />
+                {errors.status && (
+                  <p className="text-red-500 text-xs mt-0.5">{errors.status.message}</p>
+                )}
               </div>
 
               {/* Localização */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <MapPin className="w-4 h-4 inline mr-1" />
-                  Local
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Local *
                 </label>
+
+                {/* Tipo de Local */}
+                <div className="mb-2">
+                  <Controller
+                    name="locationType"
+                    control={control}
+                    render={({ field }) => (
+                      <div className="grid grid-cols-2 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => field.onChange('presencial')}
+                          className={`flex items-center justify-center gap-1 p-2 border rounded-md transition-colors ${field.value === 'presencial'
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                            }`}
+                        >
+                          <MapPinIcon className="w-3 h-3" />
+                          <span className="text-xs font-medium">Presencial</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => field.onChange('virtual')}
+                          className={`flex items-center justify-center gap-1 p-2 border rounded-md transition-colors ${field.value === 'virtual'
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                            }`}
+                        >
+                          <Monitor className="w-3 h-3" />
+                          <span className="text-xs font-medium">Virtual</span>
+                        </button>
+                      </div>
+                    )}
+                  />
+                  {errors.locationType && (
+                    <p className="text-red-500 text-xs mt-0.5">{errors.locationType.message}</p>
+                  )}
+                </div>
+
+                {/* Detalhes do Local */}
                 <Controller
                   name="location"
                   control={control}
-                  render={({ field }) => (
-                    <input
-                      {...field}
-                      type="text"
-                      placeholder="Adicionar local"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  )}
+                  render={({ field }) => {
+                    const locationType = watch('locationType');
+                    const placeholder = locationType === 'virtual'
+                      ? 'Link da reunião (Zoom, Teams, Meet, etc.)'
+                      : 'Endereço ou nome do local';
+
+                    return (
+                      <input
+                        {...field}
+                        type="text"
+                        placeholder={placeholder}
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      />
+                    );
+                  }}
                 />
               </div>
 
               {/* Descrição */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Descrição
                 </label>
                 <Controller
@@ -466,43 +687,65 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                     <textarea
                       {...field}
                       rows={4}
-                      placeholder="Adicionar descrição"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                      placeholder="Adicionar descrição do evento..."
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
                     />
                   )}
                 />
+                {errors.description && (
+                  <p className="text-red-500 text-xs mt-0.5">{errors.description.message}</p>
+                )}
               </div>
             </div>
 
             {/* Coluna 2 - Data e Horário */}
-            <div className="space-y-6">
-              <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Data e Horário</h3>
-              
-              {/* Data do evento */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Clock className="w-4 h-4 inline mr-1" />
-                  Data do evento *
-                </label>
-                <Controller
-                  name="startDate"
-                  control={control}
-                  render={({ field }) => (
-                    <input
-                      {...field}
-                      type="date"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  )}
-                />
+            <div className="space-y-4">
+              <h3 className="text-md font-medium text-gray-900 border-b pb-1">Data e Horário</h3>
+
+              {/* Data do evento e toggle dia todo */}
+              <div className="flex items-end space-x-2">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Data do evento *
+                  </label>
+                  <Controller
+                    name="startDate"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                        {...field}
+                        type="date"
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      />
+                    )}
+                  />
+                </div>
+                <div className="flex items-center space-x-1 pb-1.5">
+                  <Controller
+                    name="isAllDay"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                        type="checkbox"
+                        id="isAllDay"
+                        checked={field.value}
+                        onChange={field.onChange}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                    )}
+                  />
+                  <label htmlFor="isAllDay" className="text-xs font-medium text-gray-700 whitespace-nowrap">
+                    O dia todo
+                  </label>
+                </div>
               </div>
 
               {/* Horário e Duração */}
               {!isAllDay && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2">
                   {/* Horário de início */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Horário de início *
                     </label>
                     <Controller
@@ -512,7 +755,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                         <input
                           {...field}
                           type="time"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
                       )}
                     />
@@ -520,7 +763,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
 
                   {/* Duração */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Duração
                     </label>
                     <Controller
@@ -529,11 +772,11 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                       render={({ field }) => (
                         <select
                           {...field}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         >
-                          <option value="15">15 minutos</option>
-                          <option value="30">30 minutos</option>
-                          <option value="45">45 minutos</option>
+                          <option value="15">15 min</option>
+                          <option value="30">30 min</option>
+                          <option value="45">45 min</option>
                           <option value="60">1 hora</option>
                           <option value="90">1h 30min</option>
                           <option value="120">2 horas</option>
@@ -551,7 +794,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
               {/* Campo personalizado para duração */}
               {!isAllDay && watch('duration') === 'custom' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Duração personalizada
                   </label>
                   <div className="flex space-x-2">
@@ -565,11 +808,11 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                           min="0"
                           max="23"
                           placeholder="0"
-                          className="w-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-16 px-2 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
                       )}
                     />
-                    <span className="flex items-center text-sm text-gray-600">horas</span>
+                    <span className="flex items-center text-xs text-gray-600">h</span>
                     <Controller
                       name="customDurationMinutes"
                       control={control}
@@ -580,19 +823,19 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                           min="0"
                           max="59"
                           placeholder="0"
-                          className="w-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-16 px-2 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
                       )}
                     />
-                    <span className="flex items-center text-sm text-gray-600">minutos</span>
+                    <span className="flex items-center text-xs text-gray-600">min</span>
                   </div>
                 </div>
               )}
 
               {/* Exibir horário de término calculado */}
               {!isAllDay && watch('startTime') && watch('duration') && (
-                <div className="bg-blue-50 p-3 rounded-md">
-                  <p className="text-sm text-blue-700">
+                <div className="bg-blue-50 p-2 rounded-md">
+                  <p className="text-xs text-blue-700">
                     <strong>Término previsto:</strong> {calculateEndTime(watch('startTime'), watch('duration'), watch('customDurationHours'), watch('customDurationMinutes'))}
                   </p>
                 </div>
@@ -600,19 +843,18 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
 
               {/* Lembrete */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Bell className="w-4 h-4 inline mr-1" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Lembrete
                 </label>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-1">
                     <Controller
                       name="reminderType"
                       control={control}
                       render={({ field }) => (
                         <select
                           {...field}
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="flex-1 px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         >
                           <option value="notification">Notificação</option>
                           <option value="email">E-mail</option>
@@ -620,7 +862,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                         </select>
                       )}
                     />
-                    
+
                     <Controller
                       name="reminderTime"
                       control={control}
@@ -630,14 +872,14 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                           type="number"
                           min="1"
                           max="60"
-                          className="w-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-16 px-2 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
                       )}
                     />
-                    
-                    <span className="text-sm text-gray-600">min antes</span>
+
+                    <span className="text-xs text-gray-600">min antes</span>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <Controller
                       name="emailOffline"
@@ -651,8 +893,8 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                         />
                       )}
                     />
-                    <span className="text-sm text-gray-700 flex items-center">
-                      <Mail className="w-4 h-4 mr-1" />
+                    <span className="text-xs text-gray-700 flex items-center">
+                      <Mail className="w-3 h-3 mr-1" />
                       E-mail se offline
                     </span>
                   </div>
@@ -661,52 +903,51 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
             </div>
 
             {/* Coluna 3 - Participantes e Ações */}
-            <div className="space-y-6">
-              <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Participantes e Recursos</h3>
-              
+            <div className="space-y-4">
+              <h3 className="text-md font-medium text-gray-900 border-b pb-1">Participantes</h3>
+
               {/* Participantes */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Users className="w-4 h-4 inline mr-1" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Participantes
                 </label>
-                
+
                 {/* Lista de participantes adicionados */}
                 {participants.length > 0 && (
-                  <div className="mb-3">
-                    <div className="flex flex-wrap gap-2">
+                  <div className="mb-2">
+                    <div className="flex flex-wrap gap-1">
                       {participants.map((email, index) => (
                         <div
                           key={index}
                           className="relative group"
                         >
                           {/* Avatar com tooltip */}
-                          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium cursor-pointer hover:bg-blue-600 transition-colors relative">
+                          <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-medium cursor-pointer hover:bg-blue-600 transition-colors relative">
                             {email.charAt(0).toUpperCase()}
-                            
+
                             {/* Botão de remoção (aparece no hover) */}
                             <button
                               type="button"
                               onClick={() => handleRemoveParticipant(email)}
-                              className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                              className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-xs hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100"
                               title="Remover participante"
                             >
-                              <X className="w-3 h-3" />
+                              <X className="w-2 h-2" />
                             </button>
                           </div>
 
                           {/* Tooltip com email completo */}
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
                             {email}
                             {/* Seta do tooltip */}
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900"></div>
                           </div>
                         </div>
                       ))}
-                      
+
                       {/* Contador de participantes */}
-                      <div className="flex items-center text-sm text-gray-500 ml-2">
-                        <Users className="w-4 h-4 mr-1" />
+                      <div className="flex items-center text-xs text-gray-500 ml-1">
+                        <Users className="w-3 h-3 mr-1" />
                         {participants.length} participante{participants.length !== 1 ? 's' : ''}
                       </div>
                     </div>
@@ -715,24 +956,24 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
 
                 {/* Formulário de adicionar participante */}
                 {showAddParticipant ? (
-                  <div className="mb-3 space-y-2">
-                    <div className="flex space-x-2">
+                  <div className="mb-2 space-y-1">
+                    <div className="flex space-x-1">
                       <input
                         type="email"
                         value={newParticipantEmail}
                         onChange={(e) => setNewParticipantEmail(e.target.value)}
                         onKeyPress={handleKeyPressParticipant}
                         placeholder="email@exemplo.com"
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         autoFocus
                       />
                       <button
                         type="button"
                         onClick={handleAddParticipantFromInput}
-                        className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                        className="px-2 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                         title="Adicionar"
                       >
-                        <Plus className="w-4 h-4" />
+                        <Plus className="w-3 h-3" />
                       </button>
                       <button
                         type="button"
@@ -740,17 +981,17 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                           setShowAddParticipant(false);
                           setNewParticipantEmail('');
                         }}
-                        className="px-3 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors"
+                        className="px-2 py-1.5 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors"
                         title="Cancelar"
                       >
-                        <X className="w-4 h-4" />
+                        <X className="w-3 h-3" />
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="mb-3">
-                    <select 
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+                  <div className="mb-2">
+                    <select
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1 text-sm"
                       onChange={(e) => {
                         if (e.target.value) {
                           handleAddParticipant(e.target.value);
@@ -771,81 +1012,37 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowAddParticipant(true)}
-                  className="text-blue-600 text-sm hover:text-blue-800 flex items-center transition-colors"
+                  className="text-blue-600 text-xs hover:text-blue-800 flex items-center transition-colors"
                 >
-                  <Plus className="w-4 h-4 mr-1" />
+                  <Plus className="w-3 h-3 mr-1" />
                   Adicionar participante
                 </button>
-              </div>
-              
-              {/* Recursos/Ativos */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Recursos
-                </label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">Selecionar recursos</option>
-                  <option value="sala1">Sala de Reuniões 1</option>
-                  <option value="sala2">Sala de Reuniões 2</option>
-                  <option value="projetor">Projetor</option>
-                  <option value="notebook">Notebook</option>
-                </select>
-              </div>
-
-              {/* Ações Rápidas */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="text-sm font-medium text-gray-700 mb-3">Ações Rápidas</h4>
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                    onClick={() => {/* Duplicar evento */}}
-                  >
-                    Duplicar evento
-                  </button>
-                  <button
-                    type="button"
-                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                    onClick={() => {/* Criar série */}}
-                  >
-                    Criar evento recorrente
-                  </button>
-                  {event && (
-                    <button
-                      type="button"
-                      className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                      onClick={handleDelete}
-                    >
-                      Excluir evento
-                    </button>
-                  )}
-                </div>
               </div>
             </div>
           </div>
 
-          {/* Resumo de Participantes */}
+          {/* Resumo de Participantes - Compacto */}
           {participants.length > 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
-              <div className="flex items-center space-x-2 mb-3">
-                <UserCheck className="w-5 h-5 text-blue-600" />
-                <h4 className="text-sm font-medium text-blue-900">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+              <div className="flex items-center space-x-2 mb-2">
+                <UserCheck className="w-4 h-4 text-blue-600" />
+                <h4 className="text-xs font-medium text-blue-900">
                   Participantes Convidados ({participants.length})
                 </h4>
               </div>
-              
-              <div className="flex items-center space-x-3">
+
+              <div className="flex items-center space-x-2">
                 {/* Avatares dos participantes */}
-                <div className="flex -space-x-2">
+                <div className="flex -space-x-1">
                   {participants.slice(0, 5).map((email, index) => (
                     <div
                       key={index}
                       className="relative group"
                     >
-                      <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-medium border-2 border-white hover:z-10 cursor-pointer">
+                      <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-medium border-2 border-white hover:z-10 cursor-pointer">
                         {email.charAt(0).toUpperCase()}
                       </div>
-                      
+
                       {/* Tooltip para o resumo */}
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-20">
                         {email}
@@ -853,7 +1050,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                       </div>
                     </div>
                   ))}
-                  
+
                   {/* Indicador de mais participantes */}
                   {participants.length > 5 && (
                     <div className="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center text-white text-xs font-medium border-2 border-white">
@@ -861,7 +1058,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                     </div>
                   )}
                 </div>
-                
+
                 {/* Lista completa em texto pequeno */}
                 <div className="flex-1 text-xs text-blue-600">
                   {participants.length <= 3 ? (
@@ -871,8 +1068,8 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                   )}
                 </div>
               </div>
-              
-              <p className="text-xs text-blue-600 mt-3 flex items-center">
+
+              <p className="text-xs text-blue-600 mt-2 flex items-center">
                 <Mail className="w-3 h-3 mr-1" />
                 Convites serão enviados por email automaticamente
               </p>
@@ -880,22 +1077,36 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
           )}
 
           {/* Botões de Ação */}
-          <div className="flex justify-end space-x-3 pt-6 mt-6 border-t">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-            >
-              CANCELAR
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-8 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center space-x-2"
-            >
-              {isSubmitting && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-              <span>SALVAR</span>
-            </button>
+          <div className="flex justify-between items-center pt-3 mt-3 border-t">
+            <div>
+              {event && onDelete && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className="px-3 py-1.5 text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors flex items-center space-x-1 text-sm"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Excluir</span>
+                </button>
+              )}
+            </div>
+            <div className="flex space-x-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-1.5 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors text-sm"
+              >
+                CANCELAR
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-6 py-1.5 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center space-x-1 text-sm"
+              >
+                {isSubmitting && <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                <span>SALVAR</span>
+              </button>
+            </div>
           </div>
         </form>
       </div>

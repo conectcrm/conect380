@@ -8,6 +8,12 @@ import { Produto } from '../modules/produtos/produto.entity';
 import { Oportunidade } from '../modules/oportunidades/oportunidade.entity';
 import { Atividade } from '../modules/oportunidades/atividade.entity';
 import { Proposta } from '../modules/propostas/proposta.entity';
+import { Plano } from '../modules/planos/entities/plano.entity';
+import { ModuloSistema } from '../modules/planos/entities/modulo-sistema.entity';
+import { PlanoModulo } from '../modules/planos/entities/plano-modulo.entity';
+import { AssinaturaEmpresa } from '../modules/planos/entities/assinatura-empresa.entity';
+import { Evento } from '../modules/eventos/evento.entity';
+import { Fornecedor } from '../modules/financeiro/entities/fornecedor.entity';
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
@@ -21,8 +27,8 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       username: this.configService.get('DATABASE_USERNAME', 'conectcrm'),
       password: this.configService.get('DATABASE_PASSWORD', 'conectcrm123'),
       database: this.configService.get('DATABASE_NAME', 'conectcrm_db'),
-      entities: [User, Empresa, Cliente, Produto, Oportunidade, Atividade, Proposta],
-      synchronize: true, // Habilitado para criar tabelas automaticamente em desenvolvimento
+      entities: [User, Empresa, Cliente, Produto, Oportunidade, Atividade, Proposta, Plano, ModuloSistema, PlanoModulo, AssinaturaEmpresa, Evento, Fornecedor],
+      synchronize: false, // Desabilitado temporariamente devido a conflitos de schema
       logging: this.configService.get('APP_ENV') === 'development',
       ssl: this.configService.get('APP_ENV') === 'production' ? {
         rejectUnauthorized: false,

@@ -26,7 +26,7 @@ export const useUsuarios = () => {
     try {
       if (mostrarLoading) setLoading(true);
       setError(null);
-      
+
       const usuariosData = await usuariosService.listarUsuarios(filtros);
       setUsuarios(usuariosData);
     } catch (error: any) {
@@ -56,8 +56,8 @@ export const useUsuarios = () => {
   const atualizarUsuario = async (dados: AtualizarUsuario): Promise<Usuario | null> => {
     try {
       const usuarioAtualizado = await usuariosService.atualizarUsuario(dados);
-      setUsuarios(prev => 
-        prev.map(usuario => 
+      setUsuarios(prev =>
+        prev.map(usuario =>
           usuario.id === dados.id ? usuarioAtualizado : usuario
         )
       );
@@ -86,8 +86,8 @@ export const useUsuarios = () => {
   const alterarStatusUsuario = async (id: string, ativo: boolean): Promise<boolean> => {
     try {
       const usuarioAtualizado = await usuariosService.alterarStatusUsuario(id, ativo);
-      setUsuarios(prev => 
-        prev.map(usuario => 
+      setUsuarios(prev =>
+        prev.map(usuario =>
           usuario.id === id ? usuarioAtualizado : usuario
         )
       );
@@ -155,7 +155,7 @@ export const useEstatisticasUsuarios = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const estatisticasData = await usuariosService.obterEstatisticas();
       setEstatisticas(estatisticasData);
     } catch (error: any) {

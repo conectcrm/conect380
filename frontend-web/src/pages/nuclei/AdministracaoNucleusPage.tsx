@@ -35,7 +35,7 @@ const AdministracaoNucleusPage: React.FC = () => {
         id: 'usuarios-permissoes',
         name: 'Usuários & Permissões',
         description: 'Controle de acesso, perfis de usuário e permissões granulares.',
-        href: '/admin/usuarios',
+        href: '/gestao/usuarios',
         icon: UserCheck,
         notifications: 1,
         status: 'active'
@@ -68,7 +68,7 @@ const AdministracaoNucleusPage: React.FC = () => {
         icon: AlertTriangle,
         notifications: 2,
         badge: 'Ativo',
-        badgeColor: 'orange',
+        badgeColor: 'yellow',
         status: 'active'
       },
       {

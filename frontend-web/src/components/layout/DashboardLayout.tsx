@@ -32,7 +32,8 @@ import {
   Calendar,
   Clock,
   MapPin,
-  MessageCircle
+  MessageCircle,
+  CreditCard
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -114,6 +115,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         title: 'Fluxo de Caixa',
         subtitle: 'Acompanhamento de entradas e saídas'
       },
+      '/billing': {
+        title: 'Billing & Assinaturas',
+        subtitle: 'Gerencie sua assinatura, planos e faturamento'
+      },
       '/configuracoes': {
         title: 'Configurações',
         subtitle: 'Configurações do sistema'
@@ -189,6 +194,13 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       icon: DollarSign,
       href: '/nuclei/financeiro',
       color: 'orange'
+    },
+    {
+      id: 'billing',
+      title: 'Billing',
+      icon: CreditCard,
+      href: '/billing',
+      color: 'green'
     },
     {
       id: 'configuracoes',

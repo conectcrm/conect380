@@ -7,7 +7,8 @@ import {
   BarChart3, 
   Calculator,
   Building2,
-  Repeat
+  Repeat,
+  Users
 } from 'lucide-react';
 import ModulesScreen, { NucleusModulesData } from '../../components/navigation/ModulesScreen';
 
@@ -43,6 +44,15 @@ const FinanceiroNucleusPage: React.FC = () => {
         description: 'Visão completa do fluxo financeiro com projeções e análises detalhadas.',
         href: '/financeiro/fluxo-caixa',
         icon: PiggyBank,
+        notifications: 0,
+        status: 'active'
+      },
+      {
+        id: 'fornecedores',
+        name: 'Fornecedores',
+        description: 'Gestão completa de fornecedores e parceiros comerciais.',
+        href: '/financeiro/fornecedores',
+        icon: Users,
         notifications: 0,
         status: 'active'
       },

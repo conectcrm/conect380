@@ -4,7 +4,9 @@ import { Repository, Between } from 'typeorm';
 import { Proposta as PropostaEntity } from '../propostas/proposta.entity';
 import { User, UserRole } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
+import { Evento } from '../eventos/evento.entity';
 import { MetasService } from '../metas/metas.service';
+import { EventosService } from '../eventos/eventos.service';
 
 export interface DashboardKPIs {
   faturamentoTotal: {
@@ -43,6 +45,21 @@ export interface DashboardKPIs {
   taxaSucessoGeral: {
     percentual: number;
     variacao: number;
+  };
+  agenda: {
+    totalEventos: number;
+    eventosConcluidos: number;
+    proximosEventos: number;
+    eventosHoje: number;
+    estatisticasPorTipo: {
+      reuniao: number;
+      ligacao: number;
+      apresentacao: number;
+      visita: number;
+      'follow-up': number;
+      outro: number;
+    };
+    produtividade: number;
   };
 }
 
@@ -83,12 +100,13 @@ export class DashboardService {
     @InjectRepository(Cliente)
     private clienteRepository: Repository<Cliente>,
     private metasService: MetasService,
+    private eventosService: EventosService,
   ) { }
 
   /**
    * Obter KPIs principais do dashboard
    */
-  async getKPIs(periodo: string = 'mensal', vendedorId?: string, regiao?: string): Promise<DashboardKPIs> {
+  async getKPIs(periodo: string = 'mensal', vendedorId?: string, regiao?: string, empresaId?: number): Promise<DashboardKPIs> {
     const { dataInicio, dataFim } = this.getDateRange(periodo);
     const periodoAnterior = this.getDateRange(this.getPeriodoAnterior(periodo));
 
@@ -137,6 +155,16 @@ export class DashboardService {
     const taxaSucessoAnterior = await this.calculateTaxaSucesso(periodoAnterior.dataInicio, periodoAnterior.dataFim, vendedorId, regiao);
     const variacaoTaxaSucesso = taxaSucessoAnterior > 0 ? taxaSucessoAtual - taxaSucessoAnterior : 0;
 
+    // Estatísticas da Agenda - filtrar por empresa do usuário logado
+    // empresaId deve ser string UUID, não number
+    const empresaIdString = empresaId ? empresaId.toString() : undefined;
+    const eventStats = await this.eventosService.getEventStatsByPeriod(
+      dataInicio.toISOString().split('T')[0],
+      dataFim.toISOString().split('T')[0],
+      vendedorId,
+      empresaIdString
+    );
+
     return {
       faturamentoTotal: {
         valor: faturamentoAtual,
@@ -174,6 +202,14 @@ export class DashboardService {
       taxaSucessoGeral: {
         percentual: Number(taxaSucessoAtual.toFixed(1)),
         variacao: Number(variacaoTaxaSucesso.toFixed(1))
+      },
+      agenda: {
+        totalEventos: eventStats.totalEventos,
+        eventosConcluidos: eventStats.eventosConcluidos,
+        proximosEventos: eventStats.proximosEventos,
+        eventosHoje: eventStats.eventosHoje,
+        estatisticasPorTipo: eventStats.estatisticasPorTipo,
+        produtividade: eventStats.produtividade
       }
     };
   }
@@ -454,7 +490,7 @@ export class DashboardService {
 
   private async calculateNovosClientes(dataInicio: Date, dataFim: Date, regiao?: string): Promise<number> {
     const whereConditions: any = {
-      criadoEm: Between(dataInicio.toISOString(), dataFim.toISOString())
+      created_at: Between(dataInicio.toISOString(), dataFim.toISOString())
     };
 
     return await this.clienteRepository.count({ where: whereConditions });

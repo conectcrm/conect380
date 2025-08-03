@@ -20,12 +20,12 @@ import FinanceiroPage from './features/financeiro/FinanceiroPage';
 import ConfiguracoesPage from './features/configuracoes/ConfiguracoesPage';
 import ContasReceberPage from './features/financeiro/ContasReceberPage';
 import ContasPagarPage from './pages/gestao/financeiro/ContasPagarSimplificada';
+import FornecedoresPage from './features/financeiro/fornecedores/FornecedoresPage';
 import { AgendaPage } from './features/agenda/AgendaPage';
 import { OportunidadesPage } from './features/oportunidades/OportunidadesPage';
 import { ExemploModalProduto } from './examples/ExemploModalProduto';
 import CombosPage from './features/combos/CombosPage';
 import NovoComboPage from './features/combos/NovoComboPage';
-import CentralOperacoesPage from './pages/CentralOperacoesPage';
 import NotificationsPage from './pages/NotificationsPage';
 import FunilVendas from './pages/FunilVendas';
 // Importar páginas de núcleos
@@ -53,6 +53,7 @@ import MetasConfiguracao from './pages/configuracoes/MetasConfiguracao';
 import TestePortalPage from './pages/TestePortalPage';
 import PortalClientePage from './pages/PortalClientePage';
 import ConfiguracaoEmailPage from './pages/ConfiguracaoEmailPage';
+import { BillingPage } from './pages/billing';
 
 // Configuração do React Query
 const queryClient = new QueryClient({
@@ -110,6 +111,97 @@ const AppRoutes: React.FC = () => {
           <Route path="/gestao/empresas" element={<EmpresasListPage />} />
           <Route path="/gestao/usuarios" element={<UsuariosPage />} />
 
+          {/* Rotas do módulo de Administração */}
+          <Route path="/admin/relatorios" element={
+            <ModuleUnderConstruction
+              moduleName="Relatórios Avançados"
+              description="Analytics empresarial, dashboards executivos e KPIs estratégicos"
+              estimatedCompletion="Q2 2025"
+              features={[
+                "Dashboards executivos",
+                "KPIs estratégicos",
+                "Analytics de vendas",
+                "Relatórios customizados",
+                "Exportação avançada"
+              ]}
+            />
+          } />
+
+          <Route path="/admin/auditoria" element={
+            <ModuleUnderConstruction
+              moduleName="Auditoria & Logs"
+              description="Rastreamento de ações, logs de sistema e conformidade"
+              estimatedCompletion="Q3 2025"
+              features={[
+                "Log de atividades",
+                "Auditoria de acessos",
+                "Histórico de alterações",
+                "Relatórios de conformidade",
+                "Monitoramento em tempo real"
+              ]}
+            />
+          } />
+
+          <Route path="/admin/monitoramento" element={
+            <ModuleUnderConstruction
+              moduleName="Monitoramento de Sistema"
+              description="Status do sistema, performance e alertas de infraestrutura"
+              estimatedCompletion="Q3 2025"
+              features={[
+                "Monitor de performance",
+                "Alertas em tempo real",
+                "Status de serviços",
+                "Métricas de uso",
+                "Dashboard de infraestrutura"
+              ]}
+            />
+          } />
+
+          <Route path="/admin/analytics" element={
+            <ModuleUnderConstruction
+              moduleName="Dados & Analytics"
+              description="Análise de dados, métricas de uso e inteligência de negócios"
+              estimatedCompletion="Q4 2025"
+              features={[
+                "Análise de dados",
+                "Métricas de uso",
+                "Business Intelligence",
+                "Dashboards interativos",
+                "Relatórios estatísticos"
+              ]}
+            />
+          } />
+
+          <Route path="/admin/conformidade" element={
+            <ModuleUnderConstruction
+              moduleName="Políticas & Conformidade"
+              description="Gestão de políticas internas, LGPD e compliance regulatório"
+              estimatedCompletion="Q4 2025"
+              features={[
+                "Gestão de políticas",
+                "Compliance LGPD",
+                "Controle de consentimento",
+                "Auditoria de conformidade",
+                "Relatórios regulatórios"
+              ]}
+            />
+          } />
+
+          <Route path="/admin/acesso" element={
+            <ModuleUnderConstruction
+              moduleName="Controle de Acesso"
+              description="Configuração de roles, permissões e políticas de segurança avançadas"
+              estimatedCompletion="Q2 2025"
+              features={[
+                "Gestão de roles",
+                "Permissões granulares",
+                "Políticas de segurança",
+                "Autenticação 2FA",
+                "Controle de sessões"
+              ]}
+            />
+          } />
+
           {/* Gerenciamento de Empresas do Usuário */}
           <Route path="/empresas/minhas" element={<MinhasEmpresasPage />} />
           <Route path="/empresas/:empresaId/configuracoes" element={<ConfiguracaoEmpresaPage />} />
@@ -119,6 +211,7 @@ const AppRoutes: React.FC = () => {
 
           {/* Configurações globais da empresa ativa */}
           <Route path="/configuracoes/empresa" element={<ConfiguracaoEmpresaPage />} />
+          <Route path="/configuracoes/email" element={<ConfiguracaoEmailPage />} />
           <Route path="/configuracoes/chatwoot" element={<ChatwootConfiguracao />} />
           <Route path="/configuracoes/metas" element={<MetasConfiguracao />} />
           <Route path="/relatorios/analytics" element={<RelatoriosAnalyticsPage />} />
@@ -127,6 +220,9 @@ const AppRoutes: React.FC = () => {
 
           {/* Sistema de Suporte */}
           <Route path="/suporte" element={<SuportePage />} />
+
+          {/* Sistema de Billing e Assinaturas */}
+          <Route path="/billing" element={<BillingPage />} />
 
           {/* Exemplo Modal Produto */}
           <Route path="/exemplo-produto" element={<ExemploModalProduto />} />
@@ -160,6 +256,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/financeiro" element={<FinanceiroPage />} />
           <Route path="/financeiro/contas-receber" element={<ContasReceberPage />} />
           <Route path="/financeiro/contas-pagar" element={<ContasPagarPage />} />
+          <Route path="/financeiro/fornecedores" element={<FornecedoresPage />} />
 
           {/* Módulos financeiros em desenvolvimento */}
           <Route path="/financeiro/faturamento" element={

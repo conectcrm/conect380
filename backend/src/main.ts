@@ -12,11 +12,17 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // Log de todas as requisições
+  app.use((req, res, next) => {
+    console.log(`🔍 [REQUEST] ${req.method} ${req.url} - Body:`, req.body ? JSON.stringify(req.body) : 'Empty');
+    next();
+  });
+
   // Validação global
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false, // Temporariamente desabilitado para debug
       transform: true,
     }),
   );

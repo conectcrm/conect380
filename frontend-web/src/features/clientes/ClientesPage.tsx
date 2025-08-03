@@ -9,16 +9,16 @@ import { ModalDetalhesCliente } from '../../components/modals/ModalDetalhesClien
 import { ClienteCard } from '../../components/clientes';
 import { clientesService, Cliente, ClienteFilters, PaginatedClientes } from '../../services/clientesService';
 import { UploadResult } from '../../services/uploadService';
-import { 
-  Users, 
+import {
+  Users,
   User,
-  Plus, 
-  Search, 
-  Filter, 
-  Download, 
-  Eye, 
-  Edit, 
-  Trash2, 
+  Plus,
+  Search,
+  Filter,
+  Download,
+  Eye,
+  Edit,
+  Trash2,
   MoreVertical,
   Phone,
   Mail,
@@ -72,20 +72,20 @@ const ClientesPage: React.FC = () => {
   const loadClientes = async () => {
     try {
       setIsLoading(true);
-      
+
       const data = await clientesService.getClientes(filters);
       setClientesData(data);
       setClientes(data.data);
-      
+
     } catch (error) {
       console.error('❌ Erro ao carregar clientes:', error);
-      
+
       toast.error('Erro ao carregar clientes do servidor. Verifique sua conexão.', {
         duration: 5000,
         position: 'top-right',
         icon: '❌',
       });
-      
+
       // Em caso de erro, manter dados vazios
       setClientes([]);
       setClientesData({
@@ -137,7 +137,7 @@ const ClientesPage: React.FC = () => {
         tipo: selectedTipo,
         page: 1 // Reset para primeira página quando filtros mudam
       };
-      
+
       setFilters(newFilters);
     }, 300); // 300ms de delay para busca
 
@@ -156,7 +156,7 @@ const ClientesPage: React.FC = () => {
   useEffect(() => {
     // Carregar estatísticas do servidor na primeira carga
     loadEstatisticas();
-    
+
     // Notificação de boas-vindas (apenas uma vez)
     const hasWelcomeNotification = localStorage.getItem('conect_welcome_notification');
     if (!hasWelcomeNotification) {
@@ -227,21 +227,21 @@ const ClientesPage: React.FC = () => {
 
   const handleBulkDelete = async () => {
     if (selectedClientes.length === 0) return;
-    
+
     const confirmMessage = `Tem certeza que deseja excluir ${selectedClientes.length} cliente(s) selecionado(s)?`;
     if (window.confirm(confirmMessage)) {
       try {
         const loadingToast = toast.loading(`Excluindo ${selectedClientes.length} cliente(s)...`);
-        
+
         // Excluir todos os clientes selecionados
         await Promise.all(selectedClientes.map(id => clientesService.deleteCliente(id)));
-        
+
         // Recarregar lista
         await loadClientes();
-        
+
         // Limpar seleção
         setSelectedClientes([]);
-        
+
         toast.dismiss(loadingToast);
         toast.success(`${selectedClientes.length} cliente(s) excluído(s) com sucesso!`, {
           duration: 4000,
@@ -261,14 +261,14 @@ const ClientesPage: React.FC = () => {
 
   const handleBulkExport = async () => {
     if (selectedClientes.length === 0) return;
-    
+
     try {
       // Filtrar apenas os clientes selecionados
       const selectedFilters = {
         ...filters,
         ids: selectedClientes
       };
-      
+
       const blob = await clientesService.exportClientes(selectedFilters);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -278,7 +278,7 @@ const ClientesPage: React.FC = () => {
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
-      
+
       toast.success(`${selectedClientes.length} cliente(s) exportado(s) com sucesso!`);
     } catch (error) {
       console.error('Erro ao exportar clientes selecionados:', error);
@@ -290,12 +290,12 @@ const ClientesPage: React.FC = () => {
   const handleSaveCliente = async (clienteData: Omit<Cliente, 'id' | 'created_at' | 'updated_at'>) => {
     try {
       setIsModalLoading(true);
-      
+
       if (selectedCliente) {
         // Editar cliente existente
         await clientesService.updateCliente(selectedCliente.id!, clienteData);
         console.log('✅ Cliente editado:', clienteData.nome);
-        
+
         // Notificação de cliente editado
         addNotification({
           title: 'Cliente Atualizado',
@@ -307,7 +307,7 @@ const ClientesPage: React.FC = () => {
         // Criar novo cliente
         await clientesService.createCliente(clienteData);
         console.log('✅ Novo cliente criado:', clienteData.nome);
-        
+
         // Notificação de novo cliente
         addNotification({
           title: 'Novo Cliente',
@@ -325,14 +325,14 @@ const ClientesPage: React.FC = () => {
           isRecurring: false
         });
       }
-      
+
       // Recarregar a lista de clientes
       await loadClientes();
-      
+
       // Fechar modal
       setShowCreateModal(false);
       setSelectedCliente(null);
-      
+
       console.log('🔄 Lista recarregada, estatísticas serão recalculadas automaticamente');
     } catch (error) {
       console.error('Erro ao salvar cliente:', error);
@@ -347,27 +347,19 @@ const ClientesPage: React.FC = () => {
     if (window.confirm('Tem certeza que deseja excluir este cliente?')) {
       try {
         const loadingToast = toast.loading('Excluindo cliente...');
-        
+
         // Buscar nome do cliente antes de excluir para notificação
         const cliente = clientes.find(c => c.id === id);
         const nomeCliente = cliente?.nome || 'Cliente';
-        
+
         await clientesService.deleteCliente(id);
         await loadClientes();
-        
+
         toast.dismiss(loadingToast);
         toast.success('Cliente excluído com sucesso!', {
           duration: 4000,
           position: 'top-right',
           icon: '✅',
-        });
-
-        // Notificação do sistema
-        addNotification({
-          title: 'Cliente Excluído',
-          message: `Cliente ${nomeCliente} foi removido do sistema`,
-          type: 'warning',
-          priority: 'medium'
         });
       } catch (error) {
         console.error('Erro ao excluir cliente:', error);
@@ -375,14 +367,6 @@ const ClientesPage: React.FC = () => {
           duration: 5000,
           position: 'top-right',
           icon: '❌',
-        });
-
-        // Notificação de erro
-        addNotification({
-          title: 'Erro ao Excluir',
-          message: 'Falha ao excluir cliente. Tente novamente.',
-          type: 'error',
-          priority: 'high'
         });
       }
     }
@@ -415,7 +399,7 @@ const ClientesPage: React.FC = () => {
   const handleViewCliente = (cliente: Cliente) => {
     setSelectedCliente(cliente);
     setShowDetailsModal(true);
-    
+
     // Notificação de interação
     addNotification({
       title: 'Cliente Visualizado',
@@ -430,7 +414,7 @@ const ClientesPage: React.FC = () => {
       // TODO: Implementar API call para atualizar avatar
       toast.success('Avatar atualizado com sucesso!');
       // Atualizar localmente
-      setClientes(prev => prev.map(c => 
+      setClientes(prev => prev.map(c =>
         c.id === clienteId ? { ...c, avatar: avatar.url } : c
       ));
     } catch (error) {
@@ -477,7 +461,7 @@ const ClientesPage: React.FC = () => {
           currentModuleName="Clientes"
         />
       </div>
-      
+
       <div className="p-6">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -490,34 +474,32 @@ const ClientesPage: React.FC = () => {
               <div className="flex border border-gray-300 rounded-lg overflow-hidden">
                 <button
                   onClick={() => setViewMode('cards')}
-                  className={`px-3 py-2 text-sm transition-colors ${
-                    viewMode === 'cards' 
-                      ? 'bg-[#159A9C] text-white' 
+                  className={`px-3 py-2 text-sm transition-colors ${viewMode === 'cards'
+                      ? 'bg-[#159A9C] text-white'
                       : 'bg-white text-gray-600 hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   <Grid3X3 className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setViewMode('table')}
-                  className={`px-3 py-2 text-sm transition-colors ${
-                    viewMode === 'table' 
-                      ? 'bg-[#159A9C] text-white' 
+                  className={`px-3 py-2 text-sm transition-colors ${viewMode === 'table'
+                      ? 'bg-[#159A9C] text-white'
                       : 'bg-white text-gray-600 hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   <List className="w-4 h-4" />
                 </button>
               </div>
-              
-              <button 
+
+              <button
                 onClick={handleExportClientes}
                 className="px-4 py-2 border border-[#B4BEC9] rounded-lg hover:bg-[#DEEFE7] flex items-center gap-2 text-sm text-[#002333] transition-colors"
               >
                 <Download className="w-4 h-4" />
                 Exportar
               </button>
-              <button 
+              <button
                 onClick={() => {
                   setSelectedCliente(null);
                   setShowCreateModal(true);
@@ -543,7 +525,7 @@ const ClientesPage: React.FC = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white p-4 rounded-lg border border-[#DEEFE7] shadow-sm">
               <div className="flex items-center">
                 <div className="p-2 bg-green-100 rounded-lg">
@@ -595,7 +577,7 @@ const ClientesPage: React.FC = () => {
                 Limpar todos os filtros
               </button>
             </div>
-            
+
             {/* Grid de filtros */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {/* Busca */}
@@ -775,7 +757,7 @@ const ClientesPage: React.FC = () => {
                             </span>
                           )}
                         </span>
-                        <select 
+                        <select
                           className="text-sm border-gray-300 rounded-md focus:ring-[#159A9C] focus:border-[#159A9C]"
                           value={filters.limit}
                           onChange={(e) => handleLimitChange(Number(e.target.value))}
@@ -790,14 +772,14 @@ const ClientesPage: React.FC = () => {
                         {/* Ações em massa - aparecem quando há seleção */}
                         {selectedClientes.length > 0 && (
                           <>
-                            <button 
+                            <button
                               onClick={handleBulkExport}
                               className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 flex items-center space-x-1 transition-colors"
                             >
                               <Download className="w-4 h-4" />
                               <span>Exportar ({selectedClientes.length})</span>
                             </button>
-                            <button 
+                            <button
                               onClick={handleBulkDelete}
                               className="text-sm bg-red-600 text-white px-3 py-1.5 rounded-md hover:bg-red-700 flex items-center space-x-1 transition-colors"
                             >
@@ -806,7 +788,7 @@ const ClientesPage: React.FC = () => {
                             </button>
                           </>
                         )}
-                        <button 
+                        <button
                           onClick={handleExportClientes}
                           className="text-sm text-gray-600 hover:text-gray-800 flex items-center space-x-1"
                         >
@@ -831,42 +813,39 @@ const ClientesPage: React.FC = () => {
                             />
                           </th>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            <button 
+                            <button
                               onClick={() => handleSort('nome')}
                               className="flex items-center space-x-1 hover:text-[#159A9C] transition-colors"
                             >
                               <span>Cliente</span>
-                              <ChevronRight className={`w-3 h-3 transition-transform ${
-                                filters.sortBy === 'nome' 
-                                  ? filters.sortOrder === 'ASC' ? 'rotate-90' : 'rotate-270' 
+                              <ChevronRight className={`w-3 h-3 transition-transform ${filters.sortBy === 'nome'
+                                  ? filters.sortOrder === 'ASC' ? 'rotate-90' : 'rotate-270'
                                   : 'text-gray-400'
-                              }`} />
+                                }`} />
                             </button>
                           </th>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            <button 
+                            <button
                               onClick={() => handleSort('status')}
                               className="flex items-center space-x-1 hover:text-[#159A9C] transition-colors"
                             >
                               <span>Status</span>
-                              <ChevronRight className={`w-3 h-3 transition-transform ${
-                                filters.sortBy === 'status' 
-                                  ? filters.sortOrder === 'ASC' ? 'rotate-90' : 'rotate-270' 
+                              <ChevronRight className={`w-3 h-3 transition-transform ${filters.sortBy === 'status'
+                                  ? filters.sortOrder === 'ASC' ? 'rotate-90' : 'rotate-270'
                                   : 'text-gray-400'
-                              }`} />
+                                }`} />
                             </button>
                           </th>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            <button 
+                            <button
                               onClick={() => handleSort('created_at')}
                               className="flex items-center space-x-1 hover:text-[#159A9C] transition-colors"
                             >
                               <span>Criado em</span>
-                              <ChevronRight className={`w-3 h-3 transition-transform ${
-                                filters.sortBy === 'created_at' 
-                                  ? filters.sortOrder === 'ASC' ? 'rotate-90' : 'rotate-270' 
+                              <ChevronRight className={`w-3 h-3 transition-transform ${filters.sortBy === 'created_at'
+                                  ? filters.sortOrder === 'ASC' ? 'rotate-90' : 'rotate-270'
                                   : 'text-gray-400'
-                              }`} />
+                                }`} />
                             </button>
                           </th>
                           <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -876,11 +855,10 @@ const ClientesPage: React.FC = () => {
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-100">
                         {clientes.map((cliente, index) => (
-                          <tr 
-                            key={cliente.id} 
-                            className={`hover:bg-blue-50 transition-colors cursor-pointer ${
-                              index % 2 === 0 ? 'bg-white' : 'bg-gray-25'
-                            }`}
+                          <tr
+                            key={cliente.id}
+                            className={`hover:bg-blue-50 transition-colors cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-25'
+                              }`}
                             onClick={() => handleViewCliente(cliente)}
                           >
                             {/* Checkbox de Seleção */}
@@ -917,11 +895,10 @@ const ClientesPage: React.FC = () => {
                             {/* Status Compacto */}
                             <td className="px-4 py-3">
                               <div className="flex items-center space-x-2">
-                                <div className={`w-2 h-2 rounded-full ${
-                                  cliente.status === 'cliente' ? 'bg-green-500' : 
-                                  cliente.status === 'prospect' ? 'bg-blue-500' : 
-                                  cliente.status === 'lead' ? 'bg-yellow-500' : 'bg-gray-400'
-                                }`}></div>
+                                <div className={`w-2 h-2 rounded-full ${cliente.status === 'cliente' ? 'bg-green-500' :
+                                    cliente.status === 'prospect' ? 'bg-blue-500' :
+                                      cliente.status === 'lead' ? 'bg-yellow-500' : 'bg-gray-400'
+                                  }`}></div>
                                 <span className="text-sm text-gray-700 capitalize">
                                   {getStatusText(cliente.status)}
                                 </span>
@@ -933,7 +910,7 @@ const ClientesPage: React.FC = () => {
                               <div className="text-sm text-gray-700">
                                 {cliente.created_at ? new Date(cliente.created_at).toLocaleDateString('pt-BR', {
                                   day: '2-digit',
-                                  month: '2-digit', 
+                                  month: '2-digit',
                                   year: 'numeric'
                                 }) : '-'}
                               </div>
@@ -1000,7 +977,7 @@ const ClientesPage: React.FC = () => {
                         <span className="font-medium">{clientesData.total}</span> registros
                       </span>
                     </div>
-                    
+
                     <div className="flex items-center space-x-2">
                       {/* Primeira página */}
                       <button
@@ -1010,7 +987,7 @@ const ClientesPage: React.FC = () => {
                       >
                         Primeira
                       </button>
-                      
+
                       {/* Página anterior */}
                       <button
                         onClick={() => handlePageChange(Math.max(1, (clientesData.page || 1) - 1))}
@@ -1027,17 +1004,16 @@ const ClientesPage: React.FC = () => {
                           const startPage = Math.max(1, (clientesData.page || 1) - 2);
                           const page = startPage + i;
                           if (page > clientesData.totalPages) return null;
-                          
+
                           const isCurrentPage = page === clientesData.page;
                           return (
                             <button
                               key={page}
                               onClick={() => handlePageChange(page)}
-                              className={`px-3 py-1 text-sm border rounded ${
-                                isCurrentPage
+                              className={`px-3 py-1 text-sm border rounded ${isCurrentPage
                                   ? 'bg-[#159A9C] border-[#159A9C] text-white'
                                   : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-700'
-                              }`}
+                                }`}
                             >
                               {page}
                             </button>
@@ -1054,7 +1030,7 @@ const ClientesPage: React.FC = () => {
                         <span>Próxima</span>
                         <ChevronRight className="w-4 h-4" />
                       </button>
-                      
+
                       {/* Última página */}
                       <button
                         onClick={() => handlePageChange(clientesData.totalPages)}

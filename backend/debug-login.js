@@ -1,37 +1,53 @@
 const bcrypt = require('bcryptjs');
+const { Client } = require('pg');
 
 async function debugLogin() {
   console.log('=== DEBUG LOGIN COMPLETO ===\n');
-  
-  // Dados exatos do banco
-  const hashFromDB = '$2a$10$YGemSeUSyvVkY8Z5KHIEAeDSR63zA0hZpQM4nHcESNNrQalMQLz1K';
-  const password = 'password123';
-  
-  console.log('1. Testando hash do banco:');
-  console.log('   Hash:', hashFromDB);
-  console.log('   Senha:', password);
-  
-  const result1 = await bcrypt.compare(password, hashFromDB);
-  console.log('   Resultado:', result1);
-  
-  console.log('\n2. Gerando novo hash para comparar:');
-  const newHash = await bcrypt.hash(password, 10);
-  console.log('   Novo hash:', newHash);
-  
-  const result2 = await bcrypt.compare(password, newHash);
-  console.log('   Resultado novo hash:', result2);
-  
-  console.log('\n3. Testando outras senhas possíveis:');
-  const testPasswords = ['password123', 'Password123', 'admin123', 'admin', '123456'];
-  
-  for (const testPass of testPasswords) {
-    const testResult = await bcrypt.compare(testPass, hashFromDB);
-    console.log(`   ${testPass}: ${testResult}`);
+
+  const client = new Client({
+    host: 'localhost',
+    port: 5434,
+    user: 'conectcrm',
+    password: 'conectcrm123',
+    database: 'conectcrm_db'
+  });
+
+  try {
+    await client.connect();
+    console.log('🔍 Verificando usuário admin@conectcrm.com...');
+
+    const result = await client.query('SELECT * FROM users WHERE email = $1', ['admin@conectcrm.com']);
+
+    if (result.rows.length === 0) {
+      console.log('❌ Usuário não encontrado!');
+      return;
+    }
+
+    const user = result.rows[0];
+    console.log('👤 Usuário encontrado:');
+    console.log(`- ID: ${user.id}`);
+    console.log(`- Nome: ${user.nome}`);
+    console.log(`- Email: ${user.email}`);
+    console.log(`- Ativo: ${user.ativo}`);
+    console.log(`- Hash da senha: ${user.senha.substring(0, 30)}...`);
+
+    // Testar a senha
+    console.log('\n🔐 Testando senha "password"...');
+    const isValid = await bcrypt.compare('password', user.senha);
+    console.log(`✅ Senha válida: ${isValid}`);
+
+    if (!isValid) {
+      console.log('\n🔧 Atualizando senha para "password"...');
+      const hashedPassword = await bcrypt.hash('password', 10);
+      await client.query('UPDATE users SET senha = $1 WHERE email = $2', [hashedPassword, 'admin@conectcrm.com']);
+      console.log('✅ Senha atualizada!');
+    }
+
+  } catch (error) {
+    console.error('❌ Erro:', error.message);
+  } finally {
+    await client.end();
   }
-  
-  console.log('\n4. Verificando hash character por character:');
-  console.log('   Length:', hashFromDB.length);
-  console.log('   Starts with $2a$10$:', hashFromDB.startsWith('$2a$10$'));
 }
 
-debugLogin().catch(console.error);
+debugLogin();

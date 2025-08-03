@@ -25,7 +25,7 @@ import {
 export const AgendaPage: React.FC = () => {
   // Hook de notificações
   const { addNotification, showSuccess, showWarning } = useNotifications();
-  
+
   const {
     events,
     selectedEvent,
@@ -67,16 +67,16 @@ export const AgendaPage: React.FC = () => {
   // Função para verificar conflitos de horário
   const checkEventConflicts = (newEvent: any, existingEvents: CalendarEvent[]) => {
     if (newEvent.allDay) return []; // Eventos de dia todo não geram conflito
-    
+
     const newStart = new Date(newEvent.start);
     const newEnd = new Date(newEvent.end);
-    
+
     return existingEvents.filter(event => {
       if (event.allDay) return false;
-      
+
       const eventStart = new Date(event.start);
       const eventEnd = new Date(event.end);
-      
+
       // Verificar sobreposição de horários
       return (newStart < eventEnd && newEnd > eventStart);
     });
@@ -109,21 +109,28 @@ export const AgendaPage: React.FC = () => {
       end: eventData.end,
       location: eventData.location || '',
       allDay: eventData.allDay || false,
-      type: 'meeting',
-      priority: 'medium',
-      status: eventData.status || 'confirmed',
+      type: eventData.type || 'meeting',
+      priority: eventData.priority || 'medium',
+      status: eventData.status || 'confirmado',
       collaborator: '',
-      category: 'meeting',
-      color: 'blue',
-      attendees: eventData.attendees || []
+      category: eventData.category || 'meeting',
+      color: eventData.color || '#3B82F6',
+      attendees: eventData.attendees || [],
+      notes: eventData.notes || '',
+      isRecurring: eventData.isRecurring || false,
+      recurringPattern: eventData.recurringPattern,
+      responsavelId: eventData.responsavel || '',
+      criadoPorId: ''
     };
 
     try {
       if (selectedEvent) {
-        updateEvent(selectedEvent.id, calendarEventData);
+        await updateEvent(selectedEvent.id, calendarEventData);
+        // Toast será exibido pelo CreateEventModal
       } else {
-        addEvent(calendarEventData);
-        
+        await addEvent(calendarEventData);
+        // Toast será exibido pelo CreateEventModal
+
         // Verificar conflitos de horário para novos eventos
         const conflicts = checkEventConflicts(eventData, events);
         if (conflicts.length > 0) {
@@ -133,7 +140,13 @@ export const AgendaPage: React.FC = () => {
           );
         }
       }
+
+      // Fechar modal após sucesso
+      setShowEventModal(false);
+      setSelectedEvent(null);
+      setEventModalDate(null);
     } catch (error) {
+      console.error('Erro ao salvar evento:', error);
       addNotification({
         title: '❌ Erro na Agenda',
         message: 'Não foi possível salvar o evento. Tente novamente.',
@@ -159,17 +172,11 @@ export const AgendaPage: React.FC = () => {
   const handleDuplicateEvent = (eventId: string) => {
     try {
       duplicateEvent(eventId);
+      // Apenas toast para feedback imediato
       showSuccess(
         'Evento Duplicado',
         'Uma cópia do evento foi criada com sucesso'
       );
-      
-      addNotification({
-        title: '📋 Evento Duplicado',
-        message: 'Uma cópia do evento foi adicionada à agenda',
-        type: 'success',
-        priority: 'low'
-      });
     } catch (error) {
       addNotification({
         title: '❌ Erro ao Duplicar',
@@ -182,20 +189,11 @@ export const AgendaPage: React.FC = () => {
 
   const handleDrop = (targetDate: Date) => {
     if (draggedEvent) {
-      // Notificação de movimento bem-sucedido
+      // Apenas toast para feedback imediato
       showSuccess(
         'Evento Movido',
         `"${draggedEvent.title}" foi movido para ${targetDate.toLocaleDateString('pt-BR')}`
       );
-      
-      addNotification({
-        title: '🔄 Evento Reagendado',
-        message: `"${draggedEvent.title}" foi movido para ${targetDate.toLocaleDateString('pt-BR')}`,
-        type: 'info',
-        priority: 'medium',
-        entityType: 'agenda',
-        entityId: draggedEvent.id
-      });
     }
     setDrop(targetDate);
   };
@@ -222,7 +220,7 @@ export const AgendaPage: React.FC = () => {
       if (upcomingEvents15min.length > 0) {
         const eventCount = upcomingEvents15min.length;
         const firstEvent = upcomingEvents15min[0];
-        
+
         if (eventCount === 1) {
           addNotification({
             title: '⏰ Evento em 15 minutos!',
@@ -245,12 +243,12 @@ export const AgendaPage: React.FC = () => {
           });
         }
       }
-      
+
       // Criar uma única notificação para eventos em 1 hora
       if (upcomingEvents1hour.length > 0) {
         const eventCount = upcomingEvents1hour.length;
         const firstEvent = upcomingEvents1hour[0];
-        
+
         if (eventCount === 1) {
           addNotification({
             title: '🔔 Evento em 1 hora',
@@ -285,22 +283,22 @@ export const AgendaPage: React.FC = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
-    
+
     // Eventos de hoje
     const todayEvents = events.filter(event => {
       const eventDate = new Date(event.start);
       return eventDate >= today && eventDate < tomorrow;
     });
-    
+
     // Eventos pendentes
     const pendingEvents = events.filter(event => event.status === 'pending');
-    
+
     // Notificação de resumo - evitar duplicatas usando um ID único baseado na data
     const summaryId = `agenda-summary-${today.toDateString()}`;
-    
+
     // Verificar se já foi mostrada hoje
     const hasShownToday = sessionStorage.getItem(summaryId);
-    
+
     if (!hasShownToday) {
       setTimeout(() => {
         addNotification({
@@ -311,7 +309,7 @@ export const AgendaPage: React.FC = () => {
           entityType: 'agenda',
           entityId: summaryId
         });
-        
+
         // Marcar como mostrada para evitar duplicatas na mesma sessão
         sessionStorage.setItem(summaryId, 'true');
       }, 1000);
@@ -370,7 +368,7 @@ export const AgendaPage: React.FC = () => {
           nucleusPath="/nuclei/crm"
           currentModuleName="Agenda"
         />
-        
+
         <div className="flex items-center justify-between mt-4">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
@@ -383,8 +381,8 @@ export const AgendaPage: React.FC = () => {
               onClick={() => setShowFilters(!showFilters)}
               className={`
                 px-3 py-2 rounded-lg border transition-colors flex items-center space-x-2
-                ${showFilters 
-                  ? 'bg-[#159A9C] text-white border-[#159A9C]' 
+                ${showFilters
+                  ? 'bg-[#159A9C] text-white border-[#159A9C]'
                   : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                 }
               `}
@@ -501,14 +499,14 @@ export const AgendaPage: React.FC = () => {
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
-              
+
               <button
                 onClick={() => navigateDate('next')}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
-              
+
               <button
                 onClick={goToToday}
                 className="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
@@ -526,35 +524,32 @@ export const AgendaPage: React.FC = () => {
             <div className="flex items-center border border-gray-300 rounded-lg">
               <button
                 onClick={() => setViewType('month')}
-                className={`px-3 py-2 text-sm font-medium rounded-l-lg transition-colors flex items-center space-x-2 ${
-                  view.type === 'month'
+                className={`px-3 py-2 text-sm font-medium rounded-l-lg transition-colors flex items-center space-x-2 ${view.type === 'month'
                     ? 'bg-[#159A9C] text-white'
                     : 'text-gray-700 hover:bg-gray-50'
-                }`}
+                  }`}
               >
                 <Grid3X3 className="w-4 h-4" />
                 <span>Mês</span>
               </button>
-              
+
               <button
                 onClick={() => setViewType('week')}
-                className={`px-3 py-2 text-sm font-medium border-l border-gray-300 transition-colors flex items-center space-x-2 ${
-                  view.type === 'week'
+                className={`px-3 py-2 text-sm font-medium border-l border-gray-300 transition-colors flex items-center space-x-2 ${view.type === 'week'
                     ? 'bg-[#159A9C] text-white'
                     : 'text-gray-700 hover:bg-gray-50'
-                }`}
+                  }`}
               >
                 <Rows className="w-4 h-4" />
                 <span>Semana</span>
               </button>
-              
+
               <button
                 onClick={() => setViewType('day')}
-                className={`px-3 py-2 text-sm font-medium rounded-r-lg border-l border-gray-300 transition-colors flex items-center space-x-2 ${
-                  view.type === 'day'
+                className={`px-3 py-2 text-sm font-medium rounded-r-lg border-l border-gray-300 transition-colors flex items-center space-x-2 ${view.type === 'day'
                     ? 'bg-[#159A9C] text-white'
                     : 'text-gray-700 hover:bg-gray-50'
-                }`}
+                  }`}
               >
                 <Square className="w-4 h-4" />
                 <span>Dia</span>
@@ -565,7 +560,7 @@ export const AgendaPage: React.FC = () => {
               <button className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors">
                 <Download className="w-4 h-4" />
               </button>
-              
+
               <button className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors">
                 <Settings className="w-4 h-4" />
               </button>
@@ -699,7 +694,7 @@ export const AgendaPage: React.FC = () => {
             <h4 className="text-md font-semibold text-gray-900 mb-3">
               🎯 Ações Rápidas
             </h4>
-            
+
             <div className="space-y-2">
               <button
                 onClick={() => setShowEventModal(true)}
@@ -710,7 +705,7 @@ export const AgendaPage: React.FC = () => {
                   <span>Novo Evento</span>
                 </div>
               </button>
-              
+
               <button
                 onClick={goToToday}
                 className="w-full p-3 text-left bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"

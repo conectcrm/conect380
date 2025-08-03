@@ -11,6 +11,7 @@ export interface CalendarEvent {
   location?: string;
   color?: string;
   collaborator?: string; // Colaborador responsável pelo evento
+  responsavel?: string; // ID do usuário responsável pelo evento
   category?: string; // Categoria do evento
   cliente?: {
     id: string;
@@ -19,6 +20,7 @@ export interface CalendarEvent {
   allDay?: boolean;
   recurring?: {
     type: 'daily' | 'weekly' | 'monthly';
+    interval: number;
     until?: Date;
   };
 }
@@ -51,7 +53,7 @@ export interface CalendarDay {
 
 export const EVENT_COLORS = {
   meeting: '#3B82F6',
-  call: '#10B981', 
+  call: '#10B981',
   task: '#F59E0B',
   event: '#8B5CF6',
   'follow-up': '#EF4444'
@@ -59,6 +61,6 @@ export const EVENT_COLORS = {
 
 export const PRIORITY_COLORS = {
   low: '#6B7280',
-  medium: '#F59E0B', 
+  medium: '#F59E0B',
   high: '#EF4444'
 } as const;

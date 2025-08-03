@@ -1,110 +1,160 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { CalendarEvent, CalendarView, DragData } from '../types/calendar';
+import { eventosService } from '../services/eventosService';
+import { useAuth } from '../contexts/AuthContext';
 
 // Hook para gerenciar eventos da agenda
 export const useCalendarEvents = () => {
-  const [events, setEvents] = useState<CalendarEvent[]>([
-    {
-      id: '1',
-      title: 'Reunião com Cliente ABC',
-      description: 'Discussão sobre nova proposta',
-      start: new Date(2025, 6, 22, 10, 0),
-      end: new Date(2025, 6, 22, 11, 0),
-      type: 'meeting',
-      priority: 'high',
-      status: 'confirmed',
-      location: 'Escritório',
-      collaborator: 'João Silva',
-      cliente: { id: '1', name: 'Cliente ABC' },
-      attendees: ['joao@empresa.com', 'maria@cliente.com']
-    },
-    {
-      id: '2',
-      title: 'Follow-up Proposta XYZ',
-      start: new Date(2025, 6, 23, 14, 30),
-      end: new Date(2025, 6, 23, 15, 0),
-      type: 'follow-up',
-      priority: 'medium',
-      status: 'pending',
-      collaborator: 'Maria Santos',
-      cliente: { id: '2', name: 'Empresa XYZ' }
-    },
-    {
-      id: '3',
-      title: 'Chamada - Negociação Contrato',
-      start: new Date(2025, 6, 24, 9, 0),
-      end: new Date(2025, 6, 24, 10, 0),
-      type: 'call',
-      priority: 'high',
-      status: 'confirmed',
-      collaborator: 'João Silva',
-      location: 'Online - Teams'
-    },
-    {
-      id: '4',
-      title: 'Preparar Relatório Mensal',
-      start: new Date(2025, 6, 25, 16, 0),
-      end: new Date(2025, 6, 25, 18, 0),
-      type: 'task',
-      priority: 'medium',
-      status: 'confirmed',
-      collaborator: 'Pedro Costa'
-    },
-    {
-      id: '5',
-      title: 'Reunião de Vendas',
-      start: new Date(2025, 6, 26, 11, 0),
-      end: new Date(2025, 6, 26, 12, 0),
-      type: 'meeting',
-      priority: 'medium',
-      status: 'confirmed',
-      collaborator: 'Ana Oliveira',
-      location: 'Sala de Reuniões'
-    }
-  ]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
+  // Carregar eventos do banco de dados
+  const loadEvents = useCallback(async (filtros?: {
+    startDate?: Date;
+    endDate?: Date;
+    status?: string;
+    type?: string;
+  }) => {
+    if (!user?.id) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+      const eventos = await eventosService.listarEventos(filtros);
+      setEvents(eventos);
+    } catch (error) {
+      console.error('Erro ao carregar eventos:', error);
+      setError('Não foi possível carregar os eventos');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
+
+  // Carregar eventos iniciais
+  useEffect(() => {
+    if (user?.id) {
+      loadEvents();
+    }
+  }, [user?.id, loadEvents]);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
-  const addEvent = useCallback((event: Omit<CalendarEvent, 'id'>) => {
-    const newEvent: CalendarEvent = {
-      ...event,
-      id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    };
-    setEvents(prev => [...prev, newEvent]);
-    return newEvent;
-  }, []);
+  // Adicionar evento (criar no banco)
+  const addEvent = useCallback(async (event: Omit<CalendarEvent, 'id'>) => {
+    if (!user?.id) {
+      setError('Usuário não autenticado');
+      return null;
+    }
 
-  const updateEvent = useCallback((eventId: string, updates: Partial<CalendarEvent>) => {
-    setEvents(prev => 
-      prev.map(event => 
-        event.id === eventId ? { ...event, ...updates } : event
-      )
-    );
-  }, []);
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const newEvent = await eventosService.criarEvento(event, user.id);
+      setEvents(prev => [...prev, newEvent]);
+      return newEvent;
+    } catch (error) {
+      console.error('Erro ao criar evento:', error);
+      setError('Não foi possível criar o evento');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
 
-  const deleteEvent = useCallback((eventId: string) => {
-    setEvents(prev => prev.filter(event => event.id !== eventId));
-    if (selectedEvent?.id === eventId) {
-      setSelectedEvent(null);
+  // Atualizar evento
+  const updateEvent = useCallback(async (eventId: string, updates: Partial<CalendarEvent>) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const updatedEvent = await eventosService.atualizarEvento(eventId, updates);
+      setEvents(prev => 
+        prev.map(event => 
+          event.id === eventId ? updatedEvent : event
+        )
+      );
+      
+      // Atualizar selectedEvent se for o mesmo
+      if (selectedEvent?.id === eventId) {
+        setSelectedEvent(updatedEvent);
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar evento:', error);
+      setError('Não foi possível atualizar o evento');
+    } finally {
+      setLoading(false);
     }
   }, [selectedEvent]);
 
-  const moveEvent = useCallback((eventId: string, newStart: Date, newEnd: Date) => {
-    updateEvent(eventId, { start: newStart, end: newEnd });
+  // Excluir evento
+  const deleteEvent = useCallback(async (eventId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      await eventosService.excluirEvento(eventId);
+      setEvents(prev => prev.filter(event => event.id !== eventId));
+      
+      if (selectedEvent?.id === eventId) {
+        setSelectedEvent(null);
+      }
+    } catch (error) {
+      console.error('Erro ao excluir evento:', error);
+      setError('Não foi possível excluir o evento');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedEvent]);
+
+  // Mover evento (drag & drop)
+  const moveEvent = useCallback(async (eventId: string, newStart: Date, newEnd: Date) => {
+    await updateEvent(eventId, { start: newStart, end: newEnd });
   }, [updateEvent]);
 
-  const duplicateEvent = useCallback((eventId: string) => {
+  // Duplicar evento
+  const duplicateEvent = useCallback(async (eventId: string) => {
     const eventToDuplicate = events.find(e => e.id === eventId);
-    if (eventToDuplicate) {
+    if (eventToDuplicate && user?.id) {
       const duplicated = {
         ...eventToDuplicate,
         title: `${eventToDuplicate.title} (Cópia)`,
         start: new Date(eventToDuplicate.start.getTime() + 24 * 60 * 60 * 1000), // +1 dia
         end: new Date(eventToDuplicate.end.getTime() + 24 * 60 * 60 * 1000)
       };
-      return addEvent(duplicated);
+      
+      // Remove o id para criar um novo
+      const { id, ...eventData } = duplicated;
+      return await addEvent(eventData);
     }
-  }, [events, addEvent]);
+    return null;
+  }, [events, addEvent, user?.id]);
+
+  // Verificar conflitos
+  const checkConflicts = useCallback(async (start: Date, end: Date, excludeEventId?: string) => {
+    try {
+      return await eventosService.verificarConflitos(start, end, excludeEventId);
+    } catch (error) {
+      console.error('Erro ao verificar conflitos:', error);
+      return [];
+    }
+  }, []);
+
+  // Filtrar eventos por período
+  const filterByPeriod = useCallback(async (startDate: Date, endDate: Date) => {
+    await loadEvents({ startDate, endDate });
+  }, [loadEvents]);
+
+  // Filtrar eventos por status
+  const filterByStatus = useCallback(async (status: string) => {
+    await loadEvents({ status });
+  }, [loadEvents]);
+
+  // Filtrar eventos por tipo
+  const filterByType = useCallback(async (type: string) => {
+    await loadEvents({ type });
+  }, [loadEvents]);
 
   // Função para obter lista única de colaboradores
   const getCollaborators = useCallback(() => {
@@ -129,7 +179,14 @@ export const useCalendarEvents = () => {
     deleteEvent,
     moveEvent,
     duplicateEvent,
-    getCollaborators
+    getCollaborators,
+    checkConflicts,
+    filterByPeriod,
+    filterByStatus,
+    filterByType,
+    loadEvents,
+    loading,
+    error
   };
 };
 

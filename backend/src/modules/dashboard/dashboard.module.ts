@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
 import { MetasModule } from '../metas/metas.module';
+import { EventosModule } from '../eventos/eventos.module';
 import { Proposta } from '../propostas/proposta.entity';
 import { User } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
@@ -10,7 +11,8 @@ import { Cliente } from '../clientes/cliente.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Proposta, User, Cliente]),
-    MetasModule
+    MetasModule,
+    EventosModule
   ],
   providers: [DashboardService],
   controllers: [DashboardController],

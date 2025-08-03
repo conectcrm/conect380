@@ -5,14 +5,14 @@ import { useAtividadesUsuarios } from './hooks/useAtividadesUsuarios';
 import { Usuario, UserRole } from '../../../types/usuarios/index';
 import { useConfirmation } from '../../../hooks/useConfirmation';
 import { ConfirmationModal } from '../../../components/common/ConfirmationModal';
-import { 
-  EstatisticasCards, 
-  FiltrosUsuarios, 
-  TabelaUsuarios, 
+import {
+  EstatisticasCards,
+  FiltrosUsuarios,
+  TabelaUsuarios,
   ModalUsuarioModerno,
   ModalResetSenha,
   DashboardAtividades,
-  ModalPerfilUsuario 
+  ModalPerfilUsuario
 } from './components';
 import {
   Users,
@@ -28,6 +28,8 @@ import {
 import { toast } from 'react-hot-toast';
 
 export const UsuariosPage: React.FC = () => {
+  console.log('🔍 DEBUG: UsuariosPage iniciada');
+
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [mostrarNovoUsuario, setMostrarNovoUsuario] = useState(false);
   const [usuarioSelecionado, setUsuarioSelecionado] = useState<Usuario | null>(null);
@@ -56,7 +58,7 @@ export const UsuariosPage: React.FC = () => {
     estatisticas,
     loading: loadingEstatisticas
   } = useEstatisticasUsuarios();
-  
+
   // Hook para buscar as atividades de usuários
   const {
     atividades,
@@ -115,14 +117,14 @@ export const UsuariosPage: React.FC = () => {
   const handleAlterarStatus = async (usuario: Usuario) => {
     const novoStatus = !usuario.ativo;
     const acao = novoStatus ? 'ativar' : 'desativar';
-    
+
     showConfirmation({
       title: `${acao.charAt(0).toUpperCase() + acao.slice(1)} usuário`,
       message: `Tem certeza que deseja ${acao} o usuário "${usuario.nome}"?`,
       confirmText: acao.charAt(0).toUpperCase() + acao.slice(1),
       cancelText: 'Cancelar',
       icon: novoStatus ? 'success' : 'warning',
-      confirmButtonClass: novoStatus 
+      confirmButtonClass: novoStatus
         ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500'
         : 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
       onConfirm: async () => {
@@ -132,18 +134,18 @@ export const UsuariosPage: React.FC = () => {
   };
 
   const handleAcaoMassa = async (acao: 'ativar' | 'desativar' | 'excluir', usuarios: Usuario[]) => {
-    const nomes = usuarios.length <= 3 
+    const nomes = usuarios.length <= 3
       ? usuarios.map(u => u.nome).join(', ')
       : `${usuarios.slice(0, 2).map(u => u.nome).join(', ')} e mais ${usuarios.length - 2} usuários`;
-    
-    const mensagem = acao === 'excluir' 
+
+    const mensagem = acao === 'excluir'
       ? `Tem certeza que deseja excluir os usuários: ${nomes}? Esta ação não pode ser desfeita.`
       : `Tem certeza que deseja ${acao} os usuários: ${nomes}?`;
-    
-    const title = acao === 'excluir' 
+
+    const title = acao === 'excluir'
       ? `Excluir ${usuarios.length} usuário${usuarios.length > 1 ? 's' : ''}`
       : `${acao.charAt(0).toUpperCase() + acao.slice(1)} ${usuarios.length} usuário${usuarios.length > 1 ? 's' : ''}`;
-    
+
     showConfirmation({
       title,
       message: mensagem,
@@ -156,20 +158,20 @@ export const UsuariosPage: React.FC = () => {
       onConfirm: async () => {
         try {
           if (acao === 'excluir') {
-          for (const usuario of usuarios) {
-            await excluirUsuario(usuario.id);
+            for (const usuario of usuarios) {
+              await excluirUsuario(usuario.id);
+            }
+            toast.success(`${usuarios.length} usuário(s) excluído(s) com sucesso!`);
+          } else {
+            const novoStatus = acao === 'ativar';
+            for (const usuario of usuarios) {
+              await alterarStatusUsuario(usuario.id, novoStatus);
+            }
+            toast.success(`${usuarios.length} usuário(s) ${acao === 'ativar' ? 'ativado(s)' : 'desativado(s)'} com sucesso!`);
           }
-          toast.success(`${usuarios.length} usuário(s) excluído(s) com sucesso!`);
-        } else {
-          const novoStatus = acao === 'ativar';
-          for (const usuario of usuarios) {
-            await alterarStatusUsuario(usuario.id, novoStatus);
-          }
-          toast.success(`${usuarios.length} usuário(s) ${acao === 'ativar' ? 'ativado(s)' : 'desativado(s)'} com sucesso!`);
+        } catch (error) {
+          toast.error(`Erro ao ${acao} usuários em massa`);
         }
-      } catch (error) {
-        toast.error(`Erro ao ${acao} usuários em massa`);
-      }
       }
     });
   };
@@ -216,14 +218,14 @@ export const UsuariosPage: React.FC = () => {
             nucleusPath="/nuclei/gestao"
             currentModuleName="Gestão de Usuários"
           />
-          
+
           <div className="flex items-center justify-between mt-4">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <Users className="w-6 h-6 text-[#159A9C]" />
                 <h1 className="text-2xl font-bold text-gray-900">Gestão de Usuários</h1>
               </div>
-              
+
               {estatisticas && (
                 <div className="hidden md:flex items-center space-x-4 text-sm text-gray-600">
                   <span className="flex items-center">
@@ -256,8 +258,8 @@ export const UsuariosPage: React.FC = () => {
                 onClick={() => setMostrarFiltros(!mostrarFiltros)}
                 className={`
                   px-3 py-2 rounded-lg border transition-colors flex items-center space-x-2
-                  ${mostrarFiltros 
-                    ? 'bg-[#159A9C] text-white border-[#159A9C]' 
+                  ${mostrarFiltros
+                    ? 'bg-[#159A9C] text-white border-[#159A9C]'
                     : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                   }
                   ${getCountFiltrosAtivos() > 0 ? 'ring-2 ring-orange-200' : ''}
@@ -403,7 +405,7 @@ export const UsuariosPage: React.FC = () => {
           onSave={handleAtualizarPerfil}
         />
       )}
-      
+
       {/* Modal de Confirmação */}
       <ConfirmationModal confirmationState={confirmationState} />
     </div>

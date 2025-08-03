@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './modules/auth/auth.module';
@@ -13,6 +13,9 @@ import { OportunidadesModule } from './modules/oportunidades/oportunidades.modul
 import { EmpresasModule } from './empresas/empresas.module';
 import { ChatwootModule } from './modules/chatwoot/chatwoot.module';
 import { MetasModule } from './modules/metas/metas.module';
+import { PlanosModule } from './modules/planos/planos.module';
+import { EventosModule } from './modules/eventos/eventos.module';
+import { AssinaturaMiddleware } from './modules/common/assinatura.middleware';
 import { DatabaseConfig } from './config/database.config';
 
 @Module({
@@ -36,6 +39,21 @@ import { DatabaseConfig } from './config/database.config';
     EmpresasModule,
     ChatwootModule,
     MetasModule,
+    PlanosModule,
+    EventosModule,
   ],
 })
-export class AppModule { }
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(AssinaturaMiddleware)
+      .exclude(
+        '/auth/(.*)',
+        '/planos/(.*)',
+        '/assinaturas/(.*)',
+        '/health',
+        '/docs'
+      )
+      .forRoutes('*');
+  }
+}

@@ -6,6 +6,7 @@ import {
   FiltrosUsuarios,
   EstatisticasUsuarios
 } from '../types/usuarios/index';
+import { User } from '../types';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -96,6 +97,46 @@ class UsuariosService {
   async alterarStatusUsuario(id: string, ativo: boolean): Promise<Usuario> {
     const response = await this.api.patch(`/${id}/status`, { ativo });
     return this.formatarUsuario(response.data.data);
+  }
+
+  // Buscar usuários da equipe/empresa
+  async buscarUsuariosEquipe(): Promise<User[]> {
+    try {
+      const response = await this.api.get('/team');
+      return response.data.data.map((usuario: any) => this.formatarUsuarioParaUser(usuario));
+    } catch (error) {
+      console.error('Erro ao buscar usuários da equipe:', error);
+      throw error;
+    }
+  }
+
+  // Buscar perfil do usuário atual
+  async buscarPerfilAtual(): Promise<User> {
+    try {
+      const response = await this.api.get('/profile');
+      return this.formatarUsuarioParaUser(response.data.data);
+    } catch (error) {
+      console.error('Erro ao buscar perfil atual:', error);
+      throw error;
+    }
+  }
+
+  // Formatador específico para o tipo User (usado no contexto de autenticação)
+  private formatarUsuarioParaUser(usuario: any): User {
+    return {
+      id: usuario.id,
+      nome: usuario.nome,
+      email: usuario.email,
+      telefone: usuario.telefone,
+      role: usuario.role,
+      avatar_url: usuario.avatar_url,
+      idioma_preferido: usuario.idioma_preferido || 'pt-BR',
+      empresa: {
+        id: usuario.empresa_id || '1',
+        nome: usuario.empresa?.nome || 'Empresa',
+        slug: usuario.empresa?.slug || 'empresa'
+      }
+    };
   }
 
   async resetarSenha(id: string): Promise<{ novaSenha: string }> {
