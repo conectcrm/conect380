@@ -7,11 +7,12 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { I18nProvider } from './contexts/I18nContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { EmpresaProvider } from './contexts/EmpresaContextAPIReal';
+import { ProfileProvider } from './contexts/ProfileContext';
 import LoginPage from './features/auth/LoginPage';
 import RegistroEmpresaPage from './features/auth/RegistroEmpresaPage';
 import VerificacaoEmailPage from './features/auth/VerificacaoEmailPage';
 import DashboardLayout from './components/layout/DashboardLayout';
-import DashboardPage from './features/dashboard/DashboardPage';
+import DashboardRouter from './features/dashboard/DashboardRouter';
 import ClientesPage from './features/clientes/ClientesPage';
 import PropostasPage from './features/propostas/PropostasPage';
 import CategoriasProdutosPage from './features/produtos/CategoriasProdutosPage';
@@ -41,6 +42,7 @@ import { MinhasEmpresasPage } from './features/empresas/MinhasEmpresasPage';
 import { ContatosPage } from './features/contatos/ContatosPageNova';
 import { SuportePage } from './features/suporte/SuportePageNova';
 import { UsuariosPage } from './features/gestao/usuarios/UsuariosPage';
+import PerfilPage from './features/perfil/PerfilPage';
 // Importar novas páginas do sistema de empresas
 import { ConfiguracaoEmpresaPage } from './pages/empresas/ConfiguracaoEmpresaPage';
 import { RelatoriosAnalyticsPage } from './pages/empresas/RelatoriosAnalyticsPage';
@@ -54,6 +56,7 @@ import TestePortalPage from './pages/TestePortalPage';
 import PortalClientePage from './pages/PortalClientePage';
 import ConfiguracaoEmailPage from './pages/ConfiguracaoEmailPage';
 import { BillingPage } from './pages/billing';
+import DebugUserSwitch from './components/debug/DebugUserSwitch';
 
 // Configuração do React Query
 const queryClient = new QueryClient({
@@ -94,7 +97,7 @@ const AppRoutes: React.FC = () => {
       <DashboardLayout>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/dashboard" element={<DashboardRouter />} />
 
           {/* Página de Notificações */}
           <Route path="/notifications" element={<NotificationsPage />} />
@@ -220,6 +223,9 @@ const AppRoutes: React.FC = () => {
 
           {/* Sistema de Suporte */}
           <Route path="/suporte" element={<SuportePage />} />
+
+          {/* Perfil do Usuário */}
+          <Route path="/perfil" element={<PerfilPage />} />
 
           {/* Sistema de Billing e Assinaturas */}
           <Route path="/billing" element={<BillingPage />} />
@@ -364,25 +370,36 @@ const App: React.FC = () => {
       <I18nProvider>
         <ThemeProvider>
           <AuthProvider>
-            <NotificationProvider>
-              <EmpresaProvider>
-                <Router>
-                  <div className="App">
-                    <AppRoutes />
-                    <Toaster
-                      position="top-right"
-                      toastOptions={{
-                        duration: 4000,
-                        style: {
-                          background: '#363636',
-                          color: '#fff',
-                        },
-                      }}
-                    />
-                  </div>
-                </Router>
-              </EmpresaProvider>
-            </NotificationProvider>
+            <ProfileProvider>
+              <NotificationProvider>
+                <EmpresaProvider>
+                  <Router>
+                    <div className="App">
+                      <AppRoutes />
+
+                      {/* Componente de debug apenas em desenvolvimento */}
+                      {process.env.NODE_ENV === 'development' && (
+                        <DebugUserSwitch
+                          currentUser={null}
+                          onUserChange={() => { }}
+                        />
+                      )}
+
+                      <Toaster
+                        position="top-right"
+                        toastOptions={{
+                          duration: 4000,
+                          style: {
+                            background: '#363636',
+                            color: '#fff',
+                          },
+                        }}
+                      />
+                    </div>
+                  </Router>
+                </EmpresaProvider>
+              </NotificationProvider>
+            </ProfileProvider>
           </AuthProvider>
         </ThemeProvider>
       </I18nProvider>

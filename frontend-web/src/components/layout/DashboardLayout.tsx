@@ -3,11 +3,13 @@ import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../../contexts/I18nContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useProfile } from '../../contexts/ProfileContext';
 import { formatCompanyName, formatUserName } from '../../utils/textUtils';
 import SimpleNavGroup, { NavigationNucleus } from '../navigation/SimpleNavGroup';
 import NotificationCenter from '../notifications/NotificationCenter';
 import ConectCRMLogoFinal from '../ui/ConectCRMLogoFinal';
 import { SupportWidget } from '../suporte/SupportWidget';
+import LanguageSelector from '../common/LanguageSelector';
 import {
   Menu,
   X,
@@ -32,7 +34,6 @@ import {
   Calendar,
   Clock,
   MapPin,
-  MessageCircle,
   CreditCard
 } from 'lucide-react';
 
@@ -43,37 +44,131 @@ interface DashboardLayoutProps {
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showProfileSelector, setShowProfileSelector] = useState(false);
+  const [showLanguageSelector, setShowLanguageSelector] = useState(false);
   const { user, logout } = useAuth();
-  const { t } = useI18n();
+  const { t, language, availableLanguages } = useI18n();
+
+  console.log('🎨 DashboardLayout renderizando:', {
+    language,
+    tFunction: typeof t,
+    settingsText: t('navigation.settings'),
+    preferencesText: t('common.preferences')
+  });
   const { currentPalette } = useTheme();
+  const { perfilSelecionado, setPerfilSelecionado } = useProfile();
   const location = useLocation();
+
+  // Debug: Log quando o idioma muda
+  useEffect(() => {
+    console.log('🎨 DashboardLayout: Idioma atualizado para:', language);
+    console.log('🎨 DashboardLayout: Função t atualizada');
+  }, [language, t]);
+
+  // Verificação se é admin
+  const isAdmin = user?.role === 'admin' || user?.role === 'manager' || user?.email?.includes('admin');
+
+  // Perfis disponíveis para o seletor
+  const availableProfiles = [
+    {
+      id: 'administrador' as const,
+      nome: 'Administrador',
+      descricao: 'Acesso total ao sistema'
+    },
+    {
+      id: 'gerente' as const,
+      nome: 'Gerente',
+      descricao: 'Gestão de equipes e relatórios'
+    },
+    {
+      id: 'vendedor' as const,
+      nome: 'Vendedor',
+      descricao: 'Gestão de vendas e clientes'
+    },
+    {
+      id: 'operacional' as const,
+      nome: 'Operacional',
+      descricao: 'Operações e processos'
+    },
+    {
+      id: 'financeiro' as const,
+      nome: 'Financeiro',
+      descricao: 'Gestão financeira'
+    },
+    {
+      id: 'suporte' as const,
+      nome: 'Suporte',
+      descricao: 'Atendimento ao cliente'
+    }
+  ];
+
+  const getTipoColor = (tipo: string) => {
+    switch (tipo) {
+      case 'administrador': return 'bg-red-100 text-red-800';
+      case 'gerente': return 'bg-blue-100 text-blue-800';
+      case 'vendedor': return 'bg-green-100 text-green-800';
+      case 'operacional': return 'bg-purple-100 text-purple-800';
+      case 'financeiro': return 'bg-yellow-100 text-yellow-800';
+      case 'suporte': return 'bg-orange-100 text-orange-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getCurrentProfile = () => {
+    return availableProfiles.find(p => p.id === perfilSelecionado) || availableProfiles[0];
+  };
+
+  const handleProfileSelect = (profileId: string) => {
+    setPerfilSelecionado(profileId as any);
+    setShowProfileSelector(false);
+  };
+
+  // Fechar menus ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+
+      // Fechar menu do usuário se clicado fora (mas não quando clicamos no seletor de perfil)
+      if (!target.closest('[data-user-menu]') && !target.closest('[data-profile-selector]')) {
+        setShowUserMenu(false);
+      }
+
+      // Fechar seletor de perfil se clicado fora
+      if (!target.closest('[data-profile-selector]')) {
+        setShowProfileSelector(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Mapeamento de rotas para títulos dinâmicos
   const getPageInfo = (pathname: string) => {
     const routeMap: Record<string, { title: string; subtitle: string }> = {
       '/dashboard': {
-        title: 'Dashboard',
-        subtitle: 'Visão geral do seu negócio'
+        title: t('navigation.dashboard'),
+        subtitle: t('dashboard.subtitle')
       },
       '/nuclei/principal': {
-        title: 'Principal',
-        subtitle: 'Módulos principais do sistema'
+        title: t('navigation.main'),
+        subtitle: t('navigation.mainModules')
       },
       '/nuclei/crm': {
         title: 'CRM',
-        subtitle: 'Gestão de relacionamento com clientes'
+        subtitle: t('navigation.customerManagement')
       },
       '/nuclei/vendas': {
-        title: 'Vendas',
-        subtitle: 'Propostas, produtos e oportunidades'
+        title: t('navigation.sales'),
+        subtitle: t('navigation.salesProposals')
       },
       '/nuclei/financeiro': {
-        title: 'Financeiro',
-        subtitle: 'Controle financeiro e faturamento'
+        title: t('navigation.financial'),
+        subtitle: t('navigation.financialControl')
       },
       '/nuclei/configuracoes': {
-        title: 'Configurações',
-        subtitle: 'Configurações do sistema e integrações'
+        title: t('navigation.settings'),
+        subtitle: t('navigation.systemSettings')
       },
       '/nuclei/administracao': {
         title: 'Administração',
@@ -1017,149 +1112,279 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
                 {/* Avatar/Menu do Usuário Melhorado */}
                 <div className="relative" data-dropdown="user-menu">
-                  <button
-                    onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="flex items-center gap-2 p-2 rounded-xl hover:bg-gray-100/80 transition-all duration-200 group"
-                    title={`${formatUserName(user?.nome || 'Admin Sistema')}`}
-                  >
-                    <div className="relative">
-                      <div className="w-9 h-9 bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] rounded-full flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow">
-                        <User className="w-4 h-4 text-white" />
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setShowUserMenu(!showUserMenu)}
+                      className="flex items-center gap-2 p-2 rounded-xl hover:bg-gray-100/80 transition-all duration-200 group"
+                      title={`${formatUserName(user?.nome || 'Admin Sistema')}`}
+                      data-user-menu
+                    >
+                      <div className="relative">
+                        <div className="w-9 h-9 bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] rounded-full flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow">
+                          <User className="w-4 h-4 text-white" />
+                        </div>
+                        {/* Indicador de status online */}
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
                       </div>
-                      {/* Indicador de status online */}
-                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
-                    </div>
-                    <div className="hidden sm:flex flex-col items-start min-w-0">
-                      <span className="text-sm font-medium text-gray-900 truncate max-w-24">
-                        {formatUserName(user?.nome || 'Admin')}
-                      </span>
-                      <span className="text-xs text-gray-500 truncate max-w-24">
-                        {user?.role || 'Administrador'}
-                      </span>
-                    </div>
-                    <ChevronDown className="w-3 h-3 text-gray-400 hidden sm:block group-hover:text-gray-600 transition-colors" />
-                  </button>
+                      <div className="hidden sm:flex flex-col items-start min-w-0">
+                        <span className="text-sm font-medium text-gray-900 truncate max-w-24">
+                          {formatUserName(user?.nome || 'Admin')}
+                        </span>
+                        <span className="text-xs text-gray-500 truncate max-w-24">
+                          {user?.role || 'Administrador'}
+                        </span>
+                      </div>
+                      <ChevronDown className="w-3 h-3 text-gray-400 hidden sm:block group-hover:text-gray-600 transition-colors" />
+                    </button>
+                  </div>
 
-                  {/* Dropdown do Usuário - Design Premium */}
+                  {/* Dropdown do Usuário - Design Premium Compacto */}
                   {showUserMenu && (
-                    <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl border shadow-xl z-50 overflow-hidden">
-                      {/* Header do Profile Melhorado */}
+                    <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl border shadow-xl z-40 overflow-visible" data-user-menu>
+                      {/* Header do Profile Compacto */}
                       <div className="p-4 bg-gradient-to-r from-[#159A9C]/5 to-[#0F7B7D]/5 border-b">
                         <div className="flex items-center gap-3">
                           <div className="relative">
-                            <div className="w-12 h-12 bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] rounded-full flex items-center justify-center shadow-lg">
-                              <User className="w-6 h-6 text-white" />
+                            <div className="w-10 h-10 bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] rounded-full flex items-center justify-center shadow-lg">
+                              <User className="w-5 h-5 text-white" />
                             </div>
-                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
+                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 truncate">
+                            <p className="font-semibold text-gray-900 truncate text-sm">
                               {formatUserName(user?.nome || 'Admin Sistema')}
                             </p>
-                            <p className="text-sm text-gray-600 truncate">
+                            <p className="text-xs text-gray-600 truncate">
                               {user?.email || 'admin@conectcrm.com'}
                             </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-xs text-[#159A9C] font-medium bg-[#159A9C]/10 px-2 py-0.5 rounded-full">
-                                {user?.role || 'Administrador'}
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <span className="text-xs text-[#159A9C] font-medium bg-[#159A9C]/10 px-1.5 py-0.5 rounded-full">
+                                {user?.role || 'Admin'}
+                              </span>
+                              <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">
+                                Online
                               </span>
                             </div>
                           </div>
                         </div>
+
+                        {/* Informações adicionais compactas */}
+                        <div className="mt-2 pt-2 border-t border-gray-200/50">
+                          <div className="flex items-center justify-between text-xs text-gray-500">
+                            <span>Último: Hoje, 08:30</span>
+                            <span className="text-[#159A9C] font-medium">v2.1.0</span>
+                          </div>
+                        </div>
                       </div>
 
-                      {/* Menu de ações */}
-                      <div className="py-2">
-                        <button className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors group">
-                          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                      {/* SEÇÃO PERFIL */}
+                      <div className="py-1">
+                        <div className="px-4 py-1.5">
+                          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Perfil</span>
+                        </div>
+
+                        <Link
+                          to="/perfil"
+                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-25 flex items-center gap-3 transition-all duration-200 group"
+                          onClick={() => setShowUserMenu(false)}
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 group-hover:scale-105 transition-all duration-200">
                             <User className="w-4 h-4 text-blue-600" />
                           </div>
-                          <div>
-                            <div className="font-medium">Meu Perfil</div>
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900 text-sm">Meu Perfil</div>
                             <div className="text-xs text-gray-500">Informações pessoais</div>
                           </div>
-                        </button>
+                        </Link>
+
+                        {/* Seletor de Perfil - Apenas para Administradores */}
+                        {isAdmin && (
+                          <div className="relative" data-profile-selector>
+                            <button
+                              onClick={() => setShowProfileSelector(!showProfileSelector)}
+                              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gradient-to-r hover:from-teal-50 hover:to-teal-25 flex items-center gap-3 transition-all duration-200 group"
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center group-hover:bg-teal-100 group-hover:scale-105 transition-all duration-200">
+                                <Users className="w-4 h-4 text-teal-600" />
+                              </div>
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900 flex items-center gap-1.5 text-sm">
+                                  Alterar Perfil
+                                  <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${showProfileSelector ? 'rotate-180' : ''}`} />
+                                </div>
+                                <div className="text-xs text-gray-500 flex items-center gap-1">
+                                  <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${getTipoColor(perfilSelecionado)}`}>
+                                    {getCurrentProfile().nome}
+                                  </span>
+                                </div>
+                              </div>
+                            </button>
+
+                            {/* Dropdown de perfis - Abre ao lado */}
+                            {showProfileSelector && (
+                              <div
+                                className="absolute right-full top-0 mr-3 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-[60] overflow-hidden"
+                                data-profile-selector
+                                style={{
+                                  display: 'block',
+                                  backgroundColor: 'white',
+                                  border: '1px solid #e5e7eb',
+                                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                                }}
+                              >
+                                {/* Header do dropdown compacto */}
+                                <div className="p-3 bg-gradient-to-r from-[#159A9C]/5 to-[#0F7B7D]/5 border-b">
+                                  <div className="flex items-center gap-2">
+                                    <Users className="w-4 h-4 text-[#159A9C]" />
+                                    <h3 className="font-semibold text-gray-900 text-sm">Selecionar Perfil</h3>
+                                  </div>
+                                  <p className="text-xs text-gray-600 mt-1">
+                                    Atual: <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${getTipoColor(perfilSelecionado)}`}>
+                                      {getCurrentProfile().nome}
+                                    </span>
+                                  </p>
+                                </div>
+
+                                {/* Lista de perfis compacta */}
+                                <div className="max-h-64 overflow-y-auto">
+                                  {availableProfiles.map((profile) => (
+                                    <button
+                                      key={profile.id}
+                                      onClick={() => handleProfileSelect(profile.id)}
+                                      className={`w-full p-3 text-left hover:bg-gray-50 transition-all duration-200 border-l-4 group ${perfilSelecionado === profile.id
+                                        ? 'bg-blue-50 border-blue-500 shadow-sm'
+                                        : 'border-transparent hover:border-gray-200'
+                                        }`}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-medium text-gray-900 flex items-center gap-1.5 text-sm">
+                                            {profile.nome}
+                                            {perfilSelecionado === profile.id && (
+                                              <span className="text-xs text-blue-600 font-medium flex items-center gap-1">
+                                                <div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>
+                                                Ativo
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="text-xs text-gray-500 mt-0.5">
+                                            {profile.descricao}
+                                          </div>
+                                        </div>
+                                        <span className={`text-xs px-2 py-0.5 rounded-full ${getTipoColor(profile.id)} ml-2 group-hover:scale-105 transition-transform`}>
+                                          {profile.nome}
+                                        </span>
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* SEPARADOR */}
+                      <div className="border-t border-gray-100"></div>
+
+                      {/* SEÇÃO EMPRESA */}
+                      <div className="py-1">
+                        <div className="px-4 py-1.5">
+                          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Empresa</span>
+                        </div>
 
                         <Link
                           to="/empresas/minhas"
-                          className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors group"
+                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gradient-to-r hover:from-emerald-50 hover:to-emerald-25 flex items-center gap-3 transition-all duration-200 group"
                           onClick={() => setShowUserMenu(false)}
                         >
-                          <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 group-hover:scale-105 transition-all duration-200">
                             <Building2 className="w-4 h-4 text-emerald-600" />
                           </div>
-                          <div>
-                            <div className="font-medium">Minhas Empresas</div>
-                            <div className="text-xs text-gray-500">Gerenciar e alternar empresas</div>
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900 text-sm">Minhas Empresas</div>
+                            <div className="text-xs text-gray-500">Gerenciar empresas</div>
+                          </div>
+                          <div className="w-5 h-5 bg-emerald-100 rounded-full flex items-center justify-center text-xs font-bold text-emerald-600">
+                            3
                           </div>
                         </Link>
+                      </div>
 
-                        <Link
-                          to="/configuracoes/chatwoot"
-                          className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors group"
-                          onClick={() => setShowUserMenu(false)}
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center group-hover:bg-green-100 transition-colors">
-                            <MessageCircle className="w-4 h-4 text-green-600" />
-                          </div>
-                          <div>
-                            <div className="font-medium">Chatwoot</div>
-                            <div className="text-xs text-gray-500">Configurar integração WhatsApp</div>
-                          </div>
-                        </Link>
+                      {/* SEPARADOR */}
+                      <div className="border-t border-gray-100"></div>
 
-                        <button className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors group">
-                          <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+                      {/* SEÇÃO SISTEMA */}
+                      <div className="py-1">
+                        <div className="px-4 py-1.5">
+                          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Sistema</span>
+                        </div>
+
+                        <button className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-25 flex items-center gap-3 transition-all duration-200 group">
+                          <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 group-hover:scale-105 transition-all duration-200">
                             <Settings className="w-4 h-4 text-purple-600" />
                           </div>
-                          <div>
-                            <div className="font-medium">Configurações</div>
-                            <div className="text-xs text-gray-500">Preferências do sistema</div>
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900 text-sm">
+                              {t('navigation.settings') || 'Configurações'}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {t('common.preferences') || 'Preferências'}
+                            </div>
                           </div>
                         </button>
 
-                        {/* Seletor de Idioma Melhorado */}
-                        <div className="px-4 py-2 border-t border-gray-100 mt-2">
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Preferências</span>
-                          </div>
-                          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors group">
-                            <span className="text-xl">🇧🇷</span>
+                        {/* Seletor de Idioma Funcional */}
+                        <div className="px-4 py-2">
+                          <button
+                            onClick={() => setShowLanguageSelector(true)}
+                            className="w-full flex items-center gap-3 p-2.5 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-all duration-200 group"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shadow-sm">
+                              <span className="text-lg">
+                                {availableLanguages.find(lang => lang.code === language)?.flag || '🇧🇷'}
+                              </span>
+                            </div>
                             <div className="flex-1">
-                              <div className="text-sm font-medium text-gray-700">Português (Brasil)</div>
-                              <div className="text-xs text-gray-500">Idioma do sistema</div>
+                              <div className="text-sm font-medium text-gray-700">
+                                {availableLanguages.find(lang => lang.code === language)?.nativeName || 'Português (BR)'}
+                              </div>
+                              <div className="text-xs text-gray-500">{t('common.systemLanguage')}</div>
                             </div>
                             <ChevronDown className="w-3 h-3 text-gray-400 group-hover:text-gray-600 transition-colors" />
-                          </div>
+                          </button>
                         </div>
 
                         <Link
                           to="/suporte"
-                          className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors group"
+                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gradient-to-r hover:from-green-50 hover:to-green-25 flex items-center gap-3 transition-all duration-200 group"
                           onClick={() => setShowUserMenu(false)}
                         >
-                          <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center group-hover:bg-green-100 transition-colors">
+                          <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center group-hover:bg-green-100 group-hover:scale-105 transition-all duration-200">
                             <HelpCircle className="w-4 h-4 text-green-600" />
                           </div>
-                          <div>
-                            <div className="font-medium">Ajuda e Suporte</div>
-                            <div className="text-xs text-gray-500">Central de ajuda</div>
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900 text-sm">{t('common.helpSupport')}</div>
+                            <div className="text-xs text-gray-500">{t('common.helpCenter')}</div>
                           </div>
                         </Link>
                       </div>
 
-                      {/* Ações críticas */}
-                      <div className="border-t border-gray-100 p-2">
+                      {/* SEPARADOR */}
+                      <div className="border-t border-gray-100"></div>
+
+                      {/* SEÇÃO AÇÃO */}
+                      <div className="py-1">
                         <button
                           onClick={handleLogout}
-                          className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors rounded-lg group"
+                          className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-gradient-to-r hover:from-red-50 hover:to-red-25 flex items-center gap-3 transition-all duration-200 rounded-b-xl group"
                         >
-                          <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center group-hover:bg-red-100 transition-colors">
+                          <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center group-hover:bg-red-100 group-hover:scale-105 transition-all duration-200">
                             <LogOut className="w-4 h-4 text-red-600" />
                           </div>
-                          <div>
-                            <div className="font-medium">Sair do Sistema</div>
-                            <div className="text-xs text-red-400">Encerrar sessão</div>
+                          <div className="flex-1">
+                            <div className="font-medium text-red-600 text-sm">{t('auth.logout')}</div>
+                            <div className="text-xs text-red-400">{t('common.endSession')}</div>
                           </div>
                         </button>
                       </div>
@@ -1187,6 +1412,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         position="bottom-right"
         hideOnPages={['/suporte']} // Não mostrar na própria página de suporte
       />
+
+      {/* Modal de Seleção de Idioma */}
+      {showLanguageSelector && (
+        <LanguageSelector
+          showAsModal={true}
+          onClose={() => setShowLanguageSelector(false)}
+        />
+      )}
     </div>
   );
 };

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Download, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Download,
   Calendar,
   CreditCard,
   AlertTriangle,
@@ -20,10 +20,10 @@ import {
   Upload
 } from 'lucide-react';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
-import { 
-  ContaPagar, 
-  StatusContaPagar, 
-  FiltrosContasPagar, 
+import {
+  ContaPagar,
+  StatusContaPagar,
+  FiltrosContasPagar,
   ResumoFinanceiro,
   NovaContaPagar,
   RegistrarPagamento,
@@ -36,7 +36,6 @@ import {
 } from '../../../types/financeiro';
 
 // Importar os novos componentes aprimorados
-import FiltrosAvancados from '../../../features/financeiro/components/FiltrosAvancados';
 import ModalContaPagar from '../../../features/financeiro/components/ModalContaPagarNovo';
 
 interface ContasPagarPageProps {
@@ -70,7 +69,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Mock data para demonstração
       const mockContas: ContaPagar[] = [
         {
@@ -284,7 +283,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
     return (
       <div className="text-center py-12">
         <div className="text-red-600 text-lg mb-2">{error}</div>
-        <button 
+        <button
           onClick={carregarDados}
           className="text-blue-600 hover:text-blue-800 underline"
         >
@@ -295,118 +294,148 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
   }
 
   return (
-    <div className={`p-6 bg-gray-50 min-h-screen ${className}`}>
-      {/* Navegação de volta ao núcleo */}
-      <BackToNucleus 
-        nucleusPath="/nuclei/financeiro"
-        nucleusName="Financeiro"
-      />
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b px-6 py-4">
+        <BackToNucleus
+          nucleusPath="/nuclei/financeiro"
+          nucleusName="Financeiro"
+        />
+      </div>
 
-      {/* Cabeçalho */}
-      <div className="mb-6">
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Contas a Pagar</h1>
-            <p className="text-gray-600 mt-1">Gerencie todas as suas obrigações financeiras</p>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setMostrarFiltros(!mostrarFiltros)}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <Filter size={20} />
-              Filtros
-            </button>
-            <button
-              onClick={handleNovaConta}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus size={20} />
-              Nova Conta
-            </button>
+      <div className="p-6">
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-[#002333] flex items-center">
+                <CreditCard className="h-8 w-8 mr-3 text-[#159A9C]" />
+                Contas a Pagar
+                {loading && (
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#159A9C] ml-3"></div>
+                )}
+              </h1>
+              <p className="mt-2 text-[#B4BEC9]">
+                {loading ? 'Carregando contas...' : `Gerencie suas ${contasFiltradas.length} obrigações financeiras`}
+              </p>
+            </div>
+
+            {/* Botão de ação principal */}
+            <div className="mt-4 sm:mt-0 flex items-center gap-3">
+              <button
+                onClick={() => setMostrarFiltros(!mostrarFiltros)}
+                className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center gap-2 transition-colors"
+              >
+                <Filter className="w-4 h-4" />
+                Filtros
+              </button>
+              <button
+                onClick={handleNovaConta}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+              >
+                <Plus className="w-5 h-5" />
+                Nova Conta
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Cards de resumo */}
+        {/* Cards de Dashboard */}
         {resumoFinanceiro && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Vencendo Hoje</p>
-                  <p className="text-2xl font-bold text-orange-600">
+                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Vencendo Hoje</p>
+                  <p className="text-3xl font-bold text-orange-600 mt-2">
                     {formatarMoeda(resumoFinanceiro.totalVencendoHoje)}
                   </p>
-                  <p className="text-xs text-gray-500">
-                    {resumoFinanceiro.quantidadeVencendoHoje} conta(s)
-                  </p>
+                  <p className="text-xs text-orange-500 mt-1">⏰ {resumoFinanceiro.quantidadeVencendoHoje} conta(s)</p>
                 </div>
-                <div className="p-3 bg-orange-100 rounded-full">
-                  <Clock className="h-6 w-6 text-orange-600" />
+                <div className="p-4 bg-gradient-to-br from-orange-100 to-orange-200 rounded-xl">
+                  <Clock className="w-8 h-8 text-orange-600" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Total do Mês</p>
-                  <p className="text-2xl font-bold text-blue-600">
+                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total do Mês</p>
+                  <p className="text-3xl font-bold text-blue-600 mt-2">
                     {formatarMoeda(resumoFinanceiro.totalMes)}
                   </p>
-                  <p className="text-xs text-gray-500">
-                    {resumoFinanceiro.quantidadeMes} conta(s)
-                  </p>
+                  <p className="text-xs text-blue-500 mt-1">📅 {resumoFinanceiro.quantidadeMes} conta(s)</p>
                 </div>
-                <div className="p-3 bg-blue-100 rounded-full">
-                  <Calendar className="h-6 w-6 text-blue-600" />
+                <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl">
+                  <Calendar className="w-8 h-8 text-blue-600" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Em Atraso</p>
-                  <p className="text-2xl font-bold text-red-600">
+                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Em Atraso</p>
+                  <p className="text-3xl font-bold text-red-600 mt-2">
                     {formatarMoeda(resumoFinanceiro.totalAtrasado)}
                   </p>
-                  <p className="text-xs text-gray-500">
-                    {resumoFinanceiro.quantidadeAtrasado} conta(s)
-                  </p>
+                  <p className="text-xs text-red-500 mt-1">🚨 {resumoFinanceiro.quantidadeAtrasado} conta(s)</p>
                 </div>
-                <div className="p-3 bg-red-100 rounded-full">
-                  <AlertTriangle className="h-6 w-6 text-red-600" />
+                <div className="p-4 bg-gradient-to-br from-red-100 to-red-200 rounded-xl">
+                  <AlertTriangle className="w-8 h-8 text-red-600" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Pago no Mês</p>
-                  <p className="text-2xl font-bold text-green-600">
+                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Pago no Mês</p>
+                  <p className="text-3xl font-bold text-green-600 mt-2">
                     {formatarMoeda(resumoFinanceiro.totalPagoMes)}
                   </p>
-                  <p className="text-xs text-gray-500">
-                    {resumoFinanceiro.quantidadePagoMes} conta(s)
-                  </p>
+                  <p className="text-xs text-green-500 mt-1">✅ {resumoFinanceiro.quantidadePagoMes} conta(s)</p>
                 </div>
-                <div className="p-3 bg-green-100 rounded-full">
-                  <CheckCircle className="h-6 w-6 text-green-600" />
+                <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-xl">
+                  <CheckCircle className="w-8 h-8 text-green-600" />
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Filtros Avançados */}
+        {/* Filtros Simples */}
         {mostrarFiltros && (
-          <FiltrosAvancados
-            filtros={filtros}
-            onFiltrosChange={setFiltros}
-            onFechar={() => setMostrarFiltros(false)}
-          />
+          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+            <div className="flex flex-col sm:flex-row gap-4 items-end">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Buscar Contas
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por fornecedor, número ou descrição..."
+                    value={termoBusca}
+                    onChange={(e) => setTermoBusca(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setMostrarFiltros(false)}
+                  className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center gap-2 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
@@ -451,13 +480,17 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
         </div>
       </div>
 
-      {/* Tabela de contas */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      {/* Lista de Contas a Pagar */}
+      <div className="bg-white rounded-lg shadow-sm border">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Lista de Contas a Pagar</h2>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
               <tr>
-                <th className="w-12 px-4 py-3 text-left">
+                <th className="w-12 px-4 py-4 text-left">
                   <input
                     type="checkbox"
                     onChange={(e) => {
@@ -467,31 +500,52 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                         setContasSelecionadas([]);
                       }
                     }}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="w-4 h-4 text-[#159A9C] bg-gray-100 border-gray-300 rounded focus:ring-[#159A9C] focus:ring-2"
                   />
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Número
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-4 h-4" />
+                    Número
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Fornecedor
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <div className="flex items-center gap-2">
+                    <Building className="w-4 h-4" />
+                    Fornecedor
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Descrição
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <div className="flex items-center gap-2">
+                    <Edit className="w-4 h-4" />
+                    Descrição
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Categoria
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-4 h-4" />
+                    Categoria
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Vencimento
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    Vencimento
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Valor
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4" />
+                    Valor
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4" />
+                    Status
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Ações
                 </th>
               </tr>
@@ -500,13 +554,12 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
               {contasFiltradas.map((conta) => {
                 const isVencida = new Date(conta.dataVencimento) < new Date() && conta.status === StatusContaPagar.EM_ABERTO;
                 const isVencendoHoje = new Date(conta.dataVencimento).toDateString() === new Date().toDateString();
-                
+
                 return (
-                  <tr 
-                    key={conta.id} 
-                    className={`hover:bg-gray-50 transition-colors ${
-                      isVencida ? 'bg-red-50' : isVencendoHoje ? 'bg-orange-50' : ''
-                    }`}
+                  <tr
+                    key={conta.id}
+                    className={`hover:bg-gray-50 transition-colors ${isVencida ? 'bg-red-50' : isVencendoHoje ? 'bg-orange-50' : ''
+                      }`}
                   >
                     <td className="px-4 py-4">
                       <input
@@ -522,7 +575,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="text-sm font-medium text-gray-900">{conta.numero}</div>
                         {conta.recorrente && (
@@ -532,11 +585,11 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{conta.fornecedor.nome}</div>
                       <div className="text-sm text-gray-500">{conta.fornecedor.cnpjCpf}</div>
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-6 py-4">
                       <div className="text-sm text-gray-900 max-w-xs truncate" title={conta.descricao}>
                         {conta.descricao}
                       </div>
@@ -544,17 +597,16 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                         <div className="text-sm text-gray-500">Doc: {conta.numeroDocumento}</div>
                       )}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                         {CATEGORIA_LABELS[conta.categoria] || conta.categoria}
                       </span>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className={`text-sm ${
-                        isVencida ? 'text-red-600 font-medium' : 
-                        isVencendoHoje ? 'text-orange-600 font-medium' : 
-                        'text-gray-900'
-                      }`}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className={`text-sm ${isVencida ? 'text-red-600 font-medium' :
+                          isVencendoHoje ? 'text-orange-600 font-medium' :
+                            'text-gray-900'
+                        }`}>
                         {formatarData(conta.dataVencimento)}
                       </div>
                       {(isVencida || isVencendoHoje) && (
@@ -563,7 +615,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
                         {formatarMoeda(conta.valorTotal)}
                       </div>
@@ -573,7 +625,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         {getStatusIcon(conta.status)}
                         <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(conta.status)}`}>
@@ -581,30 +633,30 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
                         {conta.status === StatusContaPagar.EM_ABERTO && (
                           <button
                             onClick={() => handleRegistrarPagamento(conta)}
-                            className="text-green-600 hover:text-green-900 p-1 rounded"
+                            className="text-green-600 hover:text-green-800 p-1 rounded"
                             title="Registrar Pagamento"
                           >
-                            <CreditCard size={16} />
+                            <CreditCard className="w-4 h-4" />
                           </button>
                         )}
                         <button
                           onClick={() => handleEditarConta(conta)}
-                          className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                          className="text-blue-600 hover:text-blue-800 p-1 rounded"
                           title="Editar"
                         >
-                          <Edit size={16} />
+                          <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleExcluirConta(conta.id)}
-                          className="text-red-600 hover:text-red-900 p-1 rounded"
+                          className="text-red-600 hover:text-red-800 p-1 rounded"
                           title="Excluir"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>

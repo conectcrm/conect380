@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
+import React, { createContext, useContext, ReactNode, useState, useEffect, useCallback } from 'react';
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
@@ -9,9 +9,15 @@ i18n
   .use(initReactI18next)
   .init({
     fallbackLng: 'pt-BR',
-    debug: false,
+    debug: true, // Habilitando debug temporariamente
     interpolation: {
       escapeValue: false,
+    },
+    detection: {
+      // Configuração para usar localStorage
+      order: ['localStorage', 'navigator'],
+      caches: ['localStorage'],
+      lookupLocalStorage: 'preferred-language'
     },
     resources: {
       'pt-BR': {
@@ -38,6 +44,39 @@ i18n
             none: 'Nenhum',
             view: 'Visualizar',
             viewAll: 'Ver todos',
+            preferences: 'Preferências',
+            systemLanguage: 'Idioma do sistema',
+            helpSupport: 'Ajuda e Suporte',
+            helpCenter: 'Central de ajuda',
+            endSession: 'Encerrar sessão',
+            required: 'obrigatório',
+            optional: 'opcional',
+            update: 'Atualizar',
+            register: 'Cadastrar',
+            contact: 'Contato',
+            position: 'Cargo',
+            yes: 'Sim',
+            no: 'Não',
+            complement: 'Complemento',
+            neighborhood: 'Bairro',
+            subtotal: 'Subtotal',
+            discount: 'Desconto',
+            taxes: 'Impostos',
+            cashPayment: 'À Vista',
+            generateProposal: 'Gerar Proposta',
+            automaticRenewal: 'Renovação Automática',
+            frequency: 'Frequência',
+            saveProduct: 'Salvar Produto',
+            contactPerson: 'Pessoa de Contato',
+            client: 'Cliente',
+          },
+          form: {
+            requiredFields: 'Campos obrigatórios marcados com *',
+            validForm: 'Formulário válido',
+            fieldsWithError: 'campo(s) com erro',
+            fillRequired: 'Preencha todos os campos obrigatórios',
+            fillAllRequired: 'Preencha todos os campos obrigatórios',
+            fillAllRequiredFields: 'Preencha todos os campos obrigatórios',
           },
           auth: {
             login: 'Entrar',
@@ -55,6 +94,13 @@ i18n
             contracts: 'Contratos',
             financial: 'Financeiro',
             settings: 'Configurações',
+            main: 'Principal',
+            sales: 'Vendas',
+            mainModules: 'Módulos principais do sistema',
+            customerManagement: 'Gestão de relacionamento com clientes',
+            salesProposals: 'Propostas, produtos e oportunidades',
+            financialControl: 'Controle financeiro e faturamento',
+            systemSettings: 'Configurações do sistema e integrações',
           },
           dashboard: {
             title: 'Dashboard',
@@ -155,6 +201,39 @@ i18n
             none: 'None',
             view: 'View',
             viewAll: 'View all',
+            preferences: 'Preferences',
+            systemLanguage: 'System Language',
+            helpSupport: 'Help & Support',
+            helpCenter: 'Help Center',
+            endSession: 'End Session',
+            required: 'required',
+            optional: 'optional',
+            update: 'Update',
+            register: 'Register',
+            contact: 'Contact',
+            position: 'Position',
+            yes: 'Yes',
+            no: 'No',
+            complement: 'Complement',
+            neighborhood: 'Neighborhood',
+            subtotal: 'Subtotal',
+            discount: 'Discount',
+            taxes: 'Taxes',
+            cashPayment: 'Cash Payment',
+            generateProposal: 'Generate Proposal',
+            automaticRenewal: 'Automatic Renewal',
+            frequency: 'Frequency',
+            saveProduct: 'Save Product',
+            contactPerson: 'Contact Person',
+            client: 'Client',
+          },
+          form: {
+            requiredFields: 'Required fields marked with *',
+            validForm: 'Valid form',
+            fieldsWithError: 'field(s) with error',
+            fillRequired: 'Fill in all required fields',
+            fillAllRequired: 'Fill in all required fields',
+            fillAllRequiredFields: 'Fill in all required fields',
           },
           auth: {
             login: 'Sign In',
@@ -172,6 +251,13 @@ i18n
             contracts: 'Contracts',
             financial: 'Financial',
             settings: 'Settings',
+            main: 'Main',
+            sales: 'Sales',
+            mainModules: 'Main system modules',
+            customerManagement: 'Customer relationship management',
+            salesProposals: 'Proposals, products and opportunities',
+            financialControl: 'Financial control and billing',
+            systemSettings: 'System settings and integrations',
           },
           dashboard: {
             title: 'Dashboard',
@@ -272,6 +358,39 @@ i18n
             none: 'Ninguno',
             view: 'Ver',
             viewAll: 'Ver todos',
+            preferences: 'Preferencias',
+            systemLanguage: 'Idioma del Sistema',
+            helpSupport: 'Ayuda y Soporte',
+            helpCenter: 'Centro de Ayuda',
+            endSession: 'Cerrar Sesión',
+            required: 'requerido',
+            optional: 'opcional',
+            update: 'Actualizar',
+            register: 'Registrar',
+            contact: 'Contacto',
+            position: 'Posición',
+            yes: 'Sí',
+            no: 'No',
+            complement: 'Complemento',
+            neighborhood: 'Barrio',
+            subtotal: 'Subtotal',
+            discount: 'Descuento',
+            taxes: 'Impuestos',
+            cashPayment: 'Pago en Efectivo',
+            generateProposal: 'Generar Propuesta',
+            automaticRenewal: 'Renovación Automática',
+            frequency: 'Frecuencia',
+            saveProduct: 'Guardar Producto',
+            contactPerson: 'Persona de Contacto',
+            client: 'Cliente',
+          },
+          form: {
+            requiredFields: 'Campos obligatorios marcados con *',
+            validForm: 'Formulario válido',
+            fieldsWithError: 'campo(s) con error',
+            fillRequired: 'Complete todos los campos obligatorios',
+            fillAllRequired: 'Complete todos los campos obligatorios',
+            fillAllRequiredFields: 'Complete todos los campos obligatorios',
           },
           auth: {
             login: 'Iniciar Sesión',
@@ -289,6 +408,13 @@ i18n
             contracts: 'Contratos',
             financial: 'Financiero',
             settings: 'Configuración',
+            main: 'Principal',
+            sales: 'Ventas',
+            mainModules: 'Módulos principales del sistema',
+            customerManagement: 'Gestión de relaciones con clientes',
+            salesProposals: 'Propuestas, productos y oportunidades',
+            financialControl: 'Control financiero y facturación',
+            systemSettings: 'Configuración del sistema e integraciones',
           },
           dashboard: {
             title: 'Panel de Control',
@@ -389,6 +515,39 @@ i18n
             none: 'Aucun',
             view: 'Voir',
             viewAll: 'Voir tout',
+            preferences: 'Préférences',
+            systemLanguage: 'Langue du Système',
+            helpSupport: 'Aide et Support',
+            helpCenter: 'Centre d\'Aide',
+            endSession: 'Fermer la Session',
+            required: 'requis',
+            optional: 'optionnel',
+            update: 'Mettre à jour',
+            register: 'Enregistrer',
+            contact: 'Contact',
+            position: 'Position',
+            yes: 'Oui',
+            no: 'Non',
+            complement: 'Complément',
+            neighborhood: 'Quartier',
+            subtotal: 'Sous-total',
+            discount: 'Remise',
+            taxes: 'Taxes',
+            cashPayment: 'Paiement Comptant',
+            generateProposal: 'Générer une Proposition',
+            automaticRenewal: 'Renouvellement Automatique',
+            frequency: 'Fréquence',
+            saveProduct: 'Enregistrer le Produit',
+            contactPerson: 'Personne de Contact',
+            client: 'Client',
+          },
+          form: {
+            requiredFields: 'Champs obligatoires marqués avec *',
+            validForm: 'Formulaire valide',
+            fieldsWithError: 'champ(s) avec erreur',
+            fillRequired: 'Remplir tous les champs obligatoires',
+            fillAllRequired: 'Remplir tous les champs obligatoires',
+            fillAllRequiredFields: 'Remplir tous les champs obligatoires',
           },
           auth: {
             login: 'Se Connecter',
@@ -406,6 +565,13 @@ i18n
             contracts: 'Contrats',
             financial: 'Financier',
             settings: 'Paramètres',
+            main: 'Principal',
+            sales: 'Ventes',
+            mainModules: 'Modules principaux du système',
+            customerManagement: 'Gestion de la relation client',
+            salesProposals: 'Propositions, produits et opportunités',
+            financialControl: 'Contrôle financier et facturation',
+            systemSettings: 'Paramètres système et intégrations',
           },
           dashboard: {
             title: 'Tableau de Bord',
@@ -506,6 +672,9 @@ interface I18nProviderProps {
 
 export const I18nProvider: React.FC<I18nProviderProps> = ({ children }) => {
   const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
+  const [forceUpdate, setForceUpdate] = useState(0); // Para forçar re-renderização
+
+  console.log('🔧 I18nProvider renderizando com idioma:', currentLanguage, 'forceUpdate:', forceUpdate);
 
   const availableLanguages = [
     {
@@ -536,8 +705,15 @@ export const I18nProvider: React.FC<I18nProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const handleLanguageChange = (lng: string) => {
+      console.log('🔄 Evento languageChanged detectado:', lng);
       setCurrentLanguage(lng);
+      setForceUpdate(prev => prev + 1); // Força re-renderização
+      console.log('🔄 Estado currentLanguage atualizado para:', lng);
     };
+
+    // Definir idioma inicial baseado na detecção
+    setCurrentLanguage(i18n.language);
+    console.log('🔄 Idioma inicial detectado:', i18n.language);
 
     i18n.on('languageChanged', handleLanguageChange);
 
@@ -548,17 +724,37 @@ export const I18nProvider: React.FC<I18nProviderProps> = ({ children }) => {
 
   const changeLanguage = async (lng: string) => {
     try {
+      console.log('🌐 Tentando alterar idioma para:', lng);
+      console.log('🌐 Idioma atual:', currentLanguage);
+      console.log('🌐 i18n.language antes:', i18n.language);
+
       await i18n.changeLanguage(lng);
+
+      console.log('✅ Idioma alterado com sucesso para:', lng);
+      console.log('🌐 i18n.language depois:', i18n.language);
+      console.log('🔄 forceUpdate será incrementado');
+
       // Salvar preferência no localStorage
       localStorage.setItem('preferred-language', lng);
+      console.log('💾 Preferência salva no localStorage');
+
+      // Forçar atualização imediata
+      setCurrentLanguage(lng);
+      setForceUpdate(prev => prev + 1);
+      console.log('🔄 Estados atualizados manualmente');
     } catch (error) {
-      console.error('Erro ao alterar idioma:', error);
+      console.error('❌ Erro ao alterar idioma:', error);
     }
   };
 
-  const t = (key: string) => {
-    return i18n.t(key);
-  };
+  const t = useCallback((key: string) => {
+    const result = i18n.t(key);
+    // Log apenas para chaves específicas para evitar spam
+    if (key.includes('navigation') || key.includes('common.preferences')) {
+      console.log(`🔤 t("${key}") em idioma ${currentLanguage} = "${result}"`);
+    }
+    return result;
+  }, [currentLanguage, forceUpdate]); // Re-create the function when language changes
 
   const value: I18nContextData = {
     language: currentLanguage,
@@ -566,6 +762,12 @@ export const I18nProvider: React.FC<I18nProviderProps> = ({ children }) => {
     t,
     availableLanguages,
   };
+
+  console.log('🔧 I18nProvider valor do contexto:', {
+    language: currentLanguage,
+    t: typeof t,
+    forceUpdate
+  });
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 };

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Download, 
-  Eye, 
-  Edit, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Download,
+  Eye,
+  Edit,
   Trash2,
   DollarSign,
   Calendar,
@@ -131,12 +131,12 @@ const ContasReceberPage: React.FC = () => {
 
   const filteredContas = contas.filter(conta => {
     const matchesSearch = conta.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         conta.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         conta.empresa.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         conta.descricao.toLowerCase().includes(searchTerm.toLowerCase());
-    
+      conta.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      conta.empresa.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      conta.descricao.toLowerCase().includes(searchTerm.toLowerCase());
+
     const matchesStatus = filterStatus === 'todos' || conta.status === filterStatus;
-    
+
     let matchesVencimento = true;
     if (filterVencimento === 'vencidas') {
       matchesVencimento = conta.status === 'vencida';
@@ -146,7 +146,7 @@ const ContasReceberPage: React.FC = () => {
       const diffDays = Math.ceil((vencimento.getTime() - hoje.getTime()) / (1000 * 3600 * 24));
       matchesVencimento = diffDays <= 7 && diffDays >= 0;
     }
-    
+
     return matchesSearch && matchesStatus && matchesVencimento;
   });
 
@@ -189,11 +189,11 @@ const ContasReceberPage: React.FC = () => {
 
   const getVencimentoStatus = (dataVencimento: string, status: string) => {
     if (status === 'paga') return 'paga';
-    
+
     const hoje = new Date();
     const vencimento = new Date(dataVencimento);
     const diffDays = Math.ceil((vencimento.getTime() - hoje.getTime()) / (1000 * 3600 * 24));
-    
+
     if (diffDays < 0) return 'vencida';
     if (diffDays <= 7) return 'vencendo';
     return 'normal';
@@ -218,15 +218,15 @@ const ContasReceberPage: React.FC = () => {
     const totalPendente = contas
       .filter(c => c.status === 'pendente')
       .reduce((total, c) => total + c.valor, 0);
-    
+
     const totalVencidas = contas
       .filter(c => c.status === 'vencida')
       .reduce((total, c) => total + c.valor, 0);
-    
+
     const totalRecebido = contas
       .filter(c => c.status === 'paga')
       .reduce((total, c) => total + c.valorPago, 0);
-    
+
     const totalGeral = contas.reduce((total, c) => total + c.valor, 0);
 
     return {
@@ -242,159 +242,207 @@ const ContasReceberPage: React.FC = () => {
   const resumo = getResumoFinanceiro();
 
   return (
-    <div className="min-h-screen bg-[#DEEFE7]">
-      {/* Back to Nucleus */}
-      <BackToNucleus 
-        nucleusName="Financeiro" 
-        nucleusPath="/nuclei/financeiro"
-        currentModuleName="Contas a Receber"
-      />
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b px-6 py-4">
+        <BackToNucleus
+          nucleusName="Financeiro"
+          nucleusPath="/nuclei/financeiro"
+        />
+      </div>
 
       <div className="p-6">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-[#B4BEC9]">Gerencie recebimentos e controle inadimplência</p>
+              <h1 className="text-3xl font-bold text-[#002333] flex items-center">
+                <DollarSign className="h-8 w-8 mr-3 text-[#159A9C]" />
+                Contas a Receber
+              </h1>
+              <p className="mt-2 text-[#B4BEC9]">
+                Gerencie seus recebimentos e controle inadimplência de {contas.length} contas
+              </p>
             </div>
-            
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button className="flex items-center gap-2 px-4 py-2 border border-[#B4BEC9] text-[#002333] rounded-lg hover:bg-[#DEEFE7] transition-colors">
+
+            {/* Botão de ação principal */}
+            <div className="mt-4 sm:mt-0 flex items-center gap-3">
+              <button className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center gap-2 transition-colors">
                 <Download className="w-4 h-4" />
                 Exportar
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg transition-all">
-                <Plus className="w-4 h-4" />
+              <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm">
+                <Plus className="w-5 h-5" />
                 Nova Conta
               </button>
             </div>
           </div>
         </div>
 
-        {/* Resumo Financeiro */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <div className="bg-white p-6 rounded-lg border border-[#DEEFE7] shadow-sm">
+        {/* Cards de Dashboard */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-[#B4BEC9]">Total a Receber</p>
-                <p className="text-2xl font-bold text-[#159A9C]">{formatCurrency(resumo.totalGeral)}</p>
-                <p className="text-xs text-[#B4BEC9] mt-1">{contas.length} contas</p>
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total a Receber</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">{formatCurrency(resumo.totalGeral)}</p>
+                <p className="text-xs text-gray-400 mt-1">💰 Valor total</p>
               </div>
-              <div className="p-3 bg-[#DEEFE7] rounded-full">
-                <DollarSign className="w-6 h-6 text-[#159A9C]" />
+              <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl">
+                <DollarSign className="w-8 h-8 text-blue-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg border border-[#DEEFE7] shadow-sm">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-[#B4BEC9]">Pendentes</p>
-                <p className="text-2xl font-bold text-yellow-600">{formatCurrency(resumo.totalPendente)}</p>
-                <p className="text-xs text-[#B4BEC9] mt-1">{resumo.contasPendentes} contas</p>
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Pendentes</p>
+                <p className="text-3xl font-bold text-yellow-600 mt-2">{formatCurrency(resumo.totalPendente)}</p>
+                <p className="text-xs text-yellow-500 mt-1">⏳ {resumo.contasPendentes} contas</p>
               </div>
-              <div className="p-3 bg-yellow-100 rounded-full">
-                <Clock className="w-6 h-6 text-yellow-600" />
+              <div className="p-4 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-xl">
+                <Clock className="w-8 h-8 text-yellow-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg border border-[#DEEFE7] shadow-sm">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-[#B4BEC9]">Vencidas</p>
-                <p className="text-2xl font-bold text-red-600">{formatCurrency(resumo.totalVencidas)}</p>
-                <p className="text-xs text-[#B4BEC9] mt-1">{resumo.contasVencidas} contas</p>
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Vencidas</p>
+                <p className="text-3xl font-bold text-red-600 mt-2">{formatCurrency(resumo.totalVencidas)}</p>
+                <p className="text-xs text-red-500 mt-1">🚨 {resumo.contasVencidas} contas</p>
               </div>
-              <div className="p-3 bg-red-100 rounded-full">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
+              <div className="p-4 bg-gradient-to-br from-red-100 to-red-200 rounded-xl">
+                <AlertTriangle className="w-8 h-8 text-red-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg border border-[#DEEFE7] shadow-sm">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-[#B4BEC9]">Recebido</p>
-                <p className="text-2xl font-bold text-green-600">{formatCurrency(resumo.totalRecebido)}</p>
-                <p className="text-xs text-[#B4BEC9] mt-1">Este mês</p>
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Recebido</p>
+                <p className="text-3xl font-bold text-green-600 mt-2">{formatCurrency(resumo.totalRecebido)}</p>
+                <p className="text-xs text-green-500 mt-1">✅ Este mês</p>
               </div>
-              <div className="p-3 bg-green-100 rounded-full">
-                <CheckCircle className="w-6 h-6 text-green-600" />
+              <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-xl">
+                <CheckCircle className="w-8 h-8 text-green-600" />
               </div>
             </div>
           </div>
         </div>
 
         {/* Filtros e Busca */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Busca */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#B4BEC9] w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Buscar por número, cliente, empresa ou descrição..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-              />
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+          <div className="flex flex-col sm:flex-row gap-4 items-end">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Buscar Contas
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Buscar por número, cliente, empresa ou descrição..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
+                />
+              </div>
             </div>
 
-            {/* Filtro de Status */}
-            <div className="flex items-center gap-2">
-              <Filter className="w-5 h-5 text-[#B4BEC9]" />
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-              >
-                <option value="todos">Todos os Status</option>
-                <option value="pendente">Pendente</option>
-                <option value="vencida">Vencida</option>
-                <option value="paga">Paga</option>
-                <option value="cancelada">Cancelada</option>
-              </select>
-            </div>
+            <div className="flex gap-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Status
+                </label>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                >
+                  <option value="todos">Todos os Status</option>
+                  <option value="pendente">⏳ Pendente</option>
+                  <option value="vencida">🚨 Vencida</option>
+                  <option value="paga">✅ Paga</option>
+                  <option value="cancelada">🚫 Cancelada</option>
+                </select>
+              </div>
 
-            {/* Filtro de Vencimento */}
-            <div className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-[#B4BEC9]" />
-              <select
-                value={filterVencimento}
-                onChange={(e) => setFilterVencimento(e.target.value)}
-                className="px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-              >
-                <option value="todos">Todos os Prazos</option>
-                <option value="vencidas">Vencidas</option>
-                <option value="vencendo">Vencendo (7 dias)</option>
-              </select>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Vencimento
+                </label>
+                <select
+                  value={filterVencimento}
+                  onChange={(e) => setFilterVencimento(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                >
+                  <option value="todos">Todos os Prazos</option>
+                  <option value="vencidas">🚨 Vencidas</option>
+                  <option value="vencendo">⚠️ Vencendo (7 dias)</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Lista de Contas */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          {/* Header da Tabela */}
-          <div className="bg-[#DEEFE7] px-6 py-4 border-b border-[#B4BEC9]">
-            <h3 className="text-lg font-semibold text-[#002333]">
-              {filteredContas.length} conta{filteredContas.length !== 1 ? 's' : ''} encontrada{filteredContas.length !== 1 ? 's' : ''}
-            </h3>
+        <div className="bg-white rounded-lg shadow-sm border">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">Lista de Contas a Receber</h2>
           </div>
 
           {/* Tabela */}
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50">
+              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Conta</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vencimento</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Forma Pagamento</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responsável</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      Conta
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      Cliente
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="w-4 h-4" />
+                      Valor
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      Vencimento
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4" />
+                      Status
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-4 h-4" />
+                      Forma Pagamento
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      Responsável
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Ações</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -448,13 +496,13 @@ const ContasReceberPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center text-sm text-[#B4BEC9]">
+                      <div className="flex items-center text-sm text-gray-600">
                         <CreditCard className="w-4 h-4 mr-1" />
                         {conta.formaPagamento}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center text-sm text-[#B4BEC9]">
+                      <div className="flex items-center text-sm text-gray-600">
                         <User className="w-4 h-4 mr-1" />
                         {conta.responsavel}
                       </div>
@@ -463,18 +511,18 @@ const ContasReceberPage: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleViewConta(conta)}
-                          className="p-2 text-[#159A9C] hover:bg-[#DEEFE7] rounded-lg transition-colors"
+                          className="text-gray-600 hover:text-gray-800 p-1 rounded"
                           title="Visualizar"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                        <button className="text-blue-600 hover:text-blue-800 p-1 rounded" title="Editar">
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Enviar Cobrança">
+                        <button className="text-green-600 hover:text-green-800 p-1 rounded" title="Enviar Cobrança">
                           <Mail className="w-4 h-4" />
                         </button>
-                        <button className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Excluir">
+                        <button className="text-red-600 hover:text-red-800 p-1 rounded" title="Excluir">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -486,9 +534,16 @@ const ContasReceberPage: React.FC = () => {
           </div>
 
           {filteredContas.length === 0 && (
-            <div className="text-center py-12">
-              <div className="text-[#B4BEC9] text-lg mb-2">Nenhuma conta encontrada</div>
-              <p className="text-[#B4BEC9]">Tente ajustar os filtros ou criar uma nova conta</p>
+            <div className="p-8 text-center">
+              <DollarSign className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma conta encontrada</h3>
+              <p className="text-gray-600 mb-4">
+                Tente ajustar os filtros ou criar uma nova conta a receber.
+              </p>
+              <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg inline-flex items-center gap-2">
+                <Plus className="w-4 h-4" />
+                Nova Conta
+              </button>
             </div>
           )}
         </div>

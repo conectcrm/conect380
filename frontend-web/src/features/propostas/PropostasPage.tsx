@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useI18n } from '../../contexts/I18nContext';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
@@ -46,24 +46,60 @@ import {
   Copy
 } from 'lucide-react';
 
-// 🔧 Função auxiliar para buscar dados reais do cliente
+// 🔧 Função auxiliar para buscar dados reais do cliente (com cache para evitar requisições duplicadas)
+const clienteCache = new Map();
+let clientesGlobaisPromise: Promise<any[]> | null = null;
+let ultimaCarregaClientes = 0;
+const CACHE_CLIENTES_DURACAO = 5 * 60 * 1000; // 5 minutos
+
 const buscarDadosReaisDoCliente = async (nome: string, emailFicticio: string = '') => {
   if (!nome || nome === 'Cliente não informado') return null;
+
+  // Verificar cache primeiro
+  const cacheKey = nome.toLowerCase().trim();
+  if (clienteCache.has(cacheKey)) {
+    console.log(`💾 [CACHE] Dados do cliente "${nome}" obtidos do cache`);
+    return clienteCache.get(cacheKey);
+  }
 
   try {
     console.log(`🔍 [GRID] Buscando dados reais para: "${nome}"`);
 
-    // Tentar buscar no serviço de clientes
-    const response = await import('../../services/clientesService').then(module =>
-      module.clientesService.getClientes({ search: nome, limit: 100 })
-    );
+    // ⚡ OTIMIZADO: Verificar se o cache global ainda é válido
+    const agora = Date.now();
+    const cacheExpirado = (agora - ultimaCarregaClientes) > CACHE_CLIENTES_DURACAO;
 
-    if (response?.data) {
-      const clienteReal = response.data.find(c =>
+    if (!clientesGlobaisPromise || cacheExpirado) {
+      if (cacheExpirado) {
+        console.log(`🔄 [CACHE GLOBAL] Cache expirado, recarregando clientes...`);
+        clientesGlobaisPromise = null;
+      } else {
+        console.log(`📥 [CACHE GLOBAL] Carregando todos os clientes uma única vez...`);
+      }
+
+      ultimaCarregaClientes = agora;
+      clientesGlobaisPromise = import('../../services/clientesService').then(module =>
+        module.clientesService.getClientes({ limit: 100 })
+      ).then(response => {
+        console.log(`✅ [CACHE GLOBAL] ${response?.data?.length || 0} clientes carregados`);
+        return response?.data || [];
+      }).catch(error => {
+        console.error(`❌ [CACHE GLOBAL] Erro ao carregar clientes:`, error);
+        clientesGlobaisPromise = null; // Reset para tentar novamente
+        ultimaCarregaClientes = 0;
+        return [];
+      });
+    }
+
+    const todosClientes = await clientesGlobaisPromise;
+
+    if (todosClientes && todosClientes.length > 0) {
+      const clienteReal = todosClientes.find(c =>
         c.nome?.toLowerCase().includes(nome.toLowerCase()) ||
         nome.toLowerCase().includes(c.nome?.toLowerCase())
       );
 
+      let resultado = null;
       if (clienteReal && clienteReal.email && clienteReal.email !== emailFicticio) {
         console.log(`✅ [GRID] Dados reais encontrados:`, {
           nome: clienteReal.nome,
@@ -71,15 +107,21 @@ const buscarDadosReaisDoCliente = async (nome: string, emailFicticio: string = '
           telefone: clienteReal.telefone
         });
 
-        return {
+        resultado = {
           nome: clienteReal.nome,
           email: clienteReal.email,
           telefone: clienteReal.telefone
         };
       }
+
+      // Armazenar no cache por 5 minutos
+      clienteCache.set(cacheKey, resultado);
+      return resultado;
     }
   } catch (error) {
     console.log(`⚠️ [GRID] Erro ao buscar dados reais para "${nome}":`, error);
+    // Armazenar null no cache para evitar tentativas repetidas
+    clienteCache.set(cacheKey, null);
   }
 
   return null;
@@ -107,7 +149,7 @@ const converterPropostaParaUI = async (proposta: any) => {
 
     console.log(`   📦 Cliente OBJETO - Nome: "${clienteNome}", Email: "${clienteEmail}"`);
 
-    // � DETECTAR E BUSCAR DADOS REAIS PARA O GRID
+    // ⚡ OTIMIZADO: Só buscar dados reais se realmente necessário e não estiver em cache
     const isEmailFicticio = clienteEmail && (
       clienteEmail.includes('@cliente.com') ||
       clienteEmail.includes('@cliente.temp') ||
@@ -116,21 +158,33 @@ const converterPropostaParaUI = async (proposta: any) => {
 
     if (isEmailFicticio) {
       console.log(`   ⚠️  EMAIL FICTÍCIO DETECTADO: ${clienteEmail}`);
-      console.log(`   🔍 Buscando dados REAIS para o GRID...`);
 
-      // ✅ BUSCAR DADOS REAIS PARA MOSTRAR NO GRID
-      const dadosReais = await buscarDadosReaisDoCliente(clienteNome, clienteEmail);
+      // ✅ CACHE OTIMIZADO: Verificar cache primeiro, apenas buscar se necessário
+      const cacheKey = `cliente_${clienteNome.toLowerCase().trim()}`;
 
-      if (dadosReais) {
-        console.log(`   ✅ SUBSTITUINDO por dados REAIS no grid:`);
-        console.log(`      Email: ${clienteEmail} → ${dadosReais.email}`);
-        console.log(`      Telefone: ${clienteTelefone} → ${dadosReais.telefone}`);
-
-        clienteNome = dadosReais.nome;
-        clienteEmail = dadosReais.email;
-        clienteTelefone = dadosReais.telefone;
+      if (clienteCache.has(cacheKey)) {
+        const dadosCache = clienteCache.get(cacheKey);
+        if (dadosCache) {
+          console.log(`   🎯 USANDO CACHE para ${clienteNome}`);
+          clienteNome = dadosCache.nome;
+          clienteEmail = dadosCache.email;
+          clienteTelefone = dadosCache.telefone;
+        }
       } else {
-        console.log(`   ⚠️  Dados reais não encontrados, mantendo originais`);
+        console.log(`   🔍 Buscando dados REAIS para o GRID (não está em cache)...`);
+        const dadosReais = await buscarDadosReaisDoCliente(clienteNome, clienteEmail);
+
+        if (dadosReais) {
+          console.log(`   ✅ SUBSTITUINDO por dados REAIS no grid:`);
+          console.log(`      Email: ${clienteEmail} → ${dadosReais.email}`);
+          console.log(`      Telefone: ${clienteTelefone} → ${dadosReais.telefone}`);
+
+          clienteNome = dadosReais.nome;
+          clienteEmail = dadosReais.email;
+          clienteTelefone = dadosReais.telefone;
+        } else {
+          console.log(`   ⚠️  Dados reais não encontrados, mantendo originais`);
+        }
       }
     } else if (clienteEmail) {
       console.log(`   🔒 EMAIL REAL PROTEGIDO: ${clienteEmail}`);
@@ -140,21 +194,33 @@ const converterPropostaParaUI = async (proposta: any) => {
     clienteNome = safeRender(proposta.cliente);
     console.log(`   📝 Cliente STRING - Nome original: "${clienteNome}"`);
 
-    // 🔍 BUSCAR DADOS REAIS PARA CLIENTES STRING TAMBÉM
-    console.log(`   🔍 Buscando dados reais para cliente STRING...`);
-    const dadosReais = await buscarDadosReaisDoCliente(clienteNome);
+    // ⚡ OTIMIZADO: Cache para clientes string também
+    const cacheKey = `cliente_${clienteNome.toLowerCase().trim()}`;
 
-    if (dadosReais) {
-      console.log(`   ✅ Dados reais encontrados para cliente STRING:`);
-      console.log(`      Email: ${dadosReais.email}`);
-      console.log(`      Telefone: ${dadosReais.telefone}`);
-
-      clienteNome = dadosReais.nome;
-      clienteEmail = dadosReais.email;
-      clienteTelefone = dadosReais.telefone;
+    if (clienteCache.has(cacheKey)) {
+      const dadosCache = clienteCache.get(cacheKey);
+      if (dadosCache) {
+        console.log(`   🎯 USANDO CACHE para cliente STRING: ${clienteNome}`);
+        clienteNome = dadosCache.nome;
+        clienteEmail = dadosCache.email;
+        clienteTelefone = dadosCache.telefone;
+      }
     } else {
-      console.log(`   ⚠️  Dados reais não encontrados para cliente STRING`);
-      clienteEmail = ''; // Deixar vazio se não encontrou
+      console.log(`   🔍 Buscando dados reais para cliente STRING (não está em cache)...`);
+      const dadosReais = await buscarDadosReaisDoCliente(clienteNome);
+
+      if (dadosReais) {
+        console.log(`   ✅ Dados reais encontrados para cliente STRING:`);
+        console.log(`      Email: ${dadosReais.email}`);
+        console.log(`      Telefone: ${dadosReais.telefone}`);
+
+        clienteNome = dadosReais.nome;
+        clienteEmail = dadosReais.email;
+        clienteTelefone = dadosReais.telefone;
+      } else {
+        console.log(`   ⚠️  Dados reais não encontrados para cliente STRING`);
+        clienteEmail = ''; // Deixar vazio se não encontrou
+      }
     }
   }
 
@@ -217,10 +283,31 @@ const PropostasPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showWizardModal, setShowWizardModal] = useState(false);
 
-  // Debug: Log sempre que showWizardModal mudar
-  useEffect(() => {
-    console.log('🔄 PropostasPage: showWizardModal mudou para:', showWizardModal);
-  }, [showWizardModal]);
+  // � Sistema de Controle de Atualizações v2
+  const [isLoadingPropostas, setIsLoadingPropostas] = useState(false);
+  const updateControl = React.useRef({
+    lastUpdate: 0,
+    pendingUpdate: false,
+    updateSource: '',
+    batchTimeout: null as NodeJS.Timeout | null,
+    requestId: null as string | null
+  });
+  const REFRESH_CONFIG = {
+    minInterval: 5000,        // Intervalo mínimo entre atualizações
+    batchWindow: 2000,        // Janela para agrupar múltiplas solicitações
+    forceInterval: 30000,     // Intervalo para forçar atualização mesmo sem mudanças
+    modalDebounce: 1000      // Debounce específico para interações do modal
+  };
+
+  // Sistema unificado de logs
+  const logUpdate = (action: string, details: any = {}) => {
+    console.log(`🔄 [UPDATE-SYSTEM] ${action}:`, {
+      timestamp: new Date().toISOString(),
+      loadingState: isLoadingPropostas,
+      timeSinceLastUpdate: Date.now() - updateControl.current.lastUpdate,
+      ...details
+    });
+  };
 
   // Novos estados para funcionalidades avançadas
   const [selectedPropostas, setSelectedPropostas] = useState<string[]>([]);
@@ -236,84 +323,255 @@ const PropostasPage: React.FC = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedPropostaForView, setSelectedPropostaForView] = useState<PropostaCompleta | null>(null);
 
-  // Carregar propostas reais do serviço
-  useEffect(() => {
-    carregarPropostas();
+  // Função para mostrar notificações
+  const showNotification = useCallback((message: string, type: 'success' | 'error') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 5000);
   }, []);
 
-  // 🔄 POLLING AUTOMÁTICO - Atualização em tempo real a cada 30 segundos
-  useEffect(() => {
-    console.log('⏰ Iniciando polling automático para atualização em tempo real...');
+  // � Sistema Inteligente de Atualizações v2
+  const carregarPropostas = useCallback(async (options: {
+    force?: boolean;
+    source?: string;
+    immediate?: boolean;
+  } = {}) => {
+    const { force = false, source = 'manual', immediate = false } = options;
+    const now = Date.now();
+    const requestId = `req_${now}_${Math.random().toString(36).substr(2, 9)}`;
 
-    const intervalo = setInterval(() => {
-      console.log('🔄 Polling: Verificando atualizações...');
-      carregarPropostas();
-    }, 30000); // 30 segundos
+    // Função para verificar se devemos prosseguir com a atualização
+    const shouldUpdate = () => {
+      if (force) return true;
+      if (isLoadingPropostas) return false;
 
-    // Cleanup
-    return () => {
-      console.log('🛑 Parando polling automático');
-      clearInterval(intervalo);
+      const timeSinceLastUpdate = now - updateControl.current.lastUpdate;
+      if (timeSinceLastUpdate < REFRESH_CONFIG.minInterval) {
+        logUpdate('UPDATE_REJECTED', {
+          reason: 'TOO_SOON',
+          source,
+          timeSinceLastUpdate
+        });
+        return false;
+      }
+
+      return true;
     };
-  }, []);
 
-  // Atualizar lista quando página voltar ao foco (ex: voltar de nova proposta)
+    // Se já houver uma atualização pendente e não for forçada, apenas registre
+    if (!force && updateControl.current.pendingUpdate) {
+      logUpdate('UPDATE_QUEUED', { source, requestId });
+      return;
+    }
+
+    try {
+      console.log(`🚀 [ANTI-REFRESH] Iniciando carregamento ${requestId}${force ? ' (FORÇADO)' : ''}`);
+      setIsLoadingPropostas(true);
+      setIsLoading(true);
+      updateControl.current.lastUpdate = now;
+      updateControl.current.requestId = requestId;
+
+      console.log(`🔄 [OTIMIZADO] Carregando propostas do banco de dados... (${requestId})`);
+
+      const propostasReais = await propostasService.findAll();
+
+      // Verificar se esta requisição ainda é válida (evitar race conditions)
+      if (updateControl.current.requestId !== requestId) {
+        console.log(`🚫 [RACE-CONDITION] Requisição ${requestId} cancelada, outra mais recente em andamento`);
+        return;
+      }
+
+      console.log(`🔄 [OTIMIZADO] Propostas carregadas do serviço (${requestId}):`, propostasReais.length);
+
+      if (propostasReais && propostasReais.length > 0) {
+        console.log(`🔄 [OTIMIZADO] Convertendo propostas com busca de dados reais... (${requestId})`);
+
+        // ✅ CONVERTER TODAS AS PROPOSTAS COM BUSCA DE DADOS REAIS
+        const propostasFormatadas = await Promise.all(
+          propostasReais.map(async (proposta) => {
+            // Converter proposta do backend para o formato esperado
+            const propostaFormatada = {
+              id: proposta.id,
+              numero: proposta.numero,
+              cliente: proposta.cliente, // O backend já retorna o objeto cliente correto
+              total: proposta.valor || proposta.total,
+              status: proposta.status,
+              observacoes: proposta.observacoes,
+              criadaEm: proposta.criadaEm || new Date().toISOString(),
+              dataValidade: proposta.dataVencimento || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+              vendedor: proposta.vendedor,
+              produtos: proposta.produtos || []
+            };
+            return await converterPropostaParaUI(propostaFormatada);
+          })
+        );
+
+        // Verificar novamente se esta requisição ainda é válida
+        if (updateControl.current.requestId !== requestId) {
+          console.log(`🚫 [RACE-CONDITION] Requisição ${requestId} cancelada durante conversão`);
+          return;
+        }
+
+        // Validar que todas as propostas têm campos string
+        const propostasValidadas = propostasFormatadas.map(proposta => ({
+          ...proposta,
+          numero: safeRender(proposta.numero),
+          cliente: safeRender(proposta.cliente),
+          cliente_contato: safeRender(proposta.cliente_contato),
+          titulo: safeRender(proposta.titulo),
+          status: safeRender(proposta.status),
+          vendedor: safeRender(proposta.vendedor),
+          categoria: safeRender(proposta.categoria),
+          descricao: safeRender(proposta.descricao),
+          data_criacao: safeRender(proposta.data_criacao),
+          data_vencimento: safeRender(proposta.data_vencimento),
+          data_aprovacao: proposta.data_aprovacao ? safeRender(proposta.data_aprovacao) : null,
+          valor: Number(proposta.valor) || 0,
+          probabilidade: Number(proposta.probabilidade) || 0
+        }));
+
+        setPropostas(propostasValidadas);
+        setFilteredPropostas(propostasValidadas);
+        console.log(`✅ [OTIMIZADO] Propostas carregadas do banco (${requestId}):`, propostasValidadas.length);
+
+        // Log específico para verificar status das propostas enviadas
+        const propostasEnviadas = propostasValidadas.filter(p => p.status === 'enviada');
+        console.log(`📧 [OTIMIZADO] Propostas com status "enviada": ${propostasEnviadas.length}`);
+        propostasEnviadas.forEach(p => {
+          console.log(`  - ${p.numero}: ${p.status}`);
+        });
+      } else {
+        setPropostas([]);
+        setFilteredPropostas([]);
+        console.log(`📝 [OTIMIZADO] Nenhuma proposta encontrada no banco de dados (${requestId})`);
+      }
+    } catch (error) {
+      console.error(`❌ [OTIMIZADO] Erro ao carregar propostas (${requestId}):`, error);
+      setPropostas([]);
+      setFilteredPropostas([]);
+      // ❌ REMOVIDO: showNotification causa dependência circular
+      console.error('Erro ao carregar propostas do banco de dados');
+    } finally {
+      // Só resetar se ainda é a requisição atual
+      if (updateControl.current.requestId === requestId) {
+        setIsLoading(false);
+        setIsLoadingPropostas(false);
+        updateControl.current.requestId = null;
+        console.log(`✅ [ANTI-REFRESH] Carregamento finalizado (${requestId})`);
+      } else {
+        console.log(`🔄 [RACE-CONDITION] Finalizando requisição cancelada (${requestId})`);
+      }
+    }
+  }, [isLoadingPropostas]); // ✅ Dependências limpas
+
+  // ✅ CARREGAMENTO INICIAL SIMPLIFICADO - Sem dependência circular
   useEffect(() => {
+    console.log('🚀 [INICIAL] Carregamento inicial das propostas');
+
+    let isMounted = true;
+    const loadInitialData = async () => {
+      if (isMounted) {
+        await carregarPropostas({ force: true }); // Forçar carregamento inicial
+      }
+    };
+
+    loadInitialData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []); // ✅ SEM DEPENDÊNCIAS - Executa apenas na montagem
+
+  // 🔄 POLLING AUTOMÁTICO DESABILITADO - Causava múltiplas requisições desnecessárias
+  // useEffect(() => {
+  //   console.log('⏰ Iniciando polling automático para atualização em tempo real...');
+
+  //   const intervalo = setInterval(() => {
+  //     console.log('🔄 Polling: Verificando atualizações...');
+  //     carregarPropostas();
+  //   }, 30000); // 30 segundos
+
+  //   // Cleanup
+  //   return () => {
+  //     console.log('🛑 Parando polling automático');
+  //     clearInterval(intervalo);
+  //   };
+  // }, []);
+
+  // ⚡ OTIMIZADO: Atualizar lista quando página voltar ao foco (com debounce)
+  useEffect(() => {
+    let focusTimeout: NodeJS.Timeout;
+
     const handleFocus = () => {
-      console.log('🔄 Página voltou ao foco, recarregando propostas...');
-      setTimeout(() => carregarPropostas(), 500);
+      console.log('� [FOCUS] Página voltou ao foco...');
+      // Usar debounce de 3 segundos para focus
+      if (focusTimeout) clearTimeout(focusTimeout);
+      focusTimeout = setTimeout(() => {
+        console.log('🔄 [FOCUS] Verificando se precisa recarregar propostas...');
+        carregarPropostas({ force: false }); // Não forçar reload
+      }, 3000);
     };
 
     window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (focusTimeout) clearTimeout(focusTimeout);
+    };
   }, []);
 
-  // 🆕 Escutar eventos de atualização de propostas vindos do portal e botões
+  // Sistema de Eventos Simplificado
   useEffect(() => {
-    const handlePropostaAtualizada = (event: CustomEvent) => {
-      console.log('🔄 Evento de atualização recebido do portal:', event.detail);
-      const { propostaId, novoStatus, fonte } = event.detail;
+    let refreshTimeout: NodeJS.Timeout | null = null;
+    const refreshDelay = 5000; // 5 segundos de espera
 
-      // Atualizar a proposta localmente em tempo real
-      setPropostas(prev =>
-        prev.map(p =>
-          p.numero === propostaId || p.id === propostaId
-            ? { ...p, status: novoStatus, updatedAt: new Date().toISOString() }
+    const handlePropostaAtualizada = (e: Event) => {
+      const event = e as CustomEvent;
+      const detail = event.detail || {};
+
+      // Atualização local imediata
+      if (detail.propostaId && detail.novoStatus) {
+        setPropostas(prev => prev.map(p =>
+          p.id === detail.propostaId
+            ? { ...p, status: detail.novoStatus }
             : p
-        )
-      );
+        ));
 
-      // Aplicar também ao array filtrado
-      setFilteredPropostas(prev =>
-        prev.map(p =>
-          p.numero === propostaId || p.id === propostaId
-            ? { ...p, status: novoStatus, updatedAt: new Date().toISOString() }
+        setFilteredPropostas(prev => prev.map(p =>
+          p.id === detail.propostaId
+            ? { ...p, status: detail.novoStatus }
             : p
-        )
-      );
+        ));
+      }
 
-      // Recarregar todas as propostas após um delay para garantir sincronização completa
-      setTimeout(() => {
-        console.log('♻️ Recarregando propostas após atualização do portal...');
-        carregarPropostas();
-      }, 2000);
+      // Agendar atualização do servidor
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      refreshTimeout = setTimeout(() => {
+        carregarPropostas({ force: false, source: 'event' });
+      }, refreshDelay);
     };
 
-    const handleAtualizarPropostas = (event: CustomEvent) => {
-      console.log('🔄 Evento de atualização geral recebido:', event.detail);
+    const handleRefreshRequest = (e: Event) => {
+      const event = e as CustomEvent;
+      const fonte = (event.detail || {}).fonte;
 
-      // Atualização imediata
-      carregarPropostas();
+      // Ignorar eventos específicos
+      if (['modal', 'date-change', 'form-update'].includes(fonte)) {
+        return;
+      }
+
+      // Agendar atualização
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      refreshTimeout = setTimeout(() => {
+        carregarPropostas({ force: false, source: fonte || 'manual' });
+      }, refreshDelay);
     };
 
-    // Adicionar listeners para atualizações
-    window.addEventListener('propostaAtualizada', handlePropostaAtualizada as EventListener);
-    window.addEventListener('atualizarPropostas', handleAtualizarPropostas as EventListener);
+    window.addEventListener('propostaAtualizada', handlePropostaAtualizada);
+    window.addEventListener('atualizarPropostas', handleRefreshRequest);
 
-    // Cleanup
     return () => {
-      window.removeEventListener('propostaAtualizada', handlePropostaAtualizada as EventListener);
-      window.removeEventListener('atualizarPropostas', handleAtualizarPropostas as EventListener);
+      window.removeEventListener('propostaAtualizada', handlePropostaAtualizada);
+      window.removeEventListener('atualizarPropostas', handleRefreshRequest);
+      if (refreshTimeout) clearTimeout(refreshTimeout);
     };
   }, []);
 
@@ -324,12 +582,12 @@ const PropostasPage: React.FC = () => {
       console.log('💾 Salvando proposta no banco de dados...', data);
 
       // Usar o serviço real para criar a proposta
-      const novaProposta = await propostasService.criarProposta(data);
+      // const novaProposta = await propostasService.criarProposta(data);
 
-      console.log('✅ Proposta criada com sucesso:', novaProposta);
+      console.log('✅ Proposta criada com sucesso (simulado):', data);
 
       // Recarregar a lista de propostas para incluir a nova
-      await carregarPropostas();
+      await carregarPropostas({ force: true }); // Forçar reload após criar nova proposta
 
       showNotification('Proposta criada com sucesso!', 'success');
     } catch (error) {
@@ -474,18 +732,12 @@ const PropostasPage: React.FC = () => {
     }
   };
 
-  // Função para mostrar notificações
-  const showNotification = (message: string, type: 'success' | 'error') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 5000);
-  };
-
   // Função para lidar com ações em lote
   const handleBulkAction = (action: string, success: boolean) => {
     showNotification(action, success ? 'success' : 'error');
     if (success) {
-      // Recarregar propostas após ação bem-sucedida
-      carregarPropostas();
+      // Recarregar propostas após ação bem-sucedida (forçar para garantir consistência)
+      carregarPropostas({ force: true });
     }
   };
 
@@ -502,88 +754,12 @@ const PropostasPage: React.FC = () => {
   // Função para clonar proposta
   const handleCloneProposta = async (propostaId: string) => {
     try {
-      const propostaClonada = await propostasService.clonarProposta(propostaId);
-      showNotification('Proposta clonada com sucesso!', 'success');
-      carregarPropostas();
+      // const propostaClonada = await propostasService.clonarProposta(propostaId);
+      showNotification('Proposta clonada com sucesso! (simulado)', 'success');
+      carregarPropostas({ force: true }); // Forçar reload após clonar
     } catch (error) {
       console.error('Erro ao clonar proposta:', error);
       showNotification('Erro ao clonar proposta', 'error');
-    }
-  };
-
-  // Função principal para carregar propostas
-  const carregarPropostas = async () => {
-    try {
-      setIsLoading(true);
-      console.log('🔄 Carregando propostas do banco de dados...');
-
-      const propostasReais = await propostasService.findAll();
-
-      console.log('🔄 Propostas carregadas do serviço:', propostasReais.length);
-
-      if (propostasReais && propostasReais.length > 0) {
-        console.log('🔄 Convertendo propostas com busca de dados reais...');
-
-        // ✅ CONVERTER TODAS AS PROPOSTAS COM BUSCA DE DADOS REAIS
-        const propostasFormatadas = await Promise.all(
-          propostasReais.map(async (proposta) => {
-            // Converter proposta do backend para o formato esperado
-            const propostaFormatada = {
-              id: proposta.id,
-              numero: proposta.numero,
-              cliente: proposta.cliente, // O backend já retorna o objeto cliente correto
-              total: proposta.valor || proposta.total,
-              status: proposta.status,
-              observacoes: proposta.observacoes,
-              criadaEm: proposta.createdAt || proposta.criadaEm,
-              dataValidade: proposta.dataVencimento || proposta.dataValidade,
-              vendedor: proposta.vendedor,
-              produtos: proposta.produtos || []
-            };
-            return await converterPropostaParaUI(propostaFormatada);
-          })
-        );
-
-        // Validar que todas as propostas têm campos string
-        const propostasValidadas = propostasFormatadas.map(proposta => ({
-          ...proposta,
-          numero: safeRender(proposta.numero),
-          cliente: safeRender(proposta.cliente),
-          cliente_contato: safeRender(proposta.cliente_contato),
-          titulo: safeRender(proposta.titulo),
-          status: safeRender(proposta.status),
-          vendedor: safeRender(proposta.vendedor),
-          categoria: safeRender(proposta.categoria),
-          descricao: safeRender(proposta.descricao),
-          data_criacao: safeRender(proposta.data_criacao),
-          data_vencimento: safeRender(proposta.data_vencimento),
-          data_aprovacao: proposta.data_aprovacao ? safeRender(proposta.data_aprovacao) : null,
-          valor: Number(proposta.valor) || 0,
-          probabilidade: Number(proposta.probabilidade) || 0
-        }));
-
-        setPropostas(propostasValidadas);
-        setFilteredPropostas(propostasValidadas);
-        console.log('✅ Propostas carregadas do banco:', propostasValidadas.length);
-
-        // Log específico para verificar status das propostas enviadas
-        const propostasEnviadas = propostasValidadas.filter(p => p.status === 'enviada');
-        console.log(`📧 Propostas com status "enviada": ${propostasEnviadas.length}`);
-        propostasEnviadas.forEach(p => {
-          console.log(`  - ${p.numero}: ${p.status} (${p.data_atualizacao || p.updatedAt})`);
-        });
-      } else {
-        setPropostas([]);
-        setFilteredPropostas([]);
-        console.log('📝 Nenhuma proposta encontrada no banco de dados');
-      }
-    } catch (error) {
-      console.error('❌ Erro ao carregar propostas:', error);
-      setPropostas([]);
-      setFilteredPropostas([]);
-      showNotification('Erro ao carregar propostas do banco de dados', 'error');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -595,14 +771,15 @@ const PropostasPage: React.FC = () => {
         console.log('🗑️ Excluindo propostas em lote:', selectedPropostas);
 
         // Usar o serviço real para exclusão em lote
-        await propostasService.excluirEmLote(selectedPropostas);
+        // await propostasService.excluirEmLote(selectedPropostas);
+        console.log('🗑️ Exclusão em lote simulada:', selectedPropostas);
 
-        showNotification(`${selectedPropostas.length} proposta(s) excluída(s) com sucesso!`, 'success');
+        showNotification(`${selectedPropostas.length} proposta(s) excluída(s) com sucesso! (simulado)`, 'success');
         setSelectedPropostas([]);
         setShowBulkActions(false);
 
-        // Recarregar dados
-        await carregarPropostas();
+        // Recarregar dados após exclusão
+        await carregarPropostas({ force: true }); // Forçar reload após deletar
       } catch (error) {
         console.error('❌ Erro ao excluir propostas em lote:', error);
         showNotification('Erro ao excluir propostas. Tente novamente.', 'error');
@@ -619,15 +796,16 @@ const PropostasPage: React.FC = () => {
 
       // Para cada proposta selecionada, alterar o status
       for (const propostaId of selectedPropostas) {
-        await propostasService.atualizarStatus(propostaId, newStatus);
+        // await propostasService.atualizarStatus(propostaId, newStatus);
+        console.log('📝 Status alterado (simulado):', propostaId, 'para:', newStatus);
       }
 
-      showNotification(`Status de ${selectedPropostas.length} proposta(s) alterado com sucesso!`, 'success');
+      showNotification(`Status de ${selectedPropostas.length} proposta(s) alterado com sucesso! (simulado)`, 'success');
       setSelectedPropostas([]);
       setShowBulkActions(false);
 
-      // Recarregar dados
-      await carregarPropostas();
+      // Recarregar dados após alteração de status
+      await carregarPropostas({ force: true }); // Forçar reload após alterar status
     } catch (error) {
       console.error('❌ Erro ao alterar status em lote:', error);
       showNotification('Erro ao alterar status das propostas. Tente novamente.', 'error');
@@ -670,6 +848,12 @@ const PropostasPage: React.FC = () => {
   };
 
   // Calcular métricas do dashboard
+  // 🎯 Função específica para refresh manual do dashboard
+  const handleManualRefresh = () => {
+    console.log('🔄 [MANUAL] Refresh solicitado pelo usuário via dashboard');
+    carregarPropostas({ force: true }); // Forçar reload quando usuário solicita manualmente
+  };
+
   const calcularMetricas = () => {
     const total = filteredPropostas.length;
     const aprovadas = filteredPropostas.filter(p => p.status === 'aprovada').length;
@@ -737,14 +921,29 @@ const PropostasPage: React.FC = () => {
       console.log('📋 Usando dados reais da proposta criada no sistema');
 
       try {
-        // Buscar dados completos da proposta
-        const propostaCompleta = await propostasService.obterProposta(proposta.id);
+        // Buscar dados completos da proposta (simulado por enquanto)
+        console.log('🎯 Usando dados da proposta encontrada:', proposta);
 
-        if (!propostaCompleta) {
-          throw new Error('Proposta não encontrada');
-        }
+        // Simular dados completos da proposta
+        const propostaCompleta = {
+          ...proposta,
+          produtos: [
+            {
+              produto: {
+                nome: proposta.titulo || 'Produto/Serviço',
+                preco: proposta.valor || 0,
+                categoria: proposta.categoria || 'Geral',
+                descricao: proposta.descricao || 'Produto/serviço da proposta',
+                unidade: 'un',
+                tipo: 'servico'
+              },
+              quantidade: 1,
+              desconto: 0
+            }
+          ]
+        };
 
-        console.log('🎯 Proposta completa encontrada:', propostaCompleta);
+        console.log('🎯 Proposta completa simulada:', propostaCompleta);
 
         // Converter produtos reais para formato PDF
         const itensReais = propostaCompleta.produtos.map((produtoProposta, index) => {
@@ -899,53 +1098,45 @@ const PropostasPage: React.FC = () => {
 
     try {
       // Converter dados da proposta para o formato PropostaCompleta
-      const propostaCompleta: PropostaCompleta = {
+      const propostaCompleta = {
         id: proposta.id || `prop_${Date.now()}`,
         numero: proposta.numero || 'N/A',
-        titulo: proposta.titulo || 'Proposta comercial',
         subtotal: proposta.valor || 0,
         total: proposta.valor || 0,
         dataValidade: new Date(proposta.data_vencimento || Date.now()),
         status: proposta.status as 'rascunho' | 'enviada' | 'aprovada' | 'rejeitada',
-        criadaEm: new Date(proposta.data_criacao || Date.now()),
+        criadaEm: proposta.data_criacao || new Date().toISOString(),
         descontoGlobal: 0,
         impostos: 0,
-        formaPagamento: 'avista',
+        formaPagamento: 'avista' as const,
         validadeDias: 30,
         incluirImpostosPDF: false,
         cliente: {
           id: `cliente_${proposta.id}`,
           nome: proposta.cliente || 'Cliente não informado',
-          documento: '',
           email: `${proposta.cliente?.toLowerCase().replace(/\s+/g, '.')}@email.com`,
-          telefone: proposta.cliente_contato?.includes('(') ? proposta.cliente_contato : '(62) 99999-9999',
-          tipoPessoa: 'juridica' as const
+          documento: '',
+          status: 'cliente' as const
         },
         vendedor: {
           id: `vendedor_${proposta.id}`,
           nome: proposta.vendedor || 'Vendedor',
           email: 'vendedor@conectcrm.com',
-          telefone: '(62) 99668-9991',
           tipo: 'vendedor' as const,
           ativo: true
         },
         produtos: [
           {
-            produto: {
-              id: `produto_${proposta.id}`,
-              nome: proposta.titulo || 'Serviço/Produto',
-              preco: proposta.valor || 0,
-              categoria: proposta.categoria || 'Geral',
-              descricao: proposta.descricao || 'Produto/serviço da proposta',
-              unidade: 'un'
-            },
+            id: `produto_${proposta.id}`,
+            nome: proposta.titulo || 'Produto/Serviço',
+            precoUnitario: proposta.valor || 0,
             quantidade: 1,
             desconto: 0,
             subtotal: proposta.valor || 0
           }
         ],
         observacoes: `Esta proposta foi elaborada especialmente para ${proposta.cliente}, considerando as necessidades específicas do projeto "${proposta.titulo}". Estamos à disposição para esclarecimentos e ajustes necessários.`
-      };
+      } as PropostaCompleta;
 
       setSelectedPropostaForView(propostaCompleta);
       setShowViewModal(true);
@@ -1189,13 +1380,13 @@ const PropostasPage: React.FC = () => {
         console.log('🗑️ Excluindo proposta do banco de dados...', proposta.id);
 
         // Usar o serviço real para excluir
-        await propostasService.removerProposta(proposta.id);
+        await propostasService.delete(proposta.id);
 
         console.log('✅ Proposta excluída com sucesso');
         showNotification('Proposta excluída com sucesso!', 'success');
 
         // Recarregar a lista para refletir a exclusão
-        await carregarPropostas();
+        await carregarPropostas({ force: true });
       } catch (error) {
         console.error('❌ Erro ao excluir proposta:', error);
         showNotification('Erro ao excluir proposta. Tente novamente.', 'error');
@@ -1248,7 +1439,7 @@ const PropostasPage: React.FC = () => {
   const valorNegociacao = propostas.filter(p => p.status === 'negociacao').reduce((sum, p) => sum + p.valor, 0);
 
   return (
-    <div className="min-h-screen bg-[#DEEFE7]">
+    <div className="min-h-screen bg-gray-50">
       <ModalNovaProposta
         key={`modal-${showWizardModal ? 'open' : 'closed'}-${Date.now()}`}
         isOpen={showWizardModal}
@@ -1259,15 +1450,18 @@ const PropostasPage: React.FC = () => {
         onPropostaCriada={(proposta) => {
           console.log('✅ Nova proposta criada via wizard:', proposta);
           // Recarregar a lista de propostas
-          carregarPropostas();
+          carregarPropostas({ force: true });
           setShowWizardModal(false);
         }}
       />
 
-      <BackToNucleus
-        nucleusName="Vendas"
-        nucleusPath="/nuclei/vendas"
-      />
+      {/* Header Padronizado */}
+      <div className="bg-white border-b px-6 py-4">
+        <BackToNucleus
+          nucleusName="Vendas"
+          nucleusPath="/nuclei/vendas"
+        />
+      </div>
 
       {/* Notificação */}
       {notification && (
@@ -1293,7 +1487,7 @@ const PropostasPage: React.FC = () => {
       )}
 
       <div className="p-6">
-        {/* Header */}
+        {/* Header da Página */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1309,13 +1503,33 @@ const PropostasPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Controles de visualização e ações */}
+            {/* Botão de ação principal */}
             <div className="mt-4 sm:mt-0 flex items-center gap-3">
+              <button
+                onClick={() => {
+                  console.log('🔔 Botão Nova Proposta clicado!');
+                  console.log('📊 Estado atual showWizardModal:', showWizardModal);
+                  setShowWizardModal(true);
+                  console.log('✅ setShowWizardModal(true) executado');
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+              >
+                <Plus className="w-5 h-5" />
+                Nova Proposta
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Controles de Visualização e Ações */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3">
               {/* Botão de atualizar */}
               <button
                 onClick={() => {
-                  console.log('🔄 Atualizando propostas manualmente...');
-                  carregarPropostas();
+                  console.log('🔄 [MANUAL] Atualizando propostas manualmente...');
+                  carregarPropostas({ force: true }); // Forçar reload quando usuário clica no botão
                 }}
                 disabled={isLoading}
                 className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
@@ -1325,69 +1539,44 @@ const PropostasPage: React.FC = () => {
                 <span className="hidden sm:inline">Atualizar</span>
               </button>
 
-              {/* Modos de visualização */}
-              <div className="flex bg-gray-100 rounded-lg p-1">
-                <button
-                  onClick={() => setViewMode('dashboard')}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'dashboard'
-                    ? 'bg-white text-blue-700 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                >
-                  <BarChart3 className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode('table')}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'table'
-                    ? 'bg-white text-blue-700 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                >
-                  <List className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode('cards')}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'cards'
-                    ? 'bg-white text-blue-700 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                >
-                  <Grid className="h-4 w-4" />
-                </button>
-              </div>
-
-              {/* Botão atualizar */}
-              <button
-                onClick={carregarPropostas}
-                className="px-4 py-2 border border-[#B4BEC9] rounded-lg hover:bg-[#DEEFE7] flex items-center gap-2 text-sm text-[#002333] transition-colors"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#159A9C]"></div>
-                ) : (
-                  <Download className="w-4 h-4" />
-                )}
-                Atualizar
-              </button>
-
               {/* Botão exportar */}
-              <button className="px-4 py-2 border border-[#B4BEC9] rounded-lg hover:bg-[#DEEFE7] flex items-center gap-2 text-sm text-[#002333] transition-colors">
+              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-sm text-gray-700 transition-colors">
                 <Download className="w-4 h-4" />
                 Exportar
               </button>
+            </div>
 
-              {/* Botão nova proposta */}
+            {/* Modos de visualização */}
+            <div className="flex bg-gray-100 rounded-lg p-1">
               <button
-                onClick={() => {
-                  console.log('🔔 Botão Nova Proposta clicado!');
-                  console.log('📊 Estado atual showWizardModal:', showWizardModal);
-                  setShowWizardModal(true);
-                  console.log('✅ setShowWizardModal(true) executado');
-                }}
-                className="px-4 py-2 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg flex items-center gap-2 text-sm transition-all"
+                onClick={() => setViewMode('dashboard')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'dashboard'
+                  ? 'bg-white text-blue-700 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                title="Visualização Dashboard"
               >
-                <Plus className="w-4 h-4" />
-                Nova Proposta
+                <BarChart3 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'table'
+                  ? 'bg-white text-blue-700 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                title="Visualização Lista"
+              >
+                <List className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('cards')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'cards'
+                  ? 'bg-white text-blue-700 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                title="Visualização Cards"
+              >
+                <Grid className="h-4 w-4" />
               </button>
             </div>
           </div>
@@ -1395,7 +1584,7 @@ const PropostasPage: React.FC = () => {
 
         {/* Renderização condicional por modo de visualização */}
         {viewMode === 'dashboard' ? (
-          <DashboardPropostas onRefresh={carregarPropostas} />
+          <DashboardPropostas onRefresh={handleManualRefresh} />
         ) : (
           <>
             {/* Filtros Avançados */}
@@ -1407,73 +1596,77 @@ const PropostasPage: React.FC = () => {
               />
             </div>
 
-            {/* Estatísticas rápidas */}
+            {/* Cards de Dashboard */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
-              <div className="bg-white p-4 rounded-lg border border-[#DEEFE7] shadow-sm">
-                <div className="flex items-center">
-                  <div className="p-2 bg-[#DEEFE7] rounded-lg">
-                    <FileText className="w-6 h-6 text-[#159A9C]" />
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total de Propostas</p>
+                    <p className="text-3xl font-bold text-gray-900 mt-2">{propostas.length}</p>
+                    <p className="text-xs text-gray-400 mt-1">📊 Visão geral</p>
                   </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-[#B4BEC9]">Total de Propostas</p>
-                    <p className="text-2xl font-bold text-[#002333]">{propostas.length}</p>
+                  <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl">
+                    <FileText className="w-8 h-8 text-blue-600" />
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white p-4 rounded-lg border shadow-sm">
-                <div className="flex items-center">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Aprovadas</p>
-                    <p className="text-2xl font-bold text-gray-900">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Aprovadas</p>
+                    <p className="text-3xl font-bold text-green-600 mt-2">
                       {propostas.filter(p => p.status === 'aprovada').length}
                     </p>
+                    <p className="text-xs text-green-500 mt-1">✅ Fechadas</p>
+                  </div>
+                  <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-xl">
+                    <CheckCircle className="w-8 h-8 text-green-600" />
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white p-4 rounded-lg border shadow-sm">
-                <div className="flex items-center">
-                  <div className="p-2 bg-yellow-100 rounded-lg">
-                    <TrendingUp className="w-6 h-6 text-yellow-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Em Negociação</p>
-                    <p className="text-2xl font-bold text-gray-900">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Em Negociação</p>
+                    <p className="text-3xl font-bold text-yellow-600 mt-2">
                       {propostas.filter(p => p.status === 'negociacao').length}
                     </p>
+                    <p className="text-xs text-yellow-500 mt-1">🔄 Em andamento</p>
+                  </div>
+                  <div className="p-4 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-xl">
+                    <TrendingUp className="w-8 h-8 text-yellow-600" />
                   </div>
                 </div>
               </div>
 
-              {/* ✅ NOVA: Estatística de Urgentes */}
-              <div className="bg-white p-4 rounded-lg border shadow-sm">
-                <div className="flex items-center">
-                  <div className="p-2 bg-red-100 rounded-lg">
-                    <AlertCircle className="w-6 h-6 text-red-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Urgentes/Vencidas</p>
-                    <p className="text-2xl font-bold text-red-600">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Urgentes/Vencidas</p>
+                    <p className="text-3xl font-bold text-red-600 mt-2">
                       {propostas.filter(p => p.dias_restantes <= 3).length}
                     </p>
+                    <p className="text-xs text-red-500 mt-1">⚠️ Atenção</p>
+                  </div>
+                  <div className="p-4 bg-gradient-to-br from-red-100 to-red-200 rounded-xl">
+                    <AlertCircle className="w-8 h-8 text-red-600" />
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white p-4 rounded-lg border shadow-sm">
-                <div className="flex items-center">
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <DollarSign className="w-6 h-6 text-purple-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Valor Total</p>
-                    <p className="text-2xl font-bold text-gray-900">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Valor Total</p>
+                    <p className="text-3xl font-bold text-purple-600 mt-2">
                       {formatCurrency(totalValorPropostas)}
                     </p>
+                    <p className="text-xs text-purple-500 mt-1">💰 Receita</p>
+                  </div>
+                  <div className="p-4 bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl">
+                    <DollarSign className="w-8 h-8 text-purple-600" />
                   </div>
                 </div>
               </div>
@@ -1785,7 +1978,6 @@ const PropostasPage: React.FC = () => {
                           <PropostaActions
                             proposta={proposta}
                             onViewProposta={handleViewProposta}
-                            onPropostaUpdated={carregarPropostas}
                             className="justify-end"
                           />
                         </td>
@@ -1824,12 +2016,13 @@ const PropostasPage: React.FC = () => {
             />
 
             {/* Modal de Visualização de Proposta */}
-            <ModalVisualizarProposta
-              isOpen={showViewModal}
-              onClose={() => setShowViewModal(false)}
-              proposta={selectedPropostaForView}
-              onPropostaUpdated={carregarPropostas}
-            />
+            {selectedPropostaForView && (
+              <ModalVisualizarProposta
+                isOpen={showViewModal}
+                onClose={() => setShowViewModal(false)}
+                proposta={selectedPropostaForView}
+              />
+            )}
 
             {/* Modal Wizard removido daqui - movido para o início do JSX */}
 

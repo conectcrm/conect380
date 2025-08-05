@@ -3,14 +3,15 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import toast from 'react-hot-toast';
-import { 
-  X, 
-  User, 
-  Mail, 
-  Phone, 
-  FileText, 
-  MapPin, 
-  Building, 
+import { useI18n } from '../../contexts/I18nContext';
+import {
+  X,
+  User,
+  Mail,
+  Phone,
+  FileText,
+  MapPin,
+  Building,
   Tag,
   CheckCircle,
   AlertCircle,
@@ -30,7 +31,7 @@ interface ClienteFormData {
   cpf?: string;
   cnpj?: string;
   status: 'cliente' | 'lead' | 'prospect' | 'inativo';
-  
+
   // Endereço
   cep: string;
   logradouro: string;
@@ -39,7 +40,7 @@ interface ClienteFormData {
   bairro: string;
   cidade: string;
   estado: string;
-  
+
   // Observações e Tags
   tags: string[];
   observacoes?: string;
@@ -49,13 +50,13 @@ interface ClienteFormData {
 const validarCPF = (cpf: string): boolean => {
   const digits = cpf.replace(/\D/g, '');
   if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
-  
+
   let sum = 0;
   for (let i = 0; i < 9; i++) sum += parseInt(digits[i]) * (10 - i);
   let remainder = (sum * 10) % 11;
   if (remainder === 10 || remainder === 11) remainder = 0;
   if (remainder !== parseInt(digits[9])) return false;
-  
+
   sum = 0;
   for (let i = 0; i < 10; i++) sum += parseInt(digits[i]) * (11 - i);
   remainder = (sum * 10) % 11;
@@ -67,20 +68,20 @@ const validarCPF = (cpf: string): boolean => {
 const validarCNPJ = (cnpj: string): boolean => {
   const digits = cnpj.replace(/\D/g, '');
   if (digits.length !== 14 || /^(\d)\1{13}$/.test(digits)) return false;
-  
+
   const weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
   const weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
-  
+
   let sum = 0;
   for (let i = 0; i < 12; i++) sum += parseInt(digits[i]) * weights1[i];
   let remainder = sum % 11;
   const digit1 = remainder < 2 ? 0 : 11 - remainder;
-  
+
   sum = 0;
   for (let i = 0; i < 13; i++) sum += parseInt(digits[i]) * weights2[i];
   remainder = sum % 11;
   const digit2 = remainder < 2 ? 0 : 11 - remainder;
-  
+
   return digit1 === parseInt(digits[12]) && digit2 === parseInt(digits[13]);
 };
 
@@ -92,23 +93,23 @@ const clienteSchema = yup.object({
     .required('Nome é obrigatório')
     .min(3, 'Nome deve ter pelo menos 3 caracteres')
     .max(100, 'Nome deve ter no máximo 100 caracteres'),
-  
+
   email: yup
     .string()
     .required('E-mail é obrigatório')
     .email('E-mail deve ter formato válido')
     .max(100, 'E-mail deve ter no máximo 100 caracteres'),
-  
+
   telefone: yup
     .string()
     .required('Telefone é obrigatório')
     .matches(/^\(\d{2}\)\s\d{4,5}-\d{4}$/, 'Telefone deve estar no formato (11) 99999-9999'),
-  
+
   tipo: yup
     .string()
     .required('Tipo de cliente é obrigatório')
     .oneOf(['pessoa_fisica', 'pessoa_juridica'], 'Tipo deve ser Pessoa Física ou Jurídica'),
-  
+
   cpf: yup
     .string()
     .when('tipo', {
@@ -121,7 +122,7 @@ const clienteSchema = yup.object({
         }),
       otherwise: (schema) => schema.notRequired()
     }),
-  
+
   cnpj: yup
     .string()
     .when('tipo', {
@@ -134,7 +135,7 @@ const clienteSchema = yup.object({
         }),
       otherwise: (schema) => schema.notRequired()
     }),
-  
+
   status: yup
     .string()
     .required('Status é obrigatório')
@@ -145,31 +146,31 @@ const clienteSchema = yup.object({
     .string()
     .required('CEP é obrigatório')
     .matches(/^\d{5}-\d{3}$/, 'CEP deve estar no formato 12345-678'),
-  
+
   logradouro: yup
     .string()
     .required('Logradouro é obrigatório')
     .max(200, 'Logradouro deve ter no máximo 200 caracteres'),
-  
+
   numero: yup
     .string()
     .required('Número é obrigatório')
     .max(10, 'Número deve ter no máximo 10 caracteres'),
-  
+
   complemento: yup
     .string()
     .max(100, 'Complemento deve ter no máximo 100 caracteres'),
-  
+
   bairro: yup
     .string()
     .required('Bairro é obrigatório')
     .max(100, 'Bairro deve ter no máximo 100 caracteres'),
-  
+
   cidade: yup
     .string()
     .required('Cidade é obrigatória')
     .max(100, 'Cidade deve ter no máximo 100 caracteres'),
-  
+
   estado: yup
     .string()
     .required('Estado é obrigatório')
@@ -180,7 +181,7 @@ const clienteSchema = yup.object({
     .array()
     .of(yup.string())
     .max(10, 'Máximo de 10 tags permitidas'),
-  
+
   observacoes: yup
     .string()
     .max(1000, 'Observações deve ter no máximo 1000 caracteres')
@@ -201,6 +202,9 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
   cliente,
   isLoading = false
 }) => {
+  // Hook de internacionalização
+  const { t } = useI18n();
+
   // Estados para funcionalidades extras
   const [isLoadingCep, setIsLoadingCep] = useState(false);
   const [tagInput, setTagInput] = useState('');
@@ -298,18 +302,18 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
   // Função para buscar endereço por CEP
   const buscarCep = async (cep: string) => {
     if (cep.length !== 9) return;
-    
+
     setIsLoadingCep(true);
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cep.replace('-', '')}/json/`);
       const data = await response.json();
-      
+
       if (!data.erro) {
         setValue('logradouro', data.logradouro || '');
         setValue('bairro', data.bairro || '');
         setValue('cidade', data.localidade || '');
         setValue('estado', data.uf || '');
-        
+
         // Trigger validation for updated fields
         await trigger(['logradouro', 'bairro', 'cidade', 'estado']);
       }
@@ -393,12 +397,12 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
       };
 
       await onSave(clienteData);
-      
+
       // Remover toast de carregamento e mostrar sucesso
       toast.dismiss(loadingToast);
       toast.success(
-        cliente 
-          ? 'Cliente atualizado com sucesso!' 
+        cliente
+          ? 'Cliente atualizado com sucesso!'
           : 'Cliente cadastrado com sucesso!',
         {
           duration: 4000,
@@ -408,11 +412,11 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
       );
     } catch (error) {
       console.error('Erro ao salvar cliente:', error);
-      
+
       // Mostrar toast de erro
       toast.error(
-        cliente 
-          ? 'Erro ao atualizar cliente. Tente novamente.' 
+        cliente
+          ? 'Erro ao atualizar cliente. Tente novamente.'
           : 'Erro ao cadastrar cliente. Tente novamente.',
         {
           duration: 5000,
@@ -429,21 +433,21 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
       'nome', 'email', 'telefone', 'tipo', 'status',
       'cep', 'logradouro', 'numero', 'bairro', 'cidade', 'estado'
     ];
-    
+
     // Adicionar CPF ou CNPJ dependendo do tipo
     if (watchedTipo === 'pessoa_fisica') {
       camposObrigatorios.push('cpf');
     } else {
       camposObrigatorios.push('cnpj');
     }
-    
+
     let validosCount = 0;
     camposObrigatorios.forEach(campo => {
       if (touchedFields[campo as keyof ClienteFormData] && !errors[campo as keyof ClienteFormData]) {
         validosCount++;
       }
     });
-    
+
     return { validosCount, totalCount: camposObrigatorios.length };
   };
 
@@ -470,7 +474,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                 </p>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-4">
               {/* Toggle Status Panel */}
               <button
@@ -481,7 +485,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
               >
                 {showStatusPanel ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
-              
+
               <button
                 onClick={onClose}
                 className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
@@ -498,7 +502,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                 {/* Layout em 3 colunas */}
                 <div className="grid grid-cols-3 gap-8">
-                  
+
                   {/* COLUNA 1: DADOS BÁSICOS */}
                   <div className="space-y-4">
                     <div className="border-b border-gray-200 pb-2 mb-4">
@@ -516,9 +520,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                       <input
                         {...register('nome')}
                         type="text"
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-                          errors.nome ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.nome ? 'border-red-300' : 'border-gray-300'
+                          }`}
                         placeholder="Digite o nome completo"
                       />
                       {errors.nome && (
@@ -537,9 +540,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                       <input
                         {...register('email')}
                         type="email"
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-                          errors.email ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.email ? 'border-red-300' : 'border-gray-300'
+                          }`}
                         placeholder="Digite o e-mail"
                       />
                       {errors.email && (
@@ -558,9 +560,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                       <input
                         {...register('telefone')}
                         type="text"
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-                          errors.telefone ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.telefone ? 'border-red-300' : 'border-gray-300'
+                          }`}
                         placeholder="(11) 99999-9999"
                         onChange={(e) => {
                           const formatted = formatarTelefone(e.target.value);
@@ -582,9 +583,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                       </label>
                       <select
                         {...register('tipo')}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-                          errors.tipo ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.tipo ? 'border-red-300' : 'border-gray-300'
+                          }`}
                         onChange={(e) => {
                           setValue('tipo', e.target.value as 'pessoa_fisica' | 'pessoa_juridica');
                           // Limpar CPF/CNPJ ao trocar tipo
@@ -612,9 +612,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                         <input
                           {...register('cpf')}
                           type="text"
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-                            errors.cpf ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.cpf ? 'border-red-300' : 'border-gray-300'
+                            }`}
                           placeholder="000.000.000-00"
                           onChange={(e) => {
                             const formatted = formatarCPF(e.target.value);
@@ -636,9 +635,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                         <input
                           {...register('cnpj')}
                           type="text"
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-                            errors.cnpj ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.cnpj ? 'border-red-300' : 'border-gray-300'
+                            }`}
                           placeholder="00.000.000/0000-00"
                           onChange={(e) => {
                             const formatted = formatarCNPJ(e.target.value);
@@ -661,9 +659,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                       </label>
                       <select
                         {...register('status')}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-                          errors.status ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.status ? 'border-red-300' : 'border-gray-300'
+                          }`}
                       >
                         <option value="lead">Lead</option>
                         <option value="prospect">Prospect</option>
@@ -697,9 +694,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                         <input
                           {...register('cep')}
                           type="text"
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-                            errors.cep ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.cep ? 'border-red-300' : 'border-gray-300'
+                            }`}
                           placeholder="12345-678"
                           onChange={(e) => {
                             const formatted = formatarCep(e.target.value);
@@ -728,9 +724,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                       <input
                         {...register('logradouro')}
                         type="text"
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-                          errors.logradouro ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.logradouro ? 'border-red-300' : 'border-gray-300'
+                          }`}
                         placeholder="Rua, Avenida, etc."
                       />
                       {errors.logradouro && (
@@ -750,9 +745,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                         <input
                           {...register('numero')}
                           type="text"
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-                            errors.numero ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.numero ? 'border-red-300' : 'border-gray-300'
+                            }`}
                           placeholder="123"
                         />
                         {errors.numero && (
@@ -765,7 +759,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Complemento
+                          {t('common.complement')}
                         </label>
                         <input
                           {...register('complemento')}
@@ -779,14 +773,13 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                     {/* Bairro */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Bairro *
+                        {t('common.neighborhood')} *
                       </label>
                       <input
                         {...register('bairro')}
                         type="text"
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-                          errors.bairro ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.bairro ? 'border-red-300' : 'border-gray-300'
+                          }`}
                         placeholder="Nome do bairro"
                       />
                       {errors.bairro && (
@@ -806,9 +799,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                         <input
                           {...register('cidade')}
                           type="text"
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-                            errors.cidade ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.cidade ? 'border-red-300' : 'border-gray-300'
+                            }`}
                           placeholder="Nome da cidade"
                         />
                         {errors.cidade && (
@@ -826,9 +818,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                         <input
                           {...register('estado')}
                           type="text"
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-                            errors.estado ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.estado ? 'border-red-300' : 'border-gray-300'
+                            }`}
                           placeholder="SP"
                           maxLength={2}
                           style={{ textTransform: 'uppercase' }}
@@ -857,7 +848,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Tags ({watchedTags.length}/10)
                       </label>
-                      
+
                       {/* Tags existentes */}
                       {watchedTags.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-2">
@@ -932,9 +923,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                       <textarea
                         {...register('observacoes')}
                         rows={8}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors resize-none ${
-                          errors.observacoes ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors resize-none ${errors.observacoes ? 'border-red-300' : 'border-gray-300'
+                          }`}
                         placeholder="Adicione observações sobre o cliente..."
                       />
                       {errors.observacoes && (
@@ -950,33 +940,32 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                 {/* Footer com botões */}
                 <div className="flex justify-between items-center pt-6 border-t border-gray-200">
                   <div className="text-sm text-gray-500">
-                    Campos obrigatórios marcados com *
+                    {t('form.requiredFields')}
                   </div>
-                  
+
                   <div className="flex space-x-3">
                     <button
                       type="button"
                       onClick={onClose}
                       className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                     >
-                      Cancelar
+                      {t('common.cancel')}
                     </button>
-                    
+
                     <button
                       type="submit"
                       disabled={!isValid || isLoading}
-                      className={`px-6 py-2 rounded-lg font-medium transition-all flex items-center space-x-2 ${
-                        isValid && !isLoading
+                      className={`px-6 py-2 rounded-lg font-medium transition-all flex items-center space-x-2 ${isValid && !isLoading
                           ? 'bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white hover:shadow-lg'
                           : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      }`}
+                        }`}
                     >
                       {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                       <span>
-                        {isLoading 
-                          ? 'Criando cliente...' 
-                          : cliente 
-                            ? 'Salvar Alterações' 
+                        {isLoading
+                          ? 'Criando cliente...'
+                          : cliente
+                            ? 'Salvar Alterações'
                             : 'Criar Cliente'
                         }
                       </span>
@@ -994,7 +983,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                     <CheckCircle className="w-5 h-5 mr-2 text-[#159A9C]" />
                     Status do Formulário
                   </h3>
-                  
+
                   {/* Progress bar */}
                   <div className="mb-4">
                     <div className="flex justify-between text-sm text-gray-600 mb-1">
@@ -1011,9 +1000,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
 
                   {/* Validação geral */}
                   <div className="space-y-3">
-                    <div className={`flex items-center space-x-2 p-2 rounded-lg ${
-                      isValid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                    }`}>
+                    <div className={`flex items-center space-x-2 p-2 rounded-lg ${isValid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                      }`}>
                       {isValid ? (
                         <CheckCircle className="w-4 h-4" />
                       ) : (
@@ -1028,7 +1016,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                   {/* Lista de campos */}
                   <div className="mt-6 space-y-2">
                     <h4 className="text-sm font-medium text-gray-700 mb-3">Campos obrigatórios:</h4>
-                    
+
                     {[
                       { key: 'nome', label: 'Nome completo' },
                       { key: 'email', label: 'E-mail' },
@@ -1046,7 +1034,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                       const hasError = !!errors[key as keyof ClienteFormData];
                       const isTouched = touchedFields[key as keyof ClienteFormData];
                       const isFieldValid = isTouched && !hasError;
-                      
+
                       return (
                         <div key={key} className="flex items-center space-x-2 text-sm">
                           {isFieldValid ? (
@@ -1056,9 +1044,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                           ) : (
                             <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
                           )}
-                          <span className={`${
-                            isFieldValid ? 'text-green-700' : hasError ? 'text-red-700' : 'text-gray-600'
-                          }`}>
+                          <span className={`${isFieldValid ? 'text-green-700' : hasError ? 'text-red-700' : 'text-gray-600'
+                            }`}>
                             {label}
                           </span>
                         </div>

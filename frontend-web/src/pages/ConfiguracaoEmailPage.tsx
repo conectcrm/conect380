@@ -26,6 +26,7 @@ import {
 import { toast } from 'react-hot-toast';
 import { emailServiceReal } from '../services/emailServiceReal';
 import { EMAIL_PROVIDERS } from '../config/emailConfig';
+import { BackToNucleus } from '../components/navigation/BackToNucleus';
 
 const ConfiguracaoEmailPage: React.FC = () => {
   const [providerAtual, setProviderAtual] = useState('gmail');
@@ -301,28 +302,39 @@ const ConfiguracaoEmailPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
-        {/* Header com Progresso */}
+    <div className="min-h-screen bg-gray-50">
+      {/* Header Padronizado */}
+      <div className="bg-white border-b px-6 py-4">
+        <BackToNucleus
+          nucleusName="Configurações"
+          nucleusPath="/nuclei/configuracoes"
+        />
+      </div>
+
+      <div className="p-6">
+        {/* Header da Página */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
-                <Mail className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Configuração de E-mail</h1>
-                <p className="text-gray-600">Configure o envio de e-mails reais para propostas</p>
-              </div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+                <Mail className="h-8 w-8 mr-3 text-blue-600" />
+                Configuração de E-mail
+                {salvando && (
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 ml-3"></div>
+                )}
+              </h1>
+              <p className="mt-2 text-gray-600">
+                Configure provedores de e-mail e teste o envio de mensagens do sistema
+              </p>
             </div>
 
             {/* Status da Configuração */}
-            <div className="flex items-center space-x-4">
+            <div className="mt-4 sm:mt-0 flex items-center gap-3">
               {(() => {
                 const status = getStatusConfig();
                 const IconComponent = status.icon;
                 return (
-                  <div className={`flex items-center px-3 py-1 rounded-full text-sm font-medium ${status.color === 'green' ? 'bg-green-100 text-green-800' :
+                  <div className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium ${status.color === 'green' ? 'bg-green-100 text-green-800' :
                     status.color === 'blue' ? 'bg-blue-100 text-blue-800' :
                       status.color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
                         'bg-gray-100 text-gray-800'
@@ -334,8 +346,10 @@ const ConfiguracaoEmailPage: React.FC = () => {
               })()}
             </div>
           </div>
+        </div>
 
-          {/* Barra de Progresso */}
+        {/* Barra de Progresso e Próximos Passos */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-700">Progresso da Configuração</span>
@@ -370,164 +384,219 @@ const ConfiguracaoEmailPage: React.FC = () => {
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Seleção de Provedor */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Escolher Provedor</h3>
-                <Tooltip content="Selecione o serviço que enviará os e-mails">
-                  <HelpCircle className="w-4 h-4 text-gray-400" />
-                </Tooltip>
-              </div>
+        <div className="max-w-4xl mx-auto">
 
-              <div className="space-y-3">
-                {Object.entries(EMAIL_PROVIDERS).map(([key, provider]) => {
-                  const isSelected = providerAtual === key;
-                  const isConfigured = key === 'gmail' ?
-                    (configuracoes.gmail.user && configuracoes.gmail.password) :
-                    key === 'sendgrid' ? configuracoes.sendgrid.apiKey :
-                      false;
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Seleção de Provedor */}
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Escolher Provedor</h3>
+                  <Tooltip content="Selecione o serviço que enviará os e-mails">
+                    <HelpCircle className="w-4 h-4 text-gray-400" />
+                  </Tooltip>
+                </div>
 
-                  return (
-                    <div
-                      key={key}
-                      onClick={() => setProviderAtual(key)}
-                      className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md ${isSelected
-                        ? 'border-blue-500 bg-blue-50 shadow-sm'
-                        : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                    >
-                      {/* Badge de configurado */}
-                      {isConfigured && (
-                        <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full flex items-center">
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          OK
+                <div className="space-y-3">
+                  {Object.entries(EMAIL_PROVIDERS).map(([key, provider]) => {
+                    const isSelected = providerAtual === key;
+                    const isConfigured = key === 'gmail' ?
+                      (configuracoes.gmail.user && configuracoes.gmail.password) :
+                      key === 'sendgrid' ? configuracoes.sendgrid.apiKey :
+                        false;
+
+                    return (
+                      <div
+                        key={key}
+                        onClick={() => setProviderAtual(key)}
+                        className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md ${isSelected
+                          ? 'border-blue-500 bg-blue-50 shadow-sm'
+                          : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                      >
+                        {/* Badge de configurado */}
+                        {isConfigured && (
+                          <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full flex items-center">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            OK
+                          </div>
+                        )}
+
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center">
+                            {key === 'gmail' && <Globe className="w-5 h-5 text-blue-600 mr-2" />}
+                            {key === 'sendgrid' && <Zap className="w-5 h-5 text-blue-600 mr-2" />}
+                            {key === 'awsSes' && <Shield className="w-5 h-5 text-blue-600 mr-2" />}
+                            <h4 className="font-medium">{provider.name}</h4>
+                          </div>
+                          {isSelected && <Check className="w-5 h-5 text-blue-600" />}
                         </div>
-                      )}
 
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center">
-                          {key === 'gmail' && <Globe className="w-5 h-5 text-red-500 mr-2" />}
-                          {key === 'sendgrid' && <Zap className="w-5 h-5 text-blue-500 mr-2" />}
-                          {key === 'awsSes' && <Shield className="w-5 h-5 text-orange-500 mr-2" />}
-                          <h4 className="font-medium">{provider.name}</h4>
+                        <p className="text-sm text-gray-600 mb-3 leading-relaxed">{provider.description}</p>
+
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="text-gray-500">
+                            📧 {provider.limits}
+                          </div>
+                          {key === 'gmail' && (
+                            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                              Grátis
+                            </span>
+                          )}
+                          {key === 'sendgrid' && (
+                            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                              Freemium
+                            </span>
+                          )}
+                          {key === 'awsSes' && (
+                            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                              Pay per use
+                            </span>
+                          )}
                         </div>
-                        {isSelected && <Check className="w-5 h-5 text-blue-600" />}
                       </div>
+                    );
+                  })}
+                </div>
 
-                      <p className="text-sm text-gray-600 mb-3 leading-relaxed">{provider.description}</p>
-
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="text-gray-500">
-                          📧 {provider.limits}
-                        </div>
-                        {key === 'gmail' && (
-                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
-                            Grátis
-                          </span>
-                        )}
-                        {key === 'sendgrid' && (
-                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                            Freemium
-                          </span>
-                        )}
-                        {key === 'awsSes' && (
-                          <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded">
-                            Pay per use
-                          </span>
-                        )}
+                {/* Info do Provedor Atual */}
+                {getProviderInfo() && (
+                  <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start">
+                      <Info className="w-4 h-4 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
+                      <div>
+                        <h5 className="font-medium text-blue-900 mb-1">Como configurar:</h5>
+                        <p className="text-sm text-blue-700">{getProviderInfo()?.setup}</p>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Info do Provedor Atual */}
-              {getProviderInfo() && (
-                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-start">
-                    <Info className="w-4 h-4 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
-                    <div>
-                      <h5 className="font-medium text-blue-900 mb-1">Como configurar:</h5>
-                      <p className="text-sm text-blue-700">{getProviderInfo()?.setup}</p>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Configurações */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-              <h3 className="text-lg font-semibold mb-4">Configurações do {EMAIL_PROVIDERS[providerAtual as keyof typeof EMAIL_PROVIDERS]?.name}</h3>
+            {/* Configurações */}
+            <div className="lg:col-span-2">
+              <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+                <h3 className="text-lg font-semibold mb-4">Configurações do {EMAIL_PROVIDERS[providerAtual as keyof typeof EMAIL_PROVIDERS]?.name}</h3>
 
-              {/* Gmail SMTP */}
-              {providerAtual === 'gmail' && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <div className="flex items-center mb-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          E-mail do Gmail
-                        </label>
-                        <Tooltip content="Seu endereço de e-mail do Gmail que enviará as mensagens">
-                          <HelpCircle className="w-4 h-4 text-gray-400 ml-2" />
-                        </Tooltip>
-                      </div>
-                      <input
-                        type="email"
-                        value={configuracoes.gmail.user}
-                        onChange={(e) => {
-                          setConfiguracoes(prev => ({
-                            ...prev,
-                            gmail: { ...prev.gmail, user: e.target.value }
-                          }));
-                          validarCampo('gmail.user', e.target.value);
-                        }}
-                        placeholder="seu-email@gmail.com"
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${validationErrors['gmail.user']
+                {/* Gmail SMTP */}
+                {providerAtual === 'gmail' && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <div className="flex items-center mb-2">
+                          <label className="block text-sm font-medium text-gray-700">
+                            E-mail do Gmail
+                          </label>
+                          <Tooltip content="Seu endereço de e-mail do Gmail que enviará as mensagens">
+                            <HelpCircle className="w-4 h-4 text-gray-400 ml-2" />
+                          </Tooltip>
+                        </div>
+                        <input
+                          type="email"
+                          value={configuracoes.gmail.user}
+                          onChange={(e) => {
+                            setConfiguracoes(prev => ({
+                              ...prev,
+                              gmail: { ...prev.gmail, user: e.target.value }
+                            }));
+                            validarCampo('gmail.user', e.target.value);
+                          }}
+                          placeholder="seu-email@gmail.com"
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${validationErrors['gmail.user']
                             ? 'border-red-300 bg-red-50'
                             : configuracoes.gmail.user
                               ? 'border-green-300 bg-green-50'
                               : 'border-gray-300'
-                          }`}
-                      />
-                      {validationErrors['gmail.user'] && (
-                        <p className="mt-1 text-sm text-red-600 flex items-center">
-                          <X className="w-4 h-4 mr-1" />
-                          {validationErrors['gmail.user']}
-                        </p>
-                      )}
+                            }`}
+                        />
+                        {validationErrors['gmail.user'] && (
+                          <p className="mt-1 text-sm text-red-600 flex items-center">
+                            <X className="w-4 h-4 mr-1" />
+                            {validationErrors['gmail.user']}
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center mb-2">
+                          <label className="block text-sm font-medium text-gray-700">
+                            Senha de App
+                          </label>
+                          <Tooltip content="Senha específica de 16 caracteres gerada nas configurações do Gmail">
+                            <HelpCircle className="w-4 h-4 text-gray-400 ml-2" />
+                          </Tooltip>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type={mostrarSenhas ? 'text' : 'password'}
+                            value={configuracoes.gmail.password}
+                            onChange={(e) => {
+                              setConfiguracoes(prev => ({
+                                ...prev,
+                                gmail: { ...prev.gmail, password: e.target.value }
+                              }));
+                              validarCampo('gmail.password', e.target.value);
+                            }}
+                            placeholder="Senha de 16 caracteres"
+                            className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${validationErrors['gmail.password']
+                              ? 'border-red-300 bg-red-50'
+                              : configuracoes.gmail.password && configuracoes.gmail.password.length === 16
+                                ? 'border-green-300 bg-green-50'
+                                : 'border-gray-300'
+                              }`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setMostrarSenhas(!mostrarSenhas)}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          >
+                            {mostrarSenhas ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        {validationErrors['gmail.password'] && (
+                          <p className="mt-1 text-sm text-red-600 flex items-center">
+                            <X className="w-4 h-4 mr-1" />
+                            {validationErrors['gmail.password']}
+                          </p>
+                        )}
+                      </div>
                     </div>
+
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <h4 className="font-medium text-blue-900 mb-2">🔐 Como gerar uma Senha de App no Gmail:</h4>
+                      <ol className="text-sm text-blue-700 list-decimal list-inside space-y-1">
+                        <li>Acesse <a href="https://myaccount.google.com/security" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center">Segurança da Conta Google <ExternalLink className="w-3 h-3 ml-1" /></a></li>
+                        <li>Ative a "Verificação em duas etapas"</li>
+                        <li>Vá em "Senhas de app" e gere uma nova senha</li>
+                        <li>Escolha "Outro (nome personalizado)" e digite "ConectCRM"</li>
+                        <li>Copie a senha de 16 caracteres gerada</li>
+                      </ol>
+                    </div>
+                  </div>
+                )}
+
+                {/* SendGrid */}
+                {providerAtual === 'sendgrid' && (
+                  <div className="space-y-4">
                     <div>
                       <div className="flex items-center mb-2">
                         <label className="block text-sm font-medium text-gray-700">
-                          Senha de App
+                          API Key do SendGrid
                         </label>
-                        <Tooltip content="Senha específica de 16 caracteres gerada nas configurações do Gmail">
+                        <Tooltip content="Chave de API que começa com SG. gerada no painel do SendGrid">
                           <HelpCircle className="w-4 h-4 text-gray-400 ml-2" />
                         </Tooltip>
                       </div>
                       <div className="relative">
                         <input
                           type={mostrarSenhas ? 'text' : 'password'}
-                          value={configuracoes.gmail.password}
-                          onChange={(e) => {
-                            setConfiguracoes(prev => ({
-                              ...prev,
-                              gmail: { ...prev.gmail, password: e.target.value }
-                            }));
-                            validarCampo('gmail.password', e.target.value);
-                          }}
-                          placeholder="Senha de 16 caracteres"
-                          className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${validationErrors['gmail.password']
-                              ? 'border-red-300 bg-red-50'
-                              : configuracoes.gmail.password && configuracoes.gmail.password.length === 16
-                                ? 'border-green-300 bg-green-50'
-                                : 'border-gray-300'
-                            }`}
+                          value={configuracoes.sendgrid.apiKey}
+                          onChange={(e) => setConfiguracoes(prev => ({
+                            ...prev,
+                            sendgrid: { ...prev.sendgrid, apiKey: e.target.value }
+                          }))}
+                          placeholder="SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
                         <button
                           type="button"
@@ -537,315 +606,263 @@ const ConfiguracaoEmailPage: React.FC = () => {
                           {mostrarSenhas ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
-                      {validationErrors['gmail.password'] && (
-                        <p className="mt-1 text-sm text-red-600 flex items-center">
-                          <X className="w-4 h-4 mr-1" />
-                          {validationErrors['gmail.password']}
-                        </p>
-                      )}
                     </div>
-                  </div>
 
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <h4 className="font-medium text-yellow-900 mb-2">🔐 Como gerar uma Senha de App no Gmail:</h4>
-                    <ol className="text-sm text-yellow-700 list-decimal list-inside space-y-1">
-                      <li>Acesse <a href="https://myaccount.google.com/security" target="_blank" rel="noopener noreferrer" className="text-yellow-600 hover:underline inline-flex items-center">Segurança da Conta Google <ExternalLink className="w-3 h-3 ml-1" /></a></li>
-                      <li>Ative a "Verificação em duas etapas"</li>
-                      <li>Vá em "Senhas de app" e gere uma nova senha</li>
-                      <li>Escolha "Outro (nome personalizado)" e digite "ConectCRM"</li>
-                      <li>Copie a senha de 16 caracteres gerada</li>
-                    </ol>
-                  </div>
-                </div>
-              )}
-
-              {/* SendGrid */}
-              {providerAtual === 'sendgrid' && (
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex items-center mb-2">
-                      <label className="block text-sm font-medium text-gray-700">
-                        API Key do SendGrid
-                      </label>
-                      <Tooltip content="Chave de API que começa com SG. gerada no painel do SendGrid">
-                        <HelpCircle className="w-4 h-4 text-gray-400 ml-2" />
-                      </Tooltip>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type={mostrarSenhas ? 'text' : 'password'}
-                        value={configuracoes.sendgrid.apiKey}
-                        onChange={(e) => setConfiguracoes(prev => ({
-                          ...prev,
-                          sendgrid: { ...prev.sendgrid, apiKey: e.target.value }
-                        }))}
-                        placeholder="SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setMostrarSenhas(!mostrarSenhas)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        {mostrarSenhas ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <h4 className="font-medium text-blue-900 mb-2">🚀 Como criar uma API Key no SendGrid:</h4>
-                    <div className="text-sm text-blue-700">
-                      <ol className="text-sm text-blue-700 list-decimal list-inside space-y-1">
-                        <li>Crie conta gratuita em <a href="https://sendgrid.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center">SendGrid.com <ExternalLink className="w-3 h-3 ml-1" /></a></li>
-                        <li>Vá em Settings → API Keys</li>
-                        <li>Crie uma nova API Key com permissões de "Mail Send"</li>
-                        <li>Copie a chave (começa com SG.)</li>
-                      </ol>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Dados da Empresa */}
-              <div className="mt-8 pt-6 border-t border-gray-200">
-                <h4 className="font-medium text-gray-900 mb-4">Dados da Empresa (aparecem nos e-mails)</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Nome da Empresa</label>
-                    <input
-                      type="text"
-                      value={configuracoes.empresa.nome}
-                      onChange={(e) => setConfiguracoes(prev => ({
-                        ...prev,
-                        empresa: { ...prev.empresa, nome: e.target.value }
-                      }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">E-mail da Empresa</label>
-                    <input
-                      type="email"
-                      value={configuracoes.empresa.email}
-                      onChange={(e) => {
-                        setConfiguracoes(prev => ({
-                          ...prev,
-                          empresa: { ...prev.empresa, email: e.target.value }
-                        }));
-                        validarCampo('empresa.email', e.target.value);
-                      }}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${validationErrors['empresa.email']
-                          ? 'border-red-300 bg-red-50'
-                          : configuracoes.empresa.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(configuracoes.empresa.email)
-                            ? 'border-green-300 bg-green-50'
-                            : 'border-gray-300'
-                        }`}
-                    />
-                    {validationErrors['empresa.email'] && (
-                      <p className="mt-1 text-sm text-red-600 flex items-center">
-                        <X className="w-4 h-4 mr-1" />
-                        {validationErrors['empresa.email']}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Telefone</label>
-                    <input
-                      type="text"
-                      value={configuracoes.empresa.telefone}
-                      onChange={(e) => setConfiguracoes(prev => ({
-                        ...prev,
-                        empresa: { ...prev.empresa, telefone: e.target.value }
-                      }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Endereço</label>
-                    <input
-                      type="text"
-                      value={configuracoes.empresa.endereco}
-                      onChange={(e) => setConfiguracoes(prev => ({
-                        ...prev,
-                        empresa: { ...prev.empresa, endereco: e.target.value }
-                      }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Botões de Ação */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    onClick={salvarConfiguracao}
-                    disabled={salvando}
-                    className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {salvando ? (
-                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="w-4 h-4 mr-2" />
-                    )}
-                    {salvando ? 'Salvando...' : 'Salvar Configurações'}
-                  </button>
-
-                  <button
-                    onClick={exportarConfiguracao}
-                    className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Exportar
-                  </button>
-
-                  <button
-                    onClick={copiarConfiguracao}
-                    className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                  >
-                    <Copy className="w-4 h-4 mr-2" />
-                    Copiar
-                  </button>
-                </div>
-
-                <p className="mt-2 text-sm text-gray-500">
-                  💡 Dica: Exporte suas configurações para backup ou compartilhamento
-                </p>
-              </div>
-            </div>
-
-            {/* Teste de E-mail */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Teste de E-mail</h3>
-                {historicoTestes.length > 0 && (
-                  <button
-                    onClick={() => setMostrarHistorico(!mostrarHistorico)}
-                    className="flex items-center text-sm text-blue-600 hover:text-blue-700"
-                  >
-                    <History className="w-4 h-4 mr-1" />
-                    {mostrarHistorico ? 'Ocultar' : 'Ver'} Histórico ({historicoTestes.length})
-                  </button>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    E-mail para Teste
-                  </label>
-                  <input
-                    type="email"
-                    value={emailTeste}
-                    onChange={(e) => setEmailTeste(e.target.value)}
-                    placeholder="Digite um e-mail para testar"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={testarEmail}
-                    disabled={testando || !emailTeste}
-                    className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {testando ? (
-                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Send className="w-4 h-4 mr-2" />
-                    )}
-                    {testando ? 'Enviando...' : 'Enviar E-mail de Teste'}
-                  </button>
-
-                  {historicoTestes.length > 0 && (
-                    <button
-                      onClick={limparHistorico}
-                      className="flex items-center px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4 mr-1" />
-                      Limpar
-                    </button>
-                  )}
-                </div>
-
-                {/* Histórico de Testes */}
-                {mostrarHistorico && historicoTestes.length > 0 && (
-                  <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                    <h4 className="font-medium text-gray-900 mb-3">📊 Histórico de Testes</h4>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {historicoTestes.map((teste, index) => (
-                        <div
-                          key={teste.id || index}
-                          className={`p-3 rounded-lg border text-sm ${teste.success
-                              ? 'bg-green-50 border-green-200'
-                              : 'bg-red-50 border-red-200'
-                            }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              {teste.success ? (
-                                <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
-                              ) : (
-                                <X className="w-4 h-4 text-red-600 mr-2" />
-                              )}
-                              <span className="font-medium">
-                                {teste.emailTeste}
-                              </span>
-                            </div>
-                            <span className="text-xs text-gray-500">
-                              {new Date(teste.timestamp).toLocaleString('pt-BR')}
-                            </span>
-                          </div>
-                          {teste.error && (
-                            <p className="mt-1 text-red-600 text-xs">{teste.error}</p>
-                          )}
-                          {teste.provider && (
-                            <p className="mt-1 text-gray-600 text-xs">Via: {teste.provider}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Resultado do Teste Atual */}
-                {resultadoTeste && (
-                  <div className={`p-4 rounded-lg border ${resultadoTeste.success
-                    ? 'bg-green-50 border-green-200'
-                    : 'bg-red-50 border-red-200'
-                    }`}>
-                    <div className="flex items-start">
-                      {resultadoTeste.success ? (
-                        <Check className="w-5 h-5 text-green-600 mt-0.5 mr-2 flex-shrink-0" />
-                      ) : (
-                        <X className="w-5 h-5 text-red-600 mt-0.5 mr-2 flex-shrink-0" />
-                      )}
-                      <div>
-                        <h5 className={`font-medium mb-1 ${resultadoTeste.success ? 'text-green-900' : 'text-red-900'
-                          }`}>
-                          {resultadoTeste.success ? 'E-mail enviado com sucesso!' : 'Erro no envio'}
-                        </h5>
-                        {resultadoTeste.success ? (
-                          <div className="text-sm text-green-700 space-y-1">
-                            <div>📧 E-mail enviado para: <strong>{emailTeste}</strong></div>
-                            {resultadoTeste.messageId && (
-                              <div>🔗 ID da mensagem: <code className="bg-green-100 px-1 rounded">{resultadoTeste.messageId}</code></div>
-                            )}
-                            {resultadoTeste.provider && (
-                              <div>⚙️ Provedor: <strong>{resultadoTeste.provider}</strong></div>
-                            )}
-                            <div>⏰ Horário: {resultadoTeste.timestamp?.toLocaleString('pt-BR')}</div>
-                          </div>
-                        ) : (
-                          <div className="text-sm text-red-700">
-                            <div>❌ Erro: {resultadoTeste.error}</div>
-                            <div>⏰ Horário: {resultadoTeste.timestamp?.toLocaleString('pt-BR')}</div>
-                          </div>
-                        )}
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <h4 className="font-medium text-blue-900 mb-2">🚀 Como criar uma API Key no SendGrid:</h4>
+                      <div className="text-sm text-blue-700">
+                        <ol className="text-sm text-blue-700 list-decimal list-inside space-y-1">
+                          <li>Crie conta gratuita em <a href="https://sendgrid.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center">SendGrid.com <ExternalLink className="w-3 h-3 ml-1" /></a></li>
+                          <li>Vá em Settings → API Keys</li>
+                          <li>Crie uma nova API Key com permissões de "Mail Send"</li>
+                          <li>Copie a chave (começa com SG.)</li>
+                        </ol>
                       </div>
                     </div>
                   </div>
                 )}
+
+                {/* Dados da Empresa */}
+                <div className="mt-8 pt-6 border-t border-gray-200">
+                  <h4 className="font-medium text-gray-900 mb-4">Dados da Empresa (aparecem nos e-mails)</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Nome da Empresa</label>
+                      <input
+                        type="text"
+                        value={configuracoes.empresa.nome}
+                        onChange={(e) => setConfiguracoes(prev => ({
+                          ...prev,
+                          empresa: { ...prev.empresa, nome: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">E-mail da Empresa</label>
+                      <input
+                        type="email"
+                        value={configuracoes.empresa.email}
+                        onChange={(e) => {
+                          setConfiguracoes(prev => ({
+                            ...prev,
+                            empresa: { ...prev.empresa, email: e.target.value }
+                          }));
+                          validarCampo('empresa.email', e.target.value);
+                        }}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${validationErrors['empresa.email']
+                          ? 'border-red-300 bg-red-50'
+                          : configuracoes.empresa.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(configuracoes.empresa.email)
+                            ? 'border-green-300 bg-green-50'
+                            : 'border-gray-300'
+                          }`}
+                      />
+                      {validationErrors['empresa.email'] && (
+                        <p className="mt-1 text-sm text-red-600 flex items-center">
+                          <X className="w-4 h-4 mr-1" />
+                          {validationErrors['empresa.email']}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Telefone</label>
+                      <input
+                        type="text"
+                        value={configuracoes.empresa.telefone}
+                        onChange={(e) => setConfiguracoes(prev => ({
+                          ...prev,
+                          empresa: { ...prev.empresa, telefone: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Endereço</label>
+                      <input
+                        type="text"
+                        value={configuracoes.empresa.endereco}
+                        onChange={(e) => setConfiguracoes(prev => ({
+                          ...prev,
+                          empresa: { ...prev.empresa, endereco: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botões de Ação */}
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      onClick={salvarConfiguracao}
+                      disabled={salvando}
+                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {salvando ? (
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}
+                      {salvando ? 'Salvando...' : 'Salvar Configurações'}
+                    </button>
+
+                    <button
+                      onClick={exportarConfiguracao}
+                      className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Exportar
+                    </button>
+
+                    <button
+                      onClick={copiarConfiguracao}
+                      className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copiar
+                    </button>
+                  </div>
+
+                  <p className="mt-2 text-sm text-gray-500">
+                    💡 Dica: Exporte suas configurações para backup ou compartilhamento
+                  </p>
+                </div>
+              </div>
+
+              {/* Teste de E-mail */}
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Teste de E-mail</h3>
+                  {historicoTestes.length > 0 && (
+                    <button
+                      onClick={() => setMostrarHistorico(!mostrarHistorico)}
+                      className="flex items-center text-sm text-blue-600 hover:text-blue-700"
+                    >
+                      <History className="w-4 h-4 mr-1" />
+                      {mostrarHistorico ? 'Ocultar' : 'Ver'} Histórico ({historicoTestes.length})
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      E-mail para Teste
+                    </label>
+                    <input
+                      type="email"
+                      value={emailTeste}
+                      onChange={(e) => setEmailTeste(e.target.value)}
+                      placeholder="Digite um e-mail para testar"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={testarEmail}
+                      disabled={testando || !emailTeste}
+                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {testando ? (
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4 mr-2" />
+                      )}
+                      {testando ? 'Enviando...' : 'Enviar E-mail de Teste'}
+                    </button>
+
+                    {historicoTestes.length > 0 && (
+                      <button
+                        onClick={limparHistorico}
+                        className="flex items-center px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Histórico de Testes */}
+                  {mostrarHistorico && historicoTestes.length > 0 && (
+                    <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                      <h4 className="font-medium text-gray-900 mb-3">📊 Histórico de Testes</h4>
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {historicoTestes.map((teste, index) => (
+                          <div
+                            key={teste.id || index}
+                            className={`p-3 rounded-lg border text-sm ${teste.success
+                              ? 'bg-green-50 border-green-200'
+                              : 'bg-red-50 border-red-200'
+                              }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                {teste.success ? (
+                                  <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
+                                ) : (
+                                  <X className="w-4 h-4 text-red-600 mr-2" />
+                                )}
+                                <span className="font-medium">
+                                  {teste.emailTeste}
+                                </span>
+                              </div>
+                              <span className="text-xs text-gray-500">
+                                {new Date(teste.timestamp).toLocaleString('pt-BR')}
+                              </span>
+                            </div>
+                            {teste.error && (
+                              <p className="mt-1 text-red-600 text-xs">{teste.error}</p>
+                            )}
+                            {teste.provider && (
+                              <p className="mt-1 text-gray-600 text-xs">Via: {teste.provider}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Resultado do Teste Atual */}
+                  {resultadoTeste && (
+                    <div className={`p-4 rounded-lg border ${resultadoTeste.success
+                      ? 'bg-green-50 border-green-200'
+                      : 'bg-red-50 border-red-200'
+                      }`}>
+                      <div className="flex items-start">
+                        {resultadoTeste.success ? (
+                          <Check className="w-5 h-5 text-green-600 mt-0.5 mr-2 flex-shrink-0" />
+                        ) : (
+                          <X className="w-5 h-5 text-red-600 mt-0.5 mr-2 flex-shrink-0" />
+                        )}
+                        <div>
+                          <h5 className={`font-medium mb-1 ${resultadoTeste.success ? 'text-green-900' : 'text-red-900'
+                            }`}>
+                            {resultadoTeste.success ? 'E-mail enviado com sucesso!' : 'Erro no envio'}
+                          </h5>
+                          {resultadoTeste.success ? (
+                            <div className="text-sm text-green-700 space-y-1">
+                              <div>📧 E-mail enviado para: <strong>{emailTeste}</strong></div>
+                              {resultadoTeste.messageId && (
+                                <div>🔗 ID da mensagem: <code className="bg-green-100 px-1 rounded">{resultadoTeste.messageId}</code></div>
+                              )}
+                              {resultadoTeste.provider && (
+                                <div>⚙️ Provedor: <strong>{resultadoTeste.provider}</strong></div>
+                              )}
+                              <div>⏰ Horário: {resultadoTeste.timestamp?.toLocaleString('pt-BR')}</div>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-red-700">
+                              <div>❌ Erro: {resultadoTeste.error}</div>
+                              <div>⏰ Horário: {resultadoTeste.timestamp?.toLocaleString('pt-BR')}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

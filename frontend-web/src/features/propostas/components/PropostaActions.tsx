@@ -390,7 +390,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         toast.success(`✅ Proposta enviada por email para ${clienteData.nome}`);
         console.log('📧 Token de acesso gerado:', token);
 
-        // 🔄 NOTIFICAR PÁGINA PAI PARA ATUALIZAÇÃO EM TEMPO REAL
+        // 🔄 NOTIFICAR PÁGINA PAI PARA ATUALIZAÇÃO EM TEMPO REAL (OTIMIZADO)
         console.log('🔄 Disparando evento de atualização de proposta...');
 
         // Criar evento personalizado para notificar a PropostasPage
@@ -406,13 +406,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         // Disparar o evento globalmente
         window.dispatchEvent(eventoAtualizacao);
 
-        // Aguardar um pouco e atualizar novamente para garantir sincronização
-        setTimeout(() => {
-          console.log('🔄 Segunda notificação de atualização...');
-          window.dispatchEvent(new CustomEvent('atualizarPropostas', {
-            detail: { fonte: 'email-enviado' }
-          }));
-        }, 1000);
+        // ⚡ OTIMIZADO: Remover segundo evento desnecessário para evitar auto-refresh
+        // O evento único acima já é suficiente para atualizar a interface
 
       } else {
         toast.error(`❌ Erro ao enviar email: ${resultado.error}`);

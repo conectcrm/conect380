@@ -481,7 +481,13 @@ export class DashboardService {
     }
 
     const propostas = await this.propostaRepository.find({ where: whereConditions });
-    const valor = propostas.reduce((acc, p) => acc + p.total, 0);
+
+    // Correção: validar e converter total para number, evitando valores quebrados
+    const valor = propostas.reduce((acc, p) => {
+      const total = parseFloat(p.total?.toString() || '0') || 0;
+      return acc + total;
+    }, 0);
+
     const quantidade = propostas.length;
     const propostasIds = propostas.slice(0, 5).map(p => p.numero);
 

@@ -452,13 +452,12 @@ const ClientesPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#DEEFE7]">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b px-6 py-4">
         <BackToNucleus
           nucleusName="CRM"
           nucleusPath="/nuclei/crm"
-          currentModuleName="Clientes"
         />
       </div>
 
@@ -467,16 +466,27 @@ const ClientesPage: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="mt-2 text-[#B4BEC9]">Gerencie seus clientes e contatos</p>
+              <h1 className="text-3xl font-bold text-[#002333] flex items-center">
+                <Users className="h-8 w-8 mr-3 text-[#159A9C]" />
+                Clientes
+                {isLoading && (
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#159A9C] ml-3"></div>
+                )}
+              </h1>
+              <p className="mt-2 text-[#B4BEC9]">
+                {isLoading ? 'Carregando clientes...' : `Gerencie seus ${estatisticas.total} clientes e contatos`}
+              </p>
             </div>
-            <div className="mt-4 sm:mt-0 flex gap-3">
+
+            {/* Botão de ação principal */}
+            <div className="mt-4 sm:mt-0 flex items-center gap-3">
               {/* Botões de visualização */}
               <div className="flex border border-gray-300 rounded-lg overflow-hidden">
                 <button
                   onClick={() => setViewMode('cards')}
                   className={`px-3 py-2 text-sm transition-colors ${viewMode === 'cards'
-                      ? 'bg-[#159A9C] text-white'
-                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                    ? 'bg-[#159A9C] text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
                     }`}
                 >
                   <Grid3X3 className="w-4 h-4" />
@@ -484,8 +494,8 @@ const ClientesPage: React.FC = () => {
                 <button
                   onClick={() => setViewMode('table')}
                   className={`px-3 py-2 text-sm transition-colors ${viewMode === 'table'
-                      ? 'bg-[#159A9C] text-white'
-                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                    ? 'bg-[#159A9C] text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
                     }`}
                 >
                   <List className="w-4 h-4" />
@@ -504,193 +514,147 @@ const ClientesPage: React.FC = () => {
                   setSelectedCliente(null);
                   setShowCreateModal(true);
                 }}
-                className="px-4 py-2 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg flex items-center gap-2 text-sm transition-all"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-5 h-5" />
                 Novo Cliente
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Estatísticas rápidas */}
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white p-4 rounded-lg border border-[#DEEFE7] shadow-sm">
-              <div className="flex items-center">
-                <div className="p-2 bg-[#DEEFE7] rounded-lg">
-                  <Users className="w-6 h-6 text-[#159A9C]" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-[#B4BEC9]">Total de Clientes</p>
-                  <p className="text-2xl font-bold text-[#002333]">{estatisticas.total}</p>
-                </div>
+        {/* Cards de Dashboard */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total de Clientes</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">{estatisticas.total}</p>
+                <p className="text-xs text-gray-400 mt-1">📊 Visão geral</p>
+              </div>
+              <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl">
+                <Users className="w-8 h-8 text-blue-600" />
               </div>
             </div>
+          </div>
 
-            <div className="bg-white p-4 rounded-lg border border-[#DEEFE7] shadow-sm">
-              <div className="flex items-center">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <Users className="w-6 h-6 text-green-600" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-[#B4BEC9]">Clientes Ativos</p>
-                  <p className="text-2xl font-bold text-[#002333]">{estatisticas.ativos}</p>
-                </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Clientes Ativos</p>
+                <p className="text-3xl font-bold text-green-600 mt-2">{estatisticas.ativos}</p>
+                <p className="text-xs text-green-500 mt-1">✅ Ativos</p>
+              </div>
+              <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-xl">
+                <User className="w-8 h-8 text-green-600" />
               </div>
             </div>
+          </div>
 
-            <div className="bg-white p-4 rounded-lg border border-[#DEEFE7] shadow-sm">
-              <div className="flex items-center">
-                <div className="p-2 bg-yellow-100 rounded-lg">
-                  <Users className="w-6 h-6 text-yellow-600" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-[#B4BEC9]">Prospects</p>
-                  <p className="text-2xl font-bold text-[#002333]">{estatisticas.prospects}</p>
-                </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Prospects</p>
+                <p className="text-3xl font-bold text-yellow-600 mt-2">{estatisticas.prospects}</p>
+                <p className="text-xs text-yellow-500 mt-1">🎯 Em prospecção</p>
+              </div>
+              <div className="p-4 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-xl">
+                <Eye className="w-8 h-8 text-yellow-600" />
               </div>
             </div>
+          </div>
 
-            <div className="bg-white p-4 rounded-lg border border-[#DEEFE7] shadow-sm">
-              <div className="flex items-center">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Users className="w-6 h-6 text-blue-600" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-[#B4BEC9]">Leads</p>
-                  <p className="text-2xl font-bold text-[#002333]">{estatisticas.leads}</p>
-                </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Leads</p>
+                <p className="text-3xl font-bold text-purple-600 mt-2">{estatisticas.leads}</p>
+                <p className="text-xs text-purple-500 mt-1">🚀 Potenciais</p>
+              </div>
+              <div className="p-4 bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl">
+                <Tag className="w-8 h-8 text-purple-600" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Filtros Redesenhados */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex flex-col space-y-4">
-            {/* Título e botão limpar */}
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Filtros</h3>
-              <button
-                onClick={handleClearFilters}
-                className="text-sm text-gray-500 hover:text-gray-700 underline"
-              >
-                Limpar todos os filtros
-              </button>
+        {/* Filtros e Busca */}
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+          <div className="flex flex-col sm:flex-row gap-4 items-end">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Buscar Clientes
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nome, email, empresa..."
+                  value={searchTerm}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
+                />
+              </div>
             </div>
 
-            {/* Grid de filtros */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Busca */}
-              <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Buscar
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="text"
-                    placeholder="Nome, email, empresa..."
-                    value={searchTerm}
-                    onChange={(e) => handleSearchChange(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              {/* Filtro por Status */}
+            <div className="flex gap-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Status
                 </label>
                 <select
                   value={selectedStatus}
                   onChange={(e) => handleStatusChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                 >
                   <option value="">Todos os Status</option>
-                  <option value="lead">Lead</option>
-                  <option value="prospect">Prospect</option>
-                  <option value="cliente">Cliente</option>
-                  <option value="inativo">Inativo</option>
+                  <option value="lead">🚀 Lead</option>
+                  <option value="prospect">🎯 Prospect</option>
+                  <option value="cliente">✅ Cliente</option>
+                  <option value="inativo">❌ Inativo</option>
                 </select>
               </div>
 
-              {/* Filtro por Tipo */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Tipo
                 </label>
                 <select
                   value={selectedTipo}
                   onChange={(e) => handleTipoChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                 >
                   <option value="">Todos os Tipos</option>
-                  <option value="pessoa_fisica">Pessoa Física</option>
-                  <option value="pessoa_juridica">Pessoa Jurídica</option>
+                  <option value="pessoa_fisica">👤 Pessoa Física</option>
+                  <option value="pessoa_juridica">🏢 Pessoa Jurídica</option>
                 </select>
               </div>
 
-              {/* Filtro por Ordenação */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Ordenação
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ações
                 </label>
-                <select
-                  value={`${filters.sortBy}-${filters.sortOrder}`}
-                  onChange={(e) => {
-                    const [sortBy, sortOrder] = e.target.value.split('-');
-                    setFilters(prev => ({ ...prev, sortBy, sortOrder: sortOrder as 'ASC' | 'DESC', page: 1 }));
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                >
-                  <option value="created_at-DESC">Mais recentes</option>
-                  <option value="created_at-ASC">Mais antigos</option>
-                  <option value="nome-ASC">Nome A-Z</option>
-                  <option value="nome-DESC">Nome Z-A</option>
-                </select>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleClearFilters}
+                    className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center gap-2 transition-colors"
+                  >
+                    <Filter className="w-4 h-4" />
+                    Limpar
+                  </button>
+
+                  <button
+                    onClick={handleExportClientes}
+                    disabled={clientes.length === 0}
+                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                    title="Exportar clientes"
+                  >
+                    <Download className="w-4 h-4" />
+                    Exportar
+                  </button>
+                </div>
               </div>
             </div>
-
-            {/* Filtros ativos */}
-            {(searchTerm || selectedStatus || selectedTipo) && (
-              <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
-                <span className="text-sm text-gray-600">Filtros ativos:</span>
-                {searchTerm && (
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    Busca: "{searchTerm}"
-                    <button
-                      onClick={() => setSearchTerm('')}
-                      className="ml-1 text-blue-600 hover:text-blue-800"
-                    >
-                      ×
-                    </button>
-                  </span>
-                )}
-                {selectedStatus && (
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    Status: {selectedStatus}
-                    <button
-                      onClick={() => setSelectedStatus('')}
-                      className="ml-1 text-green-600 hover:text-green-800"
-                    >
-                      ×
-                    </button>
-                  </span>
-                )}
-                {selectedTipo && (
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                    Tipo: {selectedTipo === 'pessoa_fisica' ? 'Pessoa Física' : 'Pessoa Jurídica'}
-                    <button
-                      onClick={() => setSelectedTipo('')}
-                      className="ml-1 text-purple-600 hover:text-purple-800"
-                    >
-                      ×
-                    </button>
-                  </span>
-                )}
-              </div>
-            )}
           </div>
         </div>
 
@@ -819,8 +783,8 @@ const ClientesPage: React.FC = () => {
                             >
                               <span>Cliente</span>
                               <ChevronRight className={`w-3 h-3 transition-transform ${filters.sortBy === 'nome'
-                                  ? filters.sortOrder === 'ASC' ? 'rotate-90' : 'rotate-270'
-                                  : 'text-gray-400'
+                                ? filters.sortOrder === 'ASC' ? 'rotate-90' : 'rotate-270'
+                                : 'text-gray-400'
                                 }`} />
                             </button>
                           </th>
@@ -831,8 +795,8 @@ const ClientesPage: React.FC = () => {
                             >
                               <span>Status</span>
                               <ChevronRight className={`w-3 h-3 transition-transform ${filters.sortBy === 'status'
-                                  ? filters.sortOrder === 'ASC' ? 'rotate-90' : 'rotate-270'
-                                  : 'text-gray-400'
+                                ? filters.sortOrder === 'ASC' ? 'rotate-90' : 'rotate-270'
+                                : 'text-gray-400'
                                 }`} />
                             </button>
                           </th>
@@ -843,8 +807,8 @@ const ClientesPage: React.FC = () => {
                             >
                               <span>Criado em</span>
                               <ChevronRight className={`w-3 h-3 transition-transform ${filters.sortBy === 'created_at'
-                                  ? filters.sortOrder === 'ASC' ? 'rotate-90' : 'rotate-270'
-                                  : 'text-gray-400'
+                                ? filters.sortOrder === 'ASC' ? 'rotate-90' : 'rotate-270'
+                                : 'text-gray-400'
                                 }`} />
                             </button>
                           </th>
@@ -896,8 +860,8 @@ const ClientesPage: React.FC = () => {
                             <td className="px-4 py-3">
                               <div className="flex items-center space-x-2">
                                 <div className={`w-2 h-2 rounded-full ${cliente.status === 'cliente' ? 'bg-green-500' :
-                                    cliente.status === 'prospect' ? 'bg-blue-500' :
-                                      cliente.status === 'lead' ? 'bg-yellow-500' : 'bg-gray-400'
+                                  cliente.status === 'prospect' ? 'bg-blue-500' :
+                                    cliente.status === 'lead' ? 'bg-yellow-500' : 'bg-gray-400'
                                   }`}></div>
                                 <span className="text-sm text-gray-700 capitalize">
                                   {getStatusText(cliente.status)}
@@ -1011,8 +975,8 @@ const ClientesPage: React.FC = () => {
                               key={page}
                               onClick={() => handlePageChange(page)}
                               className={`px-3 py-1 text-sm border rounded ${isCurrentPage
-                                  ? 'bg-[#159A9C] border-[#159A9C] text-white'
-                                  : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-700'
+                                ? 'bg-[#159A9C] border-[#159A9C] text-white'
+                                : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-700'
                                 }`}
                             >
                               {page}

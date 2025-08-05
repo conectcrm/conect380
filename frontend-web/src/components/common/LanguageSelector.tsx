@@ -7,9 +7,9 @@ interface LanguageSelectorProps {
   onClose?: () => void;
 }
 
-const LanguageSelector: React.FC<LanguageSelectorProps> = ({ 
-  showAsModal = false, 
-  onClose 
+const LanguageSelector: React.FC<LanguageSelectorProps> = ({
+  showAsModal = false,
+  onClose
 }) => {
   const { language, changeLanguage, t, availableLanguages } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
@@ -18,11 +18,13 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
 
   const handleLanguageChange = async (langCode: string) => {
     try {
+      console.log('🗣️ LanguageSelector: Tentando alterar para:', langCode);
       await changeLanguage(langCode);
+      console.log('🗣️ LanguageSelector: Alteração concluída');
       setIsOpen(false);
       if (onClose) onClose();
     } catch (error) {
-      console.error('Erro ao alterar idioma:', error);
+      console.error('🗣️ LanguageSelector: Erro ao alterar idioma:', error);
     }
   };
 
@@ -62,11 +64,10 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                 <button
                   key={lang.code}
                   onClick={() => handleLanguageChange(lang.code)}
-                  className={`w-full flex items-center justify-between p-4 rounded-lg border-2 transition-all hover:shadow-md ${
-                    language === lang.code
+                  className={`w-full flex items-center justify-between p-4 rounded-lg border-2 transition-all hover:shadow-md ${language === lang.code
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">{lang.flag}</span>
@@ -125,11 +126,10 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
               <button
                 key={lang.code}
                 onClick={() => handleLanguageChange(lang.code)}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                  language === lang.code
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${language === lang.code
                     ? 'bg-blue-50 text-blue-700'
                     : 'hover:bg-gray-50 text-gray-700'
-                }`}
+                  }`}
               >
                 <span className="text-lg">{lang.flag}</span>
                 <div className="flex-1 text-left">

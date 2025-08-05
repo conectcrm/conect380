@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Edit3, Trash2, Building2, Phone, Mail, MapPin, Filter, Download, MoreVertical, FileSpreadsheet, Eye } from 'lucide-react';
+import { Plus, Search, Edit3, Trash2, Building2, Phone, Mail, Filter, Download, MoreVertical, FileSpreadsheet, Eye, Check, X, CheckCircle, Calendar, Activity, Settings, FileText } from 'lucide-react';
 import { fornecedorService, Fornecedor, NovoFornecedor } from '../../../services/fornecedorService';
 import ModalFornecedor from '../components/ModalFornecedor';
 import ModalDetalhesFornecedor from '../components/ModalDetalhesFornecedor';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 import { exportToCSV, exportToExcel, formatDateForExport, formatStatusForExport, ExportColumn } from '../../../utils/exportUtils';
+
+export { }; // Para resolver o erro isolatedModules
 
 interface DashboardCards {
   totalFornecedores: number;
@@ -320,81 +322,101 @@ export default function FornecedoresPage() {
         <BackToNucleus
           nucleusName="Financeiro"
           nucleusPath="/nuclei/financeiro"
-          currentModuleName="Fornecedores"
         />
       </div>
 
-      <div className="p-6 space-y-6">
-        {/* Cabeçalho */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Fornecedores</h1>
-            <p className="text-gray-600">Gerencie seus fornecedores e parceiros comerciais</p>
+      <div className="p-6">
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-[#002333] flex items-center">
+                <Building2 className="h-8 w-8 mr-3 text-[#159A9C]" />
+                Fornecedores
+                {carregando && (
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#159A9C] ml-3"></div>
+                )}
+              </h1>
+              <p className="mt-2 text-[#B4BEC9]">
+                {carregando ? 'Carregando fornecedores...' : `Gerencie seus ${dashboardCards.totalFornecedores} fornecedores e parceiros comerciais`}
+              </p>
+            </div>
+
+            {/* Botão de ação principal */}
+            <div className="mt-4 sm:mt-0 flex items-center gap-3">
+              <button
+                onClick={abrirModalCriacao}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+              >
+                <Plus className="w-5 h-5" />
+                Novo Fornecedor
+              </button>
+            </div>
           </div>
-          <button
-            onClick={abrirModalCriacao}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Novo Fornecedor
-          </button>
         </div>
 
         {/* Cards de Dashboard */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white rounded-lg shadow-sm border p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total de Fornecedores</p>
-                <p className="text-2xl font-bold text-gray-900">{dashboardCards.totalFornecedores}</p>
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total de Fornecedores</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">{dashboardCards.totalFornecedores}</p>
+                <p className="text-xs text-gray-400 mt-1">📊 Visão geral</p>
               </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Building2 className="w-6 h-6 text-blue-600" />
+              <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl">
+                <Building2 className="w-8 h-8 text-blue-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Fornecedores Ativos</p>
-                <p className="text-2xl font-bold text-green-600">{dashboardCards.fornecedoresAtivos}</p>
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Fornecedores Ativos</p>
+                <p className="text-3xl font-bold text-green-600 mt-2">{dashboardCards.fornecedoresAtivos}</p>
+                <p className="text-xs text-green-500 mt-1">✅ Operacionais</p>
               </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Building2 className="w-6 h-6 text-green-600" />
+              <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-xl">
+                <CheckCircle className="w-8 h-8 text-green-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Fornecedores Inativos</p>
-                <p className="text-2xl font-bold text-red-600">{dashboardCards.fornecedoresInativos}</p>
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Fornecedores Inativos</p>
+                <p className="text-3xl font-bold text-red-600 mt-2">{dashboardCards.fornecedoresInativos}</p>
+                <p className="text-xs text-red-500 mt-1">❌ Suspensos</p>
               </div>
-              <div className="p-3 bg-red-100 rounded-lg">
-                <Building2 className="w-6 h-6 text-red-600" />
+              <div className="p-4 bg-gradient-to-br from-red-100 to-red-200 rounded-xl">
+                <X className="w-8 h-8 text-red-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Cadastrados Hoje</p>
-                <p className="text-2xl font-bold text-purple-600">{dashboardCards.fornecedoresCadastradosHoje}</p>
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Cadastrados Hoje</p>
+                <p className="text-3xl font-bold text-purple-600 mt-2">{dashboardCards.fornecedoresCadastradosHoje}</p>
+                <p className="text-xs text-purple-500 mt-1">🆕 Novos</p>
               </div>
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <Plus className="w-6 h-6 text-purple-600" />
+              <div className="p-4 bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl">
+                <Calendar className="w-8 h-8 text-purple-600" />
               </div>
             </div>
           </div>
         </div>
 
         {/* Filtros e Busca */}
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+          <div className="flex flex-col sm:flex-row gap-4 items-end">
             <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Buscar Fornecedores
+              </label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
@@ -403,52 +425,62 @@ export default function FornecedoresPage() {
                   value={busca}
                   onChange={(e) => setBusca(e.target.value)}
                   onKeyPress={handleSearch}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
                 />
               </div>
             </div>
 
             <div className="flex gap-2">
-              <select
-                value={filtroStatus}
-                onChange={(e) => setFiltroStatus(e.target.value as 'todos' | 'ativo' | 'inativo')}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="todos">Todos</option>
-                <option value="ativo">Ativos</option>
-                <option value="inativo">Inativos</option>
-              </select>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Status
+                </label>
+                <select
+                  value={filtroStatus}
+                  onChange={(e) => setFiltroStatus(e.target.value as 'todos' | 'ativo' | 'inativo')}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                >
+                  <option value="todos">Todos os Status</option>
+                  <option value="ativo">✅ Ativos</option>
+                  <option value="inativo">❌ Inativos</option>
+                </select>
+              </div>
 
-              <button
-                onClick={buscarFornecedores}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-              >
-                <Search className="w-4 h-4" />
-                Buscar
-              </button>
-
-              {/* Botões de Exportação */}
-              <div className="relative">
-                <div className="flex gap-1">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ações
+                </label>
+                <div className="flex gap-2">
                   <button
-                    onClick={exportarParaCSV}
-                    disabled={fornecedores.length === 0}
-                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
-                    title="Exportar para CSV"
+                    onClick={buscarFornecedores}
+                    className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors"
                   >
-                    <Download className="w-4 h-4" />
-                    CSV
+                    <Search className="w-4 h-4" />
+                    Buscar
                   </button>
 
-                  <button
-                    onClick={exportarParaExcel}
-                    disabled={fornecedores.length === 0}
-                    className="px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
-                    title="Exportar para Excel"
-                  >
-                    <FileSpreadsheet className="w-4 h-4" />
-                    Excel
-                  </button>
+                  {/* Botões de Exportação */}
+                  <div className="flex gap-1">
+                    <button
+                      onClick={exportarParaCSV}
+                      disabled={fornecedores.length === 0}
+                      className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                      title="Exportar para CSV"
+                    >
+                      <Download className="w-4 h-4" />
+                      CSV
+                    </button>
+
+                    <button
+                      onClick={exportarParaExcel}
+                      disabled={fornecedores.length === 0}
+                      className="px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                      title="Exportar para Excel"
+                    >
+                      <FileSpreadsheet className="w-4 h-4" />
+                      Excel
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -457,43 +489,52 @@ export default function FornecedoresPage() {
 
         {/* Barra de Ações em Massa */}
         {mostrarAcoesMassa && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center justify-between">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <span className="text-sm font-medium text-blue-900">
-                  {fornecedoresSelecionados.length} fornecedor(es) selecionado(s)
-                </span>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                    <CheckCircle className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="text-sm font-medium text-blue-900">
+                    {fornecedoresSelecionados.length} fornecedor(es) selecionado(s)
+                  </span>
+                </div>
                 <button
                   onClick={deselecionarTodos}
-                  className="text-sm text-blue-600 hover:text-blue-800 underline"
+                  className="text-sm text-blue-600 hover:text-blue-800 underline transition-colors"
                 >
                   Desmarcar todos
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={ativarSelecionados}
-                  className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 flex items-center gap-2 transition-colors"
                 >
+                  <Check className="w-4 h-4" />
                   Ativar
                 </button>
                 <button
                   onClick={desativarSelecionados}
-                  className="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm hover:bg-orange-700 flex items-center gap-2 transition-colors"
                 >
+                  <X className="w-4 h-4" />
                   Desativar
                 </button>
                 <button
                   onClick={exportarSelecionados}
-                  className="px-3 py-1 bg-emerald-600 text-white rounded text-sm hover:bg-emerald-700"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 flex items-center gap-2 transition-colors"
                 >
+                  <Download className="w-4 h-4" />
                   Exportar
                 </button>
                 <button
                   onClick={excluirSelecionados}
-                  className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 flex items-center gap-2 transition-colors"
                 >
+                  <Trash2 className="w-4 h-4" />
                   Excluir
                 </button>
               </div>
@@ -533,36 +574,53 @@ export default function FornecedoresPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50">
+                <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-3 text-left">
-                      <input
-                        type="checkbox"
-                        checked={fornecedoresSelecionados.length === fornecedores.length && fornecedores.length > 0}
-                        onChange={(e) => e.target.checked ? selecionarTodos() : deselecionarTodos()}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
+                    <th className="px-4 py-4 text-left">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={fornecedoresSelecionados.length === fornecedores.length && fornecedores.length > 0}
+                          onChange={(e) => e.target.checked ? selecionarTodos() : deselecionarTodos()}
+                          className="w-4 h-4 text-[#159A9C] bg-gray-100 border-gray-300 rounded focus:ring-[#159A9C] focus:ring-2"
+                        />
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Fornecedor
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-4 h-4" />
+                        Fornecedor
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      CNPJ/CPF
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        CNPJ/CPF
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Contato
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4" />
+                        Contato
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Localização
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-4 h-4" />
+                        Status
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        Criado em
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Criado em
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ações
+                    <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <div className="flex items-center justify-end gap-2">
+                        <Settings className="w-4 h-4" />
+                        Ações
+                      </div>
                     </th>
                   </tr>
                 </thead>
@@ -611,16 +669,6 @@ export default function FornecedoresPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {fornecedor.cidade && fornecedor.estado ? (
-                          <div className="flex items-center text-sm text-gray-600">
-                            <MapPin className="w-3 h-3 mr-1" />
-                            {fornecedor.cidade}, {fornecedor.estado}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${fornecedor.ativo
                           ? 'bg-green-100 text-green-800'
                           : 'bg-red-100 text-red-800'
@@ -648,7 +696,7 @@ export default function FornecedoresPage() {
                             <Edit3 className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => excluirFornecedor(fornecedor.id)}
+                            onClick={() => excluirFornecedor(fornecedor.id.toString())}
                             className="text-red-600 hover:text-red-800 p-1 rounded"
                             title="Excluir fornecedor"
                           >

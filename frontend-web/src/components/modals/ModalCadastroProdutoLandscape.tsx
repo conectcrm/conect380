@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
+import { useI18n } from '../../contexts/I18nContext';
 import { X, Tag, Package, DollarSign, AlertTriangle, Keyboard } from 'lucide-react';
 import { MoneyInput } from '../common/MoneyInput';
 import { useProdutosParaPropostas } from '../../shared/produtosAdapter';
@@ -142,6 +143,9 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
   produtoEditando,
   loading = false
 }) => {
+  // Hook de internacionalização
+  const { t } = useI18n();
+
   const [tagInput, setTagInput] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isFormInitialized, setIsFormInitialized] = useState(false);
@@ -160,7 +164,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
         setLoadingCategorias(true);
         const categoriasData = await categoriasProdutosService.listarCategorias();
         const categoriasNomes = categoriasData.map(cat => cat.nome);
-        
+
         // Se há categorias cadastradas, usa elas
         if (categoriasNomes.length > 0) {
           setCategorias(categoriasNomes);
@@ -239,7 +243,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
   const onFormSubmit = async (data: ProdutoFormData) => {
     try {
       if (loading) return;
-      
+
       await onSubmit(data);
       setHasUnsavedChanges(false);
       setIsFormInitialized(false);
@@ -300,7 +304,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
     if (isOpen) {
       setHasUnsavedChanges(false);
       setIsFormInitialized(false);
-      
+
       if (produtoEditando) {
         reset({
           nome: produtoEditando.nome || '',
@@ -328,7 +332,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
           variacoes: []
         });
       }
-      
+
       // Marca como inicializado após um pequeno delay para evitar detecção de mudança
       setTimeout(() => setIsFormInitialized(true), 100);
     }
@@ -398,11 +402,11 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
       {/* Modal Principal */}
       <div className="fixed inset-0 z-50 overflow-y-auto">
         {/* Backdrop */}
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
           onClick={handleClose}
         />
-        
+
         {/* Modal - Layout Paisagem */}
         <div className="flex min-h-full items-center justify-center p-2 sm:p-4">
           <div className="relative w-full max-w-6xl bg-white rounded-xl shadow-2xl transform transition-all">
@@ -421,9 +425,9 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-4">
-                <SaveStatus 
+                <SaveStatus
                   isDirty={hasUnsavedChanges}
                   isSaving={isSubmitting}
                   lastSaved={isFormInitialized ? undefined : (lastSaveAttempt ? new Date(lastSaveAttempt) : undefined)}
@@ -441,14 +445,14 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
             {/* Formulário em Grid */}
             <form onSubmit={handleSubmit(onFormSubmit)} className="p-4 sm:p-6">
               <div className={`grid grid-cols-1 gap-6 ${isSoftware ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
-                
+
                 {/* Coluna 1: Informações Básicas */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium text-gray-900 flex items-center">
                     <Package className="w-5 h-5 mr-2 text-blue-600" />
                     Informações Básicas
                   </h3>
-                  
+
                   {/* Nome */}
                   <div>
                     <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-1">
@@ -528,9 +532,8 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                           value={field.value}
                           onChange={field.onChange}
                           placeholder="R$ 0,00"
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                            errors.precoUnitario ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.precoUnitario ? 'border-red-300' : 'border-gray-300'
+                            }`}
                         />
                       )}
                     />
@@ -550,7 +553,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                   {/* Frequência */}
                   <div>
                     <label htmlFor="frequencia" className="block text-sm font-medium text-gray-700 mb-1">
-                      Frequência *
+                      {t('common.frequency')} *
                     </label>
                     <select
                       {...register('frequencia')}
@@ -650,7 +653,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                       <Keyboard className="w-5 h-5 mr-2 text-indigo-600" />
                       Configurações de Software
                     </h3>
-                    
+
                     {/* Alerta informativo */}
                     {campos.alertaEspecial && (
                       <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
@@ -708,7 +711,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                         {campos.labelQuantidade}
                       </label>
                       <input
-                        {...register('quantidadeLicencas', { 
+                        {...register('quantidadeLicencas', {
                           valueAsNumber: true,
                           setValueAs: (value) => value === '' ? undefined : Number(value)
                         })}
@@ -729,7 +732,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                     {/* Renovação Automática */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Renovação Automática
+                        {t('common.automaticRenewal')}
                       </label>
                       <Controller
                         name="renovacaoAutomatica"
@@ -743,7 +746,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                                 onChange={() => field.onChange(true)}
                                 className="mr-2 text-green-600 focus:ring-green-500"
                               />
-                              <span className="text-sm text-gray-700">Sim</span>
+                              <span className="text-sm text-gray-700">{t('common.yes')}</span>
                             </label>
                             <label className="flex items-center">
                               <input
@@ -752,7 +755,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                                 onChange={() => field.onChange(false)}
                                 className="mr-2 text-red-600 focus:ring-red-500"
                               />
-                              <span className="text-sm text-gray-700">Não</span>
+                              <span className="text-sm text-gray-700">{t('common.no')}</span>
                             </label>
                           </div>
                         )}
@@ -822,7 +825,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                   disabled={isSubmitting}
                   className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Cancelar
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
@@ -836,7 +839,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                     </>
                   ) : (
                     <>
-                      {produtoEditando ? 'Atualizar' : 'Salvar'} Produto
+                      {produtoEditando ? t('common.update') : t('common.saveProduct')}
                     </>
                   )}
                 </button>

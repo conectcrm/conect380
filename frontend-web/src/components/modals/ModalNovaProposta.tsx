@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
+import { useI18n } from '../../contexts/I18nContext';
 import {
   X,
   ArrowLeft,
@@ -33,6 +34,11 @@ import { emailServiceReal } from '../../services/emailServiceReal';
 import { gerarTokenNumerico } from '../../utils/tokenUtils';
 import { BadgeProdutoSoftware } from '../common/BadgeProdutoSoftware';
 
+// Novos componentes otimizados
+import ClienteSearchOptimizedV2 from '../search/ClienteSearchOptimizedV2';
+import ResponsiveStepIndicator from '../navigation/ResponsiveStepIndicator';
+import ModalCadastroCliente from './ModalCadastroCliente';
+
 // Interfaces
 interface Cliente {
   id: string;
@@ -45,6 +51,11 @@ interface Cliente {
   estado?: string;
   cep?: string;
   tipoPessoa: 'fisica' | 'juridica';
+  // Propriedades opcionais para compatibilidade com o search component
+  observacoes?: string;
+  ativo?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface Produto {
@@ -137,6 +148,9 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   onClose,
   onPropostaCriada
 }) => {
+  // Hook de internacionalização
+  const { t } = useI18n();
+
   // Estados principais
   const [etapaAtual, setEtapaAtual] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -146,10 +160,18 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   const [isLoadingClientes, setIsLoadingClientes] = useState(false);
   const [buscarCliente, setBuscarCliente] = useState('');
 
+  // Estado para modal de cadastro de cliente
+  const [isModalCadastroClienteOpen, setIsModalCadastroClienteOpen] = useState(false);
+
   // Estados para vendedores
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [isLoadingVendedores, setIsLoadingVendedores] = useState(false);
   const [vendedorAtual, setVendedorAtual] = useState<Vendedor | null>(null);
+  const vendedoresCarregadosRef = useRef(false);
+
+  // Refs para controle de carregamento
+  const clientesCarregadosRef = useRef(false);
+  const produtosCarregadosRef = useRef(false);
 
   // Estados para produtos
   const [produtosDisponiveis, setProdutosDisponiveis] = useState<Produto[]>([]);
@@ -161,14 +183,14 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
 
   // Etapas do wizard
   const etapas = [
-    { id: 'cliente', titulo: 'Cliente', icone: User, descricao: 'Selecione o cliente' },
-    { id: 'produtos', titulo: 'Produtos', icone: Package, descricao: 'Adicione produtos e serviços' },
-    { id: 'condicoes', titulo: 'Condições', icone: Calculator, descricao: 'Configure condições e totais' },
-    { id: 'resumo', titulo: 'Resumo', icone: FileText, descricao: 'Revise e gere a proposta' }
+    { id: 'cliente', titulo: 'Cliente', icone: User },
+    { id: 'produtos', titulo: 'Produtos', icone: Package },
+    { id: 'condicoes', titulo: 'Condições', icone: Calculator },
+    { id: 'resumo', titulo: 'Resumo', icone: FileText }
   ];
 
   // React Hook Form
-  const { control, handleSubmit, watch, setValue, reset, formState: { errors, isValid } } = useForm<PropostaFormData>({
+  const { control, handleSubmit, watch, setValue, getValues, reset, formState: { errors, isValid } } = useForm<PropostaFormData>({
     resolver: yupResolver(schema),
     defaultValues: {
       titulo: '', // Será preenchido automaticamente
@@ -191,13 +213,16 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     name: 'produtos'
   });
 
-  // Watch dos campos
+  // Watch dos campos com otimização
   const watchedTitulo = watch('titulo');
   const watchedVendedor = watch('vendedor');
   const watchedCliente = watch('cliente');
   const watchedProdutos = watch('produtos');
   const watchedDescontoGlobal = watch('descontoGlobal');
   const watchedImpostos = watch('impostos');
+
+  // Memoização do vendedor para evitar re-renders
+  const vendedorMemoized = useMemo(() => watchedVendedor, [watchedVendedor?.id]);
 
   // Hook de cálculos
   const { totais: totaisCombinados } = useCalculosProposta(
@@ -206,111 +231,213 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     watchedImpostos || 12
   );
 
-  // Carregar clientes
-  useEffect(() => {
-    if (isOpen) {
-      const carregarClientes = async () => {
-        try {
-          setIsLoadingClientes(true);
-          const response = await clientesService.getClientes({ limit: 100 });
+  // Callbacks memorizados para evitar re-renderizações
+  const handleClienteSelect = useCallback((cliente: Cliente) => {
+    setValue('cliente', cliente);
+  }, [setValue]);
 
-          const clientesFormatados: Cliente[] = response.data.map((cliente: ClienteService) => ({
-            id: cliente.id || '',
-            nome: cliente.nome,
-            documento: cliente.documento || '',
-            email: cliente.email,
-            telefone: cliente.telefone || '',
-            endereco: cliente.endereco || '',
-            cidade: cliente.cidade || '',
-            estado: cliente.estado || '',
-            cep: cliente.cep || '',
-            tipoPessoa: cliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica'
-          }));
+  const handleNewCliente = useCallback(() => {
+    setIsModalCadastroClienteOpen(true);
+  }, []);
 
-          setClientes(clientesFormatados);
-        } catch (error) {
-          console.error('Erro ao carregar clientes:', error);
-          toast.error('Erro ao carregar clientes');
-        } finally {
-          setIsLoadingClientes(false);
-        }
-      };
+  const handleCloseModalCadastroCliente = useCallback(() => {
+    setIsModalCadastroClienteOpen(false);
+  }, []);
 
-      carregarClientes();
+  const handleReloadClientes = useCallback(async () => {
+    try {
+      setIsLoadingClientes(true);
+      const response = await clientesService.getClientes({ limit: 100 });
+
+      const clientesFormatados: Cliente[] = response.data.map((cliente: ClienteService) => ({
+        id: cliente.id || '',
+        nome: cliente.nome,
+        documento: cliente.documento || '',
+        email: cliente.email,
+        telefone: cliente.telefone || '',
+        endereco: cliente.endereco || '',
+        cidade: cliente.cidade || '',
+        estado: cliente.estado || '',
+        cep: cliente.cep || '',
+        tipoPessoa: cliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica',
+        observacoes: cliente.observacoes || '',
+        ativo: true, // Default para ativo
+        createdAt: cliente.created_at || new Date().toISOString(),
+        updatedAt: cliente.updated_at || new Date().toISOString()
+      }));
+
+      setClientes(clientesFormatados);
+      toast.success(`${clientesFormatados.length} clientes atualizados`);
+    } catch (error) {
+      console.error('Erro ao recarregar clientes:', error);
+      toast.error('Erro ao recarregar clientes');
+    } finally {
+      setIsLoadingClientes(false);
     }
-  }, [isOpen]);
+  }, []);
 
-  // Carregar vendedores e vendedor atual
-  useEffect(() => {
-    if (isOpen) {
-      const carregarVendedores = async () => {
-        try {
-          setIsLoadingVendedores(true);
+  const handleSaveNewCliente = useCallback(async (clienteData: any) => {
+    try {
+      setIsLoading(true);
 
-          // Carregar lista de vendedores
-          const vendedores = await propostasService.obterVendedores();
-          setVendedores(vendedores);
+      // Criar o novo cliente
+      const novoCliente = await clientesService.createCliente(clienteData);
 
-          // Carregar vendedor atual (usuário logado)
-          const vendedorAtual = await propostasService.obterVendedorAtual();
-          setVendedorAtual(vendedorAtual);
+      // Atualizar a lista de clientes
+      await handleReloadClientes();
 
-          // Definir vendedor atual como padrão
-          if (vendedorAtual) {
-            setValue('vendedor', vendedorAtual);
-          }
-        } catch (error) {
-          console.error('Erro ao carregar vendedores:', error);
-          toast.error('Erro ao carregar vendedores');
-        } finally {
-          setIsLoadingVendedores(false);
-        }
-      };
+      // Selecionar automaticamente o cliente recém-criado
+      if (novoCliente) {
+        const clienteFormatado: Cliente = {
+          id: novoCliente.id || '',
+          nome: novoCliente.nome,
+          documento: novoCliente.documento || '',
+          email: novoCliente.email,
+          telefone: novoCliente.telefone || '',
+          endereco: novoCliente.endereco || '',
+          cidade: novoCliente.cidade || '',
+          estado: novoCliente.estado || '',
+          cep: novoCliente.cep || '',
+          tipoPessoa: novoCliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica',
+          observacoes: novoCliente.observacoes || '',
+          ativo: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
 
-      carregarVendedores();
+        setValue('cliente', clienteFormatado);
+
+        toast.success('Cliente cadastrado e selecionado com sucesso!');
+      }
+
+      // Fechar o modal
+      setIsModalCadastroClienteOpen(false);
+
+    } catch (error) {
+      console.error('Erro ao criar cliente:', error);
+      toast.error('Erro ao cadastrar cliente. Tente novamente.');
+    } finally {
+      setIsLoading(false);
     }
-  }, [isOpen, setValue]);
+  }, [setValue, handleReloadClientes]);
 
-  // Carregar produtos
+  // Callback otimizado para mudança de vendedor
+  const handleVendedorChange = useCallback((vendedorId: string, onChange: (value: any) => void) => {
+    const vendedorSelecionado = vendedores.find(v => v.id === vendedorId);
+    onChange(vendedorSelecionado || null);
+  }, [vendedores]);
+
+  // Consolidado: Reset e carregamento de dados ao abrir modal (SEM DEPENDÊNCIAS EXTRAS)
   useEffect(() => {
     if (isOpen) {
-      const carregarProdutos = async () => {
-        try {
-          setIsLoadingProdutos(true);
-          const produtosCarregados = await propostasService.obterProdutos();
-          setProdutosDisponiveis(produtosCarregados);
-        } catch (error) {
-          console.error('Erro ao carregar produtos:', error);
-          toast.error('Erro ao carregar produtos');
-        } finally {
-          setIsLoadingProdutos(false);
-        }
-      };
+      // 1. Reset form preservando vendedor selecionado
+      const vendedorSelecionado = getValues('vendedor');
+      reset({
+        titulo: '',
+        vendedor: vendedorSelecionado ?? null,
+        cliente: null,
+        produtos: [],
+        descontoGlobal: 0,
+        impostos: 12,
+        formaPagamento: 'avista',
+        validadeDias: 15,
+        observacoes: '',
+        incluirImpostosPDF: true
+      });
 
-      carregarProdutos();
-    }
-  }, [isOpen]);
-
-  // Reset form quando modal abre
-  useEffect(() => {
-    if (isOpen) {
-      reset();
+      // 2. Reset UI states
       setEtapaAtual(0);
       setBuscarCliente('');
       setBuscarProduto('');
       setCategoriaSelecionada('');
       setTipoSelecionado('');
       setShowProdutoSearch(false);
-    }
-  }, [isOpen, reset]);
 
-  // Gerar título automático quando cliente for selecionado
+      // 3. Carregar dados apenas se não carregados
+      const carregarDados = async () => {
+        try {
+          // Carregar vendedores
+          if (!vendedoresCarregadosRef.current) {
+            setIsLoadingVendedores(true);
+            vendedoresCarregadosRef.current = true;
+
+            const [vendedoresList, vendedorAtual] = await Promise.all([
+              propostasService.obterVendedores(),
+              propostasService.obterVendedorAtual()
+            ]);
+
+            setVendedores(vendedoresList);
+            setVendedorAtual(vendedorAtual);
+
+            // Só seta o vendedor se o campo estiver vazio
+            const vendedorAtualForm = getValues('vendedor');
+            if (vendedorAtual && (vendedorAtualForm === null || vendedorAtualForm === undefined)) {
+              setValue('vendedor', vendedorAtual, { shouldDirty: false, shouldTouch: false });
+            }
+            setIsLoadingVendedores(false);
+          }
+
+          // Carregar clientes
+          if (!clientesCarregadosRef.current) {
+            setIsLoadingClientes(true);
+            clientesCarregadosRef.current = true;
+
+            const response = await clientesService.getClientes({ limit: 100 });
+            const clientesFormatados: Cliente[] = response.data.map((cliente: ClienteService) => ({
+              id: cliente.id || '',
+              nome: cliente.nome,
+              documento: cliente.documento || '',
+              email: cliente.email,
+              telefone: cliente.telefone || '',
+              endereco: cliente.endereco || '',
+              cidade: cliente.cidade || '',
+              estado: cliente.estado || '',
+              cep: cliente.cep || '',
+              tipoPessoa: cliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica'
+            }));
+
+            setClientes(clientesFormatados);
+            setIsLoadingClientes(false);
+          }
+
+          // Carregar produtos
+          if (!produtosCarregadosRef.current) {
+            setIsLoadingProdutos(true);
+            produtosCarregadosRef.current = true;
+
+            const produtosCarregados = await propostasService.obterProdutos();
+            setProdutosDisponiveis(produtosCarregados);
+            setIsLoadingProdutos(false);
+          }
+        } catch (error) {
+          console.error('Erro ao carregar dados:', error);
+          toast.error('Erro ao carregar dados');
+          // Reset refs em caso de erro
+          vendedoresCarregadosRef.current = false;
+          clientesCarregadosRef.current = false;
+          produtosCarregadosRef.current = false;
+          setIsLoadingVendedores(false);
+          setIsLoadingClientes(false);
+          setIsLoadingProdutos(false);
+        }
+      };
+
+      carregarDados();
+    } else {
+      // Ao fechar o modal, resetar refs para próxima abertura
+      vendedoresCarregadosRef.current = false;
+      clientesCarregadosRef.current = false;
+      produtosCarregadosRef.current = false;
+    }
+  }, [isOpen]); // APENAS isOpen como dependência
+
+  // Gerar título automático quando cliente for selecionado com controle otimizado
   useEffect(() => {
     if (watchedCliente && (!watchedTitulo || watchedTitulo === '')) {
       const tituloAutomatico = propostasService.gerarTituloAutomatico(watchedCliente);
-      setValue('titulo', tituloAutomatico);
+      setValue('titulo', tituloAutomatico, { shouldValidate: false });
     }
-  }, [watchedCliente, watchedTitulo, setValue]);
+  }, [watchedCliente?.id, setValue]); // Otimizado com ID do cliente
 
   // Filtrar clientes
   const clientesFiltrados = useMemo(() => {
@@ -429,7 +556,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       // Abrir preview em nova janela
       const previewWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes');
       if (previewWindow) {
-        previewWindow.document.write(previewResult.htmlContent);
+        previewWindow.document.write(previewResult.html);
         previewWindow.document.close();
       }
 
@@ -491,9 +618,9 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       };
 
       const proposta = await propostasService.criarProposta(propostaData);
-      await propostasService.enviarPorWhatsApp(proposta.id, formData.cliente.telefone);
+      // await propostasService.enviarPorWhatsApp(proposta.id, formData.cliente.telefone);
 
-      toast.success('Proposta enviada via WhatsApp!');
+      toast.success('Proposta criada! Função de WhatsApp será implementada em breve.');
       onClose();
     } catch (error) {
       console.error('Erro ao enviar via WhatsApp:', error);
@@ -525,9 +652,9 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       };
 
       const proposta = await propostasService.criarProposta(propostaData);
-      await propostasService.enviarPorEmail(proposta.id, formData.cliente.email);
+      // await propostasService.enviarPorEmail(proposta.id, formData.cliente.email);
 
-      toast.success('Proposta enviada por e-mail!');
+      toast.success('Proposta criada! Função de email será implementada em breve.');
       onClose();
     } catch (error) {
       console.error('Erro ao enviar por e-mail:', error);
@@ -583,332 +710,216 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 md:p-4">
-      <div className="modal-content modal-nova-proposta bg-white rounded-xl shadow-2xl w-full max-w-6xl mx-auto h-[85vh] max-h-[95vh] overflow-hidden flex flex-col">
-        {/* Header do Modal */}
-        <div className="bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white p-3 md:p-4 flex-shrink-0">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-1 sm:p-2">
+      <div className="modal-content modal-nova-proposta bg-white rounded-lg sm:rounded-xl shadow-2xl w-full max-w-6xl mx-auto h-[98vh] max-h-[98vh] overflow-hidden flex flex-col">
+        {/* Header do Modal - Compacto */}
+        <div className="bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white px-3 py-2 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg md:text-xl font-bold">Nova Proposta</h2>
-              <p className="text-blue-100 text-xs md:text-sm">Crie uma proposta comercial personalizada</p>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-lg font-bold truncate">Nova Proposta</h2>
             </div>
             <button
               onClick={onClose}
-              className="text-white hover:text-gray-200 transition-colors p-1"
+              className="text-white hover:text-gray-200 transition-colors p-1 ml-2 flex-shrink-0"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
-
-          {/* Progress Bar */}
-          <div className="mt-3 md:mt-4">
-            <div className="flex items-center justify-between gap-1 md:gap-2 mb-2">
-              {etapas.map((etapa, index) => {
-                const Icone = etapa.icone;
-                const isAtual = index === etapaAtual;
-                const isConcluida = index < etapaAtual;
-
-                return (
-                  <div key={etapa.id} className="flex items-center flex-1 min-w-0">
-                    <div className={`flex items-center justify-center w-6 h-6 rounded-full border-2 transition-colors flex-shrink-0 ${isConcluida
-                      ? 'bg-white text-[#159A9C] border-white'
-                      : isAtual
-                        ? 'bg-white text-[#159A9C] border-white'
-                        : 'bg-transparent text-white border-white/50'
-                      }`}>
-                      {isConcluida ? (
-                        <Check className="h-3 w-3" />
-                      ) : (
-                        <Icone className="h-3 w-3" />
-                      )}
-                    </div>
-                    <span className={`ml-1 md:ml-2 text-xs font-medium truncate ${isAtual ? 'text-white' : 'text-blue-100'
-                      }`}>
-                      {etapa.titulo}
-                    </span>
-                    {index < etapas.length - 1 && (
-                      <div className={`w-3 md:w-6 h-0.5 mx-1 md:mx-2 transition-colors flex-shrink-0 ${isConcluida ? 'bg-white' : 'bg-white/30'
-                        }`} />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         </div>
 
-        {/* Conteúdo das Etapas */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-3 md:p-4">{/* Aqui vai todo o conteúdo das etapas existente */}
-            {/* Etapa 1: Seleção de Cliente */}
-            {etapaAtual === 0 && (
-              <div className="space-y-3 md:space-y-4">
-                <div>
-                  <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-4">Informações da Proposta</h3>
+        {/* Progress Indicator - Compacto */}
+        <div className="border-b border-gray-200 px-3 py-2 flex-shrink-0 bg-white">
+          <ResponsiveStepIndicator
+            steps={etapas}
+            currentStep={etapaAtual}
+            completedSteps={Array.from({ length: etapaAtual }, (_, i) => i)}
+            onStepClick={(stepIndex) => {
+              if (stepIndex <= etapaAtual) {
+                setEtapaAtual(stepIndex);
+              }
+            }}
+          />
+        </div>
 
-                  {/* Grid layout para aproveitar melhor o espaço */}
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
-                    {/* Campo Título da Proposta */}
-                    <div className="xl:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Título da Proposta
-                        <span className="text-xs text-gray-500 font-normal ml-1">
-                          (Opcional - será gerado automaticamente)
-                        </span>
-                      </label>
-                      <Controller
-                        name="titulo"
-                        control={control}
-                        render={({ field }) => (
-                          <input
-                            {...field}
-                            type="text"
-                            placeholder="Ex: João Silva - 21/07/2025"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
+        {/* Conteúdo das Etapas - Compacto */}
+        <div className="flex-1 overflow-y-auto bg-gray-50">
+          <div className="p-2 sm:p-3 md:p-4">{/* Conteúdo das etapas com espaçamento reduzido */}
+            {/* Etapa 1: Informações Iniciais */}
+            {etapaAtual === 0 && (
+              <div className="space-y-4">
+                {/* Layout em Duas Colunas - Compacto */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+                  {/* Coluna 1: Dados da Proposta */}
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                    <div className="flex items-center mb-3">
+                      <FileText className="w-4 h-4 text-blue-600 mr-2" />
+                      <h4 className="text-base font-semibold text-gray-900">Dados da Proposta</h4>
+                    </div>
+
+                    <div className="space-y-3">
+                      {/* Título da Proposta */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Título da Proposta
+                        </label>
+                        <Controller
+                          name="titulo"
+                          control={control}
+                          render={({ field }) => (
+                            <input
+                              {...field}
+                              type="text"
+                              placeholder="Ex: Proposta Comercial - Marketing Digital"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
+                            />
+                          )}
+                        />
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Deixe em branco para gerar automaticamente
+                        </p>
+                      </div>
+
+                      {/* Data de Validade */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Válida até *
+                        </label>
+                        <input
+                          type="date"
+                          defaultValue={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
+                        />
+                      </div>
+
+                      {/* Vendedor Responsável */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Vendedor Responsável *
+                        </label>
+                        {isLoadingVendedores ? (
+                          <div className="flex items-center justify-center p-3 border border-dashed border-gray-300 rounded-lg">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#159A9C] mr-2"></div>
+                            <span className="text-sm text-gray-600">Carregando...</span>
+                          </div>
+                        ) : (
+                          <Controller
+                            name="vendedor"
+                            control={control}
+                            render={({ field }) => (
+                              <select
+                                {...field}
+                                value={field.value?.id || ''}
+                                onChange={(e) => handleVendedorChange(e.target.value, field.onChange)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
+                              >
+                                <option value="">Selecione um vendedor</option>
+                                {vendedores.map((vendedor) => (
+                                  <option key={vendedor.id} value={vendedor.id}>
+                                    {vendedor.nome}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
                           />
                         )}
+                        {errors.vendedor && (
+                          <p className="text-red-600 text-xs mt-1 flex items-center">
+                            <X className="w-3 h-3 mr-1" />
+                            {errors.vendedor.message}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Preview do Vendedor */}
+                      {vendedorMemoized && (
+                        <div className="mt-2 p-2 bg-green-100 border border-green-300 rounded-lg">
+                          <div className="flex items-center">
+                            <Check className="w-4 h-4 text-green-600 mr-2" />
+                            <div>
+                              <p className="text-sm font-medium text-green-800">
+                                {vendedorMemoized.nome}
+                              </p>
+                              <p className="text-xs text-green-600">
+                                {vendedorMemoized.email}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Observações */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Observações Iniciais
+                        </label>
+                        <textarea
+                          rows={2}
+                          placeholder="Observações sobre esta proposta..."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm resize-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Coluna 2: Seleção do Cliente */}
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+                    <div className="flex items-center mb-3">
+                      <User className="w-4 h-4 text-green-600 mr-2" />
+                      <h4 className="text-base font-semibold text-gray-900">Seleção do Cliente</h4>
+                    </div>
+
+                    {/* Campo de Busca com melhorias */}
+                    <div className="mb-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <span className="flex items-center justify-between">
+                          <span>Buscar Cliente *</span>
+                          <span className="text-xs text-gray-500">
+                            💡 Use + para cadastrar
+                          </span>
+                        </span>
+                      </label>
+                      <ClienteSearchOptimizedV2
+                        clientes={clientes}
+                        selectedCliente={watchedCliente}
+                        onClienteSelect={handleClienteSelect}
+                        isLoading={isLoadingClientes}
+                        onNewCliente={handleNewCliente}
+                        onReloadClientes={handleReloadClientes}
                       />
-                      {watchedTitulo && (
-                        <p className="text-xs text-gray-600 mt-1">
-                          <strong>Título atual:</strong> {watchedTitulo}
+                      {errors.cliente && (
+                        <p className="text-red-600 text-xs mt-1 flex items-center">
+                          <X className="w-3 h-3 mr-1" />
+                          {errors.cliente.message}
                         </p>
                       )}
                     </div>
 
-                    {/* Campo Vendedor Responsável */}
-                    <div className="xl:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Vendedor Responsável *
-                        <span className="text-xs text-gray-500 font-normal ml-1">
-                          (Selecionado automaticamente)
-                        </span>
-                      </label>
-
-                      {isLoadingVendedores ? (
-                        <div className="p-3 text-center text-gray-500 flex items-center justify-center border border-gray-300 rounded-lg">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#159A9C] mr-2"></div>
-                          <span className="text-sm">Carregando vendedores...</span>
-                        </div>
-                      ) : (
-                        <Controller
-                          name="vendedor"
-                          control={control}
-                          render={({ field }) => (
-                            <select
-                              {...field}
-                              value={field.value?.id || ''}
-                              onChange={(e) => {
-                                const vendedorSelecionado = vendedores.find(v => v.id === e.target.value);
-                                field.onChange(vendedorSelecionado || null);
-                              }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
-                            >
-                              <option value="">Selecione um vendedor</option>
-                              {vendedores.map((vendedor) => (
-                                <option key={vendedor.id} value={vendedor.id}>
-                                  {vendedor.nome} ({vendedor.tipo})
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        />
-                      )}
-
-                      {errors.vendedor && (
-                        <p className="text-red-500 text-xs mt-1">{errors.vendedor.message}</p>
-                      )}
-
-                      {/* Resumo do Vendedor Selecionado - Compacto */}
-                      {watchedVendedor && (
-                        <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <h4 className="text-sm font-medium text-blue-900 mb-1 flex items-center">
-                                <Check className="h-3 w-3 mr-1" />
-                                Vendedor Selecionado
-                              </h4>
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-1 text-xs text-blue-700">
-                                <div><strong>Nome:</strong> {watchedVendedor.nome}</div>
-                                <div><strong>Email:</strong> {watchedVendedor.email}</div>
-                                <div><strong>Tipo:</strong> {watchedVendedor.tipo}</div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <hr className="border-gray-200 my-4" />
-                  <h4 className="text-base font-semibold text-gray-900 mb-3">Selecionar Cliente</h4>
-
-                  {/* Campo de busca do cliente - Compacto */}
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Buscar Cliente
-                        <span className="text-xs text-gray-500 font-normal ml-1">
-                          (Digite para filtrar)
-                        </span>
-                      </label>
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <input
-                          type="text"
-                          placeholder="Nome, documento ou email..."
-                          value={buscarCliente}
-                          onChange={(e) => setBuscarCliente(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Lista de Cards de Clientes */}
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Selecione o Cliente *
-                        </label>
-                        {clientesFiltrados.length > 0 && (
-                          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                            {clientesFiltrados.length} cliente{clientesFiltrados.length !== 1 ? 's' : ''}
-                            {buscarCliente ? ' encontrado' : ' disponível'}{clientesFiltrados.length !== 1 ? 's' : ''}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Container dos Cards */}
-                      <div className="border border-gray-200 rounded-lg bg-gray-50 max-h-[300px] overflow-y-auto">
-                        {isLoadingClientes ? (
-                          <div className="p-8 text-center text-gray-500 flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#159A9C] mr-2"></div>
-                            Carregando clientes...
-                          </div>
-                        ) : clientesFiltrados.length === 0 ? (
-                          <div className="p-8 text-center text-gray-500">
-                            <User className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                            <div className="font-medium">
-                              {buscarCliente ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
-                            </div>
-                            {buscarCliente && (
-                              <div className="text-sm mt-1">
-                                Tente ajustar os termos de busca
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="p-2 space-y-2">
-                            {clientesFiltrados.map((cliente) => {
-                              const isSelected = watchedCliente?.id === cliente.id;
-                              return (
-                                <div
-                                  key={cliente.id}
-                                  onClick={() => handleSelecionarCliente(cliente)}
-                                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${isSelected
-                                    ? 'border-[#159A9C] bg-[#159A9C]/5 shadow-sm'
-                                    : 'border-gray-200 bg-white hover:border-gray-300'
-                                    }`}
-                                >
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex-1 min-w-0">
-                                      {/* Nome do Cliente */}
-                                      <div className="flex items-center mb-2">
-                                        <h4 className={`font-semibold text-sm truncate ${isSelected ? 'text-[#159A9C]' : 'text-gray-900'
-                                          }`}>
-                                          {cliente.nome}
-                                        </h4>
-                                        {isSelected && (
-                                          <Check className="h-4 w-4 text-[#159A9C] ml-2 flex-shrink-0" />
-                                        )}
-                                      </div>
-
-                                      {/* Informações do Cliente */}
-                                      <div className="space-y-1">
-                                        {/* Documento */}
-                                        <div className="flex items-center text-xs text-gray-600">
-                                          <span className={`inline-flex px-2 py-1 rounded text-xs font-medium mr-2 ${cliente.tipoPessoa === 'fisica'
-                                            ? 'bg-blue-100 text-blue-700'
-                                            : 'bg-green-100 text-green-700'
-                                            }`}>
-                                            {cliente.tipoPessoa === 'fisica' ? 'CPF' : 'CNPJ'}
-                                          </span>
-                                          <span className="truncate">{cliente.documento}</span>
-                                        </div>
-
-                                        {/* Email */}
-                                        <div className="flex items-center text-xs text-gray-600">
-                                          <span className="w-12 text-gray-500">Email:</span>
-                                          <span className="truncate">{cliente.email}</span>
-                                        </div>
-
-                                        {/* Telefone */}
-                                        {cliente.telefone && (
-                                          <div className="flex items-center text-xs text-gray-600">
-                                            <span className="w-12 text-gray-500">Tel:</span>
-                                            <span className="truncate">{cliente.telefone}</span>
-                                          </div>
-                                        )}
-
-                                        {/* Endereço (se disponível) */}
-                                        {cliente.endereco && (
-                                          <div className="flex items-center text-xs text-gray-500 mt-2">
-                                            <span className="w-12">End:</span>
-                                            <span className="truncate">{cliente.endereco}</span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-
-                                    {/* Indicador Visual */}
-                                    <div className="ml-3 flex-shrink-0">
-                                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${isSelected
-                                        ? 'border-[#159A9C] bg-[#159A9C]'
-                                        : 'border-gray-300'
-                                        }`}>
-                                        {isSelected && (
-                                          <div className="w-2 h-2 bg-white rounded-full"></div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {errors.cliente && (
-                      <p className="text-red-500 text-sm mt-2">{errors.cliente.message}</p>
-                    )}
-
-                    {/* Resumo do Cliente Selecionado - Compacto */}
+                    {/* Preview do Cliente Selecionado - Versão Compacta */}
                     {watchedCliente && (
-                      <div className="mt-3 p-3 bg-gradient-to-r from-green-50 to-blue-50 rounded border border-green-200">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h4 className="text-sm font-medium text-green-900 mb-1 flex items-center">
-                              <Check className="h-3 w-3 mr-1" />
-                              Cliente Selecionado
-                            </h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs">
-                              <div><strong>Nome:</strong> {watchedCliente.nome}</div>
-                              <div><strong>Documento:</strong> {watchedCliente.documento}</div>
-                              <div><strong>Email:</strong> {watchedCliente.email}</div>
-                              <div><strong>Telefone:</strong> {watchedCliente.telefone}</div>
+                      <div className="mt-3 p-3 bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-lg">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center">
+                              <Check className="w-4 h-4 text-teal-600" />
                             </div>
                           </div>
-                          <button
-                            onClick={() => {
-                              setValue('cliente', null);
-                              setBuscarCliente('');
-                            }}
-                            className="text-gray-400 hover:text-red-500 transition-colors ml-3"
-                            title="Remover cliente selecionado"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
+                          <div className="ml-3 flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <h5 className="text-sm font-semibold text-teal-800 truncate">
+                                {watchedCliente.nome}
+                              </h5>
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-teal-100 text-teal-800">
+                                Selecionado
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-4 text-xs text-teal-600 mt-1">
+                              <span>{watchedCliente.documento}</span>
+                              {watchedCliente.email && (
+                                <span className="truncate">{watchedCliente.email}</span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1317,7 +1328,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                             {...field}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                           >
-                            <option value="avista">À Vista</option>
+                            <option value="avista">{t('common.cashPayment')}</option>
                             <option value="parcelado">Parcelado</option>
                             <option value="boleto">Boleto</option>
                             <option value="cartao">Cartão</option>
@@ -1398,21 +1409,21 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
 
                     <div className="p-4 bg-gray-50 rounded-lg space-y-3">
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Subtotal:</span>
+                        <span className="text-gray-600">{t('common.subtotal')}:</span>
                         <span className="font-medium">
                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totaisCombinados.subtotal)}
                         </span>
                       </div>
 
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Desconto:</span>
+                        <span className="text-gray-600">{t('common.discount')}:</span>
                         <span className="font-medium text-red-600">
                           -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totaisCombinados.desconto)}
                         </span>
                       </div>
 
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Impostos:</span>
+                        <span className="text-gray-600">{t('common.taxes')}:</span>
                         <span className="font-medium">
                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totaisCombinados.impostos)}
                         </span>
@@ -1527,9 +1538,85 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
           </div>
         </div>
 
-        {/* Footer com botões de navegação - Mais compacto */}
-        <div className="border-t border-gray-200 p-3 md:p-4 bg-gray-50 flex-shrink-0">
-          <div className="flex items-center justify-between">
+        {/* Footer com botões de navegação - Compacto */}
+        <div className="border-t border-gray-200 p-2 sm:p-3 bg-white flex-shrink-0">
+          {/* Mobile: Stack vertical */}
+          <div className="sm:hidden space-y-2">
+            {/* Progress info */}
+            <div className="text-xs text-gray-500 text-center">
+              Etapa {etapaAtual + 1} de {etapas.length}
+            </div>
+
+            {/* Navigation buttons */}
+            <div className="flex items-center justify-between">
+              {etapaAtual > 0 ? (
+                <button
+                  onClick={etapaAnterior}
+                  className="flex items-center px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  Anterior
+                </button>
+              ) : (
+                <div /> // Espaçador
+              )}
+
+              {etapaAtual < etapas.length - 1 ? (
+                <button
+                  onClick={proximaEtapa}
+                  className="flex items-center px-3 py-1.5 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm"
+                >
+                  Próximo
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </button>
+              ) : (
+                <button
+                  onClick={handleSubmit(onSubmit)}
+                  disabled={isLoading || !isValid}
+                  className="flex items-center px-3 py-1.5 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed transition-all text-sm"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1"></div>
+                      Criando...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-4 w-4 mr-2" />
+                      {t('common.generateProposal')}
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
+            {/* Quick actions - Mobile */}
+            {etapaAtual === etapas.length - 1 && (
+              <div className="flex items-center justify-center space-x-2 pt-2 border-t border-gray-100">
+                <button
+                  onClick={handlePreview}
+                  disabled={!isValid}
+                  className="flex items-center px-3 py-1.5 border border-gray-300 text-gray-700 rounded text-xs disabled:opacity-50"
+                  title="Pré-visualizar"
+                >
+                  <Eye className="h-3 w-3 mr-1" />
+                  Preview
+                </button>
+                <button
+                  onClick={handleSaveAsDraft}
+                  disabled={!isValid}
+                  className="flex items-center px-3 py-1.5 border border-amber-300 text-amber-700 rounded text-xs disabled:opacity-50"
+                  title="Salvar rascunho"
+                >
+                  <Save className="h-3 w-3 mr-1" />
+                  Rascunho
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Desktop: Horizontal layout - Compacto */}
+          <div className="hidden sm:flex items-center justify-between">
             <div className="text-xs text-gray-500">
               Etapa {etapaAtual + 1} de {etapas.length}
             </div>
@@ -1538,89 +1625,78 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
               {etapaAtual > 0 && (
                 <button
                   onClick={etapaAnterior}
-                  className="flex items-center px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                  className="flex items-center px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
                 >
                   <ArrowLeft className="h-4 w-4 mr-1" />
-                  <span className="hidden sm:inline">Anterior</span>
-                  <span className="sm:hidden">Ant.</span>
+                  Anterior
                 </button>
               )}
 
               {etapaAtual < etapas.length - 1 ? (
                 <button
                   onClick={proximaEtapa}
-                  className="flex items-center px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm"
+                  className="flex items-center px-3 py-1.5 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm"
                 >
-                  <span className="hidden sm:inline">Próximo</span>
-                  <span className="sm:hidden">Próx.</span>
+                  Próximo
                   <ArrowRight className="h-4 w-4 ml-1" />
                 </button>
               ) : (
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* Ações rápidas - Mais compactas */}
-                  <div className="flex items-center space-x-1">
-                    {/* Pré-visualizar */}
+                <div className="flex items-center gap-2">
+                  {/* Quick actions - Desktop */}
+                  <div className="hidden lg:flex items-center space-x-1">
                     <button
                       onClick={handlePreview}
                       disabled={!isValid}
-                      className="flex items-center px-2 py-1.5 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center px-2 py-1.5 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors text-xs disabled:opacity-50"
                       title="Pré-visualizar proposta"
                     >
                       <Eye className="h-3 w-3 mr-1" />
-                      <span className="hidden lg:inline">Preview</span>
+                      Preview
                     </button>
-
-                    {/* Salvar como rascunho */}
                     <button
                       onClick={handleSaveAsDraft}
                       disabled={!isValid}
-                      className="flex items-center px-2 py-1.5 border border-amber-300 text-amber-700 rounded hover:bg-amber-50 transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center px-2 py-1.5 border border-amber-300 text-amber-700 rounded hover:bg-amber-50 transition-colors text-xs disabled:opacity-50"
                       title="Salvar como rascunho"
                     >
                       <Save className="h-3 w-3 mr-1" />
-                      <span className="hidden lg:inline">Rascunho</span>
+                      Rascunho
                     </button>
-
-                    {/* Enviar por WhatsApp */}
                     <button
                       onClick={handleSendWhatsApp}
                       disabled={!isValid}
-                      className="flex items-center px-2 py-1.5 border border-green-300 text-green-700 rounded hover:bg-green-50 transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center px-2 py-1.5 border border-green-300 text-green-700 rounded hover:bg-green-50 transition-colors text-xs disabled:opacity-50"
                       title="Enviar por WhatsApp"
                     >
                       <MessageCircle className="h-3 w-3 mr-1" />
-                      <span className="hidden lg:inline">WhatsApp</span>
+                      WhatsApp
                     </button>
-
-                    {/* Enviar por E-mail */}
                     <button
                       onClick={handleSendEmail}
                       disabled={!isValid}
-                      className="flex items-center px-2 py-1.5 border border-blue-300 text-blue-700 rounded hover:bg-blue-50 transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center px-2 py-1.5 border border-blue-300 text-blue-700 rounded hover:bg-blue-50 transition-colors text-xs disabled:opacity-50"
                       title="Enviar por e-mail"
                     >
                       <Mail className="h-3 w-3 mr-1" />
-                      <span className="hidden lg:inline">E-mail</span>
+                      E-mail
                     </button>
                   </div>
 
-                  {/* Botão principal */}
+                  {/* Main action button */}
                   <button
                     onClick={handleSubmit(onSubmit)}
                     disabled={isLoading || !isValid}
-                    className="flex items-center px-4 py-2 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed transition-all text-sm"
+                    className="flex items-center px-3 py-1.5 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed transition-all text-sm"
                   >
                     {isLoading ? (
                       <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        <span className="hidden sm:inline">Criando...</span>
-                        <span className="sm:hidden">...</span>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1"></div>
+                        Criando...
                       </>
                     ) : (
                       <>
-                        <FileText className="h-4 w-4 mr-2" />
-                        <span className="hidden sm:inline">Gerar Proposta</span>
-                        <span className="sm:hidden">Gerar</span>
+                        <FileText className="h-4 w-4 mr-1" />
+                        Criar Proposta
                       </>
                     )}
                   </button>
@@ -1630,6 +1706,14 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Modal de Cadastro de Cliente */}
+      <ModalCadastroCliente
+        isOpen={isModalCadastroClienteOpen}
+        onClose={handleCloseModalCadastroCliente}
+        onSave={handleSaveNewCliente}
+        isLoading={isLoading}
+      />
     </div>
   );
 };

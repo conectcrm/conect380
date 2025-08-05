@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Download, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Download,
   Package,
   BarChart3,
   TrendingUp,
@@ -63,18 +63,18 @@ interface ProdutoLegacy {
 }
 
 const statusConfig = {
-  ativo: { 
-    label: 'Ativo', 
+  ativo: {
+    label: 'Ativo',
     color: 'bg-green-100 text-green-800 border-green-200',
     icon: Check
   },
-  inativo: { 
-    label: 'Inativo', 
+  inativo: {
+    label: 'Inativo',
     color: 'bg-gray-100 text-gray-800 border-gray-200',
     icon: X
   },
-  descontinuado: { 
-    label: 'Descontinuado', 
+  descontinuado: {
+    label: 'Descontinuado',
     color: 'bg-red-100 text-red-800 border-red-200',
     icon: AlertTriangle
   }
@@ -82,7 +82,7 @@ const statusConfig = {
 
 const ProdutosPage: React.FC = () => {
   const navigate = useNavigate();
-  
+
   // Estados principais
   const [produtos, setProdutos] = useState<ProdutoLegacy[]>([]);
   const [estatisticas, setEstatisticas] = useState<ProdutoEstatisticas>({
@@ -98,12 +98,12 @@ const ProdutosPage: React.FC = () => {
   const [categoriaFilter, setCategoriaFilter] = useState<string>('todas');
   const [selectedProduto, setSelectedProduto] = useState<ProdutoLegacy | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
+
   // Estados para o modal de cadastro
   const [showModalAvancado, setShowModalAvancado] = useState(false);
   const [produtoParaEditar, setProdutoParaEditar] = useState<ProdutoFormData & { produtoId?: string } | null>(null);
   const [isLoadingSave, setIsLoadingSave] = useState(false);
-  
+
   // Estados para confirmação de exclusão
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [produtoParaExcluir, setProdutoParaExcluir] = useState<ProdutoLegacy | null>(null);
@@ -115,7 +115,7 @@ const ProdutosPage: React.FC = () => {
       const produtosAPI = await produtosService.findAll();
       const produtosFormatados = produtosAPI.map(produtosService.transformApiToLegacy);
       setProdutos(produtosFormatados);
-      
+
       // Carregar estatísticas
       const estatisticasAPI = await produtosService.getEstatisticas();
       setEstatisticas(estatisticasAPI);
@@ -136,12 +136,12 @@ const ProdutosPage: React.FC = () => {
   const produtosFiltrados = useMemo(() => {
     return produtos.filter(produto => {
       const matchesSearch = produto.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           produto.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           produto.fornecedor.toLowerCase().includes(searchTerm.toLowerCase());
-      
+        produto.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        produto.fornecedor.toLowerCase().includes(searchTerm.toLowerCase());
+
       const matchesStatus = statusFilter === 'todos' || produto.status === statusFilter;
       const matchesCategoria = categoriaFilter === 'todas' || produto.categoria === categoriaFilter;
-      
+
       return matchesSearch && matchesStatus && matchesCategoria;
     });
   }, [produtos, searchTerm, statusFilter, categoriaFilter]);
@@ -161,7 +161,7 @@ const ProdutosPage: React.FC = () => {
 
   const getEstoqueStatus = (produto: ProdutoLegacy) => {
     if (produto.categoria === 'Serviços') return null;
-    
+
     if (produto.estoque.atual <= produto.estoque.minimo) {
       return { label: 'Baixo', color: 'text-red-600', icon: AlertTriangle };
     } else if (produto.estoque.atual >= produto.estoque.maximo * 0.8) {
@@ -180,13 +180,13 @@ const ProdutosPage: React.FC = () => {
     setSelectedProduto(null);
     setIsModalOpen(false);
   };
-  
+
   // Funções para o modal de cadastro
   const handleNovoProduto = () => {
     setProdutoParaEditar(null);
     setShowModalAvancado(true);
   };
-  
+
   const handleEditarProduto = (produto: ProdutoLegacy) => {
     // Converter produto existente para formato do novo modal
     setProdutoParaEditar({
@@ -204,12 +204,12 @@ const ProdutosPage: React.FC = () => {
     });
     setShowModalAvancado(true);
   };
-  
+
   const handleExcluirProduto = (produto: ProdutoLegacy) => {
     setProdutoParaExcluir(produto);
     setShowConfirmDelete(true);
   };
-  
+
   const confirmarExclusao = async () => {
     if (produtoParaExcluir) {
       try {
@@ -224,7 +224,7 @@ const ProdutosPage: React.FC = () => {
       }
     }
   };
-  
+
   const cancelarExclusao = () => {
     setShowConfirmDelete(false);
     setProdutoParaExcluir(null);
@@ -232,11 +232,11 @@ const ProdutosPage: React.FC = () => {
 
   const handleSaveProduto = async (data: ProdutoFormData) => {
     setIsLoadingSave(true);
-    
+
     try {
       // Converter formato do modal para API
       const produtoData = produtosService.transformFormToApi(data);
-      
+
       if (produtoParaEditar && produtoParaEditar.produtoId) {
         // Atualizar produto existente
         await produtosService.update(produtoParaEditar.produtoId, produtoData);
@@ -246,13 +246,13 @@ const ProdutosPage: React.FC = () => {
         await produtosService.create(produtoData);
         toast.success('Produto criado com sucesso!');
       }
-      
+
       // Recarregar lista
       await carregarProdutos();
-      
+
       setShowModalAvancado(false);
       setProdutoParaEditar(null);
-      
+
     } catch (error) {
       console.error('Erro ao salvar produto:', error);
       toast.error('Erro ao salvar produto');
@@ -264,9 +264,9 @@ const ProdutosPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#DEEFE7] flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#159A9C] mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Carregando produtos...</p>
         </div>
       </div>
@@ -274,37 +274,44 @@ const ProdutosPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#DEEFE7]">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-6">
-            <div className="flex-1 min-w-0">
-              <BackToNucleus 
-                nucleusName="Produtos"
-                nucleusPath="/nuclei/produtos"
-                currentModuleName="Produtos"
-              />
-              <p className="mt-1 text-sm text-gray-500">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header Padronizado */}
+      <div className="bg-white border-b px-6 py-4">
+        <BackToNucleus
+          nucleusName="Produtos"
+          nucleusPath="/nuclei/produtos"
+        />
+      </div>
+
+      <div className="p-6">
+        {/* Header da Página */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+                <Package className="h-8 w-8 mr-3 text-blue-600" />
+                Produtos
+              </h1>
+              <p className="mt-2 text-gray-600">
                 Gestão completa do catálogo de produtos e serviços
               </p>
             </div>
-            <div className="mt-4 sm:mt-0 sm:ml-16 flex flex-col sm:flex-row gap-3">
-              <button 
+            <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row gap-3">
+              <button
                 onClick={() => navigate('/produtos/categorias')}
-                className="inline-flex items-center px-4 py-2 border border-[#159A9C] text-sm font-medium rounded-lg text-[#159A9C] bg-white hover:bg-[#DEEFE7] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C] transition-colors"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
               >
                 <Settings className="w-4 h-4 mr-2" />
                 Categorias
               </button>
-              
-              <button className="inline-flex items-center px-4 py-2 border border-[#159A9C] text-sm font-medium rounded-lg text-[#159A9C] bg-white hover:bg-[#DEEFE7] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C] transition-colors">
+
+              <button className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
                 <Download className="w-4 h-4 mr-2" />
                 Exportar
               </button>
-              
-              <button 
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-[#159A9C] hover:bg-[#0d7a7d] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C] transition-colors"
+
+              <button
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                 onClick={handleNovoProduto}
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -313,74 +320,71 @@ const ProdutosPage: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Cards de Estatísticas */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 shadow-sm border border-blue-200 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Produtos</p>
-                <p className="text-2xl font-bold text-[#002333]">{estatisticas.totalProdutos}</p>
+                <p className="text-sm font-medium text-blue-700">Total Produtos</p>
+                <p className="text-2xl font-bold text-blue-900">{estatisticas.totalProdutos}</p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Package className="w-6 h-6 text-blue-600" />
+              <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center shadow-sm">
+                <Package className="w-6 h-6 text-white" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 shadow-sm border border-green-200 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Produtos Ativos</p>
-                <p className="text-2xl font-bold text-[#002333]">{estatisticas.produtosAtivos}</p>
+                <p className="text-sm font-medium text-green-700">Produtos Ativos</p>
+                <p className="text-2xl font-bold text-green-900">{estatisticas.produtosAtivos}</p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Check className="w-6 h-6 text-green-600" />
+              <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center shadow-sm">
+                <Check className="w-6 h-6 text-white" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 shadow-sm border border-purple-200 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Vendas Mês</p>
-                <p className="text-2xl font-bold text-[#002333]">{estatisticas.vendasMes}</p>
+                <p className="text-sm font-medium text-purple-700">Vendas Mês</p>
+                <p className="text-2xl font-bold text-purple-900">{estatisticas.vendasMes}</p>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <ShoppingCart className="w-6 h-6 text-purple-600" />
+              <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center shadow-sm">
+                <ShoppingCart className="w-6 h-6 text-white" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-6 shadow-sm border border-yellow-200 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Faturamento</p>
-                <p className="text-2xl font-bold text-[#002333]">{formatCurrency(estatisticas.valorTotal)}</p>
+                <p className="text-sm font-medium text-yellow-700">Faturamento</p>
+                <p className="text-2xl font-bold text-yellow-900">{formatCurrency(estatisticas.valorTotal)}</p>
               </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-yellow-600" />
+              <div className="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center shadow-sm">
+                <DollarSign className="w-6 h-6 text-white" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 shadow-sm border border-red-200 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Estoques Baixos</p>
-                <p className="text-2xl font-bold text-[#002333]">{estatisticas.estoquesBaixos}</p>
+                <p className="text-sm font-medium text-red-700">Estoques Baixos</p>
+                <p className="text-2xl font-bold text-red-900">{estatisticas.estoquesBaixos}</p>
               </div>
-              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
+              <div className="w-12 h-12 bg-red-500 rounded-lg flex items-center justify-center shadow-sm">
+                <AlertTriangle className="w-6 h-6 text-white" />
               </div>
             </div>
           </div>
         </div>
 
         {/* Filtros */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
@@ -390,27 +394,27 @@ const ProdutosPage: React.FC = () => {
                   placeholder="Buscar por nome, SKU ou fornecedor..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C]"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
             </div>
-            
+
             <div className="flex gap-3">
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C]"
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="todos">Todos os Status</option>
                 <option value="ativo">Ativo</option>
                 <option value="inativo">Inativo</option>
                 <option value="descontinuado">Descontinuado</option>
               </select>
-              
+
               <select
                 value={categoriaFilter}
                 onChange={(e) => setCategoriaFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C]"
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="todas">Todas as Categorias</option>
                 {categorias.map(categoria => (
@@ -422,13 +426,13 @@ const ProdutosPage: React.FC = () => {
         </div>
 
         {/* Lista de Produtos */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900">
               Lista de Produtos ({produtosFiltrados.length})
             </h3>
           </div>
-          
+
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -461,7 +465,7 @@ const ProdutosPage: React.FC = () => {
                   const statusInfo = statusConfig[produto.status];
                   const estoqueStatus = getEstoqueStatus(produto);
                   const StatusIcon = statusInfo.icon;
-                  
+
                   return (
                     <tr key={produto.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -515,21 +519,21 @@ const ProdutosPage: React.FC = () => {
                         <div className="flex items-center justify-end space-x-2">
                           <button
                             onClick={() => openModal(produto)}
-                            className="text-[#159A9C] hover:text-[#0d7a7d] p-1 rounded hover:bg-gray-100"
+                            className="text-blue-600 hover:text-blue-700 p-1 rounded hover:bg-blue-50"
                             title="Visualizar"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleEditarProduto(produto)}
-                            className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-gray-100"
+                            className="text-indigo-600 hover:text-indigo-700 p-1 rounded hover:bg-indigo-50"
                             title="Editar"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleExcluirProduto(produto)}
-                            className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-gray-100"
+                            className="text-red-600 hover:text-red-700 p-1 rounded hover:bg-red-50"
                             title="Excluir"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -541,13 +545,13 @@ const ProdutosPage: React.FC = () => {
                 })}
               </tbody>
             </table>
-            
+
             {produtosFiltrados.length === 0 && (
               <div className="text-center py-12">
                 <Package className="mx-auto h-12 w-12 text-gray-400" />
                 <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum produto encontrado</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  {produtos.length === 0 
+                  {produtos.length === 0
                     ? 'Comece criando seu primeiro produto.'
                     : 'Tente ajustar os filtros ou termos de busca.'
                   }
@@ -574,13 +578,13 @@ const ProdutosPage: React.FC = () => {
                   <X className="w-6 h-6" />
                 </button>
               </div>
-              
+
               <div className="space-y-4">
                 <div>
                   <h4 className="text-sm font-medium text-gray-700">Nome</h4>
                   <p className="text-sm text-gray-900">{selectedProduto.nome}</p>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h4 className="text-sm font-medium text-gray-700">SKU</h4>
@@ -591,7 +595,7 @@ const ProdutosPage: React.FC = () => {
                     <p className="text-sm text-gray-900">{selectedProduto.categoria}</p>
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h4 className="text-sm font-medium text-gray-700">Preço</h4>
@@ -602,23 +606,23 @@ const ProdutosPage: React.FC = () => {
                     <p className="text-sm text-gray-900">{formatCurrency(selectedProduto.custoUnitario)}</p>
                   </div>
                 </div>
-                
+
                 {selectedProduto.categoria !== 'Serviços' && (
                   <div>
                     <h4 className="text-sm font-medium text-gray-700">Estoque</h4>
                     <p className="text-sm text-gray-900">
-                      Atual: {selectedProduto.estoque.atual} | 
-                      Mínimo: {selectedProduto.estoque.minimo} | 
+                      Atual: {selectedProduto.estoque.atual} |
+                      Mínimo: {selectedProduto.estoque.minimo} |
                       Máximo: {selectedProduto.estoque.maximo}
                     </p>
                   </div>
                 )}
-                
+
                 <div>
                   <h4 className="text-sm font-medium text-gray-700">Descrição</h4>
                   <p className="text-sm text-gray-900">{selectedProduto.descricao || 'Sem descrição'}</p>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h4 className="text-sm font-medium text-gray-700">Criado em</h4>
@@ -661,11 +665,11 @@ const ProdutosPage: React.FC = () => {
                   <p className="text-sm text-gray-500">Esta ação não pode ser desfeita.</p>
                 </div>
               </div>
-              
+
               <p className="text-sm text-gray-700 mb-6">
                 Tem certeza que deseja excluir o produto <strong>"{produtoParaExcluir.nome}"</strong>?
               </p>
-              
+
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={cancelarExclusao}

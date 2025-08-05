@@ -431,7 +431,7 @@ const DashboardPage: React.FC = () => {
               className="text-3xl font-black mb-2"
               style={{ color: currentPalette.colors.text }}
             >
-              {data.kpis.emNegociacao.valor.toLocaleString('pt-BR', {
+              {(data.kpis.emNegociacao.valor || 0).toLocaleString('pt-BR', {
                 style: 'currency',
                 currency: 'BRL',
                 minimumFractionDigits: 0
@@ -442,7 +442,7 @@ const DashboardPage: React.FC = () => {
                 className="text-sm font-bold"
                 style={{ color: currentPalette.colors.primary }}
               >
-                {data.kpis.emNegociacao.quantidade} propostas ativas
+                {(data.kpis.emNegociacao.quantidade || 0)} propostas ativas
               </span>
             </div>
           </div>

@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { Cliente } from '../../services/clientesService';
 import { clienteValidationSchema, ClienteFormData } from '../../utils/validation';
 import { FormField, AddressFields, DocumentField, TagsField } from '../forms/FormField';
+import { useI18n } from '../../contexts/I18nContext';
 
 interface ClienteModalProps {
   isOpen: boolean;
@@ -23,6 +24,8 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
   cliente,
   isLoading = false
 }) => {
+  const { t } = useI18n();
+
   const {
     register,
     handleSubmit,
@@ -117,7 +120,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
       try {
         const response = await fetch(`https://viacep.com.br/ws/${cep.replace('-', '')}/json/`);
         const data = await response.json();
-        
+
         if (!data.erro) {
           setValue('endereco.logradouro', data.logradouro || '');
           setValue('endereco.bairro', data.bairro || '');
@@ -198,14 +201,14 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
         })} className="flex-1 overflow-y-auto">
           <div className="p-4">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              
+
               {/* Coluna 1: Dados Básicos */}
               <div className="space-y-3">
                 <div className="flex items-center mb-3">
                   <User className="w-5 h-5 text-[#159A9C] mr-2" />
                   <h3 className="text-lg font-medium text-gray-900">Dados Básicos</h3>
                 </div>
-                
+
                 <FormField
                   name="nome"
                   label="Nome Completo"
@@ -214,7 +217,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
                   error={errors.nome}
                   placeholder="Digite o nome completo"
                 />
-                
+
                 <FormField
                   name="email"
                   label="E-mail"
@@ -233,7 +236,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
                   error={errors.telefone}
                   placeholder="(11) 99999-9999"
                 />
-                
+
                 <FormField
                   name="tipo"
                   label="Tipo de Cliente"
@@ -290,7 +293,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
                   <MapPin className="w-5 h-5 text-[#159A9C] mr-2" />
                   <h3 className="text-lg font-medium text-gray-900">Endereço</h3>
                 </div>
-                
+
                 {/* CEP com busca automática */}
                 <FormField
                   name="endereco.cep"
@@ -317,7 +320,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
                   <FileText className="w-5 h-5 text-[#159A9C] mr-2" />
                   <h3 className="text-lg font-medium text-gray-900">Observações</h3>
                 </div>
-                
+
                 <FormField
                   name="observacoes"
                   label="Observações"
@@ -361,16 +364,16 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
               {Object.keys(errors).length > 0 ? (
                 <span className="text-red-600 flex items-center">
                   <X className="w-4 h-4 mr-1" />
-                  {Object.keys(errors).length} campo(s) com erro: {Object.keys(errors).join(', ')}
+                  {Object.keys(errors).length} {t('form.fieldsWithError')}: {Object.keys(errors).join(', ')}
                 </span>
               ) : (
                 <span className={`flex items-center ${isValid ? 'text-green-600' : 'text-orange-600'}`}>
                   <User className="w-4 h-4 mr-1" />
-                  {isValid ? 'Formulário válido' : 'Preencha todos os campos obrigatórios'}
+                  {isValid ? t('form.validForm') : t('form.fillAllRequiredFields')}
                 </span>
               )}
             </div>
-            
+
             <div className="flex space-x-3">
               <button
                 type="button"
@@ -378,7 +381,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
                 disabled={isSubmitting}
                 className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Cancelar
+                {t('common.cancel')}
               </button>
               <button
                 type="submit"
@@ -388,7 +391,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
                 {(isSubmitting || isLoading) && (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 )}
-                {cliente ? 'Atualizar' : 'Criar'} Cliente
+                {cliente ? t('common.update') : 'Criar'} {t('common.client')}
               </button>
             </div>
           </div>

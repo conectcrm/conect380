@@ -75,9 +75,47 @@ interface PropostaCompleta extends PropostaFormData {
 class PropostasService {
   private baseUrl = 'http://localhost:3001/propostas';
 
-  // Método para obter produtos do sistema
+  // Cache para vendedores para evitar múltiplas requisições
+  private vendedoresCache: Vendedor[] | null = null;
+  private vendedoresCacheTimestamp: number = 0;
+  private vendedorAtualCache: Vendedor | null = null;
+  private vendedorAtualCacheTimestamp: number = 0;
+
+  // Cache para produtos para evitar múltiplas requisições
+  private produtosCache: Produto[] | null = null;
+  private produtosCacheTimestamp: number = 0;
+  private isLoadingProdutos = false;
+
+  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutos em milliseconds
+  private isLoadingVendedores = false;
+
+  // Método para obter produtos do sistema com cache
   async obterProdutos(): Promise<Produto[]> {
     try {
+      // Verificar se temos cache válido
+      const now = Date.now();
+      const isCacheValid = this.produtosCache &&
+        (now - this.produtosCacheTimestamp) < this.CACHE_DURATION;
+
+      if (isCacheValid) {
+        console.log('📦 Usando produtos do cache');
+        return this.produtosCache!;
+      }
+
+      // Se já está carregando, aguardar um pouco para evitar múltiplas requisições simultâneas
+      if (this.isLoadingProdutos) {
+        console.log('⏳ Aguardando carregamento de produtos em andamento...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Verificar se o cache foi atualizado enquanto esperava
+        if (this.produtosCache && (Date.now() - this.produtosCacheTimestamp) < this.CACHE_DURATION) {
+          return this.produtosCache;
+        }
+      }
+
+      this.isLoadingProdutos = true;
+      console.log('📦 Carregando produtos do servidor...');
+
       // Carregar produtos do backend
       const { produtosService } = await import('../../../services/produtosService');
       const produtosAPI = await produtosService.findAll();
@@ -96,15 +134,22 @@ class PropostasService {
           tipo: produto.tipo || 'produto'
         }));
 
+        // Atualizar cache
+        this.produtosCache = produtosFormatados;
+        this.produtosCacheTimestamp = Date.now();
+
+        console.log(`✅ ${produtosFormatados.length} produtos disponíveis para propostas (cache atualizado)`);
         return produtosFormatados;
       }
     } catch (error) {
       console.error('❌ Erro ao carregar produtos do backend:', error);
+    } finally {
+      this.isLoadingProdutos = false;
     }
 
     // Fallback com produtos básicos se não conseguir carregar do backend
     console.log('📦 Usando produtos básicos como fallback');
-    return [
+    const fallbackProdutos = [
       {
         id: 'prod1',
         nome: 'Produto Básico',
@@ -112,9 +157,15 @@ class PropostasService {
         categoria: 'Geral',
         descricao: 'Produto de exemplo',
         unidade: 'unidade',
-        tipo: 'produto'
+        tipo: 'produto' as const
       }
     ];
+
+    // Cache o fallback também
+    this.produtosCache = fallbackProdutos;
+    this.produtosCacheTimestamp = Date.now();
+
+    return fallbackProdutos;
   }
 
   // Método para obter clientes do sistema
@@ -150,14 +201,46 @@ class PropostasService {
     return [];
   }
 
-  // Método para obter vendedores do sistema
+  // Método para obter vendedores do sistema com cache
   async obterVendedores(): Promise<Vendedor[]> {
     try {
+      // Verificar se temos cache válido
+      const now = Date.now();
+      const isCacheValid = this.vendedoresCache &&
+        (now - this.vendedoresCacheTimestamp) < this.CACHE_DURATION;
+
+      if (isCacheValid) {
+        console.log('� Usando vendedores do cache');
+        return this.vendedoresCache!;
+      }
+
+      // Se já está carregando, aguardar um pouco para evitar múltiplas requisições simultâneas
+      if (this.isLoadingVendedores) {
+        console.log('⏳ Aguardando carregamento de vendedores em andamento...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Verificar se o cache foi atualizado enquanto esperava
+        if (this.vendedoresCache && (Date.now() - this.vendedoresCacheTimestamp) < this.CACHE_DURATION) {
+          return this.vendedoresCache;
+        }
+      }
+
+      this.isLoadingVendedores = true;
+      console.log('�🔍 Carregando vendedores do servidor...');
+
       // Como não temos vendedoresService, vamos usar usuários como vendedores
       const { usuariosService } = await import('../../../services/usuariosService');
 
-      // Filtrar apenas usuários ativos
-      const usuariosData = await usuariosService.listarUsuarios({ ativo: true });
+      // Adicionar timeout para evitar loading infinito
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout ao carregar vendedores')), 8000);
+      });
+
+      // Filtrar apenas usuários ativos com timeout
+      const usuariosData = await Promise.race([
+        usuariosService.listarUsuarios({ ativo: true }),
+        timeoutPromise
+      ]);
 
       if (usuariosData && usuariosData.length > 0) {
         console.log('👨‍💼 Usuários ativos carregados como vendedores:', usuariosData.length);
@@ -173,24 +256,39 @@ class PropostasService {
             ativo: true // Já filtrado, então todos são ativos
           }));
 
-        console.log(`✅ ${vendedoresFormatados.length} vendedores ativos disponíveis para propostas`);
+        // Atualizar cache
+        this.vendedoresCache = vendedoresFormatados;
+        this.vendedoresCacheTimestamp = Date.now();
+
+        console.log(`✅ ${vendedoresFormatados.length} vendedores ativos disponíveis para propostas (cache atualizado)`);
         return vendedoresFormatados;
+      } else {
+        console.warn('⚠️ Nenhum usuário ativo encontrado, usando fallback');
       }
     } catch (error) {
       console.error('❌ Erro ao carregar vendedores do backend:', error);
+    } finally {
+      this.isLoadingVendedores = false;
     }
 
     // Fallback: retornar pelo menos um vendedor padrão
-    return [
+    console.log('🔄 Usando vendedor padrão (fallback)');
+    const fallbackVendedores = [
       {
         id: 'vend_default',
         nome: 'Vendedor Padrão',
         email: 'vendedor@empresa.com',
         telefone: '',
-        tipo: 'vendedor',
+        tipo: 'vendedor' as const,
         ativo: true
       }
     ];
+
+    // Cache o fallback também
+    this.vendedoresCache = fallbackVendedores;
+    this.vendedoresCacheTimestamp = Date.now();
+
+    return fallbackVendedores;
   }
 
   // Gerar título automático para proposta
@@ -531,12 +629,80 @@ class PropostasService {
   // Obter vendedor atual (mock para compatibilidade)
   async obterVendedorAtual(): Promise<Vendedor | null> {
     try {
-      const vendedores = await this.obterVendedores();
-      return vendedores.length > 0 ? vendedores[0] : null;
+      // Verificar se temos cache válido para vendedor atual
+      const now = Date.now();
+      const isCacheValid = this.vendedorAtualCache &&
+        (now - this.vendedorAtualCacheTimestamp) < this.CACHE_DURATION;
+
+      if (isCacheValid) {
+        console.log('👤 Usando vendedor atual do cache');
+        return this.vendedorAtualCache;
+      }
+
+      console.log('👤 Obtendo vendedor atual...');
+
+      // Timeout para evitar loading infinito
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout ao obter vendedor atual')), 3000);
+      });
+
+      const vendedores = await Promise.race([
+        this.obterVendedores(),
+        timeoutPromise
+      ]);
+
+      const vendedorAtual = vendedores.length > 0 ? vendedores[0] : null;
+
+      // Atualizar cache do vendedor atual
+      this.vendedorAtualCache = vendedorAtual;
+      this.vendedorAtualCacheTimestamp = Date.now();
+
+      console.log('✅ Vendedor atual definido:', vendedorAtual?.nome || 'Nenhum');
+
+      return vendedorAtual;
     } catch (error) {
       console.error('❌ Erro ao obter vendedor atual:', error);
-      return null;
+
+      // Fallback: retornar vendedor padrão
+      console.log('🔄 Usando vendedor padrão como atual');
+      const fallbackVendedor = {
+        id: 'vend_atual_default',
+        nome: 'Vendedor Atual',
+        email: 'atual@empresa.com',
+        telefone: '',
+        tipo: 'vendedor' as const,
+        ativo: true
+      };
+
+      // Cache o fallback também
+      this.vendedorAtualCache = fallbackVendedor;
+      this.vendedorAtualCacheTimestamp = Date.now();
+
+      return fallbackVendedor;
     }
+  }
+
+  // Método para limpar todos os caches (útil em atualizações)
+  limparCacheCompleto(): void {
+    this.vendedoresCache = null;
+    this.vendedoresCacheTimestamp = 0;
+    this.vendedorAtualCache = null;
+    this.vendedorAtualCacheTimestamp = 0;
+    this.produtosCache = null;
+    this.produtosCacheTimestamp = 0;
+    this.isLoadingVendedores = false;
+    this.isLoadingProdutos = false;
+    console.log('🗑️ Cache completo limpo (vendedores e produtos)');
+  }
+
+  // Método para limpar cache de vendedores apenas (compatibilidade)
+  limparCacheVendedores(): void {
+    this.vendedoresCache = null;
+    this.vendedoresCacheTimestamp = 0;
+    this.vendedorAtualCache = null;
+    this.vendedorAtualCacheTimestamp = 0;
+    this.isLoadingVendedores = false;
+    console.log('🗑️ Cache de vendedores limpo');
   }
 
   // Preview de proposta (mock para compatibilidade)
