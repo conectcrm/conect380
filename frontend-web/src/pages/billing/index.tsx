@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BillingDashboard } from '../../components/Billing/BillingDashboard';
 import { PlanSelection } from '../../components/Billing/PlanSelection';
 import { UsageMeter } from '../../components/Billing/UsageMeter';
+import { PaymentForm } from '../../components/Billing/PaymentForm';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import {
@@ -12,21 +13,41 @@ import {
   HelpCircle
 } from 'lucide-react';
 
-type BillingView = 'dashboard' | 'plans' | 'usage' | 'settings';
+type BillingView = 'dashboard' | 'plans' | 'usage' | 'settings' | 'payment';
 
 export const BillingPage: React.FC = () => {
   const [currentView, setCurrentView] = useState<BillingView>('dashboard');
+  const [selectedPlan, setSelectedPlan] = useState<any>(null);
+
+  const handlePlanSelect = (plano: any) => {
+    setSelectedPlan(plano);
+    setCurrentView('payment');
+  };
+
+  const handlePaymentSuccess = (paymentData: any) => {
+    console.log('Pagamento realizado com sucesso:', paymentData);
+    // Aqui você pode fazer a integração com o backend
+    // Resetar estado e voltar para dashboard
+    setSelectedPlan(null);
+    setCurrentView('dashboard');
+  };
 
   const renderContent = () => {
     switch (currentView) {
       case 'plans':
         return (
           <PlanSelection
-            onPlanSelect={(plano) => {
-              console.log('Plano selecionado:', plano);
-              setCurrentView('dashboard');
-            }}
+            onPlanSelect={handlePlanSelect}
             onClose={() => setCurrentView('dashboard')}
+          />
+        );
+
+      case 'payment':
+        return (
+          <PaymentForm
+            planoSelecionado={selectedPlan}
+            onPaymentSuccess={handlePaymentSuccess}
+            onCancel={() => setCurrentView('plans')}
           />
         );
 
@@ -114,8 +135,8 @@ export const BillingPage: React.FC = () => {
               <button
                 onClick={() => setCurrentView('dashboard')}
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${currentView === 'dashboard'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
               >
                 Dashboard
@@ -123,8 +144,8 @@ export const BillingPage: React.FC = () => {
               <button
                 onClick={() => setCurrentView('usage')}
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${currentView === 'usage'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
               >
                 Uso Detalhado
@@ -132,8 +153,8 @@ export const BillingPage: React.FC = () => {
               <button
                 onClick={() => setCurrentView('plans')}
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${currentView === 'plans'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
               >
                 Planos
@@ -141,8 +162,8 @@ export const BillingPage: React.FC = () => {
               <button
                 onClick={() => setCurrentView('settings')}
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${currentView === 'settings'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
               >
                 Configurações

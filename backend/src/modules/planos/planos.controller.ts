@@ -43,7 +43,11 @@ export class PlanosController {
       limiteStorage: typeof dados.limiteStorage,
       limiteApiCalls: typeof dados.limiteApiCalls
     });
-    return this.planosService.criar(dados);
+
+    const novoPlano = await this.planosService.criar(dados);
+    console.log(`🎉 [PLANOS SUCCESS] Novo plano "${novoPlano.nome}" criado com sucesso!`);
+
+    return novoPlano;
   }
 
   @Put(':id')
@@ -62,22 +66,49 @@ export class PlanosController {
         limiteApiCalls: typeof dados.limiteApiCalls,
       }
     });
-    return this.planosService.atualizar(id, dados);
+
+    const planoAtualizado = await this.planosService.atualizar(id, dados);
+    console.log(`✅ [PLANOS SUCCESS] Plano "${planoAtualizado.nome}" atualizado com sucesso!`);
+
+    return planoAtualizado;
   }
 
   @Delete(':id')
   async remover(@Param('id') id: string): Promise<{ message: string }> {
     await this.planosService.remover(id);
+    console.log(`🗑️ [PLANOS SUCCESS] Plano com ID "${id}" removido com sucesso!`);
     return { message: 'Plano removido com sucesso' };
   }
 
   @Put(':id/desativar')
   async desativar(@Param('id') id: string): Promise<Plano> {
-    return this.planosService.desativar(id);
+    const plano = await this.planosService.desativar(id);
+    console.log(`⏸️ [PLANOS SUCCESS] Plano "${plano.nome}" desativado com sucesso!`);
+    return plano;
   }
 
   @Put(':id/ativar')
   async ativar(@Param('id') id: string): Promise<Plano> {
-    return this.planosService.ativar(id);
+    const plano = await this.planosService.ativar(id);
+    console.log(`✅ [PLANOS SUCCESS] Plano "${plano.nome}" ativado com sucesso!`);
+    return plano;
+  }
+
+  @Put(':id/toggle-status')
+  async toggleStatus(@Param('id') id: string): Promise<Plano> {
+    const planoAtual = await this.planosService.buscarPorId(id);
+    if (!planoAtual) {
+      throw new Error('Plano não encontrado');
+    }
+
+    const plano = planoAtual.ativo
+      ? await this.planosService.desativar(id)
+      : await this.planosService.ativar(id);
+
+    const acao = plano.ativo ? 'ativado' : 'desativado';
+    const icon = plano.ativo ? '✅' : '⏸️';
+    console.log(`${icon} [PLANOS SUCCESS] Plano "${plano.nome}" ${acao} com sucesso!`);
+
+    return plano;
   }
 }

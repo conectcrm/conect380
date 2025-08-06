@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solicitação de Assinatura de Contrato</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+
+    .container {
+      background-color: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #e9ecef;
+    }
+
+    .header h1 {
+      color: #2c3e50;
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .contract-details {
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+      border-left: 4px solid #007bff;
+    }
+
+    .contract-details h3 {
+      color: #2c3e50;
+      margin-top: 0;
+      font-size: 18px;
+    }
+
+    .detail-item {
+      display: flex;
+      justify-content: space-between;
+      margin: 8px 0;
+      padding: 5px 0;
+    }
+
+    .detail-label {
+      font-weight: 600;
+      color: #495057;
+    }
+
+    .detail-value {
+      color: #2c3e50;
+      font-weight: 500;
+    }
+
+    .cta-section {
+      text-align: center;
+      margin: 30px 0;
+    }
+
+    .btn-sign {
+      background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+      color: white;
+      padding: 15px 30px;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 16px;
+      display: inline-block;
+      box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+      transition: all 0.3s ease;
+    }
+
+    .btn-sign:hover {
+      background: linear-gradient(135deg, #218838 0%, #1e8e8c 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(40, 167, 69, 0.4);
+    }
+
+    .warning-box {
+      background-color: #fff3cd;
+      border: 1px solid #ffeaa7;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 20px 0;
+      border-left: 4px solid #ffc107;
+    }
+
+    .warning-box p {
+      margin: 0;
+      color: #856404;
+      font-size: 14px;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #e9ecef;
+      color: #6c757d;
+      font-size: 12px;
+    }
+
+    .icon {
+      font-size: 18px;
+      margin-right: 8px;
+    }
+
+    .highlight {
+      background-color: #e8f4fd;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: #0056b3;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>
+        <span class="icon">✍️</span>
+        Solicitação de Assinatura Digital
+      </h1>
+      <p style="margin: 10px 0 0 0; color: #6c757d;">
+        Você foi convidado para assinar um contrato
+      </p>
+    </div>
+
+    <!-- Greeting -->
+    <p style="font-size: 16px; margin-bottom: 20px;">
+      Olá <strong style="color: #2c3e50;">{{nomeUsuario}}</strong>,
+    </p>
+
+    <p style="font-size: 16px; line-height: 1.6; color: #495057;">
+      Você foi solicitado para assinar digitalmente o contrato descrito abaixo.
+      Este processo é <span class="highlight">seguro, rápido e possui validade jurídica</span>.
+    </p>
+
+    <!-- Contract Details -->
+    <div class="contract-details">
+      <h3>
+        <span class="icon">📋</span>
+        Detalhes do Contrato
+      </h3>
+
+      <div class="detail-item">
+        <span class="detail-label">Número:</span>
+        <span class="detail-value">{{numeroContrato}}</span>
+      </div>
+
+      <div class="detail-item">
+        <span class="detail-label">Objeto:</span>
+        <span class="detail-value">{{objetoContrato}}</span>
+      </div>
+
+      <div class="detail-item">
+        <span class="detail-label">Valor Total:</span>
+        <span class="detail-value" style="color: #28a745; font-size: 18px;">{{valorContrato}}</span>
+      </div>
+
+      <div class="detail-item">
+        <span class="detail-label">Válido até:</span>
+        <span class="detail-value" style="color: #dc3545;">{{dataVencimento}}</span>
+      </div>
+    </div>
+
+    <!-- Call to Action -->
+    <div class="cta-section">
+      <p style="margin-bottom: 20px; font-size: 16px; color: #495057;">
+        Clique no botão abaixo para revisar e assinar o contrato:
+      </p>
+
+      <a href="{{linkAssinatura}}" class="btn-sign">
+        <span class="icon">✍️</span>
+        Revisar e Assinar Contrato
+      </a>
+
+      <p style="margin-top: 15px; font-size: 14px; color: #6c757d;">
+        Processo 100% digital e seguro
+      </p>
+    </div>
+
+    <!-- Warning -->
+    <div class="warning-box">
+      <p>
+        <strong>⚠️ Importante:</strong>
+        Este link de assinatura é válido até <strong>{{dataVencimento}}</strong>.
+        Após esta data, uma nova solicitação será necessária.
+      </p>
+    </div>
+
+    <!-- Additional Info -->
+    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 6px; margin: 20px 0;">
+      <h4 style="margin-top: 0; color: #2c3e50;">
+        <span class="icon">🔐</span>
+        Sobre a Assinatura Digital
+      </h4>
+      <ul style="margin: 0; padding-left: 20px; color: #495057;">
+        <li>Possui a mesma validade jurídica de uma assinatura presencial</li>
+        <li>Processo certificado e auditável</li>
+        <li>Totalmente seguro com criptografia avançada</li>
+        <li>Você receberá uma cópia assinada por email</li>
+      </ul>
+    </div>
+
+    <!-- Help -->
+    <div style="text-align: center; margin: 20px 0;">
+      <p style="font-size: 14px; color: #6c757d;">
+        Precisa de ajuda? Entre em contato conosco
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>Este email foi enviado automaticamente pelo sistema <strong>{{empresa}}</strong></p>
+      <p>Por favor, não responda este email. Em caso de dúvidas, entre em contato através dos nossos canais oficiais.
+      </p>
+    </div>
+  </div>
+</body>
+
+</html>

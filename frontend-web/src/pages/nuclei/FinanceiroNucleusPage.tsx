@@ -1,10 +1,10 @@
 import React from 'react';
-import { 
-  TrendingUp, 
-  CreditCard, 
-  PiggyBank, 
-  FileText, 
-  BarChart3, 
+import {
+  TrendingUp,
+  CreditCard,
+  PiggyBank,
+  FileText,
+  BarChart3,
   Calculator,
   Building2,
   Repeat,
@@ -59,13 +59,11 @@ const FinanceiroNucleusPage: React.FC = () => {
       {
         id: 'faturamento',
         name: 'Faturamento',
-        description: 'Emissão de notas fiscais, controle de faturamento e integração contábil.',
+        description: 'Gestão completa de faturas, cobranças e recebimentos.',
         href: '/financeiro/faturamento',
         icon: FileText,
-        notifications: 1,
-        badge: 'Em Breve',
-        badgeColor: 'yellow',
-        status: 'coming_soon'
+        notifications: 3,
+        status: 'active'
       },
       {
         id: 'relatorios-financeiros',

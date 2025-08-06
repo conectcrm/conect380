@@ -21,6 +21,7 @@ import {
 import { api } from '../../../services/api';
 import { Plano } from '../../../hooks/useSubscription';
 import { PlanoFormModal } from './PlanoFormModal';
+import toast from 'react-hot-toast';
 
 interface PlanosAdminProps {
   onEdit?: (plano: Plano) => void;
@@ -75,9 +76,11 @@ export const PlanosAdmin: React.FC<PlanosAdminProps> = ({ onEdit }) => {
       if (editingPlano) {
         // Atualizar plano existente
         await api.put(`/planos/${editingPlano.id}`, dadosPlano);
+        toast.success(`✅ Plano "${dadosPlano.nome}" atualizado com sucesso!`);
       } else {
         // Criar novo plano
         await api.post('/planos', dadosPlano);
+        toast.success(`🎉 Novo plano "${dadosPlano.nome}" criado com sucesso!`);
       }
 
       await carregarPlanos();
@@ -86,7 +89,11 @@ export const PlanosAdmin: React.FC<PlanosAdminProps> = ({ onEdit }) => {
     } catch (err: any) {
       console.error('Erro ao salvar plano:', err);
       console.error('Resposta do erro:', err.response?.data);
-      throw new Error('Erro ao salvar plano');
+
+      // Mensagem de erro mais específica
+      const errorMessage = err.response?.data?.message || 'Erro ao salvar plano';
+      toast.error(`❌ ${errorMessage}`);
+      throw new Error(errorMessage);
     }
   };
 
@@ -94,9 +101,16 @@ export const PlanosAdmin: React.FC<PlanosAdminProps> = ({ onEdit }) => {
     try {
       await api.put(`/planos/${plano.id}/toggle-status`);
       await carregarPlanos();
+
+      // Mensagem baseada no status atual (será invertido após o toggle)
+      const novoStatus = plano.ativo ? 'desativado' : 'ativado';
+      const icon = plano.ativo ? '⏸️' : '✅';
+      toast.success(`${icon} Plano "${plano.nome}" ${novoStatus} com sucesso!`);
     } catch (err: any) {
       console.error('Erro ao alterar status:', err);
-      setError('Erro ao alterar status do plano');
+      const errorMessage = err.response?.data?.message || 'Erro ao alterar status do plano';
+      toast.error(`❌ ${errorMessage}`);
+      setError(errorMessage);
     }
   };
 
@@ -108,9 +122,12 @@ export const PlanosAdmin: React.FC<PlanosAdminProps> = ({ onEdit }) => {
     try {
       await api.delete(`/planos/${plano.id}`);
       await carregarPlanos();
+      toast.success(`🗑️ Plano "${plano.nome}" removido com sucesso!`);
     } catch (err: any) {
       console.error('Erro ao remover plano:', err);
-      setError('Erro ao remover plano');
+      const errorMessage = err.response?.data?.message || 'Erro ao remover plano';
+      toast.error(`❌ ${errorMessage}`);
+      setError(errorMessage);
     }
   };
 

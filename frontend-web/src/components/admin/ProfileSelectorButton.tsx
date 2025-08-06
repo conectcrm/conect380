@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, Crown, Eye, Settings, HelpCircle } from 'lucide-react';
+import { safeGetBoundingClientRect, safeGetWindowDimensions } from '../../utils/dom-helper';
 
 export type PerfilUsuario = 'gerente' | 'vendedor' | 'operacional' | 'financeiro' | 'suporte' | 'administrador';
 
@@ -97,17 +98,22 @@ const ProfileSelectorButton: React.FC<ProfileSelectorButtonProps> = ({
   const getDropdownPosition = () => {
     if (!buttonRef.current) return { top: '100%', left: '0' };
 
-    const rect = buttonRef.current.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
-    const dropdownHeight = 400; // altura estimada do dropdown
+    try {
+      const rect = safeGetBoundingClientRect(buttonRef.current);
+      const { innerHeight } = safeGetWindowDimensions();
+      const dropdownHeight = 400; // altura estimada do dropdown
 
-    // Se não há espaço embaixo, abrir em cima
-    if (rect.bottom + dropdownHeight > viewportHeight) {
-      return {
-        bottom: '100%',
-        left: '0',
-        marginBottom: '8px'
-      };
+      // Se não há espaço embaixo, abrir em cima
+      if (rect.bottom + dropdownHeight > innerHeight) {
+        return {
+          bottom: '100%',
+          left: '0',
+          marginBottom: '8px'
+        };
+      }
+    } catch (error) {
+      console.warn('Erro ao calcular posição do dropdown:', error);
+      return { top: '100%', left: '0' };
     }
 
     return {

@@ -48,7 +48,7 @@ class ClientesService {
 
   async getClientes(filters: ClienteFilters = {}): Promise<PaginatedClientes> {
     const params = new URLSearchParams();
-    
+
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         params.append(key, value.toString());
@@ -57,7 +57,7 @@ class ClientesService {
 
     const queryString = params.toString();
     const response = await api.get(`${this.baseUrl}?${queryString}`);
-    
+
     return response.data;
   }
 
@@ -86,13 +86,20 @@ class ClientesService {
   }
 
   async searchClientes(term: string): Promise<Cliente[]> {
-    const response = await api.get(`${this.baseUrl}/search?q=${encodeURIComponent(term)}`);
-    return response.data;
+    try {
+      // Usar o endpoint principal com parâmetro search
+      const response = await api.get(`${this.baseUrl}?search=${encodeURIComponent(term)}&limit=50`);
+      return response.data?.data || response.data || [];
+    } catch (error) {
+      console.error('Erro na busca de clientes:', error);
+      // Retornar array vazio em caso de erro
+      return [];
+    }
   }
 
   async exportClientes(filters: ClienteFilters = {}): Promise<Blob> {
     const params = new URLSearchParams();
-    
+
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         params.append(key, value.toString());

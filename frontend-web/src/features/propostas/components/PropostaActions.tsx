@@ -7,13 +7,23 @@ import {
   Download,
   Share2,
   Send,
-  Loader2
+  Loader2,
+  FileText,
+  CreditCard,
+  PlayCircle,
+  CheckCircle,
+  ArrowRight,
+  Clock
 } from 'lucide-react';
 import { emailServiceReal } from '../../../services/emailServiceReal';
 import { PropostaCompleta } from '../services/propostasService';
 import { clientesService } from '../../../services/clientesService';
 import ModalEnviarWhatsApp from '../../../components/whatsapp/ModalEnviarWhatsApp';
 import { pdfPropostasService } from '../../../services/pdfPropostasService';
+import { faturamentoService } from '../../../services/faturamentoService';
+import { contratoService } from '../../../services/contratoService';
+import { faturamentoAPI } from '../../../services/faturamentoAPI';
+import { api } from '../../../services/api';
 
 // Tipo união para aceitar tanto PropostaCompleta quanto o formato da UI
 type PropostaUI = {
@@ -51,6 +61,11 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const [clienteData, setClienteData] = useState<{ nome: string, email: string, telefone: string } | null>(null);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [propostaPdfBuffer, setPropostaPdfBuffer] = useState<Uint8Array | null>(null);
+
+  // 🚀 NOVOS ESTADOS PARA AUTOMAÇÃO
+  const [gerandoContrato, setGerandoContrato] = useState(false);
+  const [criandoFatura, setCriandoFatura] = useState(false);
+  const [avancandoFluxo, setAvancandoFluxo] = useState(false);
 
   // Carregar dados do cliente quando o componente for montado
   React.useEffect(() => {
@@ -284,14 +299,16 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         numero: proposta.numero || 'N/A',
         total: proposta.total || 0,
         dataValidade: proposta.dataValidade ? proposta.dataValidade.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        titulo: proposta.titulo || 'Proposta comercial'
+        titulo: proposta.titulo || 'Proposta comercial',
+        status: proposta.status || 'rascunho'
       };
     } else {
       return {
         numero: proposta.numero || 'N/A',
         total: proposta.valor || 0,
         dataValidade: proposta.data_vencimento || new Date().toISOString().split('T')[0],
-        titulo: proposta.titulo || 'Proposta comercial'
+        titulo: proposta.titulo || 'Proposta comercial',
+        status: proposta.status || 'rascunho'
       };
     }
   };
@@ -300,6 +317,219 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const generateAccessToken = () => {
     // Gera um token numérico de 6 dígitos (mais fácil para o cliente)
     return Math.floor(Math.random() * 900000 + 100000).toString();
+  };
+
+  // 🚀 NOVAS FUNÇÕES DE AUTOMAÇÃO
+
+  // Verificar se proposta pode gerar contrato
+  const podeGerarContrato = () => {
+    const status = getPropostaData().status;
+    return status === 'aprovada' || status === 'aceita' || status === 'negociacao';
+  };
+
+  // Verificar se proposta pode criar fatura
+  const podeCriarFatura = () => {
+    const status = getPropostaData().status;
+    return status === 'aprovada' || status === 'contrato_assinado';
+  };
+
+  // Gerar contrato a partir da proposta
+  const handleGerarContrato = async () => {
+    if (!podeGerarContrato()) {
+      toast.error('Apenas propostas aprovadas podem gerar contratos');
+      return;
+    }
+
+    setGerandoContrato(true);
+    try {
+      const propostaData = getPropostaData();
+      const clienteData = await getClienteData();
+
+      console.log('🚀 Gerando contrato para proposta:', propostaData.numero);
+
+      // Preparar dados no formato esperado pelo backend
+      const contratoData = {
+        propostaId: parseInt(propostaData.numero) || 1, // Converter para number
+        clienteId: Date.now() % 999999, // Gerar ID único simples
+        usuarioResponsavelId: 1, // ID do usuário responsável (vendedor)
+        tipo: 'servico' as const, // Tipo do contrato
+        objeto: propostaData.titulo || `Contrato referente à proposta ${propostaData.numero}`,
+        valorTotal: propostaData.total,
+        dataInicio: new Date().toISOString().split('T')[0], // Data de hoje
+        dataFim: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 1 ano
+        dataVencimento: propostaData.dataValidade || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        observacoes: `Contrato gerado automaticamente a partir da proposta ${propostaData.numero}`,
+        condicoesPagamento: {
+          parcelas: 1,
+          formaPagamento: 'À vista',
+          diaVencimento: 10,
+          valorParcela: propostaData.total
+        }
+      };
+
+      console.log('📄 Dados do contrato preparados:', contratoData);
+
+      // Usar o serviço de contratos
+      const contrato = await contratoService.criarContrato(contratoData);
+
+      if (contrato) {
+        toast.success(`✅ Contrato ${contrato.numero} gerado com sucesso!`);
+
+        // Disparar evento para atualizar a interface
+        const eventoAtualizacao = new CustomEvent('propostaAtualizada', {
+          detail: {
+            propostaId: propostaData.numero,
+            novoStatus: 'contrato_gerado',
+            acao: 'contrato_gerado',
+            contratoId: contrato.id,
+            timestamp: new Date().toISOString()
+          }
+        });
+        window.dispatchEvent(eventoAtualizacao);
+
+        // Abrir página do contrato gerado
+        if (window.confirm('Deseja visualizar o contrato gerado?')) {
+          window.open(`/contratos/${contrato.id}`, '_blank');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Erro ao gerar contrato:', error);
+      toast.error('Erro ao gerar contrato. Tente novamente.');
+    } finally {
+      setGerandoContrato(false);
+    }
+  };
+
+  // Criar fatura automática
+  const handleCriarFatura = async () => {
+    if (!podeCriarFatura()) {
+      toast.error('Apenas propostas aprovadas podem gerar faturas');
+      return;
+    }
+
+    setCriandoFatura(true);
+    try {
+      const propostaData = getPropostaData();
+      const clienteData = await getClienteData();
+
+      console.log('💰 Criando fatura para proposta:', propostaData.numero);
+
+      const faturaData = {
+        contratoId: propostaData.numero, // Temporário até ter contrato real
+        clienteId: propostaData.numero, // Temporário 
+        usuarioResponsavelId: 'user_temp', // Temporário
+        tipo: 'entrada' as const,
+        descricao: `Fatura referente à proposta ${propostaData.numero} - ${propostaData.titulo}`,
+        dataVencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        itens: [
+          {
+            descricao: propostaData.titulo,
+            quantidade: 1,
+            valorUnitario: propostaData.total,
+            valorDesconto: 0
+          }
+        ]
+      };
+
+      // Usar o serviço de faturamento
+      const fatura = await faturamentoAPI.criarFatura(faturaData);
+
+      if (fatura) {
+        toast.success(`✅ Fatura ${fatura.numero} criada com sucesso!`);
+
+        // Disparar evento para atualizar a interface
+        const eventoAtualizacao = new CustomEvent('propostaAtualizada', {
+          detail: {
+            propostaId: propostaData.numero,
+            novoStatus: 'fatura_criada',
+            acao: 'fatura_criada',
+            faturaId: fatura.numero,
+            timestamp: new Date().toISOString()
+          }
+        });
+        window.dispatchEvent(eventoAtualizacao);
+
+        // Navegar para página de faturamento (opcional)
+        if (window.confirm('Deseja visualizar a fatura criada?')) {
+          window.open(`/faturamento#fatura-${fatura.id}`, '_blank');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Erro ao criar fatura:', error);
+      toast.error('Erro ao criar fatura. Tente novamente.');
+    } finally {
+      setCriandoFatura(false);
+    }
+  };
+
+  // Avançar para próxima etapa do fluxo
+  const handleAvançarFluxo = async () => {
+    setAvancandoFluxo(true);
+    try {
+      const propostaData = getPropostaData();
+      const status = propostaData.status;
+
+      console.log('⚡ Avançando fluxo da proposta:', propostaData.numero, 'Status atual:', status);
+
+      let proximaAcao = '';
+      let novoStatus = '';
+
+      // Determinar próxima ação baseada no status atual
+      switch (status) {
+        case 'rascunho':
+          proximaAcao = 'enviar_proposta';
+          novoStatus = 'enviada';
+          await handleSendEmail(); // Enviar proposta por email
+          break;
+
+        case 'enviada':
+        case 'negociacao':
+          proximaAcao = 'aprovar_proposta';
+          novoStatus = 'aprovada';
+          // Marcar como aprovada no sistema
+          toast.success('✅ Proposta marcada como aprovada');
+          break;
+
+        case 'aprovada':
+          proximaAcao = 'gerar_contrato';
+          novoStatus = 'contrato_gerado';
+          await handleGerarContrato(); // Gerar contrato
+          break;
+
+        case 'contrato_gerado':
+          proximaAcao = 'criar_fatura';
+          novoStatus = 'fatura_criada';
+          await handleCriarFatura(); // Criar fatura
+          break;
+
+        case 'fatura_criada':
+          proximaAcao = 'aguardar_pagamento';
+          novoStatus = 'aguardando_pagamento';
+          toast('📧 Fatura enviada para cobrança automática', { icon: 'ℹ️' });
+          break;
+
+        default:
+          toast('Esta proposta já está na última etapa do fluxo', { icon: 'ℹ️' });
+          return;
+      }
+
+      // Disparar evento para atualizar a interface
+      const eventoAtualizacao = new CustomEvent('propostaAtualizada', {
+        detail: {
+          propostaId: propostaData.numero,
+          novoStatus: novoStatus,
+          acao: proximaAcao,
+          timestamp: new Date().toISOString()
+        }
+      });
+      window.dispatchEvent(eventoAtualizacao);
+
+    } catch (error) {
+      console.error('❌ Erro ao avançar fluxo:', error);
+      toast.error('Erro ao avançar fluxo. Tente novamente.');
+    } finally {
+      setAvancandoFluxo(false);
+    }
   };
 
   // Enviar proposta por email
@@ -432,16 +662,26 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     // Gerar PDF para anexar
     try {
       const propostaData = getPropostaData();
-      const pdfBlob = await pdfPropostasService.gerarPdf({
-        numero: propostaData.numero,
+      const pdfBlob = await pdfPropostasService.gerarPdf('proposta', {
+        numeroProposta: propostaData.numero,
+        titulo: propostaData.titulo,
         cliente: {
           nome: clienteData.nome,
           email: clienteData.email || '',
           telefone: clienteData.telefone
         },
+        vendedor: {
+          nome: 'ConectCRM',
+          email: 'vendedor@conectcrm.com'
+        },
         empresa: { nome: 'ConectCRM' },
         valorTotal: propostaData.total,
-        produtos: [],
+        itens: [],
+        formaPagamento: 'Conforme acordo',
+        prazoEntrega: '30 dias',
+        garantia: '12 meses',
+        validadeProposta: '30 dias',
+        condicoesGerais: [],
         observacoes: propostaData.titulo
       });
 
@@ -583,6 +823,60 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       >
         <Share2 className="w-4 h-4" />
         {showLabels && <span>Compartilhar</span>}
+      </button>
+
+      {/* ✨ SEPARADOR VISUAL */}
+      <div className="h-6 w-px bg-gray-300 mx-2"></div>
+
+      {/* 🚀 NOVOS BOTÕES DE AUTOMAÇÃO */}
+
+      {/* Gerar Contrato */}
+      {podeGerarContrato() && (
+        <button
+          onClick={handleGerarContrato}
+          disabled={gerandoContrato}
+          className={`${buttonClass} text-blue-600 hover:text-blue-900 hover:bg-blue-50 disabled:opacity-50`}
+          title="Gerar contrato a partir desta proposta"
+        >
+          {gerandoContrato ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <FileText className="w-4 h-4" />
+          )}
+          {showLabels && <span>Gerar Contrato</span>}
+        </button>
+      )}
+
+      {/* Criar Fatura */}
+      {podeCriarFatura() && (
+        <button
+          onClick={handleCriarFatura}
+          disabled={criandoFatura}
+          className={`${buttonClass} text-green-600 hover:text-green-900 hover:bg-green-50 disabled:opacity-50`}
+          title="Criar fatura automática"
+        >
+          {criandoFatura ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <CreditCard className="w-4 h-4" />
+          )}
+          {showLabels && <span>Criar Fatura</span>}
+        </button>
+      )}
+
+      {/* Avançar Fluxo */}
+      <button
+        onClick={handleAvançarFluxo}
+        disabled={avancandoFluxo}
+        className={`${buttonClass} text-orange-600 hover:text-orange-900 hover:bg-orange-50 disabled:opacity-50`}
+        title="Avançar para próxima etapa do fluxo automatizado"
+      >
+        {avancandoFluxo ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <ArrowRight className="w-4 h-4" />
+        )}
+        {showLabels && <span>Avançar Fluxo</span>}
       </button>
 
       {/* Modal WhatsApp */}

@@ -22,6 +22,9 @@ import ConfiguracoesPage from './features/configuracoes/ConfiguracoesPage';
 import ContasReceberPage from './features/financeiro/ContasReceberPage';
 import ContasPagarPage from './pages/gestao/financeiro/ContasPagarSimplificada';
 import FornecedoresPage from './features/financeiro/fornecedores/FornecedoresPage';
+import ContratosPage from './features/contratos/ContratosPage';
+import DebugContratos from './components/DebugContratos';
+import LoginDebug from './components/LoginDebug';
 import { AgendaPage } from './features/agenda/AgendaPage';
 import { OportunidadesPage } from './features/oportunidades/OportunidadesPage';
 import { ExemploModalProduto } from './examples/ExemploModalProduto';
@@ -55,8 +58,9 @@ import MetasConfiguracao from './pages/configuracoes/MetasConfiguracao';
 import TestePortalPage from './pages/TestePortalPage';
 import PortalClientePage from './pages/PortalClientePage';
 import ConfiguracaoEmailPage from './pages/ConfiguracaoEmailPage';
+import ScrollToTop from './components/common/ScrollToTop';
 import { BillingPage } from './pages/billing';
-import DebugUserSwitch from './components/debug/DebugUserSwitch';
+import { FaturamentoPage } from './pages/faturamento';
 
 // Configuração do React Query
 const queryClient = new QueryClient({
@@ -101,6 +105,15 @@ const AppRoutes: React.FC = () => {
 
           {/* Página de Notificações */}
           <Route path="/notifications" element={<NotificationsPage />} />
+
+          {/* Página de Contratos */}
+          <Route path="/contratos/:id" element={<ContratosPage />} />
+
+          {/* Debug de Contratos */}
+          <Route path="/debug-contratos" element={<DebugContratos />} />
+
+          {/* Debug de Login */}
+          <Route path="/debug-login" element={<LoginDebug />} />
 
           {/* Rotas das páginas de núcleos */}
           <Route path="/nuclei/crm" element={<CrmNucleusPage />} />
@@ -229,6 +242,10 @@ const AppRoutes: React.FC = () => {
 
           {/* Sistema de Billing e Assinaturas */}
           <Route path="/billing" element={<BillingPage />} />
+          <Route path="/assinaturas" element={<BillingPage />} />
+
+          {/* Sistema de Faturamento */}
+          <Route path="/faturamento" element={<FaturamentoPage />} />
 
           {/* Exemplo Modal Produto */}
           <Route path="/exemplo-produto" element={<ExemploModalProduto />} />
@@ -264,21 +281,8 @@ const AppRoutes: React.FC = () => {
           <Route path="/financeiro/contas-pagar" element={<ContasPagarPage />} />
           <Route path="/financeiro/fornecedores" element={<FornecedoresPage />} />
 
-          {/* Módulos financeiros em desenvolvimento */}
-          <Route path="/financeiro/faturamento" element={
-            <ModuleUnderConstruction
-              moduleName="Faturamento"
-              description="Sistema completo de emissão e controle de notas fiscais"
-              estimatedCompletion="Q1 2025"
-              features={[
-                "Emissão de NFe, NFSe e NFCe",
-                "Integração com SEFAZ",
-                "Controle de série e numeração",
-                "Cancelamento e carta de correção",
-                "Relatórios de faturamento"
-              ]}
-            />
-          } />
+          {/* Módulos financeiros */}
+          <Route path="/financeiro/faturamento" element={<FaturamentoPage />} />
 
           <Route path="/financeiro/relatorios" element={
             <ModuleUnderConstruction
@@ -374,16 +378,9 @@ const App: React.FC = () => {
               <NotificationProvider>
                 <EmpresaProvider>
                   <Router>
+                    <ScrollToTop />
                     <div className="App">
                       <AppRoutes />
-
-                      {/* Componente de debug apenas em desenvolvimento */}
-                      {process.env.NODE_ENV === 'development' && (
-                        <DebugUserSwitch
-                          currentUser={null}
-                          onUserChange={() => { }}
-                        />
-                      )}
 
                       <Toaster
                         position="top-right"

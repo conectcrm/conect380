@@ -210,6 +210,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         title: 'Fluxo de Caixa',
         subtitle: 'Acompanhamento de entradas e saídas'
       },
+      '/faturamento': {
+        title: 'Faturamento',
+        subtitle: 'Gerencie faturas, cobranças e recebimentos'
+      },
+      '/financeiro/faturamento': {
+        title: 'Faturamento',
+        subtitle: 'Gerencie faturas, cobranças e recebimentos'
+      },
       '/billing': {
         title: 'Billing & Assinaturas',
         subtitle: 'Gerencie sua assinatura, planos e faturamento'
