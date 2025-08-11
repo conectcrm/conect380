@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { Contrato } from '../../contratos/entities/contrato.entity';
 import { User } from '../../users/user.entity';
+import { Cliente } from '../../clientes/cliente.entity';
 import { ItemFatura } from './item-fatura.entity';
 import { Pagamento } from './pagamento.entity';
 
@@ -44,11 +45,17 @@ export class Fatura {
   @JoinColumn({ name: 'contratoId' })
   contrato: Contrato;
 
-  @Column()
-  clienteId: number;
+  // ✅ CORREÇÃO: Usar UUID nativo para clienteId
+  @Column('uuid')
+  clienteId: string;
 
-  @Column()
-  usuarioResponsavelId: number;
+  // ✅ CORREÇÃO: Restaurar relacionamento TypeORM nativo
+  @ManyToOne(() => Cliente, { eager: false })
+  @JoinColumn({ name: 'clienteId' })
+  cliente: Cliente;
+
+  @Column('uuid')
+  usuarioResponsavelId: string;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'usuarioResponsavelId' })
@@ -122,7 +129,8 @@ export class Fatura {
     installments?: number;
   };
 
-  @OneToMany(() => ItemFatura, item => item.fatura, { cascade: true })
+  // Removido cascade para garantir criação explícita dos itens (cálculo de valorTotal controlado)
+  @OneToMany(() => ItemFatura, item => item.fatura)
   itens: ItemFatura[];
 
   @OneToMany(() => Pagamento, pagamento => pagamento.fatura)
@@ -137,32 +145,37 @@ export class Fatura {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  // Métodos auxiliares
+  // ✅ MÉTODOS AUXILIARES SEGUROS
   isPaga(): boolean {
     return this.status === StatusFatura.PAGA;
   }
 
   isVencida(): boolean {
     const hoje = new Date();
-    return this.dataVencimento < hoje && this.status === StatusFatura.PENDENTE;
+    hoje.setHours(0, 0, 0, 0);
+    const vencimento = new Date(this.dataVencimento);
+    vencimento.setHours(0, 0, 0, 0);
+    return vencimento < hoje && this.status === StatusFatura.PENDENTE;
   }
 
   getValorRestante(): number {
-    return Math.max(0, this.valorTotal - this.valorPago);
+    return Math.max(0, Number(this.valorTotal) - Number(this.valorPago));
   }
 
   getValorComJurosMulta(): number {
-    return this.valorTotal + this.valorJuros + this.valorMulta - this.valorDesconto;
+    return Number(this.valorTotal) + Number(this.valorJuros) + Number(this.valorMulta) - Number(this.valorDesconto);
   }
 
   getDiasAtraso(): number {
     if (!this.isVencida()) return 0;
     const hoje = new Date();
-    const diffTime = hoje.getTime() - this.dataVencimento.getTime();
+    const diffTime = hoje.getTime() - new Date(this.dataVencimento).getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }
 
   getPercentualPago(): number {
-    return this.valorTotal > 0 ? (this.valorPago / this.valorTotal) * 100 : 0;
+    const total = Number(this.valorTotal);
+    const pago = Number(this.valorPago);
+    return total > 0 ? (pago / total) * 100 : 0;
   }
 }

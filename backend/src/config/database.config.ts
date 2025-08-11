@@ -14,6 +14,12 @@ import { PlanoModulo } from '../modules/planos/entities/plano-modulo.entity';
 import { AssinaturaEmpresa } from '../modules/planos/entities/assinatura-empresa.entity';
 import { Evento } from '../modules/eventos/evento.entity';
 import { Fornecedor } from '../modules/financeiro/entities/fornecedor.entity';
+import { Fatura } from '../modules/faturamento/entities/fatura.entity';
+import { ItemFatura } from '../modules/faturamento/entities/item-fatura.entity';
+import { Pagamento } from '../modules/faturamento/entities/pagamento.entity';
+import { PlanoCobranca } from '../modules/faturamento/entities/plano-cobranca.entity';
+import { Contrato } from '../modules/contratos/entities/contrato.entity';
+import { AssinaturaContrato } from '../modules/contratos/entities/assinatura-contrato.entity';
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
@@ -27,8 +33,28 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       username: this.configService.get('DATABASE_USERNAME', 'conectcrm'),
       password: this.configService.get('DATABASE_PASSWORD', 'conectcrm123'),
       database: this.configService.get('DATABASE_NAME', 'conectcrm_db'),
-      entities: [User, Empresa, Cliente, Produto, Oportunidade, Atividade, Proposta, Plano, ModuloSistema, PlanoModulo, AssinaturaEmpresa, Evento, Fornecedor],
-      synchronize: false, // Desabilitado temporariamente devido a conflitos de schema
+      entities: [
+        User,
+        Empresa,
+        Cliente,
+        Produto,
+        Oportunidade,
+        Atividade,
+        Proposta,
+        Plano,
+        ModuloSistema,
+        PlanoModulo,
+        AssinaturaEmpresa,
+        Evento,
+        Fornecedor,
+        Fatura,
+        ItemFatura,
+        Pagamento,
+        PlanoCobranca,
+        Contrato,
+        AssinaturaContrato
+      ],
+      synchronize: false, // Desabilitado temporariamente para evitar conflitos de schema
       logging: this.configService.get('APP_ENV') === 'development',
       ssl: this.configService.get('APP_ENV') === 'production' ? {
         rejectUnauthorized: false,

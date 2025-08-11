@@ -53,6 +53,8 @@ Thumbs.db
 # Temporary folders
 tmp/
 temp/
+archived/
+backup*/
 
 # Database
 *.db
@@ -95,6 +97,134 @@ dist
 .out
 .storybook-out
 
-# Temporary folders
-tmp/
-temp/
+# ==================================================
+# 🚫 ARQUIVOS TEMPORÁRIOS E DE DESENVOLVIMENTO
+# ==================================================
+
+# Scripts de teste e debug
+test-*.js
+test-*.ts
+test-*.html
+debug-*.js
+debug-*.ts
+debug-*.sql
+*-test.js
+*-debug.js
+
+# Scripts temporários
+script-*.js
+temp-*.js
+tmp-*.js
+exemplo-*.js
+demonstracao-*.js
+assistente-*.js
+monitor-*.js
+validar-*.js
+verificar-*.js
+investigar-*.js
+diagnostico-*.js
+correcao-*.js
+fix-*.js
+setup-*.js
+listar-*.js
+buscar-*.js
+coletor-*.js
+auditoria-*.js
+analise-*.js
+analisar-*.js
+resumo-*.js
+testar-*.js
+teste-*.js
+teste-*.html
+check-*.js
+create-test-*.js
+create-demo-*.js
+simular-*.js
+
+# Documentação temporária
+*_IMPLEMENTADO*.md
+*_COMPLETA*.md
+*_CONCLUIDA*.md
+*_SUCESSO*.md
+CORRECAO_*.md
+CORRECOES_*.md
+CAMPO_*.md
+COLUNA_*.md
+LAYOUT_*.md
+NOVA_*.md
+OTIMIZACAO_*.md
+EXPLICACAO_*.md
+REMOCAO_*.md
+DEBUG_*.md
+FIX_*.md
+MELHORIAS_*.md
+MODAL_*.md
+SISTEMA_*.md
+TESTE_*.md
+FASE*.md
+RELATORIO_*.md
+GUIA_*.md
+PLANO_*.md
+SUGESTOES_*.md
+ANALISE_*.md
+TEMP_*.md
+DRAFT_*.md
+
+# Scripts batch/powershell temporários
+fix-*.bat
+setup-*.bat
+test-*.bat
+test-*.ps1
+manage-*.bat
+resolve-*.bat
+start-*.bat
+executar-*.bat
+executar-*.ps1
+otimizar-*.ps1
+otimizar-*.bat
+desabilitar-*.ps1
+limpar-*.ps1
+fechar-*.bat
+identificar-*.ps1
+reorganizar-*.ps1
+migrate-*.bat
+migrate-*.js
+migrate-*.sh
+
+# Arquivos SQL temporários
+create-test-*.sql
+insert-*-teste.sql
+debug-*.sql
+test-*.sql
+
+# Templates e exemplos não utilizados
+TEMPLATE_*.tsx
+TEMPLATE_*.jsx
+TEMPLATE_*.ts
+TEMPLATE_*.js
+exemplo-*.tsx
+exemplo-*.jsx
+
+# Arquivos de backup automático
+*.bak
+*.backup
+*-backup.*
+*_backup.*
+
+# Arquivos de configuração temporária
+.env.example.backup
+*.config.backup
+
+# Pastas de desenvolvimento
+playground/
+sandbox/
+experiments/
+
+# ==================================================
+# 🤖 SISTEMA DE AUTO-LIMPEZA COPILOT
+# ==================================================
+
+# Arquivos de sistema (manter no repositório)
+# .copilot-registry.md - MANTER (rastreia arquivos criados)
+# auto-limpeza-copilot.ps1 - MANTER (script de auto-limpeza)
+# TEMPLATE_REGISTRO_COPILOT.md - MANTER (guia de uso)

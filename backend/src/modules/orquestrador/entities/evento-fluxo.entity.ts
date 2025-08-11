@@ -68,10 +68,10 @@ export class EventoFluxo {
     configuracoes?: any;
   };
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   dataProcessamento: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   dataAgendamento: Date;
 
   @Column({ type: 'int', default: 0 })

@@ -166,28 +166,80 @@ export class FaturamentoService {
       .getMany();
   }
 
+  async buscarFaturasPaginadas(
+    page: number = 1, 
+    pageSize: number = 10,
+    sortBy: string = 'createdAt',
+    sortOrder: 'ASC' | 'DESC' = 'DESC'
+  ): Promise<{ faturas: any[]; total: number; resumo: any }> {
+    console.log('🔍🔍🔍 [NOVO DEBUG CORRIGIDO] Executando buscarFaturasPaginadas...');
+    
+    const queryBuilder = this.faturaRepository
+      .createQueryBuilder('fatura')
+      .leftJoinAndSelect('fatura.contrato', 'contrato')
+      .leftJoinAndSelect('contrato.proposta', 'proposta')
+      .leftJoinAndSelect('fatura.cliente', 'cliente')  // ✅ CORREÇÃO: Usar relacionamento TypeORM nativo
+      .leftJoinAndSelect('fatura.usuarioResponsavel', 'usuario')
+      .leftJoinAndSelect('fatura.itens', 'itens')
+      .leftJoinAndSelect('fatura.pagamentos', 'pagamentos')
+      .where('fatura.ativo = :ativo', { ativo: true });
+
+    const [faturas, total] = await queryBuilder
+      .orderBy(`fatura.${sortBy}`, sortOrder)
+      .limit(pageSize)
+      .offset((page - 1) * pageSize)
+      .getManyAndCount();
+
+    console.log('🔍🔍🔍 [NOVO DEBUG CORRIGIDO] Faturas encontradas:', faturas.length);
+    console.log('🔍🔍🔍 [NOVO DEBUG CORRIGIDO] Primeira fatura cliente:', faturas[0]?.cliente?.nome || 'NÃO ENCONTRADO');
+
+    const resumo = await this.faturaRepository.query(`
+      SELECT 
+        COALESCE(SUM(f."valorTotal"), 0) AS "valorTotal",
+        COALESCE(SUM(f."valorPago"), 0) AS "valorRecebido",
+        COALESCE(SUM(f."valorTotal" - f."valorPago"), 0) AS "valorEmAberto"
+      FROM faturas f 
+      WHERE f.ativo = true
+    `);
+
+    return {
+      faturas,
+      total,
+      resumo: resumo[0]
+    };
+  }
+
   async buscarFaturaPorId(id: number): Promise<Fatura> {
+    console.log('🔍 [DEBUGGING CORRIGIDO] Buscando fatura por ID:', id);
+    
     const fatura = await this.faturaRepository.findOne({
       where: { id, ativo: true },
-      relations: ['contrato', 'contrato.proposta', 'usuarioResponsavel', 'itens', 'pagamentos'],
+      relations: ['contrato', 'contrato.proposta', 'usuarioResponsavel', 'itens', 'pagamentos', 'cliente'],
     });
 
     if (!fatura) {
       throw new NotFoundException('Fatura não encontrada');
     }
+
+    console.log(`🔍 [DEBUG CORRIGIDO] Cliente para fatura ${id}:`, fatura.cliente?.nome || 'NÃO ENCONTRADO');
 
     return fatura;
   }
 
-  async buscarFaturaPorNumero(numero: string): Promise<Fatura> {
+  async buscarFaturaPorNumero(numero: string): Promise<any> {
+    console.log('🔍 [DEBUGGING] Buscando fatura por número:', numero);
+    
     const fatura = await this.faturaRepository.findOne({
       where: { numero, ativo: true },
-      relations: ['contrato', 'contrato.proposta', 'usuarioResponsavel', 'itens', 'pagamentos'],
+      relations: ['contrato', 'contrato.proposta', 'usuarioResponsavel', 'itens', 'pagamentos', 'cliente'],
     });
 
     if (!fatura) {
       throw new NotFoundException('Fatura não encontrada');
     }
+
+    console.log(`🔍 [DEBUG] Fatura ${numero} cliente UUID:`, fatura.clienteId);
+    console.log(`🔍 [DEBUG] Cliente para fatura ${numero}:`, fatura.cliente?.nome || 'NÃO ENCONTRADO');
 
     return fatura;
   }
@@ -195,7 +247,8 @@ export class FaturamentoService {
   async atualizarFatura(id: number, updateFaturaDto: UpdateFaturaDto): Promise<Fatura> {
     const fatura = await this.buscarFaturaPorId(id);
 
-    if (fatura.isPaga()) {
+    // Verificação direta do status em vez de usar o método isPaga()
+    if (fatura.status === StatusFatura.PAGA) {
       throw new BadRequestException('Não é possível alterar fatura já paga');
     }
 
@@ -231,7 +284,8 @@ export class FaturamentoService {
   async marcarComoPaga(id: number, valorPago: number): Promise<Fatura> {
     const fatura = await this.buscarFaturaPorId(id);
 
-    if (fatura.isPaga()) {
+    // Verificação direta do status em vez de usar o método isPaga()
+    if (fatura.status === StatusFatura.PAGA) {
       throw new BadRequestException('Fatura já está paga');
     }
 
@@ -251,21 +305,68 @@ export class FaturamentoService {
   }
 
   async cancelarFatura(id: number, motivo?: string): Promise<Fatura> {
-    const fatura = await this.buscarFaturaPorId(id);
+    this.logger.log(`🔍 [CANCELAR] Iniciando cancelamento da fatura ID: ${id}`);
+    
+    try {
+      const fatura = await this.buscarFaturaPorId(id);
+      this.logger.log(`🔍 [CANCELAR] Fatura encontrada: ${fatura.numero}, Status: ${fatura.status}`);
 
-    if (fatura.isPaga()) {
-      throw new BadRequestException('Não é possível cancelar fatura já paga');
+      // Verificação direta do status em vez de usar o método isPaga()
+      if (fatura.status === StatusFatura.PAGA) {
+        this.logger.log(`🔍 [CANCELAR] Erro: Fatura já está paga`);
+        throw new BadRequestException('Não é possível cancelar fatura já paga');
+      }
+
+      this.logger.log(`🔍 [CANCELAR] Fatura não está paga, prosseguindo com cancelamento`);
+      
+      fatura.status = StatusFatura.CANCELADA;
+      if (motivo) {
+        fatura.observacoes = `${fatura.observacoes || ''}\n\nCancelada: ${motivo}`;
+      }
+
+      this.logger.log(`🔍 [CANCELAR] Salvando fatura cancelada...`);
+      const faturaAtualizada = await this.faturaRepository.save(fatura);
+      this.logger.log(`🔍 [CANCELAR] Fatura cancelada com sucesso: ${faturaAtualizada.numero}`);
+
+      return faturaAtualizada;
+    } catch (error) {
+      this.logger.error(`🔍 [CANCELAR] Erro ao cancelar fatura ID ${id}: ${error.message}`);
+      throw error;
     }
+  }
 
-    fatura.status = StatusFatura.CANCELADA;
-    if (motivo) {
-      fatura.observacoes = `${fatura.observacoes || ''}\n\nCancelada: ${motivo}`;
+  async excluirFatura(id: number): Promise<Fatura> {
+    this.logger.log(`🔍 [EXCLUIR] Iniciando exclusão da fatura ID: ${id}`);
+    
+    try {
+      const fatura = await this.buscarFaturaPorId(id);
+      this.logger.log(`🔍 [EXCLUIR] Fatura encontrada: ${fatura.numero}, Status: ${fatura.status}`);
+
+      // Verificação direta do status em vez de usar o método isPaga()
+      if (fatura.status === StatusFatura.PAGA) {
+        this.logger.log(`🔍 [EXCLUIR] Erro: Fatura já está paga`);
+        throw new BadRequestException('Não é possível excluir fatura já paga');
+      }
+
+      this.logger.log(`🔍 [EXCLUIR] Fatura não está paga, prosseguindo com exclusão`);
+      
+      // Marcar como inativa (exclusão lógica) e cancelada
+      fatura.ativo = false;
+      fatura.status = StatusFatura.CANCELADA;
+      fatura.observacoes = `${fatura.observacoes || ''}\n\nCancelada: Fatura excluída pelo usuário`;
+
+      // Também limpar a relação com contrato para evitar problemas de integridade
+      fatura.contratoId = null;
+
+      this.logger.log(`🔍 [EXCLUIR] Salvando fatura excluída...`);
+      const faturaAtualizada = await this.faturaRepository.save(fatura);
+      this.logger.log(`🔍 [EXCLUIR] Fatura excluída com sucesso: ${faturaAtualizada.numero}`);
+
+      return faturaAtualizada;
+    } catch (error) {
+      this.logger.error(`🔍 [EXCLUIR] Erro ao excluir fatura ID ${id}: ${error.message}`);
+      throw error;
     }
-
-    const faturaAtualizada = await this.faturaRepository.save(fatura);
-    this.logger.log(`Fatura cancelada: ${faturaAtualizada.numero}`);
-
-    return faturaAtualizada;
   }
 
   async verificarFaturasVencidas(): Promise<void> {

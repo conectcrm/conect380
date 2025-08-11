@@ -11,7 +11,7 @@ Sistema especializado em gestão de propostas comerciais com sincronização aut
 - **Sistema de Email Automatizado**: Envio e rastreamento de propostas por email
 - **Interface Responsiva**: Design mobile-first e totalmente responsivo
 - **Autenticação JWT**: Sistema seguro de autenticação e autorização
-- **Debug e Monitoramento**: Ferramentas completas de debug e teste
+- **Projeto Organizado**: Sistema automatizado de limpeza e organização de código
 
 ## 🛠️ Stack Tecnológica
 
@@ -34,6 +34,29 @@ Sistema especializado em gestão de propostas comerciais com sincronização aut
 - **Interface dedicada** para clientes
 - **Sistema de ações** (visualizar, aprovar, rejeitar)
 - **Notificações automáticas**
+
+## 🧹 **ORGANIZAÇÃO E LIMPEZA**
+
+Este projeto mantém uma estrutura limpa e organizada automaticamente:
+
+### **Ferramentas de Limpeza:**
+- 🛡️ **`.gitignore` avançado** - Previne commits de arquivos temporários
+- 🔍 **Pre-commit hooks** - Verificação automática antes de commits
+- 🧹 **Script de limpeza** - Remove arquivos temporários periodicamente
+- 📋 **Convenções claras** - Guias para nomenclatura e organização
+
+### **Como usar:**
+```bash
+# Verificar arquivos temporários
+# Use Task do VS Code: "📋 Verificar Arquivos Temporários"
+
+# Limpeza automática (mensal)
+.\limpeza-massa.ps1
+
+# Consultar convenções
+# Veja: CONVENCOES_DESENVOLVIMENTO.md
+# Veja: GUIA_LIMPEZA_DESENVOLVIMENTO.md
+```
 
 ## 📋 Funcionalidades Implementadas
 
@@ -325,11 +348,23 @@ Invoke-RestMethod -Uri "http://localhost:3001/propostas" -Method GET
 
 ## 🤝 Contribuição
 
+### 📚 **Diretrizes de Documentação**
+
+**IMPORTANTE**: Este projeto segue padrões específicos para documentação. Antes de criar ou modificar documentação:
+
+1. **Consulte**: `COPILOT_DOCUMENTATION_GUIDELINES.md` na raiz do projeto
+2. **Siga**: Estrutura obrigatória de 3 arquivos (README + técnico + exemplos)
+3. **Use**: Template padrão `doc/[modulo]/` 
+4. **Exemplo**: Consulte `doc/faturamento/` como referência perfeita
+
+### 🔧 **Processo de Contribuição**
+
 1. Fork o projeto
 2. Crie uma branch para sua feature (`git checkout -b feature/NovaFuncionalidade`)
-3. Commit suas mudanças (`git commit -m 'Adiciona nova funcionalidade'`)
-4. Push para a branch (`git push origin feature/NovaFuncionalidade`)
-5. Abra um Pull Request
+3. **Se criar documentação**: Siga `COPILOT_DOCUMENTATION_GUIDELINES.md`
+4. Commit suas mudanças (`git commit -m 'Adiciona nova funcionalidade'`)
+5. Push para a branch (`git push origin feature/NovaFuncionalidade`)
+6. Abra um Pull Request
 
 ## 👨‍💻 Desenvolvedor
 

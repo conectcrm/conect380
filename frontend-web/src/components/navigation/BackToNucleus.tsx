@@ -16,11 +16,11 @@ export const BackToNucleus: React.FC<BackToNucleusProps> = ({
   currentModuleName
 }) => {
   const displayTitle = currentModuleName || title;
-  
+
   return (
     <div className="flex flex-col space-y-2">
       <div className="flex items-center space-x-2 text-sm text-gray-600">
-        <Link 
+        <Link
           to={nucleusPath}
           className="flex items-center space-x-1 hover:text-[#159A9C] transition-colors"
         >

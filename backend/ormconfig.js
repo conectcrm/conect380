@@ -12,7 +12,8 @@ const AppDataSource = new DataSource({
   password: process.env.DATABASE_PASSWORD || 'conectcrm123',
   database: process.env.DATABASE_NAME || 'conectcrm_db',
   entities: ['dist/**/*.entity.js'],
-  migrations: ['dist/migrations/*.js'],
+  // Ajustado caminho das migrations (compilam para dist/src/migrations)
+  migrations: ['dist/src/migrations/*.js'],
   migrationsTableName: 'migrations',
   synchronize: false,
   logging: process.env.APP_ENV === 'development',

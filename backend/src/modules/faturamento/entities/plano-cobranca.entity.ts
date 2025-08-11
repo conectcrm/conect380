@@ -33,11 +33,11 @@ export class PlanoCobranca {
   @JoinColumn({ name: 'contratoId' })
   contrato: Contrato;
 
-  @Column()
-  clienteId: number;
+  @Column('uuid')
+  clienteId: string;
 
-  @Column()
-  usuarioResponsavelId: number;
+  @Column('uuid')
+  usuarioResponsavelId: string;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'usuarioResponsavelId' })

@@ -23,18 +23,47 @@
     "noImplicitAny": false,
     "baseUrl": "src",
     "paths": {
-      "@/*": ["*"],
-      "@/components/*": ["components/*"],
-      "@/features/*": ["features/*"],
-      "@/contexts/*": ["contexts/*"],
-      "@/assets/*": ["assets/*"],
-      "@/utils/*": ["utils/*"],
-      "@/types/*": ["types/*"],
-      "@/services/*": ["services/*"],
-      "@/hooks/*": ["hooks/*"]
+      "@/*": [
+        "*"
+      ],
+      "@/components/*": [
+        "components/*"
+      ],
+      "@/features/*": [
+        "features/*"
+      ],
+      "@/contexts/*": [
+        "contexts/*"
+      ],
+      "@/assets/*": [
+        "assets/*"
+      ],
+      "@/utils/*": [
+        "utils/*"
+      ],
+      "@/types/*": [
+        "types/*"
+      ],
+      "@/services/*": [
+        "services/*"
+      ],
+      "@/hooks/*": [
+        "hooks/*"
+      ]
     }
   },
   "include": [
     "src"
+  ],
+  "exclude": [
+    "src/**/*_temp.ts",
+    "src/**/*_temp.tsx",
+    "src/**/*_backup*.ts",
+    "src/**/*_backup*.tsx",
+    "src/**/*_broken.ts",
+    "src/**/*_broken.tsx",
+    "src/components/modals/ModalCadastroProduto.tsx",
+    "src/components/modals/ModalCadastroProdutoNovo.tsx",
+    "src/pages/AnalyticsPage.tsx"
   ]
 }

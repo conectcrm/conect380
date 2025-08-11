@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, Package, TrendingUp, Target, PackageOpen } from 'lucide-react';
+import { FileText, Package, TrendingUp, Target, PackageOpen, Calculator } from 'lucide-react';
 import ModulesScreen, { NucleusModulesData } from '../../components/navigation/ModulesScreen';
 
 const VendasNucleusPage: React.FC = () => {
@@ -19,6 +19,17 @@ const VendasNucleusPage: React.FC = () => {
         notifications: 2,
         badge: 'Ativo',
         badgeColor: 'blue',
+        status: 'active'
+      },
+      {
+        id: 'cotacoes',
+        name: 'Cotações',
+        description: 'Sistema completo de cotações e orçamentos com geração de PDF, envio por email e controle de status.',
+        href: '/cotacoes',
+        icon: Calculator,
+        notifications: 0,
+        badge: 'Novo',
+        badgeColor: 'green',
         status: 'active'
       },
       {

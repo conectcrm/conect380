@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { PlanoCobranca, StatusPlanoCobranca } from '../entities/plano-cobranca.entity';
 import { Fatura, TipoFatura } from '../entities/fatura.entity';
 import { CreatePlanoCobrancaDto, UpdatePlanoCobrancaDto } from '../dto/plano-cobranca.dto';
+import { CreateFaturaDto } from '../dto/fatura.dto';
 import { FaturamentoService } from './faturamento.service';
 import { EmailIntegradoService } from '../../propostas/email-integrado.service';
 
@@ -217,7 +218,7 @@ export class CobrancaService {
       const { juros, multa } = plano.calcularJurosMulta(plano.valorRecorrente, diasAtraso);
 
       // Criar fatura
-      const createFaturaDto = {
+      const createFaturaDto: CreateFaturaDto = {
         contratoId: plano.contratoId,
         clienteId: plano.clienteId,
         usuarioResponsavelId: plano.usuarioResponsavelId,

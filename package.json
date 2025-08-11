@@ -1,7 +1,41 @@
 {
+  "name": "conectcrm",
+  "version": "1.0.0",
+  "description": "Sistema CRM com padronização automática de telas",
+  "main": "index.js",
+  "scripts": {
+    "setup": "node scripts/setup.js",
+    "generate:page": "node scripts/generators/generatePage.js",
+    "generate:service": "node scripts/generators/generateService.js",
+    "generate:types": "node scripts/generators/generateTypes.js",
+    "setup:dev": "npm install && cd frontend-web && npm install && cd ../backend && npm install",
+    "start:all": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:backend": "cd backend && npm run start:dev",
+    "start:frontend": "cd frontend-web && npm start",
+    "test:all": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend && npm test",
+    "test:frontend": "cd frontend-web && npm test",
+    "build:all": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend-web && npm run build"
+  },
+  "keywords": [
+    "crm",
+    "padronização",
+    "automação",
+    "segurança",
+    "auditoria"
+  ],
+  "author": "ConectCRM Team",
+  "license": "MIT",
   "dependencies": {
     "axios": "^1.11.0",
     "pg": "^8.16.3",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "concurrently": "^8.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "chalk": "^4.1.2"
   }
 }

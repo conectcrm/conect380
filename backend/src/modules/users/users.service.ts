@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as bcrypt from 'bcryptjs';
 import { User, UserRole } from './user.entity';
 import { Empresa } from '../../empresas/entities/empresa.entity';
 
@@ -118,7 +119,14 @@ export class UsersService {
       throw new Error('Campos obrigatórios ausentes: nome, email, senha, empresa_id');
     }
 
-    const user = this.userRepository.create(userData);
+    // Hash da senha antes de salvar
+    const hashedPassword = await bcrypt.hash(userData.senha, 10);
+    const userDataWithHashedPassword = {
+      ...userData,
+      senha: hashedPassword
+    };
+
+    const user = this.userRepository.create(userDataWithHashedPassword);
     console.log('📝 Usuário criado em memória:', user);
 
     try {

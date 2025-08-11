@@ -20,6 +20,8 @@ import {
   Upload
 } from 'lucide-react';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
+import ModalConfirmacao from '../../../components/common/ModalConfirmacao';
+import { useConfirmacaoInteligente, useValidacaoFinanceira } from '../../../hooks/useConfirmacaoInteligente';
 import {
   ContaPagar,
   StatusContaPagar,
@@ -59,6 +61,10 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
   const [filtros, setFiltros] = useState<FiltrosContasPagar>({});
   const [termoBusca, setTermoBusca] = useState('');
   const [contasSelecionadas, setContasSelecionadas] = useState<string[]>([]);
+
+  // Hooks para confirmação inteligente
+  const confirmacao = useConfirmacaoInteligente();
+  const validacao = useValidacaoFinanceira();
 
   // Carregamento inicial dos dados
   useEffect(() => {
@@ -187,12 +193,32 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
   };
 
   const handleExcluirConta = async (contaId: string) => {
-    if (window.confirm('Tem certeza que deseja excluir esta conta?')) {
-      try {
-        setContas(contas.filter(c => c.id !== contaId));
-      } catch (err) {
-        console.error('Erro ao excluir conta:', err);
-      }
+    try {
+      // Buscar a conta para validação
+      const conta = contas.find(c => c.id === contaId);
+      if (!conta) return;
+
+      // Usar confirmação inteligente baseada no status da conta
+      const tipoConfirmacao = conta.status === StatusContaPagar.PAGO ? 'estornar-pagamento' : 'excluir-transacao';
+      
+      // Obter dados contextuais
+      const dadosContexto = {
+        numero: conta.numero,
+        valor: conta.valorTotal,
+        cliente: conta.fornecedor?.nome,
+        status: STATUS_LABELS[conta.status]
+      };
+
+      // Mostrar confirmação inteligente
+      confirmacao.confirmar(
+        tipoConfirmacao,
+        async () => {
+          setContas(contas.filter(c => c.id !== contaId));
+        },
+        dadosContexto
+      );
+    } catch (err) {
+      console.error('Erro ao excluir conta:', err);
     }
   };
 
@@ -721,6 +747,18 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de Confirmação Inteligente */}
+      {confirmacao.tipo && (
+        <ModalConfirmacao
+          isOpen={confirmacao.isOpen}
+          onClose={confirmacao.fechar}
+          onConfirm={confirmacao.executarConfirmacao}
+          tipo={confirmacao.tipo}
+          dados={confirmacao.dados}
+          loading={confirmacao.loading}
+        />
       )}
     </div>
   );

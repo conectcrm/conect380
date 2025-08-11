@@ -1,506 +1,517 @@
-/**
- * Serviço de Faturamento e Cobrança
- * Integra com contratos assinados para gerar faturas e controlar pagamentos
- */
+import { api } from './api';
+
+// Enums
+export enum StatusFatura {
+  PENDENTE = 'pendente',
+  ENVIADA = 'enviada',
+  PAGA = 'paga',
+  VENCIDA = 'vencida',
+  CANCELADA = 'cancelada',
+  PARCIALMENTE_PAGA = 'parcialmente_paga'
+}
+
+export enum TipoFatura {
+  UNICA = 'unica',
+  RECORRENTE = 'recorrente',
+  PARCELA = 'parcela',
+  ADICIONAL = 'adicional'
+}
+
+export enum FormaPagamento {
+  PIX = 'pix',
+  CARTAO_CREDITO = 'cartao_credito',
+  CARTAO_DEBITO = 'cartao_debito',
+  BOLETO = 'boleto',
+  TRANSFERENCIA = 'transferencia',
+  DINHEIRO = 'dinheiro'
+}
+
+export enum StatusPagamento {
+  PENDENTE = 'pendente',
+  PROCESSANDO = 'processando',
+  APROVADO = 'aprovado',
+  REJEITADO = 'rejeitado',
+  CANCELADO = 'cancelado',
+  ESTORNADO = 'estornado'
+}
+
+// Interfaces
+export interface ItemFatura {
+  id?: number;
+  descricao: string;
+  quantidade: number;
+  valorUnitario: number;
+  unidade?: string;
+  codigoProduto?: string;
+  percentualDesconto?: number;
+  valorDesconto?: number;
+  valorTotal: number;
+}
 
 export interface Fatura {
-  id: string;
+  id: number;
   numero: string;
   contratoId: string;
-  tipo: 'entrada' | 'parcela' | 'recorrente' | 'avulsa';
-  status: 'pendente' | 'enviada' | 'paga' | 'vencida' | 'cancelada';
-  valorOriginal: number;
-  valorComJuros: number;
-  dataVencimento: Date;
-  dataPagamento?: Date;
-  dataEmissao: Date;
-
-  cliente: {
-    nome: string;
-    documento: string;
-    email: string;
-    endereco: string;
-  };
-
-  empresa: {
-    nome: string;
-    documento: string;
-    email: string;
-  };
-
-  itens: Array<{
-    descricao: string;
-    quantidade: number;
-    valorUnitario: number;
-    valorTotal: number;
-  }>;
-
-  cobranca: {
-    metodo: 'boleto' | 'cartao' | 'pix' | 'transferencia';
-    dadosCobranca?: any;
-    tentativasEnvio: number;
-    proximaCobranca?: Date;
-  };
-
-  pagamento?: {
-    dataPagamento: Date;
-    valorPago: number;
-    metodo: string;
-    comprovante?: string;
-    referencia?: string;
-  };
+  contrato?: any;
+  clienteId: number;
+  cliente?: any;
+  usuarioResponsavelId: string;
+  usuarioResponsavel?: any;
+  tipo: TipoFatura;
+  status: StatusFatura;
+  dataEmissao: string;
+  dataVencimento: string;
+  valorBruto: number;
+  valorDesconto: number;
+  valorLiquido: number;
+  valorImpostos: number;
+  valorTotal: number;
+  // Pode vir do backend; usado nos aggregates quando disponível
+  valorPago?: number;
+  percentualDesconto?: number;
+  formaPagamento?: FormaPagamento;
+  observacoes?: string;
+  linkPagamento?: string;
+  arquivoUrl?: string;
+  notasFiscais?: string[];
+  itens: ItemFatura[];
+  pagamentos?: Pagamento[];
+  diasVencimento?: number;
+  criadoEm: string;
+  atualizadoEm: string;
 }
 
-interface PlanoCobranca {
-  id: string;
+export interface NovaFatura {
   contratoId: string;
-  tipo: 'parcelado' | 'recorrente';
-  parcelas: Array<{
-    numero: number;
-    valor: number;
-    vencimento: Date;
-    faturaId?: string;
-    status: 'pendente' | 'gerada' | 'paga';
-  }>;
-  configuracao: {
-    frequencia?: 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual';
-    diaVencimento: number;
-    jurosAtraso: number;
-    multaAtraso: number;
-    enviarLembrete: boolean;
-    diasLembrete: number[];
-  };
+  clienteId: string; // UUID string
+  usuarioResponsavelId: string;
+  tipo: TipoFatura;
+  dataVencimento: string;
+  formaPagamento?: FormaPagamento;
+  observacoes?: string;
+  percentualDesconto?: number;
+  valorDesconto?: number;
+  itens: Omit<ItemFatura, 'id' | 'valorTotal'>[];
 }
 
-class FaturamentoService {
+export interface AtualizarFatura extends Partial<NovaFatura> {
+  status?: StatusFatura;
+}
 
-  /**
-   * Cria plano de cobrança a partir de um contrato assinado
-   */
-  async criarPlanoCobranca(contratoId: string, configuracao: {
-    tipoPagamento: 'vista' | 'parcelado' | 'recorrente';
-    numeroParcelas?: number;
-    diaVencimento?: number;
-    frequencia?: PlanoCobranca['configuracao']['frequencia'];
-    valorEntrada?: number;
-  }): Promise<PlanoCobranca> {
+export interface Pagamento {
+  id: number;
+  faturaId: number;
+  valor: number;
+  dataPagamento: string;
+  formaPagamento: FormaPagamento;
+  status: StatusPagamento;
+  transacaoId?: string;
+  comprovante?: string;
+  observacoes?: string;
+  criadoEm: string;
+  atualizadoEm: string;
+}
 
+export interface NovoPagamento {
+  faturaId: number;
+  valor: number;
+  dataPagamento: string;
+  formaPagamento: FormaPagamento;
+  transacaoId?: string;
+  comprovante?: string;
+  observacoes?: string;
+}
+
+export interface FiltrosFatura {
+  busca?: string;
+  status?: StatusFatura;
+  tipo?: TipoFatura;
+  clienteId?: number;
+  dataInicial?: string;
+  dataFinal?: string;
+  valorMinimo?: number;
+  valorMaximo?: number;
+  usuarioResponsavelId?: number;
+  formaPagamento?: FormaPagamento;
+  vencidas?: boolean;
+  page?: number;
+  limit?: number;
+  // Novos parâmetros opcionais compatíveis com backend
+  pageSize?: number;
+  sortBy?: string;
+  sortOrder?: 'ASC' | 'DESC';
+  q?: string;
+}
+
+export interface PlanoCobranca {
+  id: number;
+  nome: string;
+  descricao?: string;
+  valor: number;
+  tipo: 'mensal' | 'anual' | 'unico' | 'personalizado';
+  status: 'ativo' | 'inativo' | 'arquivado';
+  clienteId?: number;
+  contratoId?: number;
+  diasVencimento: number;
+  formaPagamento: FormaPagamento;
+  dataInicio: string;
+  dataFim?: string;
+  observacoes?: string;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+export interface NovoPlanoCobranca {
+  nome: string;
+  descricao?: string;
+  valor: number;
+  tipo: 'mensal' | 'anual' | 'unico' | 'personalizado';
+  clienteId?: number;
+  contratoId?: number;
+  diasVencimento: number;
+  formaPagamento: FormaPagamento;
+  dataInicio: string;
+  dataFim?: string;
+  observacoes?: string;
+}
+
+// Tipos compartilhados
+export type Aggregates = { valorTotal?: number; valorRecebido?: number; valorEmAberto?: number };
+
+export type FaturasPaginadasResponse = {
+  data: Fatura[];
+  total: number;
+  page: number;
+  pageSize: number;
+  aggregates?: Aggregates;
+};
+
+// Serviço
+export const faturamentoService = {
+  // ==================== FATURAS ====================
+
+  // Novo tipo de resposta paginada com agregados
+  async listarFaturasPaginadas(
+    filtros?: FiltrosFatura
+  ): Promise<FaturasPaginadasResponse> {
     try {
-      console.log('Criando plano de cobrança para contrato:', contratoId);
+      const params = new URLSearchParams();
 
-      // Mock do contrato
-      const contrato = {
-        id: contratoId,
-        valorTotal: 15000,
-        dataAssinatura: new Date(),
-        condicoes: {
-          formaPagamento: 'Parcelado em 3x sem juros',
-        }
-      };
+      if (filtros) {
+        // Mapeia chaves do frontend para o backend
+        const mapping: Record<string, string> = {
+          busca: 'q',
+          page: 'page',
+          limit: 'pageSize',
+          pageSize: 'pageSize',
+          sortBy: 'sortBy',
+          sortOrder: 'sortOrder',
+          status: 'status',
+          tipo: 'tipo',
+          clienteId: 'clienteId',
+          dataInicial: 'dataInicio',
+          dataFinal: 'dataFim',
+          formaPagamento: 'formaPagamento',
+          vencidas: 'vencidas',
+          q: 'q'
+        };
 
-      const plano: PlanoCobranca = {
-        id: this.gerarIdPlano(),
-        contratoId,
-        tipo: configuracao.tipoPagamento === 'vista' ? 'parcelado' : configuracao.tipoPagamento as any,
-        parcelas: [],
-        configuracao: {
-          frequencia: configuracao.frequencia || 'mensal',
-          diaVencimento: configuracao.diaVencimento || 10,
-          jurosAtraso: 1, // 1% ao mês
-          multaAtraso: 2, // 2%
-          enviarLembrete: true,
-          diasLembrete: [7, 3, 1], // 7, 3 e 1 dia antes do vencimento
-        }
-      };
-
-      // Gerar parcelas
-      if (configuracao.tipoPagamento === 'vista') {
-        plano.parcelas = [{
-          numero: 1,
-          valor: contrato.valorTotal,
-          vencimento: this.calcularProximoVencimento(new Date(), plano.configuracao.diaVencimento),
-          status: 'pendente'
-        }];
-      } else if (configuracao.tipoPagamento === 'parcelado') {
-        const numeroParcelas = configuracao.numeroParcelas || 1;
-        const valorParcela = contrato.valorTotal / numeroParcelas;
-
-        for (let i = 1; i <= numeroParcelas; i++) {
-          const dataVencimento = this.calcularVencimentoParcela(
-            new Date(),
-            i,
-            plano.configuracao.diaVencimento
-          );
-
-          plano.parcelas.push({
-            numero: i,
-            valor: valorParcela,
-            vencimento: dataVencimento,
-            status: 'pendente'
-          });
-        }
+        Object.entries(filtros).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            const mapped = mapping[key] ?? key;
+            params.append(mapped, String(value));
+          }
+        });
       }
 
-      // Salvar plano
-      await this.salvarPlanoCobranca(plano);
+      // Consumir apenas o endpoint padronizado com metadados dentro de data
+      const response = await api.get(`/faturamento/faturas/paginadas?${params.toString()}`);
+      const d = response.data;
 
-      // Gerar primeira fatura
-      if (plano.parcelas.length > 0) {
-        await this.gerarFaturaParaParcela(plano, plano.parcelas[0]);
+      if (d?.data && Array.isArray(d?.data?.items)) {
+        const items = d.data.items as Fatura[];
+        const total = Number(d.data.total ?? items.length) || 0;
+        const page = Number(d.data.page ?? filtros?.page ?? 1) || 1;
+        const pageSize = Number(d.data.pageSize ?? filtros?.pageSize ?? filtros?.limit ?? items.length) || items.length;
+        const aggregates: Aggregates = d.data.aggregates ?? { valorTotal: 0, valorRecebido: 0, valorEmAberto: 0 };
+        return { data: items, total, page, pageSize, aggregates };
       }
 
-      return plano;
-
+      throw new Error('Formato de resposta inesperado do endpoint /faturamento/faturas/paginadas');
     } catch (error) {
-      console.error('Erro ao criar plano de cobrança:', error);
+      console.error('Erro ao listar faturas:', error);
       throw error;
     }
-  }
+  },
 
-  /**
-   * Gera fatura para uma parcela específica
-   */
-  async gerarFaturaParaParcela(plano: PlanoCobranca, parcela: PlanoCobranca['parcelas'][0]): Promise<Fatura> {
+  // Mantém compatibilidade: retorna apenas o array de faturas
+  async listarFaturas(filtros?: FiltrosFatura): Promise<Fatura[]> {
+    const res = await this.listarFaturasPaginadas(filtros);
+    return res.data;
+  },
+
+  async obterFatura(id: number): Promise<Fatura> {
     try {
-      console.log('Gerando fatura para parcela:', parcela.numero);
-
-      // Mock dos dados do contrato
-      const dadosContrato = {
-        cliente: {
-          nome: 'João Silva',
-          documento: '123.456.789-00',
-          email: 'joao@email.com',
-          endereco: 'Rua das Flores, 123'
-        },
-        empresa: {
-          nome: 'ConectCRM Soluções',
-          documento: '12.345.678/0001-90',
-          email: 'financeiro@conectcrm.com.br'
-        },
-        objeto: {
-          descricao: 'Sistema CRM Premium',
-          produtos: [{
-            nome: 'Sistema CRM Premium',
-            descricao: 'Sistema completo de gestão',
-            quantidade: 1,
-            valorUnitario: parcela.valor,
-            valorTotal: parcela.valor
-          }]
-        }
-      };
-
-      const fatura: Fatura = {
-        id: this.gerarIdFatura(),
-        numero: await this.gerarNumeroFatura(),
-        contratoId: plano.contratoId,
-        tipo: plano.parcelas.length === 1 ? 'entrada' : 'parcela',
-        status: 'pendente',
-        valorOriginal: parcela.valor,
-        valorComJuros: parcela.valor,
-        dataVencimento: parcela.vencimento,
-        dataEmissao: new Date(),
-
-        cliente: dadosContrato.cliente,
-        empresa: dadosContrato.empresa,
-
-        itens: dadosContrato.objeto.produtos.map(produto => ({
-          descricao: `${produto.nome} - Parcela ${parcela.numero}/${plano.parcelas.length}`,
-          quantidade: produto.quantidade,
-          valorUnitario: produto.valorUnitario,
-          valorTotal: produto.valorTotal
-        })),
-
-        cobranca: {
-          metodo: 'boleto', // Padrão
-          tentativasEnvio: 0,
-          proximaCobranca: parcela.vencimento
-        }
-      };
-
-      // Salvar fatura
-      await this.salvarFatura(fatura);
-
-      // Atualizar parcela com ID da fatura
-      parcela.faturaId = fatura.id;
-      parcela.status = 'gerada';
-      await this.salvarPlanoCobranca(plano);
-
-      // Gerar documento de cobrança
-      await this.gerarDocumentoCobranca(fatura);
-
-      return fatura;
-
+      const response = await api.get(`/faturamento/faturas/${id}`);
+      return response.data.data || response.data;
     } catch (error) {
-      console.error('Erro ao gerar fatura:', error);
+      console.error('Erro ao obter fatura:', error);
       throw error;
     }
-  }
+  },
 
-  /**
-   * Envia fatura por email para o cliente
-   */
-  async enviarFaturaPorEmail(faturaId: string): Promise<void> {
+  async criarFatura(dadosFatura: NovaFatura): Promise<Fatura> {
+    let backendData: any;
     try {
-      const fatura = await this.obterFatura(faturaId);
-      if (!fatura) {
-        throw new Error('Fatura não encontrada');
-      }
+      console.log('💰 [FRONTEND] Dados originais da fatura:', JSON.stringify(dadosFatura, null, 2));
 
-      console.log('Enviando fatura por email para:', fatura.cliente.email);
-
-      // Dados para o template de email
-      const dadosEmail = {
-        nomeCliente: fatura.cliente.nome,
-        numeroFatura: fatura.numero,
-        valorFatura: new Intl.NumberFormat('pt-BR', {
-          style: 'currency',
-          currency: 'BRL'
-        }).format(fatura.valorOriginal),
-        dataVencimento: fatura.dataVencimento.toLocaleDateString('pt-BR'),
-        linkPagamento: await this.gerarLinkPagamento(faturaId),
+      // Transform data to match backend DTO structure
+      backendData = {
+        clienteId: dadosFatura.clienteId,
+        usuarioResponsavelId: String(dadosFatura.usuarioResponsavelId), // Ensure it's a string for UUID validation
+        tipo: dadosFatura.tipo,
+        descricao: dadosFatura.observacoes || `Fatura ${dadosFatura.tipo}`, // Backend requires descricao field
+        dataVencimento: dadosFatura.dataVencimento,
+        observacoes: dadosFatura.observacoes,
+        valorDesconto: dadosFatura.valorDesconto || 0,
+        itens: dadosFatura.itens.map(item => ({
+          descricao: item.descricao,
+          quantidade: Math.max(item.quantidade, 0.01),
+          valorUnitario: Math.max(item.valorUnitario, 0.01),
+          unidade: item.unidade || 'un',
+          codigoProduto: item.codigoProduto || '',
+          percentualDesconto: item.percentualDesconto || 0,
+          valorDesconto: item.valorDesconto || 0
+        }))
       };
 
-      // Simular envio de email
-      console.log('Dados do email:', dadosEmail);
+      // Only include contratoId if it's a valid number
+      if (dadosFatura.contratoId && dadosFatura.contratoId !== '' && !isNaN(Number(dadosFatura.contratoId))) {
+        backendData.contratoId = Number(dadosFatura.contratoId);
+      }
 
-      // Atualizar status e tentativas
-      fatura.status = 'enviada';
-      fatura.cobranca.tentativasEnvio++;
-      await this.salvarFatura(fatura);
+      // Only include formaPagamentoPreferida if provided
+      if (dadosFatura.formaPagamento) {
+        backendData.formaPagamentoPreferida = dadosFatura.formaPagamento;
+      }
 
-    } catch (error) {
-      console.error('Erro ao enviar fatura:', error);
+      console.log('💰 [FRONTEND] Dados transformados para backend:', JSON.stringify(backendData, null, 2));
+
+      const response = await api.post('/faturamento/faturas', backendData);
+      return response.data.data || response.data;
+    } catch (error: any) {
+      console.error('❌ [FRONTEND] Erro detalhado ao criar fatura:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        originalData: dadosFatura,
+        transformedData: backendData,
+        fullError: error
+      });
+
+      // Log específico da resposta do backend
+      if (error.response?.data) {
+        console.error('🔍 [BACKEND RESPONSE]:', JSON.stringify(error.response.data, null, 2));
+      }
+
       throw error;
     }
-  }
+  },
 
-  /**
-   * Processa pagamento de uma fatura
-   */
-  async processarPagamento(faturaId: string, dadosPagamento: {
-    valor: number;
-    metodo: string;
-    comprovante?: string;
-    referencia?: string;
-  }): Promise<void> {
+  async atualizarFatura(id: number, dadosFatura: AtualizarFatura): Promise<Fatura> {
     try {
-      const fatura = await this.obterFatura(faturaId);
-      if (!fatura) {
-        throw new Error('Fatura não encontrada');
-      }
+      const response = await api.put(`/faturamento/faturas/${id}`, dadosFatura);
+      return response.data.data || response.data;
+    } catch (error) {
+      console.error('Erro ao atualizar fatura:', error);
+      throw error;
+    }
+  },
 
-      console.log('Processando pagamento para fatura:', fatura.numero);
+  async excluirFatura(id: number): Promise<void> {
+    try {
+      await api.delete(`/faturamento/faturas/${id}`);
+    } catch (error) {
+      console.error('Erro ao excluir fatura:', error);
+      throw error;
+    }
+  },
 
-      // Registrar pagamento
-      fatura.pagamento = {
-        dataPagamento: new Date(),
-        valorPago: dadosPagamento.valor,
-        metodo: dadosPagamento.metodo,
-        comprovante: dadosPagamento.comprovante,
-        referencia: dadosPagamento.referencia,
-      };
+  async gerarFaturaAutomatica(contratoId: number): Promise<Fatura> {
+    try {
+      // Ajuste para a rota real mapeada no backend
+      const response = await api.post('/faturamento/faturas/automatica', { contratoId });
+      return response.data.data || response.data;
+    } catch (error) {
+      console.error('Erro ao gerar fatura automática:', error);
+      throw error;
+    }
+  },
 
-      fatura.status = 'paga';
-      fatura.dataPagamento = new Date();
+  async enviarFaturaPorEmail(id: number, email?: string): Promise<void> {
+    try {
+      await api.post(`/faturamento/faturas/${id}/enviar-email`, { email });
+    } catch (error) {
+      console.error('Erro ao enviar fatura por email:', error);
+      throw error;
+    }
+  },
 
-      await this.salvarFatura(fatura);
+  async gerarLinkPagamento(id: number): Promise<string> {
+    try {
+      const response = await api.post(`/faturamento/faturas/${id}/link-pagamento`);
+      return response.data.data?.linkPagamento || response.data.linkPagamento;
+    } catch (error) {
+      console.error('Erro ao gerar link de pagamento:', error);
+      throw error;
+    }
+  },
 
-      // Notificar pagamento
-      await this.notificarPagamento(fatura);
+  async baixarPDF(id: number): Promise<Blob> {
+    try {
+      const response = await api.get(`/faturamento/faturas/${id}/pdf`, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao baixar PDF da fatura:', error);
+      throw error;
+    }
+  },
 
-      // Verificar se pode gerar próxima fatura
-      await this.verificarProximaFatura(fatura.contratoId);
+  // ==================== PAGAMENTOS ====================
 
+  async listarPagamentos(faturaId?: number): Promise<Pagamento[]> {
+    try {
+      const url = faturaId
+        ? `/faturamento/pagamentos?faturaId=${faturaId}`
+        : '/faturamento/pagamentos';
+      const response = await api.get(url);
+      return response.data.data || response.data;
+    } catch (error) {
+      console.error('Erro ao listar pagamentos:', error);
+      throw error;
+    }
+  },
+
+  async criarPagamento(dadosPagamento: NovoPagamento): Promise<Pagamento> {
+    try {
+      const response = await api.post('/faturamento/pagamentos', dadosPagamento);
+      return response.data.data || response.data;
+    } catch (error) {
+      console.error('Erro ao criar pagamento:', error);
+      throw error;
+    }
+  },
+
+  async processarPagamento(id: number, dadosProcessamento: any): Promise<Pagamento> {
+    try {
+      // O endpoint não usa o ID, mas sim o gatewayTransacaoId no body
+      const response = await api.post(`/faturamento/pagamentos/processar`, dadosProcessamento);
+      return response.data.data || response.data;
     } catch (error) {
       console.error('Erro ao processar pagamento:', error);
       throw error;
     }
-  }
+  },
 
-  /**
-   * Verifica faturas vencidas e aplica juros/multa
-   */
-  async processarFaturasVencidas(): Promise<void> {
+  // ==================== PLANOS DE COBRANÇA ====================
+
+  async listarPlanosCobranca(): Promise<PlanoCobranca[]> {
     try {
-      console.log('Processando faturas vencidas...');
-
-      const hoje = new Date();
-      const faturasPendentes = await this.obterFaturasPendentes();
-
-      for (const fatura of faturasPendentes) {
-        const diasAtraso = Math.floor((hoje.getTime() - fatura.dataVencimento.getTime()) / (1000 * 60 * 60 * 24));
-
-        if (diasAtraso > 0) {
-          // Aplicar juros e multa
-          const plano = await this.obterPlanoCobranca(fatura.contratoId);
-          if (plano) {
-            const multa = fatura.valorOriginal * (plano.configuracao.multaAtraso / 100);
-            const juros = fatura.valorOriginal * (plano.configuracao.jurosAtraso / 100) * diasAtraso;
-
-            fatura.valorComJuros = fatura.valorOriginal + multa + juros;
-            fatura.status = 'vencida';
-
-            await this.salvarFatura(fatura);
-
-            // Enviar notificação de vencimento
-            await this.notificarVencimento(fatura);
-          }
-        }
-      }
-
+      const response = await api.get('/faturamento/planos-cobranca');
+      return response.data.data || response.data;
     } catch (error) {
-      console.error('Erro ao processar faturas vencidas:', error);
+      console.error('Erro ao listar planos de cobrança:', error);
       throw error;
     }
-  }
+  },
 
-  /**
-   * Agenda lembretes de vencimento
-   */
-  async agendarLembretes(): Promise<void> {
+  async criarPlanoCobranca(dadosPlano: NovoPlanoCobranca): Promise<PlanoCobranca> {
     try {
-      console.log('Agendando lembretes de vencimento...');
-
-      const hoje = new Date();
-      const faturasPendentes = await this.obterFaturasPendentes();
-
-      for (const fatura of faturasPendentes) {
-        const plano = await this.obterPlanoCobranca(fatura.contratoId);
-        if (!plano?.configuracao.enviarLembrete) continue;
-
-        const diasParaVencimento = Math.floor((fatura.dataVencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
-
-        if (plano.configuracao.diasLembrete.includes(diasParaVencimento)) {
-          await this.enviarLembreteVencimento(fatura);
-        }
-      }
-
+      const response = await api.post('/faturamento/planos-cobranca', dadosPlano);
+      return response.data.data || response.data;
     } catch (error) {
-      console.error('Erro ao agendar lembretes:', error);
+      console.error('Erro ao criar plano de cobrança:', error);
       throw error;
     }
-  }
+  },
 
-  /**
-   * Gera relatório financeiro
-   */
-  async gerarRelatorioFinanceiro(periodo: {
-    dataInicio: Date;
-    dataFim: Date;
-  }): Promise<{
-    totalFaturado: number;
-    totalRecebido: number;
-    totalPendente: number;
-    totalVencido: number;
-    faturasPorStatus: Record<string, number>;
-    recebimentosPorMes: Array<{ mes: string; valor: number }>;
-  }> {
+  // ==================== RELATÓRIOS ====================
+
+  async obterEstatisticas(periodo?: { inicio: string; fim: string }) {
     try {
-      console.log('Gerando relatório financeiro...');
-
-      // Mock de dados para exemplo
-      return {
-        totalFaturado: 45000,
-        totalRecebido: 30000,
-        totalPendente: 12000,
-        totalVencido: 3000,
-        faturasPorStatus: {
-          'pendente': 8,
-          'enviada': 5,
-          'paga': 15,
-          'vencida': 2,
-          'cancelada': 1
-        },
-        recebimentosPorMes: [
-          { mes: 'Janeiro', valor: 15000 },
-          { mes: 'Fevereiro', valor: 18000 },
-          { mes: 'Março', valor: 12000 }
-        ]
-      };
-
+      const params = periodo ? `?inicio=${periodo.inicio}&fim=${periodo.fim}` : '';
+      const response = await api.get(`/faturamento/relatorios/estatisticas${params}`);
+      return response.data.data || response.data;
     } catch (error) {
-      console.error('Erro ao gerar relatório:', error);
+      console.error('Erro ao obter estatísticas:', error);
       throw error;
     }
+  },
+
+  async obterFaturasVencidas(): Promise<Fatura[]> {
+    try {
+      const response = await api.get('/faturamento/relatorios/vencidas');
+      return response.data.data || response.data;
+    } catch (error) {
+      console.error('Erro ao obter faturas vencidas:', error);
+      throw error;
+    }
+  },
+
+  // ==================== UTILITÁRIOS ====================
+
+  formatarNumeroFatura(numero: string): string {
+    return numero.padStart(6, '0');
+  },
+
+  formatarStatusFatura(status: StatusFatura): string {
+    const statusMap = {
+      [StatusFatura.PENDENTE]: 'Pendente',
+      [StatusFatura.ENVIADA]: 'Enviada',
+      [StatusFatura.PAGA]: 'Paga',
+      [StatusFatura.VENCIDA]: 'Vencida',
+      [StatusFatura.CANCELADA]: 'Cancelada',
+      [StatusFatura.PARCIALMENTE_PAGA]: 'Parcialmente Paga'
+    };
+    return statusMap[status] || status;
+  },
+
+  formatarTipoFatura(tipo: TipoFatura): string {
+    const tipoMap = {
+      [TipoFatura.UNICA]: 'Única',
+      [TipoFatura.RECORRENTE]: 'Recorrente',
+      [TipoFatura.PARCELA]: 'Parcela',
+      [TipoFatura.ADICIONAL]: 'Adicional'
+    };
+    return tipoMap[tipo] || tipo;
+  },
+
+  formatarFormaPagamento(forma: FormaPagamento): string {
+    const formaMap = {
+      [FormaPagamento.PIX]: 'PIX',
+      [FormaPagamento.CARTAO_CREDITO]: 'Cartão de Crédito',
+      [FormaPagamento.CARTAO_DEBITO]: 'Cartão de Débito',
+      [FormaPagamento.BOLETO]: 'Boleto',
+      [FormaPagamento.TRANSFERENCIA]: 'Transferência',
+      [FormaPagamento.DINHEIRO]: 'Dinheiro'
+    };
+    return formaMap[forma] || forma;
+  },
+
+  calcularValorTotal(itens: ItemFatura[]): number {
+    return itens.reduce((total, item) => {
+      const subtotal = item.quantidade * item.valorUnitario;
+      const desconto = item.valorDesconto || (subtotal * (item.percentualDesconto || 0)) / 100;
+      return total + (subtotal - desconto);
+    }, 0);
+  },
+
+  verificarVencimento(dataVencimento: string): boolean {
+    return new Date(dataVencimento) < new Date();
   }
+};
 
-  // Métodos auxiliares privados
-
-  private gerarIdPlano(): string {
-    return `PLANO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  private gerarIdFatura(): string {
-    return `FAT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  private async gerarNumeroFatura(): Promise<string> {
-    const ano = new Date().getFullYear();
-    const mes = (new Date().getMonth() + 1).toString().padStart(2, '0');
-    const proximoNumero = 1; // Implementar busca do último número
-    return `${ano}${mes}${proximoNumero.toString().padStart(6, '0')}`;
-  }
-
-  private calcularProximoVencimento(dataBase: Date, diaVencimento: number): Date {
-    const proximoMes = new Date(dataBase);
-    proximoMes.setMonth(proximoMes.getMonth() + 1);
-    proximoMes.setDate(diaVencimento);
-    return proximoMes;
-  }
-
-  private calcularVencimentoParcela(dataBase: Date, numeroParcela: number, diaVencimento: number): Date {
-    const vencimento = new Date(dataBase);
-    vencimento.setMonth(vencimento.getMonth() + numeroParcela);
-    vencimento.setDate(diaVencimento);
-    return vencimento;
-  }
-
-  private async salvarPlanoCobranca(plano: PlanoCobranca): Promise<void> {
-    console.log('Salvando plano de cobrança:', plano.id);
-  }
-
-  private async salvarFatura(fatura: Fatura): Promise<void> {
-    console.log('Salvando fatura:', fatura.id);
-  }
-
-  private async obterFatura(faturaId: string): Promise<Fatura | null> {
-    console.log('Obtendo fatura:', faturaId);
-    return null; // Implementar busca real
-  }
-
-  private async obterPlanoCobranca(contratoId: string): Promise<PlanoCobranca | null> {
-    console.log('Obtendo plano de cobrança para contrato:', contratoId);
-    return null; // Implementar busca real
-  }
-
-  private async obterFaturasPendentes(): Promise<Fatura[]> {
-    console.log('Obtendo faturas pendentes...');
-    return []; // Implementar busca real
-  }
-
-  private async gerarDocumentoCobranca(fatura: Fatura): Promise<void> {
-    console.log('Gerando documento de cobrança para fatura:', fatura.numero);
-  }
-
-  private async gerarLinkPagamento(faturaId: string): Promise<string> {
-    return `${window.location.origin}/pagamento/fatura/${faturaId}`;
-  }
-
-  private async notificarPagamento(fatura: Fatura): Promise<void> {
-    console.log('Notificando pagamento da fatura:', fatura.numero);
-  }
-
-  private async verificarProximaFatura(contratoId: string): Promise<void> {
-    console.log('Verificando próxima fatura para contrato:', contratoId);
-  }
-
-  private async notificarVencimento(fatura: Fatura): Promise<void> {
-    console.log('Notificando vencimento da fatura:', fatura.numero);
-  }
-
-  private async enviarLembreteVencimento(fatura: Fatura): Promise<void> {
-    console.log('Enviando lembrete de vencimento para fatura:', fatura.numero);
-  }
-}
-
-export const faturamentoService = new FaturamentoService();
+export default faturamentoService;

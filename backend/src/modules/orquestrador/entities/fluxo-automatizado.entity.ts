@@ -59,13 +59,13 @@ export class FluxoAutomatizado {
   @Column({ type: 'int', default: 6 })
   totalEtapas: number;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   dataInicio: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   dataConclusao: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   dataProximaAcao: Date;
 
   @Column({ type: 'int', default: 0 })

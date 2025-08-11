@@ -6,6 +6,8 @@ import ModalFornecedor from '../components/ModalFornecedor';
 import ModalDetalhesFornecedor from '../components/ModalDetalhesFornecedor';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 import { exportToCSV, exportToExcel, formatDateForExport, formatStatusForExport, ExportColumn } from '../../../utils/exportUtils';
+import ModalConfirmacao from '../../../components/common/ModalConfirmacao';
+import { useConfirmacaoInteligente, useValidacaoFinanceira } from '../../../hooks/useConfirmacaoInteligente';
 
 export { }; // Para resolver o erro isolatedModules
 
@@ -30,6 +32,10 @@ export default function FornecedoresPage() {
   // Estados para seleção múltipla
   const [fornecedoresSelecionados, setFornecedoresSelecionados] = useState<string[]>([]);
   const [mostrarAcoesMassa, setMostrarAcoesMassa] = useState(false);
+
+  // Hooks para confirmação inteligente
+  const confirmacao = useConfirmacaoInteligente();
+  const validacao = useValidacaoFinanceira();
 
   const [dashboardCards, setDashboardCards] = useState<DashboardCards>({
     totalFornecedores: 0,
@@ -144,13 +150,26 @@ export default function FornecedoresPage() {
   };
 
   const excluirFornecedor = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir este fornecedor?')) {
-      return;
-    }
-
     try {
-      await fornecedorService.excluirFornecedor(id);
-      carregarFornecedores();
+      // Buscar o fornecedor para validação
+      const fornecedor = fornecedores.find(f => f.id === id);
+      if (!fornecedor) return;
+
+      // Usar confirmação inteligente
+      const dadosContexto = {
+        cliente: fornecedor.nome,
+        observacoes: fornecedor.ativo ? 'Fornecedor ativo' : 'Fornecedor inativo'
+      };
+
+      // Mostrar confirmação inteligente
+      confirmacao.confirmar(
+        'excluir-transacao', // Usando tipo genérico para fornecedor
+        async () => {
+          await fornecedorService.excluirFornecedor(id);
+          carregarFornecedores();
+        },
+        dadosContexto
+      );
     } catch (error) {
       console.error('Erro ao excluir fornecedor:', error);
     }
@@ -267,20 +286,18 @@ export default function FornecedoresPage() {
   };
 
   const excluirSelecionados = async () => {
-    if (!window.confirm(`Tem certeza que deseja excluir ${fornecedoresSelecionados.length} fornecedor(es)? Esta ação não pode ser desfeita.`)) {
-      return;
-    }
-
-    try {
-      for (const id of fornecedoresSelecionados) {
-        await fornecedorService.excluirFornecedor(id);
-      }
-
-      deselecionarTodos();
-      carregarFornecedores();
-    } catch (error) {
-      console.error('Erro ao excluir fornecedores:', error);
-    }
+    // Usar confirmação inteligente para exclusão em massa
+    confirmacao.confirmar(
+      'excluir-categoria-financeira', // Tipo apropriado para múltiplos fornecedores
+      async () => {
+        for (const id of fornecedoresSelecionados) {
+          await fornecedorService.excluirFornecedor(id);
+        }
+        deselecionarTodos();
+        carregarFornecedores();
+      },
+      { quantidadeItens: fornecedoresSelecionados.length }
+    );
   };
 
   const exportarSelecionados = () => {
@@ -729,6 +746,18 @@ export default function FornecedoresPage() {
             onClose={fecharModalDetalhes}
             fornecedor={fornecedorDetalhes}
             onEdit={abrirModalEdicao}
+          />
+        )}
+
+        {/* Modal de Confirmação Inteligente */}
+        {confirmacao.tipo && (
+          <ModalConfirmacao
+            isOpen={confirmacao.isOpen}
+            onClose={confirmacao.fechar}
+            onConfirm={confirmacao.executarConfirmacao}
+            tipo={confirmacao.tipo}
+            dados={confirmacao.dados}
+            loading={confirmacao.loading}
           />
         )}
       </div>

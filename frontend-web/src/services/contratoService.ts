@@ -116,8 +116,26 @@ class ContratoService {
   // Listar contratos
   async listarContratos(): Promise<Contrato[]> {
     try {
-      const response = await api.get('/contratos');
-      return response.data;
+      // FIXME: Temporariamente usando empresaId fixo até implementar autenticação completa
+      const empresaId = 1; // ID da empresa padrão para testes
+
+      console.log('📋 [FRONTEND] Listando contratos para empresaId:', empresaId);
+
+      const response = await api.get('/contratos', {
+        params: {
+          empresaId: empresaId
+        }
+      });
+
+      console.log('✅ [FRONTEND] Contratos recebidos:', response.data);
+
+      // O backend retorna um objeto com { success, message, data }
+      if (response.data.success) {
+        return response.data.data || [];
+      } else {
+        console.warn('⚠️ Backend retornou erro:', response.data.message);
+        return [];
+      }
     } catch (error) {
       console.error('❌ Erro ao listar contratos:', error);
       throw error;

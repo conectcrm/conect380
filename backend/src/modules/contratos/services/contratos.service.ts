@@ -62,11 +62,9 @@ export class ContratosService {
       dataFim?: Date;
     }
   ): Promise<Contrato[]> {
+    // Consulta simplificada para teste - sem joins por enquanto
     const query = this.contratoRepository
       .createQueryBuilder('contrato')
-      .leftJoinAndSelect('contrato.proposta', 'proposta')
-      .leftJoinAndSelect('contrato.usuarioResponsavel', 'usuario')
-      .leftJoinAndSelect('contrato.assinaturas', 'assinaturas')
       .where('contrato.ativo = :ativo', { ativo: true });
 
     if (filtros?.status) {

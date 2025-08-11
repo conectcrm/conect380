@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from 'react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -60,7 +60,8 @@ import PortalClientePage from './pages/PortalClientePage';
 import ConfiguracaoEmailPage from './pages/ConfiguracaoEmailPage';
 import ScrollToTop from './components/common/ScrollToTop';
 import { BillingPage } from './pages/billing';
-import { FaturamentoPage } from './pages/faturamento';
+import FaturamentoPage from './pages/faturamento/FaturamentoPage';
+import CotacaoPage from './pages/CotacaoPage';
 
 // Configuração do React Query
 const queryClient = new QueryClient({
@@ -254,6 +255,8 @@ const AppRoutes: React.FC = () => {
           <Route path="/clientes" element={<ClientesPage />} />
           <Route path="/contatos" element={<ContatosPage />} />
           <Route path="/propostas" element={<PropostasPage />} />
+          <Route path="/cotacoes" element={<CotacaoPage />} />
+          <Route path="/orcamentos" element={<CotacaoPage />} />
           <Route path="/funil-vendas" element={<FunilVendas />} />
           <Route path="/produtos" element={<ProdutosPage />} />
           <Route path="/produtos/categorias" element={<CategoriasProdutosPage />} />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { faturamentoAPI, FaturaRequest, FaturaResponse, PagamentoRequest } from '../services/faturamentoAPI';
 import toast from 'react-hot-toast';
 
@@ -11,6 +11,10 @@ export const useFaturas = (filtros?: {
   dataFim?: string;
   page?: number;
   limit?: number;
+  pageSize?: number;
+  sortBy?: string;
+  sortOrder?: 'ASC' | 'DESC';
+  q?: string;
 }) => {
   return useQuery(
     ['faturas', filtros],

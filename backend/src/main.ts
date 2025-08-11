@@ -64,7 +64,8 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);
 
-  const port = process.env.APP_PORT || 3000;
+  // Porta padrão ajustada para 3001 para alinhar com frontend e documentação
+  const port = process.env.APP_PORT || 3001;
   await app.listen(port);
 
   console.log(`🚀 Conect CRM Backend rodando na porta ${port}`);

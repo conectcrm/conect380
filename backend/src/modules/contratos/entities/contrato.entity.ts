@@ -25,18 +25,19 @@ export class Contrato {
   @Column({ unique: true })
   numero: string;
 
-  @Column()
-  propostaId: number;
+  // Ajustado para UUID para alinhar com Proposta.id (migration correspondente altera o tipo na base)
+  @Column('uuid', { nullable: true })
+  propostaId: string;
 
-  @ManyToOne(() => Proposta, { eager: true })
+  @ManyToOne(() => Proposta, { eager: false, nullable: true })
   @JoinColumn({ name: 'propostaId' })
   proposta: Proposta;
 
-  @Column()
-  clienteId: number;
+  @Column('uuid')
+  clienteId: string;
 
-  @Column()
-  usuarioResponsavelId: number;
+  @Column('uuid')
+  usuarioResponsavelId: string;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'usuarioResponsavelId' })

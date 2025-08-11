@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsEnum, IsOptional, IsDateString, IsArray, ValidateNested, IsBoolean, Min, Max } from 'class-validator';
+import { IsString, IsNumber, IsEnum, IsOptional, IsDateString, IsArray, ValidateNested, IsBoolean, Min, Max, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
 import { TipoFatura, FormaPagamento } from '../entities/fatura.entity';
 
@@ -35,14 +35,16 @@ export class ItemFaturaDto {
 }
 
 export class CreateFaturaDto {
+  @IsOptional()
   @IsNumber()
-  contratoId: number;
+  contratoId?: number;
 
-  @IsNumber()
-  clienteId: number;
+  // ✅ CORREÇÃO: Usar UUID para cliente
+  @IsUUID(4, { message: 'ID do cliente deve ser um UUID válido' })
+  clienteId: string;
 
-  @IsNumber()
-  usuarioResponsavelId: number;
+  @IsUUID()
+  usuarioResponsavelId: string;
 
   @IsEnum(TipoFatura)
   tipo: TipoFatura;

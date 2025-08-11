@@ -29,7 +29,8 @@ export class PagamentoService {
         throw new NotFoundException('Fatura não encontrada');
       }
 
-      if (fatura.isPaga()) {
+      // Verificação direta do status em vez de usar o método isPaga()
+      if (fatura.status === StatusFatura.PAGA) {
         throw new BadRequestException('Fatura já está paga');
       }
 

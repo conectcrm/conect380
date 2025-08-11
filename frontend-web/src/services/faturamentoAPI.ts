@@ -80,7 +80,11 @@ class FaturamentoAPIService {
     dataFim?: string;
     page?: number;
     limit?: number;
-  }): Promise<{ faturas: FaturaResponse[]; total: number }> {
+    pageSize?: number;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+    q?: string;
+  }): Promise<{ faturas: FaturaResponse[]; total: number; page: number; pageSize: number; aggregates?: { valorTotal?: number; valorRecebido?: number; valorEmAberto?: number } }> {
     const params = new URLSearchParams();
 
     if (filtros?.status) params.append('status', filtros.status);
@@ -88,10 +92,27 @@ class FaturamentoAPIService {
     if (filtros?.dataInicio) params.append('dataInicio', filtros.dataInicio);
     if (filtros?.dataFim) params.append('dataFim', filtros.dataFim);
     if (filtros?.page) params.append('page', filtros.page.toString());
-    if (filtros?.limit) params.append('limit', filtros.limit.toString());
+    if (filtros?.limit) params.append('pageSize', filtros.limit.toString());
+    if (filtros?.pageSize) params.append('pageSize', filtros.pageSize.toString());
+    if (filtros?.sortBy) params.append('sortBy', filtros.sortBy);
+    if (filtros?.sortOrder) params.append('sortOrder', filtros.sortOrder);
+    if (filtros?.q) params.append('q', filtros.q);
 
-    const response = await api.get(`/faturamento/faturas?${params.toString()}`);
-    return response.data;
+    // Consumir apenas o endpoint padronizado com metadados em data
+    const response = await api.get(`/faturamento/faturas/paginadas?${params.toString()}`);
+    const d = response.data;
+
+    if (d?.data && Array.isArray(d?.data?.items)) {
+      return {
+        faturas: d.data.items,
+        total: Number(d.data.total ?? d.data.items?.length ?? 0) || 0,
+        page: Number(d.data.page ?? 1) || 1,
+        pageSize: Number(d.data.pageSize ?? d.data.items?.length ?? 0) || 0,
+        aggregates: d.data.aggregates,
+      };
+    }
+
+    throw new Error('Formato de resposta inesperado do endpoint /faturamento/faturas/paginadas');
   }
 
   async buscarFaturaPorId(id: string): Promise<FaturaResponse> {
@@ -114,7 +135,8 @@ class FaturamentoAPIService {
   }
 
   async gerarFaturaAutomatica(contratoId: string): Promise<FaturaResponse> {
-    const response = await api.post('/faturamento/gerar-automatica', { contratoId });
+    // Ajuste para a rota real mapeada
+    const response = await api.post('/faturamento/faturas/automatica', { contratoId });
     return response.data;
   }
 

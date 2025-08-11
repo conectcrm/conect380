@@ -1,15 +1,15 @@
-import { IsString, IsNumber, IsEnum, IsOptional, IsDateString, IsBoolean, IsObject, Min, Max } from 'class-validator';
+import { IsString, IsNumber, IsEnum, IsOptional, IsDateString, IsBoolean, IsObject, Min, Max, IsUUID } from 'class-validator';
 import { TipoRecorrencia } from '../entities/plano-cobranca.entity';
 
 export class CreatePlanoCobrancaDto {
   @IsNumber()
   contratoId: number;
 
-  @IsNumber()
-  clienteId: number;
+  @IsUUID(4)
+  clienteId: string;
 
-  @IsNumber()
-  usuarioResponsavelId: number;
+  @IsUUID()
+  usuarioResponsavelId: string;
 
   @IsString()
   nome: string;

@@ -1,0 +1,26 @@
+# ConectCRM - Configuração do Copilot
+
+Este projeto segue diretrizes específicas de documentação. 
+
+## 📋 Instruções para o GitHub Copilot
+
+**SEMPRE consulte e siga as diretrizes do arquivo `COPILOT_DOCUMENTATION_GUIDELINES.md`** antes de criar qualquer documentação.
+
+### Padrão Obrigatório de Documentação:
+- 3 arquivos mínimos: README.md + técnico + exemplos
+- Estrutura `doc/[modulo]/`
+- Multi-público: desenvolvedores, usuários, QA
+- Casos práticos por perfil profissional
+- Troubleshooting e arquitetura técnica
+- Roadmap de futuras funcionalidades
+
+### Exemplo de Referência:
+Consulte `doc/faturamento/` como modelo perfeito a ser seguido.
+
+### Não aceito:
+- Documentação em arquivo único
+- Ausência de exemplos práticos
+- Falta de casos de uso por perfil
+- Omissão de troubleshooting
+
+**Esta configuração garante consistência e qualidade em toda documentação do projeto.**

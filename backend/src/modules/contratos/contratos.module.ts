@@ -23,6 +23,7 @@ import { PropostasModule } from '../propostas/propostas.module';
     ContratosService,
     AssinaturaDigitalService,
     PdfContratoService,
+    TypeOrmModule, // Exporta os repositórios
   ],
 })
 export class ContratosModule { }
