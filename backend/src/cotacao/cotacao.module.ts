@@ -5,7 +5,7 @@ import { CotacaoService } from './cotacao.service';
 import { Cotacao } from './entities/cotacao.entity';
 import { ItemCotacao } from './entities/item-cotacao.entity';
 import { AnexoCotacao } from './entities/anexo-cotacao.entity';
-import { Cliente } from '../modules/clientes/cliente.entity';
+import { Fornecedor } from '../modules/financeiro/entities/fornecedor.entity';
 import { User } from '../modules/users/user.entity';
 
 @Module({
@@ -14,7 +14,7 @@ import { User } from '../modules/users/user.entity';
       Cotacao,
       ItemCotacao,
       AnexoCotacao,
-      Cliente,
+      Fornecedor,
       User
     ])
   ],
@@ -22,4 +22,4 @@ import { User } from '../modules/users/user.entity';
   providers: [CotacaoService],
   exports: [CotacaoService]
 })
-export class CotacaoModule {}
+export class CotacaoModule { }

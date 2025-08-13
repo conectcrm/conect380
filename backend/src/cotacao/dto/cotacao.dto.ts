@@ -1,14 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { 
-  IsString, 
-  IsUUID, 
-  IsEnum, 
-  IsNumber, 
-  IsDate, 
-  IsOptional, 
-  IsArray, 
-  ValidateNested, 
-  Min, 
+import {
+  IsString,
+  IsUUID,
+  IsEnum,
+  IsNumber,
+  IsDate,
+  IsOptional,
+  IsArray,
+  ValidateNested,
+  Min,
   Max,
   IsEmail,
   IsBoolean,
@@ -100,18 +100,18 @@ export class ItemCotacaoResponseDto extends CriarItemCotacaoDto {
   dataCriacao: Date;
 }
 
-// DTO principal para criar cotação
+// DTO principal para criar cotação de aquisição
 export class CriarCotacaoDto {
-  @ApiProperty({ description: 'ID do cliente' })
+  @ApiProperty({ description: 'ID do fornecedor' })
   @IsUUID()
-  clienteId: string;
+  fornecedorId: string;
 
-  @ApiProperty({ description: 'Título da cotação' })
+  @ApiProperty({ description: 'Título da solicitação de cotação' })
   @IsString()
   @Length(1, 200)
   titulo: string;
 
-  @ApiPropertyOptional({ description: 'Descrição da cotação' })
+  @ApiPropertyOptional({ description: 'Descrição da solicitação' })
   @IsOptional()
   @IsString()
   descricao?: string;
@@ -120,10 +120,16 @@ export class CriarCotacaoDto {
   @IsEnum(PrioridadeCotacao)
   prioridade: PrioridadeCotacao;
 
-  @ApiProperty({ description: 'Data de vencimento' })
+  @ApiPropertyOptional({ description: 'Prazo máximo para resposta da cotação' })
+  @IsOptional()
   @Type(() => Date)
   @IsDate()
-  dataVencimento: Date;
+  prazoResposta?: Date;
+
+  @ApiPropertyOptional({ description: 'Prazo de entrega esperado' })
+  @IsOptional()
+  @IsString()
+  prazoEntrega?: string;
 
   @ApiPropertyOptional({ description: 'Observações' })
   @IsOptional()
@@ -134,11 +140,6 @@ export class CriarCotacaoDto {
   @IsOptional()
   @IsString()
   condicoesPagamento?: string;
-
-  @ApiPropertyOptional({ description: 'Prazo de entrega' })
-  @IsOptional()
-  @IsString()
-  prazoEntrega?: string;
 
   @ApiPropertyOptional({ description: 'Validade do orçamento em dias' })
   @IsOptional()
@@ -159,20 +160,20 @@ export class CriarCotacaoDto {
   itens: CriarItemCotacaoDto[];
 }
 
-// DTO para atualizar cotação
+// DTO para atualizar cotação de aquisição
 export class AtualizarCotacaoDto {
-  @ApiPropertyOptional({ description: 'ID do cliente' })
+  @ApiPropertyOptional({ description: 'ID do fornecedor' })
   @IsOptional()
   @IsUUID()
-  clienteId?: string;
+  fornecedorId?: string;
 
-  @ApiPropertyOptional({ description: 'Título da cotação' })
+  @ApiPropertyOptional({ description: 'Título da solicitação de cotação' })
   @IsOptional()
   @IsString()
   @Length(1, 200)
   titulo?: string;
 
-  @ApiPropertyOptional({ description: 'Descrição da cotação' })
+  @ApiPropertyOptional({ description: 'Descrição da solicitação' })
   @IsOptional()
   @IsString()
   descricao?: string;
@@ -182,11 +183,11 @@ export class AtualizarCotacaoDto {
   @IsEnum(PrioridadeCotacao)
   prioridade?: PrioridadeCotacao;
 
-  @ApiPropertyOptional({ description: 'Data de vencimento' })
+  @ApiPropertyOptional({ description: 'Prazo máximo para resposta da cotação' })
   @IsOptional()
   @Type(() => Date)
   @IsDate()
-  dataVencimento?: Date;
+  prazoResposta?: Date;
 
   @ApiPropertyOptional({ description: 'Observações' })
   @IsOptional()
@@ -197,11 +198,6 @@ export class AtualizarCotacaoDto {
   @IsOptional()
   @IsString()
   condicoesPagamento?: string;
-
-  @ApiPropertyOptional({ description: 'Prazo de entrega' })
-  @IsOptional()
-  @IsString()
-  prazoEntrega?: string;
 
   @ApiPropertyOptional({ description: 'Validade do orçamento em dias' })
   @IsOptional()
@@ -250,10 +246,10 @@ export class CotacaoQueryDto {
   @IsString()
   busca?: string;
 
-  @ApiPropertyOptional({ description: 'ID do cliente' })
+  @ApiPropertyOptional({ description: 'ID do fornecedor' })
   @IsOptional()
   @IsUUID()
-  clienteId?: string;
+  fornecedorId?: string;
 
   @ApiPropertyOptional({ description: 'Status da cotação', enum: StatusCotacao })
   @IsOptional()
@@ -329,10 +325,10 @@ export class DuplicarCotacaoDto {
   @Length(1, 200)
   titulo?: string;
 
-  @ApiPropertyOptional({ description: 'ID do cliente (se diferente)' })
+  @ApiPropertyOptional({ description: 'ID do fornecedor (se diferente)' })
   @IsOptional()
   @IsUUID()
-  clienteId?: string;
+  fornecedorId?: string;
 
   @ApiPropertyOptional({ description: 'Nova data de vencimento' })
   @IsOptional()
@@ -374,7 +370,7 @@ export class EnviarEmailDto {
   copiaParaRemetente?: boolean;
 }
 
-// DTO de resposta da cotação
+// DTO de resposta da cotação de aquisição
 export class CotacaoResponseDto {
   @ApiProperty({ description: 'ID da cotação' })
   id: string;
@@ -382,10 +378,10 @@ export class CotacaoResponseDto {
   @ApiProperty({ description: 'Número da cotação' })
   numero: string;
 
-  @ApiProperty({ description: 'Título da cotação' })
+  @ApiProperty({ description: 'Título da solicitação de cotação' })
   titulo: string;
 
-  @ApiPropertyOptional({ description: 'Descrição da cotação' })
+  @ApiPropertyOptional({ description: 'Descrição da solicitação' })
   descricao?: string;
 
   @ApiProperty({ description: 'Status', enum: StatusCotacao })
@@ -397,8 +393,8 @@ export class CotacaoResponseDto {
   @ApiProperty({ description: 'Valor total' })
   valorTotal: number;
 
-  @ApiProperty({ description: 'Data de vencimento' })
-  dataVencimento: Date;
+  @ApiPropertyOptional({ description: 'Prazo máximo para resposta da cotação' })
+  prazoResposta?: Date;
 
   @ApiPropertyOptional({ description: 'Observações' })
   observacoes?: string;
@@ -415,15 +411,16 @@ export class CotacaoResponseDto {
   @ApiProperty({ description: 'Origem', enum: OrigemCotacao })
   origem: OrigemCotacao;
 
-  @ApiProperty({ description: 'ID do cliente' })
-  clienteId: string;
+  @ApiProperty({ description: 'ID do fornecedor' })
+  fornecedorId: string;
 
-  @ApiPropertyOptional({ description: 'Dados do cliente' })
-  cliente?: {
+  @ApiPropertyOptional({ description: 'Dados do fornecedor' })
+  fornecedor?: {
     id: string;
     nome: string;
     email?: string;
     telefone?: string;
+    cnpjCpf?: string;
   };
 
   @ApiProperty({ description: 'ID do responsável' })

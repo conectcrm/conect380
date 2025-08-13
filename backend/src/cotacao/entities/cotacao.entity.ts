@@ -1,17 +1,18 @@
-import { 
-  Entity, 
-  PrimaryGeneratedColumn, 
-  Column, 
-  CreateDateColumn, 
-  UpdateDateColumn, 
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
   DeleteDateColumn,
   ManyToOne,
   JoinColumn,
   OneToMany,
   Index
 } from 'typeorm';
-import { Cliente } from '../../cliente/entities/cliente.entity';
-import { User } from '../../users/entities/user.entity';
+import { Cliente } from '../../modules/clientes/cliente.entity';
+import { Fornecedor } from '../../modules/financeiro/entities/fornecedor.entity';
+import { User } from '../../modules/users/user.entity';
 import { ItemCotacao } from './item-cotacao.entity';
 import { AnexoCotacao } from './anexo-cotacao.entity';
 
@@ -44,10 +45,10 @@ export enum OrigemCotacao {
 
 @Entity('cotacoes')
 @Index(['numero'], { unique: true })
-@Index(['clienteId'])
+@Index(['fornecedorId'])
 @Index(['responsavelId'])
 @Index(['status'])
-@Index(['dataVencimento'])
+@Index(['prazoResposta'])
 @Index(['dataCriacao'])
 export class Cotacao {
   @PrimaryGeneratedColumn('uuid')
@@ -86,8 +87,8 @@ export class Cotacao {
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
   valorTotal: number;
 
-  @Column({ type: 'date' })
-  dataVencimento: Date;
+  @Column({ type: 'date', nullable: true })
+  prazoResposta: Date;
 
   @Column({ type: 'text', nullable: true })
   observacoes: string;
@@ -98,16 +99,19 @@ export class Cotacao {
   @Column({ length: 100, nullable: true })
   prazoEntrega: string;
 
+  @Column({ length: 200, nullable: true })
+  localEntrega: string;
+
   @Column({ type: 'int', nullable: true, default: 30 })
   validadeOrcamento: number; // dias
 
   // Relacionamentos
-  @Column({ name: 'cliente_id' })
-  clienteId: string;
+  @Column({ name: 'fornecedor_id' })
+  fornecedorId: string;
 
-  @ManyToOne(() => Cliente, { eager: false })
-  @JoinColumn({ name: 'cliente_id' })
-  cliente: Cliente;
+  @ManyToOne(() => Fornecedor, { eager: false })
+  @JoinColumn({ name: 'fornecedor_id' })
+  fornecedor: Fornecedor;
 
   @Column({ name: 'responsavel_id' })
   responsavelId: string;
@@ -209,14 +213,14 @@ export class Cotacao {
 
   // Método para verificar se está vencida
   get isVencida(): boolean {
-    return this.dataVencimento < new Date() && 
-           ![StatusCotacao.APROVADA, StatusCotacao.CONVERTIDA, StatusCotacao.CANCELADA].includes(this.status);
+    return this.prazoResposta < new Date() &&
+      ![StatusCotacao.APROVADA, StatusCotacao.CONVERTIDA, StatusCotacao.CANCELADA].includes(this.status);
   }
 
   // Método para calcular dias restantes
   get diasRestantes(): number {
     const hoje = new Date();
-    const vencimento = new Date(this.dataVencimento);
+    const vencimento = new Date(this.prazoResposta);
     const diffTime = vencimento.getTime() - hoje.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }

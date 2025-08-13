@@ -9,7 +9,7 @@ import { ProdutosModule } from './modules/produtos/produtos.module';
 import { ContratosModule } from './modules/contratos/contratos.module';
 import { FinanceiroModule } from './modules/financeiro/financeiro.module';
 import { FaturamentoModule } from './modules/faturamento/faturamento.module';
-// import { CotacaoModule } from './cotacao/cotacao.module';
+import { CotacaoModule } from './cotacao/cotacao.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { OportunidadesModule } from './modules/oportunidades/oportunidades.module';
 import { EmpresasModule } from './empresas/empresas.module';
@@ -37,7 +37,7 @@ import { DatabaseConfig } from './config/database.config';
     ContratosModule,
     FinanceiroModule,
     FaturamentoModule,
-    // CotacaoModule,
+    CotacaoModule,
     DashboardModule,
     OportunidadesModule,
     EmpresasModule,

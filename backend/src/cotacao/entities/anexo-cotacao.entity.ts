@@ -1,14 +1,14 @@
-import { 
-  Entity, 
-  PrimaryGeneratedColumn, 
-  Column, 
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
   Index
 } from 'typeorm';
 import { Cotacao } from './cotacao.entity';
-import { User } from '../../users/entities/user.entity';
+import { User } from '../../modules/users/user.entity';
 
 @Entity('anexos_cotacao')
 @Index(['cotacaoId'])

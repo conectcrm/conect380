@@ -4,11 +4,11 @@ import { Repository, SelectQueryBuilder, In, Between } from 'typeorm';
 import { Cotacao, StatusCotacao } from './entities/cotacao.entity';
 import { ItemCotacao } from './entities/item-cotacao.entity';
 import { AnexoCotacao } from './entities/anexo-cotacao.entity';
-import { Cliente } from '../modules/clientes/entities/cliente.entity';
-import { User } from '../modules/users/entities/user.entity';
-import { 
-  CriarCotacaoDto, 
-  AtualizarCotacaoDto, 
+import { Fornecedor } from '../modules/financeiro/entities/fornecedor.entity';
+import { User } from '../modules/users/user.entity';
+import {
+  CriarCotacaoDto,
+  AtualizarCotacaoDto,
   CotacaoQueryDto,
   DuplicarCotacaoDto,
   EnviarEmailDto,
@@ -20,28 +20,28 @@ export class CotacaoService {
   constructor(
     @InjectRepository(Cotacao)
     private cotacaoRepository: Repository<Cotacao>,
-    
+
     @InjectRepository(ItemCotacao)
     private itemCotacaoRepository: Repository<ItemCotacao>,
-    
+
     @InjectRepository(AnexoCotacao)
     private anexoCotacaoRepository: Repository<AnexoCotacao>,
-    
-    @InjectRepository(Cliente)
-    private clienteRepository: Repository<Cliente>,
-    
+
+    @InjectRepository(Fornecedor)
+    private fornecedorRepository: Repository<Fornecedor>,
+
     @InjectRepository(User)
     private userRepository: Repository<User>
-  ) {}
+  ) { }
 
   async criar(criarCotacaoDto: CriarCotacaoDto, userId: string): Promise<CotacaoResponseDto> {
-    // Validar cliente
-    const cliente = await this.clienteRepository.findOne({
-      where: { id: criarCotacaoDto.clienteId }
+    // Validar fornecedor
+    const fornecedor = await this.fornecedorRepository.findOne({
+      where: { id: criarCotacaoDto.fornecedorId }
     });
 
-    if (!cliente) {
-      throw new HttpException('Cliente não encontrado', HttpStatus.NOT_FOUND);
+    if (!fornecedor) {
+      throw new HttpException('Fornecedor não encontrado', HttpStatus.NOT_FOUND);
     }
 
     // Validar usuário responsável
@@ -62,7 +62,7 @@ export class CotacaoService {
       numero,
       status: StatusCotacao.RASCUNHO,
       responsavelId: userId,
-      dataVencimento: new Date(criarCotacaoDto.dataVencimento),
+      prazoResposta: criarCotacaoDto.prazoResposta ? new Date(criarCotacaoDto.prazoResposta) : null,
       criadoPor: userId,
       atualizadoPor: userId
     });
@@ -71,7 +71,7 @@ export class CotacaoService {
 
     // Criar itens
     if (criarCotacaoDto.itens && criarCotacaoDto.itens.length > 0) {
-      const itens = criarCotacaoDto.itens.map(item => 
+      const itens = criarCotacaoDto.itens.map(item =>
         this.itemCotacaoRepository.create({
           ...item,
           cotacaoId: cotacaoSalva.id,
@@ -153,8 +153,8 @@ export class CotacaoService {
   }
 
   async atualizar(
-    id: string, 
-    atualizarCotacaoDto: AtualizarCotacaoDto, 
+    id: string,
+    atualizarCotacaoDto: AtualizarCotacaoDto,
     userId: string
   ): Promise<CotacaoResponseDto> {
     const cotacao = await this.cotacaoRepository.findOne({
@@ -174,14 +174,14 @@ export class CotacaoService {
       );
     }
 
-    // Validar cliente se foi alterado
-    if (atualizarCotacaoDto.clienteId && atualizarCotacaoDto.clienteId !== cotacao.clienteId) {
-      const cliente = await this.clienteRepository.findOne({
-        where: { id: atualizarCotacaoDto.clienteId }
+    // Validar fornecedor se foi alterado
+    if (atualizarCotacaoDto.fornecedorId && atualizarCotacaoDto.fornecedorId !== cotacao.fornecedorId) {
+      const fornecedor = await this.fornecedorRepository.findOne({
+        where: { id: atualizarCotacaoDto.fornecedorId }
       });
 
-      if (!cliente) {
-        throw new HttpException('Cliente não encontrado', HttpStatus.NOT_FOUND);
+      if (!fornecedor) {
+        throw new HttpException('Fornecedor não encontrado', HttpStatus.NOT_FOUND);
       }
     }
 
@@ -192,8 +192,8 @@ export class CotacaoService {
       dataAtualizacao: new Date()
     });
 
-    if (atualizarCotacaoDto.dataVencimento) {
-      cotacao.dataVencimento = new Date(atualizarCotacaoDto.dataVencimento);
+    if (atualizarCotacaoDto.prazoResposta) {
+      cotacao.prazoResposta = new Date(atualizarCotacaoDto.prazoResposta);
     }
 
     await this.cotacaoRepository.save(cotacao);
@@ -205,7 +205,7 @@ export class CotacaoService {
 
       // Criar novos itens
       if (atualizarCotacaoDto.itens.length > 0) {
-        const novosItens = atualizarCotacaoDto.itens.map(item => 
+        const novosItens = atualizarCotacaoDto.itens.map(item =>
           this.itemCotacaoRepository.create({
             ...item,
             cotacaoId: id,
@@ -253,8 +253,8 @@ export class CotacaoService {
   }
 
   async alterarStatus(
-    id: string, 
-    novoStatus: StatusCotacao, 
+    id: string,
+    novoStatus: StatusCotacao,
     observacao?: string,
     userId?: string
   ): Promise<CotacaoResponseDto> {
@@ -309,7 +309,7 @@ export class CotacaoService {
 
   async gerarPDF(id: string, userId: string): Promise<Buffer> {
     const cotacao = await this.buscarPorId(id, userId);
-    
+
     // Log simples de auditoria
     console.log(`[AUDIT] COTACAO GENERATE_PDF - ID: ${id}, User: ${userId}, Numero: ${cotacao.numero}`);
 
@@ -320,17 +320,17 @@ export class CotacaoService {
       geradoEm: new Date(),
       geradoPor: userId
     }, null, 2);
-    
+
     return Buffer.from(dados, 'utf-8');
   }
 
   async enviarEmail(
-    id: string, 
-    enviarEmailDto: EnviarEmailDto, 
+    id: string,
+    enviarEmailDto: EnviarEmailDto,
     userId: string
   ): Promise<void> {
     const cotacao = await this.buscarPorId(id, userId);
-    
+
     // Log simples em vez de envio real
     console.log(`[EMAIL] COTACAO SEND - ID: ${id}, Destinatarios: ${enviarEmailDto.destinatarios.join(', ')}, Assunto: ${enviarEmailDto.assunto}`);
 
@@ -356,9 +356,9 @@ export class CotacaoService {
   async exportar(formato: 'csv' | 'excel' | 'pdf', query: CotacaoQueryDto, userId: string) {
     const queryBuilder = this.createQueryBuilder();
     this.applyFilters(queryBuilder, query, userId);
-    
+
     const cotacoes = await queryBuilder.getMany();
-    
+
     // Log simples de auditoria
     console.log(`[AUDIT] COTACAO EXPORT - User: ${userId}, Formato: ${formato}, Quantidade: ${cotacoes.length}`);
 
@@ -369,7 +369,7 @@ export class CotacaoService {
       exportadoEm: new Date(),
       exportadoPor: userId
     }, null, 2);
-    
+
     return Buffer.from(dados, 'utf-8');
   }
 
@@ -385,8 +385,8 @@ export class CotacaoService {
 
   private applyFilters(queryBuilder: SelectQueryBuilder<Cotacao>, query: CotacaoQueryDto, userId: string) {
     // Filtro por cliente
-    if (query.clienteId) {
-      queryBuilder.andWhere('cotacao.clienteId = :clienteId', { clienteId: query.clienteId });
+    if (query.fornecedorId) {
+      queryBuilder.andWhere('cotacao.fornecedorId = :fornecedorId', { fornecedorId: query.fornecedorId });
     }
 
     // Filtro por status
@@ -429,7 +429,7 @@ export class CotacaoService {
   private async gerarNumeroCotacao(): Promise<string> {
     const ano = new Date().getFullYear();
     const prefixo = `COT${ano}`;
-    
+
     const ultimaCotacao = await this.cotacaoRepository
       .createQueryBuilder('cotacao')
       .where('cotacao.numero LIKE :prefixo', { prefixo: `${prefixo}%` })
@@ -519,18 +519,18 @@ export class CotacaoService {
       status: cotacao.status,
       prioridade: cotacao.prioridade,
       valorTotal: cotacao.valorTotal,
-      dataVencimento: cotacao.dataVencimento,
+      prazoResposta: cotacao.prazoResposta,
       observacoes: cotacao.observacoes,
       condicoesPagamento: cotacao.condicoesPagamento,
       prazoEntrega: cotacao.prazoEntrega,
       validadeOrcamento: cotacao.validadeOrcamento,
       origem: cotacao.origem,
-      clienteId: cotacao.clienteId,
-      cliente: cotacao.cliente ? {
-        id: cotacao.cliente.id,
-        nome: cotacao.cliente.nome,
-        email: cotacao.cliente.email,
-        telefone: cotacao.cliente.telefone
+      fornecedorId: cotacao.fornecedorId,
+      fornecedor: cotacao.fornecedor ? {
+        id: cotacao.fornecedor.id,
+        nome: cotacao.fornecedor.nome,
+        email: cotacao.fornecedor.email,
+        telefone: cotacao.fornecedor.telefone
       } : null,
       responsavelId: cotacao.responsavelId,
       responsavel: cotacao.responsavel ? {
@@ -545,7 +545,11 @@ export class CotacaoService {
         unidade: item.unidade,
         valorUnitario: item.valorUnitario,
         valorTotal: item.valorTotal,
-        observacoes: item.observacoes
+        valorDesconto: item.valorDesconto || 0,
+        valorImposto: item.valorImposto || 0,
+        valorLiquido: item.valorLiquido || item.valorTotal,
+        observacoes: item.observacoes,
+        dataCriacao: item.dataCriacao || new Date()
       })) || [],
       anexos: cotacao.anexos?.map(anexo => ({
         id: anexo.id,
