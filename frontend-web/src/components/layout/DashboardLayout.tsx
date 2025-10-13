@@ -8,7 +8,6 @@ import { formatCompanyName, formatUserName } from '../../utils/textUtils';
 import SimpleNavGroup, { NavigationNucleus } from '../navigation/SimpleNavGroup';
 import NotificationCenter from '../notifications/NotificationCenter';
 import ConectCRMLogoFinal from '../ui/ConectCRMLogoFinal';
-import { SupportWidget } from '../suporte/SupportWidget';
 import LanguageSelector from '../common/LanguageSelector';
 import {
   Menu,
@@ -1419,12 +1418,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           </div>
         </main>
       </div>
-
-      {/* Widget de Suporte Flutuante */}
-      <SupportWidget
-        position="bottom-right"
-        hideOnPages={['/suporte']} // Não mostrar na própria página de suporte
-      />
 
       {/* Modal de Seleção de Idioma */}
       {showLanguageSelector && (
