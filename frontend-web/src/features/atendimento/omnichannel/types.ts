@@ -76,3 +76,16 @@ export interface Demanda {
   dataAbertura: Date;
   dataConclusao?: Date;
 }
+
+export interface NotaCliente {
+  id: string;
+  conteudo: string;
+  autor: {
+    id: string;
+    nome: string;
+    foto?: string;
+  };
+  dataCriacao: Date;
+  dataEdicao?: Date;
+  importante?: boolean;
+}

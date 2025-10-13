@@ -1,5 +1,5 @@
 // Dados mock para desenvolvimento e testes do chat omnichannel
-import { Ticket, Mensagem, HistoricoAtendimento, Demanda, Contato } from './types';
+import { Ticket, Mensagem, HistoricoAtendimento, Demanda, Contato, NotaCliente } from './types';
 
 export const mockContatos: Contato[] = [
   {
@@ -227,5 +227,42 @@ export const mockDemandas: Demanda[] = [
     status: 'concluida',
     dataAbertura: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
     dataConclusao: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+  }
+];
+
+export const mockNotas: NotaCliente[] = [
+  {
+    id: 'n1',
+    conteudo: 'Cliente VIP - sempre priorizar atendimento. Responsável por contrato de R$ 50k/mês.',
+    autor: {
+      id: 'a1',
+      nome: 'Ana Costa',
+      foto: 'https://i.pravatar.cc/150?img=47'
+    },
+    dataCriacao: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+    importante: true
+  },
+  {
+    id: 'n2',
+    conteudo: 'Prefere contato por WhatsApp. Evitar ligações antes das 10h.',
+    autor: {
+      id: 'a2',
+      nome: 'Pedro Souza',
+      foto: 'https://i.pravatar.cc/150?img=51'
+    },
+    dataCriacao: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+    importante: false
+  },
+  {
+    id: 'n3',
+    conteudo: 'Teve problema com entrega em setembro/2024. Compensado com desconto de 15% na renovação.',
+    autor: {
+      id: 'a1',
+      nome: 'Ana Costa',
+      foto: 'https://i.pravatar.cc/150?img=47'
+    },
+    dataCriacao: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+    dataEdicao: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+    importante: false
   }
 ];

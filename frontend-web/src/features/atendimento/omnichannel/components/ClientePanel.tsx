@@ -7,9 +7,12 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  ExternalLink
+  ExternalLink,
+  FileText,
+  Trash2,
+  Star
 } from 'lucide-react';
-import { Contato, HistoricoAtendimento, Demanda } from '../types';
+import { Contato, HistoricoAtendimento, Demanda, NotaCliente } from '../types';
 import { formatarTempoDecorrido, getIconeCanal } from '../utils';
 import { ThemePalette } from '../../../../contexts/ThemeContext';
 
@@ -17,9 +20,12 @@ interface ClientePanelProps {
   contato: Contato;
   historico: HistoricoAtendimento[];
   demandas: Demanda[];
+  notas: NotaCliente[];
   onEditarContato: () => void;
   onVincularCliente: () => void;
   onAbrirDemanda: (tipo: string, descricao: string) => void;
+  onAdicionarNota: (conteudo: string, importante: boolean) => void;
+  onExcluirNota: (notaId: string) => void;
   theme: ThemePalette;
 }
 
@@ -27,21 +33,34 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
   contato,
   historico,
   demandas,
+  notas,
   onEditarContato,
   onVincularCliente,
   onAbrirDemanda,
+  onAdicionarNota,
+  onExcluirNota,
   theme
 }) => {
   const [expandido, setExpandido] = useState(true);
-  const [abaAtiva, setAbaAtiva] = useState<'historico' | 'demandas'>('historico');
+  const [abaAtiva, setAbaAtiva] = useState<'historico' | 'demandas' | 'notas'>('historico');
   const [tipoDemanda, setTipoDemanda] = useState('');
   const [descricaoDemanda, setDescricaoDemanda] = useState('');
+  const [novaNota, setNovaNota] = useState('');
+  const [notaImportante, setNotaImportante] = useState(false);
 
   const handleAbrirDemanda = () => {
     if (tipoDemanda.trim() && descricaoDemanda.trim()) {
       onAbrirDemanda(tipoDemanda, descricaoDemanda);
       setTipoDemanda('');
       setDescricaoDemanda('');
+    }
+  };
+
+  const handleAdicionarNota = () => {
+    if (novaNota.trim()) {
+      onAdicionarNota(novaNota, notaImportante);
+      setNovaNota('');
+      setNotaImportante(false);
     }
   };
 
@@ -182,7 +201,7 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
           </div>
         </div>
 
-        {/* Tabs: Histórico e Demandas */}
+        {/* Tabs: Histórico, Demandas e Notas */}
         <div className="border-b border-gray-200">
           <div className="flex">
             <button
@@ -191,11 +210,10 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                 color: abaAtiva === 'historico' ? theme.colors.primary : '',
                 borderBottomColor: abaAtiva === 'historico' ? theme.colors.primary : ''
               }}
-              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                abaAtiva === 'historico'
+              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${abaAtiva === 'historico'
                   ? 'border-b-2'
                   : 'text-gray-600 hover:text-gray-900'
-              }`}
+                }`}
             >
               Histórico ({historico.length})
             </button>
@@ -205,13 +223,25 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                 color: abaAtiva === 'demandas' ? theme.colors.primary : '',
                 borderBottomColor: abaAtiva === 'demandas' ? theme.colors.primary : ''
               }}
-              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                abaAtiva === 'demandas'
+              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${abaAtiva === 'demandas'
                   ? 'border-b-2'
                   : 'text-gray-600 hover:text-gray-900'
-              }`}
+                }`}
             >
               Demandas ({demandas.length})
+            </button>
+            <button
+              onClick={() => setAbaAtiva('notas')}
+              style={{
+                color: abaAtiva === 'notas' ? theme.colors.primary : '',
+                borderBottomColor: abaAtiva === 'notas' ? theme.colors.primary : ''
+              }}
+              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${abaAtiva === 'notas'
+                  ? 'border-b-2'
+                  : 'text-gray-600 hover:text-gray-900'
+                }`}
+            >
+              Notas ({notas.length})
             </button>
           </div>
         </div>
@@ -235,18 +265,16 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                       >
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <div className={`p-1.5 rounded-full ${
-                              item.canal === 'whatsapp' ? 'bg-green-100' :
-                              item.canal === 'telegram' ? 'bg-blue-100' :
-                              item.canal === 'email' ? 'bg-red-100' :
-                              'bg-gray-100'
-                            }`}>
-                              <IconeCanal className={`w-3 h-3 ${
-                                item.canal === 'whatsapp' ? 'text-green-600' :
-                                item.canal === 'telegram' ? 'text-blue-600' :
-                                item.canal === 'email' ? 'text-red-600' :
-                                'text-gray-600'
-                              }`} />
+                            <div className={`p-1.5 rounded-full ${item.canal === 'whatsapp' ? 'bg-green-100' :
+                                item.canal === 'telegram' ? 'bg-blue-100' :
+                                  item.canal === 'email' ? 'bg-red-100' :
+                                    'bg-gray-100'
+                              }`}>
+                              <IconeCanal className={`w-3 h-3 ${item.canal === 'whatsapp' ? 'text-green-600' :
+                                  item.canal === 'telegram' ? 'text-blue-600' :
+                                    item.canal === 'email' ? 'text-red-600' :
+                                      'text-gray-600'
+                                }`} />
                             </div>
                             <span className="text-xs font-medium text-gray-700">
                               {item.numero}
@@ -264,7 +292,7 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                     );
                   })}
                   {historico.length > 5 && (
-                    <button 
+                    <button
                       className="w-full py-2 text-sm font-medium"
                       style={{ color: theme.colors.primary }}
                       onMouseEnter={(e) => e.currentTarget.style.color = theme.colors.primaryHover}
@@ -276,12 +304,12 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                 </>
               )}
             </div>
-          ) : (
+          ) : abaAtiva === 'demandas' ? (
             <div className="space-y-4">
               {/* Formulário Nova Demanda */}
               <div className="p-4 rounded-lg space-y-3" style={{ backgroundColor: theme.colors.primaryLight }}>
                 <h4 className="text-sm font-semibold text-gray-900">Nova Demanda</h4>
-                
+
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Tipo
@@ -370,9 +398,8 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                         <span className="text-sm font-medium text-gray-900">
                           {demanda.tipo}
                         </span>
-                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                          getStatusDemandaStyle(demanda.status)
-                        }`}>
+                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusDemandaStyle(demanda.status)
+                          }`}>
                           {getStatusDemandaIcon(demanda.status)}
                           {demanda.status.replace('_', ' ')}
                         </span>
@@ -384,6 +411,150 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                       </div>
                     </div>
                   ))
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Aba de Notas */
+            <div className="space-y-4">
+              {/* Formulário Nova Nota */}
+              <div className="p-4 rounded-lg space-y-3" style={{ backgroundColor: theme.colors.primaryLight }}>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    Nova Nota
+                  </h4>
+                  <button
+                    onClick={() => setNotaImportante(!notaImportante)}
+                    className={`p-1.5 rounded transition-colors ${
+                      notaImportante ? 'bg-yellow-100' : 'hover:bg-gray-100'
+                    }`}
+                    title={notaImportante ? 'Remover marcação importante' : 'Marcar como importante'}
+                  >
+                    <Star
+                      className={`w-4 h-4 ${notaImportante ? 'text-yellow-500 fill-yellow-500' : 'text-gray-400'}`}
+                    />
+                  </button>
+                </div>
+
+                <div>
+                  <textarea
+                    value={novaNota}
+                    onChange={(e) => setNovaNota(e.target.value)}
+                    rows={4}
+                    placeholder="Adicione uma nota sobre o cliente (visível apenas para equipe interna)..."
+                    style={{ borderColor: theme.colors.border }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.outline = `2px solid ${theme.colors.primary}`;
+                      e.currentTarget.style.borderColor = 'transparent';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.outline = 'none';
+                      e.currentTarget.style.borderColor = theme.colors.border;
+                    }}
+                    className="w-full px-3 py-2 border rounded-lg text-sm resize-none transition-all"
+                  />
+                </div>
+
+                <button
+                  onClick={handleAdicionarNota}
+                  disabled={!novaNota.trim()}
+                  style={{
+                    backgroundColor: !novaNota.trim() ? '#D1D5DB' : theme.colors.primary,
+                    color: '#FFFFFF'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (novaNota.trim()) {
+                      e.currentTarget.style.backgroundColor = theme.colors.primaryHover;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (novaNota.trim()) {
+                      e.currentTarget.style.backgroundColor = theme.colors.primary;
+                    }
+                  }}
+                  className="w-full py-2 rounded-lg disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                >
+                  Adicionar Nota
+                </button>
+              </div>
+
+              {/* Lista de Notas */}
+              <div className="space-y-3">
+                {notas.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Nenhuma nota adicionada</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Adicione notas para registrar informações importantes
+                    </p>
+                  </div>
+                ) : (
+                  [...notas]
+                    .sort((a, b) => {
+                      // Importante primeiro, depois por data
+                      if (a.importante && !b.importante) return -1;
+                      if (!a.importante && b.importante) return 1;
+                      return new Date(b.dataCriacao).getTime() - new Date(a.dataCriacao).getTime();
+                    })
+                    .map(nota => (
+                      <div
+                        key={nota.id}
+                        className={`p-3 rounded-lg transition-colors relative group ${
+                          nota.importante
+                            ? 'bg-yellow-50 border border-yellow-200'
+                            : 'bg-gray-50 hover:bg-gray-100'
+                        }`}
+                      >
+                        {/* Badge Importante */}
+                        {nota.importante && (
+                          <div className="absolute top-2 right-2">
+                            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                          </div>
+                        )}
+
+                        {/* Autor e Data */}
+                        <div className="flex items-start gap-2 mb-2">
+                          <img
+                            src={
+                              nota.autor.foto ||
+                              `https://ui-avatars.com/api/?name=${encodeURIComponent(nota.autor.nome)}&background=random&size=32`
+                            }
+                            alt={nota.autor.nome}
+                            className="w-6 h-6 rounded-full object-cover"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-medium text-gray-900">
+                                {nota.autor.nome}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {formatarTempoDecorrido(nota.dataCriacao)}
+                              </span>
+                            </div>
+                            {nota.dataEdicao && (
+                              <span className="text-xs text-gray-400">
+                                (editado)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Conteúdo da Nota */}
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap mb-2 pr-8">
+                          {nota.conteudo}
+                        </p>
+
+                        {/* Botão Excluir (aparece no hover) */}
+                        <button
+                          onClick={() => onExcluirNota(nota.id)}
+                          className="absolute bottom-2 right-2 p-1.5 bg-white border border-gray-200 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 hover:border-red-200"
+                          title="Excluir nota"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-gray-600 hover:text-red-600" />
+                        </button>
+                      </div>
+                    ))
                 )}
               </div>
             </div>

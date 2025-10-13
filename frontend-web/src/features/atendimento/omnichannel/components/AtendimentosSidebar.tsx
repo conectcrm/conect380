@@ -43,11 +43,11 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
 
   const ticketsFiltrados = tickets.filter(ticket => {
     const matchStatus = ticket.status === tabAtiva;
-    const matchBusca = busca === '' || 
+    const matchBusca = busca === '' ||
       ticket.contato.nome.toLowerCase().includes(busca.toLowerCase()) ||
       ticket.numero.toLowerCase().includes(busca.toLowerCase()) ||
       ticket.ultimaMensagem.toLowerCase().includes(busca.toLowerCase());
-    
+
     return matchStatus && matchBusca;
   });
 
@@ -97,17 +97,15 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
                 backgroundColor: tabAtiva === tab.value ? theme.colors.primary : '',
                 color: tabAtiva === tab.value ? '#FFFFFF' : ''
               }}
-              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                tabAtiva === tab.value
+              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${tabAtiva === tab.value
                   ? 'shadow-md'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+                }`}
             >
               {tab.label}
               {tab.count > 0 && (
-                <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-                  tabAtiva === tab.value ? 'bg-white/20' : 'bg-gray-300'
-                }`}>
+                <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${tabAtiva === tab.value ? 'bg-white/20' : 'bg-gray-300'
+                  }`}>
                   {tab.count}
                 </span>
               )}
@@ -150,9 +148,8 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
                   borderLeftColor: isAtivo ? theme.colors.primary : '',
                   borderLeftWidth: isAtivo ? '4px' : ''
                 }}
-                className={`flex items-start gap-3 p-4 border-b border-gray-100 cursor-pointer transition-all ${
-                  isAtivo ? '' : 'hover:bg-gray-50'
-                }`}
+                className={`flex items-start gap-3 p-4 border-b border-gray-100 cursor-pointer transition-all ${isAtivo ? '' : 'hover:bg-gray-50'
+                  }`}
               >
                 {/* Foto do Contato */}
                 <div className="relative flex-shrink-0">
@@ -162,13 +159,12 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
                     className="w-12 h-12 rounded-full object-cover"
                   />
                   {/* Ícone do Canal */}
-                  <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center ${
-                    ticket.canal === 'whatsapp' ? 'bg-green-500' :
-                    ticket.canal === 'telegram' ? 'bg-blue-400' :
-                    ticket.canal === 'email' ? 'bg-red-500' :
-                    ticket.canal === 'chat' ? 'bg-purple-500' :
-                    'bg-gray-500'
-                  }`}>
+                  <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center ${ticket.canal === 'whatsapp' ? 'bg-green-500' :
+                      ticket.canal === 'telegram' ? 'bg-blue-400' :
+                        ticket.canal === 'email' ? 'bg-red-500' :
+                          ticket.canal === 'chat' ? 'bg-purple-500' :
+                            'bg-gray-500'
+                    }`}>
                     <IconeCanal className="w-3 h-3 text-white" />
                   </div>
                   {/* Status Online */}
@@ -187,7 +183,7 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
                       {formatarTempoUltimaMensagem(ticket.tempoUltimaMensagem)}
                     </span>
                   </div>
-                  
+
                   <p className="text-sm text-gray-600 truncate mb-2">
                     {ticket.ultimaMensagem}
                   </p>
@@ -206,7 +202,7 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
                         </span>
                       ))}
                     </div>
-                    
+
                     {ticket.status === 'aberto' && (
                       <div className="flex items-center gap-1 text-xs text-gray-500">
                         <Clock className="w-3 h-3" />

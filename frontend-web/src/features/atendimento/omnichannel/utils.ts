@@ -66,17 +66,17 @@ export const formatarTempoAtendimento = (segundos: number): string => {
 export const formatarHorarioMensagem = (data: Date): string => {
   const hoje = new Date();
   const ehHoje = data.toDateString() === hoje.toDateString();
-  
+
   const horas = data.getHours().toString().padStart(2, '0');
   const minutos = data.getMinutes().toString().padStart(2, '0');
-  
+
   if (ehHoje) {
     return `${horas}:${minutos}`;
   }
-  
+
   const dia = data.getDate().toString().padStart(2, '0');
   const mes = (data.getMonth() + 1).toString().padStart(2, '0');
-  
+
   return `${dia}/${mes} ${horas}:${minutos}`;
 };
 

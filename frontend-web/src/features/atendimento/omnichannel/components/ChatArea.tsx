@@ -120,22 +120,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
               )}
             </div>
-            
+
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="font-semibold text-gray-900">{ticket.contato.nome}</h2>
-                <div className={`p-1.5 rounded-full ${
-                  ticket.canal === 'whatsapp' ? 'bg-green-100' :
-                  ticket.canal === 'telegram' ? 'bg-blue-100' :
-                  ticket.canal === 'email' ? 'bg-red-100' :
-                  'bg-gray-100'
-                }`}>
-                  <IconeCanal className={`w-3 h-3 ${
-                    ticket.canal === 'whatsapp' ? 'text-green-600' :
-                    ticket.canal === 'telegram' ? 'text-blue-600' :
-                    ticket.canal === 'email' ? 'text-red-600' :
-                    'text-gray-600'
-                  }`} />
+                <div className={`p-1.5 rounded-full ${ticket.canal === 'whatsapp' ? 'bg-green-100' :
+                    ticket.canal === 'telegram' ? 'bg-blue-100' :
+                      ticket.canal === 'email' ? 'bg-red-100' :
+                        'bg-gray-100'
+                  }`}>
+                  <IconeCanal className={`w-3 h-3 ${ticket.canal === 'whatsapp' ? 'text-green-600' :
+                      ticket.canal === 'telegram' ? 'text-blue-600' :
+                        ticket.canal === 'email' ? 'text-red-600' :
+                          'text-gray-600'
+                    }`} />
                 </div>
               </div>
               <p className="text-sm text-gray-500">
@@ -168,7 +166,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
 
             {/* Tempo de Atendimento */}
-            <div 
+            <div
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
               style={{ backgroundColor: theme.colors.primaryLight }}
             >
@@ -234,7 +232,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               >
                 <MoreVertical className="w-5 h-5 text-gray-600" />
               </button>
-              
+
               {mostrarOpcoes && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
                   <button className="w-full px-4 py-2 text-left hover:bg-gray-50 text-sm text-gray-700">
@@ -257,7 +255,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 bg-gray-50">
         {mensagens.map((mensagem, index) => {
           const ehCliente = mensagem.remetente.tipo === 'cliente';
-          const mostrarFoto = index === 0 || 
+          const mostrarFoto = index === 0 ||
             mensagens[index - 1].remetente.id !== mensagem.remetente.id;
 
           return (
@@ -287,24 +285,22 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     {mensagem.remetente.nome}
                   </span>
                 )}
-                
-                <div 
-                  className={`rounded-2xl px-4 py-2.5 shadow-sm ${
-                    ehCliente
+
+                <div
+                  className={`rounded-2xl px-4 py-2.5 shadow-sm ${ehCliente
                       ? 'bg-white border border-gray-200'
                       : ''
-                  }`}
+                    }`}
                   style={!ehCliente ? {
                     backgroundColor: theme.colors.primaryLight,
                     border: `1px solid ${theme.colors.borderLight}`
                   } : {}}
                 >
-                  <p className={`text-sm whitespace-pre-wrap break-words leading-relaxed ${
-                    ehCliente ? 'text-gray-800' : 'text-gray-900'
-                  }`}>
+                  <p className={`text-sm whitespace-pre-wrap break-words leading-relaxed ${ehCliente ? 'text-gray-800' : 'text-gray-900'
+                    }`}>
                     {mensagem.conteudo}
                   </p>
-                  
+
                   {/* Timestamp e Status */}
                   <div className="flex items-center gap-1 mt-1.5 justify-end text-gray-500">
                     <span className="text-xs font-medium">

@@ -2,8 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { AtendimentosSidebar } from './components/AtendimentosSidebar';
 import { ChatArea } from './components/ChatArea';
 import { ClientePanel } from './components/ClientePanel';
-import { mockTickets, mockMensagens, mockHistorico, mockDemandas } from './mockData';
-import { Mensagem } from './types';
+import { mockTickets, mockMensagens, mockHistorico, mockDemandas, mockNotas } from './mockData';
+import { Mensagem, NotaCliente } from './types';
 import { useTheme } from '../../../contexts/ThemeContext';
 
 /**
@@ -23,6 +23,7 @@ export const ChatOmnichannel: React.FC = () => {
   const [mensagens, setMensagens] = useState<Mensagem[]>(mockMensagens);
   const [historico] = useState(mockHistorico);
   const [demandas, setDemandas] = useState(mockDemandas);
+  const [notas, setNotas] = useState<NotaCliente[]>(mockNotas);
 
   // Encontra o ticket atual
   const ticketAtual = tickets.find(t => t.id === ticketSelecionado);
@@ -61,19 +62,19 @@ export const ChatOmnichannel: React.FC = () => {
 
     // Simular envio e mudança de status
     setTimeout(() => {
-      setMensagens(prev => 
+      setMensagens(prev =>
         prev.map(m => m.id === novaMensagem.id ? { ...m, status: 'enviado' } : m)
       );
     }, 500);
 
     setTimeout(() => {
-      setMensagens(prev => 
+      setMensagens(prev =>
         prev.map(m => m.id === novaMensagem.id ? { ...m, status: 'entregue' } : m)
       );
     }, 1000);
 
     setTimeout(() => {
-      setMensagens(prev => 
+      setMensagens(prev =>
         prev.map(m => m.id === novaMensagem.id ? { ...m, status: 'lido' } : m)
       );
     }, 2000);
@@ -117,6 +118,32 @@ export const ChatOmnichannel: React.FC = () => {
     setDemandas(prev => [novaDemanda, ...prev]);
     console.log('Nova demanda criada:', novaDemanda);
     // TODO: Salvar no backend
+  }, []);
+
+  const handleAdicionarNota = useCallback((conteudo: string, importante: boolean) => {
+    if (!ticketAtual) return;
+
+    const novaNota: NotaCliente = {
+      id: `n${Date.now()}`,
+      conteudo,
+      autor: {
+        id: ticketAtual.atendente?.id || 'a1',
+        nome: ticketAtual.atendente?.nome || 'Atendente',
+        foto: ticketAtual.atendente?.foto
+      },
+      dataCriacao: new Date(),
+      importante
+    };
+
+    setNotas(prev => [novaNota, ...prev]);
+    console.log('Nova nota criada:', novaNota);
+    // TODO: Salvar no backend
+  }, [ticketAtual]);
+
+  const handleExcluirNota = useCallback((notaId: string) => {
+    setNotas(prev => prev.filter(n => n.id !== notaId));
+    console.log('Nota excluída:', notaId);
+    // TODO: Excluir no backend
   }, []);
 
   if (!ticketAtual) {
@@ -165,9 +192,12 @@ export const ChatOmnichannel: React.FC = () => {
         contato={ticketAtual.contato}
         historico={historico}
         demandas={demandas}
+        notas={notas}
         onEditarContato={handleEditarContato}
         onVincularCliente={handleVincularCliente}
         onAbrirDemanda={handleAbrirDemanda}
+        onAdicionarNota={handleAdicionarNota}
+        onExcluirNota={handleExcluirNota}
         theme={currentPalette}
       />
     </div>
