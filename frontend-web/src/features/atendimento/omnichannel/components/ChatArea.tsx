@@ -181,7 +181,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             {/* Transferir */}
             <button
               onClick={onTransferir}
-              className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors font-medium text-sm"
+              style={{
+                borderColor: theme.colors.secondary,
+                color: theme.colors.text,
+                backgroundColor: 'transparent'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = theme.colors.secondaryLight;
+                e.currentTarget.style.borderColor = theme.colors.neutral;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.borderColor = theme.colors.secondary;
+              }}
+              className="px-4 py-2 border-2 rounded-lg transition-colors font-medium text-sm"
             >
               <div className="flex items-center gap-2">
                 <RefreshCw className="w-4 h-4" />
@@ -192,7 +205,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             {/* Encerrar */}
             <button
               onClick={onEncerrar}
-              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium text-sm"
+              style={{
+                borderColor: theme.colors.error,
+                color: theme.colors.error,
+                backgroundColor: 'transparent'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = theme.colors.error;
+                e.currentTarget.style.color = '#FFFFFF';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = theme.colors.error;
+              }}
+              className="px-4 py-2 border-2 rounded-lg transition-colors font-medium text-sm"
             >
               <div className="flex items-center gap-2">
                 <UserX className="w-4 h-4" />
