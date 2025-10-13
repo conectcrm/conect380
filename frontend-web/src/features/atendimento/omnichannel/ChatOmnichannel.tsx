@@ -2,6 +2,9 @@ import React, { useState, useCallback } from 'react';
 import { AtendimentosSidebar } from './components/AtendimentosSidebar';
 import { ChatArea } from './components/ChatArea';
 import { ClientePanel } from './components/ClientePanel';
+import { NovoAtendimentoModal, NovoAtendimentoData } from './modals/NovoAtendimentoModal';
+import { TransferirAtendimentoModal, TransferenciaData } from './modals/TransferirAtendimentoModal';
+import { EncerrarAtendimentoModal, EncerramentoData } from './modals/EncerrarAtendimentoModal';
 import { mockTickets, mockMensagens, mockHistorico, mockDemandas, mockNotas } from './mockData';
 import { Mensagem, NotaCliente } from './types';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -28,6 +31,11 @@ export const ChatOmnichannel: React.FC = () => {
   const [demandas, setDemandas] = useState(mockDemandas);
   const [notas, setNotas] = useState<NotaCliente[]>(mockNotas);
 
+  // Estados dos modais
+  const [modalNovoAtendimento, setModalNovoAtendimento] = useState(false);
+  const [modalTransferir, setModalTransferir] = useState(false);
+  const [modalEncerrar, setModalEncerrar] = useState(false);
+
   // Encontra o ticket atual
   const ticketAtual = tickets.find(t => t.id === ticketSelecionado);
 
@@ -40,8 +48,14 @@ export const ChatOmnichannel: React.FC = () => {
   }, []);
 
   const handleNovoAtendimento = useCallback(() => {
-    console.log('Abrir modal de novo atendimento');
-    // TODO: Implementar modal de novo atendimento
+    setModalNovoAtendimento(true);
+  }, []);
+
+  const handleConfirmarNovoAtendimento = useCallback((dados: NovoAtendimentoData) => {
+    console.log('Criar novo atendimento:', dados);
+    // TODO: Integrar com API
+    // TODO: Criar ticket no estado
+    // TODO: Redirecionar para o novo ticket
   }, []);
 
   const handleEnviarMensagem = useCallback((conteudo: string) => {
@@ -84,13 +98,26 @@ export const ChatOmnichannel: React.FC = () => {
   }, [ticketSelecionado, ticketAtual]);
 
   const handleTransferir = useCallback(() => {
-    console.log('Transferir atendimento');
-    // TODO: Implementar modal de transferência
+    setModalTransferir(true);
+  }, []);
+
+  const handleConfirmarTransferencia = useCallback((dados: TransferenciaData) => {
+    console.log('Transferir atendimento:', dados);
+    // TODO: Integrar com API
+    // TODO: Atualizar estado do ticket
+    // TODO: Notificar novo agente
   }, []);
 
   const handleEncerrar = useCallback(() => {
-    console.log('Encerrar atendimento');
-    // TODO: Implementar confirmação e lógica de encerramento
+    setModalEncerrar(true);
+  }, []);
+
+  const handleConfirmarEncerramento = useCallback((dados: EncerramentoData) => {
+    console.log('Encerrar atendimento:', dados);
+    // TODO: Integrar com API
+    // TODO: Atualizar status do ticket
+    // TODO: Criar follow-up se necessário
+    // TODO: Enviar pesquisa de satisfação
   }, []);
 
   const handleLigar = useCallback(() => {
@@ -167,9 +194,8 @@ export const ChatOmnichannel: React.FC = () => {
   return (
     <div className="flex h-full bg-gray-100 overflow-hidden">
       {/* Coluna 1: Lista de Atendimentos - Adaptável ao estado da sidebar */}
-      <div className={`flex-shrink-0 transition-all duration-300 ${
-        sidebarCollapsed ? 'w-96' : 'w-80'
-      }`}>
+      <div className={`flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'w-96' : 'w-80'
+        }`}>
         <AtendimentosSidebar
           tickets={tickets}
           ticketSelecionado={ticketSelecionado}
@@ -204,6 +230,27 @@ export const ChatOmnichannel: React.FC = () => {
         onAdicionarNota={handleAdicionarNota}
         onExcluirNota={handleExcluirNota}
         theme={currentPalette}
+      />
+
+      {/* Modais */}
+      <NovoAtendimentoModal
+        isOpen={modalNovoAtendimento}
+        onClose={() => setModalNovoAtendimento(false)}
+        onConfirm={handleConfirmarNovoAtendimento}
+      />
+
+      <TransferirAtendimentoModal
+        isOpen={modalTransferir}
+        onClose={() => setModalTransferir(false)}
+        onConfirm={handleConfirmarTransferencia}
+        ticketAtual={ticketAtual}
+      />
+
+      <EncerrarAtendimentoModal
+        isOpen={modalEncerrar}
+        onClose={() => setModalEncerrar(false)}
+        onConfirm={handleConfirmarEncerramento}
+        ticketAtual={ticketAtual}
       />
     </div>
   );
