@@ -83,12 +83,12 @@ export const AbrirDemandaModal: React.FC<AbrirDemandaModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div 
+        <div
           className="flex items-center justify-between px-6 py-4 border-b"
           style={{ backgroundColor: `${currentPalette.colors.primary}10` }}
         >
           <div className="flex items-center gap-3">
-            <div 
+            <div
               className="w-10 h-10 rounded-full flex items-center justify-center"
               style={{ backgroundColor: currentPalette.colors.primary, color: 'white' }}
             >
@@ -115,9 +115,8 @@ export const AbrirDemandaModal: React.FC<AbrirDemandaModalProps> = ({
                   <button
                     key={t.value}
                     onClick={() => setTipo(t.value as any)}
-                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                      tipo === t.value ? 'text-white' : 'bg-gray-100 text-gray-700'
-                    }`}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${tipo === t.value ? 'text-white' : 'bg-gray-100 text-gray-700'
+                      }`}
                     style={{ backgroundColor: tipo === t.value ? t.cor : undefined }}
                   >
                     {t.label}
@@ -157,9 +156,8 @@ export const AbrirDemandaModal: React.FC<AbrirDemandaModalProps> = ({
                   <button
                     key={p.value}
                     onClick={() => setPrioridade(p.value as any)}
-                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                      prioridade === p.value ? 'text-white' : 'bg-gray-100 text-gray-700'
-                    }`}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${prioridade === p.value ? 'text-white' : 'bg-gray-100 text-gray-700'
+                      }`}
                     style={{ backgroundColor: prioridade === p.value ? p.cor : undefined }}
                   >
                     {p.label}

@@ -28,7 +28,7 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
   ticketAtual
 }) => {
   const { currentPalette } = useTheme();
-  
+
   const [motivo, setMotivo] = useState('');
   const [observacoes, setObservacoes] = useState('');
   const [criarFollowUp, setCriarFollowUp] = useState(false);
@@ -85,12 +85,12 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div 
+        <div
           className="flex items-center justify-between px-6 py-4 border-b"
           style={{ backgroundColor: `${currentPalette.colors.primary}10` }}
         >
           <div className="flex items-center gap-3">
-            <div 
+            <div
               className="w-10 h-10 rounded-full flex items-center justify-center"
               style={{ backgroundColor: currentPalette.colors.primary, color: 'white' }}
             >
@@ -128,11 +128,10 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
                   <button
                     key={m.value}
                     onClick={() => setMotivo(m.value)}
-                    className={`p-4 rounded-lg border-2 transition-all text-left ${
-                      motivo === m.value
+                    className={`p-4 rounded-lg border-2 transition-all text-left ${motivo === m.value
                         ? 'border-current shadow-md scale-105'
                         : 'border-gray-200 hover:border-gray-300'
-                    }`}
+                      }`}
                     style={{
                       borderColor: motivo === m.value ? m.cor : undefined,
                       backgroundColor: motivo === m.value ? `${m.cor}10` : undefined
@@ -140,7 +139,7 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xl">{m.icon}</span>
-                      <span 
+                      <span
                         className="text-sm font-medium"
                         style={{ color: motivo === m.value ? m.cor : '#374151' }}
                       >
@@ -181,9 +180,9 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
                     checked={criarFollowUp}
                     onChange={(e) => setCriarFollowUp(e.target.checked)}
                     className="mt-1 w-4 h-4 rounded border-gray-300 focus:ring-2 focus:ring-offset-0"
-                    style={{ 
+                    style={{
                       accentColor: currentPalette.colors.primary,
-                      '--tw-ring-color': currentPalette.colors.primary 
+                      '--tw-ring-color': currentPalette.colors.primary
                     } as any}
                   />
                   <div className="flex-1">
@@ -194,7 +193,7 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
                     <p className="text-xs text-gray-500 mt-1">
                       Agendar um acompanhamento futuro com este cliente
                     </p>
-                    
+
                     {criarFollowUp && (
                       <div className="mt-3">
                         <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -223,9 +222,9 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
                     checked={solicitarAvaliacao}
                     onChange={(e) => setSolicitarAvaliacao(e.target.checked)}
                     className="mt-1 w-4 h-4 rounded border-gray-300 focus:ring-2 focus:ring-offset-0"
-                    style={{ 
+                    style={{
                       accentColor: currentPalette.colors.primary,
-                      '--tw-ring-color': currentPalette.colors.primary 
+                      '--tw-ring-color': currentPalette.colors.primary
                     } as any}
                   />
                   <div className="flex-1">
@@ -257,7 +256,7 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
                 <div className="text-sm text-yellow-800">
                   <p className="font-medium mb-1">Atenção!</p>
                   <p className="text-xs">
-                    Ao encerrar este atendimento, ele será arquivado e não aparecerá mais na lista de ativos. 
+                    Ao encerrar este atendimento, ele será arquivado e não aparecerá mais na lista de ativos.
                     Você poderá consultá-lo no histórico.
                   </p>
                 </div>

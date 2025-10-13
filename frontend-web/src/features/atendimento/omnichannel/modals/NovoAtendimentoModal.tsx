@@ -28,7 +28,7 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
   onConfirm
 }) => {
   const { currentPalette } = useTheme();
-  
+
   const [step, setStep] = useState<1 | 2>(1);
   const [canal, setCanal] = useState<'whatsapp' | 'chat' | 'email' | 'telefone'>('whatsapp');
   const [buscaContato, setBuscaContato] = useState('');
@@ -54,10 +54,10 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
 
   const contatosFiltrados = buscaContato
     ? contatosMock.filter(c =>
-        c.nome.toLowerCase().includes(buscaContato.toLowerCase()) ||
-        c.telefone.includes(buscaContato) ||
-        c.email.toLowerCase().includes(buscaContato.toLowerCase())
-      )
+      c.nome.toLowerCase().includes(buscaContato.toLowerCase()) ||
+      c.telefone.includes(buscaContato) ||
+      c.email.toLowerCase().includes(buscaContato.toLowerCase())
+    )
     : contatosMock;
 
   const canais = [
@@ -135,12 +135,12 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div 
+        <div
           className="flex items-center justify-between px-6 py-4 border-b"
           style={{ backgroundColor: `${currentPalette.colors.primary}10` }}
         >
           <div className="flex items-center gap-3">
-            <div 
+            <div
               className="w-10 h-10 rounded-full flex items-center justify-center"
               style={{ backgroundColor: currentPalette.colors.primary, color: 'white' }}
             >
@@ -177,18 +177,17 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
                     <button
                       key={c.id}
                       onClick={() => setCanal(c.id as any)}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
-                        canal === c.id
+                      className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${canal === c.id
                           ? 'border-current shadow-md scale-105'
                           : 'border-gray-200 hover:border-gray-300'
-                      }`}
+                        }`}
                       style={{
                         borderColor: canal === c.id ? c.cor : undefined,
                         backgroundColor: canal === c.id ? `${c.cor}10` : undefined
                       }}
                     >
-                      <c.icon 
-                        className="w-6 h-6" 
+                      <c.icon
+                        className="w-6 h-6"
                         style={{ color: canal === c.id ? c.cor : '#6B7280' }}
                       />
                       <span className="text-xs font-medium text-gray-700">
@@ -204,7 +203,7 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Contato *
                 </label>
-                
+
                 {!contatoSelecionado ? (
                   <>
                     {/* Campo de Busca */}
@@ -230,7 +229,7 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
                               onClick={() => handleSelecionarContato(contato)}
                               className="w-full px-4 py-3 hover:bg-gray-50 transition-colors text-left flex items-center gap-3 border-b last:border-b-0"
                             >
-                              <div 
+                              <div
                                 className="w-10 h-10 rounded-full flex items-center justify-center text-white font-medium"
                                 style={{ backgroundColor: currentPalette.colors.primary }}
                               >
@@ -308,7 +307,7 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
                   /* Contato Selecionado */
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div 
+                      <div
                         className="w-12 h-12 rounded-full flex items-center justify-center text-white font-medium"
                         style={{ backgroundColor: currentPalette.colors.primary }}
                       >
@@ -395,11 +394,10 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
                     <button
                       key={p.value}
                       onClick={() => setPrioridade(p.value as any)}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                        prioridade === p.value
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${prioridade === p.value
                           ? 'text-white shadow-md scale-105'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
+                        }`}
                       style={{
                         backgroundColor: prioridade === p.value ? p.cor : undefined
                       }}

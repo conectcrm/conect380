@@ -32,9 +32,9 @@ export const VincularClienteModal: React.FC<VincularClienteModalProps> = ({
 
   const clientesFiltrados = busca
     ? clientesMock.filter(c =>
-        c.nome.toLowerCase().includes(busca.toLowerCase()) ||
-        c.cnpj.includes(busca)
-      )
+      c.nome.toLowerCase().includes(busca.toLowerCase()) ||
+      c.cnpj.includes(busca)
+    )
     : clientesMock;
 
   const handleConfirmar = () => {
@@ -57,12 +57,12 @@ export const VincularClienteModal: React.FC<VincularClienteModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div 
+        <div
           className="flex items-center justify-between px-6 py-4 border-b"
           style={{ backgroundColor: `${currentPalette.colors.primary}10` }}
         >
           <div className="flex items-center gap-3">
-            <div 
+            <div
               className="w-10 h-10 rounded-full flex items-center justify-center"
               style={{ backgroundColor: currentPalette.colors.primary, color: 'white' }}
             >
@@ -99,11 +99,10 @@ export const VincularClienteModal: React.FC<VincularClienteModalProps> = ({
                 <button
                   key={cliente.id}
                   onClick={() => setClienteSelecionado(cliente)}
-                  className={`w-full px-4 py-3 rounded-lg transition-all text-left ${
-                    clienteSelecionado?.id === cliente.id
+                  className={`w-full px-4 py-3 rounded-lg transition-all text-left ${clienteSelecionado?.id === cliente.id
                       ? 'border-2 shadow-md'
                       : 'border border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                   style={{
                     borderColor: clienteSelecionado?.id === cliente.id ? currentPalette.colors.primary : undefined,
                     backgroundColor: clienteSelecionado?.id === cliente.id ? `${currentPalette.colors.primary}10` : undefined

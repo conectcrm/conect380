@@ -31,7 +31,7 @@ export const EditarContatoModal: React.FC<EditarContatoModalProps> = ({
   contato
 }) => {
   const { currentPalette } = useTheme();
-  
+
   const [nome, setNome] = useState(contato?.nome || '');
   const [telefone, setTelefone] = useState(contato?.telefone || '');
   const [email, setEmail] = useState(contato?.email || '');
@@ -80,12 +80,12 @@ export const EditarContatoModal: React.FC<EditarContatoModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div 
+        <div
           className="flex items-center justify-between px-6 py-4 border-b"
           style={{ backgroundColor: `${currentPalette.colors.primary}10` }}
         >
           <div className="flex items-center gap-3">
-            <div 
+            <div
               className="w-10 h-10 rounded-full flex items-center justify-center"
               style={{ backgroundColor: currentPalette.colors.primary, color: 'white' }}
             >

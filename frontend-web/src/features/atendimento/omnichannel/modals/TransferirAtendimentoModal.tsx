@@ -27,7 +27,7 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
   ticketAtual
 }) => {
   const { currentPalette } = useTheme();
-  
+
   const [buscaAgente, setBuscaAgente] = useState('');
   const [agenteSelecionado, setAgenteSelecionado] = useState<any>(null);
   const [motivo, setMotivo] = useState('');
@@ -44,8 +44,8 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
 
   const agentesFiltrados = buscaAgente
     ? agentesMock.filter(a =>
-        a.nome.toLowerCase().includes(buscaAgente.toLowerCase())
-      )
+      a.nome.toLowerCase().includes(buscaAgente.toLowerCase())
+    )
     : agentesMock;
 
   const motivosComuns = [
@@ -107,12 +107,12 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div 
+        <div
           className="flex items-center justify-between px-6 py-4 border-b"
           style={{ backgroundColor: `${currentPalette.colors.primary}10` }}
         >
           <div className="flex items-center gap-3">
-            <div 
+            <div
               className="w-10 h-10 rounded-full flex items-center justify-center"
               style={{ backgroundColor: currentPalette.colors.primary, color: 'white' }}
             >
@@ -145,7 +145,7 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Transferir para *
               </label>
-              
+
               {!agenteSelecionado ? (
                 <>
                   {/* Campo de Busca */}
@@ -171,13 +171,13 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
                       >
                         <div className="flex items-center gap-3">
                           <div className="relative">
-                            <div 
+                            <div
                               className="w-10 h-10 rounded-full flex items-center justify-center text-white font-medium text-sm"
                               style={{ backgroundColor: currentPalette.colors.primary }}
                             >
                               {agente.avatar}
                             </div>
-                            <div 
+                            <div
                               className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white"
                               style={{ backgroundColor: getStatusColor(agente.status) }}
                             />
@@ -191,7 +191,7 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
                             </p>
                           </div>
                         </div>
-                        <div 
+                        <div
                           className="px-3 py-1 rounded-full text-xs font-medium"
                           style={{
                             backgroundColor: `${getStatusColor(agente.status)}20`,
@@ -209,13 +209,13 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      <div 
+                      <div
                         className="w-12 h-12 rounded-full flex items-center justify-center text-white font-medium"
                         style={{ backgroundColor: currentPalette.colors.primary }}
                       >
                         {agenteSelecionado.avatar}
                       </div>
-                      <div 
+                      <div
                         className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white"
                         style={{ backgroundColor: getStatusColor(agenteSelecionado.status) }}
                       />
@@ -249,11 +249,10 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
                   <button
                     key={m}
                     onClick={() => setMotivo(m)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                      motivo === m
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${motivo === m
                         ? 'text-white'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                      }`}
                     style={{
                       backgroundColor: motivo === m ? currentPalette.colors.primary : undefined
                     }}
@@ -298,9 +297,9 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
                 checked={notificarAgente}
                 onChange={(e) => setNotificarAgente(e.target.checked)}
                 className="w-4 h-4 rounded border-gray-300 focus:ring-2 focus:ring-offset-0"
-                style={{ 
+                style={{
                   accentColor: currentPalette.colors.primary,
-                  '--tw-ring-color': currentPalette.colors.primary 
+                  '--tw-ring-color': currentPalette.colors.primary
                 } as any}
               />
               <label htmlFor="notificar" className="text-sm text-gray-700 cursor-pointer flex-1">
@@ -317,7 +316,7 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
               <div className="text-sm text-yellow-800">
                 <p className="font-medium mb-1">Atenção!</p>
                 <p className="text-xs">
-                  Ao transferir o atendimento, você não terá mais acesso a esta conversa. 
+                  Ao transferir o atendimento, você não terá mais acesso a esta conversa.
                   O novo agente assumirá toda a responsabilidade pelo cliente.
                 </p>
               </div>
