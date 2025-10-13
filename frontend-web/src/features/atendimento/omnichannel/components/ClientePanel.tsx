@@ -211,8 +211,8 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                 borderBottomColor: abaAtiva === 'historico' ? theme.colors.primary : ''
               }}
               className={`flex-1 px-2 py-2 text-xs font-medium transition-colors ${abaAtiva === 'historico'
-                  ? 'border-b-2'
-                  : 'text-gray-600 hover:text-gray-900'
+                ? 'border-b-2'
+                : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
               Histórico ({historico.length})
@@ -224,8 +224,8 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                 borderBottomColor: abaAtiva === 'demandas' ? theme.colors.primary : ''
               }}
               className={`flex-1 px-2 py-2 text-xs font-medium transition-colors ${abaAtiva === 'demandas'
-                  ? 'border-b-2'
-                  : 'text-gray-600 hover:text-gray-900'
+                ? 'border-b-2'
+                : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
               Demandas ({demandas.length})
@@ -237,8 +237,8 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                 borderBottomColor: abaAtiva === 'notas' ? theme.colors.primary : ''
               }}
               className={`flex-1 px-2 py-2 text-xs font-medium transition-colors ${abaAtiva === 'notas'
-                  ? 'border-b-2'
-                  : 'text-gray-600 hover:text-gray-900'
+                ? 'border-b-2'
+                : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
               Notas ({notas.length})
@@ -500,8 +500,8 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                       <div
                         key={nota.id}
                         className={`p-2.5 rounded-lg transition-colors relative group ${nota.importante
-                            ? 'bg-yellow-50 border border-yellow-200'
-                            : 'bg-gray-50 hover:bg-gray-100'
+                          ? 'bg-yellow-50 border border-yellow-200'
+                          : 'bg-gray-50 hover:bg-gray-100'
                           }`}
                       >
                         {/* Badge Importante */}
