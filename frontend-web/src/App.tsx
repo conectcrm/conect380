@@ -43,7 +43,6 @@ import { UploadDemoPage } from './pages/UploadDemoPage';
 import { EmpresasListPage } from './features/admin/empresas/EmpresasListPage';
 import { MinhasEmpresasPage } from './features/empresas/MinhasEmpresasPage';
 import { ContatosPage } from './features/contatos/ContatosPageNova';
-import { SuportePage } from './features/suporte/SuportePageNova';
 import { UsuariosPage } from './features/gestao/usuarios/UsuariosPage';
 import PerfilPage from './features/perfil/PerfilPage';
 import { AtendimentoIntegradoPage } from './pages/AtendimentoIntegradoPage';
@@ -238,10 +237,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/gestao/permissoes" element={<SistemaPermissoesPage />} />
           <Route path="/sistema/backup" element={<BackupSincronizacaoPage />} />
 
-          {/* Sistema de Suporte */}
-          <Route path="/suporte" element={<SuportePage />} />
-
-          {/* Atendimento Omnichannel (WebSocket Real-Time) */}
+          {/* Atendimento Omnichannel (WebSocket Real-Time) - Sistema Oficial */}
           <Route path="/atendimento" element={<AtendimentoIntegradoPage />} />
 
           {/* Perfil do Usuário */}
