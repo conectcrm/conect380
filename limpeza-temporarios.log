@@ -1,0 +1,90 @@
+[2025-10-13 14:27:21] [WARNING] 🔍 MODO SIMULAÇÃO - Nenhum arquivo será deletado
+[2025-10-13 14:27:21] [INFO] 📂 Diretório raiz: C:\Projetos\conectcrm
+[2025-10-13 14:27:21] [INFO] 📄 Log será salvo em: C:\Projetos\conectcrm\limpeza-temporarios.log
+[2025-10-13 14:27:21] [INFO] Buscando padrão: *_backup.*
+[2025-10-13 14:27:34] [INFO]   Encontrado: .\frontend-web\src\features\financeiro\fornecedores\FornecedoresPage_backup.tsx
+[2025-10-13 14:27:34] [INFO]   Encontrado: .\frontend-web\src\pages\ConfiguracaoEmailPage_backup.tsx
+[2025-10-13 14:27:34] [INFO]   Encontrado: .\frontend-web\src\pages\CotacaoPage_backup.tsx
+[2025-10-13 14:27:34] [INFO] Buscando padrão: *_temp.*
+[2025-10-13 14:27:37] [INFO]   Encontrado: .\frontend-web\src\components\calendar\CreateEventModal_temp.tsx
+[2025-10-13 14:27:37] [INFO]   Encontrado: .\frontend-web\src\pages\ConfiguracaoEmailPage_temp.tsx
+[2025-10-13 14:27:37] [INFO] Buscando padrão: *_BACKUP.*
+[2025-10-13 14:27:41] [INFO]   Encontrado: .\frontend-web\src\features\financeiro\fornecedores\FornecedoresPage_backup.tsx
+[2025-10-13 14:27:41] [INFO]   Encontrado: .\frontend-web\src\pages\ConfiguracaoEmailPage_backup.tsx
+[2025-10-13 14:27:41] [INFO]   Encontrado: .\frontend-web\src\pages\CotacaoPage_backup.tsx
+[2025-10-13 14:27:41] [INFO] Buscando padrão: *_TEMP.*
+[2025-10-13 14:27:44] [INFO]   Encontrado: .\frontend-web\src\components\calendar\CreateEventModal_temp.tsx
+[2025-10-13 14:27:44] [INFO]   Encontrado: .\frontend-web\src\pages\ConfiguracaoEmailPage_temp.tsx
+[2025-10-13 14:27:44] [INFO] Buscando padrão: *OLD.*
+[2025-10-13 14:27:47] [INFO]   Encontrado: .\frontend-web\src\features\produtos\ProdutosPage.old.tsx
+[2025-10-13 14:27:47] [INFO]   Encontrado: .\frontend-web\src\pages\FunilVendasOLD.jsx
+[2025-10-13 14:27:47] [INFO] Buscando padrão: *old.*
+[2025-10-13 14:27:51] [INFO]   Encontrado: .\frontend-web\src\features\produtos\ProdutosPage.old.tsx
+[2025-10-13 14:27:51] [INFO]   Encontrado: .\frontend-web\src\pages\FunilVendasOLD.jsx
+[2025-10-13 14:27:51] [INFO] Buscando padrão: *IMPLEMENTADO_SUCESSO.md
+[2025-10-13 14:27:54] [INFO] Buscando padrão: *_IMPLEMENTADO.md
+[2025-10-13 14:27:59] [INFO]   Encontrado: .\FRONTEND_IMPLEMENTADO.md
+[2025-10-13 14:27:59] [INFO]   Encontrado: .\docs\features\CONFIRMACAO_INTELIGENTE_IMPLEMENTADO.md
+[2025-10-13 14:27:59] [INFO]   Encontrado: .\docs\features\MODULO_EMPRESAS_IMPLEMENTADO.md
+[2025-10-13 14:27:59] [INFO]   Encontrado: .\docs\features\SISTEMA_SUPORTE_IMPLEMENTADO.md
+[2025-10-13 14:27:59] [INFO]   Encontrado: .\docs\implementation\DASHBOARD_IMPLEMENTADO.md
+[2025-10-13 14:27:59] [INFO]   Encontrado: .\docs\implementation\FUNIL_VENDAS_IMPLEMENTADO.md
+[2025-10-13 14:27:59] [INFO]   Encontrado: .\docs\implementation\MODULO_CLIENTES_IMPLEMENTADO.md
+[2025-10-13 14:27:59] [INFO]   Encontrado: .\docs\implementation\PARTICIPANTES_MODAL_IMPLEMENTADO.md
+[2025-10-13 14:27:59] [INFO]   Encontrado: .\docs\implementation\PRODUTOS_DETALHADOS_IMPLEMENTADO.md
+[2025-10-13 14:27:59] [INFO]   Encontrado: .\docs\implementation\SISTEMA_FILTRAGEM_IMPLEMENTADO.md
+[2025-10-13 14:27:59] [INFO]   Encontrado: .\docs\implementation\TEMPLATE_PROPOSTA_DADOS_REAIS_IMPLEMENTADO.md
+[2025-10-13 14:27:59] [INFO]   Encontrado: .\docs\implementation\VENDEDORES_MODAL_PROPOSTA_IMPLEMENTADO.md
+[2025-10-13 14:27:59] [INFO] Buscando padrão: *_CONCLUIDA.md
+[2025-10-13 14:28:03] [INFO]   Encontrado: .\CONSOLIDACAO_ATENDIMENTO_CONCLUIDA.md
+[2025-10-13 14:28:03] [INFO]   Encontrado: .\docs\changelog\REORGANIZACAO_CONCLUIDA.md
+[2025-10-13 14:28:03] [INFO]   Encontrado: .\docs\implementation\LIMPEZA_CHATWOOT_CONCLUIDA.md
+[2025-10-13 14:28:03] [INFO] Buscando padrão: *_FINALIZADO.md
+[2025-10-13 14:28:06] [INFO] Buscando padrão: test-*.html
+[2025-10-13 14:28:10] [INFO]   Encontrado: .\frontend-web\public\test-api.html
+[2025-10-13 14:28:10] [INFO]   Encontrado: .\frontend-web\src\test-categorias.html
+[2025-10-13 14:28:10] [INFO]   Encontrado: .\frontend-web\src\test-modal.html
+[2025-10-13 14:28:10] [INFO] Buscando padrão: teste-*.html
+[2025-10-13 14:28:13] [INFO] Buscando padrão: debug-*.html
+[2025-10-13 14:28:18] [INFO] Buscando padrão: *_old_*
+[2025-10-13 14:28:21] [INFO] Buscando padrão: *_backup_*
+[2025-10-13 14:28:24] [INFO]   Encontrado: .\frontend-web\src\features\propostas\PropostasPage_backup_20250728_201403.tsx
+[2025-10-13 14:28:24] [INFO] Buscando padrão: *.backup
+[2025-10-13 14:28:26] [INFO]   Encontrado: .\backend\src\modules\atendimento\entities\mensagem.entity.ts.backup
+[2025-10-13 14:28:26] [INFO]   Encontrado: .\backend\src\modules\atendimento\entities\ticket.entity.ts.backup
+[2025-10-13 14:28:26] [INFO]   Encontrado: .\frontend-web\src\pages\faturamento\index.tsx.backup
+[2025-10-13 14:28:27] [INFO] Buscando padrão: *.temp
+[2025-10-13 14:28:30] [WARNING] Total de arquivos temporários encontrados: 36
+[2025-10-13 14:28:30] [SUCCESS] Simulação concluída. Use sem -DryRun para executar a limpeza.
+[2025-10-13 14:29:06] [INFO] 📂 Diretório raiz: C:\Projetos\conectcrm
+[2025-10-13 14:29:06] [INFO] 📄 Log será salvo em: C:\Projetos\conectcrm\limpeza-temporarios.log
+[2025-10-13 14:29:06] [INFO] Buscando padrão: *_backup.*
+[2025-10-13 14:29:12] [INFO] Buscando padrão: *_temp.*
+[2025-10-13 14:29:16] [INFO] Buscando padrão: *_BACKUP.*
+[2025-10-13 14:29:20] [INFO] Buscando padrão: *_TEMP.*
+[2025-10-13 14:29:23] [INFO] Buscando padrão: *OLD.*
+[2025-10-13 14:29:26] [INFO] Buscando padrão: *old.*
+[2025-10-13 14:29:32] [INFO] Buscando padrão: *IMPLEMENTADO_SUCESSO.md
+[2025-10-13 14:29:44] [INFO] Buscando padrão: *_IMPLEMENTADO.md
+[2025-10-13 14:29:49] [INFO] Buscando padrão: *_CONCLUIDA.md
+[2025-10-13 14:29:52] [INFO] Buscando padrão: *_FINALIZADO.md
+[2025-10-13 14:29:56] [INFO] Buscando padrão: test-*.html
+[2025-10-13 14:30:02] [INFO] Buscando padrão: teste-*.html
+[2025-10-13 14:30:05] [INFO] Buscando padrão: debug-*.html
+[2025-10-13 14:30:10] [INFO] Buscando padrão: *_old_*
+[2025-10-13 14:30:14] [INFO] Buscando padrão: *_backup_*
+[2025-10-13 14:30:19] [INFO] Buscando padrão: *.backup
+[2025-10-13 14:30:24] [INFO] Buscando padrão: *.temp
+[2025-10-13 14:30:28] [WARNING] Total de arquivos temporários encontrados: 36
+[2025-10-13 14:30:29] [ERROR]   ✗ Erro ao remover .\frontend-web\src\features\financeiro\fornecedores\FornecedoresPage_backup.tsx: Cannot find path 'C:\Projetos\conectcrm\frontend-web\src\features\financeiro\fornecedores\FornecedoresPage_backup.tsx' because it does not exist.
+[2025-10-13 14:30:29] [ERROR]   ✗ Erro ao remover .\frontend-web\src\pages\ConfiguracaoEmailPage_backup.tsx: Cannot find path 'C:\Projetos\conectcrm\frontend-web\src\pages\ConfiguracaoEmailPage_backup.tsx' because it does not exist.
+[2025-10-13 14:30:29] [ERROR]   ✗ Erro ao remover .\frontend-web\src\pages\CotacaoPage_backup.tsx: Cannot find path 'C:\Projetos\conectcrm\frontend-web\src\pages\CotacaoPage_backup.tsx' because it does not exist.
+[2025-10-13 14:30:29] [ERROR]   ✗ Erro ao remover .\frontend-web\src\components\calendar\CreateEventModal_temp.tsx: Cannot find path 'C:\Projetos\conectcrm\frontend-web\src\components\calendar\CreateEventModal_temp.tsx' because it does not exist.
+[2025-10-13 14:30:29] [ERROR]   ✗ Erro ao remover .\frontend-web\src\pages\ConfiguracaoEmailPage_temp.tsx: Cannot find path 'C:\Projetos\conectcrm\frontend-web\src\pages\ConfiguracaoEmailPage_temp.tsx' because it does not exist.
+[2025-10-13 14:30:29] [ERROR]   ✗ Erro ao remover .\frontend-web\src\features\produtos\ProdutosPage.old.tsx: Cannot find path 'C:\Projetos\conectcrm\frontend-web\src\features\produtos\ProdutosPage.old.tsx' because it does not exist.
+[2025-10-13 14:30:29] [ERROR]   ✗ Erro ao remover .\frontend-web\src\pages\FunilVendasOLD.jsx: Cannot find path 'C:\Projetos\conectcrm\frontend-web\src\pages\FunilVendasOLD.jsx' because it does not exist.
+[2025-10-13 14:30:29] [INFO] Arquivos encontrados: 36
+[2025-10-13 14:30:29] [SUCCESS] Arquivos removidos: 29
+[2025-10-13 14:30:29] [ERROR] Erros: 7
+[2025-10-13 14:30:29] [SUCCESS] Espaço liberado: 0.85 MB
+[2025-10-13 14:30:29] [WARNING] Limpeza concluída, mas com 7 erro(s). Verifique o log.
