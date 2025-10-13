@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Ticket, Mensagem } from '../types';
 import { getIconeCanal, formatarTempoAtendimento, formatarHorarioMensagem, copiarParaClipboard } from '../utils';
+import { ThemePalette } from '../../../../contexts/ThemeContext';
 
 interface ChatAreaProps {
   ticket: Ticket;
@@ -23,6 +24,7 @@ interface ChatAreaProps {
   onTransferir: () => void;
   onEncerrar: () => void;
   onLigar: () => void;
+  theme: ThemePalette;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -31,7 +33,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onEnviarMensagem,
   onTransferir,
   onEncerrar,
-  onLigar
+  onLigar,
+  theme
 }) => {
   const [mensagemAtual, setMensagemAtual] = useState('');
   const [tempoAtendimento, setTempoAtendimento] = useState(ticket.tempoAtendimento);
@@ -165,9 +168,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
 
             {/* Tempo de Atendimento */}
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-lg">
-              <Clock className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-mono font-medium text-blue-700">
+            <div 
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+              style={{ backgroundColor: theme.colors.primaryLight }}
+            >
+              <Clock className="w-4 h-4" style={{ color: theme.colors.primary }} />
+              <span className="text-sm font-mono font-medium" style={{ color: theme.colors.primary }}>
                 {formatarTempoAtendimento(tempoAtendimento)}
               </span>
             </div>
@@ -256,11 +262,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   </span>
                 )}
                 
-                <div className={`rounded-2xl px-4 py-2.5 shadow-sm ${
-                  ehCliente
-                    ? 'bg-white border border-gray-200'
-                    : 'bg-blue-500 text-white'
-                }`}>
+                <div 
+                  className={`rounded-2xl px-4 py-2.5 shadow-sm ${
+                    ehCliente
+                      ? 'bg-white border border-gray-200'
+                      : ''
+                  }`}
+                  style={!ehCliente ? {
+                    backgroundColor: theme.colors.primary,
+                    color: '#FFFFFF'
+                  } : {}}
+                >
                   <p className="text-sm whitespace-pre-wrap break-words">
                     {mensagem.conteudo}
                   </p>
@@ -310,7 +322,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               onKeyPress={handleKeyPress}
               placeholder="Digite sua mensagem..."
               rows={1}
-              className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent max-h-32"
+              style={{ borderColor: theme.colors.border }}
+              onFocus={(e) => {
+                e.currentTarget.style.outline = `2px solid ${theme.colors.primary}`;
+                e.currentTarget.style.borderColor = 'transparent';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.outline = 'none';
+                e.currentTarget.style.borderColor = theme.colors.border;
+              }}
+              className="w-full px-4 py-2.5 pr-10 border rounded-lg resize-none max-h-32 transition-all"
             />
             <button className="absolute right-3 top-1/2 transform -translate-y-1/2 hover:bg-gray-100 p-1.5 rounded-lg transition-colors">
               <Smile className="w-5 h-5 text-gray-400" />
@@ -321,7 +342,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {mensagemAtual.trim() ? (
             <button
               onClick={handleEnviar}
-              className="p-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex-shrink-0 shadow-md hover:shadow-lg"
+              style={{
+                backgroundColor: theme.colors.primary,
+                color: '#FFFFFF'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.colors.primaryHover}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme.colors.primary}
+              className="p-3 rounded-lg transition-colors flex-shrink-0 shadow-md hover:shadow-lg"
             >
               <Send className="w-5 h-5" />
             </button>

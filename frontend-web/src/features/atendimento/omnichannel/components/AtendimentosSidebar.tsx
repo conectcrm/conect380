@@ -2,19 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, Clock, MessageSquare } from 'lucide-react';
 import { Ticket, StatusAtendimento, CanalTipo } from '../types';
 import { getIconeCanal } from '../utils';
+import { ThemePalette } from '../../../../contexts/ThemeContext';
 
 interface AtendimentosSidebarProps {
   tickets: Ticket[];
   ticketSelecionado?: string;
   onSelecionarTicket: (ticketId: string) => void;
   onNovoAtendimento: () => void;
+  theme: ThemePalette;
 }
 
 export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
   tickets,
   ticketSelecionado,
   onSelecionarTicket,
-  onNovoAtendimento
+  onNovoAtendimento,
+  theme
 }) => {
   const [tabAtiva, setTabAtiva] = useState<StatusAtendimento>('aberto');
   const [busca, setBusca] = useState('');
@@ -90,9 +93,13 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
             <button
               key={tab.value}
               onClick={() => setTabAtiva(tab.value)}
+              style={{
+                backgroundColor: tabAtiva === tab.value ? theme.colors.primary : '',
+                color: tabAtiva === tab.value ? '#FFFFFF' : ''
+              }}
               className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
                 tabAtiva === tab.value
-                  ? 'bg-blue-500 text-white shadow-md'
+                  ? 'shadow-md'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -138,10 +145,13 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
               <div
                 key={ticket.id}
                 onClick={() => onSelecionarTicket(ticket.id)}
+                style={{
+                  backgroundColor: isAtivo ? theme.colors.primaryLight : '',
+                  borderLeftColor: isAtivo ? theme.colors.primary : '',
+                  borderLeftWidth: isAtivo ? '4px' : ''
+                }}
                 className={`flex items-start gap-3 p-4 border-b border-gray-100 cursor-pointer transition-all ${
-                  isAtivo
-                    ? 'bg-blue-50 border-l-4 border-l-blue-500'
-                    : 'hover:bg-gray-50'
+                  isAtivo ? '' : 'hover:bg-gray-50'
                 }`}
               >
                 {/* Foto do Contato */}
@@ -217,7 +227,13 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
       <div className="p-4 border-t border-gray-200">
         <button
           onClick={onNovoAtendimento}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors shadow-md hover:shadow-lg"
+          style={{
+            backgroundColor: theme.colors.primary,
+            color: '#FFFFFF'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.colors.primaryHover}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme.colors.primary}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-colors shadow-md hover:shadow-lg"
         >
           <Plus className="w-5 h-5" />
           Novo Atendimento

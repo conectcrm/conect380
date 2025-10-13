@@ -4,6 +4,7 @@ import { ChatArea } from './components/ChatArea';
 import { ClientePanel } from './components/ClientePanel';
 import { mockTickets, mockMensagens, mockHistorico, mockDemandas } from './mockData';
 import { Mensagem } from './types';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 /**
  * ChatOmnichannel - Componente principal do chat omnichannel
@@ -12,8 +13,11 @@ import { Mensagem } from './types';
  * 1. Sidebar Esquerda: Lista de atendimentos com tabs (Aberto/Resolvido/Retornos)
  * 2. Área Central: Chat com mensagens, header e input
  * 3. Painel Direito: Informações do cliente e demandas
+ * 
+ * TEMA: Integrado com ThemeContext do CRM
  */
 export const ChatOmnichannel: React.FC = () => {
+  const { currentPalette } = useTheme();
   const [tickets] = useState(mockTickets);
   const [ticketSelecionado, setTicketSelecionado] = useState<string>(mockTickets[0]?.id);
   const [mensagens, setMensagens] = useState<Mensagem[]>(mockMensagens);
@@ -139,6 +143,7 @@ export const ChatOmnichannel: React.FC = () => {
           ticketSelecionado={ticketSelecionado}
           onSelecionarTicket={handleSelecionarTicket}
           onNovoAtendimento={handleNovoAtendimento}
+          theme={currentPalette}
         />
       </div>
 
@@ -151,6 +156,7 @@ export const ChatOmnichannel: React.FC = () => {
           onTransferir={handleTransferir}
           onEncerrar={handleEncerrar}
           onLigar={handleLigar}
+          theme={currentPalette}
         />
       </div>
 
@@ -162,6 +168,7 @@ export const ChatOmnichannel: React.FC = () => {
         onEditarContato={handleEditarContato}
         onVincularCliente={handleVincularCliente}
         onAbrirDemanda={handleAbrirDemanda}
+        theme={currentPalette}
       />
     </div>
   );

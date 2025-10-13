@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Contato, HistoricoAtendimento, Demanda } from '../types';
 import { formatarTempoDecorrido, getIconeCanal } from '../utils';
+import { ThemePalette } from '../../../../contexts/ThemeContext';
 
 interface ClientePanelProps {
   contato: Contato;
@@ -19,6 +20,7 @@ interface ClientePanelProps {
   onEditarContato: () => void;
   onVincularCliente: () => void;
   onAbrirDemanda: (tipo: string, descricao: string) => void;
+  theme: ThemePalette;
 }
 
 export const ClientePanel: React.FC<ClientePanelProps> = ({
@@ -27,7 +29,8 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
   demandas,
   onEditarContato,
   onVincularCliente,
-  onAbrirDemanda
+  onAbrirDemanda,
+  theme
 }) => {
   const [expandido, setExpandido] = useState(true);
   const [abaAtiva, setAbaAtiva] = useState<'historico' | 'demandas'>('historico');
@@ -156,7 +159,21 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
             ) : (
               <button
                 onClick={onVincularCliente}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors text-gray-600 hover:text-blue-600"
+                style={{
+                  borderColor: theme.colors.border,
+                  color: theme.colors.textSecondary
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = theme.colors.primary;
+                  e.currentTarget.style.backgroundColor = theme.colors.primaryLight;
+                  e.currentTarget.style.color = theme.colors.primary;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = theme.colors.border;
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = theme.colors.textSecondary;
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed rounded-lg transition-colors"
               >
                 <LinkIcon className="w-4 h-4" />
                 <span className="text-sm font-medium">Vincular Cliente</span>
@@ -170,9 +187,13 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
           <div className="flex">
             <button
               onClick={() => setAbaAtiva('historico')}
+              style={{
+                color: abaAtiva === 'historico' ? theme.colors.primary : '',
+                borderBottomColor: abaAtiva === 'historico' ? theme.colors.primary : ''
+              }}
               className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
                 abaAtiva === 'historico'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  ? 'border-b-2'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
@@ -180,9 +201,13 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
             </button>
             <button
               onClick={() => setAbaAtiva('demandas')}
+              style={{
+                color: abaAtiva === 'demandas' ? theme.colors.primary : '',
+                borderBottomColor: abaAtiva === 'demandas' ? theme.colors.primary : ''
+              }}
               className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
                 abaAtiva === 'demandas'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  ? 'border-b-2'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
@@ -239,7 +264,12 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                     );
                   })}
                   {historico.length > 5 && (
-                    <button className="w-full py-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
+                    <button 
+                      className="w-full py-2 text-sm font-medium"
+                      style={{ color: theme.colors.primary }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = theme.colors.primaryHover}
+                      onMouseLeave={(e) => e.currentTarget.style.color = theme.colors.primary}
+                    >
                       Ver histórico completo ({historico.length} atendimentos)
                     </button>
                   )}
@@ -249,7 +279,7 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
           ) : (
             <div className="space-y-4">
               {/* Formulário Nova Demanda */}
-              <div className="p-4 bg-blue-50 rounded-lg space-y-3">
+              <div className="p-4 rounded-lg space-y-3" style={{ backgroundColor: theme.colors.primaryLight }}>
                 <h4 className="text-sm font-semibold text-gray-900">Nova Demanda</h4>
                 
                 <div>
@@ -259,7 +289,16 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                   <select
                     value={tipoDemanda}
                     onChange={(e) => setTipoDemanda(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    style={{ borderColor: theme.colors.border }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.outline = `2px solid ${theme.colors.primary}`;
+                      e.currentTarget.style.borderColor = 'transparent';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.outline = 'none';
+                      e.currentTarget.style.borderColor = theme.colors.border;
+                    }}
+                    className="w-full px-3 py-2 border rounded-lg text-sm transition-all"
                   >
                     <option value="">Selecione...</option>
                     <option value="Suporte Técnico">Suporte Técnico</option>
@@ -279,14 +318,37 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                     onChange={(e) => setDescricaoDemanda(e.target.value)}
                     rows={3}
                     placeholder="Descreva a demanda..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
+                    style={{ borderColor: theme.colors.border }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.outline = `2px solid ${theme.colors.primary}`;
+                      e.currentTarget.style.borderColor = 'transparent';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.outline = 'none';
+                      e.currentTarget.style.borderColor = theme.colors.border;
+                    }}
+                    className="w-full px-3 py-2 border rounded-lg text-sm resize-none transition-all"
                   />
                 </div>
 
                 <button
                   onClick={handleAbrirDemanda}
                   disabled={!tipoDemanda.trim() || !descricaoDemanda.trim()}
-                  className="w-full py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                  style={{
+                    backgroundColor: (!tipoDemanda.trim() || !descricaoDemanda.trim()) ? '#D1D5DB' : theme.colors.primary,
+                    color: '#FFFFFF'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (tipoDemanda.trim() && descricaoDemanda.trim()) {
+                      e.currentTarget.style.backgroundColor = theme.colors.primaryHover;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (tipoDemanda.trim() && descricaoDemanda.trim()) {
+                      e.currentTarget.style.backgroundColor = theme.colors.primary;
+                    }
+                  }}
+                  className="w-full py-2 rounded-lg disabled:cursor-not-allowed transition-colors text-sm font-medium"
                 >
                   Abrir Demanda
                 </button>
