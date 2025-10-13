@@ -289,25 +289,25 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 )}
                 
                 <div 
-                  className={`rounded-2xl px-4 py-2.5 shadow-sm ${
+                  className={`rounded-2xl px-4 py-2.5 ${
                     ehCliente
-                      ? 'bg-white border border-gray-200'
-                      : ''
+                      ? 'bg-white border border-gray-200 shadow-sm'
+                      : 'shadow-md'
                   }`}
                   style={!ehCliente ? {
-                    backgroundColor: theme.colors.primary,
+                    backgroundColor: theme.colors.primaryDark || theme.colors.primary,
                     color: '#FFFFFF'
                   } : {}}
                 >
-                  <p className="text-sm whitespace-pre-wrap break-words">
+                  <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
                     {mensagem.conteudo}
                   </p>
                   
                   {/* Timestamp e Status */}
-                  <div className={`flex items-center gap-1 mt-1 justify-end ${
-                    ehCliente ? 'text-gray-500' : 'text-white/70'
+                  <div className={`flex items-center gap-1 mt-1.5 justify-end ${
+                    ehCliente ? 'text-gray-500' : 'text-white/80'
                   }`}>
-                    <span className="text-xs">
+                    <span className="text-xs font-medium">
                       {formatarHorarioMensagem(mensagem.timestamp)}
                     </span>
                     {!ehCliente && renderIconeStatus(mensagem.status)}
