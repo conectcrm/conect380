@@ -5,8 +5,11 @@ import { ClientePanel } from './components/ClientePanel';
 import { NovoAtendimentoModal, NovoAtendimentoData } from './modals/NovoAtendimentoModal';
 import { TransferirAtendimentoModal, TransferenciaData } from './modals/TransferirAtendimentoModal';
 import { EncerrarAtendimentoModal, EncerramentoData } from './modals/EncerrarAtendimentoModal';
+import { EditarContatoModal, ContatoEditado } from './modals/EditarContatoModal';
+import { VincularClienteModal } from './modals/VincularClienteModal';
+import { AbrirDemandaModal, NovaDemanda } from './modals/AbrirDemandaModal';
 import { mockTickets, mockMensagens, mockHistorico, mockDemandas, mockNotas } from './mockData';
-import { Mensagem, NotaCliente } from './types';
+import { Mensagem, NotaCliente, Demanda } from './types';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useSidebar } from '../../../contexts/SidebarContext';
 
@@ -35,6 +38,9 @@ export const ChatOmnichannel: React.FC = () => {
   const [modalNovoAtendimento, setModalNovoAtendimento] = useState(false);
   const [modalTransferir, setModalTransferir] = useState(false);
   const [modalEncerrar, setModalEncerrar] = useState(false);
+  const [modalEditarContato, setModalEditarContato] = useState(false);
+  const [modalVincularCliente, setModalVincularCliente] = useState(false);
+  const [modalAbrirDemanda, setModalAbrirDemanda] = useState(false);
 
   // Encontra o ticket atual
   const ticketAtual = tickets.find(t => t.id === ticketSelecionado);
@@ -127,27 +133,41 @@ export const ChatOmnichannel: React.FC = () => {
   }, [ticketAtual]);
 
   const handleEditarContato = useCallback(() => {
-    console.log('Editar contato');
-    // TODO: Implementar modal de edição de contato
+    setModalEditarContato(true);
+  }, []);
+
+  const handleConfirmarEdicaoContato = useCallback((dados: ContatoEditado) => {
+    console.log('Editar contato:', dados);
+    // TODO: Integrar com API
+    // TODO: Atualizar dados do contato
   }, []);
 
   const handleVincularCliente = useCallback(() => {
-    console.log('Vincular cliente');
-    // TODO: Implementar modal de busca e vinculação de cliente
+    setModalVincularCliente(true);
   }, []);
 
-  const handleAbrirDemanda = useCallback((tipo: string, descricao: string) => {
-    const novaDemanda = {
+  const handleConfirmarVinculoCliente = useCallback((clienteId: string) => {
+    console.log('Vincular cliente:', clienteId);
+    // TODO: Integrar com API
+    // TODO: Atualizar vinculação
+  }, []);
+
+  const handleAbrirDemanda = useCallback(() => {
+    setModalAbrirDemanda(true);
+  }, []);
+
+  const handleConfirmarNovaDemanda = useCallback((dados: NovaDemanda) => {
+    const novaDemanda: Demanda = {
       id: `d${Date.now()}`,
-      tipo,
-      descricao,
+      tipo: dados.tipo,
+      descricao: dados.descricao,
       status: 'aberta' as const,
       dataAbertura: new Date()
     };
-
     setDemandas(prev => [novaDemanda, ...prev]);
     console.log('Nova demanda criada:', novaDemanda);
-    // TODO: Salvar no backend
+    // TODO: Integrar com API
+    // TODO: Criar oportunidade vinculada
   }, []);
 
   const handleAdicionarNota = useCallback((conteudo: string, importante: boolean) => {
@@ -250,6 +270,27 @@ export const ChatOmnichannel: React.FC = () => {
         isOpen={modalEncerrar}
         onClose={() => setModalEncerrar(false)}
         onConfirm={handleConfirmarEncerramento}
+        ticketAtual={ticketAtual}
+      />
+
+      <EditarContatoModal
+        isOpen={modalEditarContato}
+        onClose={() => setModalEditarContato(false)}
+        onConfirm={handleConfirmarEdicaoContato}
+        contato={ticketAtual.contato}
+      />
+
+      <VincularClienteModal
+        isOpen={modalVincularCliente}
+        onClose={() => setModalVincularCliente(false)}
+        onConfirm={handleConfirmarVinculoCliente}
+        contatoAtual={ticketAtual.contato}
+      />
+
+      <AbrirDemandaModal
+        isOpen={modalAbrirDemanda}
+        onClose={() => setModalAbrirDemanda(false)}
+        onConfirm={handleConfirmarNovaDemanda}
         ticketAtual={ticketAtual}
       />
     </div>
