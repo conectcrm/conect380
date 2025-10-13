@@ -1410,12 +1410,20 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         </header>
 
         {/* Conteúdo da página */}
-        <main className="flex-1 relative overflow-y-auto focus:outline-none">
-          <div className="py-6">
-            <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6">
+        <main className={`flex-1 relative focus:outline-none ${location.pathname === '/atendimento' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+          {location.pathname === '/atendimento' ? (
+            // Para a rota de atendimento, não aplicar padding para usar tela completa
+            <div className="h-full">
               {children}
             </div>
-          </div>
+          ) : (
+            // Para outras rotas, manter o padding padrão
+            <div className="py-6">
+              <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6">
+                {children}
+              </div>
+            </div>
+          )}
         </main>
       </div>
 

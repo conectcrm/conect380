@@ -131,7 +131,7 @@ export const ChatOmnichannel: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
+    <div className="flex h-full bg-gray-100 overflow-hidden">
       {/* Coluna 1: Lista de Atendimentos */}
       <div className="w-96 flex-shrink-0">
         <AtendimentosSidebar

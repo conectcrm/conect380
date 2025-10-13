@@ -18,7 +18,14 @@ import { ChatOmnichannel } from '../features/atendimento/omnichannel';
  * - Sistema de demandas
  * - Busca e filtros
  * - Design responsivo e moderno
+ * 
+ * NOTA: Este componente usa calc(100vh - 64px) para ocupar
+ * toda altura disponível, considerando a navbar de 64px
  */
 export function AtendimentoIntegradoPage() {
-  return <ChatOmnichannel />;
+  return (
+    <div style={{ height: 'calc(100vh - 64px)' }} className="w-full">
+      <ChatOmnichannel />
+    </div>
+  );
 }
