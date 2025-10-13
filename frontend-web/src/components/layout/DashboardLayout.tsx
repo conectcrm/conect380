@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../../contexts/I18nContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useProfile } from '../../contexts/ProfileContext';
+import { useSidebar } from '../../contexts/SidebarContext';
 import { formatCompanyName, formatUserName } from '../../utils/textUtils';
 import SimpleNavGroup, { NavigationNucleus } from '../navigation/SimpleNavGroup';
 import NotificationCenter from '../notifications/NotificationCenter';
@@ -44,7 +45,7 @@ interface DashboardLayoutProps {
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { sidebarCollapsed, setSidebarCollapsed } = useSidebar();
   const [showProfileSelector, setShowProfileSelector] = useState(false);
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
   const { user, logout } = useAuth();

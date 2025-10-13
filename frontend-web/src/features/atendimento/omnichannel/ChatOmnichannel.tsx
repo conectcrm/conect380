@@ -5,6 +5,7 @@ import { ClientePanel } from './components/ClientePanel';
 import { mockTickets, mockMensagens, mockHistorico, mockDemandas, mockNotas } from './mockData';
 import { Mensagem, NotaCliente } from './types';
 import { useTheme } from '../../../contexts/ThemeContext';
+import { useSidebar } from '../../../contexts/SidebarContext';
 
 /**
  * ChatOmnichannel - Componente principal do chat omnichannel
@@ -15,9 +16,11 @@ import { useTheme } from '../../../contexts/ThemeContext';
  * 3. Painel Direito: Informações do cliente e demandas
  * 
  * TEMA: Integrado com ThemeContext do CRM
+ * RESPONSIVE: Adapta larguras quando sidebar global está expandida/colapsada
  */
 export const ChatOmnichannel: React.FC = () => {
   const { currentPalette } = useTheme();
+  const { sidebarCollapsed } = useSidebar();
   const [tickets] = useState(mockTickets);
   const [ticketSelecionado, setTicketSelecionado] = useState<string>(mockTickets[0]?.id);
   const [mensagens, setMensagens] = useState<Mensagem[]>(mockMensagens);
@@ -163,8 +166,10 @@ export const ChatOmnichannel: React.FC = () => {
 
   return (
     <div className="flex h-full bg-gray-100 overflow-hidden">
-      {/* Coluna 1: Lista de Atendimentos */}
-      <div className="w-96 flex-shrink-0">
+      {/* Coluna 1: Lista de Atendimentos - Adaptável ao estado da sidebar */}
+      <div className={`flex-shrink-0 transition-all duration-300 ${
+        sidebarCollapsed ? 'w-96' : 'w-80'
+      }`}>
         <AtendimentosSidebar
           tickets={tickets}
           ticketSelecionado={ticketSelecionado}
@@ -174,7 +179,7 @@ export const ChatOmnichannel: React.FC = () => {
         />
       </div>
 
-      {/* Coluna 2: Área do Chat */}
+      {/* Coluna 2: Área do Chat - Flex para usar espaço disponível */}
       <div className="flex-1 flex flex-col min-w-0">
         <ChatArea
           ticket={ticketAtual}
@@ -187,7 +192,7 @@ export const ChatOmnichannel: React.FC = () => {
         />
       </div>
 
-      {/* Coluna 3: Painel do Cliente */}
+      {/* Coluna 3: Painel do Cliente - Largura fixa otimizada (320px) */}
       <ClientePanel
         contato={ticketAtual.contato}
         historico={historico}

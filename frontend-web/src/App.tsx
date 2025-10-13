@@ -8,6 +8,7 @@ import { I18nProvider } from './contexts/I18nContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { EmpresaProvider } from './contexts/EmpresaContextAPIReal';
 import { ProfileProvider } from './contexts/ProfileContext';
+import { SidebarProvider } from './contexts/SidebarContext';
 import LoginPage from './features/auth/LoginPage';
 import RegistroEmpresaPage from './features/auth/RegistroEmpresaPage';
 import VerificacaoEmailPage from './features/auth/VerificacaoEmailPage';
@@ -382,28 +383,30 @@ const App: React.FC = () => {
             <ProfileProvider>
               <NotificationProvider>
                 <EmpresaProvider>
-                  <Router
-                    future={{
-                      v7_startTransition: true,
-                      v7_relativeSplatPath: true,
-                    }}
-                  >
-                    <ScrollToTop />
-                    <div className="App">
-                      <AppRoutes />
+                  <SidebarProvider>
+                    <Router
+                      future={{
+                        v7_startTransition: true,
+                        v7_relativeSplatPath: true,
+                      }}
+                    >
+                      <ScrollToTop />
+                      <div className="App">
+                        <AppRoutes />
 
-                      <Toaster
-                        position="top-right"
-                        toastOptions={{
-                          duration: 4000,
-                          style: {
-                            background: '#363636',
-                            color: '#fff',
-                          },
-                        }}
-                      />
-                    </div>
-                  </Router>
+                        <Toaster
+                          position="top-right"
+                          toastOptions={{
+                            duration: 4000,
+                            style: {
+                              background: '#363636',
+                              color: '#fff',
+                            },
+                          }}
+                        />
+                      </div>
+                    </Router>
+                  </SidebarProvider>
                 </EmpresaProvider>
               </NotificationProvider>
             </ProfileProvider>
