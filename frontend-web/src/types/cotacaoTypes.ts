@@ -1,18 +1,19 @@
 export interface Cotacao {
   id: string;
   numero: string;
-  clienteId: string;
-  cliente?: {
+  fornecedorId: string;
+  fornecedor?: {
     id: string;
     nome: string;
     email: string;
     telefone?: string;
+    cnpjCpf?: string;
   };
   titulo: string;
   descricao?: string;
   status: StatusCotacao;
   prioridade: PrioridadeCotacao;
-  dataVencimento: string;
+  prazoResposta?: string;
   dataCriacao: string;
   dataUltimaAtualizacao: string;
   valorTotal: number;
@@ -21,6 +22,7 @@ export interface Cotacao {
   observacoes?: string;
   condicoesPagamento?: string;
   prazoEntrega?: string;
+  localEntrega?: string;
   validadeOrcamento?: number; // dias
   responsavelId: string;
   responsavel?: {
@@ -74,7 +76,7 @@ export interface HistoricoCotacao {
   dadosNovos?: Record<string, any>;
 }
 
-export type StatusCotacao = 
+export type StatusCotacao =
   | 'rascunho'
   | 'enviada'
   | 'em_analise'
@@ -89,14 +91,15 @@ export type PrioridadeCotacao = 'baixa' | 'media' | 'alta' | 'urgente';
 export type OrigemCotacao = 'manual' | 'website' | 'email' | 'telefone' | 'whatsapp' | 'indicacao';
 
 export interface CriarCotacaoRequest {
-  clienteId: string;
+  fornecedorId: string;
   titulo: string;
   descricao?: string;
   prioridade: PrioridadeCotacao;
-  dataVencimento: string;
+  prazoResposta?: string;
   observacoes?: string;
   condicoesPagamento?: string;
   prazoEntrega?: string;
+  localEntrega?: string;
   validadeOrcamento?: number;
   itens: Omit<ItemCotacao, 'id' | 'valorTotal'>[];
   tags?: string[];
@@ -108,18 +111,20 @@ export interface AtualizarCotacaoRequest {
   descricao?: string;
   status?: StatusCotacao;
   prioridade?: PrioridadeCotacao;
-  dataVencimento?: string;
+  prazoResposta?: string;
   valorDesconto?: number;
   percentualDesconto?: number;
   observacoes?: string;
   condicoesPagamento?: string;
   prazoEntrega?: string;
+  localEntrega?: string;
   validadeOrcamento?: number;
   itens?: Omit<ItemCotacao, 'id' | 'valorTotal'>[];
   tags?: string[];
 }
 
 export interface FiltroCotacao {
+  busca?: string;
   status?: StatusCotacao[];
   prioridade?: PrioridadeCotacao[];
   clienteId?: string;

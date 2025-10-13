@@ -39,9 +39,7 @@ class IAService {
   };
 
   constructor() {
-    console.log('🚀 IA Service inicializando...');
     this.inicializarBaseConhecimento();
-    console.log('✅ IA Service inicializada com sucesso!');
   }
 
   private inicializarBaseConhecimento() {
@@ -141,7 +139,7 @@ class IAService {
       'hello', 'hi', 'tchau', 'obrigado', 'obrigada', 'valeu', 'ok', 'beleza',
       'legal', 'perfeito', 'certo', 'entendi', 'show', 'massa', 'top'
     ];
-    
+
     const mensagemLower = mensagem.toLowerCase();
     return saudacoes.some(saudacao => mensagemLower.includes(saudacao));
   }
@@ -149,7 +147,7 @@ class IAService {
   // Gerar resposta para saudações
   private gerarRespostaSaudacao(mensagem: string): string {
     const mensagemLower = mensagem.toLowerCase();
-    
+
     if (mensagemLower.includes('bom dia')) {
       return '🌅 Bom dia! Como posso ajudar você hoje no ConectCRM?';
     }
@@ -165,12 +163,12 @@ class IAService {
     if (mensagemLower.includes('obrigad')) {
       return '😊 De nada! Fico feliz em ter ajudado. Precisa de mais alguma coisa?';
     }
-    if (mensagemLower.includes('valeu') || mensagemLower.includes('ok') || 
-        mensagemLower.includes('beleza') || mensagemLower.includes('legal') ||
-        mensagemLower.includes('show') || mensagemLower.includes('top')) {
+    if (mensagemLower.includes('valeu') || mensagemLower.includes('ok') ||
+      mensagemLower.includes('beleza') || mensagemLower.includes('legal') ||
+      mensagemLower.includes('show') || mensagemLower.includes('top')) {
       return '😄 Que bom que consegui ajudar! Há mais alguma dúvida sobre o ConectCRM?';
     }
-    
+
     // Saudação padrão
     return '👋 Olá! Sou a IA especializada do ConectCRM. Como posso ajudar você hoje?';
   }
@@ -191,8 +189,8 @@ class IAService {
     }
 
     // Verificar se quer falar com agente
-    if (mensagemLower.includes('agente') || mensagemLower.includes('humano') || 
-        mensagemLower.includes('atendente') || mensagemLower.includes('pessoa')) {
+    if (mensagemLower.includes('agente') || mensagemLower.includes('humano') ||
+      mensagemLower.includes('atendente') || mensagemLower.includes('pessoa')) {
       return {
         categoria: 'transferencia',
         confianca: 0.95,
@@ -202,8 +200,8 @@ class IAService {
     }
 
     // Verificar problemas técnicos
-    if (mensagemLower.includes('erro') || mensagemLower.includes('problema') || 
-        mensagemLower.includes('bug') || mensagemLower.includes('não funciona')) {
+    if (mensagemLower.includes('erro') || mensagemLower.includes('problema') ||
+      mensagemLower.includes('bug') || mensagemLower.includes('não funciona')) {
       return {
         categoria: 'problema',
         confianca: 0.9,
@@ -232,16 +230,12 @@ class IAService {
 
   // Gerar resposta baseada na intenção
   gerarResposta(mensagem: string, sessaoId: string): RespostaIA {
-    console.log('🤖 IA Service - gerarResposta chamado:', { mensagem, sessaoId });
-    
     const intencao = this.analisarIntencao(mensagem);
-    console.log('🎯 Intenção analisada:', intencao);
-    
+
     this.metricas.totalPerguntas++;
 
     // Saudações e cumprimentos
     if (intencao.entidades.includes('saudacao')) {
-      console.log('👋 Detectada saudação');
       this.metricas.respostasComSucesso++;
       return {
         resposta: this.gerarRespostaSaudacao(mensagem),
@@ -308,7 +302,7 @@ class IAService {
         if (mensagemLower.includes('permissão') || mensagemLower.includes('usuário')) acao = 'permissoes';
 
         const resposta = modulo.respostas[acao] || modulo.respostas.criar;
-        
+
         if (resposta) {
           this.metricas.respostasComSucesso++;
           return {
@@ -350,7 +344,7 @@ class IAService {
   // Criar nova sessão
   criarSessao(usuarioId: string): string {
     const sessaoId = `sessao_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     this.sessoes.set(sessaoId, {
       id: sessaoId,
       usuarioId,
@@ -369,7 +363,7 @@ class IAService {
     if (sessao) {
       sessao.contexto.push(mensagem);
       sessao.ultimaInteracao = new Date();
-      
+
       // Manter apenas últimas 10 mensagens para contexto
       if (sessao.contexto.length > 10) {
         sessao.contexto = sessao.contexto.slice(-10);
@@ -391,11 +385,11 @@ class IAService {
     const sessao = this.sessoes.get(sessaoId);
     if (sessao) {
       sessao.satisfacao = nota;
-      
+
       // Atualizar média
       const sessoesComAvaliacao = Array.from(this.sessoes.values())
         .filter(s => s.satisfacao !== undefined);
-      
+
       if (sessoesComAvaliacao.length > 0) {
         this.metricas.satisfacaoMedia = sessoesComAvaliacao
           .reduce((acc, s) => acc + (s.satisfacao || 0), 0) / sessoesComAvaliacao.length;
@@ -407,8 +401,8 @@ class IAService {
   obterMetricas() {
     return {
       ...this.metricas,
-      taxaSucesso: this.metricas.totalPerguntas > 0 
-        ? (this.metricas.respostasComSucesso / this.metricas.totalPerguntas) * 100 
+      taxaSucesso: this.metricas.totalPerguntas > 0
+        ? (this.metricas.respostasComSucesso / this.metricas.totalPerguntas) * 100
         : 0,
       taxaTransferencia: this.metricas.totalPerguntas > 0
         ? (this.metricas.transferenciasParaAgente / this.metricas.totalPerguntas) * 100

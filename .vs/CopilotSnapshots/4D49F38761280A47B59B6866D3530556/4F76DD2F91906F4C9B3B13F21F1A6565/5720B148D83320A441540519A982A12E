@@ -1,0 +1,151 @@
+﻿import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } from 'typeorm';
+
+export class CreateAtendimentoAtendentes1728950400000 implements MigrationInterface {
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Criar tabela de atendentes
+    await queryRunner.createTable(
+      new Table({
+        name: 'atendimento_atendentes',
+        columns: [
+          {
+            name: 'id',
+            type: 'uuid',
+            isPrimary: true,
+            default: 'uuid_generate_v4()',
+          },
+          {
+            name: 'usuario_id',
+            type: 'uuid',
+            isNullable: false,
+          },
+          {
+            name: 'nome',
+            type: 'varchar',
+            length: '255',
+            isNullable: false,
+          },
+          {
+            name: 'email',
+            type: 'varchar',
+            length: '255',
+            isNullable: false,
+          },
+          {
+            name: 'avatar_url',
+            type: 'text',
+            isNullable: true,
+          },
+          {
+            name: 'status',
+            type: 'varchar',
+            length: '20',
+            default: "'offline'",
+            isNullable: false,
+          },
+          {
+            name: 'max_tickets',
+            type: 'integer',
+            default: 5,
+            isNullable: true,
+          },
+          {
+            name: 'ativo',
+            type: 'boolean',
+            default: true,
+            isNullable: true,
+          },
+          {
+            name: 'created_at',
+            type: 'timestamp',
+            default: 'NOW()',
+            isNullable: false,
+          },
+          {
+            name: 'updated_at',
+            type: 'timestamp',
+            default: 'NOW()',
+            isNullable: false,
+          },
+        ],
+      }),
+      true,
+    );
+
+    // Adicionar foreign key para usuarios
+    await queryRunner.createForeignKey(
+      'atendimento_atendentes',
+      new TableForeignKey({
+        columnNames: ['usuario_id'],
+        referencedColumnNames: ['id'],
+        referencedTableName: 'usuarios',
+        onDelete: 'CASCADE',
+        name: 'fk_atendentes_usuario',
+      }),
+    );
+
+    // Criar índices
+    await queryRunner.createIndex(
+      'atendimento_atendentes',
+      new TableIndex({
+        name: 'idx_atendentes_usuario',
+        columnNames: ['usuario_id'],
+      }),
+    );
+
+    await queryRunner.createIndex(
+      'atendimento_atendentes',
+      new TableIndex({
+        name: 'idx_atendentes_status',
+        columnNames: ['status'],
+      }),
+    );
+
+    await queryRunner.createIndex(
+      'atendimento_atendentes',
+      new TableIndex({
+        name: 'idx_atendentes_ativo',
+        columnNames: ['ativo'],
+      }),
+    );
+
+    // Adicionar constraint de validação de status
+    await queryRunner.query(`
+      ALTER TABLE atendimento_atendentes 
+        ADD CONSTRAINT chk_atendente_status 
+        CHECK (status IN ('online', 'offline', 'ausente'))
+    `);
+
+    // Criar trigger para updated_at
+    await queryRunner.query(`
+      CREATE OR REPLACE FUNCTION update_atendimento_atendentes_updated_at()
+      RETURNS TRIGGER AS $$
+      BEGIN
+          NEW.updated_at = NOW();
+          RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+
+    await queryRunner.query(`
+      CREATE TRIGGER trigger_update_atendimento_atendentes_updated_at
+          BEFORE UPDATE ON atendimento_atendentes
+          FOR EACH ROW
+          EXECUTE FUNCTION update_atendimento_atendentes_updated_at();
+    `);
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // Remover trigger
+    await queryRunner.query('DROP TRIGGER IF EXISTS trigger_update_atendimento_atendentes_updated_at ON atendimento_atendentes');
+    await queryRunner.query('DROP FUNCTION IF EXISTS update_atendimento_atendentes_updated_at()');
+
+    // Remover constraint
+    await queryRunner.query('ALTER TABLE atendimento_atendentes DROP CONSTRAINT IF EXISTS chk_atendente_status');
+
+    // Remover foreign key
+    await queryRunner.dropForeignKey('atendimento_atendentes', 'fk_atendentes_usuario');
+
+    // Remover tabela
+    await queryRunner.dropTable('atendimento_atendentes');
+  }
+}

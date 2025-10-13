@@ -13,12 +13,14 @@ import { CotacaoModule } from './cotacao/cotacao.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { OportunidadesModule } from './modules/oportunidades/oportunidades.module';
 import { EmpresasModule } from './empresas/empresas.module';
-import { ChatwootModule } from './modules/chatwoot/chatwoot.module';
 import { MetasModule } from './modules/metas/metas.module';
 import { PlanosModule } from './modules/planos/planos.module';
 import { EventosModule } from './modules/eventos/eventos.module';
+import { AtendimentoModule } from './modules/atendimento/atendimento.module';
+import { IAModule } from './modules/ia/ia.module';
 import { AssinaturaMiddleware } from './modules/common/assinatura.middleware';
 import { DatabaseConfig } from './config/database.config';
+import { BullModule } from '@nestjs/bull';
 
 @Module({
   imports: [
@@ -28,6 +30,12 @@ import { DatabaseConfig } from './config/database.config';
     }),
     TypeOrmModule.forRootAsync({
       useClass: DatabaseConfig,
+    }),
+    BullModule.forRoot({
+      redis: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379'),
+      },
     }),
     AuthModule,
     UsersModule,
@@ -41,10 +49,11 @@ import { DatabaseConfig } from './config/database.config';
     DashboardModule,
     OportunidadesModule,
     EmpresasModule,
-    ChatwootModule,
     MetasModule,
     PlanosModule,
     EventosModule,
+    AtendimentoModule,
+    IAModule,
   ],
 })
 export class AppModule implements NestModule {

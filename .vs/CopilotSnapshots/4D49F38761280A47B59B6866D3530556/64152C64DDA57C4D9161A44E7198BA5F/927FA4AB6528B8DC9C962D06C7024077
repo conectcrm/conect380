@@ -1,0 +1,83 @@
+﻿import { IsString, IsNotEmpty, IsOptional, IsUUID, IsEnum, MaxLength, Matches } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { PrioridadeTicketEnum } from './filtrar-tickets.dto';
+
+export class CriarTicketDto {
+  @ApiProperty({
+    description: 'Número de telefone do cliente (formato internacional)',
+    example: '+5511999999999',
+  })
+  @IsString()
+  @IsNotEmpty({ message: 'Número do cliente é obrigatório' })
+  @Matches(/^\+?[1-9]\d{1,14}$/, { 
+    message: 'Telefone deve estar no formato internacional (+5511999999999)' 
+  })
+  clienteNumero: string;
+
+  @ApiProperty({
+    description: 'Nome do cliente',
+    required: false,
+    example: 'João Silva',
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(255)
+  clienteNome?: string;
+
+  @ApiProperty({
+    description: 'Email do cliente',
+    required: false,
+    example: 'joao@example.com',
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(255)
+  clienteEmail?: string;
+
+  @ApiProperty({
+    description: 'Assunto do ticket',
+    example: 'Preciso de ajuda com meu pedido',
+    maxLength: 500,
+  })
+  @IsString()
+  @IsNotEmpty({ message: 'Assunto é obrigatório' })
+  @MaxLength(500, { message: 'Assunto deve ter no máximo 500 caracteres' })
+  assunto: string;
+
+  @ApiProperty({
+    description: 'Descrição detalhada do problema',
+    required: false,
+    example: 'Meu pedido #1234 ainda não foi entregue...',
+  })
+  @IsString()
+  @IsOptional()
+  descricao?: string;
+
+  @ApiProperty({
+    description: 'ID do canal de comunicação',
+    required: false,
+    example: 'df104dd2-3b8d-42cf-a60f-8a43e54e7520',
+  })
+  @IsUUID('4', { message: 'Canal ID inválido' })
+  @IsOptional()
+  canalId?: string;
+
+  @ApiProperty({
+    description: 'Prioridade do ticket',
+    enum: PrioridadeTicketEnum,
+    default: PrioridadeTicketEnum.MEDIA,
+    required: false,
+  })
+  @IsEnum(PrioridadeTicketEnum)
+  @IsOptional()
+  prioridade?: PrioridadeTicketEnum = PrioridadeTicketEnum.MEDIA;
+
+  @ApiProperty({
+    description: 'Origem do ticket',
+    example: 'WHATSAPP',
+    default: 'MANUAL',
+  })
+  @IsString()
+  @IsOptional()
+  origem?: string = 'MANUAL';
+}

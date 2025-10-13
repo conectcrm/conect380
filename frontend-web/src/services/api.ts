@@ -13,7 +13,7 @@ export const api = axios.create({
 // Interceptor para adicionar token de autenticação
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('authToken'); // ✅ Corrigido para 'authToken'
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -149,9 +149,24 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401) {
       // Token expirado ou inválido
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user_data');
-      window.location.href = '/login';
+      console.warn('⚠️ [API] Erro 401 detectado - Token inválido ou expirado');
+      console.warn('⚠️ [API] URL da requisição:', error.config?.url);
+
+      // Evitar loop infinito: não redirecionar se já estiver na página de login
+      // ou se for a requisição inicial de verificação de perfil
+      const isLoginPage = window.location.pathname === '/login';
+      const isProfileCheck = error.config?.url?.includes('/users/profile');
+
+      if (!isLoginPage) {
+        console.warn('⚠️ [API] Removendo token e redirecionando para login...');
+        localStorage.removeItem('authToken'); // ✅ Corrigido para 'authToken'
+        localStorage.removeItem('user_data');
+
+        // Apenas redirecionar se não for a verificação inicial do perfil
+        if (!isProfileCheck) {
+          window.location.href = '/login';
+        }
+      }
     }
     return Promise.reject(error);
   }

@@ -15,16 +15,6 @@
 <body>
   <noscript>Você precisa habilitar o JavaScript para executar este aplicativo.</noscript>
   <div id="root"></div>
-  <script>
-    // Aguardar o carregamento completo da aplicação
-    window.addEventListener('load', () => {
-      setTimeout(() => {
-        const script = document.createElement('script');
-        script.src = '%PUBLIC_URL%/test-i18n.js';
-        document.head.appendChild(script);
-      }, 3000);
-    });
-  </script>
 </body>
 
 </html>

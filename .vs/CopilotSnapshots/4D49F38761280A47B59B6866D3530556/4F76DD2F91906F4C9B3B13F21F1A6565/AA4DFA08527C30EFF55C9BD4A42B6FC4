@@ -1,0 +1,99 @@
+﻿import { IsString, IsOptional, IsEnum, IsUUID, IsObject } from 'class-validator';
+import { PrioridadeTicket, OrigemTicket } from '../entities/ticket.entity';
+
+export class CriarTicketDto {
+  @IsString()
+  assunto: string;
+
+  @IsObject()
+  remetente: any; // {nome, email, telefone, etc}
+
+  @IsEnum(OrigemTicket)
+  origem: OrigemTicket;
+
+  @IsOptional()
+  @IsEnum(PrioridadeTicket)
+  prioridade?: PrioridadeTicket;
+
+  @IsUUID()
+  canalId: string;
+
+  @IsUUID()
+  filaId: string;
+
+  @IsOptional()
+  @IsUUID()
+  atendenteId?: string;
+}
+
+export class AtualizarTicketDto {
+  @IsOptional()
+  @IsString()
+  assunto?: string;
+
+  @IsOptional()
+  @IsEnum(PrioridadeTicket)
+  prioridade?: PrioridadeTicket;
+
+  @IsOptional()
+  @IsUUID()
+  atendenteId?: string;
+
+  @IsOptional()
+  @IsEnum(['ABERTO', 'EM_ATENDIMENTO', 'AGUARDANDO', 'RESOLVIDO', 'FECHADO'])
+  status?: string;
+}
+
+export class AtribuirTicketDto {
+  @IsUUID()
+  atendenteId: string;
+}
+
+export class TransferirTicketDto {
+  @IsUUID()
+  filaId: string;
+
+  @IsOptional()
+  @IsString()
+  motivo?: string;
+}
+
+export class FecharTicketDto {
+  @IsOptional()
+  @IsString()
+  observacoes?: string;
+
+  @IsOptional()
+  @IsEnum(['resolvido', 'cancelado'])
+  status?: string;
+}
+
+export class FiltrarTicketsDto {
+  @IsOptional()
+  @IsEnum(['aguardando', 'em_atendimento', 'resolvido', 'cancelado'])
+  status?: string;
+
+  @IsOptional()
+  @IsUUID()
+  canalId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  filaId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  atendenteId?: string;
+
+  @IsOptional()
+  @IsEnum(PrioridadeTicket)
+  prioridade?: PrioridadeTicket;
+
+  @IsOptional()
+  @IsString()
+  contatoExterno?: string;
+
+  @IsOptional()
+  @IsString()
+  clienteId?: string;
+}

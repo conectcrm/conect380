@@ -27,19 +27,47 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const token = authService.getToken();
         const savedUser = authService.getUser();
 
+        console.log('🔍 [AuthContext] Inicializando autenticação...');
+        console.log('🔍 [AuthContext] Token presente?', !!token);
+        console.log('🔍 [AuthContext] User salvo?', !!savedUser);
+
         if (token && savedUser) {
           // Verificar se o token ainda é válido fazendo uma requisição
-          const profileResponse = await authService.getProfile();
-          if (profileResponse.success && profileResponse.data) {
-            setUser(profileResponse.data);
-            authService.setUser(profileResponse.data);
-          } else {
-            authService.logout();
+          try {
+            console.log('🔍 [AuthContext] Verificando validade do token...');
+            const profileResponse = await authService.getProfile();
+
+            if (profileResponse.success && profileResponse.data) {
+              console.log('✅ [AuthContext] Token válido - Usuário autenticado:', profileResponse.data.email);
+              setUser(profileResponse.data);
+              authService.setUser(profileResponse.data);
+            } else {
+              console.warn('⚠️ [AuthContext] Resposta inesperada ao verificar perfil:', profileResponse);
+              // Manter o usuário salvo mesmo se a verificação falhar
+              setUser(savedUser);
+            }
+          } catch (profileError: any) {
+            console.warn('⚠️ [AuthContext] Erro ao verificar perfil:', profileError.message);
+
+            // Se for erro 401, o token é inválido - fazer logout
+            if (profileError.response?.status === 401) {
+              console.warn('⚠️ [AuthContext] Token inválido (401) - Fazendo logout');
+              authService.logout();
+              setUser(null);
+            } else {
+              // Para outros erros (rede, servidor, etc), manter o usuário logado
+              console.warn('⚠️ [AuthContext] Erro de rede/servidor - Mantendo sessão com dados salvos');
+              setUser(savedUser);
+            }
           }
+        } else {
+          console.log('ℹ️ [AuthContext] Nenhum token/usuário encontrado - Usuário não autenticado');
         }
       } catch (error) {
-        console.error('Erro ao inicializar autenticação:', error);
+        console.error('❌ [AuthContext] Erro ao inicializar autenticação:', error);
+        // Em caso de erro inesperado, limpar tudo
         authService.logout();
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
@@ -51,10 +79,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string) => {
     try {
       const response = await authService.login({ email, senha: password });
-      
+
       if (response.success && response.data) {
         const { access_token, user: userData } = response.data;
-        
+
         authService.setToken(access_token);
         authService.setUser(userData);
         setUser(userData);

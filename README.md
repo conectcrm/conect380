@@ -1,10 +1,33 @@
 # ConectCRM 🚀
 
-Sistema completo de CRM com portal do cliente integrado, desenvolvido com NestJS (backend) e React (frontend). 
+Sistema completo de CRM com portal do cliente integrado e plataforma de Atendimento Omnichannel, desenvolvido com NestJS (backend) e React (frontend).
 
-Sistema especializado em gestão de propostas comerciais com sincronização automática em tempo real entre o CRM e o portal do cliente.
+## 🌟 **NOVIDADE: Omnichannel Atendimento**
 
-## 🚀 Características Principais
+### ✨ Funcionalidades de Atendimento
+- **🔌 WebSocket em Tempo Real**: Chat ao vivo com clientes
+- **🤖 IA Integrada**: Respostas automáticas com OpenAI e Anthropic Claude
+- **📱 Multi-Canal**: WhatsApp, Telegram, Twilio
+- **🎯 Gestão de Tickets**: Sistema completo de atendimento
+- **📊 Filas Inteligentes**: Distribuição automática de tickets
+- **⚙️ Configurações de Integrações**: Interface para configurar 5 integrações externas
+
+### 🔗 Integrações Disponíveis
+1. **WhatsApp Business API** - Atendimento via WhatsApp oficial
+2. **OpenAI GPT** - Chatbot inteligente com GPT-4
+3. **Anthropic Claude** - IA avançada com Claude 3.5
+4. **Telegram Bot** - Canal de atendimento via Telegram
+5. **Twilio** - SMS e chamadas de voz
+
+**📖 Documentação Completa:**
+- [Configurações de Integrações](./docs/OMNICHANNEL_CONFIGURACOES_INTEGRACOES.md)
+- [Guia de Testes](./docs/TESTES_INTEGRACOES.md)
+- [API Documentation](./docs/API_DOCUMENTATION.md)
+- [Guia de Deploy](./docs/GUIA_DEPLOY.md)
+
+---
+
+## 🚀 Características Principais (CRM)
 
 - **Portal do Cliente Integrado**: Sistema completo de visualização e aprovação de propostas
 - **Sincronização em Tempo Real**: Atualizações automáticas entre portal e CRM
@@ -21,19 +44,30 @@ Sistema especializado em gestão de propostas comerciais com sincronização aut
 - **PostgreSQL** (Banco de dados)
 - **JWT** (Autenticação)
 - **TypeORM** (ORM)
+- **Socket.io** (WebSocket para tempo real)
 - **Nodemailer** (Sistema de emails)
+- **Axios** (Requisições HTTP para integrações)
 
 ### Frontend Web
-- **React** + **TypeScript**
+- **React 18** + **TypeScript**
 - **Tailwind CSS** (Estilização)
 - **React Router** (Roteamento)
-- **Custom Hooks** (Lógica reutilizável)
+- **Socket.io-client** (WebSocket cliente)
+- **Lucide React** (Ícones)
+- **React Hot Toast** (Notificações)
+
+### Testes
+- **Playwright** (Testes E2E)
+- **Jest** (Testes unitários)
+- **28+ testes E2E** para Omnichannel
 
 ### Portal do Cliente
 - **Links únicos** por proposta
 - **Interface dedicada** para clientes
 - **Sistema de ações** (visualizar, aprovar, rejeitar)
 - **Notificações automáticas**
+
+---
 
 ## 🧹 **ORGANIZAÇÃO E LIMPEZA**
 

@@ -29,16 +29,16 @@ export const authService = {
   },
 
   logout() {
-    localStorage.removeItem('auth_token');
+    localStorage.removeItem('authToken');
     localStorage.removeItem('user_data');
   },
 
   setToken(token: string) {
-    localStorage.setItem('auth_token', token);
+    localStorage.setItem('authToken', token);
   },
 
   getToken(): string | null {
-    return localStorage.getItem('auth_token');
+    return localStorage.getItem('authToken');
   },
 
   setUser(user: User) {

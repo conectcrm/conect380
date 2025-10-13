@@ -34,7 +34,9 @@ import {
   Calendar,
   Clock,
   MapPin,
-  CreditCard
+  CreditCard,
+  Headphones,
+  MessageSquare
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -49,21 +51,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const { user, logout } = useAuth();
   const { t, language, availableLanguages } = useI18n();
 
-  console.log('🎨 DashboardLayout renderizando:', {
-    language,
-    tFunction: typeof t,
-    settingsText: t('navigation.settings'),
-    preferencesText: t('common.preferences')
-  });
   const { currentPalette } = useTheme();
   const { perfilSelecionado, setPerfilSelecionado } = useProfile();
   const location = useLocation();
-
-  // Debug: Log quando o idioma muda
-  useEffect(() => {
-    console.log('🎨 DashboardLayout: Idioma atualizado para:', language);
-    console.log('🎨 DashboardLayout: Função t atualizada');
-  }, [language, t]);
 
   // Verificação se é admin
   const isAdmin = user?.role === 'admin' || user?.role === 'manager' || user?.email?.includes('admin');
@@ -222,6 +212,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         title: 'Billing & Assinaturas',
         subtitle: 'Gerencie sua assinatura, planos e faturamento'
       },
+      '/atendimento': {
+        title: 'Atendimento Omnichannel',
+        subtitle: 'Chat em tempo real • WebSocket • Multi-canal'
+      },
+      '/suporte': {
+        title: 'Suporte',
+        subtitle: 'Central de ajuda e atendimento ao cliente'
+      },
       '/configuracoes': {
         title: 'Configurações',
         subtitle: 'Configurações do sistema'
@@ -304,6 +302,13 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       icon: CreditCard,
       href: '/billing',
       color: 'green'
+    },
+    {
+      id: 'atendimento',
+      title: 'Atendimento',
+      icon: MessageSquare,
+      href: '/atendimento',
+      color: 'purple'
     },
     {
       id: 'configuracoes',

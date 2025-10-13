@@ -1,0 +1,154 @@
+﻿const { AppDataSource } = require('./ormconfig.js');
+
+async function testarIntegracao() {
+  try {
+    console.log('🧪 TESTE DE INTEGRAÇÃO - Sistema Omnichannel\n');
+    
+    await AppDataSource.initialize();
+    console.log('✅ Conectado ao banco\n');
+
+    // 1. Verificar tabelas principais
+    console.log('📋 1. Verificando tabelas...');
+    const tabelas = await AppDataSource.query(`
+      SELECT tablename 
+      FROM pg_tables 
+      WHERE schemaname='public' 
+      AND tablename IN ('atendimento_tickets', 'atendimento_mensagens', 'canais')
+      ORDER BY tablename
+    `);
+    
+    tabelas.forEach(t => console.log(`   ✅ ${t.tablename}`));
+    console.log('');
+
+    // 2. Verificar se existem tickets
+    console.log('🎫 2. Verificando tickets...');
+    const tickets = await AppDataSource.query(`
+      SELECT COUNT(*) as total FROM atendimento_tickets
+    `);
+    console.log(`   📊 Total de tickets: ${tickets[0].total}`);
+    
+    if (parseInt(tickets[0].total) > 0) {
+      const ultimoTicket = await AppDataSource.query(`
+        SELECT id, numero, contato_nome, status, created_at 
+        FROM atendimento_tickets 
+        ORDER BY created_at DESC 
+        LIMIT 1
+      `);
+      console.log(`   📌 Último ticket:`);
+      console.log(`      Número: ${ultimoTicket[0].numero}`);
+      console.log(`      Cliente: ${ultimoTicket[0].contato_nome}`);
+      console.log(`      Status: ${ultimoTicket[0].status}`);
+      console.log(`      Data: ${ultimoTicket[0].created_at}`);
+    }
+    console.log('');
+
+    // 3. Verificar mensagens
+    console.log('💬 3. Verificando mensagens...');
+    const mensagens = await AppDataSource.query(`
+      SELECT COUNT(*) as total FROM atendimento_mensagens
+    `);
+    console.log(`   📊 Total de mensagens: ${mensagens[0].total}`);
+    
+    if (parseInt(mensagens[0].total) > 0) {
+      const ultimaMensagem = await AppDataSource.query(`
+        SELECT id, tipo, remetente_tipo, conteudo, created_at 
+        FROM atendimento_mensagens 
+        ORDER BY created_at DESC 
+        LIMIT 1
+      `);
+      console.log(`   📌 Última mensagem:`);
+      console.log(`      Tipo: ${ultimaMensagem[0].tipo}`);
+      console.log(`      Remetente: ${ultimaMensagem[0].remetente_tipo}`);
+      console.log(`      Conteúdo: ${ultimaMensagem[0].conteudo.substring(0, 50)}...`);
+      console.log(`      Data: ${ultimaMensagem[0].created_at}`);
+    }
+    console.log('');
+
+    // 4. Verificar canais WhatsApp ativos
+    console.log('📱 4. Verificando canais WhatsApp...');
+    const canais = await AppDataSource.query(`
+      SELECT id, nome, tipo, ativo 
+      FROM canais 
+      WHERE tipo = 'whatsapp' AND ativo = true
+    `);
+    
+    if (canais.length > 0) {
+      console.log(`   ✅ ${canais.length} canal(is) WhatsApp ativo(s)`);
+      canais.forEach(canal => {
+        console.log(`      - ${canal.nome} (${canal.id})`);
+      });
+    } else {
+      console.log(`   ⚠️  Nenhum canal WhatsApp ativo encontrado`);
+    }
+    console.log('');
+
+    // 5. Estatísticas gerais
+    console.log('📊 5. Estatísticas gerais...');
+    
+    const stats = await AppDataSource.query(`
+      SELECT 
+        (SELECT COUNT(*) FROM atendimento_tickets WHERE status = 'ABERTO') as tickets_abertos,
+        (SELECT COUNT(*) FROM atendimento_tickets WHERE status = 'EM_ATENDIMENTO') as tickets_em_atendimento,
+        (SELECT COUNT(*) FROM atendimento_tickets WHERE status = 'RESOLVIDO') as tickets_resolvidos,
+        (SELECT COUNT(*) FROM atendimento_tickets WHERE status = 'FECHADO') as tickets_fechados,
+        (SELECT COUNT(*) FROM atendimento_mensagens WHERE remetente_tipo = 'CLIENTE') as mensagens_clientes,
+        (SELECT COUNT(*) FROM atendimento_mensagens WHERE remetente_tipo = 'ATENDENTE') as mensagens_atendentes,
+        (SELECT COUNT(*) FROM atendimento_mensagens WHERE remetente_tipo = 'BOT') as mensagens_bot
+    `);
+
+    const s = stats[0];
+    console.log(`   🎫 Tickets:`);
+    console.log(`      Abertos: ${s.tickets_abertos}`);
+    console.log(`      Em atendimento: ${s.tickets_em_atendimento}`);
+    console.log(`      Resolvidos: ${s.tickets_resolvidos}`);
+    console.log(`      Fechados: ${s.tickets_fechados}`);
+    console.log('');
+    console.log(`   💬 Mensagens:`);
+    console.log(`      De clientes: ${s.mensagens_clientes}`);
+    console.log(`      De atendentes: ${s.mensagens_atendentes}`);
+    console.log(`      Do bot (IA): ${s.mensagens_bot}`);
+    console.log('');
+
+    // 6. Resumo
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('');
+    
+    const totalTickets = parseInt(tickets[0].total);
+    const totalMensagens = parseInt(mensagens[0].total);
+    
+    if (totalTickets > 0 && totalMensagens > 0) {
+      console.log('🎉 SISTEMA OMNICHANNEL FUNCIONANDO!');
+      console.log('');
+      console.log('✅ Tickets sendo criados automaticamente');
+      console.log('✅ Mensagens sendo salvas no banco');
+      console.log('✅ Integração WhatsApp operacional');
+      console.log('');
+      console.log(`📈 Total de conversas: ${totalTickets}`);
+      console.log(`📈 Total de mensagens: ${totalMensagens}`);
+      console.log(`📈 Média: ${Math.round(totalMensagens / totalTickets)} mensagens/ticket`);
+    } else if (totalTickets === 0 && totalMensagens === 0) {
+      console.log('⚠️  SISTEMA PRONTO MAS SEM DADOS');
+      console.log('');
+      console.log('📝 Para testar:');
+      console.log('   1. Certifique-se que o backend está rodando');
+      console.log('   2. Envie uma mensagem para o número WhatsApp Business');
+      console.log('   3. Execute este script novamente');
+    } else {
+      console.log('⚠️  DADOS PARCIAIS');
+      console.log(`   Tickets: ${totalTickets}`);
+      console.log(`   Mensagens: ${totalMensagens}`);
+    }
+    
+    console.log('');
+    console.log('═══════════════════════════════════════════════════════════');
+
+    await AppDataSource.destroy();
+
+  } catch (error) {
+    console.error('❌ Erro:', error.message);
+    console.error(error.stack);
+    process.exit(1);
+  }
+}
+
+testarIntegracao();

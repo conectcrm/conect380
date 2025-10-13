@@ -46,6 +46,7 @@ import { ContatosPage } from './features/contatos/ContatosPageNova';
 import { SuportePage } from './features/suporte/SuportePageNova';
 import { UsuariosPage } from './features/gestao/usuarios/UsuariosPage';
 import PerfilPage from './features/perfil/PerfilPage';
+import { AtendimentoIntegradoPage } from './pages/AtendimentoIntegradoPage';
 // Importar novas páginas do sistema de empresas
 import { ConfiguracaoEmpresaPage } from './pages/empresas/ConfiguracaoEmpresaPage';
 import { RelatoriosAnalyticsPage } from './pages/empresas/RelatoriosAnalyticsPage';
@@ -55,6 +56,7 @@ import { useAuth } from './hooks/useAuth';
 import PortalRoutes from './routes/PortalRoutes';
 import ChatwootConfiguracao from './pages/configuracoes/ChatwootConfiguracao';
 import MetasConfiguracao from './pages/configuracoes/MetasConfiguracao';
+import IntegracoesPage from './pages/configuracoes/IntegracoesPage';
 import TestePortalPage from './pages/TestePortalPage';
 import PortalClientePage from './pages/PortalClientePage';
 import ConfiguracaoEmailPage from './pages/ConfiguracaoEmailPage';
@@ -231,12 +233,16 @@ const AppRoutes: React.FC = () => {
           <Route path="/configuracoes/email" element={<ConfiguracaoEmailPage />} />
           <Route path="/configuracoes/chatwoot" element={<ChatwootConfiguracao />} />
           <Route path="/configuracoes/metas" element={<MetasConfiguracao />} />
+          <Route path="/configuracoes/integracoes" element={<IntegracoesPage />} />
           <Route path="/relatorios/analytics" element={<RelatoriosAnalyticsPage />} />
           <Route path="/gestao/permissoes" element={<SistemaPermissoesPage />} />
           <Route path="/sistema/backup" element={<BackupSincronizacaoPage />} />
 
           {/* Sistema de Suporte */}
           <Route path="/suporte" element={<SuportePage />} />
+
+          {/* Atendimento Omnichannel (WebSocket Real-Time) */}
+          <Route path="/atendimento" element={<AtendimentoIntegradoPage />} />
 
           {/* Perfil do Usuário */}
           <Route path="/perfil" element={<PerfilPage />} />
@@ -380,7 +386,12 @@ const App: React.FC = () => {
             <ProfileProvider>
               <NotificationProvider>
                 <EmpresaProvider>
-                  <Router>
+                  <Router
+                    future={{
+                      v7_startTransition: true,
+                      v7_relativeSplatPath: true,
+                    }}
+                  >
                     <ScrollToTop />
                     <div className="App">
                       <AppRoutes />

@@ -9,7 +9,7 @@ i18n
   .use(initReactI18next)
   .init({
     fallbackLng: 'pt-BR',
-    debug: true, // Habilitando debug temporariamente
+    debug: false, // Debug desabilitado para produção
     interpolation: {
       escapeValue: false,
     },
@@ -674,8 +674,6 @@ export const I18nProvider: React.FC<I18nProviderProps> = ({ children }) => {
   const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
   const [forceUpdate, setForceUpdate] = useState(0); // Para forçar re-renderização
 
-  console.log('🔧 I18nProvider renderizando com idioma:', currentLanguage, 'forceUpdate:', forceUpdate);
-
   const availableLanguages = [
     {
       code: 'pt-BR',
@@ -705,15 +703,12 @@ export const I18nProvider: React.FC<I18nProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const handleLanguageChange = (lng: string) => {
-      console.log('🔄 Evento languageChanged detectado:', lng);
       setCurrentLanguage(lng);
       setForceUpdate(prev => prev + 1); // Força re-renderização
-      console.log('🔄 Estado currentLanguage atualizado para:', lng);
     };
 
     // Definir idioma inicial baseado na detecção
     setCurrentLanguage(i18n.language);
-    console.log('🔄 Idioma inicial detectado:', i18n.language);
 
     i18n.on('languageChanged', handleLanguageChange);
 
@@ -724,36 +719,21 @@ export const I18nProvider: React.FC<I18nProviderProps> = ({ children }) => {
 
   const changeLanguage = async (lng: string) => {
     try {
-      console.log('🌐 Tentando alterar idioma para:', lng);
-      console.log('🌐 Idioma atual:', currentLanguage);
-      console.log('🌐 i18n.language antes:', i18n.language);
-
       await i18n.changeLanguage(lng);
-
-      console.log('✅ Idioma alterado com sucesso para:', lng);
-      console.log('🌐 i18n.language depois:', i18n.language);
-      console.log('🔄 forceUpdate será incrementado');
 
       // Salvar preferência no localStorage
       localStorage.setItem('preferred-language', lng);
-      console.log('💾 Preferência salva no localStorage');
 
       // Forçar atualização imediata
       setCurrentLanguage(lng);
       setForceUpdate(prev => prev + 1);
-      console.log('🔄 Estados atualizados manualmente');
     } catch (error) {
       console.error('❌ Erro ao alterar idioma:', error);
     }
   };
 
   const t = useCallback((key: string) => {
-    const result = i18n.t(key);
-    // Log apenas para chaves específicas para evitar spam
-    if (key.includes('navigation') || key.includes('common.preferences')) {
-      console.log(`🔤 t("${key}") em idioma ${currentLanguage} = "${result}"`);
-    }
-    return result;
+    return i18n.t(key);
   }, [currentLanguage, forceUpdate]); // Re-create the function when language changes
 
   const value: I18nContextData = {
@@ -762,12 +742,6 @@ export const I18nProvider: React.FC<I18nProviderProps> = ({ children }) => {
     t,
     availableLanguages,
   };
-
-  console.log('🔧 I18nProvider valor do contexto:', {
-    language: currentLanguage,
-    t: typeof t,
-    forceUpdate
-  });
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 };

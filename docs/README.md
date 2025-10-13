@@ -29,11 +29,29 @@
 - Logs de depuração
 - Execução de processos
 
-## 📂 Estrutura Geral do Projeto
+### 📱 Webhook WhatsApp (NOVO!)
+**10 arquivos** - Documentação completa do webhook WhatsApp Business API
+- Status atual do sistema
+- Resolução de problemas (401, UUID)
+- Guias de configuração e ativação
+- Testes e validação
+- Scripts de automação
+
+**🚀 Início Rápido Webhook**: [STATUS_WEBHOOK_ATUAL.md](./STATUS_WEBHOOK_ATUAL.md)  
+**� Índice Completo**: [INDICE_WEBHOOK_WHATSAPP.md](./INDICE_WEBHOOK_WHATSAPP.md)
+
+---
+
+## �📂 Estrutura Geral do Projeto
 
 ```
 conectcrm/
 ├── 📁 docs/                    # Toda documentação (.md)
+│   ├── 📱 Webhook WhatsApp    # 10 arquivos (NOVO!)
+│   ├── 📋 changelog/          # 27 arquivos
+│   ├── 📖 guides/             # 11 arquivos  
+│   ├── 🔧 implementation/     # 49 arquivos
+│   └── 🐛 debug/              # 6 arquivos
 ├── 📁 temp/                    # Arquivos temporários e testes
 ├── 📁 backend/                 # API backend (NestJS)
 ├── 📁 frontend-web/           # Interface web (React)

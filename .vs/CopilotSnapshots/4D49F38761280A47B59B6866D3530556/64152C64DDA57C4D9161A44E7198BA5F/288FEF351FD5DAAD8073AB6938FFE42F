@@ -1,0 +1,214 @@
+﻿import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+  ParseUUIDPipe,
+  HttpStatus,
+  HttpException,
+  Logger,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+  ApiBody,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { TicketService } from '../services/ticket.service';
+import { MensagemService } from '../services/mensagem.service';
+import { WhatsAppSenderService } from '../services/whatsapp-sender.service';
+import { AtendimentoGateway } from '../gateways/atendimento.gateway';
+import {
+  EnviarMensagemDto,
+  EnviarMensagemResponseDto,
+  MensagemDto,
+  TipoMensagemEnum,
+} from '../dto';
+import { RemetenteMensagem } from '../entities/mensagem.entity';
+
+@ApiTags('Atendimento - Mensagens')
+@ApiBearerAuth()
+@Controller('api/atendimento/tickets/:ticketId/mensagens')
+@UseGuards(JwtAuthGuard)
+export class MensagensController {
+  private readonly logger = new Logger(MensagensController.name);
+
+  constructor(
+    private readonly ticketService: TicketService,
+    private readonly mensagemService: MensagemService,
+    private readonly whatsappSender: WhatsAppSenderService,
+    private readonly atendimentoGateway: AtendimentoGateway,
+  ) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Listar mensagens do ticket' })
+  @ApiParam({ name: 'ticketId', description: 'ID do ticket' })
+  @ApiQuery({ name: 'limite', required: false, type: Number, example: 100 })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de mensagens',
+    type: [MensagemDto],
+  })
+  @ApiResponse({ status: 404, description: 'Ticket não encontrado' })
+  async listar(
+    @Param('ticketId', ParseUUIDPipe) ticketId: string,
+    @Query('limite') limite?: number,
+    @Req() req?,
+  ): Promise<MensagemDto[]> {
+    const empresaId = req.user.empresa_id || req.user.empresaId;
+
+    // Validar acesso ao ticket
+    await this.ticketService.buscarPorId(ticketId, empresaId);
+
+    const mensagens = await this.mensagemService.buscarPorTicket(
+      ticketId,
+      limite || 100,
+    );
+    return mensagens.map(m => MensagemDto.fromEntity(m));
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Enviar mensagem no ticket' })
+  @ApiParam({ name: 'ticketId', description: 'ID do ticket' })
+  @ApiBody({ type: EnviarMensagemDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Mensagem enviada com sucesso',
+    type: EnviarMensagemResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Ticket não encontrado' })
+  @ApiResponse({ status: 400, description: 'Erro ao enviar mensagem' })
+  async enviar(
+    @Param('ticketId', ParseUUIDPipe) ticketId: string,
+    @Body() dados: EnviarMensagemDto,
+    @Req() req,
+  ): Promise<EnviarMensagemResponseDto> {
+    const empresaId = req.user.empresa_id || req.user.empresaId;
+    const userId = req.user.id || req.user.sub;
+
+    this.logger.log(`📤 Enviando mensagem - Ticket: ${ticketId}, User: ${userId}`);
+
+    try {
+      // 1. Validar acesso ao ticket e buscar dados
+      const ticket = await this.ticketService.buscarPorId(ticketId, empresaId);
+
+      if (!ticket) {
+        throw new HttpException('Ticket não encontrado', HttpStatus.NOT_FOUND);
+      }
+
+      // 2. Salvar mensagem no banco
+      this.logger.log(`💾 Salvando mensagem no banco...`);
+      const mensagem = await this.mensagemService.salvar({
+        ticketId,
+        tipo: dados.tipo || TipoMensagemEnum.TEXTO,
+        remetente: RemetenteMensagem.ATENDENTE as string,
+        conteudo: dados.conteudo,
+        atendenteId: userId,
+      });
+
+      this.logger.log(`✅ Mensagem salva: ${mensagem.id}`);
+
+      // 3. Enviar via WhatsApp
+      let resultado: any = { sucesso: false };
+      let messageId: string | undefined;
+
+      try {
+        this.logger.log(
+          `📱 Enviando via WhatsApp para ${ticket.contatoTelefone}...`,
+        );
+
+        resultado = await this.whatsappSender.enviarMensagem(
+          empresaId,
+          ticket.contatoTelefone,
+          dados.conteudo,
+        );
+
+        if (resultado.sucesso && resultado.messageId) {
+          messageId = resultado.messageId;
+          mensagem.idExterno = messageId;
+          await this.mensagemService['mensagemRepository'].save(mensagem);
+          this.logger.log(`✅ Mensagem enviada via WhatsApp: ${messageId}`);
+        } else {
+          this.logger.warn(`⚠️ Falha ao enviar: ${resultado.erro}`);
+        }
+      } catch (errorWhatsApp) {
+        this.logger.error(`❌ Erro ao enviar via WhatsApp:`, errorWhatsApp.message);
+        resultado = {
+          sucesso: false,
+          erro: errorWhatsApp.message,
+        };
+      }
+
+      // 4. Registrar primeira resposta (se for a primeira)
+      await this.ticketService.registrarPrimeiraResposta(ticketId);
+
+      // 5. Atualizar última mensagem
+      await this.ticketService.atualizarUltimaMensagem(ticketId);
+
+      // 6. Notificar via WebSocket
+      this.atendimentoGateway.notificarNovaMensagem(mensagem);
+
+      // 7. Retornar resultado
+      return {
+        mensagem: MensagemDto.fromEntity(mensagem),
+        sucesso: resultado.sucesso,
+        messageId,
+        mensagemStatus: resultado.sucesso ? 'Enviada com sucesso' : 'Salva mas não enviada',
+        erro: resultado.erro,
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erro ao processar mensagem:`, error);
+      throw new HttpException(
+        error.message || 'Erro ao enviar mensagem',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Patch(':mensagemId/lida')
+  @ApiOperation({ summary: 'Marcar mensagem como lida' })
+  @ApiParam({ name: 'ticketId', description: 'ID do ticket' })
+  @ApiParam({ name: 'mensagemId', description: 'ID da mensagem' })
+  @ApiResponse({ status: 200, description: 'Mensagem marcada como lida', type: MensagemDto })
+  async marcarComoLida(
+    @Param('ticketId', ParseUUIDPipe) ticketId: string,
+    @Param('mensagemId', ParseUUIDPipe) mensagemId: string,
+    @Req() req,
+  ): Promise<MensagemDto> {
+    const empresaId = req.user.empresa_id || req.user.empresaId;
+
+    // Validar acesso ao ticket
+    await this.ticketService.buscarPorId(ticketId, empresaId);
+
+    const mensagem = await this.mensagemService.marcarComoLida(mensagemId);
+    return MensagemDto.fromEntity(mensagem);
+  }
+
+  @Get('cliente/:telefone/historico')
+  @ApiOperation({ summary: 'Buscar histórico completo de mensagens do cliente' })
+  @ApiParam({ name: 'telefone', description: 'Número de telefone', example: '+5511999999999' })
+  @ApiResponse({ status: 200, description: 'Histórico de mensagens', type: [MensagemDto] })
+  async buscarHistorico(
+    @Param('telefone') telefone: string,
+    @Req() req,
+  ): Promise<MensagemDto[]> {
+    const empresaId = req.user.empresa_id || req.user.empresaId;
+
+    const mensagens = await this.mensagemService.buscarHistoricoCliente(
+      empresaId,
+      telefone,
+      50,
+    );
+
+    return mensagens.map(m => MensagemDto.fromEntity(m));
+  }
+}

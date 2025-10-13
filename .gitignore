@@ -228,3 +228,10 @@ experiments/
 # .copilot-registry.md - MANTER (rastreia arquivos criados)
 # auto-limpeza-copilot.ps1 - MANTER (script de auto-limpeza)
 # TEMPLATE_REGISTRO_COPILOT.md - MANTER (guia de uso)
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

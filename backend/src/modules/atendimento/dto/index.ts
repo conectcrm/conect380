@@ -1,0 +1,11 @@
+// DTOs Barrel Export
+
+export * from './canal.dto';
+export * from './fila.dto';
+export * from './atendente.dto';
+export * from './ticket.dto';
+export * from './mensagem.dto';
+export * from './template-tag.dto';
+export * from './integracao.dto';
+export * from './contexto-cliente.dto';
+export * from './busca-global.dto';

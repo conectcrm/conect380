@@ -1,5 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { Empresa } from '../../empresas/entities/empresa.entity';
+// import { Contato } from './contato.entity';
 
 export enum StatusCliente {
   LEAD = 'lead',
@@ -90,4 +91,15 @@ export class Cliente {
   @ManyToOne(() => Empresa)
   @JoinColumn({ name: 'empresa_id' })
   empresaRel: Empresa;
+
+  /**
+   * Relacionamento OneToMany: Um Cliente pode ter vários Contatos
+   * Contatos são os funcionários/pessoas vinculadas à empresa (cliente)
+   * 
+   * NOTA: Comentado temporariamente para resolver referência circular
+   */
+  // @OneToMany(() => Contato, (contato) => contato.cliente, {
+  //   cascade: true, // Salva contatos automaticamente ao salvar cliente
+  // })
+  // contatos: Contato[];
 }

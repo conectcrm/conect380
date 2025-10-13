@@ -1,0 +1,1039 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Projetos\\conectcrm\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\migrations\\1728950400000-CreateAtendimentoAtendentes.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\migrations\\1728950400000-CreateAtendimentoAtendentes.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\migrations\\1728950500000-CreateAtendimentoTickets.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\migrations\\1728950500000-CreateAtendimentoTickets.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\migrations\\1728950600000-CreateAtendimentoMensagens.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\migrations\\1728950600000-CreateAtendimentoMensagens.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\check-tables.js||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\check-tables.js||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\docs\\SPRINT1_FUNDACAO_COMPLETA.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:docs\\SPRINT1_FUNDACAO_COMPLETA.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\test-omnichannel.js||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\test-omnichannel.js||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\check-schema.js||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\check-schema.js||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\docs\\SISTEMA_OMNICHANNEL_STATUS_FINAL.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:docs\\SISTEMA_OMNICHANNEL_STATUS_FINAL.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\docs\\PROXIMOS_PASSOS_SPRINT2.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:docs\\PROXIMOS_PASSOS_SPRINT2.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\docs\\SUMARIO_EXECUTIVO_SPRINT1.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:docs\\SUMARIO_EXECUTIVO_SPRINT1.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\docs\\README_OMNICHANNEL.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:docs\\README_OMNICHANNEL.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\filtrar-tickets.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\modules\\atendimento\\dto\\tickets\\filtrar-tickets.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\criar-ticket.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\modules\\atendimento\\dto\\tickets\\criar-ticket.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\atualizar-status.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\modules\\atendimento\\dto\\tickets\\atualizar-status.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\atualizar-prioridade.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\modules\\atendimento\\dto\\tickets\\atualizar-prioridade.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\transferir-ticket.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\modules\\atendimento\\dto\\tickets\\transferir-ticket.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\resolver-ticket.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\modules\\atendimento\\dto\\tickets\\resolver-ticket.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\ticket.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\modules\\atendimento\\dto\\tickets\\ticket.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\listar-tickets-response.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\modules\\atendimento\\dto\\tickets\\listar-tickets-response.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\mensagens\\enviar-mensagem.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\modules\\atendimento\\dto\\mensagens\\enviar-mensagem.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\mensagens\\mensagem.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\modules\\atendimento\\dto\\mensagens\\mensagem.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\mensagens\\enviar-mensagem-response.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\modules\\atendimento\\dto\\mensagens\\enviar-mensagem-response.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\index.ts||{3B902123-F8A7-4915-9F01-361F908088D0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\modules\\atendimento\\dto\\index.ts||{3B902123-F8A7-4915-9F01-361F908088D0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\controllers\\tickets.controller.ts||{3B902123-F8A7-4915-9F01-361F908088D0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\modules\\atendimento\\controllers\\tickets.controller.ts||{3B902123-F8A7-4915-9F01-361F908088D0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\controllers\\mensagens.controller.ts||{3B902123-F8A7-4915-9F01-361F908088D0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\modules\\atendimento\\controllers\\mensagens.controller.ts||{3B902123-F8A7-4915-9F01-361F908088D0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\ticket.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\modules\\atendimento\\dto\\ticket.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\mults\\AppData\\Local\\Temp\\CopilotBaseline\\Deleted\\750251841\\ticket.dto.ts||{3B902123-F8A7-4915-9F01-361F908088D0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\entities\\ticket.entity.ts||{3B902123-F8A7-4915-9F01-361F908088D0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\src\\modules\\atendimento\\entities\\ticket.entity.ts||{3B902123-F8A7-4915-9F01-361F908088D0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\docs\\SPRINT2_API_REST_PROGRESSO.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:docs\\SPRINT2_API_REST_PROGRESSO.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\test-api-rest.js||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\test-api-rest.js||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\docs\\SPRINT2_API_REST_RESUMO_FINAL.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:docs\\SPRINT2_API_REST_RESUMO_FINAL.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\postman\\ConectCRM-Omnichannel-API.postman_collection.json||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\postman\\ConectCRM-Omnichannel-API.postman_collection.json||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\postman\\ConectCRM-Development.postman_environment.json||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\postman\\ConectCRM-Development.postman_environment.json||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\backend\\postman\\README_POSTMAN.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:backend\\postman\\README_POSTMAN.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\docs\\SPRINT2_API_REST_COMPLETA.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:docs\\SPRINT2_API_REST_COMPLETA.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\docs\\SPRINT3_FRONTEND_PLANEJAMENTO.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:docs\\SPRINT3_FRONTEND_PLANEJAMENTO.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\docs\\SISTEMA_OMNICHANNEL_RESUMO_EXECUTIVO.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:docs\\SISTEMA_OMNICHANNEL_RESUMO_EXECUTIVO.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\docs\\SPRINT3_FRONTEND_CHECKLIST.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:docs\\SPRINT3_FRONTEND_CHECKLIST.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\docs\\SPRINT3_INICIO_RAPIDO.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:docs\\SPRINT3_INICIO_RAPIDO.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\docs\\DASHBOARD_PROGRESSO.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:docs\\DASHBOARD_PROGRESSO.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\docs\\INDICE_GERAL.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:docs\\INDICE_GERAL.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\package.json||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\package.json||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\vite.config.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\vite.config.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\tsconfig.json||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\tsconfig.json||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\tsconfig.node.json||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\tsconfig.node.json||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\tailwind.config.js||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\tailwind.config.js||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\postcss.config.js||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\postcss.config.js||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\.env||{8B382828-6202-11D1-8870-0000F87579D2}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\.env||{8B382828-6202-11D1-8870-0000F87579D2}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\.gitignore||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\.gitignore||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\index.html||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\index.html||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\src\\index.css||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\src\\index.css||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\src\\main.tsx||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\src\\main.tsx||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\src\\services\\api\\axios.config.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\src\\services\\api\\axios.config.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\src\\services\\socket\\socket.config.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\src\\services\\socket\\socket.config.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\src\\store\\useAtendimentoStore.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\src\\store\\useAtendimentoStore.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\src\\store\\useAuthStore.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\src\\store\\useAuthStore.ts||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\src\\App.tsx||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\src\\App.tsx||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\src\\pages\\auth\\LoginPage.tsx||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\src\\pages\\auth\\LoginPage.tsx||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\src\\pages\\atendimento\\AtendimentoPage.tsx||{3B902123-F8A7-4915-9F01-361F908088D0}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\src\\pages\\atendimento\\AtendimentoPage.tsx||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Projetos\\conectcrm\\frontend\\README.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\README.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 3,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "check-tables.js",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\check-tables.js",
+              "RelativeDocumentMoniker": "backend\\check-tables.js",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\check-tables.js",
+              "RelativeToolTip": "backend\\check-tables.js",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2025-10-13T14:51:23.936Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "1728950600000-CreateAtendimentoMensagens.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\migrations\\1728950600000-CreateAtendimentoMensagens.ts",
+              "RelativeDocumentMoniker": "backend\\src\\migrations\\1728950600000-CreateAtendimentoMensagens.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\migrations\\1728950600000-CreateAtendimentoMensagens.ts",
+              "RelativeToolTip": "backend\\src\\migrations\\1728950600000-CreateAtendimentoMensagens.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T14:48:52.721Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "1728950500000-CreateAtendimentoTickets.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\migrations\\1728950500000-CreateAtendimentoTickets.ts",
+              "RelativeDocumentMoniker": "backend\\src\\migrations\\1728950500000-CreateAtendimentoTickets.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\migrations\\1728950500000-CreateAtendimentoTickets.ts",
+              "RelativeToolTip": "backend\\src\\migrations\\1728950500000-CreateAtendimentoTickets.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T14:48:22.972Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "1728950400000-CreateAtendimentoAtendentes.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\migrations\\1728950400000-CreateAtendimentoAtendentes.ts",
+              "RelativeDocumentMoniker": "backend\\src\\migrations\\1728950400000-CreateAtendimentoAtendentes.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\migrations\\1728950400000-CreateAtendimentoAtendentes.ts",
+              "RelativeToolTip": "backend\\src\\migrations\\1728950400000-CreateAtendimentoAtendentes.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T14:47:43.725Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 59,
+              "Title": "README.md",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\README.md",
+              "RelativeDocumentMoniker": "frontend\\README.md",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\README.md",
+              "RelativeToolTip": "frontend\\README.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2025-10-13T16:35:06.347Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 58,
+              "Title": "AtendimentoPage.tsx",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\src\\pages\\atendimento\\AtendimentoPage.tsx",
+              "RelativeDocumentMoniker": "frontend\\src\\pages\\atendimento\\AtendimentoPage.tsx",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\src\\pages\\atendimento\\AtendimentoPage.tsx",
+              "RelativeToolTip": "frontend\\src\\pages\\atendimento\\AtendimentoPage.tsx",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T16:34:32.666Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 57,
+              "Title": "LoginPage.tsx",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\src\\pages\\auth\\LoginPage.tsx",
+              "RelativeDocumentMoniker": "frontend\\src\\pages\\auth\\LoginPage.tsx",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\src\\pages\\auth\\LoginPage.tsx",
+              "RelativeToolTip": "frontend\\src\\pages\\auth\\LoginPage.tsx",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T16:34:13.933Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 56,
+              "Title": "App.tsx",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\src\\App.tsx",
+              "RelativeDocumentMoniker": "frontend\\src\\App.tsx",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\src\\App.tsx",
+              "RelativeToolTip": "frontend\\src\\App.tsx",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T16:33:54.2Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 55,
+              "Title": "useAuthStore.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\src\\store\\useAuthStore.ts",
+              "RelativeDocumentMoniker": "frontend\\src\\store\\useAuthStore.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\src\\store\\useAuthStore.ts",
+              "RelativeToolTip": "frontend\\src\\store\\useAuthStore.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T16:33:41.858Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 54,
+              "Title": "useAtendimentoStore.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\src\\store\\useAtendimentoStore.ts",
+              "RelativeDocumentMoniker": "frontend\\src\\store\\useAtendimentoStore.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\src\\store\\useAtendimentoStore.ts",
+              "RelativeToolTip": "frontend\\src\\store\\useAtendimentoStore.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T16:33:31.284Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 53,
+              "Title": "socket.config.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\src\\services\\socket\\socket.config.ts",
+              "RelativeDocumentMoniker": "frontend\\src\\services\\socket\\socket.config.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\src\\services\\socket\\socket.config.ts",
+              "RelativeToolTip": "frontend\\src\\services\\socket\\socket.config.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T16:33:12.799Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 52,
+              "Title": "axios.config.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\src\\services\\api\\axios.config.ts",
+              "RelativeDocumentMoniker": "frontend\\src\\services\\api\\axios.config.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\src\\services\\api\\axios.config.ts",
+              "RelativeToolTip": "frontend\\src\\services\\api\\axios.config.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T16:32:57.361Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 51,
+              "Title": "main.tsx",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\src\\main.tsx",
+              "RelativeDocumentMoniker": "frontend\\src\\main.tsx",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\src\\main.tsx",
+              "RelativeToolTip": "frontend\\src\\main.tsx",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T16:32:41.361Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 50,
+              "Title": "index.css",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\src\\index.css",
+              "RelativeDocumentMoniker": "frontend\\src\\index.css",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\src\\index.css",
+              "RelativeToolTip": "frontend\\src\\index.css",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003000|",
+              "WhenOpened": "2025-10-13T16:32:29.37Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 49,
+              "Title": "index.html",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\index.html",
+              "RelativeDocumentMoniker": "frontend\\index.html",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\index.html",
+              "RelativeToolTip": "frontend\\index.html",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
+              "WhenOpened": "2025-10-13T16:32:15.383Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 48,
+              "Title": ".gitignore",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\.gitignore",
+              "RelativeDocumentMoniker": "frontend\\.gitignore",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\.gitignore",
+              "RelativeToolTip": "frontend\\.gitignore",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-10-13T16:32:03.466Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 47,
+              "Title": ".env",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\.env",
+              "RelativeDocumentMoniker": "frontend\\.env",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\.env",
+              "RelativeToolTip": "frontend\\.env",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-10-13T16:31:47.977Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 46,
+              "Title": "postcss.config.js",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\postcss.config.js",
+              "RelativeDocumentMoniker": "frontend\\postcss.config.js",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\postcss.config.js",
+              "RelativeToolTip": "frontend\\postcss.config.js",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2025-10-13T16:31:36.497Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 45,
+              "Title": "tailwind.config.js",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\tailwind.config.js",
+              "RelativeDocumentMoniker": "frontend\\tailwind.config.js",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\tailwind.config.js",
+              "RelativeToolTip": "frontend\\tailwind.config.js",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2025-10-13T16:31:24.74Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 44,
+              "Title": "tsconfig.node.json",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\tsconfig.node.json",
+              "RelativeDocumentMoniker": "frontend\\tsconfig.node.json",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\tsconfig.node.json",
+              "RelativeToolTip": "frontend\\tsconfig.node.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2025-10-13T16:31:11.632Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 43,
+              "Title": "tsconfig.json",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\tsconfig.json",
+              "RelativeDocumentMoniker": "frontend\\tsconfig.json",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\tsconfig.json",
+              "RelativeToolTip": "frontend\\tsconfig.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2025-10-13T16:30:59.508Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 42,
+              "Title": "vite.config.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\vite.config.ts",
+              "RelativeDocumentMoniker": "frontend\\vite.config.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\vite.config.ts",
+              "RelativeToolTip": "frontend\\vite.config.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T16:30:43.979Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 41,
+              "Title": "package.json",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\frontend\\package.json",
+              "RelativeDocumentMoniker": "frontend\\package.json",
+              "ToolTip": "C:\\Projetos\\conectcrm\\frontend\\package.json",
+              "RelativeToolTip": "frontend\\package.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2025-10-13T16:30:28.907Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 40,
+              "Title": "INDICE_GERAL.md",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\docs\\INDICE_GERAL.md",
+              "RelativeDocumentMoniker": "docs\\INDICE_GERAL.md",
+              "ToolTip": "C:\\Projetos\\conectcrm\\docs\\INDICE_GERAL.md",
+              "RelativeToolTip": "docs\\INDICE_GERAL.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2025-10-13T16:20:40.291Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 39,
+              "Title": "DASHBOARD_PROGRESSO.md",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\docs\\DASHBOARD_PROGRESSO.md",
+              "RelativeDocumentMoniker": "docs\\DASHBOARD_PROGRESSO.md",
+              "ToolTip": "C:\\Projetos\\conectcrm\\docs\\DASHBOARD_PROGRESSO.md",
+              "RelativeToolTip": "docs\\DASHBOARD_PROGRESSO.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2025-10-13T16:18:22.547Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 38,
+              "Title": "SPRINT3_INICIO_RAPIDO.md",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\docs\\SPRINT3_INICIO_RAPIDO.md",
+              "RelativeDocumentMoniker": "docs\\SPRINT3_INICIO_RAPIDO.md",
+              "ToolTip": "C:\\Projetos\\conectcrm\\docs\\SPRINT3_INICIO_RAPIDO.md",
+              "RelativeToolTip": "docs\\SPRINT3_INICIO_RAPIDO.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2025-10-13T16:16:50.162Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 37,
+              "Title": "SPRINT3_FRONTEND_CHECKLIST.md",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\docs\\SPRINT3_FRONTEND_CHECKLIST.md",
+              "RelativeDocumentMoniker": "docs\\SPRINT3_FRONTEND_CHECKLIST.md",
+              "ToolTip": "C:\\Projetos\\conectcrm\\docs\\SPRINT3_FRONTEND_CHECKLIST.md",
+              "RelativeToolTip": "docs\\SPRINT3_FRONTEND_CHECKLIST.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2025-10-13T16:13:50.55Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 36,
+              "Title": "SISTEMA_OMNICHANNEL_RESUMO_EXECUTIVO.md",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\docs\\SISTEMA_OMNICHANNEL_RESUMO_EXECUTIVO.md",
+              "RelativeDocumentMoniker": "docs\\SISTEMA_OMNICHANNEL_RESUMO_EXECUTIVO.md",
+              "ToolTip": "C:\\Projetos\\conectcrm\\docs\\SISTEMA_OMNICHANNEL_RESUMO_EXECUTIVO.md",
+              "RelativeToolTip": "docs\\SISTEMA_OMNICHANNEL_RESUMO_EXECUTIVO.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2025-10-13T16:12:26.724Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 35,
+              "Title": "SPRINT3_FRONTEND_PLANEJAMENTO.md",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\docs\\SPRINT3_FRONTEND_PLANEJAMENTO.md",
+              "RelativeDocumentMoniker": "docs\\SPRINT3_FRONTEND_PLANEJAMENTO.md",
+              "ToolTip": "C:\\Projetos\\conectcrm\\docs\\SPRINT3_FRONTEND_PLANEJAMENTO.md",
+              "RelativeToolTip": "docs\\SPRINT3_FRONTEND_PLANEJAMENTO.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2025-10-13T16:10:54.24Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 34,
+              "Title": "SPRINT2_API_REST_COMPLETA.md",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\docs\\SPRINT2_API_REST_COMPLETA.md",
+              "RelativeDocumentMoniker": "docs\\SPRINT2_API_REST_COMPLETA.md",
+              "ToolTip": "C:\\Projetos\\conectcrm\\docs\\SPRINT2_API_REST_COMPLETA.md",
+              "RelativeToolTip": "docs\\SPRINT2_API_REST_COMPLETA.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2025-10-13T15:35:49.475Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 33,
+              "Title": "README_POSTMAN.md",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\postman\\README_POSTMAN.md",
+              "RelativeDocumentMoniker": "backend\\postman\\README_POSTMAN.md",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\postman\\README_POSTMAN.md",
+              "RelativeToolTip": "backend\\postman\\README_POSTMAN.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2025-10-13T15:34:22.383Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 32,
+              "Title": "ConectCRM-Development.postman_environment.json",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\postman\\ConectCRM-Development.postman_environment.json",
+              "RelativeDocumentMoniker": "backend\\postman\\ConectCRM-Development.postman_environment.json",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\postman\\ConectCRM-Development.postman_environment.json",
+              "RelativeToolTip": "backend\\postman\\ConectCRM-Development.postman_environment.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2025-10-13T15:33:24.948Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 31,
+              "Title": "ConectCRM-Omnichannel-API.postman_collection.json",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\postman\\ConectCRM-Omnichannel-API.postman_collection.json",
+              "RelativeDocumentMoniker": "backend\\postman\\ConectCRM-Omnichannel-API.postman_collection.json",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\postman\\ConectCRM-Omnichannel-API.postman_collection.json",
+              "RelativeToolTip": "backend\\postman\\ConectCRM-Omnichannel-API.postman_collection.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2025-10-13T15:33:12.841Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 30,
+              "Title": "SPRINT2_API_REST_RESUMO_FINAL.md",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\docs\\SPRINT2_API_REST_RESUMO_FINAL.md",
+              "RelativeDocumentMoniker": "docs\\SPRINT2_API_REST_RESUMO_FINAL.md",
+              "ToolTip": "C:\\Projetos\\conectcrm\\docs\\SPRINT2_API_REST_RESUMO_FINAL.md",
+              "RelativeToolTip": "docs\\SPRINT2_API_REST_RESUMO_FINAL.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2025-10-13T15:28:53.669Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 29,
+              "Title": "test-api-rest.js",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\test-api-rest.js",
+              "RelativeDocumentMoniker": "backend\\test-api-rest.js",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\test-api-rest.js",
+              "RelativeToolTip": "backend\\test-api-rest.js",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2025-10-13T15:27:54.508Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 28,
+              "Title": "SPRINT2_API_REST_PROGRESSO.md",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\docs\\SPRINT2_API_REST_PROGRESSO.md",
+              "RelativeDocumentMoniker": "docs\\SPRINT2_API_REST_PROGRESSO.md",
+              "ToolTip": "C:\\Projetos\\conectcrm\\docs\\SPRINT2_API_REST_PROGRESSO.md",
+              "RelativeToolTip": "docs\\SPRINT2_API_REST_PROGRESSO.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2025-10-13T15:27:20.518Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 27,
+              "Title": "ticket.entity.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\entities\\ticket.entity.ts",
+              "RelativeDocumentMoniker": "backend\\src\\modules\\atendimento\\entities\\ticket.entity.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\entities\\ticket.entity.ts",
+              "RelativeToolTip": "backend\\src\\modules\\atendimento\\entities\\ticket.entity.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwGAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T15:16:37.104Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 26,
+              "Title": "ticket.dto.ts",
+              "DocumentMoniker": "C:\\Users\\mults\\AppData\\Local\\Temp\\CopilotBaseline\\Deleted\\750251841\\ticket.dto.ts",
+              "RelativeDocumentMoniker": "..\\..\\Users\\mults\\AppData\\Local\\Temp\\CopilotBaseline\\Deleted\\750251841\\ticket.dto.ts",
+              "ToolTip": "C:\\Users\\mults\\AppData\\Local\\Temp\\CopilotBaseline\\Deleted\\750251841\\ticket.dto.ts",
+              "RelativeToolTip": "..\\..\\Users\\mults\\AppData\\Local\\Temp\\CopilotBaseline\\Deleted\\750251841\\ticket.dto.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T15:15:02.075Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 25,
+              "Title": "ticket.dto.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\ticket.dto.ts",
+              "RelativeDocumentMoniker": "backend\\src\\modules\\atendimento\\dto\\ticket.dto.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\ticket.dto.ts",
+              "RelativeToolTip": "backend\\src\\modules\\atendimento\\dto\\ticket.dto.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T15:15:01.581Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 24,
+              "Title": "mensagens.controller.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\controllers\\mensagens.controller.ts",
+              "RelativeDocumentMoniker": "backend\\src\\modules\\atendimento\\controllers\\mensagens.controller.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\controllers\\mensagens.controller.ts",
+              "RelativeToolTip": "backend\\src\\modules\\atendimento\\controllers\\mensagens.controller.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwHEAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T15:12:13.293Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 23,
+              "Title": "tickets.controller.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\controllers\\tickets.controller.ts",
+              "RelativeDocumentMoniker": "backend\\src\\modules\\atendimento\\controllers\\tickets.controller.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\controllers\\tickets.controller.ts",
+              "RelativeToolTip": "backend\\src\\modules\\atendimento\\controllers\\tickets.controller.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwD4BAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T15:11:10.968Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 22,
+              "Title": "index.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\index.ts",
+              "RelativeDocumentMoniker": "backend\\src\\modules\\atendimento\\dto\\index.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\index.ts",
+              "RelativeToolTip": "backend\\src\\modules\\atendimento\\dto\\index.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAsAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T15:10:07.055Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 21,
+              "Title": "enviar-mensagem-response.dto.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\mensagens\\enviar-mensagem-response.dto.ts",
+              "RelativeDocumentMoniker": "backend\\src\\modules\\atendimento\\dto\\mensagens\\enviar-mensagem-response.dto.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\mensagens\\enviar-mensagem-response.dto.ts",
+              "RelativeToolTip": "backend\\src\\modules\\atendimento\\dto\\mensagens\\enviar-mensagem-response.dto.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T15:09:48.198Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 20,
+              "Title": "mensagem.dto.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\mensagens\\mensagem.dto.ts",
+              "RelativeDocumentMoniker": "backend\\src\\modules\\atendimento\\dto\\mensagens\\mensagem.dto.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\mensagens\\mensagem.dto.ts",
+              "RelativeToolTip": "backend\\src\\modules\\atendimento\\dto\\mensagens\\mensagem.dto.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T15:09:30.187Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 19,
+              "Title": "enviar-mensagem.dto.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\mensagens\\enviar-mensagem.dto.ts",
+              "RelativeDocumentMoniker": "backend\\src\\modules\\atendimento\\dto\\mensagens\\enviar-mensagem.dto.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\mensagens\\enviar-mensagem.dto.ts",
+              "RelativeToolTip": "backend\\src\\modules\\atendimento\\dto\\mensagens\\enviar-mensagem.dto.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T15:09:09.672Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 18,
+              "Title": "listar-tickets-response.dto.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\listar-tickets-response.dto.ts",
+              "RelativeDocumentMoniker": "backend\\src\\modules\\atendimento\\dto\\tickets\\listar-tickets-response.dto.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\listar-tickets-response.dto.ts",
+              "RelativeToolTip": "backend\\src\\modules\\atendimento\\dto\\tickets\\listar-tickets-response.dto.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T15:08:50.838Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 17,
+              "Title": "ticket.dto.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\ticket.dto.ts",
+              "RelativeDocumentMoniker": "backend\\src\\modules\\atendimento\\dto\\tickets\\ticket.dto.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\ticket.dto.ts",
+              "RelativeToolTip": "backend\\src\\modules\\atendimento\\dto\\tickets\\ticket.dto.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T15:08:35.242Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 16,
+              "Title": "resolver-ticket.dto.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\resolver-ticket.dto.ts",
+              "RelativeDocumentMoniker": "backend\\src\\modules\\atendimento\\dto\\tickets\\resolver-ticket.dto.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\resolver-ticket.dto.ts",
+              "RelativeToolTip": "backend\\src\\modules\\atendimento\\dto\\tickets\\resolver-ticket.dto.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T15:08:07.248Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 15,
+              "Title": "transferir-ticket.dto.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\transferir-ticket.dto.ts",
+              "RelativeDocumentMoniker": "backend\\src\\modules\\atendimento\\dto\\tickets\\transferir-ticket.dto.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\transferir-ticket.dto.ts",
+              "RelativeToolTip": "backend\\src\\modules\\atendimento\\dto\\tickets\\transferir-ticket.dto.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T15:07:51.018Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 14,
+              "Title": "atualizar-prioridade.dto.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\atualizar-prioridade.dto.ts",
+              "RelativeDocumentMoniker": "backend\\src\\modules\\atendimento\\dto\\tickets\\atualizar-prioridade.dto.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\atualizar-prioridade.dto.ts",
+              "RelativeToolTip": "backend\\src\\modules\\atendimento\\dto\\tickets\\atualizar-prioridade.dto.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T15:07:35.29Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "atualizar-status.dto.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\atualizar-status.dto.ts",
+              "RelativeDocumentMoniker": "backend\\src\\modules\\atendimento\\dto\\tickets\\atualizar-status.dto.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\atualizar-status.dto.ts",
+              "RelativeToolTip": "backend\\src\\modules\\atendimento\\dto\\tickets\\atualizar-status.dto.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T15:07:23.431Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "criar-ticket.dto.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\criar-ticket.dto.ts",
+              "RelativeDocumentMoniker": "backend\\src\\modules\\atendimento\\dto\\tickets\\criar-ticket.dto.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\criar-ticket.dto.ts",
+              "RelativeToolTip": "backend\\src\\modules\\atendimento\\dto\\tickets\\criar-ticket.dto.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T15:06:59.728Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "filtrar-tickets.dto.ts",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\filtrar-tickets.dto.ts",
+              "RelativeDocumentMoniker": "backend\\src\\modules\\atendimento\\dto\\tickets\\filtrar-tickets.dto.ts",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\src\\modules\\atendimento\\dto\\tickets\\filtrar-tickets.dto.ts",
+              "RelativeToolTip": "backend\\src\\modules\\atendimento\\dto\\tickets\\filtrar-tickets.dto.ts",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-13T15:06:42.383Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "README_OMNICHANNEL.md",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\docs\\README_OMNICHANNEL.md",
+              "RelativeDocumentMoniker": "docs\\README_OMNICHANNEL.md",
+              "ToolTip": "C:\\Projetos\\conectcrm\\docs\\README_OMNICHANNEL.md",
+              "RelativeToolTip": "docs\\README_OMNICHANNEL.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2025-10-13T15:01:01.597Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "SUMARIO_EXECUTIVO_SPRINT1.md",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\docs\\SUMARIO_EXECUTIVO_SPRINT1.md",
+              "RelativeDocumentMoniker": "docs\\SUMARIO_EXECUTIVO_SPRINT1.md",
+              "ToolTip": "C:\\Projetos\\conectcrm\\docs\\SUMARIO_EXECUTIVO_SPRINT1.md",
+              "RelativeToolTip": "docs\\SUMARIO_EXECUTIVO_SPRINT1.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2025-10-13T14:59:51.449Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "PROXIMOS_PASSOS_SPRINT2.md",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\docs\\PROXIMOS_PASSOS_SPRINT2.md",
+              "RelativeDocumentMoniker": "docs\\PROXIMOS_PASSOS_SPRINT2.md",
+              "ToolTip": "C:\\Projetos\\conectcrm\\docs\\PROXIMOS_PASSOS_SPRINT2.md",
+              "RelativeToolTip": "docs\\PROXIMOS_PASSOS_SPRINT2.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2025-10-13T14:58:46.985Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "SISTEMA_OMNICHANNEL_STATUS_FINAL.md",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\docs\\SISTEMA_OMNICHANNEL_STATUS_FINAL.md",
+              "RelativeDocumentMoniker": "docs\\SISTEMA_OMNICHANNEL_STATUS_FINAL.md",
+              "ToolTip": "C:\\Projetos\\conectcrm\\docs\\SISTEMA_OMNICHANNEL_STATUS_FINAL.md",
+              "RelativeToolTip": "docs\\SISTEMA_OMNICHANNEL_STATUS_FINAL.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2025-10-13T14:57:33.45Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "check-schema.js",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\check-schema.js",
+              "RelativeDocumentMoniker": "backend\\check-schema.js",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\check-schema.js",
+              "RelativeToolTip": "backend\\check-schema.js",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2025-10-13T14:55:19.494Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "test-omnichannel.js",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\backend\\test-omnichannel.js",
+              "RelativeDocumentMoniker": "backend\\test-omnichannel.js",
+              "ToolTip": "C:\\Projetos\\conectcrm\\backend\\test-omnichannel.js",
+              "RelativeToolTip": "backend\\test-omnichannel.js",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2025-10-13T14:54:54.046Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "SPRINT1_FUNDACAO_COMPLETA.md",
+              "DocumentMoniker": "C:\\Projetos\\conectcrm\\docs\\SPRINT1_FUNDACAO_COMPLETA.md",
+              "RelativeDocumentMoniker": "docs\\SPRINT1_FUNDACAO_COMPLETA.md",
+              "ToolTip": "C:\\Projetos\\conectcrm\\docs\\SPRINT1_FUNDACAO_COMPLETA.md",
+              "RelativeToolTip": "docs\\SPRINT1_FUNDACAO_COMPLETA.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2025-10-13T14:54:24.814Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

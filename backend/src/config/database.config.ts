@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { User } from '../modules/users/user.entity';
 import { Empresa } from '../empresas/entities/empresa.entity';
 import { Cliente } from '../modules/clientes/cliente.entity';
+import { Contato } from '../modules/clientes/contato.entity';
 import { Produto } from '../modules/produtos/produto.entity';
 import { Oportunidade } from '../modules/oportunidades/oportunidade.entity';
 import { Atividade } from '../modules/oportunidades/atividade.entity';
@@ -20,6 +21,12 @@ import { Pagamento } from '../modules/faturamento/entities/pagamento.entity';
 import { PlanoCobranca } from '../modules/faturamento/entities/plano-cobranca.entity';
 import { Contrato } from '../modules/contratos/entities/contrato.entity';
 import { AssinaturaContrato } from '../modules/contratos/entities/assinatura-contrato.entity';
+import { Canal } from '../modules/atendimento/entities/canal.entity';
+import { Fila } from '../modules/atendimento/entities/fila.entity';
+import { Atendente } from '../modules/atendimento/entities/atendente.entity';
+import { Ticket } from '../modules/atendimento/entities/ticket.entity';
+import { Mensagem } from '../modules/atendimento/entities/mensagem.entity';
+import { IntegracoesConfig } from '../modules/atendimento/entities/integracoes-config.entity'; // ✅ Adicionado para IA
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
@@ -37,6 +44,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         User,
         Empresa,
         Cliente,
+        Contato, // ✅ Entity de contatos vinculados a clientes
         Produto,
         Oportunidade,
         Atividade,
@@ -52,7 +60,13 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         Pagamento,
         PlanoCobranca,
         Contrato,
-        AssinaturaContrato
+        AssinaturaContrato,
+        Canal, // Módulo omnichannel
+        Fila, // Módulo omnichannel
+        Atendente, // Módulo omnichannel
+        Ticket, // Módulo omnichannel
+        Mensagem, // Módulo omnichannel
+        IntegracoesConfig, // ✅ Configurações de IA (OpenAI, Anthropic)
       ],
       synchronize: false, // Desabilitado temporariamente para evitar conflitos de schema
       logging: this.configService.get('APP_ENV') === 'development',

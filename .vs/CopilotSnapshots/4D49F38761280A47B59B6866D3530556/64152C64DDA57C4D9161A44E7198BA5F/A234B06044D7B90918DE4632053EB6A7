@@ -1,0 +1,25 @@
+﻿// DTOs Barrel Export
+
+export * from './canal.dto';
+export * from './fila.dto';
+export * from './atendente.dto';
+export * from './ticket.dto';
+export * from './mensagem.dto';
+export * from './template-tag.dto';
+export * from './integracao.dto';
+export * from './contexto-cliente.dto';
+export * from './busca-global.dto';
+
+// Sprint 2: DTOs para API REST
+export * from './tickets/filtrar-tickets.dto';
+export * from './tickets/criar-ticket.dto';
+export * from './tickets/atualizar-status.dto';
+export * from './tickets/atualizar-prioridade.dto';
+export * from './tickets/transferir-ticket.dto';
+export * from './tickets/resolver-ticket.dto';
+export * from './tickets/ticket.dto';
+export * from './tickets/listar-tickets-response.dto';
+
+export * from './mensagens/enviar-mensagem.dto';
+export * from './mensagens/mensagem.dto';
+export * from './mensagens/enviar-mensagem-response.dto';

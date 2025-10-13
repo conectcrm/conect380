@@ -1,0 +1,81 @@
+﻿import { ApiProperty } from '@nestjs/swagger';
+import { Ticket } from '../../entities/ticket.entity';
+
+export class TicketDto {
+  @ApiProperty({ example: 'uuid-ticket' })
+  id: string;
+
+  @ApiProperty({ example: 1 })
+  numero: number;
+
+  @ApiProperty({ example: 'uuid-empresa' })
+  empresaId: string;
+
+  @ApiProperty({ example: 'uuid-canal' })
+  canalId: string;
+
+  @ApiProperty({ example: 'uuid-fila', required: false })
+  filaId?: string;
+
+  @ApiProperty({ example: 'João Silva' })
+  contatoNome: string;
+
+  @ApiProperty({ example: '+5511999999999' })
+  contatoTelefone: string;
+
+  @ApiProperty({ example: 'uuid-atendente', required: false })
+  atendenteId?: string;
+
+  @ApiProperty({ example: 'ABERTO', enum: ['ABERTO', 'EM_ATENDIMENTO', 'AGUARDANDO', 'RESOLVIDO', 'FECHADO'] })
+  status: string;
+
+  @ApiProperty({ example: 'MEDIA', enum: ['BAIXA', 'MEDIA', 'ALTA', 'URGENTE'] })
+  prioridade: string;
+
+  @ApiProperty({ example: 'Preciso de ajuda com meu pedido' })
+  assunto: string;
+
+  @ApiProperty({ example: '2025-10-13T10:00:00Z' })
+  dataAbertura: Date;
+
+  @ApiProperty({ example: '2025-10-13T15:00:00Z', required: false })
+  dataFechamento?: Date;
+
+  @ApiProperty({ example: '2025-10-13T16:00:00Z' })
+  ultimaMensagemEm: Date;
+
+  @ApiProperty({ example: '2025-10-13T10:05:00Z', required: false })
+  dataPrimeiraResposta?: Date;
+
+  @ApiProperty({ example: '2025-10-13T15:00:00Z', required: false })
+  dataResolucao?: Date;
+
+  @ApiProperty()
+  createdAt: Date;
+
+  @ApiProperty()
+  updatedAt: Date;
+
+  static fromEntity(ticket: Ticket): TicketDto {
+    const dto = new TicketDto();
+    dto.id = ticket.id;
+    dto.numero = ticket.numero;
+    dto.empresaId = ticket.empresaId;
+    dto.canalId = ticket.canalId;
+    dto.filaId = ticket.filaId;
+    dto.contatoNome = ticket.contatoNome;
+    dto.contatoTelefone = ticket.contatoTelefone;
+    dto.atendenteId = ticket.atendenteId;
+    dto.status = ticket.status;
+    dto.prioridade = ticket.prioridade;
+    dto.assunto = ticket.assunto;
+    dto.dataAbertura = ticket.data_abertura;
+    dto.dataFechamento = ticket.data_fechamento;
+    dto.ultimaMensagemEm = ticket.ultima_mensagem_em;
+    dto.dataPrimeiraResposta = ticket.data_primeira_resposta;
+    dto.dataResolucao = ticket.data_resolucao;
+    dto.createdAt = ticket.createdAt;
+    dto.updatedAt = ticket.updatedAt;
+    return dto;
+  }
+}

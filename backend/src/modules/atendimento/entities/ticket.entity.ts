@@ -1,0 +1,96 @@
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+  Index,
+} from 'typeorm';
+
+export enum StatusTicket {
+  ABERTO = 'ABERTO',
+  EM_ATENDIMENTO = 'EM_ATENDIMENTO',
+  AGUARDANDO = 'AGUARDANDO',
+  RESOLVIDO = 'RESOLVIDO',
+  FECHADO = 'FECHADO',
+}
+
+export enum PrioridadeTicket {
+  BAIXA = 'BAIXA',
+  MEDIA = 'MEDIA',
+  ALTA = 'ALTA',
+  URGENTE = 'URGENTE',
+}
+
+export enum OrigemTicket {
+  WHATSAPP = 'WHATSAPP',
+  TELEGRAM = 'TELEGRAM',
+  EMAIL = 'EMAIL',
+  SMS = 'SMS',
+  WEBCHAT = 'WEBCHAT',
+  API = 'API',
+}
+
+@Entity('atendimento_tickets')
+@Index(['empresaId'])
+@Index(['status'])
+@Index(['atendenteId'])
+export class Ticket {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ type: 'integer', nullable: true })
+  numero: number;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  assunto: string;
+
+  @Column({ type: 'varchar', length: 20, default: 'ABERTO' })
+  status: string;
+
+  @Column({ type: 'varchar', length: 20, default: 'MEDIA' })
+  prioridade: string;
+
+  @Column({ type: 'uuid', name: 'canal_id', nullable: true })
+  canalId: string;
+
+  @Column({ type: 'uuid', name: 'fila_id', nullable: true })
+  filaId: string;
+
+  @Column({ type: 'uuid', name: 'atendente_id', nullable: true })
+  atendenteId: string;
+
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @Column({ type: 'varchar', length: 20, name: 'contato_telefone', nullable: true })
+  contatoTelefone: string;
+
+  @Column({ type: 'varchar', length: 255, name: 'contato_nome', nullable: true })
+  contatoNome: string;
+
+  @Column({ type: 'timestamp', name: 'data_abertura', nullable: true })
+  data_abertura: Date;
+
+  @Column({ type: 'timestamp', name: 'data_primeira_resposta', nullable: true })
+  data_primeira_resposta: Date;
+
+  @Column({ type: 'timestamp', name: 'data_resolucao', nullable: true })
+  data_resolucao: Date;
+
+  @Column({ type: 'timestamp', name: 'data_fechamento', nullable: true })
+  data_fechamento: Date;
+
+  @Column({ type: 'timestamp', name: 'ultima_mensagem_em', nullable: true })
+  ultima_mensagem_em: Date;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
+
+  // @DeleteDateColumn({ name: 'deleted_at', nullable: true })
+  // deletedAt: Date;
+}

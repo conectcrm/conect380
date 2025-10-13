@@ -1,0 +1,277 @@
+﻿import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+  ParseUUIDPipe,
+  HttpStatus,
+  HttpException,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+  ApiBody,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { TicketService } from '../services/ticket.service';
+import {
+  FiltrarTicketsDto,
+  CriarTicketDto,
+  AtualizarStatusDto,
+  AtualizarPrioridadeDto,
+  TransferirTicketDto,
+  ResolverTicketDto,
+  TicketDto,
+  ListarTicketsResponseDto,
+  StatusTicketEnum,
+} from '../dto';
+
+@ApiTags('Atendimento - Tickets')
+@ApiBearerAuth()
+@Controller('api/atendimento/tickets')
+@UseGuards(JwtAuthGuard)
+export class TicketsController {
+  constructor(
+    private readonly ticketService: TicketService,
+  ) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Listar tickets com filtros e paginação' })
+  @ApiQuery({ name: 'status', required: false, isArray: true, enum: StatusTicketEnum })
+  @ApiQuery({ name: 'canalId', required: false, type: String })
+  @ApiQuery({ name: 'filaId', required: false, type: String })
+  @ApiQuery({ name: 'atendenteId', required: false, type: String })
+  @ApiQuery({ name: 'prioridade', required: false, enum: ['BAIXA', 'MEDIA', 'ALTA', 'URGENTE'] })
+  @ApiQuery({ name: 'limite', required: false, type: Number, example: 50 })
+  @ApiQuery({ name: 'pagina', required: false, type: Number, example: 1 })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Lista de tickets retornada com sucesso',
+    type: ListarTicketsResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  async listar(
+    @Query() filtros: FiltrarTicketsDto,
+    @Req() req,
+  ): Promise<ListarTicketsResponseDto> {
+    const empresaId = req.user.empresa_id || req.user.empresaId;
+    
+    const { tickets, total } = await this.ticketService.listar({
+      ...filtros,
+      empresaId,
+    });
+
+    const ticketDtos = tickets.map(t => TicketDto.fromEntity(t));
+    const totalPaginas = Math.ceil(total / (filtros.limite || 50));
+
+    return {
+      tickets: ticketDtos,
+      total,
+      pagina: filtros.pagina || 1,
+      limite: filtros.limite || 50,
+      totalPaginas,
+    };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Buscar ticket por ID' })
+  @ApiParam({ name: 'id', description: 'ID do ticket', type: String })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Ticket encontrado',
+    type: TicketDto,
+  })
+  @ApiResponse({ status: 404, description: 'Ticket não encontrado' })
+  async buscar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req,
+  ): Promise<TicketDto> {
+    const empresaId = req.user.empresa_id || req.user.empresaId;
+    const ticket = await this.ticketService.buscarPorId(id, empresaId);
+    return TicketDto.fromEntity(ticket);
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Criar novo ticket manualmente' })
+  @ApiBody({ type: CriarTicketDto })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Ticket criado com sucesso',
+    type: TicketDto,
+  })
+  @ApiResponse({ status: 400, description: 'Dados inválidos' })
+  async criar(
+    @Body() dados: CriarTicketDto,
+    @Req() req,
+  ): Promise<TicketDto> {
+    const empresaId = req.user.empresa_id || req.user.empresaId;
+    
+    // Adaptar DTO da API para interface do service
+    const dadosService = {
+      empresaId,
+      canalId: dados.canalId,
+      clienteNumero: dados.clienteNumero,
+      clienteNome: dados.clienteNome,
+      clienteEmail: dados.clienteEmail,
+      assunto: dados.assunto,
+      descricao: dados.descricao,
+      prioridade: dados.prioridade,
+      origem: dados.origem || 'MANUAL',
+    };
+
+    const ticket = await this.ticketService.criar(dadosService);
+
+    return TicketDto.fromEntity(ticket);
+  }
+
+  @Post(':id/atribuir')
+  @ApiOperation({ summary: 'Atribuir ticket a um atendente' })
+  @ApiParam({ name: 'id', description: 'ID do ticket' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        atendenteId: { type: 'string', format: 'uuid', example: 'uuid-atendente' },
+      },
+      required: ['atendenteId'],
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Ticket atribuído com sucesso', type: TicketDto })
+  @ApiResponse({ status: 404, description: 'Ticket não encontrado' })
+  async atribuir(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('atendenteId', ParseUUIDPipe) atendenteId: string,
+    @Req() req,
+  ): Promise<TicketDto> {
+    const empresaId = req.user.empresa_id || req.user.empresaId;
+    
+    // Validar se ticket pertence à empresa
+    await this.ticketService.buscarPorId(id, empresaId);
+    
+    const ticket = await this.ticketService.atribuir(id, atendenteId);
+    return TicketDto.fromEntity(ticket);
+  }
+
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Atualizar status do ticket' })
+  @ApiParam({ name: 'id', description: 'ID do ticket' })
+  @ApiBody({ type: AtualizarStatusDto })
+  @ApiResponse({ status: 200, description: 'Status atualizado', type: TicketDto })
+  async atualizarStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AtualizarStatusDto,
+    @Req() req,
+  ): Promise<TicketDto> {
+    const empresaId = req.user.empresa_id || req.user.empresaId;
+    
+    // Validar acesso
+    await this.ticketService.buscarPorId(id, empresaId);
+    
+    const ticket = await this.ticketService.atualizarStatus(id, dto.status as any);
+    return TicketDto.fromEntity(ticket);
+  }
+
+  @Patch(':id/prioridade')
+  @ApiOperation({ summary: 'Atualizar prioridade do ticket' })
+  @ApiParam({ name: 'id', description: 'ID do ticket' })
+  @ApiBody({ type: AtualizarPrioridadeDto })
+  @ApiResponse({ status: 200, description: 'Prioridade atualizada', type: TicketDto })
+  async atualizarPrioridade(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AtualizarPrioridadeDto,
+    @Req() req,
+  ): Promise<TicketDto> {
+    const empresaId = req.user.empresa_id || req.user.empresaId;
+    
+    // Validar acesso
+    await this.ticketService.buscarPorId(id, empresaId);
+    
+    const ticket = await this.ticketService.atualizarPrioridade(id, dto.prioridade as any);
+    return TicketDto.fromEntity(ticket);
+  }
+
+  @Post(':id/transferir')
+  @ApiOperation({ summary: 'Transferir ticket para outra fila' })
+  @ApiParam({ name: 'id', description: 'ID do ticket' })
+  @ApiBody({ type: TransferirTicketDto })
+  @ApiResponse({ status: 200, description: 'Ticket transferido', type: TicketDto })
+  async transferir(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: TransferirTicketDto,
+    @Req() req,
+  ): Promise<TicketDto> {
+    const empresaId = req.user.empresa_id || req.user.empresaId;
+    
+    // Validar acesso
+    const ticket = await this.ticketService.buscarPorId(id, empresaId);
+    
+    // Atualizar fila e atendente
+    ticket.filaId = dto.filaId;
+    ticket.atendenteId = dto.atendenteId || null;
+    ticket.status = 'AGUARDANDO' as any;
+    
+    // Salvar (assumindo que save existe no repository)
+    const ticketAtualizado = await this.ticketService['ticketRepository'].save(ticket);
+    
+    return TicketDto.fromEntity(ticketAtualizado);
+  }
+
+  @Post(':id/resolver')
+  @ApiOperation({ summary: 'Marcar ticket como resolvido' })
+  @ApiParam({ name: 'id', description: 'ID do ticket' })
+  @ApiBody({ type: ResolverTicketDto })
+  @ApiResponse({ status: 200, description: 'Ticket resolvido', type: TicketDto })
+  async resolver(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ResolverTicketDto,
+    @Req() req,
+  ): Promise<TicketDto> {
+    const empresaId = req.user.empresa_id || req.user.empresaId;
+    
+    // Validar acesso
+    const ticket = await this.ticketService.buscarPorId(id, empresaId);
+    
+    // Atualizar para resolvido
+    const ticketResolvido = await this.ticketService.atualizarStatus(id, 'RESOLVIDO' as any);
+    
+    // Se houver avaliação, salvar (futuro: criar service de avaliação)
+    if (dto.avaliacao) {
+      ticketResolvido.avaliacao = dto.avaliacao;
+      ticketResolvido.comentario_avaliacao = dto.comentarioAvaliacao;
+      ticketResolvido.data_avaliacao = new Date();
+      await this.ticketService['ticketRepository'].save(ticketResolvido);
+    }
+    
+    return TicketDto.fromEntity(ticketResolvido);
+  }
+
+  @Get('cliente/:telefone')
+  @ApiOperation({ summary: 'Buscar histórico de tickets do cliente por telefone' })
+  @ApiParam({ name: 'telefone', description: 'Número de telefone do cliente', example: '+5511999999999' })
+  @ApiResponse({ status: 200, description: 'Histórico de tickets', type: [TicketDto] })
+  async buscarPorTelefone(
+    @Param('telefone') telefone: string,
+    @Req() req,
+  ): Promise<TicketDto[]> {
+    const empresaId = req.user.empresa_id || req.user.empresaId;
+    const tickets = await this.ticketService.buscarPorTelefone(empresaId, telefone);
+    return tickets.map(t => TicketDto.fromEntity(t));
+  }
+}
+
+
+
+
+
+
+
+

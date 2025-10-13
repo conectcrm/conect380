@@ -16,7 +16,7 @@ const AppDataSource = new DataSource({
   migrations: ['dist/src/migrations/*.js'],
   migrationsTableName: 'migrations',
   synchronize: false,
-  logging: process.env.APP_ENV === 'development',
+  logging: true, // Temporariamente ativado para debug
   ssl: process.env.APP_ENV === 'production' ? {
     rejectUnauthorized: false,
   } : false,

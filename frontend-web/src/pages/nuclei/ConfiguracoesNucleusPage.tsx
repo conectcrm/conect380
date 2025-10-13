@@ -67,9 +67,9 @@ const ConfiguracoesNucleusPage: React.FC = () => {
         href: '/configuracoes/integracoes',
         icon: Zap,
         notifications: 0,
-        badge: 'Beta',
-        badgeColor: 'yellow',
-        status: 'beta'
+        badge: 'Novo',
+        badgeColor: 'green',
+        status: 'active'
       },
       {
         id: 'backup-sync',
