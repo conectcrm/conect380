@@ -254,7 +254,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       </div>
 
       {/* Área de Mensagens */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 bg-gray-50">
         {mensagens.map((mensagem, index) => {
           const ehCliente = mensagem.remetente.tipo === 'cliente';
           const mostrarFoto = index === 0 || 
@@ -289,28 +289,32 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 )}
                 
                 <div 
-                  className={`rounded-2xl px-4 py-2.5 ${
+                  className={`rounded-2xl px-4 py-2.5 shadow-sm ${
                     ehCliente
-                      ? 'bg-white border border-gray-200 shadow-sm'
-                      : 'shadow-md'
+                      ? 'bg-white border border-gray-200'
+                      : ''
                   }`}
                   style={!ehCliente ? {
-                    backgroundColor: theme.colors.primaryDark || theme.colors.primary,
-                    color: '#FFFFFF'
+                    backgroundColor: theme.colors.primaryLight,
+                    border: `1px solid ${theme.colors.borderLight}`
                   } : {}}
                 >
-                  <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
+                  <p className={`text-sm whitespace-pre-wrap break-words leading-relaxed ${
+                    ehCliente ? 'text-gray-800' : 'text-gray-900'
+                  }`}>
                     {mensagem.conteudo}
                   </p>
                   
                   {/* Timestamp e Status */}
-                  <div className={`flex items-center gap-1 mt-1.5 justify-end ${
-                    ehCliente ? 'text-gray-500' : 'text-white/80'
-                  }`}>
+                  <div className="flex items-center gap-1 mt-1.5 justify-end text-gray-500">
                     <span className="text-xs font-medium">
                       {formatarHorarioMensagem(mensagem.timestamp)}
                     </span>
-                    {!ehCliente && renderIconeStatus(mensagem.status)}
+                    {!ehCliente && (
+                      <span style={{ color: theme.colors.primary }}>
+                        {renderIconeStatus(mensagem.status)}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
