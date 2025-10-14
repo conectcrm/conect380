@@ -8,7 +8,7 @@ export * from './utils';
 
 // Services
 export { atendimentoService } from './services/atendimentoService';
-export type { 
+export type {
   ListarTicketsParams,
   ListarTicketsResponse,
   ListarMensagensParams,

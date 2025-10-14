@@ -10,24 +10,24 @@
  */
 
 import { api } from '../../../../services/api';
-import { 
-  Ticket, 
-  Mensagem, 
-  Contato, 
-  CanalTipo, 
+import {
+  Ticket,
+  Mensagem,
+  Contato,
+  CanalTipo,
   StatusAtendimento,
   Demanda,
   NotaCliente,
   HistoricoAtendimento
 } from '../types';
-import { 
-  NovoAtendimentoData 
+import {
+  NovoAtendimentoData
 } from '../modals/NovoAtendimentoModal';
-import { 
-  TransferenciaData 
+import {
+  TransferenciaData
 } from '../modals/TransferirAtendimentoModal';
-import { 
-  EncerramentoData 
+import {
+  EncerramentoData
 } from '../modals/EncerrarAtendimentoModal';
 import {
   ContatoEditado
@@ -165,7 +165,7 @@ class AtendimentoService {
    * Transfere ticket para outro atendente
    */
   async transferirTicket(
-    ticketId: string, 
+    ticketId: string,
     dados: TransferenciaData
   ): Promise<TransferirTicketResponse> {
     try {

@@ -308,7 +308,7 @@ export class TicketService {
     ticket.status = StatusTicket.EM_ATENDIMENTO;
 
     const ticketAtualizado = await this.ticketRepository.save(ticket);
-    
+
     this.logger.log(
       `🔄 Ticket ${ticketId} transferido de ${atendenteAnterior || 'fila'} para ${dados.atendenteId}. ` +
       `Motivo: ${dados.motivo}`
@@ -332,7 +332,7 @@ export class TicketService {
     ticket.data_fechamento = new Date();
 
     const ticketAtualizado = await this.ticketRepository.save(ticket);
-    
+
     this.logger.log(
       `🏁 Ticket ${ticketId} encerrado. Motivo: ${dados.motivo}`
     );
@@ -374,7 +374,7 @@ export class TicketService {
     ticket.data_fechamento = null;
 
     const ticketAtualizado = await this.ticketRepository.save(ticket);
-    
+
     this.logger.log(`🔓 Ticket ${ticketId} reaberto`);
 
     return ticketAtualizado;

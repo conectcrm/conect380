@@ -19,13 +19,13 @@ import { Mensagem, Ticket } from '../types';
 interface SocketContextData {
   connected: boolean;
   socket: Socket | null;
-  
+
   // Eventos de escuta
   onNovaMensagem: (callback: (mensagem: Mensagem) => void) => void;
   onTicketAtualizado: (callback: (ticket: Ticket) => void) => void;
   onUsuarioDigitando: (callback: (data: { ticketId: string; nomeUsuario: string }) => void) => void;
   onStatusMensagem: (callback: (data: { mensagemId: string; status: string }) => void) => void;
-  
+
   // Ações
   enviarDigitando: (ticketId: string) => void;
   entrarSalaTicket: (ticketId: string) => void;
@@ -74,7 +74,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     }
 
     const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-    
+
     console.log('🔌 Conectando ao WebSocket...', API_URL);
 
     const socketInstance = io(API_URL, {
@@ -87,7 +87,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     });
 
     // ===== EVENTOS DE CONEXÃO =====
-    
+
     socketInstance.on('connect', () => {
       console.log('✅ Socket conectado:', socketInstance.id);
       setConnected(true);
@@ -159,7 +159,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   const onNovaMensagem = useCallback((callback: (mensagem: Mensagem) => void) => {
     callbacksRef.current.novaMensagem.push(callback);
-    
+
     // Retornar função de cleanup
     return () => {
       callbacksRef.current.novaMensagem = callbacksRef.current.novaMensagem.filter(
@@ -170,7 +170,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   const onTicketAtualizado = useCallback((callback: (ticket: Ticket) => void) => {
     callbacksRef.current.ticketAtualizado.push(callback);
-    
+
     return () => {
       callbacksRef.current.ticketAtualizado = callbacksRef.current.ticketAtualizado.filter(
         cb => cb !== callback
@@ -182,7 +182,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     callback: (data: { ticketId: string; nomeUsuario: string }) => void
   ) => {
     callbacksRef.current.usuarioDigitando.push(callback);
-    
+
     return () => {
       callbacksRef.current.usuarioDigitando = callbacksRef.current.usuarioDigitando.filter(
         cb => cb !== callback
@@ -194,7 +194,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     callback: (data: { mensagemId: string; status: string }) => void
   ) => {
     callbacksRef.current.statusMensagem.push(callback);
-    
+
     return () => {
       callbacksRef.current.statusMensagem = callbacksRef.current.statusMensagem.filter(
         cb => cb !== callback

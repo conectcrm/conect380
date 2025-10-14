@@ -12,9 +12,9 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { 
-  atendimentoService, 
-  ListarTicketsParams 
+import {
+  atendimentoService,
+  ListarTicketsParams
 } from '../services/atendimentoService';
 import { Ticket, StatusAtendimento, CanalTipo } from '../types';
 import { NovoAtendimentoData } from '../modals/NovoAtendimentoModal';
@@ -123,13 +123,13 @@ export const useAtendimentos = (
     try {
       setLoading(true);
       const response = await atendimentoService.criarTicket(dados);
-      
+
       // Recarregar lista
       await carregarTickets();
-      
+
       // Selecionar o novo ticket
       setTicketSelecionado(response.ticket);
-      
+
       console.log('✅ Ticket criado com sucesso:', response.ticket.numero);
       return response.ticket;
     } catch (err: any) {
@@ -150,14 +150,14 @@ export const useAtendimentos = (
     try {
       setLoading(true);
       await atendimentoService.transferirTicket(ticketId, dados);
-      
+
       // Recarregar lista e ticket atual
       await carregarTickets();
-      
+
       if (ticketSelecionado?.id === ticketId) {
         await selecionarTicket(ticketId);
       }
-      
+
       console.log('✅ Ticket transferido com sucesso');
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao transferir ticket';
@@ -177,15 +177,15 @@ export const useAtendimentos = (
     try {
       setLoading(true);
       await atendimentoService.encerrarTicket(ticketId, dados);
-      
+
       // Recarregar lista
       await carregarTickets();
-      
+
       // Limpar seleção se era o ticket atual
       if (ticketSelecionado?.id === ticketId) {
         setTicketSelecionado(null);
       }
-      
+
       console.log('✅ Ticket encerrado com sucesso');
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao encerrar ticket';
@@ -202,13 +202,13 @@ export const useAtendimentos = (
     try {
       setLoading(true);
       const ticketReaberto = await atendimentoService.reabrirTicket(ticketId);
-      
+
       // Recarregar lista
       await carregarTickets();
-      
+
       // Selecionar ticket reaberto
       setTicketSelecionado(ticketReaberto);
-      
+
       console.log('✅ Ticket reaberto com sucesso');
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao reabrir ticket';

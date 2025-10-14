@@ -138,7 +138,7 @@ export class TransferirTicketDto {
 }
 
 export class EncerrarTicketDto {
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Motivo do encerramento',
     enum: ['resolvido', 'cancelado', 'sem_resposta', 'duplicado', 'spam', 'outro']
   })

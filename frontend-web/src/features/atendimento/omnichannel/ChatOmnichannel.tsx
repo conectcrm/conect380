@@ -8,10 +8,12 @@ import { EncerrarAtendimentoModal, EncerramentoData } from './modals/EncerrarAte
 import { EditarContatoModal, ContatoEditado } from './modals/EditarContatoModal';
 import { VincularClienteModal } from './modals/VincularClienteModal';
 import { AbrirDemandaModal, NovaDemanda } from './modals/AbrirDemandaModal';
-import { mockTickets, mockMensagens, mockHistorico, mockDemandas, mockNotas } from './mockData';
 import { Mensagem, NotaCliente, Demanda } from './types';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useSidebar } from '../../../contexts/SidebarContext';
+import { useAtendimentos } from './hooks/useAtendimentos';
+import { useMensagens } from './hooks/useMensagens';
+import { mockHistorico, mockDemandas, mockNotas } from './mockData';
 
 /**
  * ChatOmnichannel - Componente principal do chat omnichannel
@@ -27,9 +29,32 @@ import { useSidebar } from '../../../contexts/SidebarContext';
 export const ChatOmnichannel: React.FC = () => {
   const { currentPalette } = useTheme();
   const { sidebarCollapsed } = useSidebar();
-  const [tickets] = useState(mockTickets);
-  const [ticketSelecionado, setTicketSelecionado] = useState<string>(mockTickets[0]?.id);
-  const [mensagens, setMensagens] = useState<Mensagem[]>(mockMensagens);
+  
+  // Hooks do backend real
+  const { 
+    tickets, 
+    ticketSelecionado, 
+    selecionarTicket,
+    criarTicket,
+    transferirTicket,
+    encerrarTicket,
+    loading: loadingTickets 
+  } = useAtendimentos({
+    autoRefresh: true,
+    filtroInicial: { status: 'aberto' }
+  });
+
+  const {
+    mensagens,
+    enviarMensagem,
+    enviarMensagemComAnexos,
+    marcarComoLidas,
+    loading: loadingMensagens
+  } = useMensagens({
+    ticketId: ticketSelecionado?.id || null
+  });
+
+  // Dados que ainda vêm do mock (serão implementados depois)
   const [historico] = useState(mockHistorico);
   const [demandas, setDemandas] = useState(mockDemandas);
   const [notas, setNotas] = useState<NotaCliente[]>(mockNotas);
@@ -42,95 +67,90 @@ export const ChatOmnichannel: React.FC = () => {
   const [modalVincularCliente, setModalVincularCliente] = useState(false);
   const [modalAbrirDemanda, setModalAbrirDemanda] = useState(false);
 
-  // Encontra o ticket atual
-  const ticketAtual = tickets.find(t => t.id === ticketSelecionado);
-
-  // Filtra mensagens do ticket atual
-  const mensagensDoTicket = mensagens.filter(m => m.ticketId === ticketSelecionado);
+  // Variáveis derivadas
+  const ticketAtual = ticketSelecionado;
+  const mensagensDoTicket = mensagens;
 
   // Handlers
   const handleSelecionarTicket = useCallback((ticketId: string) => {
-    setTicketSelecionado(ticketId);
-  }, []);
+    selecionarTicket(ticketId);
+  }, [selecionarTicket]);
 
   const handleNovoAtendimento = useCallback(() => {
     setModalNovoAtendimento(true);
   }, []);
 
-  const handleConfirmarNovoAtendimento = useCallback((dados: NovoAtendimentoData) => {
-    console.log('Criar novo atendimento:', dados);
-    // TODO: Integrar com API
-    // TODO: Criar ticket no estado
-    // TODO: Redirecionar para o novo ticket
-  }, []);
+  const handleConfirmarNovoAtendimento = useCallback(async (dados: NovoAtendimentoData) => {
+    try {
+      const novoTicket = await criarTicket(dados);
+      
+      // Seleciona o novo ticket
+      selecionarTicket(novoTicket.id);
+      setModalNovoAtendimento(false);
+    } catch (error) {
+      console.error('Erro ao criar ticket:', error);
+      alert('Erro ao criar atendimento. Tente novamente.');
+    }
+  }, [criarTicket, selecionarTicket]);
 
-  const handleEnviarMensagem = useCallback((conteudo: string) => {
-    if (!ticketAtual) return;
+  const handleEnviarMensagem = useCallback(async (conteudo: string, anexos?: File[]) => {
+    if (!ticketSelecionado) return;
 
-    const novaMensagem: Mensagem = {
-      id: `m${Date.now()}`,
-      ticketId: ticketSelecionado,
-      remetente: {
-        id: ticketAtual.atendente?.id || 'a1',
-        nome: ticketAtual.atendente?.nome || 'Atendente',
-        foto: ticketAtual.atendente?.foto,
-        tipo: 'atendente'
-      },
-      conteudo,
-      timestamp: new Date(),
-      status: 'enviando'
-    };
-
-    setMensagens(prev => [...prev, novaMensagem]);
-
-    // Simular envio e mudança de status
-    setTimeout(() => {
-      setMensagens(prev =>
-        prev.map(m => m.id === novaMensagem.id ? { ...m, status: 'enviado' } : m)
-      );
-    }, 500);
-
-    setTimeout(() => {
-      setMensagens(prev =>
-        prev.map(m => m.id === novaMensagem.id ? { ...m, status: 'entregue' } : m)
-      );
-    }, 1000);
-
-    setTimeout(() => {
-      setMensagens(prev =>
-        prev.map(m => m.id === novaMensagem.id ? { ...m, status: 'lido' } : m)
-      );
-    }, 2000);
-  }, [ticketSelecionado, ticketAtual]);
+    try {
+      if (anexos && anexos.length > 0) {
+        await enviarMensagemComAnexos(conteudo, anexos);
+      } else {
+        await enviarMensagem(conteudo);
+      }
+    } catch (error) {
+      console.error('Erro ao enviar mensagem:', error);
+      alert('Erro ao enviar mensagem. Tente novamente.');
+    }
+  }, [ticketSelecionado, enviarMensagem, enviarMensagemComAnexos]);
 
   const handleTransferir = useCallback(() => {
     setModalTransferir(true);
   }, []);
 
-  const handleConfirmarTransferencia = useCallback((dados: TransferenciaData) => {
-    console.log('Transferir atendimento:', dados);
-    // TODO: Integrar com API
-    // TODO: Atualizar estado do ticket
-    // TODO: Notificar novo agente
-  }, []);
+  const handleConfirmarTransferencia = useCallback(async (dados: TransferenciaData) => {
+    if (!ticketSelecionado) return;
+    
+    try {
+      await transferirTicket(ticketSelecionado.id, dados);
+      setModalTransferir(false);
+    } catch (error) {
+      console.error('Erro ao transferir ticket:', error);
+      alert('Erro ao transferir atendimento. Tente novamente.');
+    }
+  }, [ticketSelecionado, transferirTicket]);
 
   const handleEncerrar = useCallback(() => {
     setModalEncerrar(true);
   }, []);
 
-  const handleConfirmarEncerramento = useCallback((dados: EncerramentoData) => {
-    console.log('Encerrar atendimento:', dados);
-    // TODO: Integrar com API
-    // TODO: Atualizar status do ticket
-    // TODO: Criar follow-up se necessário
-    // TODO: Enviar pesquisa de satisfação
-  }, []);
+  const handleConfirmarEncerramento = useCallback(async (dados: EncerramentoData) => {
+    if (!ticketSelecionado) return;
+    
+    try {
+      await encerrarTicket(ticketSelecionado.id, {
+        motivo: dados.motivo as any,
+        observacoes: dados.observacoes,
+        criarFollowUp: dados.criarFollowUp,
+        dataFollowUp: dados.dataFollowUp,
+        solicitarAvaliacao: dados.solicitarAvaliacao
+      });
+      setModalEncerrar(false);
+    } catch (error) {
+      console.error('Erro ao encerrar ticket:', error);
+      alert('Erro ao encerrar atendimento. Tente novamente.');
+    }
+  }, [ticketSelecionado, encerrarTicket]);
 
   const handleLigar = useCallback(() => {
-    if (!ticketAtual) return;
-    console.log('Ligar para:', ticketAtual.contato.telefone);
+    if (!ticketSelecionado) return;
+    console.log('Ligar para:', ticketSelecionado.contato.telefone);
     // TODO: Integrar com sistema de telefonia
-  }, [ticketAtual]);
+  }, [ticketSelecionado]);
 
   const handleEditarContato = useCallback(() => {
     setModalEditarContato(true);
@@ -218,7 +238,7 @@ export const ChatOmnichannel: React.FC = () => {
         }`}>
         <AtendimentosSidebar
           tickets={tickets}
-          ticketSelecionado={ticketSelecionado}
+          ticketSelecionado={ticketSelecionado?.id || ''}
           onSelecionarTicket={handleSelecionarTicket}
           onNovoAtendimento={handleNovoAtendimento}
           theme={currentPalette}

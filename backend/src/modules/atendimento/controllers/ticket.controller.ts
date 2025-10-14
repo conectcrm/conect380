@@ -445,7 +445,7 @@ export class TicketController {
     try {
       // Adicionar ticketId do parâmetro da URL
       const dadosCompletos = { ...dados, ticketId };
-      
+
       const mensagem = await this.mensagemService.enviar(dadosCompletos, arquivos);
       this.logger.log(`✅ Mensagem enviada para ticket ${ticketId}`);
 

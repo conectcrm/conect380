@@ -12,9 +12,9 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { 
+import {
   atendimentoService,
-  EnviarMensagemParams 
+  EnviarMensagemParams
 } from '../services/atendimentoService';
 import { Mensagem, StatusMensagem } from '../types';
 
@@ -57,7 +57,7 @@ export const useMensagens = (
   const [enviando, setEnviando] = useState(false);
   const [temMais, setTemMais] = useState(false);
   const [paginaAtual, setPaginaAtual] = useState(1);
-  
+
   const mensagensRef = useRef<HTMLDivElement>(null);
   const ultimaMensagemRef = useRef<string | null>(null);
 
@@ -121,7 +121,7 @@ export const useMensagens = (
 
       // Adicionar mensagem otimisticamente
       setMensagens(prev => [...prev, novaMensagem]);
-      
+
       console.log('✅ Mensagem enviada');
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao enviar mensagem';
@@ -152,7 +152,7 @@ export const useMensagens = (
 
       // Adicionar mensagem
       setMensagens(prev => [...prev, novaMensagem]);
-      
+
       console.log('✅ Mensagem com anexos enviada');
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao enviar mensagem';
@@ -180,7 +180,7 @@ export const useMensagens = (
 
       // Adicionar mensagem
       setMensagens(prev => [...prev, novaMensagem]);
-      
+
       console.log('✅ Áudio enviado');
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao enviar áudio';
@@ -198,14 +198,14 @@ export const useMensagens = (
 
     try {
       await atendimentoService.marcarComoLidas(ticketId, mensagemIds);
-      
+
       // Atualizar estado local
-      setMensagens(prev => prev.map(msg => 
-        mensagemIds.includes(msg.id) 
+      setMensagens(prev => prev.map(msg =>
+        mensagemIds.includes(msg.id)
           ? { ...msg, status: 'lido' as StatusMensagem }
           : msg
       ));
-      
+
       console.log(`✅ ${mensagemIds.length} mensagens marcadas como lidas`);
     } catch (err: any) {
       console.error('❌ Erro ao marcar mensagens como lidas:', err);
@@ -246,11 +246,11 @@ export const useMensagens = (
   useEffect(() => {
     if (mensagens.length > 0) {
       const ultimaMensagem = mensagens[mensagens.length - 1];
-      
+
       // Só fazer scroll se for mensagem nova
       if (ultimaMensagemRef.current !== ultimaMensagem.id) {
         ultimaMensagemRef.current = ultimaMensagem.id;
-        
+
         // Scroll apenas se for mensagem do atendente (enviada por mim)
         if (ultimaMensagem.remetente.tipo === 'atendente') {
           scrollParaFinal();
@@ -265,8 +265,8 @@ export const useMensagens = (
 
     // Buscar mensagens do cliente que não foram lidas
     const mensagensNaoLidas = mensagens
-      .filter(msg => 
-        msg.remetente.tipo === 'cliente' && 
+      .filter(msg =>
+        msg.remetente.tipo === 'cliente' &&
         msg.status !== 'lido'
       )
       .map(msg => msg.id);
