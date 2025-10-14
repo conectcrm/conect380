@@ -115,3 +115,51 @@ export class FiltrarTicketsDto {
   @IsString()
   busca?: string;
 }
+
+export class TransferirTicketDto {
+  @ApiProperty({ description: 'ID do atendente destino' })
+  @IsNotEmpty()
+  @IsUUID()
+  atendenteId: string;
+
+  @ApiProperty({ description: 'Motivo da transferência' })
+  @IsNotEmpty()
+  @IsString()
+  motivo: string;
+
+  @ApiPropertyOptional({ description: 'Nota interna' })
+  @IsOptional()
+  @IsString()
+  notaInterna?: string;
+
+  @ApiPropertyOptional({ description: 'Notificar o atendente', default: true })
+  @IsOptional()
+  notificarAgente?: boolean;
+}
+
+export class EncerrarTicketDto {
+  @ApiProperty({ 
+    description: 'Motivo do encerramento',
+    enum: ['resolvido', 'cancelado', 'sem_resposta', 'duplicado', 'spam', 'outro']
+  })
+  @IsNotEmpty()
+  @IsString()
+  motivo: string;
+
+  @ApiPropertyOptional({ description: 'Observações do encerramento' })
+  @IsOptional()
+  @IsString()
+  observacoes?: string;
+
+  @ApiPropertyOptional({ description: 'Criar follow-up', default: false })
+  @IsOptional()
+  criarFollowUp?: boolean;
+
+  @ApiPropertyOptional({ description: 'Data do follow-up' })
+  @IsOptional()
+  dataFollowUp?: Date;
+
+  @ApiPropertyOptional({ description: 'Solicitar avaliação CSAT', default: false })
+  @IsOptional()
+  solicitarAvaliacao?: boolean;
+}

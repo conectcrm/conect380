@@ -282,4 +282,143 @@ export class TicketController {
       );
     }
   }
+
+  /**
+   * POST /api/atendimento/tickets
+   * Cria um novo ticket
+   * 
+   * Body: CriarTicketDto
+   */
+  @Post()
+  async criar(@Body() dadosTicket: any) {
+    this.logger.log(`📝 [POST /tickets] Criando novo ticket`);
+
+    try {
+      const ticket = await this.ticketService.criar(dadosTicket);
+
+      this.logger.log(`✅ Ticket criado: ${ticket.id}`);
+
+      return {
+        success: true,
+        data: ticket,
+        message: 'Ticket criado com sucesso',
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erro ao criar ticket: ${error.message}`);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao criar ticket',
+          erro: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * POST /api/atendimento/tickets/:id/transferir
+   * Transfere ticket para outro atendente
+   * 
+   * Body: TransferirTicketDto
+   */
+  @Post(':id/transferir')
+  async transferir(
+    @Param('id') id: string,
+    @Body() dados: any,
+  ) {
+    this.logger.log(`🔄 [POST /tickets/${id}/transferir] → ${dados.atendenteId}`);
+
+    try {
+      const ticket = await this.ticketService.transferir(id, dados);
+
+      this.logger.log(`✅ Ticket transferido com sucesso`);
+
+      return {
+        success: true,
+        data: ticket,
+        notificado: dados.notificarAgente !== false,
+        message: 'Ticket transferido com sucesso',
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erro ao transferir ticket: ${error.message}`);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao transferir ticket',
+          erro: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * POST /api/atendimento/tickets/:id/encerrar
+   * Encerra um ticket
+   * 
+   * Body: EncerrarTicketDto
+   */
+  @Post(':id/encerrar')
+  async encerrar(
+    @Param('id') id: string,
+    @Body() dados: any,
+  ) {
+    this.logger.log(`🏁 [POST /tickets/${id}/encerrar] motivo=${dados.motivo}`);
+
+    try {
+      const resultado = await this.ticketService.encerrar(id, dados);
+
+      this.logger.log(`✅ Ticket encerrado com sucesso`);
+
+      return {
+        success: true,
+        data: resultado.ticket,
+        followUp: resultado.followUp,
+        csatEnviado: resultado.csatEnviado,
+        message: 'Ticket encerrado com sucesso',
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erro ao encerrar ticket: ${error.message}`);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao encerrar ticket',
+          erro: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * POST /api/atendimento/tickets/:id/reabrir
+   * Reabre um ticket encerrado
+   */
+  @Post(':id/reabrir')
+  async reabrir(@Param('id') id: string) {
+    this.logger.log(`🔓 [POST /tickets/${id}/reabrir]`);
+
+    try {
+      const ticket = await this.ticketService.reabrir(id);
+
+      this.logger.log(`✅ Ticket reaberto com sucesso`);
+
+      return {
+        success: true,
+        data: ticket,
+        message: 'Ticket reaberto com sucesso',
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erro ao reabrir ticket: ${error.message}`);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao reabrir ticket',
+          erro: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 }

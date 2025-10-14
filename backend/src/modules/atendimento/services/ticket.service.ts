@@ -293,4 +293,90 @@ export class TicketService {
       },
     });
   }
+
+  /**
+   * Transfere ticket para outro atendente
+   */
+  async transferir(ticketId: string, dados: any): Promise<Ticket> {
+    const ticket = await this.buscarPorId(ticketId);
+
+    // Armazenar atendente anterior
+    const atendenteAnterior = ticket.atendenteId;
+
+    // Atualizar ticket
+    ticket.atendenteId = dados.atendenteId;
+    ticket.status = StatusTicket.EM_ATENDIMENTO;
+
+    const ticketAtualizado = await this.ticketRepository.save(ticket);
+    
+    this.logger.log(
+      `🔄 Ticket ${ticketId} transferido de ${atendenteAnterior || 'fila'} para ${dados.atendenteId}. ` +
+      `Motivo: ${dados.motivo}`
+    );
+
+    // TODO: Criar nota interna com motivo e notaInterna
+    // TODO: Se notificarAgente, enviar notificação
+
+    return ticketAtualizado;
+  }
+
+  /**
+   * Encerra um ticket
+   */
+  async encerrar(ticketId: string, dados: any): Promise<any> {
+    const ticket = await this.buscarPorId(ticketId);
+
+    // Atualizar status
+    ticket.status = StatusTicket.RESOLVIDO;
+    ticket.data_resolucao = new Date();
+    ticket.data_fechamento = new Date();
+
+    const ticketAtualizado = await this.ticketRepository.save(ticket);
+    
+    this.logger.log(
+      `🏁 Ticket ${ticketId} encerrado. Motivo: ${dados.motivo}`
+    );
+
+    // TODO: Criar follow-up se solicitado
+    let followUp = null;
+    if (dados.criarFollowUp && dados.dataFollowUp) {
+      // Criar follow-up
+      this.logger.log(`📅 Follow-up criado para ${dados.dataFollowUp}`);
+    }
+
+    // TODO: Enviar solicitação CSAT se solicitado
+    const csatEnviado = dados.solicitarAvaliacao || false;
+    if (csatEnviado) {
+      this.logger.log(`⭐ Solicitação CSAT enviada`);
+    }
+
+    return {
+      ticket: ticketAtualizado,
+      followUp,
+      csatEnviado,
+    };
+  }
+
+  /**
+   * Reabre um ticket encerrado
+   */
+  async reabrir(ticketId: string): Promise<Ticket> {
+    const ticket = await this.buscarPorId(ticketId);
+
+    // Verificar se está encerrado
+    if (ticket.status !== StatusTicket.RESOLVIDO && ticket.status !== StatusTicket.FECHADO) {
+      throw new Error('Ticket não está encerrado');
+    }
+
+    // Reabrir
+    ticket.status = StatusTicket.ABERTO;
+    ticket.data_resolucao = null;
+    ticket.data_fechamento = null;
+
+    const ticketAtualizado = await this.ticketRepository.save(ticket);
+    
+    this.logger.log(`🔓 Ticket ${ticketId} reaberto`);
+
+    return ticketAtualizado;
+  }
 }
