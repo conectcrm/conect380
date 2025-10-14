@@ -322,4 +322,65 @@ export class MensagemService {
       take: quantidade,
     });
   }
+
+  /**
+   * Envia nova mensagem
+   */
+  async enviar(dados: any, arquivos?: Express.Multer.File[]): Promise<Mensagem> {
+    this.logger.log(`📤 Enviando mensagem para ticket ${dados.ticketId}`);
+
+    const mensagemData: any = {
+      ticketId: dados.ticketId,
+      tipo: TipoMensagem.TEXTO,
+      remetente: dados.tipoRemetente || RemetenteMensagem.ATENDENTE,
+      conteudo: dados.conteudo,
+      atendenteId: dados.remetenteId,
+    };
+
+    // Se houver arquivos anexos, processar o primeiro
+    if (arquivos && arquivos.length > 0) {
+      const arquivo = arquivos[0];
+      mensagemData.midia = {
+        url: arquivo.path || arquivo.filename,
+        tipo: arquivo.mimetype,
+        tamanho: arquivo.size,
+        nome: arquivo.originalname,
+      };
+
+      // Determinar tipo baseado no MIME
+      if (arquivo.mimetype.startsWith('image/')) {
+        mensagemData.tipo = TipoMensagem.IMAGEM;
+      } else if (arquivo.mimetype.startsWith('audio/')) {
+        mensagemData.tipo = TipoMensagem.AUDIO;
+        mensagemData.midia.duracao = dados.duracaoAudio;
+      } else if (arquivo.mimetype.startsWith('video/')) {
+        mensagemData.tipo = TipoMensagem.VIDEO;
+      } else {
+        mensagemData.tipo = TipoMensagem.DOCUMENTO;
+      }
+    }
+
+    const mensagem = this.mensagemRepository.create(mensagemData);
+    const mensagemSalva = await this.mensagemRepository.save(mensagem) as any as Mensagem;
+
+    this.logger.log(`✅ Mensagem enviada com sucesso`);
+
+    // TODO: Enviar via gateway (WhatsApp, Telegram, etc.)
+    // TODO: Emitir evento WebSocket para atualização em tempo real
+
+    return mensagemSalva;
+  }
+
+  /**
+   * Marca mensagens como lidas (simulação - campo não existe na entidade)
+   */
+  async marcarLidas(mensagemIds: string[]): Promise<void> {
+    this.logger.log(`✔️ Marcando ${mensagemIds.length} mensagens como lidas`);
+
+    // TODO: Adicionar campo 'lida' na entidade Mensagem
+    // TODO: Implementar lógica de marcar como lida
+    // TODO: Emitir evento WebSocket
+
+    this.logger.log(`✅ Mensagens processadas (campo 'lida' precisa ser criado no banco)`);
+  }
 }

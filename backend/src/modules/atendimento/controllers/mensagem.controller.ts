@@ -1,12 +1,17 @@
 import {
   Controller,
   Get,
+  Post,
   Query,
   Param,
+  Body,
   Logger,
   HttpStatus,
   HttpException,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { MensagemService } from '../services/mensagem.service';
 
 /**
@@ -99,6 +104,51 @@ export class MensagemController {
           message: 'Erro ao buscar mensagem',
           erro: error.message,
         },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post()
+  @UseInterceptors(FilesInterceptor('anexos', 5))
+  async enviar(
+    @Body() dados: any,
+    @UploadedFiles() arquivos?: Express.Multer.File[],
+  ) {
+    this.logger.log(`📤 [POST /mensagens] ticketId=${dados.ticketId}`);
+
+    try {
+      const mensagem = await this.mensagemService.enviar(dados, arquivos);
+      this.logger.log(`✅ Mensagem enviada: ${mensagem.id}`);
+
+      return {
+        success: true,
+        data: mensagem,
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erro ao enviar mensagem: ${error.message}`);
+      throw new HttpException(
+        { success: false, message: 'Erro ao enviar mensagem', erro: error.message },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('marcar-lidas')
+  async marcarLidas(@Body() dados: { mensagemIds: string[] }) {
+    this.logger.log(`✔️ [POST /mensagens/marcar-lidas] ${dados.mensagemIds.length} mensagens`);
+
+    try {
+      await this.mensagemService.marcarLidas(dados.mensagemIds);
+
+      return {
+        success: true,
+        message: 'Mensagens marcadas como lidas',
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erro ao marcar mensagens: ${error.message}`);
+      throw new HttpException(
+        { success: false, message: 'Erro ao marcar mensagens', erro: error.message },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

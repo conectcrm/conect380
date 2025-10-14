@@ -9,8 +9,12 @@ import {
   Logger,
   HttpStatus,
   HttpException,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { TicketService } from '../services/ticket.service';
+import { MensagemService } from '../services/mensagem.service';
 import { StatusTicket, PrioridadeTicket } from '../entities/ticket.entity';
 
 /**
@@ -21,7 +25,10 @@ import { StatusTicket, PrioridadeTicket } from '../entities/ticket.entity';
 export class TicketController {
   private readonly logger = new Logger(TicketController.name);
 
-  constructor(private readonly ticketService: TicketService) { }
+  constructor(
+    private readonly ticketService: TicketService,
+    private readonly mensagemService: MensagemService,
+  ) { }
 
   /**
    * GET /api/atendimento/tickets
@@ -415,6 +422,43 @@ export class TicketController {
         {
           success: false,
           message: 'Erro ao reabrir ticket',
+          erro: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * POST /api/atendimento/tickets/:id/mensagens
+   * Envia mensagem para um ticket (rota nested para compatibilidade com frontend)
+   */
+  @Post(':id/mensagens')
+  @UseInterceptors(FilesInterceptor('anexos', 5))
+  async enviarMensagem(
+    @Param('id') ticketId: string,
+    @Body() dados: any,
+    @UploadedFiles() arquivos?: Express.Multer.File[],
+  ) {
+    this.logger.log(`📤 [POST /tickets/${ticketId}/mensagens]`);
+
+    try {
+      // Adicionar ticketId do parâmetro da URL
+      const dadosCompletos = { ...dados, ticketId };
+      
+      const mensagem = await this.mensagemService.enviar(dadosCompletos, arquivos);
+      this.logger.log(`✅ Mensagem enviada para ticket ${ticketId}`);
+
+      return {
+        success: true,
+        data: mensagem,
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erro ao enviar mensagem: ${error.message}`);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao enviar mensagem',
           erro: error.message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
