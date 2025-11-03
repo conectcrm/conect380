@@ -66,25 +66,50 @@ className="border-[#B4BEC9]"       # Crevasse-1 border
 className="bg-[#DEEFE7]"           # Crevasse-4 background soft
 ```
 
-## 🚀 Template Base para Novas Telas
-
-**Arquivo**: `frontend-web/src/pages/_TemplatePage.tsx`
+## 🚀 Templates Base para Novas Telas
 
 ### Regra Principal
-❗ **NUNCA crie uma página do zero** - sempre copie `_TemplatePage.tsx` como base:
+❗ **NUNCA crie uma página do zero** - sempre copie um dos templates como base.
+
+### 🎯 Escolha o Template Correto
+
+#### Template SIMPLES (sem KPIs)
+**Arquivo**: `frontend-web/src/pages/_TemplateSimplePage.tsx`
+
+**Use quando:**
+- ✅ Cadastros básicos (categorias, tags, departamentos)
+- ✅ Páginas de configuração
+- ✅ Listagens simples sem métricas
+- ✅ Páginas auxiliares/secundárias
+- ✅ CRUD puro
 
 ```powershell
-cp frontend-web/src/pages/_TemplatePage.tsx frontend-web/src/pages/NomeDaPagina.tsx
+cp frontend-web/src/pages/_TemplateSimplePage.tsx frontend-web/src/pages/NomeDaPagina.tsx
+```
+
+#### Template COM KPIs (com métricas)
+**Arquivo**: `frontend-web/src/pages/_TemplateWithKPIsPage.tsx`
+
+**Use quando:**
+- ✅ Dashboards com métricas
+- ✅ Páginas principais de módulos
+- ✅ Telas com estatísticas importantes
+- ✅ Gestão com indicadores (total, ativos, inativos, etc)
+- ✅ Overview/resumo
+
+```powershell
+cp frontend-web/src/pages/_TemplateWithKPIsPage.tsx frontend-web/src/pages/NomeDaPagina.tsx
 ```
 
 ### Fluxo de Criação de Telas
 
-1. **Copiar template** → `_TemplatePage.tsx`
-2. **Buscar marcadores** → Todos os `[PERSONALIZAR]` no código
-3. **Consultar cores** → Ver paleta em `DESIGN_GUIDELINES.md`
-4. **Implementar service** → Conectar com backend
-5. **Ajustar métricas** → Dashboard cards específicos
-6. **Testar estados** → Loading, error, empty, success
+1. **Escolher template** → SIMPLES ou COM KPIs (ver `TEMPLATES_GUIDE.md`)
+2. **Copiar template** → Usar comando correto acima
+3. **Buscar marcadores** → Todos os `[PERSONALIZAR]` no código
+4. **Consultar cores** → Ver paleta em `DESIGN_GUIDELINES.md`
+5. **Implementar service** → Conectar com backend
+6. **Ajustar métricas** → Se usar template COM KPIs, definir cálculos
+7. **Testar estados** → Loading, error, empty, success
 
 ## 📋 Padrões Obrigatórios
 
