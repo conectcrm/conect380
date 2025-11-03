@@ -28,6 +28,17 @@ export class UsersService {
     });
   }
 
+  /**
+   * Busca usuário por ID (inclui senha - para validação de senha antiga)
+   * Diferente de findById que NÃO retorna senha
+   */
+  async findOne(id: string): Promise<User | undefined> {
+    return this.userRepository.findOne({
+      where: { id },
+      select: ['id', 'nome', 'email', 'senha', 'role', 'empresa_id', 'ativo', 'ultimo_login', 'created_at', 'updated_at'],
+    });
+  }
+
   async create(userData: Partial<User>): Promise<User> {
     const user = this.userRepository.create(userData);
     return this.userRepository.save(user);
@@ -47,6 +58,19 @@ export class UsersService {
 
   async updateLastLogin(id: string): Promise<void> {
     await this.userRepository.update(id, { ultimo_login: new Date() });
+  }
+
+  /**
+   * Atualiza senha do usuário e marca como ativo (primeiro acesso concluído)
+   * @param id ID do usuário
+   * @param hashedPassword Senha já com hash bcrypt
+   * @param ativar Se true, marca usuário como ativo (default: true)
+   */
+  async updatePassword(id: string, hashedPassword: string, ativar: boolean = true): Promise<void> {
+    await this.userRepository.update(id, {
+      senha: hashedPassword,
+      ativo: ativar,
+    });
   }
 
   async listarComFiltros(filtros: any): Promise<{ usuarios: User[], total: number }> {

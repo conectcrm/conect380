@@ -43,18 +43,23 @@ export class TelefoneBrasilUtil {
 
   /**
    * Adiciona o dígito 9 se necessário (números antigos sem o 9)
+   * 
+   * ⚠️ IMPORTANTE: Alguns números antigos realmente NÃO TÊM o 9!
+   * Esta função agora é mais conservadora:
+   * - Só adiciona o 9 se o número tem EXATAMENTE 10 dígitos (DDD + 8 dígitos)
+   * - Se o número já tem 11 dígitos, MANTÉM COMO ESTÁ (mesmo sem 9 no terceiro dígito)
    */
   static adicionarDigito9SeNecessario(numeroLimpo: string): string {
     // Remove código do país se presente
     const comPais = numeroLimpo.startsWith('55');
     const semPais = comPais ? numeroLimpo.substring(2) : numeroLimpo;
 
-    // Se já tem 11 dígitos e começa com 9 no terceiro dígito, está OK
-    if (semPais.length === 11 && semPais.charAt(2) === '9') {
-      return numeroLimpo; // Já está correto
+    // ✅ Se já tem 11 dígitos, MANTÉM ORIGINAL (pode ser número sem 9 legítimo)
+    if (semPais.length === 11) {
+      return numeroLimpo; // ⚠️ Não força adição do 9!
     }
 
-    // Se tem 10 dígitos (DDD 2 + número 8), adiciona o 9
+    // ✅ Se tem 10 dígitos (DDD 2 + número 8), adiciona o 9
     if (semPais.length === 10) {
       const ddd = semPais.substring(0, 2);
       const numero = semPais.substring(2);
@@ -63,18 +68,7 @@ export class TelefoneBrasilUtil {
       return comPais ? `55${corrigido}` : corrigido;
     }
 
-    // Se tem 11 dígitos mas o terceiro NÃO é 9, assume erro e adiciona
-    if (semPais.length === 11 && semPais.charAt(2) !== '9') {
-      // Pode ser número antigo digitado com DDD estendido
-      // Tenta adicionar o 9 após os primeiros 2 dígitos (DDD)
-      const ddd = semPais.substring(0, 2);
-      const numero = semPais.substring(2);
-      const corrigido = `${ddd}9${numero}`;
-
-      return comPais ? `55${corrigido}` : corrigido;
-    }
-
-    // Número com tamanho inválido - retorna original
+    // ✅ Qualquer outro tamanho: retorna original sem modificar
     return numeroLimpo;
   }
 
@@ -116,6 +110,9 @@ export class TelefoneBrasilUtil {
 
   /**
    * Valida se o número está no formato correto
+   * 
+   * ⚠️ ATUALIZADO: Aceita números com ou sem o dígito 9
+   * Alguns números antigos realmente não têm o 9 e são válidos na whitelist
    */
   static validarNumero(numeroLimpo: string): { valido: boolean; erro?: string } {
     if (!numeroLimpo) {
@@ -126,7 +123,7 @@ export class TelefoneBrasilUtil {
     const comPais = numeroLimpo.startsWith('55');
     const semPais = comPais ? numeroLimpo.substring(2) : numeroLimpo;
 
-    // Deve ter 11 dígitos (DDD 2 + 9 + número 8)
+    // Deve ter 11 dígitos (DDD 2 + [9 opcional] + número 8 ou 9)
     if (semPais.length !== 11) {
       return {
         valido: false,
@@ -143,13 +140,8 @@ export class TelefoneBrasilUtil {
       };
     }
 
-    // Terceiro dígito deve ser 9 (celular)
-    if (semPais.charAt(2) !== '9') {
-      return {
-        valido: false,
-        erro: 'Número de celular deve começar com 9 após o DDD'
-      };
-    }
+    // ✅ REMOVIDO: Não exige mais o dígito 9 no terceiro dígito
+    // Aceita números com ou sem o 9 (compatibilidade com números antigos)
 
     return { valido: true };
   }
@@ -157,7 +149,9 @@ export class TelefoneBrasilUtil {
   /**
    * Formata o número para exibição amigável
    * 
-   * Exemplo: 5562996689991 → +55 (62) 99668-9991
+   * Exemplos:
+   * - 5562996689991 → +55 (62) 99668-9991 (com 9)
+   * - 556284709519  → +55 (62) 8470-9519  (sem 9, número antigo)
    */
   static formatarParaExibicao(numeroLimpo: string): string {
     if (!numeroLimpo) return '';
@@ -171,13 +165,28 @@ export class TelefoneBrasilUtil {
     }
 
     const ddd = semPais.substring(0, 2);
-    const digito9 = semPais.substring(2, 3);
-    const primeiraParte = semPais.substring(3, 7);
-    const segundaParte = semPais.substring(7, 11);
 
-    return comPais
-      ? `+55 (${ddd}) ${digito9}${primeiraParte}-${segundaParte}`
-      : `(${ddd}) ${digito9}${primeiraParte}-${segundaParte}`;
+    // ✅ Detecta se tem o dígito 9 (terceiro dígito deve ser 9)
+    const tem9 = semPais.charAt(2) === '9';
+
+    if (tem9) {
+      // Formato: (62) 99668-9991 (9 dígitos após DDD)
+      const digito9 = semPais.substring(2, 3);
+      const primeiraParte = semPais.substring(3, 7);
+      const segundaParte = semPais.substring(7, 11);
+
+      return comPais
+        ? `+55 (${ddd}) ${digito9}${primeiraParte}-${segundaParte}`
+        : `(${ddd}) ${digito9}${primeiraParte}-${segundaParte}`;
+    } else {
+      // Formato: (62) 8470-9519 (8 dígitos após DDD, número antigo)
+      const primeiraParte = semPais.substring(2, 6);
+      const segundaParte = semPais.substring(6, 11);
+
+      return comPais
+        ? `+55 (${ddd}) ${primeiraParte}-${segundaParte}`
+        : `(${ddd}) ${primeiraParte}-${segundaParte}`;
+    }
   }
 
   /**

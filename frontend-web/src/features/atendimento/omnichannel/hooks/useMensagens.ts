@@ -12,11 +12,10 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  atendimentoService,
-  EnviarMensagemParams
-} from '../services/atendimentoService';
+import { atendimentoService } from '../services/atendimentoService';
 import { Mensagem, StatusMensagem } from '../types';
+
+const DEBUG = false; // ✅ Desabilitado após resolução do problema de tempo real
 
 interface UseMensagensOptions {
   ticketId: string | null;
@@ -40,6 +39,7 @@ interface UseMensagensReturn {
   carregarMais: () => Promise<void>;
   marcarComoLidas: (mensagemIds: string[]) => Promise<void>;
   recarregar: () => Promise<void>;
+  adicionarMensagemRecebida: (mensagem: Mensagem) => void; // 🔥 NOVA: para WebSocket
 
   // Refs úteis
   mensagensRef: React.RefObject<HTMLDivElement>;
@@ -89,7 +89,7 @@ export const useMensagens = (
       setTemMais(response.data.length === pageSize);
       setPaginaAtual(pagina);
 
-      console.log(`✅ ${response.data.length} mensagens carregadas (página ${pagina})`);
+      if (DEBUG) console.log(`✅ ${response.data.length} mensagens carregadas (página ${pagina})`);
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao carregar mensagens';
       setError(mensagemErro);
@@ -119,10 +119,9 @@ export const useMensagens = (
         conteudo: conteudo.trim()
       });
 
-      // Adicionar mensagem otimisticamente
-      setMensagens(prev => [...prev, novaMensagem]);
-
-      console.log('✅ Mensagem enviada');
+      // 🔥 NÃO adicionar otimisticamente - WebSocket cuidará disso
+      // Evita duplicatas (mensagem aparecerá via WebSocket)
+      if (DEBUG) console.log('✅ Mensagem enviada, aguardando WebSocket...');
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao enviar mensagem';
       setError(mensagemErro);
@@ -150,10 +149,8 @@ export const useMensagens = (
         anexos: arquivos
       });
 
-      // Adicionar mensagem
-      setMensagens(prev => [...prev, novaMensagem]);
-
-      console.log('✅ Mensagem com anexos enviada');
+      // 🔥 NÃO adicionar otimisticamente - WebSocket cuidará disso
+      if (DEBUG) console.log('✅ Mensagem com anexos enviada, aguardando WebSocket...');
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao enviar mensagem';
       setError(mensagemErro);
@@ -174,14 +171,12 @@ export const useMensagens = (
     try {
       const novaMensagem = await atendimentoService.enviarMensagem({
         ticketId,
-        conteudo: '🎤 Áudio',
+        conteudo: '',
         audio: { blob: audioBlob, duracao }
       });
 
-      // Adicionar mensagem
-      setMensagens(prev => [...prev, novaMensagem]);
-
-      console.log('✅ Áudio enviado');
+      // 🔥 NÃO adicionar otimisticamente - WebSocket cuidará disso
+      if (DEBUG) console.log('✅ Áudio enviado, aguardando WebSocket...');
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao enviar áudio';
       setError(mensagemErro);
@@ -206,7 +201,7 @@ export const useMensagens = (
           : msg
       ));
 
-      console.log(`✅ ${mensagemIds.length} mensagens marcadas como lidas`);
+      if (DEBUG) console.log(`✅ ${mensagemIds.length} mensagens marcadas como lidas`);
     } catch (err: any) {
       console.error('❌ Erro ao marcar mensagens como lidas:', err);
     }
@@ -216,6 +211,23 @@ export const useMensagens = (
   const recarregar = useCallback(async () => {
     await carregarMensagens(1, false);
   }, [carregarMensagens]);
+
+  // ===== ADICIONAR MENSAGEM RECEBIDA (WEBSOCKET) =====
+  const adicionarMensagemRecebida = useCallback((mensagem: Mensagem) => {
+    if (DEBUG) console.log('📩 Adicionando mensagem recebida via WebSocket:', mensagem);
+
+    setMensagens(prev => {
+      // Verificar se mensagem já existe (evitar duplicatas)
+      const jaExiste = prev.some(m => m.id === mensagem.id);
+      if (jaExiste) {
+        if (DEBUG) console.log('⚠️ Mensagem já existe, ignorando duplicata');
+        return prev;
+      }
+
+      // Adicionar nova mensagem ao final
+      return [...prev, mensagem];
+    });
+  }, []);
 
   // ===== SCROLL AUTOMÁTICO =====
   const scrollParaFinal = useCallback(() => {
@@ -298,6 +310,7 @@ export const useMensagens = (
     carregarMais,
     marcarComoLidas,
     recarregar,
+    adicionarMensagemRecebida, // 🔥 NOVA
 
     // Refs
     mensagensRef,

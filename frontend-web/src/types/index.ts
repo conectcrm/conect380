@@ -61,9 +61,14 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   success: boolean;
+  action?: 'TROCAR_SENHA'; // ✅ Ação de trocar senha (primeiro acesso)
   data: {
     access_token: string;
     user: User;
-  };
+  } | {
+    userId: string;
+    email: string;
+    nome: string;
+  }; // ✅ Data pode ser token+user OU dados para trocar senha
   message: string;
 }

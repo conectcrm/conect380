@@ -81,6 +81,19 @@ export class ResponseContatoDto {
   ativo: boolean;
   observacoes: string;
   clienteId: string;
+
+  /**
+   * Cliente vinculado (quando a relação for carregada)
+   */
+  cliente?: {
+    id: string;
+    nome: string;
+    documento: string;
+    tipo: string;
+    email?: string;
+    telefone?: string;
+  };
+
   createdAt: Date;
   updatedAt: Date;
 
@@ -109,6 +122,18 @@ export class ResponseContatoDto {
     this.createdAt = contato.createdAt;
     this.updatedAt = contato.updatedAt;
 
+    // Incluir dados do cliente se estiver disponível
+    if (contato.cliente) {
+      this.cliente = {
+        id: contato.cliente.id,
+        nome: contato.cliente.nome,
+        documento: contato.cliente.documento,
+        tipo: contato.cliente.tipo,
+        email: contato.cliente.email,
+        telefone: contato.cliente.telefone,
+      };
+    }
+
     // Campos calculados
     this.nomeCompleto = contato.cargo
       ? `${contato.nome} (${contato.cargo})`
@@ -118,10 +143,35 @@ export class ResponseContatoDto {
   }
 
   private formatarTelefone(telefone: string): string {
-    const numeros = telefone.replace(/\D/g, '');
-    if (numeros.length === 11) {
-      return `(${numeros.substr(0, 2)}) ${numeros.substr(2, 5)}-${numeros.substr(7)}`;
+    if (!telefone) {
+      return '';
     }
-    return telefone;
+
+    const trimmed = telefone.trim();
+
+    if (trimmed.startsWith('+')) {
+      const digits = trimmed.slice(1).replace(/\D/g, '');
+
+      if (trimmed.startsWith('+55') && digits.length >= 12) {
+        const local = digits.slice(2);
+        if (local.length === 11) {
+          return `+55 (${local.slice(0, 2)}) ${local.slice(2, 7)}-${local.slice(7)}`;
+        }
+        if (local.length === 10) {
+          return `+55 (${local.slice(0, 2)}) ${local.slice(2, 6)}-${local.slice(6)}`;
+        }
+      }
+
+      return `+${digits}`;
+    }
+
+    const numeros = trimmed.replace(/\D/g, '');
+    if (numeros.length === 11) {
+      return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 7)}-${numeros.slice(7)}`;
+    }
+    if (numeros.length === 10) {
+      return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 6)}-${numeros.slice(6)}`;
+    }
+    return trimmed;
   }
 }

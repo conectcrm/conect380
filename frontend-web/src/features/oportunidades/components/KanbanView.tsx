@@ -7,10 +7,10 @@ import {
   Droppable,
   Draggable,
   DropResult
-} from 'react-beautiful-dnd';
-import { 
-  TrendingUp, 
-  Users, 
+} from '@hello-pangea/dnd';
+import {
+  TrendingUp,
+  Users,
   DollarSign,
   Clock,
   RefreshCw,
@@ -36,27 +36,27 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
 
   const handleDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result;
-    
+
     setDraggedItem(null);
-    
+
     if (!destination) return;
     if (source.droppableId === destination.droppableId) return;
-    
+
     const oportunidadeId = parseInt(draggableId);
     const estagioOrigem = source.droppableId as EstagioOportunidade;
     const estagioDestino = destination.droppableId as EstagioOportunidade;
-    
+
     await moverOportunidade(oportunidadeId, estagioOrigem, estagioDestino);
   };
 
   const findOportunidadeById = (id: number): Oportunidade | null => {
     if (!dadosKanban) return null;
-    
+
     for (const estagio of dadosKanban.estagios) {
       const oportunidade = estagio.oportunidades.find(op => op.id === id);
       if (oportunidade) return oportunidade;
     }
-    
+
     return null;
   };
 
@@ -105,7 +105,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         icone: AlertCircle
       }
     };
-    
+
     return configs[estagio];
   };
 
@@ -150,7 +150,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               }).format(dadosKanban.totalValor)} em negociação
             </p>
           </div>
-          
+
           <button
             onClick={recarregar}
             className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
@@ -167,7 +167,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
             {dadosKanban?.estagios?.map((estagioData) => {
               const config = getEstagioConfig(estagioData.estagio);
               const Icone = config.icone;
-              
+
               return (
                 <div
                   key={estagioData.estagio}
@@ -182,7 +182,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           {config.nome}
                         </h3>
                       </div>
-                      
+
                       <div className="text-right">
                         <div className={`text-lg font-bold ${config.corTexto}`}>
                           {estagioData?.quantidade || 0}
@@ -234,9 +234,9 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                             )}
                           </Draggable>
                         ))}
-                        
+
                         {provided.placeholder}
-                        
+
                         {/* Placeholder quando vazio */}
                         {estagioData.oportunidades.length === 0 && (
                           <div className="text-center py-8 text-gray-400">

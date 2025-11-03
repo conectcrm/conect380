@@ -1,0 +1,92 @@
+import { MigrationInterface, QueryRunner } from 'typeorm';
+
+/**
+ * Migration para adicionar campos de status online/offline
+ * 
+ * Adiciona campos para rastrear:
+ * - last_activity: Última atividade do contato
+ * - online_status: Status online/offline calculado
+ */
+export class AddOnlineStatusFields1729123456789 implements MigrationInterface {
+  name = 'AddOnlineStatusFields1729123456789';
+
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Adicionar campos na tabela contatos
+    await queryRunner.query(`
+      ALTER TABLE contatos 
+      ADD COLUMN IF NOT EXISTS last_activity TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS online_status BOOLEAN DEFAULT FALSE
+    `);
+
+    // Adicionar campos na tabela atendimento_tickets para cache
+    await queryRunner.query(`
+      ALTER TABLE atendimento_tickets 
+      ADD COLUMN IF NOT EXISTS contato_online BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS contato_last_activity TIMESTAMP
+    `);
+
+    // Índices para performance
+    await queryRunner.query(`
+      CREATE INDEX IF NOT EXISTS idx_contatos_last_activity 
+      ON contatos(last_activity)
+    `);
+
+    await queryRunner.query(`
+      CREATE INDEX IF NOT EXISTS idx_contatos_online_status 
+      ON contatos(online_status)
+    `);
+
+    await queryRunner.query(`
+      CREATE INDEX IF NOT EXISTS idx_tickets_contato_online 
+      ON atendimento_tickets(contato_online)
+    `);
+
+    // Inicializar dados existentes
+    await queryRunner.query(`
+      UPDATE contatos 
+      SET last_activity = "updatedAt", 
+          online_status = FALSE 
+      WHERE last_activity IS NULL
+    `);
+
+    await queryRunner.query(`
+      UPDATE atendimento_tickets 
+      SET contato_online = FALSE,
+          contato_last_activity = "updatedAt"
+      WHERE contato_online IS NULL
+    `);
+
+    // Comentários
+    await queryRunner.query(`
+      COMMENT ON COLUMN contatos.last_activity IS 'Última atividade registrada do contato'
+    `);
+
+    await queryRunner.query(`
+      COMMENT ON COLUMN contatos.online_status IS 'Status online/offline calculado baseado na última atividade'
+    `);
+
+    await queryRunner.query(`
+      COMMENT ON COLUMN atendimento_tickets.contato_online IS 'Cache do status online do contato no momento do ticket'
+    `);
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // Remover índices
+    await queryRunner.query(`DROP INDEX IF EXISTS idx_tickets_contato_online`);
+    await queryRunner.query(`DROP INDEX IF EXISTS idx_contatos_online_status`);
+    await queryRunner.query(`DROP INDEX IF EXISTS idx_contatos_last_activity`);
+
+    // Remover colunas
+    await queryRunner.query(`
+      ALTER TABLE atendimento_tickets 
+      DROP COLUMN IF EXISTS contato_last_activity,
+      DROP COLUMN IF EXISTS contato_online
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE contatos 
+      DROP COLUMN IF EXISTS online_status,
+      DROP COLUMN IF EXISTS last_activity
+    `);
+  }
+}

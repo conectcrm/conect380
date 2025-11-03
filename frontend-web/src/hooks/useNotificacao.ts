@@ -10,6 +10,14 @@ interface NotificacaoState {
   duration?: number;
 }
 
+interface NotificationPayload {
+  tipo: TipoNotificacao;
+  titulo: string;
+  mensagem: string;
+  autoClose?: boolean;
+  duration?: number;
+}
+
 interface UseNotificacaoReturn {
   notificacoes: NotificacaoState[];
   mostrarSucesso: (titulo: string, mensagem: string, autoClose?: boolean) => void;
@@ -18,6 +26,7 @@ interface UseNotificacaoReturn {
   mostrarErro: (titulo: string, mensagem: string, autoClose?: boolean) => void;
   fecharNotificacao: (id: string) => void;
   limparTodas: () => void;
+  showNotification: (payload: NotificationPayload) => void;
 }
 
 export const useNotificacao = (): UseNotificacaoReturn => {
@@ -74,6 +83,16 @@ export const useNotificacao = (): UseNotificacaoReturn => {
     setNotificacoes([]);
   }, []);
 
+  const showNotification = useCallback((payload: NotificationPayload) => {
+    adicionarNotificacao(
+      payload.tipo,
+      payload.titulo,
+      payload.mensagem,
+      payload.autoClose,
+      payload.duration
+    );
+  }, [adicionarNotificacao]);
+
   return {
     notificacoes,
     mostrarSucesso,
@@ -81,7 +100,8 @@ export const useNotificacao = (): UseNotificacaoReturn => {
     mostrarAviso,
     mostrarErro,
     fecharNotificacao,
-    limparTodas
+    limparTodas,
+    showNotification
   };
 };
 

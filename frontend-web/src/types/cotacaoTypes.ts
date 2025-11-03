@@ -14,6 +14,8 @@ export interface Cotacao {
   status: StatusCotacao;
   prioridade: PrioridadeCotacao;
   prazoResposta?: string;
+  dataEmissao?: string;
+  dataVencimento?: string;
   dataCriacao: string;
   dataUltimaAtualizacao: string;
   valorTotal: number;

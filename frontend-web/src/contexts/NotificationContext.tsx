@@ -19,13 +19,15 @@ export interface Notification {
   duration?: number;
 }
 
+export type ReminderEntityType = 'cliente' | 'proposta' | 'tarefa' | 'agenda';
+
 export interface NotificationReminder {
   id: string;
   title: string;
   message: string;
   scheduledFor: Date;
-  entityType: 'cliente' | 'proposta' | 'tarefa' | 'agenda';
-  entityId: string;
+  entityType: ReminderEntityType;
+  entityId?: string;
   recurring?: {
     type: 'daily' | 'weekly' | 'monthly';
     interval: number;
@@ -33,11 +35,24 @@ export interface NotificationReminder {
   active: boolean;
 }
 
+export interface NotificationReminderInput {
+  title: string;
+  message?: string;
+  scheduledFor: Date | string | number;
+  entityType?: ReminderEntityType | 'client' | 'reunião' | 'reuniao';
+  entityId?: string;
+  recurring?: {
+    type: 'daily' | 'weekly' | 'monthly';
+    interval: number;
+  };
+  active?: boolean;
+}
+
 interface NotificationContextData {
   // Notificações
   notifications: Notification[];
   unreadCount: number;
-  addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void;
+  addNotification: (notification: AddNotificationInput) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   removeNotification: (id: string) => void;
@@ -45,7 +60,7 @@ interface NotificationContextData {
 
   // Lembretes
   reminders: NotificationReminder[];
-  addReminder: (reminder: Omit<NotificationReminder, 'id'>) => void;
+  addReminder: (reminder: NotificationReminderInput) => string;
   updateReminder: (id: string, updates: Partial<NotificationReminder>) => void;
   removeReminder: (id: string) => void;
 
@@ -67,6 +82,8 @@ interface NotificationContextData {
 }
 
 const NotificationContext = createContext<NotificationContextData | undefined>(undefined);
+
+type AddNotificationInput = Omit<Notification, 'id' | 'timestamp' | 'read' | 'priority'> & Partial<Pick<Notification, 'priority'>>;
 
 export const useNotifications = () => {
   const context = useContext(NotificationContext);
@@ -90,6 +107,47 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     reminderInterval: 15, // 15 minutos antes
   });
 
+  const generateId = () => `notification-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+  // Normaliza a estrutura de lembretes independente da origem do dado
+  const normalizeReminder = (reminder: NotificationReminderInput, existingId?: string): NotificationReminder => {
+    const normalizeEntityType = (entityType?: NotificationReminderInput['entityType']): ReminderEntityType => {
+      switch (entityType) {
+        case 'client':
+          return 'cliente';
+        case 'reunião':
+        case 'reuniao':
+          return 'agenda';
+        case 'proposta':
+        case 'tarefa':
+        case 'cliente':
+        case 'agenda':
+          return entityType;
+        default:
+          return 'agenda';
+      }
+    };
+
+    const scheduledForValue = reminder.scheduledFor instanceof Date
+      ? reminder.scheduledFor
+      : new Date(reminder.scheduledFor);
+
+    const scheduledFor = Number.isNaN(scheduledForValue.getTime())
+      ? new Date()
+      : scheduledForValue;
+
+    return {
+      id: existingId ?? generateId(),
+      title: reminder.title,
+      message: reminder.message ?? '',
+      scheduledFor,
+      entityType: normalizeEntityType(reminder.entityType),
+      entityId: reminder.entityId,
+      recurring: reminder.recurring,
+      active: reminder.active ?? true,
+    };
+  };
+
   // Carregar dados do localStorage na inicialização
   useEffect(() => {
     const savedNotifications = localStorage.getItem('conect-notifications');
@@ -112,10 +170,27 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     if (savedReminders) {
       try {
         const parsed = JSON.parse(savedReminders);
-        const validReminders = parsed.map((r: any) => ({
-          ...r,
-          scheduledFor: new Date(r.scheduledFor)
-        }));
+        const validReminders = parsed
+          .map((r: any) => {
+            try {
+              return normalizeReminder(
+                {
+                  title: r.title ?? 'Lembrete',
+                  message: r.message,
+                  scheduledFor: r.scheduledFor ?? r.dateTime ?? new Date(),
+                  entityType: r.entityType,
+                  entityId: r.entityId,
+                  recurring: r.recurring,
+                  active: r.active,
+                },
+                r.id
+              );
+            } catch (innerError) {
+              console.warn('Lembrete inválido ignorado:', innerError);
+              return null;
+            }
+          })
+          .filter((reminder: NotificationReminder | null): reminder is NotificationReminder => reminder !== null);
         setReminders(validReminders);
       } catch (error) {
         console.error('Erro ao carregar lembretes:', error);
@@ -186,13 +261,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     return () => clearInterval(interval);
   }, [reminders, settings.reminderInterval]);
 
-  const generateId = () => `notification-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-  const addNotification = (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
+  const addNotification = (notification: AddNotificationInput) => {
     // Verificar se já existe uma notificação similar muito recente (últimos 2 minutos para erros)
     const timeWindow = notification.type === 'error' ? 2 * 60 * 1000 : 5 * 60 * 1000;
     const recentTimeAgo = new Date(Date.now() - timeWindow);
-    const recentSimilar = notifications.find(existing => 
+    const recentSimilar = notifications.find(existing =>
       existing.title === notification.title &&
       existing.type === notification.type &&
       existing.message === notification.message &&
@@ -211,6 +284,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       id: generateId(),
       timestamp: new Date(),
       read: false,
+      priority: notification.priority ?? 'medium',
     };
 
     setNotifications(prev => [newNotification, ...prev]);
@@ -229,22 +303,22 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         toast.error(notification.message, toastOptions);
         break;
       case 'warning':
-        toast(notification.message, { 
-          ...toastOptions, 
+        toast(notification.message, {
+          ...toastOptions,
           icon: '⚠️',
           style: { borderLeft: '4px solid #f59e0b' }
         });
         break;
       case 'info':
-        toast(notification.message, { 
-          ...toastOptions, 
+        toast(notification.message, {
+          ...toastOptions,
           icon: 'ℹ️',
           style: { borderLeft: '4px solid #3b82f6' }
         });
         break;
       case 'reminder':
-        toast(notification.message, { 
-          ...toastOptions, 
+        toast(notification.message, {
+          ...toastOptions,
           icon: '🔔',
           style: { borderLeft: '4px solid #8b5cf6' }
         });
@@ -322,11 +396,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     setNotifications([]);
   };
 
-  const addReminder = (reminder: Omit<NotificationReminder, 'id'>) => {
-    const newReminder: NotificationReminder = {
-      ...reminder,
-      id: generateId(),
-    };
+  const addReminder = (reminder: NotificationReminderInput) => {
+    const newReminder = normalizeReminder(reminder);
     setReminders(prev => [...prev, newReminder]);
     return newReminder.id;
   };
@@ -365,14 +436,14 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   };
 
   const showReminder = (title: string, message: string, entityType: Notification['entityType'], entityId: string) => {
-    addNotification({ 
-      type: 'reminder', 
-      title, 
-      message, 
-      priority: 'high', 
-      entityType, 
+    addNotification({
+      type: 'reminder',
+      title,
+      message,
+      priority: 'high',
+      entityType,
       entityId,
-      autoClose: false 
+      autoClose: false
     });
   };
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Calculator, FileText, DollarSign } from 'lucide-react';
 import { NovaFatura, ItemFatura, TipoFatura, FormaPagamento, Fatura } from '../../services/faturamentoService';
-import ClienteSelect from '../../components/selects/ClienteSelect';
+import ClienteSelect, { ClienteSelectValue } from '../../components/selects/ClienteSelect';
 import ContratoSelect from '../../components/selects/ContratoSelect';
 import MoneyInput from '../../components/inputs/MoneyInput';
 import MoneyInputNoPrefix from '../../components/inputs/MoneyInputNoPrefix';
@@ -57,14 +57,7 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
   const [salvando, setSalvando] = useState(false);
 
   // Estados para os selects de cliente e contrato
-  const [clienteSelecionado, setClienteSelecionado] = useState<{
-    id: number;
-    nome: string;
-    email?: string;
-    telefone?: string;
-    documento?: string;
-    tipo?: 'pessoa_fisica' | 'pessoa_juridica';
-  } | null>(null);
+  const [clienteSelecionado, setClienteSelecionado] = useState<ClienteSelectValue | null>(null);
 
   const [contratoSelecionado, setContratoSelecionado] = useState<{
     id: string;
@@ -84,8 +77,8 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
   useEffect(() => {
     if (fatura) {
       setFormData({
-        contratoId: fatura.contratoId,
-        clienteId: fatura.clienteId,
+        contratoId: fatura.contratoId ? String(fatura.contratoId) : '',
+        clienteId: fatura.clienteId ? String(fatura.clienteId) : '',
         usuarioResponsavelId: fatura.usuarioResponsavelId,
         tipo: fatura.tipo,
         dataVencimento: fatura.dataVencimento.split('T')[0],
@@ -107,15 +100,18 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
       // TODO: Carregar dados do cliente e contrato quando editando
       if (fatura.clienteId) {
         setClienteSelecionado({
-          id: fatura.clienteId,
+          id: String(fatura.clienteId),
           nome: fatura.cliente?.nome || `Cliente ID: ${fatura.clienteId}`,
-          email: fatura.cliente?.email
+          email: fatura.cliente?.email,
+          telefone: fatura.cliente?.telefone,
+          documento: fatura.cliente?.documento,
+          tipo: fatura.cliente?.tipo
         });
       }
 
       if (fatura.contratoId) {
         setContratoSelecionado({
-          id: fatura.contratoId,
+          id: String(fatura.contratoId),
           numero: `CT${fatura.contratoId}`,
           cliente: fatura.cliente
         });

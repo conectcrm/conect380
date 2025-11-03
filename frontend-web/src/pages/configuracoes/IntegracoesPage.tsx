@@ -133,7 +133,8 @@ const IntegracoesPage: React.FC = () => {
                 api_key: credenciais.openai_api_key || '',
                 model: credenciais.openai_model || 'gpt-4o-mini',
                 max_tokens: credenciais.openai_max_tokens || 2000,
-                temperature: credenciais.openai_temperature || 0.7
+                temperature: credenciais.openai_temperature || 0.7,
+                auto_responder: credenciais.openai_auto_responder ?? false
               });
               break;
             case 'anthropic':
@@ -141,7 +142,8 @@ const IntegracoesPage: React.FC = () => {
                 ativo: canal.ativo,
                 api_key: credenciais.anthropic_api_key || '',
                 model: credenciais.anthropic_model || 'claude-3-5-sonnet-20241022',
-                max_tokens: credenciais.anthropic_max_tokens || 2000
+                max_tokens: credenciais.anthropic_max_tokens || 2000,
+                auto_responder: credenciais.anthropic_auto_responder ?? false
               });
               break;
             case 'telegram':
@@ -215,14 +217,16 @@ const IntegracoesPage: React.FC = () => {
             openai_api_key: config.api_key,
             openai_model: config.model,
             openai_max_tokens: config.max_tokens,
-            openai_temperature: config.temperature
+            openai_temperature: config.temperature,
+            openai_auto_responder: config.auto_responder
           };
           break;
         case 'anthropic':
           credenciais = {
             anthropic_api_key: config.api_key,
             anthropic_model: config.model,
-            anthropic_max_tokens: config.max_tokens
+            anthropic_max_tokens: config.max_tokens,
+            anthropic_auto_responder: config.auto_responder
           };
           break;
         case 'telegram':
@@ -521,6 +525,30 @@ const IntegracoesPage: React.FC = () => {
               Meta Developers <ExternalLink className="w-3 h-3" />
             </a>
           </p>
+
+          {/* 🔑 BOTÃO DE ATALHO PARA GERAR TOKEN */}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <a
+              href="https://business.facebook.com/settings/system-users"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors text-sm font-medium"
+            >
+              <Key className="w-4 h-4" />
+              Gerar Token Permanente
+              <ExternalLink className="w-3 h-3" />
+            </a>
+            <a
+              href="https://developers.facebook.com/apps"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+            >
+              <Settings className="w-4 h-4" />
+              Configurar App
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -538,15 +566,39 @@ const IntegracoesPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 Access Token
+                <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full font-medium">
+                  Permanente
+                </span>
               </label>
+
+              {/* 🔑 INSTRUÇÕES PARA GERAR TOKEN PERMANENTE */}
+              <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <Key className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-xs text-blue-900 space-y-1">
+                    <p className="font-semibold">⚡ Use Token Permanente (Não Expira)</p>
+                    <ol className="list-decimal ml-4 space-y-0.5">
+                      <li>Acesse <a href="https://business.facebook.com/settings/system-users" target="_blank" rel="noopener noreferrer" className="underline font-medium">Usuários do Sistema</a></li>
+                      <li>Clique em <strong>"Adicionar"</strong> → Crie um usuário (ou use existente)</li>
+                      <li>Em <strong>"Ativos atribuídos"</strong> → Adicione seu App WhatsApp</li>
+                      <li>Marque permissões: <code className="bg-white px-1 rounded">whatsapp_business_messaging</code> e <code className="bg-white px-1 rounded">whatsapp_business_management</code></li>
+                      <li>Clique em <strong>"Gerar novo token"</strong> → Copie e cole abaixo</li>
+                    </ol>
+                    <p className="text-blue-700 font-medium mt-2">
+                      ⚠️ Token temporário expira em 24h! Use apenas token de usuário do sistema.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="relative">
                 <input
                   type={mostrarSenhas['whatsapp_token'] ? 'text' : 'password'}
                   value={whatsappConfig.api_token}
                   onChange={(e) => setWhatsappConfig({ ...whatsappConfig, api_token: e.target.value })}
-                  placeholder="EAAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  placeholder="EAAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (Token permanente do System User)"
                   className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 />
                 <button

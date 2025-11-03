@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  FileText, 
-  Download, 
-  Eye, 
+import {
+  FileText,
+  Download,
+  Eye,
   Settings,
   Printer,
   Send,
@@ -63,19 +63,30 @@ const TemplatesPropostasPage: React.FC = () => {
     }
   };
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = (field: string, value: unknown) => {
     const keys = field.split('.');
     if (keys.length === 1) {
       setDadosProposta(prev => ({ ...prev, [field]: value }));
-    } else {
-      setDadosProposta(prev => ({
-        ...prev,
-        [keys[0]]: {
-          ...prev[keys[0] as keyof DadosProposta],
-          [keys[1]]: value
-        }
-      }));
+      return;
     }
+
+    const [parentKey, childKey] = keys as [keyof DadosProposta, string];
+
+    setDadosProposta(prev => {
+      const parentValue = prev[parentKey];
+      const parentObject =
+        parentValue && typeof parentValue === 'object' && !Array.isArray(parentValue)
+          ? (parentValue as Record<string, unknown>)
+          : {};
+
+      return {
+        ...prev,
+        [parentKey]: {
+          ...parentObject,
+          [childKey]: value
+        }
+      };
+    });
   };
 
   const adicionarItem = () => {

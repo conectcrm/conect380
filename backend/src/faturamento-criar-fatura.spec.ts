@@ -11,16 +11,35 @@ class EmailMock { async enviarEmailGenerico() { return true; } }
 function createInMemoryRepository<T extends { id?: any }>() {
   const data: T[] = [];
   let seq = 1;
+
+  const saveSingle = async (obj: T): Promise<T> => {
+    const record: any = { ...obj };
+    if (!record.id) {
+      record.id = seq++;
+    }
+
+    const index = data.findIndex((item) => (item as any).id === record.id);
+    if (index >= 0) {
+      data[index] = record;
+    } else {
+      data.push(record);
+    }
+
+    return { ...record } as T;
+  };
+
   return {
     create: (obj: Partial<T>) => ({ ...obj }) as T,
     save: async (obj: T | T[]) => {
-      if (Array.isArray(obj)) return Promise.all(obj.map(o => (this as any).save(o))) as any;
-      const o: any = obj;
-      if (!o.id) o.id = seq++;
-      // attach if not exists
-      const idx = data.findIndex(d => d.id === o.id);
-      if (idx >= 0) data[idx] = o; else data.push(o);
-      return { ...o } as T;
+      if (Array.isArray(obj)) {
+        const results: T[] = [];
+        for (const item of obj) {
+          results.push(await saveSingle(item));
+        }
+        return results as any;
+      }
+
+      return saveSingle(obj);
     },
     findOne: async (opts: any) => {
       if (opts?.where?.id != null) {

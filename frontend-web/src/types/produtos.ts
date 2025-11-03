@@ -38,6 +38,8 @@ export interface CategoriaProduto {
   ordem?: number;
   subcategorias: SubcategoriaProduto[];
   ativo?: boolean;
+  criadoEm?: string;
+  atualizadoEm?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -104,6 +106,7 @@ export interface CriarCategoriaProdutoRequest {
   icone: string;
   cor?: string;
   ordem?: number;
+  ativo?: boolean;
 }
 
 export interface CriarSubcategoriaProdutoRequest {

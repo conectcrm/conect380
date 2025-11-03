@@ -1,0 +1,61 @@
+# ============================================
+# .dockerignore - ConectCRM
+# ============================================
+# Ignora arquivos desnecessários no build do Docker
+
+# Node modules (serão instalados dentro do container)
+**/node_modules
+**/node_modules/**
+
+# Build outputs
+**/dist
+# **/build - Temporariamente desabilitado para copiar frontend build
+backend/dist
+**/.next
+
+# Tests
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/test
+**/coverage
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Logs
+**/*.log
+**/logs
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp
+**/temp
+**/tmp
+**/.temp
+
+# Documentation (não necessário no container)
+**/*.md
+!README.md
+
+# Scripts de desenvolvimento
+**/*.ps1
+**/*.sh
+
+# Environment (usar variáveis do Docker)
+**/.env
+**/.env.local
+**/.env.*.local

@@ -2,6 +2,68 @@
 
 Sistema completo de CRM com portal do cliente integrado e plataforma de Atendimento Omnichannel, desenvolvido com NestJS (backend) e React (frontend).
 
+---
+
+## 🤖 **PARA DESENVOLVEDORES E AGENTES DE IA**
+
+### 📚 Documentação Completa para Desenvolvimento
+
+**IMPORTANTE**: Este projeto possui documentação extensa para garantir consistência e qualidade do código.
+
+#### 🎯 Documentos Principais:
+
+1. **[ÍNDICE DE DOCUMENTAÇÃO IA](./INDICE_DOCUMENTACAO_IA.md)** ⭐
+   - Ponto de partida para agentes de IA
+   - Fluxos de trabalho completos
+   - Checklists e regras de ouro
+
+2. **[Instruções do Copilot](./.github/copilot-instructions.md)** (lido automaticamente)
+   - Design system completo
+   - Padrões de código
+   - Nomenclatura e convenções
+   - Gestão de contexto
+
+3. **[Guia Rápido para IA](./GUIA_RAPIDO_AGENTE_IA.md)**
+   - Checklist antes de qualquer tarefa
+   - Ordem de execução (Backend → Frontend)
+   - Sinais de perda de contexto
+
+4. **[Comandos de Diagnóstico](./COMANDOS_DIAGNOSTICO_IA.md)**
+   - Comandos grep/file_search prontos
+   - Troubleshooting de erros comuns
+   - Workflow de verificação
+
+5. **[Design Guidelines Frontend](./frontend-web/DESIGN_GUIDELINES.md)**
+   - Paleta de cores oficial
+   - Componentes padronizados
+   - Template de páginas
+
+6. **[README Frontend](./frontend-web/README.md)**
+   - Quick start para criar páginas
+   - Stack técnico
+   - Erros comuns
+
+### 🎨 Criando Novas Telas React
+
+```powershell
+# SEMPRE copie o template base:
+cp frontend-web/src/pages/_TemplatePage.tsx frontend-web/src/pages/MinhaPage.tsx
+
+# Consulte DESIGN_GUIDELINES.md para padrões
+# Busque [PERSONALIZAR] no código
+# Use cores: Comercial #159A9C, Atendimento #9333EA, Financeiro #16A34A
+```
+
+### 🚀 Criando Features Completas
+
+1. **Backend PRIMEIRO** (Entity → DTO → Service → Controller → Migration)
+2. **Depois Frontend** (Service → Página → Rota → Menu)
+3. **Validação** (Testes + Documentação)
+
+**Ver fluxo completo**: `GUIA_RAPIDO_AGENTE_IA.md`
+
+---
+
 ## 🌟 **NOVIDADE: Omnichannel Atendimento**
 
 ### ✨ Funcionalidades de Atendimento

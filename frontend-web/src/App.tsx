@@ -9,10 +9,12 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { EmpresaProvider } from './contexts/EmpresaContextAPIReal';
 import { ProfileProvider } from './contexts/ProfileContext';
 import { SidebarProvider } from './contexts/SidebarContext';
-import { SocketProvider } from './features/atendimento/omnichannel/contexts/SocketContext';
+import { MenuProvider } from './contexts/MenuContext';
+import { ToastProvider } from './features/atendimento/omnichannel/contexts/ToastContext';
 import LoginPage from './features/auth/LoginPage';
 import RegistroEmpresaPage from './features/auth/RegistroEmpresaPage';
 import VerificacaoEmailPage from './features/auth/VerificacaoEmailPage';
+import TrocarSenhaPage from './pages/TrocarSenhaPage'; // ✅ Troca de senha (primeiro acesso)
 import DashboardLayout from './components/layout/DashboardLayout';
 import DashboardRouter from './features/dashboard/DashboardRouter';
 import ClientesPage from './features/clientes/ClientesPage';
@@ -44,10 +46,18 @@ import ModuleUnderConstruction from './components/common/ModuleUnderConstruction
 import { UploadDemoPage } from './pages/UploadDemoPage';
 import { EmpresasListPage } from './features/admin/empresas/EmpresasListPage';
 import { MinhasEmpresasPage } from './features/empresas/MinhasEmpresasPage';
-import { ContatosPage } from './features/contatos/ContatosPageNova';
+import ContatosPage from './features/contatos/ContatosPage';
 import { UsuariosPage } from './features/gestao/usuarios/UsuariosPage';
 import PerfilPage from './features/perfil/PerfilPage';
-import { AtendimentoIntegradoPage } from './pages/AtendimentoIntegradoPage';
+import AtendimentoIntegradoPage from './pages/AtendimentoIntegradoPage';
+import AtendimentoDashboard from './pages/AtendimentoDashboard';
+import GestaoNucleosPage from './pages/GestaoNucleosPage';
+import GestaoFluxosPage from './pages/GestaoFluxosPage';
+import FluxoBuilderPage from './pages/FluxoBuilderPage';
+import GestaoEquipesPage from './pages/GestaoEquipesPage';
+import GestaoAtendentesPage from './pages/GestaoAtendentesPage';
+import GestaoAtribuicoesPage from './pages/GestaoAtribuicoesPage';
+import GestaoDepartamentosPage from './pages/GestaoDepartamentosPage';
 // Importar novas páginas do sistema de empresas
 import { ConfiguracaoEmpresaPage } from './pages/empresas/ConfiguracaoEmpresaPage';
 import { RelatoriosAnalyticsPage } from './pages/empresas/RelatoriosAnalyticsPage';
@@ -65,6 +75,7 @@ import ScrollToTop from './components/common/ScrollToTop';
 import { BillingPage } from './pages/billing';
 import FaturamentoPage from './pages/faturamento/FaturamentoPage';
 import CotacaoPage from './pages/CotacaoPage';
+import DepartamentosPage from './pages/DepartamentosPage';
 
 // Configuração do React Query
 const queryClient = new QueryClient({
@@ -130,6 +141,14 @@ const AppRoutes: React.FC = () => {
           <Route path="/admin/empresas" element={<EmpresasListPage />} />
           <Route path="/gestao/empresas" element={<EmpresasListPage />} />
           <Route path="/gestao/usuarios" element={<UsuariosPage />} />
+          <Route path="/gestao/nucleos" element={<GestaoNucleosPage />} />
+          <Route path="/gestao/fluxos" element={<GestaoFluxosPage />} />
+          <Route path="/gestao/fluxos/:id/builder" element={<FluxoBuilderPage />} />
+          <Route path="/gestao/fluxos/novo/builder" element={<FluxoBuilderPage />} />
+          <Route path="/gestao/equipes" element={<GestaoEquipesPage />} />
+          <Route path="/gestao/atendentes" element={<GestaoAtendentesPage />} />
+          <Route path="/gestao/atribuicoes" element={<GestaoAtribuicoesPage />} />
+          <Route path="/gestao/departamentos" element={<GestaoDepartamentosPage />} />
 
           {/* Rotas do módulo de Administração */}
           <Route path="/admin/relatorios" element={
@@ -235,12 +254,14 @@ const AppRoutes: React.FC = () => {
           <Route path="/configuracoes/chatwoot" element={<ChatwootConfiguracao />} />
           <Route path="/configuracoes/metas" element={<MetasConfiguracao />} />
           <Route path="/configuracoes/integracoes" element={<IntegracoesPage />} />
+          <Route path="/configuracoes/departamentos" element={<DepartamentosPage />} />
           <Route path="/relatorios/analytics" element={<RelatoriosAnalyticsPage />} />
           <Route path="/gestao/permissoes" element={<SistemaPermissoesPage />} />
           <Route path="/sistema/backup" element={<BackupSincronizacaoPage />} />
 
-          {/* Atendimento Omnichannel (WebSocket Real-Time) - Sistema Oficial */}
-          <Route path="/atendimento" element={<AtendimentoIntegradoPage />} />
+          {/* Atendimento Omnichannel */}
+          <Route path="/atendimento" element={<AtendimentoDashboard />} />
+          <Route path="/atendimento/chat" element={<AtendimentoIntegradoPage />} />
 
           {/* Perfil do Usuário */}
           <Route path="/perfil" element={<PerfilPage />} />
@@ -370,6 +391,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/registro" element={<RegistroEmpresaPage />} />
       <Route path="/verificar-email" element={<VerificacaoEmailPage />} />
+      <Route path="/trocar-senha" element={<TrocarSenhaPage />} /> {/* ✅ Troca de senha (primeiro acesso) */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
@@ -385,30 +407,35 @@ const App: React.FC = () => {
               <NotificationProvider>
                 <EmpresaProvider>
                   <SidebarProvider>
-                    <SocketProvider>
-                      <Router
-                        future={{
-                          v7_startTransition: true,
-                          v7_relativeSplatPath: true,
-                        }}
-                      >
-                        <ScrollToTop />
-                        <div className="App">
-                          <AppRoutes />
+                    <MenuProvider>
+                      <ToastProvider>
+                        {/* SocketProvider temporariamente desabilitado - usando useWebSocket do chat */}
+                        {/* <SocketProvider> */}
+                        <Router
+                          future={{
+                            v7_startTransition: true,
+                            v7_relativeSplatPath: true,
+                          }}
+                        >
+                          <ScrollToTop />
+                          <div className="App">
+                            <AppRoutes />
 
-                          <Toaster
-                            position="top-right"
-                            toastOptions={{
-                              duration: 4000,
-                              style: {
-                                background: '#363636',
-                                color: '#fff',
-                              },
-                            }}
-                          />
-                        </div>
-                      </Router>
-                    </SocketProvider>
+                            <Toaster
+                              position="top-right"
+                              toastOptions={{
+                                duration: 4000,
+                                style: {
+                                  background: '#363636',
+                                  color: '#fff',
+                                },
+                              }}
+                            />
+                          </div>
+                        </Router>
+                        {/* </SocketProvider> */}
+                      </ToastProvider>
+                    </MenuProvider>
                   </SidebarProvider>
                 </EmpresaProvider>
               </NotificationProvider>

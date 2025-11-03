@@ -9,7 +9,8 @@ import {
   StatusFatura,
   TipoFatura,
   FormaPagamento,
-  FiltrosFatura
+  FiltrosFatura,
+  FaturasPaginadasResponse
 } from '../../services/faturamentoService';
 import ModalFatura from './ModalFatura';
 import ModalDetalhesFatura from './ModalDetalhesFatura';
@@ -115,7 +116,7 @@ export default function FaturamentoPage() {
   const notificacao = useNotificacaoFinanceira();
 
   // Dados paginados com aggregates (React Query)
-  const { data: respostaPaginada, isLoading, refetch } = useFaturasPaginadas({
+  const faturasQuery = useFaturasPaginadas({
     ...filtros,
     busca: buscaDebounced.trim() || undefined,
     page,
@@ -123,6 +124,7 @@ export default function FaturamentoPage() {
     sortBy,
     sortOrder,
   });
+  const { data: respostaPaginada, isLoading, refetch } = faturasQuery;
 
   useEffect(() => {
     // Carregar configuração dos cards do localStorage
@@ -152,26 +154,26 @@ export default function FaturamentoPage() {
     setCarregando(isLoading);
     if (!respostaPaginada) return;
 
-    const res = respostaPaginada;
-    setFaturas(res.data);
-    setTotal(res.total || res.data.length);
-    setAggregates(res.aggregates || {});
+    const dados = respostaPaginada;
+    setFaturas(dados.data);
+    setTotal(dados.total || dados.data.length);
+    setAggregates(dados.aggregates || {});
 
     const hoje = new Date();
     const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    const vencidas = res.data.filter(f =>
+    const vencidas = dados.data.filter(f =>
       f.status !== StatusFatura.PAGA &&
       f.status !== StatusFatura.CANCELADA &&
       new Date(f.dataVencimento) < hoje
     ).length;
-    const pagas = res.data.filter(f => f.status === StatusFatura.PAGA).length;
-    const doMes = res.data.filter(f => new Date(f.dataEmissao) >= inicioMes).length;
+    const pagas = dados.data.filter(f => f.status === StatusFatura.PAGA).length;
+    const doMes = dados.data.filter(f => new Date(f.dataEmissao) >= inicioMes).length;
 
     setDashboardCards({
-      totalFaturas: res.total || res.data.length,
+      totalFaturas: dados.total || dados.data.length,
       faturasVencidas: vencidas,
-      valorTotalPendente: res.aggregates?.valorEmAberto ?? 0,
-      valorTotalPago: res.aggregates?.valorRecebido ?? 0,
+      valorTotalPendente: dados.aggregates?.valorEmAberto ?? 0,
+      valorTotalPago: dados.aggregates?.valorRecebido ?? 0,
       faturasPagas: pagas,
       faturasDoMes: doMes,
     });
@@ -246,9 +248,9 @@ export default function FaturamentoPage() {
       {
         id: 'valorTotalPendente',
         title: 'Valor Pendente',
-        value: `R$ ${Number(dashboardCards.valorTotalPendente).toLocaleString('pt-BR', { 
-          minimumFractionDigits: 2, 
-          maximumFractionDigits: 2 
+        value: `R$ ${Number(dashboardCards.valorTotalPendente).toLocaleString('pt-BR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
         })}`,
         icon: Clock,
         color: 'text-orange-600',
@@ -259,9 +261,9 @@ export default function FaturamentoPage() {
       {
         id: 'valorTotalPago',
         title: 'Valor Recebido',
-        value: `R$ ${Number(dashboardCards.valorTotalPago).toLocaleString('pt-BR', { 
-          minimumFractionDigits: 2, 
-          maximumFractionDigits: 2 
+        value: `R$ ${Number(dashboardCards.valorTotalPago).toLocaleString('pt-BR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
         })}`,
         icon: DollarSign,
         color: 'text-green-600',
@@ -282,16 +284,16 @@ export default function FaturamentoPage() {
     ];
   };
 
-  const carregarFaturas = async () => { 
+  const carregarFaturas = async () => {
     try {
       console.log('Recarregando faturas...');
-      
+
       // Estratégia agressiva de atualização do cache
-      await queryClient.removeQueries(['faturas-paginadas']); // Remove completamente do cache
-      await queryClient.invalidateQueries(['faturas-paginadas']); // Invalida todas as queries relacionadas
-      await queryClient.refetchQueries(['faturas-paginadas']); // Força uma nova busca imediatamente
-      await refetch(); 
-      
+      await queryClient.removeQueries({ queryKey: ['faturas-paginadas'] }); // Remove completamente do cache
+      await queryClient.invalidateQueries({ queryKey: ['faturas-paginadas'] }); // Invalida todas as queries relacionadas
+      await queryClient.refetchQueries({ queryKey: ['faturas-paginadas'] }); // Força uma nova busca imediatamente
+      await refetch();
+
       console.log('Faturas recarregadas com sucesso');
     } catch (error) {
       console.error('Erro ao recarregar faturas:', error);
@@ -486,7 +488,7 @@ export default function FaturamentoPage() {
 
       // Determinar o tipo de confirmação baseado na fatura
       const tipoConfirmacao = validacao.validarExclusaoFatura(fatura);
-      
+
       // Obter dados contextuais
       const dadosContexto = validacao.obterDadosContexto(fatura, tipoConfirmacao);
 
@@ -498,21 +500,21 @@ export default function FaturamentoPage() {
             console.log('Excluindo fatura:', id);
             await faturamentoService.excluirFatura(id);
             console.log('Fatura excluída com sucesso');
-            
+
             // Estratégia agressiva de atualização do cache
-            await queryClient.removeQueries(['faturas-paginadas']); // Remove completamente do cache
-            await queryClient.invalidateQueries(['faturas-paginadas']); // Invalida todas as queries relacionadas
-            await queryClient.refetchQueries(['faturas-paginadas']); // Força uma nova busca imediatamente
-            
+            await queryClient.removeQueries({ queryKey: ['faturas-paginadas'] }); // Remove completamente do cache
+            await queryClient.invalidateQueries({ queryKey: ['faturas-paginadas'] }); // Invalida todas as queries relacionadas
+            await queryClient.refetchQueries({ queryKey: ['faturas-paginadas'] }); // Força uma nova busca imediatamente
+
             // Recarregar dados - força atualização completa
             await refetch();
-            
+
             // Também força uma atualização do estado local para garantir
             setFaturas(prev => prev.filter(f => f.id !== id));
-            
+
             // Atualizar faturas selecionadas removendo a excluída
             setFaturasSelecionadas(prev => prev.filter(faturaId => faturaId !== id));
-            
+
             // Mostrar notificação de sucesso
             notificacao.mostrarSucesso(
               'Fatura Excluída',
@@ -597,11 +599,11 @@ export default function FaturamentoPage() {
       };
 
       console.log('Registrando pagamento:', dadosPagamento);
-      
+
       // Chamar o serviço real para criar o pagamento
       const pagamentoCreated = await faturamentoService.criarPagamento(dadosPagamento);
       console.log('Pagamento criado:', pagamentoCreated);
-      
+
       // Processar o pagamento como aprovado automaticamente (para pagamentos manuais)
       if (pagamentoCreated.id) {
         console.log('Processando pagamento como aprovado...');
@@ -614,24 +616,24 @@ export default function FaturamentoPage() {
             userRegistered: true
           }
         };
-        
+
         await faturamentoService.processarPagamento(pagamentoCreated.id, processarData);
         console.log('Pagamento processado como aprovado');
       }
 
       notificacao.sucesso.pagamentoRegistrado(pagamento.valor);
-      
+
       // Estratégia agressiva de atualização do cache após pagamento
-      await queryClient.removeQueries(['faturas-paginadas']);
-      await queryClient.invalidateQueries(['faturas-paginadas']);
-      await queryClient.refetchQueries(['faturas-paginadas']);
-      
+      await queryClient.removeQueries({ queryKey: ['faturas-paginadas'] });
+      await queryClient.invalidateQueries({ queryKey: ['faturas-paginadas'] });
+      await queryClient.refetchQueries({ queryKey: ['faturas-paginadas'] });
+
       // Recarregar faturas após registrar pagamento
       await carregarFaturas();
-      
+
       // Fechar modal após sucesso
       fecharModalPagamentos();
-      
+
     } catch (error) {
       console.error('Erro ao registrar pagamento:', error);
       notificacao.erro.operacaoFalhou('registrar pagamento');
@@ -721,13 +723,13 @@ export default function FaturamentoPage() {
                 await faturamentoService.excluirFatura(faturaId);
                 setProgressoAcaoMassa(((i + 1) / faturasSelecionadas.length) * 100);
               }
-              
+
               // Estratégia agressiva de atualização do cache após exclusão em massa
-              await queryClient.removeQueries(['faturas-paginadas']); // Remove completamente do cache
-              await queryClient.invalidateQueries(['faturas-paginadas']); // Invalida todas as queries relacionadas
-              await queryClient.refetchQueries(['faturas-paginadas']); // Força uma nova busca imediatamente
+              await queryClient.removeQueries({ queryKey: ['faturas-paginadas'] }); // Remove completamente do cache
+              await queryClient.invalidateQueries({ queryKey: ['faturas-paginadas'] }); // Invalida todas as queries relacionadas
+              await queryClient.refetchQueries({ queryKey: ['faturas-paginadas'] }); // Força uma nova busca imediatamente
               carregarFaturas();
-              
+
               // Notificação de sucesso é exibida automaticamente pelo hook
             },
             { quantidadeItens: faturasSelecionadas.length }
@@ -1286,7 +1288,7 @@ export default function FaturamentoPage() {
                             <Activity className="w-3 h-3 text-blue-600" />
                             <span>Status</span>
                           </div>
-                          <div 
+                          <div
                             className="col-span-2 flex items-center gap-1 cursor-pointer hover:text-blue-600 transition-colors"
                             onClick={() => {
                               if (sortBy === 'dataVencimento') {
@@ -1304,7 +1306,7 @@ export default function FaturamentoPage() {
                             <span>Vencimento</span>
                             {sortBy === 'dataVencimento' && (sortOrder === 'DESC' ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
                           </div>
-                          <div 
+                          <div
                             className="col-span-2 flex items-center justify-end gap-1 cursor-pointer hover:text-blue-600 transition-colors pr-8"
                             onClick={() => {
                               if (sortBy === 'valorTotal') {
@@ -1340,10 +1342,9 @@ export default function FaturamentoPage() {
                           const diasVencimento = Math.ceil((dataVencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
 
                           // Definir classes de estilo baseado no status
-                          let rowClass = `grid grid-cols-12 gap-4 px-4 py-3 hover:bg-gradient-to-r hover:from-blue-25 hover:to-indigo-25 transition-all duration-200 group ${
-                            isSelected ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 shadow-sm' : ''
-                          }`;
-                          
+                          let rowClass = `grid grid-cols-12 gap-4 px-4 py-3 hover:bg-gradient-to-r hover:from-blue-25 hover:to-indigo-25 transition-all duration-200 group ${isSelected ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 shadow-sm' : ''
+                            }`;
+
                           if (isVencida && fatura.status === StatusFatura.PENDENTE) {
                             rowClass += ' bg-gradient-to-r from-red-25 to-red-50 border-l-4 border-red-400';
                           } else if (diasVencimento <= 7 && diasVencimento > 0 && fatura.status === StatusFatura.PENDENTE) {
@@ -1364,20 +1365,18 @@ export default function FaturamentoPage() {
 
                               {/* Número da Fatura */}
                               <div className="col-span-2 flex items-center">
-                                <div className={`w-8 h-8 bg-gradient-to-br ${
-                                  fatura.status === StatusFatura.PAGA
+                                <div className={`w-8 h-8 bg-gradient-to-br ${fatura.status === StatusFatura.PAGA
                                     ? 'from-emerald-100 to-emerald-200 shadow-emerald-200'
                                     : isVencida
                                       ? 'from-red-100 to-red-200 shadow-red-200'
                                       : 'from-blue-100 to-blue-200 shadow-blue-200'
-                                } rounded-xl flex items-center justify-center mr-3 shadow-md transition-all group-hover:shadow-lg group-hover:scale-105`}>
-                                  <FileText className={`w-4 h-4 ${
-                                    fatura.status === StatusFatura.PAGA
+                                  } rounded-xl flex items-center justify-center mr-3 shadow-md transition-all group-hover:shadow-lg group-hover:scale-105`}>
+                                  <FileText className={`w-4 h-4 ${fatura.status === StatusFatura.PAGA
                                       ? 'text-emerald-600'
                                       : isVencida
                                         ? 'text-red-600'
                                         : 'text-blue-600'
-                                  }`} />
+                                    }`} />
                                 </div>
                                 <div>
                                   <div className="text-sm font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">
@@ -1436,23 +1435,22 @@ export default function FaturamentoPage() {
                               {/* Vencimento */}
                               <div className="col-span-2 flex items-center">
                                 <div>
-                                  <div className={`text-sm font-medium tabular-nums ${
-                                    isVencida
+                                  <div className={`text-sm font-medium tabular-nums ${isVencida
                                       ? 'text-red-600'
                                       : diasVencimento <= 7 && diasVencimento > 0 && fatura.status === StatusFatura.PENDENTE
                                         ? 'text-yellow-600'
                                         : 'text-gray-900'
-                                  } group-hover:text-blue-700 transition-colors`}>
-                                    {dataVencimento.toLocaleDateString('pt-BR', { 
-                                      day: '2-digit', 
+                                    } group-hover:text-blue-700 transition-colors`}>
+                                    {dataVencimento.toLocaleDateString('pt-BR', {
+                                      day: '2-digit',
                                       month: '2-digit',
                                       year: '2-digit'
                                     })}
                                   </div>
                                   <div className="text-xs text-gray-400 tabular-nums hidden sm:block">
-                                    Em: {dataEmissao.toLocaleDateString('pt-BR', { 
-                                      day: '2-digit', 
-                                      month: '2-digit' 
+                                    Em: {dataEmissao.toLocaleDateString('pt-BR', {
+                                      day: '2-digit',
+                                      month: '2-digit'
                                     })}
                                   </div>
                                 </div>
@@ -1463,9 +1461,9 @@ export default function FaturamentoPage() {
                                 <div className="text-right min-w-[140px]">
                                   <div className="text-sm font-bold text-gray-900 group-hover:text-blue-700 transition-colors tabular-nums whitespace-nowrap">
                                     <span className="text-gray-500 mr-1 font-normal">R$</span>
-                                    {Number(fatura.valorTotal).toLocaleString('pt-BR', { 
+                                    {Number(fatura.valorTotal).toLocaleString('pt-BR', {
                                       minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2 
+                                      maximumFractionDigits: 2
                                     })}
                                   </div>
                                   {fatura.formaPagamento && (
@@ -1493,7 +1491,7 @@ export default function FaturamentoPage() {
                                   >
                                     <Eye className="w-3 h-3" />
                                   </button>
-                                  
+
                                   {fatura.status !== StatusFatura.PAGA && fatura.status !== StatusFatura.CANCELADA && (
                                     <button
                                       onClick={() => abrirModalEdicao(fatura)}
@@ -1541,7 +1539,7 @@ export default function FaturamentoPage() {
                                             </button>
                                           </>
                                         )}
-                                        
+
                                         <button
                                           onClick={() => baixarPDF(fatura.id)}
                                           className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 transition-colors"
@@ -1549,9 +1547,9 @@ export default function FaturamentoPage() {
                                           <Download className="w-3 h-3" />
                                           Baixar PDF
                                         </button>
-                                        
+
                                         <div className="border-t border-gray-100 my-1"></div>
-                                        
+
                                         <button
                                           onClick={() => excluirFatura(fatura.id)}
                                           className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center gap-2 transition-colors"
@@ -1668,9 +1666,9 @@ export default function FaturamentoPage() {
                                 Valor
                               </label>
                               <div className="text-xl font-bold text-gray-900 mt-1">
-                                R$ {Number(fatura.valorTotal).toLocaleString('pt-BR', { 
+                                R$ {Number(fatura.valorTotal).toLocaleString('pt-BR', {
                                   minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2 
+                                  maximumFractionDigits: 2
                                 })}
                               </div>
                               {fatura.formaPagamento && (
@@ -1700,10 +1698,10 @@ export default function FaturamentoPage() {
                                   ? 'text-yellow-600'
                                   : 'text-gray-900'
                                 }`}>
-                                {dataVencimento.toLocaleDateString('pt-BR', { 
-                                  day: '2-digit', 
-                                  month: '2-digit', 
-                                  year: 'numeric' 
+                                {dataVencimento.toLocaleDateString('pt-BR', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric'
                                 })}
                                 {isVencida && (
                                   <div className="text-xs text-red-500 font-normal mt-1">
@@ -1720,10 +1718,10 @@ export default function FaturamentoPage() {
                             <div className="bg-gray-50 rounded-lg p-3">
                               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Emissão</label>
                               <div className="text-gray-900 font-semibold mt-1">
-                                {dataEmissao.toLocaleDateString('pt-BR', { 
-                                  day: '2-digit', 
-                                  month: '2-digit', 
-                                  year: 'numeric' 
+                                {dataEmissao.toLocaleDateString('pt-BR', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric'
                                 })}
                               </div>
                             </div>
@@ -1770,7 +1768,7 @@ export default function FaturamentoPage() {
                                   <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-100">
                                     Mais Ações
                                   </div>
-                                  
+
                                   {fatura.status !== StatusFatura.PAGA && (
                                     <button
                                       onClick={() => abrirModalGateway(fatura)}
@@ -1783,7 +1781,7 @@ export default function FaturamentoPage() {
                                       </div>
                                     </button>
                                   )}
-                                  
+
                                   <button
                                     onClick={() => baixarPDF(fatura.id)}
                                     className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 flex items-center gap-3 transition-colors"
@@ -1794,7 +1792,7 @@ export default function FaturamentoPage() {
                                       <div className="text-xs text-gray-500">Documento</div>
                                     </div>
                                   </button>
-                                  
+
                                   <button
                                     onClick={() => enviarPorEmail(fatura.id)}
                                     className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-3 transition-colors"
@@ -1805,7 +1803,7 @@ export default function FaturamentoPage() {
                                       <div className="text-xs text-gray-500">Cobrança</div>
                                     </div>
                                   </button>
-                                  
+
                                   {fatura.status !== StatusFatura.PAGA && (
                                     <button
                                       onClick={() => gerarLinkPagamento(fatura.id)}
@@ -1818,9 +1816,9 @@ export default function FaturamentoPage() {
                                       </div>
                                     </button>
                                   )}
-                                  
+
                                   <div className="border-t border-gray-100 my-1"></div>
-                                  
+
                                   <button
                                     onClick={() => excluirFatura(fatura.id)}
                                     className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center gap-3 transition-colors"
@@ -1848,34 +1846,34 @@ export default function FaturamentoPage() {
                         <span className="text-gray-600">Página atual:</span>
                         <span className="font-bold text-blue-700 tabular-nums whitespace-nowrap">
                           <span className="text-gray-500 mr-1 font-normal">R$</span>
-                          {faturasFiltradas.reduce((acc, f) => acc + Number(f.valorTotal || 0), 0).toLocaleString('pt-BR', { 
+                          {faturasFiltradas.reduce((acc, f) => acc + Number(f.valorTotal || 0), 0).toLocaleString('pt-BR', {
                             minimumFractionDigits: 2,
-                            maximumFractionDigits: 2 
+                            maximumFractionDigits: 2
                           })}
                         </span>
                         <span className="text-gray-500">({faturasFiltradas.length} itens)</span>
                       </div>
-                      
+
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                         <span className="text-gray-600">Recebido:</span>
                         <span className="font-bold text-green-700 tabular-nums whitespace-nowrap">
                           <span className="text-gray-500 mr-1 font-normal">R$</span>
-                          {Number(aggregates?.valorRecebido ?? 0).toLocaleString('pt-BR', { 
+                          {Number(aggregates?.valorRecebido ?? 0).toLocaleString('pt-BR', {
                             minimumFractionDigits: 2,
-                            maximumFractionDigits: 2 
+                            maximumFractionDigits: 2
                           })}
                         </span>
                       </div>
-                      
+
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
                         <span className="text-gray-600">Em aberto:</span>
                         <span className="font-bold text-orange-700 tabular-nums whitespace-nowrap">
                           <span className="text-gray-500 mr-1 font-normal">R$</span>
-                          {Number(aggregates?.valorEmAberto ?? 0).toLocaleString('pt-BR', { 
+                          {Number(aggregates?.valorEmAberto ?? 0).toLocaleString('pt-BR', {
                             minimumFractionDigits: 2,
-                            maximumFractionDigits: 2 
+                            maximumFractionDigits: 2
                           })}
                         </span>
                       </div>
@@ -1898,7 +1896,7 @@ export default function FaturamentoPage() {
                       <FileText className="w-4 h-4 text-gray-400" />
                       Mostrando <span className="font-semibold tabular-nums">{(page - 1) * pageSize + 1}</span> - <span className="font-semibold tabular-nums">{Math.min(page * pageSize, total)}</span> de <span className="font-semibold tabular-nums">{total}</span> faturas
                     </div>
-                    
+
                     <div className="flex items-center gap-4">
                       {/* Controles de navegação */}
                       <div className="flex items-center gap-2">
@@ -1910,7 +1908,7 @@ export default function FaturamentoPage() {
                           <ChevronUp className="w-4 h-4 rotate-[-90deg]" />
                           Anterior
                         </button>
-                        
+
                         <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg">
                           <span className="text-sm text-gray-600">Página</span>
                           <input
@@ -1929,7 +1927,7 @@ export default function FaturamentoPage() {
                           />
                           <span className="text-sm text-gray-600">de {Math.max(1, Math.ceil(total / pageSize))}</span>
                         </div>
-                        
+
                         <button
                           className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                           onClick={() => setPage((p) => (p * pageSize < total ? p + 1 : p))}

@@ -4,6 +4,7 @@ export interface ExportColumn {
   key: string;
   label: string;
   transform?: (value: any) => string | number;
+  format?: (value: any) => string | number;
 }
 
 // Função para formatar data para exportação
@@ -57,12 +58,13 @@ export const exportToCSV = (
 
   // Criar cabeçalho
   const headers = columns.map(col => col.label);
-  
+
   // Processar dados
   const processedData = data.map(item => {
     return columns.map(col => {
       const value = getNestedValue(item, col.key);
-      return col.transform ? col.transform(value) : value || '';
+      const formatter = col.transform ?? col.format;
+      return formatter ? formatter(value) : value || '';
     });
   });
 
@@ -74,7 +76,7 @@ export const exportToCSV = (
   // Adicionar BOM para suporte a UTF-8
   const BOM = '\uFEFF';
   const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
-  
+
   // Download
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
@@ -103,7 +105,8 @@ export const exportToExcel = (
     const row: { [key: string]: any } = {};
     columns.forEach(col => {
       const value = getNestedValue(item, col.key);
-      row[col.label] = col.transform ? col.transform(value) : value || '';
+      const formatter = col.transform ?? col.format;
+      row[col.label] = formatter ? formatter(value) : value || '';
     });
     return row;
   });
@@ -128,10 +131,10 @@ export const exportToExcel = (
 // Função auxiliar para obter valores aninhados de objetos
 const getNestedValue = (obj: any, path: string): any => {
   if (!obj || !path) return '';
-  
+
   const keys = path.split('.');
   let current = obj;
-  
+
   for (const key of keys) {
     if (current && typeof current === 'object' && key in current) {
       current = current[key];
@@ -139,7 +142,7 @@ const getNestedValue = (obj: any, path: string): any => {
       return '';
     }
   }
-  
+
   return current;
 };
 

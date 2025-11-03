@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { 
-  DragDropContext, 
-  Droppable, 
-  Draggable 
-} from 'react-beautiful-dnd';
+import {
+  DragDropContext,
+  Droppable,
+  Draggable
+} from '@hello-pangea/dnd';
 import {
   Plus,
   Filter,
@@ -44,7 +44,7 @@ const FunilVendas = () => {
   const { data: pipelineData, isLoading: loadingPipeline, error: pipelineError } = useQuery(
     'pipeline',
     opportunitiesService.getPipelineData,
-    { 
+    {
       refetchInterval: 30000,
       retry: 3,
       retryDelay: 1000
@@ -54,7 +54,7 @@ const FunilVendas = () => {
   const { data: metrics, isLoading: loadingMetrics, error: metricsError } = useQuery(
     'metrics',
     opportunitiesService.getMetrics,
-    { 
+    {
       refetchInterval: 30000,
       retry: 3,
       retryDelay: 1000
@@ -100,7 +100,7 @@ const FunilVendas = () => {
             <p className="font-bold">Erro ao carregar dados</p>
             <p>Verifique se o backend está rodando e tente novamente.</p>
           </div>
-          <button 
+          <button
             onClick={() => {
               queryClient.invalidateQueries('pipeline');
               queryClient.invalidateQueries('metrics');
@@ -119,15 +119,15 @@ const FunilVendas = () => {
     if (!pipelineData || !pipelineData.stages) return {};
 
     const organized = { ...pipelineData.stages };
-    
+
     // Aplicar filtros de busca e outros filtros
     Object.keys(organized).forEach(stageId => {
       if (organized[stageId]?.opportunities) {
         organized[stageId].opportunities = organized[stageId].opportunities.filter(opp => {
-          if (searchTerm && 
-              !opp.titulo?.toLowerCase().includes(searchTerm.toLowerCase()) &&
-              !opp.empresaContato?.toLowerCase().includes(searchTerm.toLowerCase()) &&
-              !opp.cliente?.nome?.toLowerCase().includes(searchTerm.toLowerCase())) {
+          if (searchTerm &&
+            !opp.titulo?.toLowerCase().includes(searchTerm.toLowerCase()) &&
+            !opp.empresaContato?.toLowerCase().includes(searchTerm.toLowerCase()) &&
+            !opp.cliente?.nome?.toLowerCase().includes(searchTerm.toLowerCase())) {
             return false;
           }
           if (filters.assignedTo !== 'all' && opp.responsavel?.nome !== filters.assignedTo) {
@@ -151,8 +151,8 @@ const FunilVendas = () => {
     const { destination, source, draggableId } = result;
 
     if (!destination) return;
-    if (destination.droppableId === source.droppableId && 
-        destination.index === source.index) return;
+    if (destination.droppableId === source.droppableId &&
+      destination.index === source.index) return;
 
     // Atualizar estágio via API
     updateStageMutation.mutate({
@@ -192,7 +192,7 @@ const FunilVendas = () => {
               {opportunity.titulo}
             </h4>
             <div className="flex gap-1 ml-2">
-              <button 
+              <button
                 onClick={(e) => {
                   e.stopPropagation();
                   // Editar oportunidade
@@ -211,9 +211,9 @@ const FunilVendas = () => {
             </div>
             <div className="flex items-center gap-1">
               <DollarSign className="w-3 h-3" />
-              {new Intl.NumberFormat('pt-BR', { 
-                style: 'currency', 
-                currency: 'BRL' 
+              {new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
               }).format(opportunity.valor || 0)}
             </div>
           </div>
@@ -223,7 +223,7 @@ const FunilVendas = () => {
               {opportunity.probabilidade || 0}% prob.
             </span>
             <span className="text-gray-500">
-              {opportunity.dataFechamentoEsperado 
+              {opportunity.dataFechamentoEsperado
                 ? new Date(opportunity.dataFechamentoEsperado).toLocaleDateString('pt-BR')
                 : 'Sem data'
               }
@@ -251,7 +251,7 @@ const FunilVendas = () => {
     <div className="flex-1 min-w-[280px] bg-gray-50 rounded-xl p-4">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div 
+          <div
             className="w-3 h-3 rounded-full"
             style={{ backgroundColor: stage?.color || '#6B7280' }}
           />
@@ -260,7 +260,7 @@ const FunilVendas = () => {
             {opportunities.length}
           </span>
         </div>
-        <button 
+        <button
           onClick={() => {
             // Adicionar nova oportunidade neste estágio
           }}
@@ -275,9 +275,8 @@ const FunilVendas = () => {
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
-            className={`min-h-[400px] transition-colors rounded-lg ${
-              snapshot.isDraggingOver ? 'bg-[#159A9C] bg-opacity-10' : ''
-            }`}
+            className={`min-h-[400px] transition-colors rounded-lg ${snapshot.isDraggingOver ? 'bg-[#159A9C] bg-opacity-10' : ''
+              }`}
           >
             {opportunities.map((opportunity, index) => (
               <OpportunityCard
@@ -294,9 +293,9 @@ const FunilVendas = () => {
       {/* Valor total do estágio */}
       <div className="mt-4 pt-3 border-t border-gray-200">
         <div className="text-xs text-gray-600">
-          Total: {new Intl.NumberFormat('pt-BR', { 
-            style: 'currency', 
-            currency: 'BRL' 
+          Total: {new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
           }).format(
             opportunities.reduce((sum, opp) => sum + (opp.valor || 0), 0)
           )}
@@ -316,15 +315,14 @@ const FunilVendas = () => {
             <p className="text-gray-600">Gerencie suas oportunidades de vendas</p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
-              showFilters 
-                ? 'bg-[#159A9C] text-white border-[#159A9C]' 
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${showFilters
+                ? 'bg-[#159A9C] text-white border-[#159A9C]'
                 : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-            }`}
+              }`}
           >
             <Filter className="w-4 h-4" />
             Filtros
@@ -358,8 +356,8 @@ const FunilVendas = () => {
             <div>
               <p className="text-sm text-gray-600">Valor Total Pipeline</p>
               <p className="text-2xl font-bold text-gray-900">
-                {new Intl.NumberFormat('pt-BR', { 
-                  style: 'currency', 
+                {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
                   currency: 'BRL',
                   notation: 'compact',
                   maximumFractionDigits: 1
@@ -377,8 +375,8 @@ const FunilVendas = () => {
             <div>
               <p className="text-sm text-gray-600">Vendas Fechadas</p>
               <p className="text-2xl font-bold text-gray-900">
-                {new Intl.NumberFormat('pt-BR', { 
-                  style: 'currency', 
+                {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
                   currency: 'BRL',
                   notation: 'compact',
                   maximumFractionDigits: 1
@@ -427,7 +425,7 @@ const FunilVendas = () => {
               </label>
               <select
                 value={filters.assignedTo}
-                onChange={(e) => setFilters({...filters, assignedTo: e.target.value})}
+                onChange={(e) => setFilters({ ...filters, assignedTo: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
               >
                 <option value="all">Todos</option>
@@ -442,7 +440,7 @@ const FunilVendas = () => {
               </label>
               <select
                 value={filters.priority}
-                onChange={(e) => setFilters({...filters, priority: e.target.value})}
+                onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
               >
                 <option value="all">Todas</option>
@@ -458,7 +456,7 @@ const FunilVendas = () => {
               </label>
               <select
                 value={filters.dateRange}
-                onChange={(e) => setFilters({...filters, dateRange: e.target.value})}
+                onChange={(e) => setFilters({ ...filters, dateRange: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
               >
                 <option value="all">Todos</option>

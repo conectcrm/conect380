@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { faturamentoAPI, FaturaRequest, FaturaResponse, PagamentoRequest } from '../services/faturamentoAPI';
 import toast from 'react-hot-toast';
+
+type ListaFaturasResponse = Awaited<ReturnType<typeof faturamentoAPI.listarFaturas>>;
+type ResumoFaturamentoResponse = Awaited<ReturnType<typeof faturamentoAPI.obterResumoFaturamento>>;
+type AnalyticsFaturamentoResponse = Awaited<ReturnType<typeof faturamentoAPI.obterAnalyticsFaturamento>>;
 
 // Hook para listar faturas
 export const useFaturas = (filtros?: {
@@ -16,171 +20,152 @@ export const useFaturas = (filtros?: {
   sortOrder?: 'ASC' | 'DESC';
   q?: string;
 }) => {
-  return useQuery(
-    ['faturas', filtros],
-    () => faturamentoAPI.listarFaturas(filtros),
-    {
-      keepPreviousData: true,
-      staleTime: 5 * 60 * 1000, // 5 minutos
-    }
-  );
+  return useQuery<ListaFaturasResponse>({
+    queryKey: ['faturas', filtros],
+    queryFn: () => faturamentoAPI.listarFaturas(filtros),
+    placeholderData: keepPreviousData,
+    staleTime: 5 * 60 * 1000,
+  });
 };
 
 // Hook para buscar uma fatura específica
 export const useFatura = (id: string | null) => {
-  return useQuery(
-    ['fatura', id],
-    () => faturamentoAPI.buscarFaturaPorId(id!),
-    {
-      enabled: !!id,
-      staleTime: 5 * 60 * 1000,
-    }
-  );
+  return useQuery<FaturaResponse>({
+    queryKey: ['fatura', id],
+    queryFn: () => faturamentoAPI.buscarFaturaPorId(id!),
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+  });
 };
 
 // Hook para criar fatura
 export const useCriarFatura = () => {
   const queryClient = useQueryClient();
 
-  return useMutation(
-    (dados: FaturaRequest) => faturamentoAPI.criarFatura(dados),
-    {
-      onSuccess: (data) => {
-        queryClient.invalidateQueries('faturas');
-        toast.success('Fatura criada com sucesso!');
-        return data;
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.message || 'Erro ao criar fatura');
-        throw error;
-      },
-    }
-  );
+  return useMutation({
+    mutationFn: (dados: FaturaRequest) => faturamentoAPI.criarFatura(dados),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['faturas'] });
+      toast.success('Fatura criada com sucesso!');
+      return data;
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Erro ao criar fatura');
+      throw error;
+    },
+  });
 };
 
 // Hook para atualizar fatura
 export const useAtualizarFatura = () => {
   const queryClient = useQueryClient();
 
-  return useMutation(
-    ({ id, dados }: { id: string; dados: Partial<FaturaRequest> }) =>
+  return useMutation({
+    mutationFn: ({ id, dados }: { id: string; dados: Partial<FaturaRequest> }) =>
       faturamentoAPI.atualizarFatura(id, dados),
-    {
-      onSuccess: (data, variables) => {
-        queryClient.invalidateQueries('faturas');
-        queryClient.invalidateQueries(['fatura', variables.id]);
-        toast.success('Fatura atualizada com sucesso!');
-        return data;
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.message || 'Erro ao atualizar fatura');
-        throw error;
-      },
-    }
-  );
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['faturas'] });
+      queryClient.invalidateQueries({ queryKey: ['fatura', variables.id] });
+      toast.success('Fatura atualizada com sucesso!');
+      return data;
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Erro ao atualizar fatura');
+      throw error;
+    },
+  });
 };
 
 // Hook para deletar fatura
 export const useDeletarFatura = () => {
   const queryClient = useQueryClient();
 
-  return useMutation(
-    (id: string) => faturamentoAPI.deletarFatura(id),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('faturas');
-        toast.success('Fatura deletada com sucesso!');
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.message || 'Erro ao deletar fatura');
-        throw error;
-      },
-    }
-  );
+  return useMutation({
+    mutationFn: (id: string) => faturamentoAPI.deletarFatura(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['faturas'] });
+      toast.success('Fatura deletada com sucesso!');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Erro ao deletar fatura');
+      throw error;
+    },
+  });
 };
 
 // Hook para gerar fatura automática
 export const useGerarFaturaAutomatica = () => {
   const queryClient = useQueryClient();
 
-  return useMutation(
-    (contratoId: string) => faturamentoAPI.gerarFaturaAutomatica(contratoId),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('faturas');
-        toast.success('Fatura gerada automaticamente!');
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.message || 'Erro ao gerar fatura automática');
-        throw error;
-      },
-    }
-  );
+  return useMutation({
+    mutationFn: (contratoId: string) => faturamentoAPI.gerarFaturaAutomatica(contratoId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['faturas'] });
+      toast.success('Fatura gerada automaticamente!');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Erro ao gerar fatura automática');
+      throw error;
+    },
+  });
 };
 
 // Hook para enviar fatura por email
 export const useEnviarFaturaEmail = () => {
-  return useMutation(
-    ({ faturaId, email }: { faturaId: string; email?: string }) =>
+  return useMutation({
+    mutationFn: ({ faturaId, email }: { faturaId: string; email?: string }) =>
       faturamentoAPI.enviarFaturaPorEmail(faturaId, email),
-    {
-      onSuccess: () => {
-        toast.success('Fatura enviada por email com sucesso!');
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.message || 'Erro ao enviar fatura por email');
-        throw error;
-      },
-    }
-  );
+    onSuccess: () => {
+      toast.success('Fatura enviada por email com sucesso!');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Erro ao enviar fatura por email');
+      throw error;
+    },
+  });
 };
 
 // Hook para download de PDF
 export const useDownloadPDFFatura = () => {
-  return useMutation(
-    (faturaId: string) => faturamentoAPI.baixarPDFFatura(faturaId),
-    {
-      onSuccess: (blob, faturaId) => {
-        // Criar URL para download
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `fatura-${faturaId}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
+  return useMutation({
+    mutationFn: (faturaId: string) => faturamentoAPI.baixarPDFFatura(faturaId),
+    onSuccess: (blob, faturaId) => {
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `fatura-${faturaId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
 
-        toast.success('Download iniciado!');
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.message || 'Erro ao baixar PDF da fatura');
-        throw error;
-      },
-    }
-  );
+      toast.success('Download iniciado!');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Erro ao baixar PDF da fatura');
+      throw error;
+    },
+  });
 };
 
 // Hook para registrar pagamento
 export const useRegistrarPagamento = () => {
   const queryClient = useQueryClient();
 
-  return useMutation(
-    (dados: PagamentoRequest) => faturamentoAPI.registrarPagamento(dados),
-    {
-      onSuccess: (data) => {
-        queryClient.invalidateQueries('faturas');
-        queryClient.invalidateQueries(['fatura', data.faturaId]);
-        queryClient.invalidateQueries('pagamentos');
-        toast.success('Pagamento registrado com sucesso!');
-        return data;
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.message || 'Erro ao registrar pagamento');
-        throw error;
-      },
-    }
-  );
+  return useMutation({
+    mutationFn: (dados: PagamentoRequest) => faturamentoAPI.registrarPagamento(dados),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['faturas'] });
+      queryClient.invalidateQueries({ queryKey: ['fatura', data.faturaId] });
+      queryClient.invalidateQueries({ queryKey: ['pagamentos'] });
+      toast.success('Pagamento registrado com sucesso!');
+      return data;
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Erro ao registrar pagamento');
+      throw error;
+    },
+  });
 };
 
 // Hook para resumo de faturamento
@@ -188,13 +173,11 @@ export const useResumoFaturamento = (periodo?: {
   dataInicio: string;
   dataFim: string;
 }) => {
-  return useQuery(
-    ['resumo-faturamento', periodo],
-    () => faturamentoAPI.obterResumoFaturamento(periodo),
-    {
-      staleTime: 10 * 60 * 1000, // 10 minutos
-    }
-  );
+  return useQuery<ResumoFaturamentoResponse>({
+    queryKey: ['resumo-faturamento', periodo],
+    queryFn: () => faturamentoAPI.obterResumoFaturamento(periodo),
+    staleTime: 10 * 60 * 1000,
+  });
 };
 
 // Hook para analytics de faturamento
@@ -202,13 +185,11 @@ export const useAnalyticsFaturamento = (periodo?: {
   dataInicio: string;
   dataFim: string;
 }) => {
-  return useQuery(
-    ['analytics-faturamento', periodo],
-    () => faturamentoAPI.obterAnalyticsFaturamento(periodo),
-    {
-      staleTime: 15 * 60 * 1000, // 15 minutos
-    }
-  );
+  return useQuery<AnalyticsFaturamentoResponse>({
+    queryKey: ['analytics-faturamento', periodo],
+    queryFn: () => faturamentoAPI.obterAnalyticsFaturamento(periodo),
+    staleTime: 15 * 60 * 1000,
+  });
 };
 
 // Hook personalizado para gerenciar filtros de fatura

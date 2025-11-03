@@ -184,7 +184,8 @@ export function useWhatsApp(options: UseWhatsAppOptions) {
     if (!connected) return;
 
     // Nova mensagem recebida
-    const unsubNovaMensagem = on('nova:mensagem', (data: NovaMensagemEvent) => {
+    // ✅ CORRIGIDO: 'nova_mensagem' com underscore (compatível com backend)
+    const unsubNovaMensagem = on('nova_mensagem', (data: NovaMensagemEvent) => {
       console.log('[WhatsApp] Nova mensagem recebida via WebSocket:', data);
 
       // Adicionar mensagem ao state
@@ -217,7 +218,8 @@ export function useWhatsApp(options: UseWhatsAppOptions) {
     });
 
     // Novo ticket criado
-    const unsubNovoTicket = on('novo:ticket', (ticket: Ticket) => {
+    // ✅ CORRIGIDO: 'novo_ticket' com underscore (compatível com backend)
+    const unsubNovoTicket = on('novo_ticket', (ticket: Ticket) => {
       console.log('[WhatsApp] Novo ticket criado via WebSocket:', ticket);
 
       setTickets((prev) => {
@@ -230,7 +232,8 @@ export function useWhatsApp(options: UseWhatsAppOptions) {
     });
 
     // Ticket atualizado
-    const unsubTicketAtualizado = on('ticket:atualizado', (data: { ticketId: string;[key: string]: any }) => {
+    // ✅ CORRIGIDO: 'ticket_atualizado' com underscore (compatível com backend)
+    const unsubTicketAtualizado = on('ticket_atualizado', (data: { ticketId: string;[key: string]: any }) => {
       console.log('[WhatsApp] Ticket atualizado via WebSocket:', data);
 
       setTickets((prev) =>
@@ -242,11 +245,33 @@ export function useWhatsApp(options: UseWhatsAppOptions) {
       );
     });
 
+    // Status online/offline atualizado
+    const unsubStatusAtualizado = on('contato:status:atualizado', (data: {
+      telefone: string;
+      online: boolean;
+      lastActivity: string
+    }) => {
+      console.log('[WhatsApp] Status de contato atualizado via WebSocket:', data);
+
+      setTickets((prev) =>
+        prev.map((t) =>
+          t.contatoTelefone === data.telefone
+            ? {
+              ...t,
+              contatoOnline: data.online,
+              contatoLastActivity: data.lastActivity
+            }
+            : t
+        )
+      );
+    });
+
     // Cleanup
     return () => {
       unsubNovaMensagem();
       unsubNovoTicket();
       unsubTicketAtualizado();
+      unsubStatusAtualizado();
     };
   }, [connected, on]);
 

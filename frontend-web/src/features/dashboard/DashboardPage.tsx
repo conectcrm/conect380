@@ -161,7 +161,7 @@ const DashboardPage: React.FC = () => {
   };
 
   // Loading state
-  if (loading && !data.kpis) {
+  if (loading || !data?.kpis) {
     return (
       <div className="p-6">
         <div className="animate-pulse">
@@ -177,7 +177,7 @@ const DashboardPage: React.FC = () => {
   }
 
   // Error state
-  if (error && !data.kpis) {
+  if (error) {
     return (
       <div className="p-6">
         <div className="rounded-xl p-6 border border-red-200 bg-red-50">
@@ -377,7 +377,7 @@ const DashboardPage: React.FC = () => {
         </div>
 
         {/* KPIs Principais com Dados Reais */}
-        {data.kpis && (
+        {data.kpis && data.kpis.faturamentoTotal && data.kpis.ticketMedio && data.kpis.vendasFechadas && data.kpis.emNegociacao && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
             {/* Faturamento Total */}
             <div
@@ -608,10 +608,10 @@ const DashboardPage: React.FC = () => {
                 className="text-3xl font-black mb-2"
                 style={{ color: currentPalette.colors.text }}
               >
-                {data.kpis.vendasFechadas.quantidade}
+                {data.kpis?.vendasFechadas?.quantidade ?? 0}
               </div>
               <div className="flex items-center gap-2">
-                {data.kpis.vendasFechadas.variacao >= 0 ? (
+                {(data.kpis?.vendasFechadas?.variacao ?? 0) >= 0 ? (
                   <ArrowUp
                     className="w-5 h-5"
                     style={{ color: currentPalette.colors.success }}
@@ -625,12 +625,12 @@ const DashboardPage: React.FC = () => {
                 <span
                   className="text-sm font-bold"
                   style={{
-                    color: data.kpis.vendasFechadas.variacao >= 0
+                    color: (data.kpis?.vendasFechadas?.variacao ?? 0) >= 0
                       ? currentPalette.colors.success
                       : currentPalette.colors.error
                   }}
                 >
-                  {data.kpis.vendasFechadas.variacao >= 0 ? '+' : ''}{data.kpis.vendasFechadas.variacao}% {data.kpis.vendasFechadas.periodo}
+                  {(data.kpis?.vendasFechadas?.variacao ?? 0) >= 0 ? '+' : ''}{data.kpis?.vendasFechadas?.variacao ?? 0}% {data.kpis?.vendasFechadas?.periodo ?? 'vs mês anterior'}
                 </span>
               </div>
             </div>
@@ -664,7 +664,7 @@ const DashboardPage: React.FC = () => {
                 className="text-3xl font-black mb-2"
                 style={{ color: currentPalette.colors.text }}
               >
-                {data.kpis.emNegociacao.valor.toLocaleString('pt-BR', {
+                {(data.kpis?.emNegociacao?.valor ?? 0).toLocaleString('pt-BR', {
                   style: 'currency',
                   currency: 'BRL',
                   minimumFractionDigits: 0
@@ -675,7 +675,7 @@ const DashboardPage: React.FC = () => {
                   className="text-sm font-bold"
                   style={{ color: currentPalette.colors.primary }}
                 >
-                  {data.kpis.emNegociacao.quantidade} propostas ativas
+                  {data.kpis?.emNegociacao?.quantidade ?? 0} propostas ativas
                 </span>
               </div>
             </div>
@@ -686,11 +686,11 @@ const DashboardPage: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <KPICard
             title="Novos Clientes"
-            value={data.kpis?.novosClientesMes.quantidade || 0}
+            value={data.kpis?.novosClientesMes?.quantidade || 0}
             icon={<UserPlus size={24} />}
             trend={{
-              value: data.kpis?.novosClientesMes.variacao || 0,
-              isPositive: (data.kpis?.novosClientesMes.variacao || 0) >= 0,
+              value: data.kpis?.novosClientesMes?.variacao || 0,
+              isPositive: (data.kpis?.novosClientesMes?.variacao || 0) >= 0,
               period: "vs mês anterior"
             }}
             currentPalette={currentPalette}
@@ -698,11 +698,11 @@ const DashboardPage: React.FC = () => {
 
           <KPICard
             title="Leads Qualificados"
-            value={data.kpis?.leadsQualificados.quantidade || 0}
+            value={data.kpis?.leadsQualificados?.quantidade || 0}
             icon={<Target size={24} />}
             trend={{
-              value: data.kpis?.leadsQualificados.variacao || 0,
-              isPositive: (data.kpis?.leadsQualificados.variacao || 0) >= 0,
+              value: data.kpis?.leadsQualificados?.variacao || 0,
+              isPositive: (data.kpis?.leadsQualificados?.variacao || 0) >= 0,
               period: "vs mês anterior"
             }}
             currentPalette={currentPalette}
@@ -710,12 +710,12 @@ const DashboardPage: React.FC = () => {
 
           <KPICard
             title="Propostas Enviadas"
-            value={data.kpis?.propostasEnviadas.valor || 0}
+            value={data.kpis?.propostasEnviadas?.valor || 0}
             prefix="R$"
             icon={<FileText size={24} />}
             trend={{
-              value: data.kpis?.propostasEnviadas.variacao || 0,
-              isPositive: (data.kpis?.propostasEnviadas.variacao || 0) >= 0,
+              value: data.kpis?.propostasEnviadas?.variacao || 0,
+              isPositive: (data.kpis?.propostasEnviadas?.variacao || 0) >= 0,
               period: "vs mês anterior"
             }}
             currentPalette={currentPalette}
@@ -723,12 +723,12 @@ const DashboardPage: React.FC = () => {
 
           <KPICard
             title="Taxa de Sucesso"
-            value={data.kpis?.taxaSucessoGeral.percentual || 0}
+            value={data.kpis?.taxaSucessoGeral?.percentual || 0}
             suffix="%"
             icon={<BarChart3 size={24} />}
             trend={{
-              value: data.kpis?.taxaSucessoGeral.variacao || 0,
-              isPositive: (data.kpis?.taxaSucessoGeral.variacao || 0) >= 0,
+              value: data.kpis?.taxaSucessoGeral?.variacao || 0,
+              isPositive: (data.kpis?.taxaSucessoGeral?.variacao || 0) >= 0,
               period: "vs mês anterior"
             }}
             currentPalette={currentPalette}

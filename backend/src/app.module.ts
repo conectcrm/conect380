@@ -18,7 +18,10 @@ import { PlanosModule } from './modules/planos/planos.module';
 import { EventosModule } from './modules/eventos/eventos.module';
 import { AtendimentoModule } from './modules/atendimento/atendimento.module';
 import { IAModule } from './modules/ia/ia.module';
+import { TriagemModule } from './modules/triagem/triagem.module';
 import { AssinaturaMiddleware } from './modules/common/assinatura.middleware';
+import { TenantContextMiddleware } from './common/middleware/tenant-context.middleware';
+import { HealthController } from './health/health.controller';
 import { DatabaseConfig } from './config/database.config';
 import { BullModule } from '@nestjs/bull';
 
@@ -54,10 +57,19 @@ import { BullModule } from '@nestjs/bull';
     EventosModule,
     AtendimentoModule,
     IAModule,
+    TriagemModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
+    // 🔒 CRÍTICO: Middleware de Tenant Context (Multi-Tenancy)
+    // Define automaticamente o empresaId no PostgreSQL para RLS funcionar
+    consumer
+      .apply(TenantContextMiddleware)
+      .forRoutes('*'); // Aplicar em TODAS as rotas
+
+    // Middleware de verificação de assinatura
     consumer
       .apply(AssinaturaMiddleware)
       .exclude(

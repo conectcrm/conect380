@@ -7,7 +7,7 @@ import { Plano } from './entities/plano.entity';
 import { ModuloSistema } from './entities/modulo-sistema.entity';
 
 @Controller('planos')
-// @UseGuards(JwtAuthGuard) // Temporariamente desabilitado para testes
+@UseGuards(JwtAuthGuard)
 export class PlanosController {
   constructor(private readonly planosService: PlanosService) { }
 

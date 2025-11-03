@@ -1,4 +1,4 @@
-# 📦 Guia de Commit Profissional - ConectCRM
+# 📦 Guia de Commit Profissional - ConectSuite
 
 Este guia fornece comandos práticos para organizar commits de forma profissional.
 

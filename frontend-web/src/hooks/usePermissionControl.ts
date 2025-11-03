@@ -16,18 +16,36 @@ interface Role {
   permissions: string[];
 }
 
-interface User {
-  id: string;
-  roles: string[];
-  permissions: string[];
-}
+type AuthUser = ReturnType<typeof useAuth>['user'];
+
+type ExtendedUser = (AuthUser extends null ? never : AuthUser) & {
+  roles?: string[];
+  role?: string;
+  permissions?: string[];
+  department?: string;
+  companyId?: string;
+};
 
 export function usePermissionControl() {
   const { user } = useAuth();
-  
+  const typedUser = (user ?? null) as ExtendedUser | null;
+
+  const userRoles = useCallback((): string[] => {
+    if (!typedUser) return [];
+    if (Array.isArray(typedUser.roles) && typedUser.roles.length > 0) {
+      return typedUser.roles;
+    }
+    return typedUser.role ? [typedUser.role] : [];
+  }, [typedUser]);
+
+  const userPermissions = useCallback((): string[] => {
+    if (!typedUser) return [];
+    return Array.isArray(typedUser.permissions) ? typedUser.permissions : [];
+  }, [typedUser]);
+
   // Modo desenvolvimento - permite tudo se não houver usuário ou em ambiente de desenvolvimento
   const isDevelopment = process.env.NODE_ENV === 'development' || !user;
-  
+
   const hasPermission = useCallback((
     permission: string | string[],
     resource?: any,
@@ -37,11 +55,12 @@ export function usePermissionControl() {
     if (isDevelopment) {
       return true;
     }
-    
+
     if (!user) return false;
-    
+
     // Admin tem todas as permissões
-    if (user.roles?.includes('admin') || user.roles?.includes('super_admin')) {
+    const roles = userRoles();
+    if (roles.includes('admin') || roles.includes('super_admin')) {
       return true;
     }
 
@@ -49,12 +68,12 @@ export function usePermissionControl() {
 
     return permissionsToCheck.some(perm => {
       // Verificar permissão direta do usuário
-      if (user.permissions?.includes(perm)) {
+      if (userPermissions().includes(perm)) {
         return checkResourceConditions(perm, resource, context);
       }
 
       // Verificar permissões através de roles
-      return user.roles?.some(roleId => {
+      return roles.some(roleId => {
         const role = getRoleById(roleId);
         if (role?.permissions.includes(perm)) {
           return checkResourceConditions(perm, resource, context);
@@ -62,7 +81,9 @@ export function usePermissionControl() {
         return false;
       });
     });
-  }, [user, isDevelopment]);  const hasAnyPermission = useCallback((permissions: string[]): boolean => {
+  }, [user, isDevelopment, userPermissions, userRoles]);
+
+  const hasAnyPermission = useCallback((permissions: string[]): boolean => {
     return permissions.some(permission => hasPermission(permission));
   }, [hasPermission]);
 
@@ -96,27 +117,27 @@ export function usePermissionControl() {
     context?: Record<string, any>
   ): boolean => {
     const permissionConfig = getPermissionConfig(permission);
-    
+
     if (!permissionConfig?.conditions) return true;
 
     // Verificar condições baseadas no proprietário
     if (permissionConfig.conditions.owner && resource) {
-      return resource.userId === user?.id || resource.createdBy === user?.id;
+      return resource.userId === typedUser?.id || resource.createdBy === typedUser?.id;
     }
 
     // Verificar condições baseadas no departamento
     if (permissionConfig.conditions.department && resource) {
-      return resource.department === user?.department;
+      return resource.department === typedUser?.department;
     }
 
     // Verificar condições baseadas na empresa
     if (permissionConfig.conditions.company && resource) {
-      return resource.companyId === user?.companyId;
+      return resource.companyId === typedUser?.companyId;
     }
 
     // Verificar condições personalizadas
     if (permissionConfig.conditions.custom && context) {
-      return permissionConfig.conditions.custom(user, resource, context);
+      return permissionConfig.conditions.custom(typedUser, resource, context);
     }
 
     return true;
@@ -140,29 +161,29 @@ export function usePermissionControl() {
     hasAllPermissions,
     canAccessResource,
     filterByPermission,
-    user
+    user: typedUser
   };
 }
 
 // Hook para componentes que precisam verificar permissões específicas
 export function useRequirePermission(permission: string | string[]) {
   const { hasPermission } = usePermissionControl();
-  
+
   // Em desenvolvimento, sempre permite acesso
   const isDevelopment = process.env.NODE_ENV === 'development';
   const hasRequiredPermission = isDevelopment ? true : hasPermission(permission);
-  
+
   if (!hasRequiredPermission) {
     return {
       hasPermission: false,
-      component: React.createElement('div', 
+      component: React.createElement('div',
         { className: "flex items-center justify-center p-8" },
-        React.createElement('div', 
+        React.createElement('div',
           { className: "text-center" },
-          React.createElement('div', 
+          React.createElement('div',
             { className: "w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center" },
-            React.createElement('svg', 
-              { 
+            React.createElement('svg',
+              {
                 className: "w-8 h-8 text-red-600",
                 fill: "none",
                 stroke: "currentColor",
@@ -176,11 +197,11 @@ export function useRequirePermission(permission: string | string[]) {
               })
             )
           ),
-          React.createElement('h3', 
+          React.createElement('h3',
             { className: "text-lg font-medium text-gray-900 mb-2" },
             "Acesso Negado"
           ),
-          React.createElement('p', 
+          React.createElement('p',
             { className: "text-gray-600" },
             "Você não tem permissão para acessar este recurso."
           )
@@ -188,7 +209,7 @@ export function useRequirePermission(permission: string | string[]) {
       )
     };
   }
-  
+
   return {
     hasPermission: true,
     component: null
@@ -202,11 +223,11 @@ export function withPermission<P extends object>(
 ) {
   return function PermissionWrapper(props: P) {
     const { hasPermission, component } = useRequirePermission(permission);
-    
+
     if (!hasPermission) {
       return component;
     }
-    
+
     return React.createElement(Component, props);
   };
 }
@@ -214,18 +235,18 @@ export function withPermission<P extends object>(
 // Utility para validar permissões no backend (para usar em services)
 export function validarPermissaoAcao(user: any, permissions: string[]): boolean {
   if (!user) return false;
-  
+
   // Admin tem todas as permissões
   if (user.roles?.includes('admin') || user.roles?.includes('super_admin')) {
     return true;
   }
-  
+
   return permissions.some(permission => {
     // Verificar permissão direta
     if (user.permissions?.includes(permission)) {
       return true;
     }
-    
+
     // Verificar através de roles
     return user.roles?.some((roleId: string) => {
       // TODO: Implementar verificação de role

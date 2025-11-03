@@ -1,31 +1,26 @@
 import React from 'react';
-import { ChatOmnichannel } from '../features/atendimento/omnichannel';
+import ChatOmnichannel from '../features/atendimento/omnichannel/ChatOmnichannel';
 
 /**
- * Página de Atendimento Omnichannel - Nova Interface
+ * Página de Atendimento Integrado
  * 
- * Layout de 3 colunas moderno e completo:
- * - Coluna 1: Lista de atendimentos com tabs (Aberto/Resolvido/Retornos)
- * - Coluna 2: Chat com mensagens em tempo real
- * - Coluna 3: Informações do cliente e demandas
+ * Esta página encapsula o sistema completo de chat omnichannel
+ * com layout responsivo que se adapta a qualquer tamanho de tela
+ * sem necessidade de scroll horizontal ou vertical desnecessário.
  * 
  * Funcionalidades:
+ * - Layout responsivo para Desktop/Tablet/Mobile
  * - Múltiplos canais (WhatsApp, Telegram, Email, Chat, Telefone)
- * - Contador de tempo em tempo real
- * - Status de mensagens (enviando/enviado/entregue/lido)
- * - Fotos de perfil dinâmicas
- * - Histórico de atendimentos
- * - Sistema de demandas
- * - Busca e filtros
- * - Design responsivo e moderno
- * 
- * NOTA: Este componente usa calc(100vh - 64px) para ocupar
- * toda altura disponível, considerando a navbar de 64px
+ * - Sistema de mensagens em tempo real
+ * - Informações do cliente integradas
+ * - Altura otimizada sem scroll desnecessário
  */
-export function AtendimentoIntegradoPage() {
+const AtendimentoIntegradoPage: React.FC = () => {
   return (
-    <div style={{ height: 'calc(100vh - 64px)' }} className="w-full">
+    <div className="chat-height-responsive chat-container-optimized">
       <ChatOmnichannel />
     </div>
   );
-}
+};
+
+export default AtendimentoIntegradoPage;

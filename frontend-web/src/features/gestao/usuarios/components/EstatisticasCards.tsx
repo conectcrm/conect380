@@ -18,7 +18,7 @@ export const EstatisticasCards: React.FC<EstatisticasCardsProps> = ({ estatistic
       vendedor: 0,
       user: 0,
     },
-    ultimosLogins: [],
+    ultimosLogins: 0,
   };
   const safeDistribuicao = safeStats.distribuicaoPorRole || {};
   const cards = [
@@ -57,7 +57,7 @@ export const EstatisticasCards: React.FC<EstatisticasCardsProps> = ({ estatistic
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {cards.map((card, index) => {
           const Icone = card.icone;
-          
+
           return (
             <div
               key={index}

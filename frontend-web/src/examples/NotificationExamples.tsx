@@ -12,7 +12,7 @@ const PropostaExample = () => {
     try {
       // Simular criação da proposta
       await createProposta(proposta);
-      
+
       // Notificação de sucesso
       addNotification({
         title: 'Proposta Criada',
@@ -26,8 +26,8 @@ const PropostaExample = () => {
         title: 'Follow-up da Proposta',
         entityType: 'proposta',
         entityId: proposta.id,
-        dateTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 dias
-        isRecurring: false
+        message: `Verificar andamento da proposta com ${proposta.clienteNome}`,
+        scheduledFor: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 dias
       });
 
     } catch (error) {
@@ -59,10 +59,10 @@ const ClienteExample = () => {
     // Lembrete para próximo contato
     addReminder({
       title: 'Próximo Contato',
-      entityType: 'client',
+      entityType: 'cliente',
       entityId: clienteId,
-      dateTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 dias
-      isRecurring: true
+      message: `Agendar novo contato com ${clienteNome}`,
+      scheduledFor: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 dias
     });
   };
 
@@ -103,7 +103,7 @@ const AutomaticNotifications = () => {
   // Verificar propostas vencendo
   const checkExpiringPropostas = () => {
     const expiringPropostas = getExpiringPropostas(); // Função hipotética
-    
+
     expiringPropostas.forEach(proposta => {
       addNotification({
         title: 'Proposta Vencendo',
@@ -117,7 +117,7 @@ const AutomaticNotifications = () => {
   // Lembrete de aniversário de cliente
   const checkClientBirthdays = () => {
     const birthdayClients = getTodayBirthdays(); // Função hipotética
-    
+
     birthdayClients.forEach(client => {
       addNotification({
         title: 'Aniversário do Cliente',
@@ -146,10 +146,10 @@ export const useSalesNotifications = () => {
     // Lembrete para contato inicial
     addReminder({
       title: 'Contato Inicial',
-      entityType: 'client',
+      entityType: 'cliente',
       entityId: leadData.id,
-      dateTime: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 horas
-      isRecurring: false
+      message: `Entrar em contato com ${leadData.nome}`,
+      scheduledFor: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 horas
     });
   };
 
@@ -194,10 +194,10 @@ export const useAgendaNotifications = () => {
     const reminderTime = new Date(appointment.dateTime.getTime() - 60 * 60 * 1000);
     addReminder({
       title: 'Reunião em 1 hora',
-      entityType: 'reunião',
+      entityType: 'agenda',
       entityId: appointment.id,
-      dateTime: reminderTime,
-      isRecurring: false
+      message: `Reunião com ${appointment.clienteNome} em 1 hora`,
+      scheduledFor: reminderTime,
     });
   };
 

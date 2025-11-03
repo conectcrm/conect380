@@ -7,7 +7,13 @@
    - Responsividade de tabelas e modais
    - Tratamento de texto longo
    - Layout otimizado para diferentes telas
+   - Largura completa para dashboards
+   - Chat responsivo sem scroll
 */
+
+/* IMPORTAÇÃO DE UTILIDADES CSS ESPECÍFICAS
+   ========================================================================= */
+@import './chat-responsive.css';
 
 /* 1. VARIÁVEIS DE FONTE E CORES
    ========================================================================= */
@@ -19,6 +25,71 @@
   --modal-max-height: 90vh;
   --table-padding: 8px 12px;
   --ellipsis-max-width: 200px;
+}
+
+/* 1.1. LAYOUT DE LARGURA COMPLETA
+   ========================================================================= */
+.full-width-layout {
+  width: 100%;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Containers de dashboard para ocupar toda a largura */
+.dashboard-container,
+.page-container {
+  width: 100%;
+  max-width: none;
+}
+
+/* Utility para remover limitações de largura em containers existentes */
+.container-full-width {
+  max-width: none !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Aplicar automaticamente a largura completa para containers comuns */
+.max-w-7xl,
+.max-w-6xl,
+.max-w-5xl,
+.max-w-4xl {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+/* Garantir que grids e flexbox usem todo o espaço */
+.dashboard-grid {
+  width: 100%;
+  display: grid;
+  gap: 1.5rem;
+}
+
+/* Responsividade para grids de dashboard */
+@media (min-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 1536px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
 }
 
 /* 2. AJUSTES PARA MODAIS
@@ -188,27 +259,28 @@
 /* 9. RESPONSIVIDADE MÓVEL
    ========================================================================= */
 @media (max-width: 768px) {
+
   /* Ocultar colunas menos importantes no mobile */
   .table-propostas .col-hide-mobile {
     display: none;
   }
-  
+
   /* Ajustar tabelas para stack vertical no mobile */
   .table-responsive-stack {
     display: block;
   }
-  
+
   .table-responsive-stack thead {
     display: none;
   }
-  
+
   .table-responsive-stack tbody,
   .table-responsive-stack tr,
   .table-responsive-stack td {
     display: block;
     width: 100%;
   }
-  
+
   .table-responsive-stack tr {
     border: 1px solid #e5e7eb;
     border-radius: 8px;
@@ -216,20 +288,20 @@
     padding: 1rem;
     background: white;
   }
-  
+
   .table-responsive-stack td {
     border: none;
     padding: 0.25rem 0;
     text-align: left;
   }
-  
+
   .table-responsive-stack td:before {
     content: attr(data-label) ": ";
     font-weight: 600;
     font-size: var(--font-secondary);
     color: var(--color-text-secondary);
   }
-  
+
   /* Modais ocupam tela toda no mobile */
   .modal-content {
     margin: 0;
@@ -237,7 +309,7 @@
     max-height: 100vh;
     height: 100vh;
   }
-  
+
   /* Ajustar font-base para mobile */
   :root {
     --font-base: 13px;
@@ -251,12 +323,12 @@
   .table-propostas {
     font-size: 13px;
   }
-  
+
   .table-propostas th,
   .table-propostas td {
     padding: 6px 10px;
   }
-  
+
   .ellipsis-text {
     max-width: 150px;
   }
@@ -279,17 +351,17 @@
   word-wrap: break-word;
 }
 
-.compact-spacing > * {
+.compact-spacing>* {
   margin-bottom: 0.5rem;
 }
 
-.compact-spacing > *:last-child {
+.compact-spacing>*:last-child {
   margin-bottom: 0;
 }
 
 /* 12. MELHORIAS ESPECÍFICAS PARA COMPONENTES EXISTENTES
    ========================================================================= */
-   
+
 /* Ajustes para ModalNovaProposta */
 .modal-nova-proposta .wizard-step {
   font-size: var(--font-base);

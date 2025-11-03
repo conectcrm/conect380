@@ -24,7 +24,7 @@ import { StatusPagamento } from './entities/pagamento.entity';
 import { StatusPlanoCobranca } from './entities/plano-cobranca.entity';
 
 @Controller('faturamento')
-// @UseGuards(JwtAuthGuard) // Temporariamente desabilitado para debug
+@UseGuards(JwtAuthGuard)
 export class FaturamentoController {
   constructor(
     private readonly faturamentoService: FaturamentoService,
@@ -62,7 +62,6 @@ export class FaturamentoController {
     }
   }
 
-  // @UseGuards(JwtAuthGuard) // Temporariamente desabilitado para debug
   @Get('faturas')
   async buscarFaturas(
     @Query('status') status?: StatusFatura,
@@ -105,7 +104,6 @@ export class FaturamentoController {
   }
 
   // Versão que embala paginação e agregados dentro de data para garantir compatibilidade com wrappers externos
-  // @UseGuards(JwtAuthGuard) // Temporariamente desabilitado para debug
   @Get('faturas/paginadas')
   async buscarFaturasPaginadas(
     @Query('status') status?: StatusFatura,
@@ -226,11 +224,11 @@ export class FaturamentoController {
   @Delete('faturas/:id')
   async excluirFatura(@Param('id', ParseIntPipe) id: number) {
     console.log(`🔍 [CONTROLLER] DELETE /faturamento/faturas/${id} - Iniciando exclusão`);
-    
+
     try {
       console.log(`🔍 [CONTROLLER] Chamando excluirFatura para ID: ${id}`);
       const faturaAtualizada = await this.faturamentoService.excluirFatura(id);
-      
+
       console.log(`🔍 [CONTROLLER] Fatura ${id} excluída com sucesso`);
       return {
         status: HttpStatus.OK,

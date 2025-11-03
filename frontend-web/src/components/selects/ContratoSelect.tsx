@@ -21,7 +21,7 @@ interface Contrato {
 interface ContratoSelectProps {
   value: Contrato | null;
   onChange: (contrato: Contrato | null) => void;
-  clienteId?: number; // Filtrar contratos por cliente
+  clienteId?: string; // Filtrar contratos por cliente
   onCreateNew?: () => void;
   required?: boolean;
   disabled?: boolean;
@@ -53,9 +53,14 @@ export default function ContratoSelect({
 
       // Filtrar por cliente se especificado
       let contratosFormatados = response.map((contrato: ContratoService): Contrato => ({
-        id: contrato.id,
+        id: String(contrato.id),
         numero: contrato.numero,
-        cliente: contrato.cliente,
+        cliente: contrato.cliente
+          ? {
+            ...contrato.cliente,
+            id: contrato.cliente.id ? String(contrato.cliente.id) : contrato.cliente.id,
+          }
+          : undefined,
         valor: contrato.valor,
         status: contrato.status,
         dataEmissao: contrato.dataEmissao,
@@ -76,7 +81,7 @@ export default function ContratoSelect({
       // Filtrar por cliente se especificado
       if (clienteId) {
         contratosFormatados = contratosFormatados.filter(contrato =>
-          contrato.cliente?.id === clienteId.toString()
+          contrato.cliente?.id ? String(contrato.cliente.id) === clienteId : false
         );
       }
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useContext, useMemo, useState } from 'react';
 
 // Componentes básicos usando classes CSS do Tailwind
 export const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
@@ -51,24 +51,10 @@ export const Button: React.FC<{
   );
 };
 
-export const Input: React.FC<{
-  value?: string;
-  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  placeholder?: string;
-  type?: string;
-  className?: string;
-  disabled?: boolean;
-  id?: string;
-  name?: string;
-}> = ({ value, onChange, placeholder, type = 'text', className, disabled, id, name }) => (
+export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = ({ className, type = 'text', ...props }) => (
   <input
-    id={id}
-    name={name}
     type={type}
-    value={value}
-    onChange={onChange}
-    placeholder={placeholder}
-    disabled={disabled}
+    {...props}
     className={`input-field ${className || ''}`}
   />
 );
@@ -79,61 +65,86 @@ export const Label: React.FC<{ children: React.ReactNode; htmlFor?: string; clas
   </label>
 );
 
-export const Textarea: React.FC<{
-  value?: string;
-  onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  placeholder?: string;
-  className?: string;
-  rows?: number;
-  disabled?: boolean;
-  id?: string;
-  name?: string;
-}> = ({ value, onChange, placeholder, className, rows = 3, disabled, id, name }) => (
+export const Textarea: React.FC<React.TextareaHTMLAttributes<HTMLTextAreaElement>> = ({ className, rows = 3, ...props }) => (
   <textarea
-    id={id}
-    name={name}
-    value={value}
-    onChange={onChange}
-    placeholder={placeholder}
+    {...props}
     rows={rows}
-    disabled={disabled}
     className={`input-field resize-none ${className || ''}`}
   />
 );
 
+type SwitchBaseProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'checked' | 'disabled'>;
+
 export const Switch: React.FC<{
   checked?: boolean;
+  defaultChecked?: boolean;
   onChange?: (checked: boolean) => void;
+  onCheckedChange?: (checked: boolean) => void;
   disabled?: boolean;
   className?: string;
-}> = ({ checked, onChange, disabled, className }) => (
-  <label className={`relative inline-flex items-center cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className || ''}`}>
-    <input
-      type="checkbox"
-      checked={checked}
-      onChange={(e) => onChange?.(e.target.checked)}
-      disabled={disabled}
-      className="sr-only peer"
-    />
-    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-  </label>
-);
+} & SwitchBaseProps> = ({
+  checked,
+  defaultChecked,
+  onChange,
+  onCheckedChange,
+  disabled,
+  className,
+  ...rest
+}) => {
+    const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+      onChange?.(event.target.checked);
+      onCheckedChange?.(event.target.checked);
+    };
+
+    return (
+      <label className={`relative inline-flex items-center cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className || ''}`}>
+        <input
+          type="checkbox"
+          checked={checked}
+          defaultChecked={defaultChecked}
+          onChange={handleChange}
+          disabled={disabled}
+          className="sr-only peer"
+          {...rest}
+        />
+        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+      </label>
+    );
+  };
+
+type BadgeVariant =
+  | 'primary'
+  | 'secondary'
+  | 'success'
+  | 'warning'
+  | 'danger'
+  | 'default'
+  | 'outline'
+  | 'destructive';
 
 export const Badge: React.FC<{
   children: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger';
+  variant?: BadgeVariant;
   className?: string;
 }> = ({ children, variant = 'primary', className }) => {
-  const variantClasses = {
+  const variantClasses: Record<BadgeVariant, string> = {
     primary: 'bg-blue-100 text-blue-800',
     secondary: 'bg-gray-100 text-gray-800',
     success: 'bg-green-100 text-green-800',
     warning: 'bg-yellow-100 text-yellow-800',
-    danger: 'bg-red-100 text-red-800'
+    danger: 'bg-red-100 text-red-800',
+    default: 'bg-blue-100 text-blue-800',
+    outline: 'border border-gray-300 text-gray-700 bg-transparent',
+    destructive: 'bg-red-100 text-red-800'
   };
 
+  const resolvedVariant = variantClasses[variant] ? variant : 'primary';
+
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${variantClasses[variant]} ${className || ''}`}>
+    <span
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${variantClasses[resolvedVariant]
+        } ${className || ''}`}
+    >
       {children}
     </span>
   );
@@ -159,9 +170,42 @@ export const AlertDescription: React.FC<{ children: React.ReactNode; className?:
 );
 
 // Componentes de Tabs
-export const Tabs: React.FC<{ children: React.ReactNode; defaultValue?: string; className?: string }> = ({ children, className }) => (
-  <div className={`${className || ''}`}>{children}</div>
-);
+interface TabsContextValue {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+const TabsContext = React.createContext<TabsContextValue | undefined>(undefined);
+
+export const Tabs: React.FC<{
+  children: React.ReactNode;
+  value?: string;
+  defaultValue?: string;
+  onValueChange?: (value: string) => void;
+  className?: string;
+}> = ({ children, value, defaultValue, onValueChange, className }) => {
+  const [internalValue, setInternalValue] = useState(defaultValue || '');
+  const isControlled = value !== undefined;
+  const activeValue = isControlled ? value! : internalValue;
+
+  const handleChange = useCallback(
+    (nextValue: string) => {
+      if (!isControlled) {
+        setInternalValue(nextValue);
+      }
+      onValueChange?.(nextValue);
+    },
+    [isControlled, onValueChange]
+  );
+
+  const contextValue = useMemo<TabsContextValue>(() => ({ value: activeValue, onChange: handleChange }), [activeValue, handleChange]);
+
+  return (
+    <TabsContext.Provider value={contextValue}>
+      <div className={className || ''}>{children}</div>
+    </TabsContext.Provider>
+  );
+};
 
 export const TabsList: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
   <div className={`flex space-x-1 rounded-lg bg-gray-100 p-1 ${className || ''}`}>{children}</div>
@@ -171,23 +215,44 @@ export const TabsTrigger: React.FC<{
   children: React.ReactNode;
   value: string;
   className?: string;
-  onClick?: () => void;
-  active?: boolean;
-}> = ({ children, className, onClick, active }) => (
-  <button
-    onClick={onClick}
-    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${active ? 'bg-white shadow-sm' : 'hover:bg-gray-200'} ${className || ''}`}
-  >
-    {children}
-  </button>
-);
+}> = ({ children, value, className }) => {
+  const context = useContext(TabsContext);
 
-export const TabsContent: React.FC<{ children: React.ReactNode; value: string; className?: string }> = ({ children, className }) => (
-  <div className={`mt-4 ${className || ''}`}>{children}</div>
-);
+  const isActive = context?.value === value;
+
+  const handleClick = useCallback(() => {
+    context?.onChange(value);
+  }, [context, value]);
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${isActive ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
+        } ${className || ''}`}
+    >
+      {children}
+    </button>
+  );
+};
+
+export const TabsContent: React.FC<{ children: React.ReactNode; value: string; className?: string }> = ({ children, value, className }) => {
+  const context = useContext(TabsContext);
+
+  if (context && context.value !== value) {
+    return null;
+  }
+
+  return <div className={`mt-4 ${className || ''}`}>{children}</div>;
+};
 
 // Componentes de Select
-export const Select: React.FC<{ children: React.ReactNode; value?: string; onValueChange?: (value: string) => void }> = ({ children }) => (
+export const Select: React.FC<{
+  children: React.ReactNode;
+  value?: string;
+  defaultValue?: string;
+  onValueChange?: (value: string) => void;
+}> = ({ children }) => (
   <div className="relative">{children}</div>
 );
 
@@ -245,13 +310,61 @@ export const TableCell: React.FC<{ children: React.ReactNode; className?: string
   </td>
 );
 
-// Componentes de Dialog/Modal 
-export const Dialog: React.FC<{ children: React.ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void }> = ({ children, open }) =>
-  open ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">{children}</div> : null;
+// Componentes de Dialog/Modal
+interface DialogContextValue {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+}
 
-export const DialogContent: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
-  <div className={`bg-white rounded-lg shadow-xl max-w-md w-full mx-4 ${className || ''}`}>{children}</div>
-);
+const DialogContext = React.createContext<DialogContextValue | undefined>(undefined);
+
+export const Dialog: React.FC<{ children: React.ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void }> = ({
+  children,
+  open,
+  onOpenChange
+}) => {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = open !== undefined;
+  const currentOpen = isControlled ? !!open : internalOpen;
+
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (!isControlled) {
+        setInternalOpen(next);
+      }
+      onOpenChange?.(next);
+    },
+    [isControlled, onOpenChange]
+  );
+
+  const contextValue = useMemo<DialogContextValue>(() => ({ open: currentOpen, setOpen }), [currentOpen, setOpen]);
+
+  return <DialogContext.Provider value={contextValue}>{children}</DialogContext.Provider>;
+};
+
+export const DialogContent: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => {
+  const context = useContext(DialogContext);
+
+  if (!context?.open) {
+    return null;
+  }
+
+  const handleBackdropClick = () => {
+    context.setOpen(false);
+  };
+
+  const handleContentClick: React.MouseEventHandler<HTMLDivElement> = (event) => {
+    event.stopPropagation();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={handleBackdropClick}>
+      <div className={`bg-white rounded-lg shadow-xl max-w-md w-full mx-4 ${className || ''}`} onClick={handleContentClick}>
+        {children}
+      </div>
+    </div>
+  );
+};
 
 export const DialogHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="px-6 py-4 border-b">{children}</div>
@@ -261,24 +374,61 @@ export const DialogTitle: React.FC<{ children: React.ReactNode }> = ({ children 
   <h2 className="text-lg font-semibold">{children}</h2>
 );
 
-export const DialogTrigger: React.FC<{ children: React.ReactNode; onClick?: () => void }> = ({ children, onClick }) => (
-  <div onClick={onClick}>{children}</div>
-);
+export const DialogTrigger: React.FC<{ children: React.ReactNode; asChild?: boolean }> = ({ children, asChild = false }) => {
+  const context = useContext(DialogContext);
+
+  if (!context) {
+    return <>{children}</>;
+  }
+
+  const handleClick: React.MouseEventHandler<HTMLElement> = (event) => {
+    if (React.isValidElement(children) && typeof children.props.onClick === 'function') {
+      children.props.onClick(event);
+    }
+
+    if (!event.defaultPrevented) {
+      context.setOpen(true);
+    }
+  };
+
+  if (asChild && React.isValidElement(children)) {
+    return React.cloneElement(children, {
+      onClick: handleClick,
+    } as Record<string, unknown>);
+  }
+
+  return (
+    <button type="button" onClick={handleClick} className="px-4 py-2 rounded-md border border-gray-300 bg-white">
+      {children}
+    </button>
+  );
+};
 
 export const Checkbox: React.FC<{
+  id?: string;
   checked?: boolean;
   onChange?: (checked: boolean) => void;
+  onCheckedChange?: (checked: boolean) => void;
   disabled?: boolean;
   className?: string;
-}> = ({ checked, onChange, disabled, className }) => (
-  <input
-    type="checkbox"
-    checked={checked}
-    onChange={(e) => onChange?.(e.target.checked)}
-    disabled={disabled}
-    className={`w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 ${className || ''}`}
-  />
-);
+}> = ({ id, checked, onChange, onCheckedChange, disabled, className }) => {
+  const handleChange: React.ChangeEventHandler<HTMLInputElement> = (event) => {
+    const nextChecked = event.target.checked;
+    onChange?.(nextChecked);
+    onCheckedChange?.(nextChecked);
+  };
+
+  return (
+    <input
+      id={id}
+      type="checkbox"
+      checked={checked}
+      onChange={handleChange}
+      disabled={disabled}
+      className={`w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 ${className || ''}`}
+    />
+  );
+};
 
 // Componentes de Progress
 export const Progress: React.FC<{ value?: number; className?: string }> = ({ value = 0, className }) => (

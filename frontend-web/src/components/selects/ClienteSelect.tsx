@@ -3,7 +3,7 @@ import { User, Plus } from 'lucide-react';
 import SearchSelect from '../common/SearchSelect';
 import { clientesService, Cliente as ClienteService } from '../../services/clientesService';
 
-interface Cliente {
+export interface ClienteSelectValue {
   id: string;
   nome: string;
   email?: string;
@@ -13,12 +13,13 @@ interface Cliente {
 }
 
 interface ClienteSelectProps {
-  value: Cliente | null;
-  onChange: (cliente: Cliente | null) => void;
+  value: ClienteSelectValue | null;
+  onChange: (cliente: ClienteSelectValue | null) => void;
   onCreateNew?: () => void;
   required?: boolean;
   disabled?: boolean;
   className?: string;
+  label?: string | null;
 }
 
 export default function ClienteSelect({
@@ -27,9 +28,10 @@ export default function ClienteSelect({
   onCreateNew,
   required = false,
   disabled = false,
-  className = ""
+  className = "",
+  label = 'Cliente'
 }: ClienteSelectProps) {
-  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [clientes, setClientes] = useState<ClienteSelectValue[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -47,8 +49,8 @@ export default function ClienteSelect({
       });
 
       // Converter para o formato esperado
-      const clientesFormatados = response.data.map((cliente: ClienteService): Cliente => ({
-        id: cliente.id || '', // Manter como string UUID
+      const clientesFormatados = response.data.map((cliente: ClienteService): ClienteSelectValue => ({
+        id: cliente.id ? String(cliente.id) : '',
         nome: cliente.nome,
         email: cliente.email,
         telefone: cliente.telefone,
@@ -100,7 +102,7 @@ export default function ClienteSelect({
             value={selectedOption}
             onChange={handleChange}
             onSearch={handleSearch}
-            label="Cliente"
+            label={label || undefined}
             placeholder="Busque por nome, documento ou email..."
             required={required}
             disabled={disabled}

@@ -18,11 +18,16 @@ export interface CalendarEvent {
     name: string;
   };
   allDay?: boolean;
+  notes?: string;
   recurring?: {
     type: 'daily' | 'weekly' | 'monthly';
     interval: number;
     until?: Date;
   };
+  isRecurring?: boolean;
+  recurringPattern?: unknown;
+  responsavelId?: string;
+  criadoPorId?: string;
 }
 
 export interface CalendarView {

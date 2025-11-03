@@ -1,760 +1,548 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useI18n } from '../../contexts/I18nContext';
-import { BackToNucleus } from '../../components/navigation/BackToNucleus';
-import { ModalContato } from '../../components/contatos/ModalContato';
-import { ModalNovoContato } from '../../components/contatos/ModalNovoContato';
-import { ContatoCard } from '../../components/contatos/ContatoCard';
-import { ContatoFilters } from '../../components/contatos/ContatoFilters';
-import { ContatoMetrics } from '../../components/contatos/ContatoMetrics';
-import { contatosService, Contato } from './services/contatosService';
-import { safeRender, validateAndSanitizeContact } from '../../utils/safeRender';
+import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import {
   Users,
+  User,
   Plus,
   Search,
-  Filter,
-  Download,
-  Eye,
-  Edit,
-  Trash2,
-  MoreVertical,
   Phone,
   Mail,
   Building,
-  MapPin,
-  Calendar,
   Star,
-  UserPlus,
-  Import,
-  FileText,
+  Edit,
+  Trash2,
+  Filter,
   Grid3X3,
-  List,
-  SortAsc,
-  Settings,
-  Tag,
-  Activity,
-  TrendingUp
+  List as ListIcon,
+  Loader2,
+  MoreVertical,
+  Eye
 } from 'lucide-react';
-
-// Interface para o contato da UI
-interface ContatoUI {
-  id: string;
-  nome: string;
-  email: string;
-  telefone: string;
-  empresa: string;
-  cargo: string;
-  status: 'ativo' | 'inativo' | 'prospecto' | 'cliente' | 'ex-cliente';
-  tipo: 'lead' | 'cliente' | 'parceiro' | 'fornecedor' | 'outro';
-  fonte: string;
-  proprietario: string;
-  data_criacao: string;
-  data_ultima_interacao: string;
-  data_nascimento?: string;
-  endereco?: {
-    rua: string;
-    cidade: string;
-    estado: string;
-    cep: string;
-    pais: string;
-  };
-  redes_sociais?: {
-    linkedin?: string;
-    twitter?: string;
-    facebook?: string;
-    instagram?: string;
-  };
-  tags: string[];
-  pontuacao_lead: number;
-  valor_potencial: number;
-  notas: string;
-  anexos: any[];
-  atividades_recentes: number;
-  oportunidades_abertas: number;
-  vendas_realizadas: number;
-  valor_total_vendas: number;
-  categoria: string;
-}
-
-// Dados mock para desenvolvimento - inspirados nos CRMs líderes
-const mockContatos: ContatoUI[] = [
-  {
-    id: '001',
-    nome: 'João Silva Santos',
-    email: 'joao.santos@techsolutions.com.br',
-    telefone: '+55 11 99999-8888',
-    empresa: 'Tech Solutions Ltda',
-    cargo: 'Diretor de TI',
-    status: 'cliente',
-    tipo: 'cliente',
-    fonte: 'Website',
-    proprietario: 'Maria Santos',
-    data_criacao: '2024-11-15',
-    data_ultima_interacao: '2025-01-20',
-    data_nascimento: '1985-06-15',
-    endereco: {
-      rua: 'Av. Paulista, 1000',
-      cidade: 'São Paulo',
-      estado: 'SP',
-      cep: '01310-100',
-      pais: 'Brasil'
-    },
-    redes_sociais: {
-      linkedin: 'https://linkedin.com/in/joaosantos',
-      twitter: '@joaosantos'
-    },
-    tags: ['VIP', 'Tecnologia', 'Decisor'],
-    pontuacao_lead: 95,
-    valor_potencial: 150000,
-    notas: 'Cliente estratégico com alto potencial de crescimento. Interessado em soluções de automação.',
-    anexos: [],
-    atividades_recentes: 12,
-    oportunidades_abertas: 2,
-    vendas_realizadas: 3,
-    valor_total_vendas: 285000,
-    categoria: 'enterprise'
-  },
-  {
-    id: '002',
-    nome: 'Maria Oliveira Costa',
-    email: 'maria.costa@startupxyz.com',
-    telefone: '+55 11 98888-7777',
-    empresa: 'StartupXYZ',
-    cargo: 'CEO & Founder',
-    status: 'prospecto',
-    tipo: 'lead',
-    fonte: 'LinkedIn',
-    proprietario: 'Pedro Costa',
-    data_criacao: '2025-01-10',
-    data_ultima_interacao: '2025-01-21',
-    data_nascimento: '1990-03-22',
-    endereco: {
-      rua: 'Rua das Startups, 500',
-      cidade: 'São Paulo',
-      estado: 'SP',
-      cep: '04567-890',
-      pais: 'Brasil'
-    },
-    redes_sociais: {
-      linkedin: 'https://linkedin.com/in/mariacosta',
-      instagram: '@mariacosta_ceo'
-    },
-    tags: ['Startup', 'CEO', 'Inovação', 'Quente'],
-    pontuacao_lead: 85,
-    valor_potencial: 75000,
-    notas: 'Founder de startup em crescimento. Muito interessada em soluções de CRM e automação de vendas.',
-    anexos: [],
-    atividades_recentes: 8,
-    oportunidades_abertas: 1,
-    vendas_realizadas: 0,
-    valor_total_vendas: 0,
-    categoria: 'startup'
-  },
-  {
-    id: '003',
-    nome: 'Carlos Roberto Mendes',
-    email: 'carlos.mendes@empresaabc.com.br',
-    telefone: '+55 11 97777-6666',
-    empresa: 'Empresa ABC Ltda',
-    cargo: 'Gerente de Vendas',
-    status: 'ativo',
-    tipo: 'cliente',
-    fonte: 'Indicação',
-    proprietario: 'Ana Silva',
-    data_criacao: '2024-09-05',
-    data_ultima_interacao: '2025-01-19',
-    data_nascimento: '1982-11-08',
-    endereco: {
-      rua: 'Rua do Comércio, 1500',
-      cidade: 'Rio de Janeiro',
-      estado: 'RJ',
-      cep: '20040-020',
-      pais: 'Brasil'
-    },
-    redes_sociais: {
-      linkedin: 'https://linkedin.com/in/carlosmendes'
-    },
-    tags: ['Vendas', 'Tradicional', 'Confiável'],
-    pontuacao_lead: 70,
-    valor_potencial: 45000,
-    notas: 'Cliente tradicional com processo de vendas bem estruturado. Busca melhorias incrementais.',
-    anexos: [],
-    atividades_recentes: 5,
-    oportunidades_abertas: 1,
-    vendas_realizadas: 2,
-    valor_total_vendas: 89000,
-    categoria: 'tradicional'
-  },
-  {
-    id: '004',
-    nome: 'Ana Paula Rodrigues',
-    email: 'ana.rodrigues@inovacorp.com',
-    telefone: '+55 11 96666-5555',
-    empresa: 'InovaCorp',
-    cargo: 'Diretora de Marketing',
-    status: 'prospecto',
-    tipo: 'lead',
-    fonte: 'Google Ads',
-    proprietario: 'Lucas Oliveira',
-    data_criacao: '2025-01-18',
-    data_ultima_interacao: '2025-01-21',
-    data_nascimento: '1988-07-12',
-    endereco: {
-      rua: 'Av. Inovação, 800',
-      cidade: 'Belo Horizonte',
-      estado: 'MG',
-      cep: '30140-070',
-      pais: 'Brasil'
-    },
-    redes_sociais: {
-      linkedin: 'https://linkedin.com/in/anapaula',
-      instagram: '@anapaula_mkt',
-      twitter: '@anapaula_mkt'
-    },
-    tags: ['Marketing', 'Digital', 'Inovação', 'Novo'],
-    pontuacao_lead: 78,
-    valor_potencial: 92000,
-    notas: 'Diretora de marketing em empresa inovadora. Foco em soluções digitais e automação.',
-    anexos: [],
-    atividades_recentes: 3,
-    oportunidades_abertas: 1,
-    vendas_realizadas: 0,
-    valor_total_vendas: 0,
-    categoria: 'digital'
-  },
-  {
-    id: '005',
-    nome: 'Fernando Silva Lopes',
-    email: 'fernando.lopes@comercialmax.com.br',
-    telefone: '+55 11 95555-4444',
-    empresa: 'Comercial Max',
-    cargo: 'Proprietário',
-    status: 'ex-cliente',
-    tipo: 'cliente',
-    fonte: 'Feira/Evento',
-    proprietario: 'Carla Santos',
-    data_criacao: '2023-03-20',
-    data_ultima_interacao: '2024-12-15',
-    data_nascimento: '1975-09-30',
-    endereco: {
-      rua: 'Rua do Comércio Popular, 300',
-      cidade: 'São Paulo',
-      estado: 'SP',
-      cep: '03020-010',
-      pais: 'Brasil'
-    },
-    redes_sociais: {
-      facebook: 'https://facebook.com/fernandolopes'
-    },
-    tags: ['PME', 'Tradicional', 'Reativar'],
-    pontuacao_lead: 45,
-    valor_potencial: 25000,
-    notas: 'Ex-cliente que cancelou por questões financeiras. Empresa em recuperação, possível reativação.',
-    anexos: [],
-    atividades_recentes: 1,
-    oportunidades_abertas: 0,
-    vendas_realizadas: 1,
-    valor_total_vendas: 35000,
-    categoria: 'reativacao'
-  },
-  {
-    id: '006',
-    nome: 'Juliana Freitas Santos',
-    email: 'juliana.santos@consultoriaplus.com',
-    telefone: '+55 11 94444-3333',
-    empresa: 'Consultoria Plus',
-    cargo: 'Sócia-Diretora',
-    status: 'ativo',
-    tipo: 'parceiro',
-    fonte: 'Networking',
-    proprietario: 'Roberto Lima',
-    data_criacao: '2024-08-12',
-    data_ultima_interacao: '2025-01-22',
-    data_nascimento: '1983-12-05',
-    endereco: {
-      rua: 'Av. das Nações, 1200',
-      cidade: 'Brasília',
-      estado: 'DF',
-      cep: '70040-010',
-      pais: 'Brasil'
-    },
-    redes_sociais: {
-      linkedin: 'https://linkedin.com/in/julianasantos',
-      twitter: '@juliana_plus'
-    },
-    tags: ['Parceiro', 'Consultoria', 'B2B', 'Referência'],
-    pontuacao_lead: 90,
-    valor_potencial: 120000,
-    notas: 'Parceira estratégica com excelente rede de contatos. Fonte importante de indicações.',
-    anexos: [],
-    atividades_recentes: 15,
-    oportunidades_abertas: 3,
-    vendas_realizadas: 4,
-    valor_total_vendas: 156000,
-    categoria: 'parceiro'
-  }
-];
+import { BackToNucleus } from '../../components/navigation/BackToNucleus';
+import ModalNovoContato from '../../components/contatos/ModalNovoContato';
+import { contatosService, Contato } from '../../services/contatosService';
+import { clientesService, Cliente } from '../../services/clientesService';
 
 const ContatosPage: React.FC = () => {
-  const { t } = useI18n();
-  const navigate = useNavigate();
-
-  // Estados principais
-  const [contatos, setContatos] = useState<ContatoUI[]>(mockContatos);
-  const [filteredContatos, setFilteredContatos] = useState<ContatoUI[]>(mockContatos);
-  const [selectedContato, setSelectedContato] = useState<ContatoUI | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [showNewModal, setShowNewModal] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-
-  // Estados de filtros
+  const [contatos, setContatos] = useState<Contato[]>([]);
+  const [contatosFiltrados, setContatosFiltrados] = useState<Contato[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('todos');
-  const [tipoFilter, setTipoFilter] = useState<string>('todos');
-  const [proprietarioFilter, setProprietarioFilter] = useState<string>('todos');
-  const [fonteFilter, setFonteFilter] = useState<string>('todas');
+  const [clienteFiltro, setClienteFiltro] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [showModal, setShowModal] = useState(false);
+  const [contatoSelecionado, setContatoSelecionado] = useState<Contato | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Estados de visualização
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [sortBy, setSortBy] = useState<string>('nome');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-
-  // Estados de seleção em massa
-  const [selectedContatos, setSelectedContatos] = useState<string[]>([]);
-  const [showBulkActions, setShowBulkActions] = useState(false);
-
-  // Métricas calculadas
-  const metrics = useMemo(() => {
-    const total = contatos.length;
-    const ativos = contatos.filter(c => c.status === 'ativo' || c.status === 'cliente').length;
-    const prospectos = contatos.filter(c => c.status === 'prospecto').length;
-    const leads = contatos.filter(c => c.tipo === 'lead').length;
-    const valorPotencial = contatos.reduce((sum, c) => sum + c.valor_potencial, 0);
-    const pontuacaoMedia = contatos.reduce((sum, c) => sum + c.pontuacao_lead, 0) / total;
-    const novosMes = contatos.filter(c => {
-      const dataContato = new Date(c.data_criacao);
-      const agora = new Date();
-      return dataContato.getMonth() === agora.getMonth() && dataContato.getFullYear() === agora.getFullYear();
-    }).length;
-
-    return {
-      total,
-      ativos,
-      prospectos,
-      leads,
-      valorPotencial,
-      pontuacaoMedia: Math.round(pontuacaoMedia),
-      novosMes,
-      taxaConversao: total > 0 ? Math.round((ativos / total) * 100) : 0
-    };
-  }, [contatos]);
-
-  // Aplicar filtros
+  // Carregar dados iniciais
   useEffect(() => {
-    let filtered = [...contatos];
+    carregarDados();
+  }, []);
 
-    // Filtro de busca
+  // Filtrar contatos quando mudar busca ou filtro de cliente
+  useEffect(() => {
+    filtrarContatos();
+  }, [contatos, searchTerm, clienteFiltro]);
+
+  const carregarDados = async () => {
+    try {
+      setLoading(true);
+      // Carregar tudo em paralelo
+      const [contatosData, clientesData] = await Promise.all([
+        contatosService.listarTodos(),
+        clientesService.getClientes({ limit: 1000 })
+      ]);
+
+      setContatos(contatosData);
+      setClientes(clientesData.data);
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      toast.error('Erro ao carregar dados');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filtrarContatos = () => {
+    let resultado = [...contatos];
+
+    // Filtro por cliente
+    if (clienteFiltro) {
+      resultado = resultado.filter(c => c.clienteId === clienteFiltro);
+    }
+
+    // Filtro por busca
     if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(contato =>
-        contato.nome.toLowerCase().includes(term) ||
-        contato.email.toLowerCase().includes(term) ||
-        contato.empresa.toLowerCase().includes(term) ||
-        contato.telefone.includes(term) ||
-        contato.cargo.toLowerCase().includes(term) ||
-        contato.tags.some(tag => tag.toLowerCase().includes(term))
+      const termo = searchTerm.toLowerCase();
+      resultado = resultado.filter(contato =>
+        contato.nome.toLowerCase().includes(termo) ||
+        contato.email?.toLowerCase().includes(termo) ||
+        contato.telefone.includes(termo) ||
+        contato.cargo?.toLowerCase().includes(termo) ||
+        contato.cliente?.nome.toLowerCase().includes(termo)
       );
     }
 
-    // Filtros específicos
-    if (statusFilter !== 'todos') {
-      filtered = filtered.filter(contato => contato.status === statusFilter);
-    }
+    setContatosFiltrados(resultado);
+  };
 
-    if (tipoFilter !== 'todos') {
-      filtered = filtered.filter(contato => contato.tipo === tipoFilter);
-    }
-
-    if (proprietarioFilter !== 'todos') {
-      filtered = filtered.filter(contato => contato.proprietario === proprietarioFilter);
-    }
-
-    if (fonteFilter !== 'todas') {
-      filtered = filtered.filter(contato => contato.fonte === fonteFilter);
-    }
-
-    // Ordenação
-    filtered.sort((a, b) => {
-      let valueA: any, valueB: any;
-
-      switch (sortBy) {
-        case 'nome':
-          valueA = a.nome;
-          valueB = b.nome;
-          break;
-        case 'empresa':
-          valueA = a.empresa;
-          valueB = b.empresa;
-          break;
-        case 'data_criacao':
-          valueA = new Date(a.data_criacao);
-          valueB = new Date(b.data_criacao);
-          break;
-        case 'pontuacao_lead':
-          valueA = a.pontuacao_lead;
-          valueB = b.pontuacao_lead;
-          break;
-        case 'valor_potencial':
-          valueA = a.valor_potencial;
-          valueB = b.valor_potencial;
-          break;
-        default:
-          valueA = a.nome;
-          valueB = b.nome;
-      }
-
-      if (valueA < valueB) {
-        return sortOrder === 'asc' ? -1 : 1;
-      }
-      if (valueA > valueB) {
-        return sortOrder === 'asc' ? 1 : -1;
-      }
-      return 0;
-    });
-
-    setFilteredContatos(filtered);
-  }, [contatos, searchTerm, statusFilter, tipoFilter, proprietarioFilter, fonteFilter, sortBy, sortOrder]);
-
-  // Funções de manipulação
-  const handleSelectContato = (contato: ContatoUI) => {
-    setSelectedContato(contato);
+  const handleNovo = () => {
+    setContatoSelecionado(null);
     setShowModal(true);
   };
 
-  const handleEditContato = (contato: ContatoUI) => {
-    setSelectedContato(contato);
-    setShowNewModal(true);
+  const handleEditar = (contato: Contato) => {
+    setContatoSelecionado(contato);
+    setShowModal(true);
   };
 
-  const handleDeleteContato = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja excluir este contato?')) {
-      setContatos(prev => prev.filter(c => c.id !== id));
+  const handleRemover = async (contato: Contato) => {
+    // eslint-disable-next-line no-restricted-globals
+    if (!confirm(`Deseja realmente remover o contato ${contato.nome}?`)) {
+      return;
+    }
+
+    try {
+      await contatosService.remover(contato.id);
+      toast.success('Contato removido com sucesso!');
+      carregarDados();
+    } catch (error) {
+      console.error('Erro ao remover contato:', error);
+      toast.error('Erro ao remover contato');
     }
   };
 
-  const handleBulkAction = (action: string) => {
-    switch (action) {
-      case 'delete':
-        if (window.confirm(`Tem certeza que deseja excluir ${selectedContatos.length} contatos?`)) {
-          setContatos(prev => prev.filter(c => !selectedContatos.includes(c.id)));
-          setSelectedContatos([]);
-        }
-        break;
-      case 'export':
-        // Implementar exportação
-        console.log('Exportando contatos:', selectedContatos);
-        break;
-      case 'assign':
-        // Implementar atribuição
-        console.log('Atribuindo contatos:', selectedContatos);
-        break;
+  const handleDefinirPrincipal = async (contato: Contato) => {
+    try {
+      await contatosService.definirPrincipal(contato.id);
+      toast.success('Contato definido como principal!');
+      carregarDados();
+    } catch (error) {
+      console.error('Erro ao definir contato principal:', error);
+      toast.error('Erro ao definir contato principal');
     }
-    setShowBulkActions(false);
   };
 
-  const resetFilters = () => {
-    setSearchTerm('');
-    setStatusFilter('todos');
-    setTipoFilter('todos');
-    setProprietarioFilter('todos');
-    setFonteFilter('todas');
+  const handleSuccess = () => {
+    carregarDados();
   };
+
+  // Cliente selecionado
+  const clienteSelecionado = clientes.find(c => c.id === clienteFiltro);
+
+  // Estatísticas
+  const totalContatos = contatosFiltrados.length;
+  const contatosPrincipais = contatosFiltrados.filter(c => c.principal).length;
+  const contatosAtivos = contatosFiltrados.filter(c => c.ativo).length;
+  const contatosComEmail = contatosFiltrados.filter(c => c.email).length;
 
   return (
-    <div className="min-h-screen bg-[#DEEFE7]">
-      {/* Header com Back to Nucleus */}
-      <BackToNucleus
-        nucleusName="CRM"
-        nucleusPath="/nuclei/crm"
-        currentModuleName="Contatos"
-      />
+    <div className="min-h-screen bg-gray-50">
+      {/* BackToNucleus Fixo no Topo */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-20">
+        <div className="px-6 py-3">
+          <BackToNucleus nucleusName="CRM" nucleusPath="/crm" />
+        </div>
+      </div>
 
       <div className="p-6">
-        {/* Métricas de Contatos */}
-        <ContatoMetrics metrics={metrics} />
-
-        {/* Header da Lista */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-              <p className="text-[#B4BEC9]">Gerencie todos os seus contatos e relacionamentos</p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center gap-2 px-4 py-2 border border-[#B4BEC9] text-[#002333] rounded-lg hover:bg-[#DEEFE7] transition-colors"
-              >
-                <Filter className="w-4 h-4" />
-                Filtros
-              </button>
-
-              <button
-                className="flex items-center gap-2 px-4 py-2 border border-[#B4BEC9] text-[#002333] rounded-lg hover:bg-[#DEEFE7] transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Exportar
-              </button>
-
-              <button
-                className="flex items-center gap-2 px-4 py-2 border border-[#B4BEC9] text-[#002333] rounded-lg hover:bg-[#DEEFE7] transition-colors"
-              >
-                <Import className="w-4 h-4" />
-                Importar
-              </button>
-
-              <button
-                onClick={() => setShowNewModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg transition-all"
-              >
-                <UserPlus className="w-4 h-4" />
-                Novo Contato
-              </button>
-            </div>
-          </div>
-
-          {/* Barra de Pesquisa e Controles */}
-          <div className="mt-6 flex flex-col lg:flex-row gap-4">
-            {/* Pesquisa */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Pesquisar por nome, email, empresa, telefone ou tags..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-              />
-            </div>
-
-            {/* Controles de Visualização */}
-            <div className="flex items-center gap-2">
-              <div className="flex border border-gray-300 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-2 ${viewMode === 'grid' ? 'bg-[#159A9C] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-                >
-                  <Grid3X3 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 ${viewMode === 'list' ? 'bg-[#159A9C] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-                >
-                  <List className="w-4 h-4" />
-                </button>
-              </div>
-
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-              >
-                <option value="nome">Nome</option>
-                <option value="empresa">Empresa</option>
-                <option value="data_criacao">Data de Criação</option>
-                <option value="pontuacao_lead">Pontuação</option>
-                <option value="valor_potencial">Valor Potencial</option>
-              </select>
-
-              <button
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                <SortAsc className={`w-4 h-4 ${sortOrder === 'desc' ? 'rotate-180' : ''} transition-transform`} />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Filtros Expandidos */}
-        {showFilters && (
-          <ContatoFilters
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-            tipoFilter={tipoFilter}
-            setTipoFilter={setTipoFilter}
-            proprietarioFilter={proprietarioFilter}
-            setProprietarioFilter={setProprietarioFilter}
-            fonteFilter={fonteFilter}
-            setFonteFilter={setFonteFilter}
-            onReset={resetFilters}
-          />
-        )}
-
-        {/* Ações em Massa */}
-        {selectedContatos.length > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center justify-between">
-              <span className="text-blue-800 font-medium">
-                {selectedContatos.length} contatos selecionados
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleBulkAction('assign')}
-                  className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-                >
-                  Atribuir
-                </button>
-                <button
-                  onClick={() => handleBulkAction('export')}
-                  className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
-                >
-                  Exportar
-                </button>
-                <button
-                  onClick={() => handleBulkAction('delete')}
-                  className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-                >
-                  Excluir
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Lista de Contatos */}
-        <div className="bg-white rounded-lg shadow-sm">
-          {viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
-              {filteredContatos.map((contato) => (
-                <ContatoCard
-                  key={contato.id}
-                  contato={contato}
-                  onSelect={handleSelectContato}
-                  onEdit={handleEditContato}
-                  onDelete={handleDeleteContato}
-                  isSelected={selectedContatos.includes(contato.id)}
-                  onSelectToggle={(id, selected) => {
-                    if (selected) {
-                      setSelectedContatos(prev => [...prev, id]);
-                    } else {
-                      setSelectedContatos(prev => prev.filter(cId => cId !== id));
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="bg-white rounded-lg shadow-sm border mb-6">
+            <div className="px-6 py-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start">
+                <div>
+                  <h1 className="text-3xl font-bold text-[#002333] flex items-center">
+                    <Users className="h-8 w-8 mr-3 text-[#159A9C]" />
+                    Contatos
+                    {loading && (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#159A9C] ml-3"></div>
+                    )}
+                  </h1>
+                  <p className="mt-2 text-[#B4BEC9]">
+                    {loading
+                      ? 'Carregando contatos...'
+                      : clienteFiltro && clienteSelecionado
+                        ? `${totalContatos} contatos de ${clienteSelecionado.nome}`
+                        : `Gerencie seus ${totalContatos} contatos cadastrados`
                     }
-                  }}
-                />
-              ))}
+                  </p>
+                </div>
+                <div className="mt-4 sm:mt-0 flex items-center gap-3">
+                  <button
+                    onClick={handleNovo}
+                    className="bg-[#159A9C] hover:bg-[#0d7a7c] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                  >
+                    <Plus className="w-5 h-5" />
+                    Novo Contato
+                  </button>
+                </div>
+              </div>
             </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {filteredContatos.map((contato) => (
-                <div key={contato.id} className="p-6 hover:bg-gray-50 transition-colors">
-                  {/* Implementar vista em lista */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedContatos.includes(contato.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedContatos(prev => [...prev, contato.id]);
-                          } else {
-                            setSelectedContatos(prev => prev.filter(cId => cId !== contato.id));
-                          }
-                        }}
-                        className="rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
-                      />
+          </div>
+
+          {/* Dashboard Cards */}
+          {!loading && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total de Contatos</p>
+                    <p className="text-3xl font-bold text-gray-900 mt-2">{totalContatos}</p>
+                    <p className="text-xs text-gray-400 mt-1">📊 Cadastrados</p>
+                  </div>
+                  <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl">
+                    <Users className="w-8 h-8 text-blue-600" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Principais</p>
+                    <p className="text-3xl font-bold text-yellow-600 mt-2">{contatosPrincipais}</p>
+                    <p className="text-xs text-yellow-500 mt-1">⭐ Contato principal</p>
+                  </div>
+                  <div className="p-4 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-xl">
+                    <Star className="w-8 h-8 text-yellow-600" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Ativos</p>
+                    <p className="text-3xl font-bold text-green-600 mt-2">{contatosAtivos}</p>
+                    <p className="text-xs text-green-500 mt-1">✅ Em uso</p>
+                  </div>
+                  <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-xl">
+                    <User className="w-8 h-8 text-green-600" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Com E-mail</p>
+                    <p className="text-3xl font-bold text-purple-600 mt-2">{contatosComEmail}</p>
+                    <p className="text-xs text-purple-500 mt-1">📧 Cadastrado</p>
+                  </div>
+                  <div className="p-4 bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl">
+                    <Mail className="w-8 h-8 text-purple-600" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Filtros */}
+          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+            <div className="flex flex-col sm:flex-row gap-4 items-end">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Cliente (opcional)</label>
+                <select
+                  value={clienteFiltro}
+                  onChange={(e) => setClienteFiltro(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent bg-white"
+                >
+                  <option value="">Todos os clientes</option>
+                  {clientes.map(cliente => (
+                    <option key={cliente.id} value={cliente.id}>
+                      {cliente.nome} {cliente.documento ? `- ${cliente.documento}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Buscar Contatos</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por nome, email, telefone, cargo, empresa..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              {contatosFiltrados.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Modo de Visualização</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setViewMode('grid')}
+                      className={`p-2.5 rounded-lg transition-colors border ${viewMode === 'grid'
+                        ? 'bg-[#159A9C] text-white border-[#159A9C]'
+                        : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-300'
+                        }`}
+                      title="Visualização em Grade"
+                    >
+                      <Grid3X3 className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => setViewMode('list')}
+                      className={`p-2.5 rounded-lg transition-colors border ${viewMode === 'list'
+                        ? 'bg-[#159A9C] text-white border-[#159A9C]'
+                        : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-300'
+                        }`}
+                      title="Visualização em Lista"
+                    >
+                      <ListIcon className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Loading */}
+          {loading && (
+            <div className="bg-white rounded-lg shadow-sm border p-12">
+              <div className="flex flex-col items-center justify-center">
+                <Loader2 className="w-12 h-12 animate-spin text-[#159A9C] mb-4" />
+                <p className="text-gray-600">Carregando contatos...</p>
+              </div>
+            </div>
+          )}
+
+          {/* Estado Vazio - Nenhum contato */}
+          {!loading && contatosFiltrados.length === 0 && (
+            <div className="bg-white rounded-lg shadow-sm border p-12">
+              <div className="text-center">
+                <User className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {searchTerm || clienteFiltro
+                    ? 'Nenhum contato encontrado'
+                    : 'Nenhum contato cadastrado'}
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  {searchTerm || clienteFiltro
+                    ? 'Tente ajustar os filtros de busca'
+                    : 'Comece adicionando o primeiro contato'}
+                </p>
+                {!searchTerm && !clienteFiltro && (
+                  <button
+                    onClick={handleNovo}
+                    className="px-6 py-3 bg-gradient-to-r from-[#159A9C] to-[#0d7a7d] text-white rounded-lg hover:shadow-lg transition-all inline-flex items-center gap-2"
+                  >
+                    <Plus className="w-5 h-5" />
+                    Novo Contato
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Lista de Contatos - Grid */}
+          {!loading && viewMode === 'grid' && contatosFiltrados.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {contatosFiltrados.map(contato => (
+                <div
+                  key={contato.id}
+                  className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow"
+                >
+                  {/* Cabeçalho do Card */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-gradient-to-br from-[#159A9C] to-[#0d7a7d] rounded-full flex items-center justify-center text-white font-bold text-lg">
+                        {contato.nome.charAt(0).toUpperCase()}
+                      </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900">{(() => {
-                          try {
-                            const safeContato = validateAndSanitizeContact(contato);
-                            return safeRender(safeContato.nome);
-                          } catch {
-                            return 'Nome não disponível';
-                          }
-                        })()}</h3>
-                        <p className="text-sm text-gray-600">{safeRender(contato.empresa)} • {safeRender(contato.cargo)}</p>
+                        <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                          {contato.nome}
+                          {contato.principal && (
+                            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                          )}
+                        </h3>
+                        {contato.cargo && (
+                          <p className="text-sm text-gray-600">{contato.cargo}</p>
+                        )}
+                        {contato.cliente && (
+                          <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                            <Building className="w-3 h-3" />
+                            {contato.cliente.nome}
+                          </p>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 text-xs rounded-full ${contato.status === 'cliente' ? 'bg-green-100 text-green-800' :
-                        contato.status === 'prospecto' ? 'bg-blue-100 text-blue-800' :
-                          contato.status === 'ativo' ? 'bg-green-100 text-green-800' :
-                            'bg-gray-100 text-gray-800'
-                        }`}>
-                        {(() => {
-                          try {
-                            const safeContato = validateAndSanitizeContact(contato);
-                            return safeRender(safeContato.status);
-                          } catch {
-                            return 'Status não disponível';
-                          }
-                        })()}
-                      </span>
-                      <button
-                        onClick={() => handleSelectContato(contato)}
-                        className="p-1 text-gray-400 hover:text-[#159A9C]"
-                      >
-                        <Eye className="w-4 h-4" />
+
+                    {/* Menu */}
+                    <div className="relative group">
+                      <button className="p-1 text-gray-400 hover:text-gray-600">
+                        <MoreVertical className="w-5 h-5" />
                       </button>
+                      <div className="absolute right-0 top-8 w-48 bg-white border border-gray-200 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                        <button
+                          onClick={() => handleEditar(contato)}
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                        >
+                          <Edit className="w-4 h-4" />
+                          Editar
+                        </button>
+                        {!contato.principal && (
+                          <button
+                            onClick={() => handleDefinirPrincipal(contato)}
+                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          >
+                            <Star className="w-4 h-4" />
+                            Definir como Principal
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleRemover(contato)}
+                          className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Remover
+                        </button>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Informações de Contato */}
+                  <div className="space-y-2">
+                    {contato.email && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <Mail className="w-4 h-4 text-gray-400" />
+                        <span className="truncate">{contato.email}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Phone className="w-4 h-4 text-gray-400" />
+                      <span>{contatosService.formatarTelefone(contato.telefone)}</span>
+                    </div>
+                  </div>
+
+                  {/* Observações */}
+                  {contato.observacoes && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <p className="text-sm text-gray-500 line-clamp-2">
+                        {contato.observacoes}
+                      </p>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
 
-          {filteredContatos.length === 0 && (
-            <div className="text-center py-12">
-              <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum contato encontrado</h3>
-              <p className="text-gray-500 mb-4">Tente ajustar os filtros ou adicionar um novo contato.</p>
-              <button
-                onClick={() => setShowNewModal(true)}
-                className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg transition-all"
-              >
-                <UserPlus className="w-4 h-4 mr-2" />
-                Novo Contato
-              </button>
+          {/* Lista de Contatos - Tabela */}
+          {!loading && viewMode === 'list' && contatosFiltrados.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Nome
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Cliente
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Cargo
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Email
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Telefone
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Ações
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {contatosFiltrados.map(contato => (
+                    <tr key={contato.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gradient-to-br from-[#159A9C] to-[#0d7a7d] rounded-full flex items-center justify-center text-white font-bold">
+                            {contato.nome.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900 flex items-center gap-2">
+                              {contato.nome}
+                              {contato.principal && (
+                                <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {contato.cliente ? (
+                          <div className="flex items-center gap-1 text-sm text-gray-600">
+                            <Building className="w-3 h-3" />
+                            {contato.cliente.nome}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {contato.cargo || '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {contato.email || '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {contatosService.formatarTelefone(contato.telefone)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleEditar(contato)}
+                            className="p-2 text-gray-600 hover:text-[#159A9C] hover:bg-gray-100 rounded-lg transition-colors"
+                            title="Editar"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          {!contato.principal && (
+                            <button
+                              onClick={() => handleDefinirPrincipal(contato)}
+                              className="p-2 text-gray-600 hover:text-yellow-500 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="Definir como Principal"
+                            >
+                              <Star className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleRemover(contato)}
+                            className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Remover"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
+
+          {/* Modal */}
+          <ModalNovoContato
+            isOpen={showModal}
+            onClose={() => {
+              setShowModal(false);
+              setContatoSelecionado(null);
+            }}
+            onSuccess={handleSuccess}
+            contato={contatoSelecionado}
+            clienteId={clienteFiltro}
+          />
         </div>
       </div>
-
-      {/* Modais */}
-      {showModal && selectedContato && (
-        <ModalContato
-          contato={selectedContato}
-          onClose={() => {
-            setShowModal(false);
-            setSelectedContato(null);
-          }}
-          onEdit={handleEditContato}
-          onDelete={handleDeleteContato}
-        />
-      )}
-
-      {showNewModal && (
-        <ModalNovoContato
-          contato={selectedContato}
-          onClose={() => {
-            setShowNewModal(false);
-            setSelectedContato(null);
-          }}
-          onSave={(contato) => {
-            if (selectedContato) {
-              // Editar
-              setContatos(prev => prev.map(c => c.id === contato.id ? contato : c));
-            } else {
-              // Criar
-              setContatos(prev => [...prev, { ...contato, id: Date.now().toString() }]);
-            }
-            setShowNewModal(false);
-            setSelectedContato(null);
-          }}
-        />
-      )}
     </div>
   );
 };

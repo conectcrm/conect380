@@ -27,6 +27,17 @@ import { Atendente } from '../modules/atendimento/entities/atendente.entity';
 import { Ticket } from '../modules/atendimento/entities/ticket.entity';
 import { Mensagem } from '../modules/atendimento/entities/mensagem.entity';
 import { IntegracoesConfig } from '../modules/atendimento/entities/integracoes-config.entity'; // ✅ Adicionado para IA
+import { NotaCliente } from '../modules/atendimento/entities/nota-cliente.entity'; // ✅ SPRINT 1 - Notas dos clientes
+import { Demanda } from '../modules/atendimento/entities/demanda.entity'; // ✅ SPRINT 1 - Demandas dos clientes
+import { NucleoAtendimento } from '../modules/triagem/entities/nucleo-atendimento.entity';
+import { Departamento } from '../modules/triagem/entities/departamento.entity';
+import { FluxoTriagem } from '../modules/triagem/entities/fluxo-triagem.entity';
+import { SessaoTriagem } from '../modules/triagem/entities/sessao-triagem.entity';
+import { Equipe } from '../modules/triagem/entities/equipe.entity';
+import { AtendenteEquipe } from '../modules/triagem/entities/atendente-equipe.entity';
+import { AtendenteAtribuicao } from '../modules/triagem/entities/atendente-atribuicao.entity';
+import { EquipeAtribuicao } from '../modules/triagem/entities/equipe-atribuicao.entity';
+import { TriagemLog } from '../modules/triagem/entities/triagem-log.entity';
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
@@ -67,10 +78,23 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         Ticket, // Módulo omnichannel
         Mensagem, // Módulo omnichannel
         IntegracoesConfig, // ✅ Configurações de IA (OpenAI, Anthropic)
+        NotaCliente, // ✅ SPRINT 1 - Notas dos clientes
+        Demanda, // ✅ SPRINT 1 - Demandas dos clientes
+        NucleoAtendimento, // Módulo triagem
+        Departamento, // Módulo triagem
+        FluxoTriagem, // Módulo triagem
+        SessaoTriagem, // Módulo triagem
+        Equipe, // Módulo triagem
+        AtendenteEquipe, // Módulo triagem
+        AtendenteAtribuicao, // Módulo triagem
+        EquipeAtribuicao, // Módulo triagem
+        TriagemLog, // Módulo triagem
       ],
-      synchronize: false, // Desabilitado temporariamente para evitar conflitos de schema
+      synchronize: false, // Desabilitado - apenas tabelas base criadas manualmente
       logging: this.configService.get('APP_ENV') === 'development',
-      ssl: this.configService.get('APP_ENV') === 'production' ? {
+      cache: false, // ⚡ CRITICAL: Desabilita cache do TypeORM para evitar dados obsoletos
+      // SSL apenas se DATABASE_SSL=true (para RDS externo)
+      ssl: this.configService.get('DATABASE_SSL') === 'true' ? {
         rejectUnauthorized: false,
       } : false,
     };

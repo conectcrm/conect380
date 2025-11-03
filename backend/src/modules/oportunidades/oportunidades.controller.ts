@@ -1,12 +1,12 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Body, 
-  Patch, 
-  Param, 
-  Delete, 
-  Query, 
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
   UseGuards,
   ParseIntPipe
 } from '@nestjs/common';
@@ -19,16 +19,16 @@ import { User } from '../users/user.entity';
 import { EstagioOportunidade } from './oportunidade.entity';
 
 @Controller('oportunidades')
-// @UseGuards(JwtAuthGuard) // Temporariamente comentado para teste
+@UseGuards(JwtAuthGuard)
 export class OportunidadesController {
-  constructor(private readonly oportunidadesService: OportunidadesService) {}
+  constructor(private readonly oportunidadesService: OportunidadesService) { }
 
   @Post()
   create(@Body() createOportunidadeDto: CreateOportunidadeDto, @CurrentUser() user?: User) {
     // Mock user para teste com UUID válido
-    const mockUser = user || { 
+    const mockUser = user || {
       id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479', // UUID fixo para teste
-      role: 'admin', 
+      role: 'admin',
       empresa_id: 'f47ac10b-58cc-4372-a567-0e02b2c3d480',
       nome: 'Admin Teste'
     } as User;
@@ -45,9 +45,9 @@ export class OportunidadesController {
     @Query('dataFim') dataFim?: string,
   ) {
     // Mock user para teste
-    const mockUser = user || { 
-      id: 'mock-user', 
-      role: 'admin', 
+    const mockUser = user || {
+      id: 'mock-user',
+      role: 'admin',
       empresa_id: '1',
       nome: 'Admin Teste'
     } as User;
@@ -66,9 +66,9 @@ export class OportunidadesController {
   @Get('pipeline')
   getPipelineData(@CurrentUser() user?: User) {
     // Mock user para teste
-    const mockUser = user || { 
-      id: 'mock-user', 
-      role: 'admin', 
+    const mockUser = user || {
+      id: 'mock-user',
+      role: 'admin',
       empresa_id: '1',
       nome: 'Admin Teste'
     } as User;
@@ -81,9 +81,9 @@ export class OportunidadesController {
     @Query() queryDto?: MetricasQueryDto,
   ) {
     // Mock user para teste
-    const mockUser = user || { 
-      id: 'mock-user', 
-      role: 'admin', 
+    const mockUser = user || {
+      id: 'mock-user',
+      role: 'admin',
       empresa_id: '1',
       nome: 'Admin Teste'
     } as User;
@@ -93,9 +93,9 @@ export class OportunidadesController {
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user?: User) {
     // Mock user para teste
-    const mockUser = user || { 
-      id: 'mock-user', 
-      role: 'admin', 
+    const mockUser = user || {
+      id: 'mock-user',
+      role: 'admin',
       empresa_id: '1',
       nome: 'Admin Teste'
     } as User;
@@ -104,14 +104,14 @@ export class OportunidadesController {
 
   @Patch(':id')
   update(
-    @Param('id', ParseIntPipe) id: number, 
+    @Param('id', ParseIntPipe) id: number,
     @Body() updateOportunidadeDto: UpdateOportunidadeDto,
     @CurrentUser() user?: User
   ) {
     // Mock user para teste
-    const mockUser = user || { 
-      id: 'mock-user', 
-      role: 'admin', 
+    const mockUser = user || {
+      id: 'mock-user',
+      role: 'admin',
       empresa_id: '1',
       nome: 'Admin Teste'
     } as User;
@@ -125,9 +125,9 @@ export class OportunidadesController {
     @CurrentUser() user?: User
   ) {
     // Mock user para teste
-    const mockUser = user || { 
-      id: 'mock-user', 
-      role: 'admin', 
+    const mockUser = user || {
+      id: 'mock-user',
+      role: 'admin',
       empresa_id: '1',
       nome: 'Admin Teste'
     } as User;
@@ -137,9 +137,9 @@ export class OportunidadesController {
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user?: User) {
     // Mock user para teste
-    const mockUser = user || { 
-      id: 'mock-user', 
-      role: 'admin', 
+    const mockUser = user || {
+      id: 'mock-user',
+      role: 'admin',
       empresa_id: '1',
       nome: 'Admin Teste'
     } as User;
@@ -153,9 +153,9 @@ export class OportunidadesController {
     @CurrentUser() user?: User
   ) {
     // Mock user para teste
-    const mockUser = user || { 
-      id: 'mock-user', 
-      role: 'admin', 
+    const mockUser = user || {
+      id: 'mock-user',
+      role: 'admin',
       empresa_id: '1',
       nome: 'Admin Teste'
     } as User;

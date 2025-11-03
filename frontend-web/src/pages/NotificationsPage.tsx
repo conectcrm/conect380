@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../contexts/NotificationContext';
-import { 
-  ArrowLeft, 
-  Bell, 
-  Check, 
-  Trash2, 
+import {
+  ArrowLeft,
+  Bell,
+  Check,
+  Trash2,
   Calendar,
   AlertCircle,
   Info,
@@ -17,26 +17,28 @@ import {
 
 const NotificationsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { 
-    notifications, 
-    markAsRead, 
-    deleteNotification, 
-    clearAllNotifications,
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    removeNotification,
+    clearAll,
     reminders,
-    deleteReminder 
+    removeReminder
   } = useNotifications();
-  
+
   const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'success' | 'error' | 'warning' | 'info'>('all');
 
   // Filtrar notificações
   const filteredNotifications = notifications.filter(notification => {
-    const statusMatch = filter === 'all' || 
-      (filter === 'read' && notification.isRead) || 
-      (filter === 'unread' && !notification.isRead);
-    
+    const statusMatch = filter === 'all' ||
+      (filter === 'read' && notification.read) ||
+      (filter === 'unread' && !notification.read);
+
     const typeMatch = typeFilter === 'all' || notification.type === typeFilter;
-    
+
     return statusMatch && typeMatch;
   });
 
@@ -59,23 +61,22 @@ const NotificationsPage: React.FC = () => {
     }
   };
 
-  const formatTime = (timestamp: number) => {
+  const formatTime = (timestamp: Date) => {
+    const timestampMs = timestamp.getTime();
     const now = Date.now();
-    const diff = now - timestamp;
-    
+    const diff = now - timestampMs;
+
     const minutes = Math.floor(diff / (1000 * 60));
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
+
     if (minutes < 1) return 'Agora';
     if (minutes < 60) return `${minutes}m atrás`;
     if (hours < 24) return `${hours}h atrás`;
     if (days < 7) return `${days}d atrás`;
-    
-    return new Date(timestamp).toLocaleDateString('pt-BR');
-  };
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+    return timestamp.toLocaleDateString('pt-BR');
+  };
 
   return (
     <div className="min-h-screen bg-[#DEEFE7]">
@@ -84,7 +85,7 @@ const NotificationsPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
-              <button 
+              <button
                 onClick={() => navigate('/dashboard')}
                 className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
               >
@@ -101,9 +102,9 @@ const NotificationsPage: React.FC = () => {
                 )}
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-2">
-              <button 
+              <button
                 onClick={() => navigate('/dashboard')}
                 className="p-2 text-gray-400 hover:text-[#159A9C] hover:bg-[#DEEFE7] rounded-lg transition-colors"
                 title="Configurações"
@@ -113,16 +114,13 @@ const NotificationsPage: React.FC = () => {
               {notifications.length > 0 && (
                 <>
                   <button
-                    onClick={() => {
-                      // Marcar todas como lidas
-                      notifications.filter(n => !n.isRead).forEach(n => markAsRead(n.id));
-                    }}
+                    onClick={markAllAsRead}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
                   >
                     Marcar Todas como Lidas
                   </button>
                   <button
-                    onClick={clearAllNotifications}
+                    onClick={clearAll}
                     className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
                   >
                     Limpar Todas
@@ -140,7 +138,7 @@ const NotificationsPage: React.FC = () => {
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-sm p-6 sticky top-8">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Filtros</h2>
-              
+
               {/* Filtro por Status */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -206,9 +204,9 @@ const NotificationsPage: React.FC = () => {
               <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-gray-900">
-                    {filter === 'all' ? 'Todas as Notificações' : 
-                     filter === 'unread' ? 'Notificações Não Lidas' : 
-                     'Notificações Lidas'}
+                    {filter === 'all' ? 'Todas as Notificações' :
+                      filter === 'unread' ? 'Notificações Não Lidas' :
+                        'Notificações Lidas'}
                   </h2>
                   <span className="text-sm text-gray-500">
                     {filteredNotifications.length} de {notifications.length} notificações
@@ -222,9 +220,8 @@ const NotificationsPage: React.FC = () => {
                   filteredNotifications.map((notification) => (
                     <div
                       key={notification.id}
-                      className={`p-6 hover:bg-gray-50 transition-colors border-l-4 ${getPriorityColor(notification.priority)} ${
-                        !notification.isRead ? 'bg-blue-50' : ''
-                      }`}
+                      className={`p-6 hover:bg-gray-50 transition-colors border-l-4 ${getPriorityColor(notification.priority)} ${!notification.read ? 'bg-blue-50' : ''
+                        }`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex items-start space-x-4 flex-1">
@@ -236,14 +233,14 @@ const NotificationsPage: React.FC = () => {
                           {/* Conteúdo */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center space-x-2 mb-1">
-                              <h3 className={`text-lg font-semibold ${!notification.isRead ? 'text-gray-900' : 'text-gray-700'}`}>
+                              <h3 className={`text-lg font-semibold ${!notification.read ? 'text-gray-900' : 'text-gray-700'}`}>
                                 {notification.title}
                               </h3>
-                              {!notification.isRead && (
+                              {!notification.read && (
                                 <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                               )}
                             </div>
-                            <p className={`text-sm ${!notification.isRead ? 'text-gray-800' : 'text-gray-600'} mb-2`}>
+                            <p className={`text-sm ${!notification.read ? 'text-gray-800' : 'text-gray-600'} mb-2`}>
                               {notification.message}
                             </p>
                             <div className="flex items-center space-x-4 text-xs text-gray-500">
@@ -263,7 +260,7 @@ const NotificationsPage: React.FC = () => {
 
                         {/* Ações */}
                         <div className="flex items-center space-x-2 ml-4">
-                          {!notification.isRead && (
+                          {!notification.read && (
                             <button
                               onClick={() => markAsRead(notification.id)}
                               className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
@@ -273,7 +270,7 @@ const NotificationsPage: React.FC = () => {
                             </button>
                           )}
                           <button
-                            onClick={() => deleteNotification(notification.id)}
+                            onClick={() => removeNotification(notification.id)}
                             className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                             title="Excluir notificação"
                           >
@@ -290,8 +287,8 @@ const NotificationsPage: React.FC = () => {
                       {filter === 'unread' ? 'Nenhuma notificação não lida' : 'Nenhuma notificação encontrada'}
                     </h3>
                     <p className="text-gray-500">
-                      {filter === 'unread' 
-                        ? 'Você está em dia com suas notificações!' 
+                      {filter === 'unread'
+                        ? 'Você está em dia com suas notificações!'
                         : 'As notificações aparecerão aqui conforme você usar o sistema.'}
                     </p>
                   </div>
@@ -325,12 +322,12 @@ const NotificationsPage: React.FC = () => {
                           <div className="flex items-center space-x-4 text-sm text-gray-600">
                             <span className="flex items-center space-x-1">
                               <Calendar className="w-4 h-4" />
-                              <span>{new Date(reminder.dateTime).toLocaleString('pt-BR')}</span>
+                              <span>{new Date(reminder.scheduledFor).toLocaleString('pt-BR')}</span>
                             </span>
                             <span className="capitalize px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
                               {reminder.entityType}
                             </span>
-                            {reminder.isRecurring && (
+                            {reminder.recurring && (
                               <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs">
                                 Recorrente
                               </span>
@@ -338,7 +335,7 @@ const NotificationsPage: React.FC = () => {
                           </div>
                         </div>
                         <button
-                          onClick={() => deleteReminder(reminder.id)}
+                          onClick={() => removeReminder(reminder.id)}
                           className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Excluir lembrete"
                         >

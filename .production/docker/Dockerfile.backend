@@ -1,0 +1,74 @@
+# ============================================
+# Dockerfile Backend - ConectCRM Production
+# ============================================
+# Multi-stage build otimizado para produção
+# Porta: 3500 (unificada)
+# Health check: Configurado corretamente
+# ============================================
+
+# ============================================
+# Stage 1: Build
+# ============================================
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copiar arquivos de dependências
+COPY backend/package*.json ./
+COPY backend/tsconfig*.json ./
+
+# Instalar dependências (incluindo devDependencies para build)
+RUN npm ci --legacy-peer-deps
+
+# Copiar código fonte
+COPY backend/src ./src
+COPY backend/ormconfig.js ./
+
+# Build da aplicação TypeScript
+RUN npm run build
+
+# Limpar devDependencies (reduzir tamanho da imagem)
+RUN npm prune --production --legacy-peer-deps
+
+# ============================================
+# Stage 2: Production
+# ============================================
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Instalar dumb-init para gerenciamento correto de processos
+RUN apk add --no-cache dumb-init curl
+
+# Criar usuário não-root (segurança)
+RUN addgroup -g 1001 -S nodejs && \
+  adduser -S nestjs -u 1001
+
+# Copiar dependências de produção do stage anterior
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
+
+# Copiar build compilado
+COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
+COPY --from=builder --chown=nestjs:nodejs /app/ormconfig.js ./
+
+# Criar diretórios necessários para uploads e logs
+RUN mkdir -p uploads logs && \
+  chown -R nestjs:nodejs uploads logs
+
+# Trocar para usuário não-root
+USER nestjs
+
+# Expor porta 3001 (porta padrão do NestJS)
+EXPOSE 3001
+
+# Health check configurado para porta 3001
+# Verifica a cada 30s, timeout 3s, espera inicial 40s, 3 tentativas antes de marcar unhealthy
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:3001/health || exit 1
+
+# Usar dumb-init para gerenciar processos corretamente
+ENTRYPOINT ["dumb-init", "--"]
+
+# Executar aplicação
+CMD ["node", "dist/main.js"]

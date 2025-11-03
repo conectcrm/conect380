@@ -1,0 +1,281 @@
+/* =====================================================
+   CHAT RESPONSIVO - UTILIDADES CSS ESPECÍFICAS
+   ===================================================== */
+
+/* Altura responsiva do chat - Adapta ao viewport sem scroll */
+.chat-height-responsive {
+  height: 100%;
+  /* Usar 100% da altura do container pai (main) */
+  min-height: 500px;
+  /* Altura mínima para usabilidade */
+  overflow: hidden;
+  /* Previne scroll no container principal */
+  /* Garantir que não há espaços extras */
+  box-sizing: border-box;
+}
+
+/* Para viewports menores em altura (como laptops) */
+@media (max-height: 768px) {
+  .chat-height-responsive {
+    height: 100%;
+    /* Manter consistente */
+    min-height: 400px;
+  }
+}
+
+/* Layout de grid responsivo para 3 colunas */
+.chat-layout-responsive {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) 1fr minmax(280px, 320px);
+  gap: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Tablet: Remove coluna do cliente */
+@media (max-width: 1279px) {
+  .chat-layout-responsive {
+    grid-template-columns: minmax(280px, 320px) 1fr;
+  }
+}
+
+/* Ajuste específico para laptops comuns (1366x768, 1440x900, etc) */
+@media (min-width: 1280px) and (max-height: 800px) {
+  .chat-height-responsive {
+    height: 100%;
+    /* Usar valor padrão */
+  }
+
+  .messages-container-responsive {
+    padding-bottom: 1rem;
+    /* Menos padding em telas baixas */
+  }
+
+  .chat-input-responsive {
+    padding: 0.75rem 1.5rem;
+    /* Input mais compacto */
+  }
+}
+
+/* Mobile: Layout de coluna única */
+@media (max-width: 767px) {
+  .chat-layout-responsive {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-height-responsive {
+    height: 100%;
+    /* Consistente com desktop */
+    min-height: 400px;
+    /* Altura mínima menor para mobile */
+  }
+}
+
+/* Sidebar responsiva */
+.sidebar-responsive {
+  overflow-y: auto;
+  max-height: 100%;
+  transition: width 0.3s ease;
+}
+
+/* Área do chat - Central */
+.chat-area-responsive {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: #f9fafb;
+}
+
+/* Container de mensagens com scroll otimizado */
+.messages-container-responsive {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1rem 1.5rem;
+  background: #f9fafb;
+  /* Garantir que há espaço suficiente acima da área de input */
+  padding-bottom: 2rem;
+
+  /* Scroll personalizado */
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.messages-container-responsive::-webkit-scrollbar {
+  width: 6px;
+}
+
+.messages-container-responsive::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.messages-container-responsive::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 3px;
+}
+
+.messages-container-responsive::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+}
+
+/* Input área fixa no bottom */
+.chat-input-responsive {
+  flex-shrink: 0;
+  padding: 1rem 1.5rem;
+  background: white;
+  border-top: 1px solid #e5e7eb;
+  /* Garantir que a área de input seja sempre visível */
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  /* Adicionar sombra sutil para destacar */
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Cliente panel responsivo */
+.cliente-panel-responsive {
+  overflow-y: auto;
+  max-height: 100%;
+  background: white;
+  border-left: 1px solid #e5e7eb;
+}
+
+/* Drawer para tablet - Cliente panel como overlay */
+@media (max-width: 1279px) and (min-width: 768px) {
+  .cliente-panel-drawer {
+    position: fixed;
+    right: 0;
+    top: 64px;
+    bottom: 0;
+    width: 320px;
+    z-index: 50;
+    background: white;
+    box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+  }
+
+  .cliente-panel-drawer.open {
+    transform: translateX(0);
+  }
+
+  .cliente-panel-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 40;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+  }
+
+  .cliente-panel-overlay.open {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+/* Mobile: Navegação em tabs */
+@media (max-width: 767px) {
+  .mobile-chat-tabs {
+    display: flex;
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .mobile-chat-tab {
+    flex: 1;
+    padding: 12px;
+    text-align: center;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
+  }
+
+  .mobile-chat-tab.active {
+    border-bottom-color: var(--primary-color, #3b82f6);
+    color: var(--primary-color, #3b82f6);
+    font-weight: 600;
+  }
+
+  .mobile-content-panels {
+    display: none;
+  }
+
+  .mobile-content-panels.active {
+    display: flex;
+    flex-direction: column;
+    height: calc(100% - 60px);
+    /* 60px = altura das tabs */
+  }
+}
+
+/* Otimizações de performance */
+.chat-container-optimized {
+  contain: layout style paint;
+  transform: translateZ(0);
+  /* Force GPU acceleration */
+  backface-visibility: hidden;
+  /* Garantir que não há overflow ou margin/padding interferindo */
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+/* Estados de loading suaves */
+.chat-loading-state {
+  opacity: 0.7;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+/* Animações suaves para transições de layout */
+.layout-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Utilities para hide/show em breakpoints específicos */
+.hidden-mobile {
+  display: block;
+}
+
+@media (max-width: 767px) {
+  .hidden-mobile {
+    display: none;
+  }
+}
+
+.hidden-tablet {
+  display: block;
+}
+
+@media (max-width: 1279px) and (min-width: 768px) {
+  .hidden-tablet {
+    display: none;
+  }
+}
+
+.hidden-desktop {
+  display: block;
+}
+
+@media (min-width: 1280px) {
+  .hidden-desktop {
+    display: none;
+  }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+
+  .layout-transition,
+  .cliente-panel-drawer,
+  .cliente-panel-overlay {
+    transition: none;
+  }
+}
+
+/* Focus management para keyboard navigation */
+.chat-area-responsive:focus-within .messages-container-responsive {
+  scrollbar-color: #3b82f6 transparent;
+}

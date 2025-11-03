@@ -1,704 +1,427 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  X, 
-  Save, 
-  Mail, 
-  Phone, 
-  Building, 
-  MapPin, 
+import {
+  X,
+  Save,
+  Mail,
+  Phone,
+  Building,
   User,
-  Globe,
-  Tag,
   FileText,
   Star,
-  Calendar,
-  Plus,
-  Trash2
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
-import { Contato } from '../../features/contatos/services/contatosService';
+import toast from 'react-hot-toast';
+import ClienteSelect, { ClienteSelectValue } from '../selects/ClienteSelect';
+import { contatosService, Contato, CreateContatoDto, UpdateContatoDto } from '../../services/contatosService';
 
 interface ModalNovoContatoProps {
-  contato?: Contato | null;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (contato: Partial<Contato>) => void;
+  onSuccess: () => void;
+  contato?: Contato;
+  clienteId?: string;
 }
 
-export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
-  contato,
+interface FormErrors {
+  nome?: string;
+  telefone?: string;
+  email?: string;
+  clienteId?: string;
+}
+
+const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
   isOpen,
   onClose,
-  onSave
+  onSuccess,
+  contato,
+  clienteId: clienteIdProp
 }) => {
-  const [formData, setFormData] = useState<Partial<Contato>>({
+  const [loading, setLoading] = useState(false);
+  const [clienteSelecionado, setClienteSelecionado] = useState<ClienteSelectValue | null>(null);
+  const [formData, setFormData] = useState({
     nome: '',
     email: '',
     telefone: '',
-    empresa: '',
     cargo: '',
-    status: 'prospecto',
-    tipo: 'lead',
-    fonte: '',
-    proprietario: 'Maria Santos',
-    data_nascimento: '',
-    endereco: {
-      rua: '',
-      cidade: '',
-      estado: '',
-      cep: '',
-      pais: 'Brasil'
-    },
-    redes_sociais: {
-      linkedin: '',
-      twitter: '',
-      facebook: '',
-      instagram: ''
-    },
-    tags: [],
-    pontuacao_lead: 0,
-    valor_potencial: 0,
-    notas: '',
-    categoria: 'Geral'
+    principal: false,
+    observacoes: ''
   });
+  const [errors, setErrors] = useState<FormErrors>({});
 
-  const [newTag, setNewTag] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const sanitizeTelefoneInput = (value: string): string => {
+    if (!value) {
+      return '';
+    }
+
+    let sanitized = value.replace(/[^0-9+\s()-]/g, '');
+
+    // Permite apenas um sinal de + e sempre na primeira posição
+    if (sanitized.includes('+')) {
+      const semMais = sanitized.replace(/\+/g, '');
+      sanitized = semMais ? `+${semMais}` : '+';
+    }
+
+    return sanitized;
+  };
 
   useEffect(() => {
     if (contato) {
       setFormData({
-        ...contato,
-        endereco: contato.endereco || {
-          rua: '',
-          cidade: '',
-          estado: '',
-          cep: '',
-          pais: 'Brasil'
-        },
-        redes_sociais: contato.redes_sociais || {
-          linkedin: '',
-          twitter: '',
-          facebook: '',
-          instagram: ''
-        }
+        nome: contato.nome || '',
+        email: contato.email || '',
+        telefone: contato.telefone || '',
+        cargo: contato.cargo || '',
+        principal: contato.principal || false,
+        observacoes: contato.observacoes || ''
       });
+      if (contato.cliente) {
+        setClienteSelecionado({
+          id: contato.cliente.id,
+          nome: contato.cliente.nome,
+          documento: contato.cliente.documento,
+          email: contato.cliente.email,
+          telefone: contato.cliente.telefone,
+          tipo: contato.cliente.tipo,
+        });
+      }
     } else {
       setFormData({
         nome: '',
         email: '',
         telefone: '',
-        empresa: '',
         cargo: '',
-        status: 'prospecto',
-        tipo: 'lead',
-        fonte: '',
-        proprietario: 'Maria Santos',
-        data_nascimento: '',
-        endereco: {
-          rua: '',
-          cidade: '',
-          estado: '',
-          cep: '',
-          pais: 'Brasil'
-        },
-        redes_sociais: {
-          linkedin: '',
-          twitter: '',
-          facebook: '',
-          instagram: ''
-        },
-        tags: [],
-        pontuacao_lead: 0,
-        valor_potencial: 0,
-        notas: '',
-        categoria: 'Geral'
+        principal: false,
+        observacoes: ''
       });
+      setClienteSelecionado(null);
     }
-    setErrors({});
-  }, [contato, isOpen]);
+  }, [contato]);
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
+  const handleClienteSelecionado = (cliente: ClienteSelectValue | null) => {
+    setClienteSelecionado(cliente);
+    if (errors.clienteId) {
+      setErrors(prev => ({ ...prev, clienteId: undefined }));
+    }
+  };
 
-    if (!formData.nome?.trim()) {
+  useEffect(() => {
+    if (!isOpen) {
+      setErrors({});
+    }
+  }, [isOpen]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
+
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+
+    if (errors[name as keyof FormErrors]) {
+      setErrors(prev => ({ ...prev, [name]: undefined }));
+    }
+  };
+
+  const handleTelefoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = sanitizeTelefoneInput(e.target.value);
+    setFormData(prev => ({ ...prev, telefone: value }));
+
+    if (errors.telefone) {
+      setErrors(prev => ({ ...prev, telefone: undefined }));
+    }
+  };
+
+  const validate = (): boolean => {
+    const newErrors: FormErrors = {};
+
+    if (!clienteSelecionado && !contato) {
+      newErrors.clienteId = 'Selecione um cliente';
+    }
+
+    if (!formData.nome.trim()) {
       newErrors.nome = 'Nome é obrigatório';
     }
 
-    if (!formData.email?.trim()) {
-      newErrors.email = 'Email é obrigatório';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Email inválido';
-    }
+    const telefoneNormalizado = contatosService.normalizarTelefone(formData.telefone);
+    const telefoneDigitos = telefoneNormalizado.replace(/\D/g, '');
 
-    if (!formData.telefone?.trim()) {
+    if (!telefoneNormalizado) {
       newErrors.telefone = 'Telefone é obrigatório';
+    } else if (telefoneDigitos.length < 8 || telefoneDigitos.length > 15) {
+      newErrors.telefone = 'Telefone deve estar no formato internacional (E.164)';
     }
 
-    if (!formData.empresa?.trim()) {
-      newErrors.empresa = 'Empresa é obrigatória';
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'E-mail inválido';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
+
+    if (!validate()) {
+      toast.error('Por favor, corrija os erros no formulário');
       return;
     }
 
-    onSave(formData);
-  };
+    setLoading(true);
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    
-    // Limpar erro quando o campo for preenchido
-    if (errors[field] && value?.toString().trim()) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
-      });
-    }
-  };
+    try {
+      const telefoneNormalizado = contatosService.normalizarTelefone(formData.telefone);
 
-  const handleEnderecoChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      endereco: {
-        ...prev.endereco,
-        [field]: value
+      if (contato) {
+        const updateData: UpdateContatoDto = {
+          nome: formData.nome,
+          email: formData.email || undefined,
+          telefone: telefoneNormalizado,
+          cargo: formData.cargo || undefined,
+          principal: formData.principal,
+          observacoes: formData.observacoes || undefined
+        };
+
+        await contatosService.atualizar(contato.id, updateData);
+        toast.success('Contato atualizado com sucesso!');
+      } else {
+        const clienteId = clienteSelecionado?.id || clienteIdProp;
+        if (!clienteId) {
+          toast.error('Cliente não selecionado');
+          return;
+        }
+
+        const createData: CreateContatoDto = {
+          nome: formData.nome,
+          email: formData.email || undefined,
+          telefone: telefoneNormalizado,
+          cargo: formData.cargo || undefined,
+          principal: formData.principal,
+          observacoes: formData.observacoes || undefined
+        };
+
+        await contatosService.criar(clienteId, createData);
+        toast.success('Contato criado com sucesso!');
       }
-    }));
-  };
 
-  const handleRedesSociaisChange = (platform: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      redes_sociais: {
-        ...prev.redes_sociais,
-        [platform]: value
-      }
-    }));
-  };
-
-  const addTag = () => {
-    if (newTag.trim() && !formData.tags?.includes(newTag.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...(prev.tags || []), newTag.trim()]
-      }));
-      setNewTag('');
+      onSuccess();
+      onClose();
+    } catch (error: any) {
+      console.error('Erro ao salvar contato:', error);
+      toast.error(error.response?.data?.message || 'Erro ao salvar contato');
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags?.filter(tag => tag !== tagToRemove) || []
-    }));
   };
 
   if (!isOpen) return null;
 
-  const isEditing = !!contato;
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-[#159A9C] to-[#0d7a7d]">
-          <h1 className="text-2xl font-bold text-white">
-            {isEditing ? 'Editar Contato' : 'Novo Contato'}
-          </h1>
-          
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+        <div className="bg-gradient-to-r from-[#159A9C] to-[#0d7a7d] text-white px-6 py-4 flex justify-between items-center">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <User className="w-5 h-5" />
+            {contato ? 'Editar Contato' : 'Novo Contato'}
+          </h2>
           <button
             onClick={onClose}
-            className="p-2 text-white hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors"
+            className="text-white hover:bg-white/20 rounded-lg p-1 transition-colors"
+            disabled={loading}
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Formulário */}
-        <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-120px)]">
-          <div className="p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
-              {/* Coluna Esquerda */}
-              <div className="space-y-6">
-                
-                {/* Informações Básicas */}
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
-                    <User className="w-5 h-5" />
-                    Informações Básicas
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Nome *
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.nome || ''}
-                        onChange={(e) => handleInputChange('nome', e.target.value)}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
-                          errors.nome ? 'border-red-300' : 'border-gray-300'
-                        }`}
-                        placeholder="Nome completo"
-                      />
-                      {errors.nome && <p className="text-red-500 text-sm mt-1">{errors.nome}</p>}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Email *
-                        </label>
-                        <input
-                          type="email"
-                          value={formData.email || ''}
-                          onChange={(e) => handleInputChange('email', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
-                            errors.email ? 'border-red-300' : 'border-gray-300'
-                          }`}
-                          placeholder="email@exemplo.com"
-                        />
-                        {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Telefone *
-                        </label>
-                        <input
-                          type="tel"
-                          value={formData.telefone || ''}
-                          onChange={(e) => handleInputChange('telefone', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
-                            errors.telefone ? 'border-red-300' : 'border-gray-300'
-                          }`}
-                          placeholder="(11) 99999-9999"
-                        />
-                        {errors.telefone && <p className="text-red-500 text-sm mt-1">{errors.telefone}</p>}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Empresa *
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.empresa || ''}
-                          onChange={(e) => handleInputChange('empresa', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
-                            errors.empresa ? 'border-red-300' : 'border-gray-300'
-                          }`}
-                          placeholder="Nome da empresa"
-                        />
-                        {errors.empresa && <p className="text-red-500 text-sm mt-1">{errors.empresa}</p>}
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Cargo
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.cargo || ''}
-                          onChange={(e) => handleInputChange('cargo', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                          placeholder="Cargo na empresa"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Data de Nascimento
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.data_nascimento || ''}
-                        onChange={(e) => handleInputChange('data_nascimento', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Classificação */}
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
-                    <Tag className="w-5 h-5" />
-                    Classificação
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Status
-                      </label>
-                      <select
-                        value={formData.status || 'prospecto'}
-                        onChange={(e) => handleInputChange('status', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                      >
-                        <option value="prospecto">Prospecto</option>
-                        <option value="ativo">Ativo</option>
-                        <option value="cliente">Cliente</option>
-                        <option value="inativo">Inativo</option>
-                        <option value="ex-cliente">Ex-Cliente</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Tipo
-                      </label>
-                      <select
-                        value={formData.tipo || 'lead'}
-                        onChange={(e) => handleInputChange('tipo', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                      >
-                        <option value="lead">Lead</option>
-                        <option value="cliente">Cliente</option>
-                        <option value="parceiro">Parceiro</option>
-                        <option value="fornecedor">Fornecedor</option>
-                        <option value="outro">Outro</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Fonte
-                      </label>
-                      <select
-                        value={formData.fonte || ''}
-                        onChange={(e) => handleInputChange('fonte', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                      >
-                        <option value="">Selecione uma fonte</option>
-                        <option value="Website">Website</option>
-                        <option value="LinkedIn">LinkedIn</option>
-                        <option value="Google Ads">Google Ads</option>
-                        <option value="Facebook">Facebook</option>
-                        <option value="Indicação">Indicação</option>
-                        <option value="Feira/Evento">Feira/Evento</option>
-                        <option value="Networking">Networking</option>
-                        <option value="Telemarketing">Telemarketing</option>
-                        <option value="Email Marketing">Email Marketing</option>
-                        <option value="Outros">Outros</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Proprietário
-                      </label>
-                      <select
-                        value={formData.proprietario || 'Maria Santos'}
-                        onChange={(e) => handleInputChange('proprietario', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                      >
-                        <option value="Maria Santos">Maria Santos</option>
-                        <option value="Pedro Costa">Pedro Costa</option>
-                        <option value="Ana Silva">Ana Silva</option>
-                        <option value="Lucas Oliveira">Lucas Oliveira</option>
-                        <option value="Carla Santos">Carla Santos</option>
-                        <option value="Roberto Lima">Roberto Lima</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Categoria
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.categoria || ''}
-                        onChange={(e) => handleInputChange('categoria', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                        placeholder="Ex: Tecnologia, Saúde, Educação"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Pontuação Lead (0-100)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={formData.pontuacao_lead || 0}
-                        onChange={(e) => handleInputChange('pontuacao_lead', parseInt(e.target.value) || 0)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Valor Potencial (R$)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={formData.valor_potencial || 0}
-                        onChange={(e) => handleInputChange('valor_potencial', parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                        placeholder="0,00"
-                      />
-                    </div>
-                  </div>
-                </div>
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+          <div className="space-y-5">
+            {!contato && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Cliente *
+                </label>
+                <ClienteSelect
+                  value={clienteSelecionado}
+                  onChange={handleClienteSelecionado}
+                  label={null}
+                  error={errors.clienteId}
+                  disabled={!!clienteIdProp}
+                />
+                {errors.clienteId && (
+                  <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    {errors.clienteId}
+                  </p>
+                )}
               </div>
+            )}
 
-              {/* Coluna Direita */}
-              <div className="space-y-6">
-                
-                {/* Endereço */}
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
-                    <MapPin className="w-5 h-5" />
-                    Endereço
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Rua
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.endereco?.rua || ''}
-                        onChange={(e) => handleEnderecoChange('rua', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                        placeholder="Rua, número, complemento"
-                      />
-                    </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Nome Completo *
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  name="nome"
+                  value={formData.nome}
+                  onChange={handleChange}
+                  className={`w-full pl-10 pr-4 py-2.5 border ${errors.nome ? 'border-red-500' : 'border-gray-300'
+                    } rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent`}
+                  placeholder="Digite o nome completo"
+                  disabled={loading}
+                />
+              </div>
+              {errors.nome && (
+                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" />
+                  {errors.nome}
+                </p>
+              )}
+            </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Cidade
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.endereco?.cidade || ''}
-                          onChange={(e) => handleEnderecoChange('cidade', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                          placeholder="Cidade"
-                        />
-                      </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Telefone *
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  name="telefone"
+                  value={formData.telefone}
+                  onChange={handleTelefoneChange}
+                  className={`w-full pl-10 pr-4 py-2.5 border ${errors.telefone ? 'border-red-500' : 'border-gray-300'
+                    } rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent`}
+                  placeholder="+55 11 99999-9999"
+                  disabled={loading}
+                  autoComplete="tel"
+                />
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Informe o número completo com DDI (formato E.164). Ex: +44 20 7946 0958. Caso não inclua o DDI, será assumido o código +55.
+              </p>
+              {errors.telefone && (
+                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" />
+                  {errors.telefone}
+                </p>
+              )}
+            </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Estado
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.endereco?.estado || ''}
-                          onChange={(e) => handleEnderecoChange('estado', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                          placeholder="Estado"
-                        />
-                      </div>
-                    </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                E-mail
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className={`w-full pl-10 pr-4 py-2.5 border ${errors.email ? 'border-red-500' : 'border-gray-300'
+                    } rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent`}
+                  placeholder="email@exemplo.com"
+                  disabled={loading}
+                />
+              </div>
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" />
+                  {errors.email}
+                </p>
+              )}
+            </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          CEP
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.endereco?.cep || ''}
-                          onChange={(e) => handleEnderecoChange('cep', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                          placeholder="00000-000"
-                        />
-                      </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Cargo
+              </label>
+              <div className="relative">
+                <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  name="cargo"
+                  value={formData.cargo}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                  placeholder="Ex: Gerente de Compras"
+                  disabled={loading}
+                />
+              </div>
+            </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          País
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.endereco?.pais || 'Brasil'}
-                          onChange={(e) => handleEnderecoChange('pais', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                          placeholder="País"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
+            <div className="flex items-center gap-3 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <input
+                type="checkbox"
+                id="principal"
+                name="principal"
+                checked={formData.principal}
+                onChange={handleChange}
+                className="w-4 h-4 text-[#159A9C] border-gray-300 rounded focus:ring-[#159A9C]"
+                disabled={loading}
+              />
+              <label htmlFor="principal" className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                <Star className="w-4 h-4 text-yellow-500" />
+                Definir como contato principal
+              </label>
+            </div>
 
-                {/* Redes Sociais */}
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
-                    <Globe className="w-5 h-5" />
-                    Redes Sociais
-                  </h3>
-                  
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        LinkedIn
-                      </label>
-                      <input
-                        type="url"
-                        value={formData.redes_sociais?.linkedin || ''}
-                        onChange={(e) => handleRedesSociaisChange('linkedin', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                        placeholder="https://linkedin.com/in/usuario"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Twitter
-                      </label>
-                      <input
-                        type="url"
-                        value={formData.redes_sociais?.twitter || ''}
-                        onChange={(e) => handleRedesSociaisChange('twitter', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                        placeholder="https://twitter.com/usuario"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Facebook
-                      </label>
-                      <input
-                        type="url"
-                        value={formData.redes_sociais?.facebook || ''}
-                        onChange={(e) => handleRedesSociaisChange('facebook', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                        placeholder="https://facebook.com/usuario"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Instagram
-                      </label>
-                      <input
-                        type="url"
-                        value={formData.redes_sociais?.instagram || ''}
-                        onChange={(e) => handleRedesSociaisChange('instagram', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                        placeholder="https://instagram.com/usuario"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tags */}
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
-                    <Tag className="w-5 h-5" />
-                    Tags
-                  </h3>
-                  
-                  <div className="space-y-3">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newTag}
-                        onChange={(e) => setNewTag(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                        placeholder="Digite uma tag"
-                      />
-                      <button
-                        type="button"
-                        onClick={addTag}
-                        className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0d7a7d] transition-colors flex items-center gap-2"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Adicionar
-                      </button>
-                    </div>
-
-                    {formData.tags && formData.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {formData.tags.map((tag, index) => (
-                          <span
-                            key={index}
-                            className="inline-flex items-center gap-1 px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm"
-                          >
-                            {tag}
-                            <button
-                              type="button"
-                              onClick={() => removeTag(tag)}
-                              className="hover:bg-gray-300 rounded-full p-0.5"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Notas */}
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
-                    <FileText className="w-5 h-5" />
-                    Notas
-                  </h3>
-                  
-                  <textarea
-                    value={formData.notas || ''}
-                    onChange={(e) => handleInputChange('notas', e.target.value)}
-                    rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent resize-none"
-                    placeholder="Adicione observações sobre este contato..."
-                  />
-                </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Observações
+              </label>
+              <div className="relative">
+                <FileText className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
+                <textarea
+                  name="observacoes"
+                  value={formData.observacoes}
+                  onChange={handleChange}
+                  rows={4}
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent resize-none"
+                  placeholder="Adicione observações sobre este contato..."
+                  disabled={loading}
+                />
               </div>
             </div>
           </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Cancelar
-            </button>
-            
-            <button
-              type="submit"
-              className="flex items-center gap-2 px-6 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0d7a7d] transition-colors"
-            >
-              <Save className="w-4 h-4" />
-              {isEditing ? 'Atualizar Contato' : 'Criar Contato'}
-            </button>
-          </div>
         </form>
+
+        <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-200">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            disabled={loading}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="px-4 py-2 bg-gradient-to-r from-[#159A9C] to-[#0d7a7d] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 disabled:opacity-50"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                {contato ? 'Salvar Alterações' : 'Criar Contato'}
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
 };
+
+export default ModalNovoContato;

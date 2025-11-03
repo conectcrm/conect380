@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Limpar Cache do Menu</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    button {
+      background: #9333EA;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 20px;
+    }
+
+    button:hover {
+      background: #7928CA;
+    }
+
+    .success {
+      color: #16A34A;
+      font-weight: bold;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>🔄 Limpar Cache do Menu</h1>
+    <p>Se o item "Fluxos de Triagem" não está aparecendo no menu de Atendimento, clique no botão abaixo para limpar o
+      cache.</p>
+
+    <button onclick="clearCache()">Limpar Cache e Recarregar</button>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    function clearCache() {
+      // Limpar localStorage relacionado ao menu
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.includes('menu') || key.includes('sidebar') || key.includes('manually-closed'))) {
+          keysToRemove.push(key);
+        }
+      }
+
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+
+      // Limpar sessionStorage também
+      sessionStorage.clear();
+
+      document.getElementById('result').innerHTML =
+        '<p class="success">✅ Cache limpo! Recarregando em 2 segundos...</p>';
+
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 2000);
+    }
+  </script>
+</body>
+
+</html>

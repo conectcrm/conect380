@@ -11,7 +11,7 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<{email?: string; password?: string}>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const { login } = useAuth();
   const { t } = useI18n();
   const location = useLocation();
@@ -29,38 +29,52 @@ const LoginPage: React.FC = () => {
   }, [location]);
 
   const validateForm = () => {
-    const newErrors: {email?: string; password?: string} = {};
-    
+    const newErrors: { email?: string; password?: string } = {};
+
     if (!email) {
       newErrors.email = 'Email é obrigatório';
     } else if (!/\S+@\S+\.\S+/.test(email)) {
       newErrors.email = 'Email inválido';
     }
-    
+
     if (!password) {
       newErrors.password = 'Senha é obrigatória';
     } else if (password.length < 6) {
       newErrors.password = 'Senha deve ter pelo menos 6 caracteres';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
       await login(email, password);
       toast.success('Login realizado com sucesso!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro no login:', error);
+
+      // ✅ VERIFICAR SE PRECISA TROCAR SENHA (primeiro acesso)
+      if (error.message === 'TROCAR_SENHA' && error.data) {
+        toast('🔑 Primeiro acesso detectado. Redirecionando...', { icon: '🔑' });
+        navigate('/trocar-senha', {
+          state: {
+            userId: error.data.userId,
+            email: error.data.email,
+            nome: error.data.nome,
+          }
+        });
+        return;
+      }
+
       toast.error('Credenciais inválidas. Tente novamente.');
       setErrors({ email: 'Email ou senha incorretos' });
     } finally {
@@ -78,7 +92,7 @@ const LoginPage: React.FC = () => {
           <div className="absolute bottom-20 right-20 w-96 h-96 rounded-full bg-white"></div>
           <div className="absolute top-1/2 left-1/3 w-32 h-32 rounded-full bg-white"></div>
         </div>
-        
+
         <div className="relative z-10 flex flex-col justify-center p-12 text-white">
           {/* Logo */}
           <div className="mb-8">
@@ -167,9 +181,8 @@ const LoginPage: React.FC = () => {
                       setEmail(e.target.value);
                       if (errors.email) setErrors(prev => ({ ...prev, email: undefined }));
                     }}
-                    className={`w-full pl-11 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-                      errors.email ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                    }`}
+                    className={`w-full pl-11 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.email ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
                     placeholder="seu@empresa.com"
                   />
                 </div>
@@ -192,9 +205,8 @@ const LoginPage: React.FC = () => {
                       setPassword(e.target.value);
                       if (errors.password) setErrors(prev => ({ ...prev, password: undefined }));
                     }}
-                    className={`w-full pl-11 pr-12 py-3 border rounded-xl focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-                      errors.password ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                    }`}
+                    className={`w-full pl-11 pr-12 py-3 border rounded-xl focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.password ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
                     placeholder="Digite sua senha"
                   />
                   <button
@@ -221,7 +233,7 @@ const LoginPage: React.FC = () => {
                 </label>
                 <button
                   type="button"
-                  onClick={() => {/* TODO: Implementar recuperação de senha */}}
+                  onClick={() => {/* TODO: Implementar recuperação de senha */ }}
                   className="text-sm font-medium text-[#159A9C] hover:text-[#0F7B7D] transition-colors"
                 >
                   Esqueci minha senha
@@ -271,7 +283,7 @@ const LoginPage: React.FC = () => {
               >
                 <span>🚀 Criar Conta Empresarial</span>
               </button>
-              
+
               {/* Benefits */}
               <div className="flex items-center justify-center space-x-6 text-xs text-[#B4BEC9]">
                 <div className="flex items-center space-x-1">

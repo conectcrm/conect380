@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { User } from '../types';
 import { authService } from '../services/authService';
 
+const DEBUG = process.env.NODE_ENV === 'development';
+
 interface AuthContextData {
   user: User | null;
   isAuthenticated: boolean;
@@ -27,20 +29,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const token = authService.getToken();
         const savedUser = authService.getUser();
 
-        console.log('🔍 [AuthContext] Inicializando autenticação...');
-        console.log('🔍 [AuthContext] Token presente?', !!token);
-        console.log('🔍 [AuthContext] User salvo?', !!savedUser);
-
         if (token && savedUser) {
           // Verificar se o token ainda é válido fazendo uma requisição
           try {
-            console.log('🔍 [AuthContext] Verificando validade do token...');
             const profileResponse = await authService.getProfile();
 
             if (profileResponse.success && profileResponse.data) {
-              console.log('✅ [AuthContext] Token válido - Usuário autenticado:', profileResponse.data.email);
               setUser(profileResponse.data);
               authService.setUser(profileResponse.data);
+
+              // ✨ GARANTIR que empresaId está salvo ao verificar perfil
+              if (profileResponse.data.empresa?.id) {
+                localStorage.setItem('empresaAtiva', profileResponse.data.empresa.id);
+              }
             } else {
               console.warn('⚠️ [AuthContext] Resposta inesperada ao verificar perfil:', profileResponse);
               // Manter o usuário salvo mesmo se a verificação falhar
@@ -80,12 +81,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const response = await authService.login({ email, senha: password });
 
+      // ✅ VERIFICAR SE PRECISA TROCAR SENHA (primeiro acesso)
+      if (response.action === 'TROCAR_SENHA') {
+        const trocarSenhaData = response.data as { userId: string; email: string; nome: string };
+        // Lançar erro especial com dados para redirect
+        const error = new Error('TROCAR_SENHA') as any;
+        error.data = {
+          userId: trocarSenhaData.userId,
+          email: trocarSenhaData.email,
+          nome: trocarSenhaData.nome,
+        };
+        throw error;
+      }
+
       if (response.success && response.data) {
-        const { access_token, user: userData } = response.data;
+        const loginData = response.data as { access_token: string; user: User };
+        const { access_token, user: userData } = loginData;
 
         authService.setToken(access_token);
         authService.setUser(userData);
         setUser(userData);
+
+        // ✨ SALVAR empresaId para uso em rotas de atendimento
+        if (userData.empresa?.id) {
+          localStorage.setItem('empresaAtiva', userData.empresa.id);
+          console.log('✅ [AuthContext] empresaId salvo:', userData.empresa.id);
+        } else {
+          console.warn('⚠️ [AuthContext] userData.empresa.id não encontrado:', userData);
+        }
       } else {
         throw new Error('Falha na autenticação');
       }
@@ -98,6 +121,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = () => {
     authService.logout();
     setUser(null);
+    // ✨ LIMPAR empresaId no logout
+    localStorage.removeItem('empresaAtiva');
+    console.log('🔓 [AuthContext] Logout realizado - empresaId removido');
   };
 
   const updateUser = (userData: Partial<User>) => {

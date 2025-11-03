@@ -1,6 +1,6 @@
-# 🤝 Guia de Contribuição - ConectCRM
+# 🤝 Guia de Contribuição - ConectSuite
 
-Obrigado por contribuir com o **ConectCRM**! Este guia ajudará você a contribuir de forma profissional e organizada.
+Obrigado por contribuir com o **ConectSuite**! Este guia ajudará você a contribuir de forma profissional e organizada.
 
 ## 📋 Índice
 
@@ -26,8 +26,8 @@ Obrigado por contribuir com o **ConectCRM**! Este guia ajudará você a contribu
 
 ```bash
 # 1. Clonar repositório
-git clone https://github.com/Dhonleno/conectcrm.git
-cd conectcrm
+git clone https://github.com/Dhonleno/conectsuite.git
+cd conectsuite
 
 # 2. Backend
 cd backend
@@ -345,8 +345,8 @@ npm run test:coverage     # Com cobertura
 
 ## 📞 Suporte
 
-- **Issues**: [GitHub Issues](https://github.com/Dhonleno/conectcrm/issues)
-- **Discussões**: [GitHub Discussions](https://github.com/Dhonleno/conectcrm/discussions)
+- **Issues**: [GitHub Issues](https://github.com/Dhonleno/conectsuite/issues)
+- **Discussões**: [GitHub Discussions](https://github.com/Dhonleno/conectsuite/discussions)
 - **Email**: suporte@conectcrm.com
 
 ---

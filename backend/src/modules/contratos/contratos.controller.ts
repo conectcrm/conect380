@@ -23,7 +23,7 @@ import { StatusContrato } from './entities/contrato.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('contratos')
-// @UseGuards(JwtAuthGuard) // Temporariamente comentado para teste
+@UseGuards(JwtAuthGuard)
 export class ContratosController {
   private readonly logger = new Logger(ContratosController.name);
 

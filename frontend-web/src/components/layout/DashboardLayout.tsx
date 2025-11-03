@@ -6,37 +6,28 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useProfile } from '../../contexts/ProfileContext';
 import { useSidebar } from '../../contexts/SidebarContext';
 import { formatCompanyName, formatUserName } from '../../utils/textUtils';
-import SimpleNavGroup, { NavigationNucleus } from '../navigation/SimpleNavGroup';
+import HierarchicalNavGroup from '../navigation/HierarchicalNavGroup';
+import { menuConfig } from '../../config/menuConfig';
 import NotificationCenter from '../notifications/NotificationCenter';
 import ConectCRMLogoFinal from '../ui/ConectCRMLogoFinal';
 import LanguageSelector from '../common/LanguageSelector';
 import {
   Menu,
   X,
-  Home,
   Users,
   Settings,
   LogOut,
-  Bell,
   Search,
-  Wifi,
-  WifiOff,
   User,
   ChevronDown,
-  HelpCircle,
   ChevronLeft,
   ChevronRight,
-  TrendingUp,
   ShoppingBag,
-  DollarSign,
-  Target,
   Building2,
   Calendar,
   Clock,
-  MapPin,
   CreditCard,
-  Headphones,
-  MessageSquare
+  HelpCircle
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -240,6 +231,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         title: 'Configurações da Empresa',
         subtitle: 'Configurações específicas da empresa ativa'
       },
+      '/configuracoes/departamentos': {
+        title: 'Gestão de Departamentos',
+        subtitle: 'Configure departamentos de atendimento e organize sua equipe'
+      },
       '/configuracoes/metas': {
         title: 'Metas Comerciais',
         subtitle: 'Defina e gerencie metas de vendas por período, vendedor ou região'
@@ -265,66 +260,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   };
 
   const currentPage = getPageInfo(location.pathname);
-
-  // Dados dos núcleos para navegação simplificada
-  const navigationNuclei: NavigationNucleus[] = [
-    {
-      id: 'dashboard',
-      title: 'Dashboard',
-      icon: Home,
-      href: '/dashboard',
-      color: 'blue'
-    },
-    {
-      id: 'crm',
-      title: 'CRM',
-      icon: Users,
-      href: '/nuclei/crm',
-      color: 'blue'
-    },
-    {
-      id: 'vendas',
-      title: 'Vendas',
-      icon: ShoppingBag,
-      href: '/nuclei/vendas',
-      color: 'green'
-    },
-    {
-      id: 'financeiro',
-      title: 'Financeiro',
-      icon: DollarSign,
-      href: '/nuclei/financeiro',
-      color: 'orange'
-    },
-    {
-      id: 'billing',
-      title: 'Billing',
-      icon: CreditCard,
-      href: '/billing',
-      color: 'green'
-    },
-    {
-      id: 'atendimento',
-      title: 'Atendimento',
-      icon: MessageSquare,
-      href: '/atendimento',
-      color: 'purple'
-    },
-    {
-      id: 'configuracoes',
-      title: 'Configurações',
-      icon: Settings,
-      href: '/nuclei/configuracoes',
-      color: 'purple'
-    },
-    {
-      id: 'administracao',
-      title: 'Administração',
-      icon: Building2,
-      href: '/nuclei/administracao',
-      color: 'blue'
-    }
-  ];
 
   // Estados para funcionalidades da barra superior
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -556,8 +491,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               </div>
             </div>
             {/* Navegação Mobile */}
-            <SimpleNavGroup
-              nuclei={navigationNuclei}
+            <HierarchicalNavGroup
+              menuItems={menuConfig}
               sidebarCollapsed={false}
             />
           </div>
@@ -636,9 +571,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 )}
               </div>
 
-              {/* Navegação Simplificada */}
-              <SimpleNavGroup
-                nuclei={navigationNuclei}
+              {/* Navegação Hierárquica */}
+              <HierarchicalNavGroup
+                menuItems={menuConfig}
                 sidebarCollapsed={sidebarCollapsed}
               />
             </div>
@@ -653,7 +588,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           {/* Gradiente sutil no topo */}
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#159A9C]/20 to-transparent"></div>
 
-          <div className="w-full max-w-[1440px] mx-auto px-4 md:px-6">
+          <div className="w-full px-4 md:px-6">
             <div className="h-16 flex items-center justify-between">
 
               {/* Lado Esquerdo: Menu Mobile + Breadcrumb + Status */}
@@ -1411,16 +1346,16 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         </header>
 
         {/* Conteúdo da página */}
-        <main className={`flex-1 relative focus:outline-none ${location.pathname === '/atendimento' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
-          {location.pathname === '/atendimento' ? (
-            // Para a rota de atendimento, não aplicar padding para usar tela completa
-            <div className="h-full">
+        <main className={`flex-1 relative focus:outline-none ${(location.pathname === '/atendimento' || location.pathname === '/atendimento/chat') ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+          {(location.pathname === '/atendimento' || location.pathname === '/atendimento/chat') ? (
+            // Para as rotas de atendimento, não aplicar padding para usar tela completa
+            <div className="h-full w-full">
               {children}
             </div>
           ) : (
-            // Para outras rotas, manter o padding padrão
+            // Para outras rotas, usar toda a largura disponível
             <div className="py-6">
-              <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6">
+              <div className="w-full px-4 sm:px-6">
                 {children}
               </div>
             </div>

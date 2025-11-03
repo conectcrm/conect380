@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { Ticket, StatusTicket, OrigemTicket, PrioridadeTicket } from '../entities/ticket.entity';
 import { Mensagem } from '../entities/mensagem.entity';
 import { AtendimentoGateway } from '../gateways/atendimento.gateway';
+import { OnlineStatusService } from '../services/online-status.service';
 import {
   CriarTicketDto,
   AtualizarTicketDto,
@@ -34,6 +35,7 @@ export class TicketsController {
     private mensagemRepo: Repository<Mensagem>,
 
     private atendimentoGateway: AtendimentoGateway,
+    private onlineStatusService: OnlineStatusService,
   ) { }
 
   @Get()
@@ -55,10 +57,46 @@ export class TicketsController {
         take: 100,
       });
 
+      // 🟢 Enriquecer tickets com status online dos contatos
+      const ticketsEnriquecidos = await Promise.all(
+        tickets.map(async (ticket) => {
+          let contatoOnline = false;
+
+          // Calcular status online baseado na última atividade
+          if (ticket.contatoTelefone) {
+            // Buscar última atividade do contato por telefone
+            const lastActivity = await this.ticketRepo.query(`
+              SELECT MAX(contato_last_activity) as last_activity
+              FROM atendimento_tickets 
+              WHERE contato_telefone = $1 
+                AND empresa_id = $2
+                AND contato_last_activity IS NOT NULL
+            `, [ticket.contatoTelefone, empresaId]);
+
+            if (lastActivity.length > 0 && lastActivity[0].last_activity) {
+              contatoOnline = this.onlineStatusService.calculateOnlineStatus(
+                new Date(lastActivity[0].last_activity)
+              );
+            }
+          }
+
+          return {
+            ...ticket,
+            contato: {
+              id: ticket.contatoTelefone || ticket.id,
+              nome: ticket.contatoNome || 'Sem nome',
+              telefone: ticket.contatoTelefone || '',
+              email: '', // Campo não está na entidade atual
+              online: contatoOnline,
+            }
+          };
+        })
+      );
+
       return {
         success: true,
-        data: tickets,
-        total: tickets.length,
+        data: ticketsEnriquecidos,
+        total: ticketsEnriquecidos.length,
       };
     } catch (error) {
       console.error('❌ [TicketsController] Erro ao listar tickets:', error);

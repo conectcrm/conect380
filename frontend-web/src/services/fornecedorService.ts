@@ -6,6 +6,7 @@ export interface Fornecedor {
   razaoSocial?: string;
   cnpj?: string;
   cpf?: string;
+  cnpjCpf?: string;
   email?: string;
   telefone?: string;
   endereco?: string;
@@ -15,6 +16,7 @@ export interface Fornecedor {
   estado?: string;
   cep?: string;
   contato?: string;
+  cargo?: string;
   observacoes?: string;
   ativo: boolean;
   criadoEm: string;
@@ -26,6 +28,7 @@ export interface NovoFornecedor {
   razaoSocial?: string;
   cnpj?: string;
   cpf?: string;
+  cnpjCpf?: string;
   email?: string;
   telefone?: string;
   endereco?: string;
@@ -35,17 +38,35 @@ export interface NovoFornecedor {
   estado?: string;
   cep?: string;
   contato?: string;
+  cargo?: string;
   observacoes?: string;
   ativo?: boolean;
 }
 
-export interface AtualizarFornecedor extends Partial<NovoFornecedor> {}
+export interface AtualizarFornecedor extends Partial<NovoFornecedor> { }
 
 export const fornecedorService = {
   // Listar todos os fornecedores
-  async listarFornecedores(): Promise<Fornecedor[]> {
+  async listarFornecedores(filtros?: {
+    nome?: string;
+    ativo?: boolean;
+    cidade?: string;
+    estado?: string;
+  }): Promise<Fornecedor[]> {
     try {
-      const response = await api.get('/fornecedores');
+      if (!filtros || Object.keys(filtros).length === 0) {
+        const response = await api.get('/fornecedores');
+        return response.data;
+      }
+
+      const params = new URLSearchParams();
+
+      if (filtros.nome) params.append('nome', filtros.nome);
+      if (filtros.ativo !== undefined) params.append('ativo', String(filtros.ativo));
+      if (filtros.cidade) params.append('cidade', filtros.cidade);
+      if (filtros.estado) params.append('estado', filtros.estado);
+
+      const response = await api.get(`/fornecedores?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao listar fornecedores:', error);
@@ -105,7 +126,7 @@ export const fornecedorService = {
   }): Promise<Fornecedor[]> {
     try {
       const params = new URLSearchParams();
-      
+
       if (filtros.nome) params.append('nome', filtros.nome);
       if (filtros.ativo !== undefined) params.append('ativo', String(filtros.ativo));
       if (filtros.cidade) params.append('cidade', filtros.cidade);

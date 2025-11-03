@@ -1,0 +1,142 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # PostgreSQL Database
+  # ============================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: conectcrm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-conectcrm}
+      POSTGRES_USER: ${DATABASE_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME:-postgres}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - conectcrm-network
+
+  # ============================================
+  # Redis Cache
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: conectcrm-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - conectcrm-network
+
+  # ============================================
+  # Backend NestJS
+  # ============================================
+  backend:
+    build:
+      context: ..
+      dockerfile: .production/docker/Dockerfile.backend
+    container_name: conectcrm-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3500
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-postgres}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_NAME: ${DATABASE_NAME:-conectcrm}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-7d}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      WHATSAPP_API_KEY: ${WHATSAPP_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    ports:
+      - "3500:3500"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_logs:/app/logs
+    networks:
+      - conectcrm-network
+
+  # ============================================
+  # Frontend React
+  # ============================================
+  frontend:
+    build:
+      context: ..
+      dockerfile: .production/docker/Dockerfile.frontend
+      args:
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:3500}
+    container_name: conectcrm-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - conectcrm-network
+
+  # ============================================
+  # Nginx Gateway (Opcional)
+  # ============================================
+  nginx:
+    image: nginx:alpine
+    container_name: conectcrm-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - .production/configs/nginx-gateway.conf:/etc/nginx/nginx.conf:ro
+      - nginx_certs:/etc/nginx/certs
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - conectcrm-network
+
+# ============================================
+# Volumes Persistentes
+# ============================================
+volumes:
+  postgres_data:
+    name: conectcrm_postgres_data
+  redis_data:
+    name: conectcrm_redis_data
+  backend_uploads:
+    name: conectcrm_backend_uploads
+  backend_logs:
+    name: conectcrm_backend_logs
+  nginx_certs:
+    name: conectcrm_nginx_certs
+
+# ============================================
+# Network Isolada
+# ============================================
+networks:
+  conectcrm-network:
+    name: conectcrm-network
+    driver: bridge

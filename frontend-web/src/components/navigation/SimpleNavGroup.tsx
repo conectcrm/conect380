@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
+// import { ChevronRight } from 'lucide-react'; // Não usado mais
 import './sidebar-animations.css';
 import './menu-improvements.css';
 
@@ -106,10 +106,10 @@ const SimpleNavGroup: React.FC<SimpleNavGroupProps> = ({ nuclei, sidebarCollapse
                   </div>
                 </div>
 
-                {/* Ícone de seta apenas para itens expandidos */}
-                {nucleus.id !== 'dashboard' && (
+                {/* Ícone de seta DESABILITADO - todos os menus navegam diretamente */}
+                {/* {nucleus.id !== 'dashboard' && (
                   <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isActive ? 'rotate-90 text-[#159A9C]' : ''}`} />
-                )}
+                )} */}
               </>
             )}
 

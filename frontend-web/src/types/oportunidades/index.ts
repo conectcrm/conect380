@@ -8,9 +8,9 @@ export interface Oportunidade {
   prioridade: PrioridadeOportunidade;
   origem: OrigemOportunidade;
   tags: string[];
-  dataFechamentoEsperado?: Date;
-  dataFechamentoReal?: Date;
-  
+  dataFechamentoEsperado?: Date | string | null;
+  dataFechamentoReal?: Date | string | null;
+
   // Responsável
   responsavel: {
     id: string;
@@ -18,7 +18,7 @@ export interface Oportunidade {
     email: string;
     avatar?: string;
   };
-  
+
   // Cliente (opcional)
   cliente?: {
     id: number;
@@ -27,20 +27,23 @@ export interface Oportunidade {
     telefone?: string;
     empresa?: string;
   };
-  
+
   // Informações de contato direto (quando não há cliente)
   nomeContato?: string;
   emailContato?: string;
   telefoneContato?: string;
   empresaContato?: string;
-  
+  observacoes?: string;
+  criadoEm?: Date | string;
+  atualizadoEm?: Date | string;
+
   // Atividades
   atividades: Atividade[];
-  
+
   // Metadados
   createdAt: Date;
   updatedAt: Date;
-  
+
   // Campos calculados
   valorFormatado: string;
   diasNoEstagio: number;
@@ -51,7 +54,7 @@ export interface Oportunidade {
 
 export enum EstagioOportunidade {
   LEADS = 'leads',
-  QUALIFICACAO = 'qualification', 
+  QUALIFICACAO = 'qualification',
   PROPOSTA = 'proposal',
   NEGOCIACAO = 'negotiation',
   FECHAMENTO = 'closing',
@@ -61,7 +64,7 @@ export enum EstagioOportunidade {
 
 export enum PrioridadeOportunidade {
   BAIXA = 'low',
-  MEDIA = 'medium', 
+  MEDIA = 'medium',
   ALTA = 'high'
 }
 
@@ -92,7 +95,7 @@ export interface Atividade {
 
 export enum TipoAtividade {
   LIGACAO = 'call',
-  EMAIL = 'email', 
+  EMAIL = 'email',
   REUNIAO = 'meeting',
   NOTA = 'note',
   TAREFA = 'task'
@@ -131,13 +134,14 @@ export interface NovaOportunidade {
   prioridade: PrioridadeOportunidade;
   origem: OrigemOportunidade;
   tags: string[];
-  dataFechamentoEsperado?: Date;
+  dataFechamentoEsperado?: Date | string | null;
   responsavelId: string;
   clienteId?: string; // Alterado de number para string (UUID)
   nomeContato?: string;
   emailContato?: string;
   telefoneContato?: string;
   empresaContato?: string;
+  observacoes?: string;
 }
 
 export interface AtualizarOportunidade extends Partial<NovaOportunidade> {

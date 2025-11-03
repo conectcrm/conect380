@@ -30,7 +30,7 @@ export default function FornecedoresPage() {
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'ativo' | 'inativo'>('todos');
 
   // Estados para seleção múltipla
-  const [fornecedoresSelecionados, setFornecedoresSelecionados] = useState<string[]>([]);
+  const [fornecedoresSelecionados, setFornecedoresSelecionados] = useState<number[]>([]);
   const [mostrarAcoesMassa, setMostrarAcoesMassa] = useState(false);
 
   // Hooks para confirmação inteligente
@@ -57,14 +57,18 @@ export default function FornecedoresPage() {
       };
 
       const dados = await fornecedorService.listarFornecedores(filtros);
-      setFornecedores(dados);
+      const dadosNormalizados = dados.map(fornecedor => ({
+        ...fornecedor,
+        cnpjCpf: fornecedor.cnpjCpf ?? fornecedor.cnpj ?? fornecedor.cpf ?? ''
+      }));
+      setFornecedores(dadosNormalizados);
 
       // Calcular estatísticas para o dashboard
-      const total = dados.length;
-      const ativos = dados.filter(f => f.ativo).length;
+      const total = dadosNormalizados.length;
+      const ativos = dadosNormalizados.filter(f => f.ativo).length;
       const inativos = total - ativos;
       const hoje = new Date().toDateString();
-      const cadastradosHoje = dados.filter(f =>
+      const cadastradosHoje = dadosNormalizados.filter(f =>
         new Date(f.criadoEm).toDateString() === hoje
       ).length;
 
@@ -95,7 +99,11 @@ export default function FornecedoresPage() {
       };
 
       const dados = await fornecedorService.listarFornecedores(filtros);
-      setFornecedores(dados);
+      const dadosNormalizados = dados.map(fornecedor => ({
+        ...fornecedor,
+        cnpjCpf: fornecedor.cnpjCpf ?? fornecedor.cnpj ?? fornecedor.cpf ?? ''
+      }));
+      setFornecedores(dadosNormalizados);
     } catch (error) {
       console.error('Erro ao buscar fornecedores:', error);
     } finally {
@@ -149,7 +157,7 @@ export default function FornecedoresPage() {
     }
   };
 
-  const excluirFornecedor = async (id: string) => {
+  const excluirFornecedor = async (id: number) => {
     try {
       // Buscar o fornecedor para validação
       const fornecedor = fornecedores.find(f => f.id === id);
@@ -175,8 +183,9 @@ export default function FornecedoresPage() {
     }
   };
 
-  const formatarCNPJCPF = (valor: string) => {
-    const numeros = valor.replace(/\D/g, '');
+  const formatarCNPJCPF = (valor?: string) => {
+    const input = valor ?? '';
+    const numeros = input.replace(/\D/g, '');
     if (numeros.length === 11) {
       // CPF
       return numeros.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
@@ -184,7 +193,7 @@ export default function FornecedoresPage() {
       // CNPJ
       return numeros.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
     }
-    return valor;
+    return input;
   };
 
   // Funções de exportação
@@ -229,7 +238,7 @@ export default function FornecedoresPage() {
   };
 
   // Funções de seleção múltipla
-  const toggleSelecionarFornecedor = (fornecedorId: string) => {
+  const toggleSelecionarFornecedor = (fornecedorId: number) => {
     setFornecedoresSelecionados(prev => {
       const novaSelecao = prev.includes(fornecedorId)
         ? prev.filter(id => id !== fornecedorId)

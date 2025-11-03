@@ -18,6 +18,30 @@ export class ContatosService {
   ) { }
 
   /**
+   * Lista TODOS os contatos da empresa
+   * Ordenados por: cliente.nome ASC, principal DESC, nome ASC
+   */
+  async listarTodos(empresaId: string): Promise<ResponseContatoDto[]> {
+    const contatos = await this.contatoRepository.find({
+      where: { ativo: true },
+      relations: ['cliente'],
+      order: { nome: 'ASC' },
+    });
+
+    const contatosDaEmpresa = contatos.filter(
+      (contato) => contato.cliente?.empresa_id === empresaId,
+    );
+
+    const contatosNormalizados = await Promise.all(
+      contatosDaEmpresa.map((contato) => this.garantirTelefoneNormalizado(contato)),
+    );
+
+    return contatosNormalizados.map(
+      (contato) => new ResponseContatoDto(contato),
+    );
+  }
+
+  /**
    * Lista todos os contatos de um cliente
    * Ordenados por: principal DESC, nome ASC
    */
@@ -36,7 +60,13 @@ export class ContatosService {
       order: { principal: 'DESC', nome: 'ASC' },
     });
 
-    return contatos.map((contato) => new ResponseContatoDto(contato));
+    const contatosNormalizados = await Promise.all(
+      contatos.map((contato) => this.garantirTelefoneNormalizado(contato)),
+    );
+
+    return contatosNormalizados.map(
+      (contato) => new ResponseContatoDto(contato),
+    );
   }
 
   /**
@@ -54,7 +84,9 @@ export class ContatosService {
       throw new NotFoundException('Contato não encontrado');
     }
 
-    return new ResponseContatoDto(contato);
+    const contatoNormalizado = await this.garantirTelefoneNormalizado(contato);
+
+    return new ResponseContatoDto(contatoNormalizado);
   }
 
   /**
@@ -74,8 +106,9 @@ export class ContatosService {
       throw new NotFoundException('Cliente não encontrado');
     }
 
-    // Validações
-    await this.validarTelefone(createContatoDto.telefone, clienteId);
+    const telefoneNormalizado = this.normalizarTelefoneEntrada(createContatoDto.telefone);
+
+    await this.validarTelefone(telefoneNormalizado, clienteId);
 
     // Se marcar como principal, remove flag de outros contatos
     if (createContatoDto.principal) {
@@ -85,6 +118,7 @@ export class ContatosService {
     // Cria o contato
     const contato = this.contatoRepository.create({
       ...createContatoDto,
+      telefone: telefoneNormalizado,
       clienteId,
     });
 
@@ -112,9 +146,13 @@ export class ContatosService {
       throw new NotFoundException('Contato não encontrado');
     }
 
-    // Validações
-    if (updateContatoDto.telefone && updateContatoDto.telefone !== contato.telefone) {
-      await this.validarTelefone(updateContatoDto.telefone, contato.clienteId, id);
+    let telefoneNormalizado: string | undefined;
+    const { telefone, ...dadosRestantes } = updateContatoDto;
+
+    if (telefone && telefone !== contato.telefone) {
+      telefoneNormalizado = this.normalizarTelefoneEntrada(telefone);
+      await this.validarTelefone(telefoneNormalizado, contato.clienteId, id);
+      contato.telefone = telefoneNormalizado;
     }
 
     // Se marcar como principal, remove flag de outros contatos
@@ -123,7 +161,7 @@ export class ContatosService {
     }
 
     // Atualiza
-    Object.assign(contato, updateContatoDto);
+    Object.assign(contato, dadosRestantes);
     const contatoAtualizado = await this.contatoRepository.save(contato);
 
     return new ResponseContatoDto(contatoAtualizado);
@@ -179,27 +217,115 @@ export class ContatosService {
    * Valida se o telefone já está cadastrado para outro contato do mesmo cliente
    */
   private async validarTelefone(
-    telefone: string,
+    telefoneNormalizado: string,
     clienteId: string,
     contatoIdIgnorar?: string,
   ): Promise<void> {
-    const where: any = {
-      telefone,
-      clienteId,
-      ativo: true,
-    };
+    const telefoneDigitos = telefoneNormalizado.replace(/\D/g, '');
+
+    const query = this.contatoRepository
+      .createQueryBuilder('contato')
+      .where('contato.clienteId = :clienteId', { clienteId })
+      .andWhere('contato.ativo = TRUE')
+      .andWhere(
+        "regexp_replace(contato.telefone, '\\D', '', 'g') = :telefone",
+        { telefone: telefoneDigitos },
+      );
 
     if (contatoIdIgnorar) {
-      where.id = Not(contatoIdIgnorar);
+      query.andWhere('contato.id != :contatoIdIgnorar', {
+        contatoIdIgnorar,
+      });
     }
 
-    const contatoExistente = await this.contatoRepository.findOne({ where });
+    const contatoExistente = await query.getOne();
 
     if (contatoExistente) {
       throw new BadRequestException(
         'Já existe um contato com este telefone para este cliente',
       );
     }
+  }
+
+  private async garantirTelefoneNormalizado(contato: Contato): Promise<Contato> {
+    if (!contato?.telefone) {
+      return contato;
+    }
+
+    const telefoneNormalizado = this.converterTelefoneParaE164(contato.telefone);
+
+    if (telefoneNormalizado && telefoneNormalizado !== contato.telefone) {
+      contato.telefone = telefoneNormalizado;
+      await this.contatoRepository.update(contato.id, {
+        telefone: telefoneNormalizado,
+      });
+    }
+
+    return contato;
+  }
+
+  private normalizarTelefoneEntrada(telefone: string): string {
+    const telefoneNormalizado = this.converterTelefoneParaE164(telefone);
+
+    if (!telefoneNormalizado) {
+      throw new BadRequestException(
+        'Telefone em formato inválido. Utilize o padrão internacional (E.164).',
+      );
+    }
+
+    return telefoneNormalizado;
+  }
+
+  private converterTelefoneParaE164(telefone: string | null | undefined): string | null {
+    if (!telefone) {
+      return null;
+    }
+
+    let valor = telefone.trim();
+
+    if (!valor) {
+      return null;
+    }
+
+    if (valor.startsWith('00')) {
+      valor = `+${valor.slice(2)}`;
+    }
+
+    valor = valor.replace(/\s+/g, '').replace(/[()\-]/g, '');
+
+    if (valor.startsWith('+')) {
+      const digits = valor.slice(1).replace(/\D/g, '');
+      if (!digits) {
+        return null;
+      }
+
+      if (digits.length < 8) {
+        return null;
+      }
+
+      const limited = digits.slice(0, 15);
+      return `+${limited}`;
+    }
+
+    const digitsOnly = valor.replace(/\D/g, '');
+
+    if (!digitsOnly) {
+      return null;
+    }
+
+    if (digitsOnly.length > 15) {
+      return `+${digitsOnly.slice(0, 15)}`;
+    }
+
+    if (digitsOnly.length > 11) {
+      return `+${digitsOnly}`;
+    }
+
+    if (digitsOnly.length >= 8) {
+      return `+55${digitsOnly}`;
+    }
+
+    return null;
   }
 
   /**

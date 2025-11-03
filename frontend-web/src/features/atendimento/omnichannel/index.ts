@@ -14,7 +14,6 @@ export type {
   ListarMensagensParams,
   ListarMensagensResponse,
   EnviarMensagemParams,
-  CriarTicketResponse,
   TransferirTicketResponse,
   EncerrarTicketResponse,
   BuscarContatosParams,

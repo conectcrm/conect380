@@ -1,12 +1,145 @@
 import { api } from './api';
 
+export interface EmpresaCoresConfig {
+  primaria: string;
+  secundaria: string;
+  accent: string;
+}
+
+export interface EmpresaRestricaoHorarioConfig {
+  habilitado: boolean;
+  inicio: string;
+  fim: string;
+  diasSemana: number[];
+}
+
+export interface EmpresaSegurancaConfig {
+  autenticacao2FA: boolean;
+  sessaoExpiracaoMinutos: number;
+  tentativasLoginMax: number;
+  senhaComplexidade: 'baixa' | 'media' | 'alta';
+  auditoriaNivel: 'basico' | 'medio' | 'completo';
+  ipsBloqueados: string[];
+  restricaoHorario: EmpresaRestricaoHorarioConfig;
+}
+
+export interface EmpresaLimitesUsuariosConfig {
+  total: number;
+  administradores: number;
+  vendedores: number;
+  supervisores: number;
+}
+
+export interface EmpresaPermissoesDefaultConfig {
+  vendedor: string[];
+  supervisor: string[];
+  administrador: string[];
+}
+
+export interface EmpresaUsuariosConfig {
+  limitesUsuarios: EmpresaLimitesUsuariosConfig;
+  permissoesDefault: EmpresaPermissoesDefaultConfig;
+  aprovacaoNovoUsuario: boolean;
+  dominiosPermitidos: string[];
+}
+
+export interface EmpresaServidorEmailConfig {
+  tipo: string;
+  servidor: string;
+  porta: number;
+  ssl: boolean;
+  usuario: string;
+  senha: string;
+}
+
+export interface EmpresaTemplateEmailConfig {
+  cabecalho: string;
+  rodape: string;
+  assinatura: string;
+}
+
+export interface EmpresaNotificacoesConfig {
+  emailsHabilitados: boolean;
+  servidorEmail: EmpresaServidorEmailConfig;
+  templateEmail: EmpresaTemplateEmailConfig;
+  tiposNotificacao: Record<string, boolean>;
+}
+
+export interface EmpresaIntegracoesApiConfig {
+  habilitada: boolean;
+  chaveApi: string;
+  webhooks: string[];
+  limitesRequisicao: {
+    por_minuto: number;
+    por_dia: number;
+  };
+}
+
+export interface EmpresaServicoIntegracaoConfig {
+  habilitado: boolean;
+  token?: string;
+  numero?: string;
+  client_id?: string;
+  client_secret?: string;
+  [key: string]: string | boolean | undefined;
+}
+
+export interface EmpresaIntegracoesConfig {
+  api: EmpresaIntegracoesApiConfig;
+  servicos: Record<string, EmpresaServicoIntegracaoConfig>;
+}
+
+export interface EmpresaBackupConfig {
+  automatico: boolean;
+  frequencia: 'diario' | 'semanal' | 'mensal';
+  retencaoDias: number;
+  incluirAnexos: boolean;
+  sincronizacaoNuvem: {
+    habilitada: boolean;
+    provedor: string;
+    configuracao: Record<string, unknown>;
+  };
+}
+
+export interface EmpresaConfiguracoes {
+  geral?: {
+    nome?: string;
+    descricao?: string;
+    site?: string;
+    telefone?: string;
+    email?: string;
+    endereco?: string;
+    timezone?: string;
+    logo?: string;
+    cores?: Partial<EmpresaCoresConfig>;
+  };
+  site?: string;
+  timezone?: string;
+  logo?: string;
+  cores?: Partial<EmpresaCoresConfig>;
+  seguranca?: Partial<EmpresaSegurancaConfig>;
+  usuarios?: Partial<EmpresaUsuariosConfig>;
+  notificacoes?: Partial<EmpresaNotificacoesConfig>;
+  integracoes?: Partial<EmpresaIntegracoesConfig>;
+  backup?: Partial<EmpresaBackupConfig>;
+  // Campos legados
+  notificacoesEmail?: boolean;
+  notificacoesSMS?: boolean;
+  backupAutomatico?: boolean;
+  integracaoAPI?: boolean;
+  suportePersonalizado?: boolean;
+  whiteLabel?: boolean;
+  relatoriosAvancados?: boolean;
+}
+
 export interface EmpresaCompleta {
   id: string;
   nome: string;
+  descricao?: string;
   cnpj: string;
   email: string;
   telefone: string;
-  endereco: {
+  endereco: string | {
     rua: string;
     numero: string;
     complemento?: string;
@@ -23,21 +156,18 @@ export interface EmpresaCompleta {
     limitesUsuarios: number;
     limitesClientes: number;
     limitesArmazenamento: string; // "5GB", "50GB", "Ilimitado"
+    limites?: {
+      usuarios: number;
+      clientes: number;
+      armazenamento: string;
+    };
   };
   status: 'ativa' | 'trial' | 'suspensa' | 'inativa';
   isActive: boolean;
   dataVencimento: string;
   dataCriacao: string;
   ultimoAcesso: string;
-  configuracoes: {
-    notificacoesEmail: boolean;
-    notificacoesSMS: boolean;
-    backupAutomatico: boolean;
-    integracaoAPI: boolean;
-    suportePersonalizado: boolean;
-    whiteLabel: boolean;
-    relatoriosAvancados: boolean;
-  };
+  configuracoes: EmpresaConfiguracoes;
   estatisticas: {
     usuariosAtivos: number;
     totalUsuarios: number;
@@ -89,10 +219,11 @@ export interface NovaEmpresaRequest {
 
 export interface EmpresaUpdate {
   nome?: string;
+  descricao?: string;
   email?: string;
   telefone?: string;
-  endereco?: Partial<EmpresaCompleta['endereco']>;
-  configuracoes?: Partial<EmpresaCompleta['configuracoes']>;
+  endereco?: EmpresaCompleta['endereco'];
+  configuracoes?: Partial<EmpresaConfiguracoes>;
 }
 
 export interface SwitchEmpresaResponse {

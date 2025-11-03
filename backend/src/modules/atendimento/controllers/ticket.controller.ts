@@ -59,10 +59,15 @@ export class TicketController {
     }
 
     try {
-      // Normalizar status para array
+      // Normalizar status para array e converter para MAIÚSCULO
       let statusArray: string[] | undefined;
       if (status) {
-        statusArray = Array.isArray(status) ? status : [status];
+        const statusRaw = Array.isArray(status) ? status : [status];
+        // Converter para maiúsculo para match com enum StatusTicket
+        // Garantir que são strings antes de converter
+        statusArray = statusRaw
+          .filter(s => s && typeof s === 'string')
+          .map(s => s.toString().toUpperCase());
       }
 
       const resultado = await this.ticketService.listar({
@@ -441,10 +446,30 @@ export class TicketController {
     @UploadedFiles() arquivos?: Express.Multer.File[],
   ) {
     this.logger.log(`📤 [POST /tickets/${ticketId}/mensagens]`);
+    this.logger.debug(`📋 Body recebido: ${JSON.stringify(dados)}`);
+    this.logger.debug(`📎 Arquivos: ${arquivos?.length || 0}`);
 
     try {
+      // ✅ Garantir que conteudo existe (pode vir no body ou como string direta)
+      let conteudo = dados.conteudo;
+
+      // Se dados é uma string, significa que o FormData não foi parseado corretamente
+      if (typeof dados === 'string') {
+        try {
+          const parsed = JSON.parse(dados);
+          conteudo = parsed.conteudo;
+        } catch {
+          // Se não é JSON, assume que é o próprio conteúdo
+          conteudo = dados;
+        }
+      }
+
       // Adicionar ticketId do parâmetro da URL
-      const dadosCompletos = { ...dados, ticketId };
+      const dadosCompletos = {
+        ...dados,
+        ticketId,
+        conteudo // Garante que conteudo está presente
+      };
 
       const mensagem = await this.mensagemService.enviar(dadosCompletos, arquivos);
       this.logger.log(`✅ Mensagem enviada para ticket ${ticketId}`);

@@ -23,6 +23,7 @@ import {
   AlertDescription
 } from '../../components/ui';
 import { useEmpresas } from '../../contexts/EmpresaContextAPIReal';
+import type { EmpresaInfo } from '../../contexts/EmpresaContextAPIReal';
 import {
   Settings,
   Save,
@@ -46,6 +47,255 @@ interface ConfiguracaoEmpresaPageProps {
   empresaId?: string;
 }
 
+interface ConfiguracoesGerais {
+  nome: string;
+  descricao: string;
+  site: string;
+  telefone: string;
+  email: string;
+  endereco: string;
+  timezone: string;
+  logo: string;
+  cores: {
+    primaria: string;
+    secundaria: string;
+    accent: string;
+  };
+}
+
+interface ConfiguracoesSeguranca {
+  autenticacao2FA: boolean;
+  sessaoExpiracaoMinutos: number;
+  tentativasLoginMax: number;
+  senhaComplexidade: 'baixa' | 'media' | 'alta';
+  auditoriaNivel: 'basico' | 'medio' | 'completo';
+  ipsBloqueados: string[];
+  restricaoHorario: {
+    habilitado: boolean;
+    inicio: string;
+    fim: string;
+    diasSemana: number[];
+  };
+}
+
+interface ConfiguracoesUsuarios {
+  limitesUsuarios: {
+    total: number;
+    administradores: number;
+    vendedores: number;
+    supervisores: number;
+  };
+  permissoesDefault: {
+    vendedor: string[];
+    supervisor: string[];
+    administrador: string[];
+  };
+  aprovacaoNovoUsuario: boolean;
+  dominiosPermitidos: string[];
+}
+
+interface ConfiguracoesNotificacoes {
+  emailsHabilitados: boolean;
+  servidorEmail: {
+    tipo: string;
+    servidor: string;
+    porta: number;
+    ssl: boolean;
+    usuario: string;
+    senha: string;
+  };
+  templateEmail: {
+    cabecalho: string;
+    rodape: string;
+    assinatura: string;
+  };
+  tiposNotificacao: Record<string, boolean>;
+}
+
+interface ConfiguracoesIntegracoes {
+  api: {
+    habilitada: boolean;
+    chaveApi: string;
+    webhooks: string[];
+    limitesRequisicao: {
+      por_minuto: number;
+      por_dia: number;
+    };
+  };
+  servicos: Record<
+    string,
+    {
+      habilitado: boolean;
+      token?: string;
+      numero?: string;
+      client_id?: string;
+      client_secret?: string;
+    }
+  >;
+}
+
+interface ConfiguracoesBackup {
+  automatico: boolean;
+  frequencia: 'diario' | 'semanal' | 'mensal';
+  retencaoDias: number;
+  incluirAnexos: boolean;
+  sincronizacaoNuvem: {
+    habilitada: boolean;
+    provedor: string;
+    configuracao: Record<string, unknown>;
+  };
+}
+
+interface ConfiguracoesState {
+  geral: ConfiguracoesGerais;
+  seguranca: ConfiguracoesSeguranca;
+  usuarios: ConfiguracoesUsuarios;
+  notificacoes: ConfiguracoesNotificacoes;
+  integracoes: ConfiguracoesIntegracoes;
+  backup: ConfiguracoesBackup;
+}
+
+const formatarEndereco = (endereco?: EmpresaInfo['endereco']): string => {
+  if (!endereco) {
+    return '';
+  }
+
+  if (typeof endereco === 'string') {
+    return endereco;
+  }
+
+  const { rua, numero, complemento, bairro, cidade, estado, cep } = endereco;
+  const complementoTexto = complemento ? ` ${complemento}` : '';
+  return `${rua}, ${numero}${complementoTexto} - ${bairro}, ${cidade} - ${estado}, ${cep}`;
+};
+
+const criarConfiguracoesIniciais = (empresa?: EmpresaInfo | null): ConfiguracoesState => {
+  const config = empresa?.configuracoes ?? {};
+  const geralConfig = config.geral ?? {};
+  const coresConfig = geralConfig.cores ?? config.cores ?? {};
+  const seguranca = config.seguranca ?? {};
+  const usuarios = config.usuarios ?? {};
+  const notificacoes = config.notificacoes ?? {};
+  const integracoes = config.integracoes ?? {};
+  const backup = config.backup ?? {};
+
+  const limitesUsuariosPlano = empresa?.plano?.limites?.usuarios ?? empresa?.plano?.limitesUsuarios ?? 10;
+
+  const limitesRequisicao = integracoes.api?.limitesRequisicao ?? { por_minuto: 100, por_dia: 10000 };
+
+  const servicosPadrao: ConfiguracoesIntegracoes['servicos'] = {
+    receita_federal: { habilitado: false, token: '' },
+    correios: { habilitado: false, token: '' },
+    whatsapp: { habilitado: false, token: '', numero: '' },
+    google_calendar: { habilitado: false, client_id: '', client_secret: '' }
+  };
+
+  const servicosMesclados = {
+    ...servicosPadrao,
+    ...(integracoes.servicos ?? {})
+  };
+
+  return {
+    geral: {
+      nome: geralConfig.nome ?? empresa?.nome ?? '',
+      descricao: geralConfig.descricao ?? empresa?.descricao ?? '',
+      site: geralConfig.site ?? config.site ?? '',
+      telefone: geralConfig.telefone ?? empresa?.telefone ?? '',
+      email: geralConfig.email ?? empresa?.email ?? '',
+      endereco: geralConfig.endereco ?? formatarEndereco(empresa?.endereco),
+      timezone: geralConfig.timezone ?? config.timezone ?? 'America/Sao_Paulo',
+      logo: geralConfig.logo ?? config.logo ?? '',
+      cores: {
+        primaria: coresConfig.primaria ?? '#2563eb',
+        secundaria: coresConfig.secundaria ?? '#64748b',
+        accent: coresConfig.accent ?? '#10b981'
+      }
+    },
+    seguranca: {
+      autenticacao2FA: seguranca.autenticacao2FA ?? false,
+      sessaoExpiracaoMinutos: seguranca.sessaoExpiracaoMinutos ?? 480,
+      tentativasLoginMax: seguranca.tentativasLoginMax ?? 5,
+      senhaComplexidade: seguranca.senhaComplexidade ?? 'media',
+      auditoriaNivel: seguranca.auditoriaNivel ?? 'completo',
+      ipsBloqueados: seguranca.ipsBloqueados ?? [],
+      restricaoHorario:
+        seguranca.restricaoHorario ?? {
+          habilitado: false,
+          inicio: '08:00',
+          fim: '18:00',
+          diasSemana: [1, 2, 3, 4, 5]
+        }
+    },
+    usuarios: {
+      limitesUsuarios:
+        usuarios.limitesUsuarios ?? {
+          total: limitesUsuariosPlano,
+          administradores: 3,
+          vendedores: 50,
+          supervisores: 5
+        },
+      permissoesDefault:
+        usuarios.permissoesDefault ?? {
+          vendedor: ['clientes.ver', 'propostas.criar', 'propostas.editar'],
+          supervisor: ['clientes.ver', 'propostas.ver', 'relatorios.ver'],
+          administrador: ['*']
+        },
+      aprovacaoNovoUsuario: usuarios.aprovacaoNovoUsuario ?? true,
+      dominiosPermitidos: usuarios.dominiosPermitidos ?? []
+    },
+    notificacoes: {
+      emailsHabilitados: notificacoes.emailsHabilitados ?? true,
+      servidorEmail:
+        notificacoes.servidorEmail ?? {
+          tipo: 'smtp',
+          servidor: '',
+          porta: 587,
+          ssl: true,
+          usuario: '',
+          senha: ''
+        },
+      templateEmail:
+        notificacoes.templateEmail ?? {
+          cabecalho: '',
+          rodape: '',
+          assinatura: ''
+        },
+      tiposNotificacao:
+        notificacoes.tiposNotificacao ?? {
+          novoCliente: true,
+          novaProposta: true,
+          propostaAprovada: true,
+          tarefaVencendo: true,
+          pagamentoVencido: true
+        }
+    },
+    integracoes: {
+      api: {
+        habilitada: integracoes.api?.habilitada ?? false,
+        chaveApi: integracoes.api?.chaveApi ?? '',
+        webhooks: integracoes.api?.webhooks ?? [],
+        limitesRequisicao: {
+          por_minuto: limitesRequisicao.por_minuto ?? 100,
+          por_dia: limitesRequisicao.por_dia ?? 10000
+        }
+      },
+      servicos: servicosMesclados
+    },
+    backup: {
+      automatico: backup.automatico ?? true,
+      frequencia: backup.frequencia ?? 'diario',
+      retencaoDias: backup.retencaoDias ?? 30,
+      incluirAnexos: backup.incluirAnexos ?? true,
+      sincronizacaoNuvem:
+        backup.sincronizacaoNuvem ?? {
+          habilitada: false,
+          provedor: 'aws',
+          configuracao: {}
+        }
+    }
+  };
+};
+
 export const ConfiguracaoEmpresaPage: React.FC<ConfiguracaoEmpresaPageProps> = ({ empresaId }) => {
   const { empresas, empresaAtiva, updateConfiguracoes } = useEmpresas();
   const [loading, setLoading] = useState(false);
@@ -56,130 +306,12 @@ export const ConfiguracaoEmpresaPage: React.FC<ConfiguracaoEmpresaPageProps> = (
   const empresa = empresas.find(e => e.id === empresaId) || empresaAtiva;
 
   // Estados das configurações
-  const [configuracoes, setConfiguracoes] = useState({
-    // Configurações Gerais
-    geral: {
-      nome: empresa?.nome || '',
-      descricao: empresa?.descricao || '',
-      site: empresa?.configuracoes?.site || '',
-      telefone: empresa?.telefone || '',
-      email: empresa?.email || '',
-      endereco: empresa?.endereco || '',
-      timezone: empresa?.configuracoes?.timezone || 'America/Sao_Paulo',
-      logo: empresa?.configuracoes?.logo || '',
-      cores: {
-        primaria: empresa?.configuracoes?.cores?.primaria || '#2563eb',
-        secundaria: empresa?.configuracoes?.cores?.secundaria || '#64748b',
-        accent: empresa?.configuracoes?.cores?.accent || '#10b981'
-      }
-    },
-
-    // Configurações de Segurança
-    seguranca: {
-      autenticacao2FA: empresa?.configuracoes?.seguranca?.autenticacao2FA || false,
-      sessaoExpiracaoMinutos: empresa?.configuracoes?.seguranca?.sessaoExpiracaoMinutos || 480,
-      tentativasLoginMax: empresa?.configuracoes?.seguranca?.tentativasLoginMax || 5,
-      senhaComplexidade: empresa?.configuracoes?.seguranca?.senhaComplexidade || 'media',
-      auditoriaNivel: empresa?.configuracoes?.seguranca?.auditoriaNivel || 'completo',
-      ipsBloqueados: empresa?.configuracoes?.seguranca?.ipsBloqueados || [],
-      restricaoHorario: empresa?.configuracoes?.seguranca?.restricaoHorario || {
-        habilitado: false,
-        inicio: '08:00',
-        fim: '18:00',
-        diasSemana: [1, 2, 3, 4, 5]
-      }
-    },
-
-    // Configurações de Usuários e Permissões
-    usuarios: {
-      limitesUsuarios: empresa?.configuracoes?.usuarios?.limitesUsuarios || {
-        total: empresa?.plano?.limites?.usuarios || 10,
-        administradores: 3,
-        vendedores: 50,
-        supervisores: 5
-      },
-      permissoesDefault: empresa?.configuracoes?.usuarios?.permissoesDefault || {
-        vendedor: ['clientes.ver', 'propostas.criar', 'propostas.editar'],
-        supervisor: ['clientes.ver', 'propostas.ver', 'relatorios.ver'],
-        administrador: ['*']
-      },
-      aprovacaoNovoUsuario: empresa?.configuracoes?.usuarios?.aprovacaoNovoUsuario || true,
-      dominiosPermitidos: empresa?.configuracoes?.usuarios?.dominiosPermitidos || []
-    },
-
-    // Configurações de Email e Notificações
-    notificacoes: {
-      emailsHabilitados: empresa?.configuracoes?.notificacoes?.emailsHabilitados || true,
-      servidorEmail: empresa?.configuracoes?.notificacoes?.servidorEmail || {
-        tipo: 'smtp',
-        servidor: '',
-        porta: 587,
-        ssl: true,
-        usuario: '',
-        senha: ''
-      },
-      templateEmail: empresa?.configuracoes?.notificacoes?.templateEmail || {
-        cabecalho: '',
-        rodape: '',
-        assinatura: ''
-      },
-      tiposNotificacao: empresa?.configuracoes?.notificacoes?.tiposNotificacao || {
-        novoCliente: true,
-        novaProposta: true,
-        propostaAprovada: true,
-        tarefaVencendo: true,
-        pagamentoVencido: true
-      }
-    },
-
-    // Configurações de Integrações
-    integracoes: {
-      api: {
-        habilitada: empresa?.configuracoes?.integracoes?.api?.habilitada || false,
-        chaveApi: empresa?.configuracoes?.integracoes?.api?.chaveApi || '',
-        webhooks: empresa?.configuracoes?.integracoes?.api?.webhooks || [],
-        limitesRequisicao: empresa?.configuracoes?.integracoes?.api?.limitesRequisicao || {
-          por_minuto: 100,
-          por_dia: 10000
-        }
-      },
-      servicos: empresa?.configuracoes?.integracoes?.servicos || {
-        receita_federal: { habilitado: false, token: '' },
-        correios: { habilitado: false, token: '' },
-        whatsapp: { habilitado: false, token: '', numero: '' },
-        google_calendar: { habilitado: false, client_id: '', client_secret: '' }
-      }
-    },
-
-    // Configurações de Backup e Sincronização
-    backup: {
-      automatico: empresa?.configuracoes?.backup?.automatico || true,
-      frequencia: empresa?.configuracoes?.backup?.frequencia || 'diario',
-      retencaoDias: empresa?.configuracoes?.backup?.retencaoDias || 30,
-      incluirAnexos: empresa?.configuracoes?.backup?.incluirAnexos || true,
-      sincronizacaoNuvem: empresa?.configuracoes?.backup?.sincronizacaoNuvem || {
-        habilitada: false,
-        provedor: 'aws',
-        configuracao: {}
-      }
-    }
-  });
+  const [configuracoes, setConfiguracoes] = useState<ConfiguracoesState>(() => criarConfiguracoesIniciais(empresa));
 
   // Atualizar configurações quando empresa mudar
   useEffect(() => {
-    if (empresa) {
-      setConfiguracoes(prev => ({
-        ...prev,
-        geral: {
-          ...prev.geral,
-          nome: empresa.nome,
-          descricao: empresa.descricao || '',
-          telefone: empresa.telefone,
-          email: empresa.email,
-          endereco: empresa.endereco || ''
-        }
-      }));
-    }
+    setConfiguracoes(criarConfiguracoesIniciais(empresa));
+    setHasChanges(false);
   }, [empresa]);
 
   // Função para salvar configurações
@@ -188,7 +320,7 @@ export const ConfiguracaoEmpresaPage: React.FC<ConfiguracaoEmpresaPageProps> = (
 
     try {
       setLoading(true);
-      await updateConfiguracoes(empresa.id, configuracoes);
+      await updateConfiguracoes(empresa.id, configuracoes as Partial<EmpresaInfo['configuracoes']>);
       setHasChanges(false);
     } catch (error) {
       console.error('Erro ao salvar configurações:', error);
@@ -198,11 +330,15 @@ export const ConfiguracaoEmpresaPage: React.FC<ConfiguracaoEmpresaPageProps> = (
   };
 
   // Função para atualizar configuração específica
-  const updateConfig = (section: string, key: string, value: any) => {
+  const updateConfig = <Section extends keyof ConfiguracoesState, Key extends keyof ConfiguracoesState[Section]>(
+    section: Section,
+    key: Key,
+    value: ConfiguracoesState[Section][Key]
+  ) => {
     setConfiguracoes(prev => ({
       ...prev,
       [section]: {
-        ...prev[section as keyof typeof prev],
+        ...prev[section],
         [key]: value
       }
     }));
@@ -210,17 +346,30 @@ export const ConfiguracaoEmpresaPage: React.FC<ConfiguracaoEmpresaPageProps> = (
   };
 
   // Função para atualizar configuração aninhada
-  const updateNestedConfig = (section: string, parentKey: string, key: string, value: any) => {
-    setConfiguracoes(prev => ({
-      ...prev,
-      [section]: {
-        ...prev[section as keyof typeof prev],
-        [parentKey]: {
-          ...(prev[section as keyof typeof prev] as any)[parentKey],
-          [key]: value
+  const updateNestedConfig = <
+    Section extends keyof ConfiguracoesState,
+    ParentKey extends keyof ConfiguracoesState[Section]
+  >(
+    section: Section,
+    parentKey: ParentKey,
+    key: string,
+    value: unknown
+  ) => {
+    setConfiguracoes(prev => {
+      const sectionData = prev[section];
+      const parentValue = sectionData[parentKey] as Record<string, unknown> | undefined;
+
+      return {
+        ...prev,
+        [section]: {
+          ...sectionData,
+          [parentKey]: {
+            ...(parentValue ?? {}),
+            [key]: value
+          }
         }
-      }
-    }));
+      };
+    });
     setHasChanges(true);
   };
 
@@ -507,7 +656,9 @@ export const ConfiguracaoEmpresaPage: React.FC<ConfiguracaoEmpresaPageProps> = (
                   <Label htmlFor="senha-complexidade">Complexidade da Senha</Label>
                   <Select
                     value={configuracoes.seguranca.senhaComplexidade}
-                    onValueChange={(value) => updateConfig('seguranca', 'senhaComplexidade', value)}
+                    onValueChange={(value: ConfiguracoesSeguranca['senhaComplexidade']) =>
+                      updateConfig('seguranca', 'senhaComplexidade', value)
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -524,7 +675,9 @@ export const ConfiguracaoEmpresaPage: React.FC<ConfiguracaoEmpresaPageProps> = (
                   <Label htmlFor="auditoria-nivel">Nível de Auditoria</Label>
                   <Select
                     value={configuracoes.seguranca.auditoriaNivel}
-                    onValueChange={(value) => updateConfig('seguranca', 'auditoriaNivel', value)}
+                    onValueChange={(value: ConfiguracoesSeguranca['auditoriaNivel']) =>
+                      updateConfig('seguranca', 'auditoriaNivel', value)
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -884,7 +1037,9 @@ export const ConfiguracaoEmpresaPage: React.FC<ConfiguracaoEmpresaPageProps> = (
                       <Label htmlFor="backup-frequencia">Frequência</Label>
                       <Select
                         value={configuracoes.backup.frequencia}
-                        onValueChange={(value) => updateConfig('backup', 'frequencia', value)}
+                        onValueChange={(value: ConfiguracoesBackup['frequencia']) =>
+                          updateConfig('backup', 'frequencia', value)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue />

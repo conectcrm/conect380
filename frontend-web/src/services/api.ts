@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const DEBUG = false;
 
 // Instância do axios
 export const api = axios.create({
@@ -16,6 +17,39 @@ api.interceptors.request.use(
     const token = localStorage.getItem('authToken'); // ✅ Corrigido para 'authToken'
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    if (config.data instanceof FormData && config.headers) {
+      // Permite que o Axios defina o boundary corretamente
+      delete config.headers['Content-Type'];
+      delete config.headers['content-type'];
+    }
+
+    // ✨ ADICIONAR empresaId automaticamente para rotas de atendimento
+    if (config.url?.includes('/atendimento')) {
+      const empresaAtiva = localStorage.getItem('empresaAtiva');
+      const metodo = config.method?.toLowerCase();
+
+      if (empresaAtiva && metodo === 'get') {
+        // Adicionar empresaId nos query params para GET requests
+        config.params = {
+          ...config.params,
+          empresaId: empresaAtiva,
+        };
+      } else if (empresaAtiva && (metodo === 'post' || metodo === 'patch' || metodo === 'put')) {
+        // Adicionar empresaId no body para POST/PATCH requests
+        if (config.data instanceof FormData) {
+          // FormData não pode ser espalhado, então apenas anexamos o campo
+          if (!config.data.has('empresaId')) {
+            config.data.append('empresaId', empresaAtiva);
+          }
+        } else if (config.data && typeof config.data === 'object') {
+          config.data = {
+            ...config.data,
+            empresaId: empresaAtiva,
+          };
+        }
+      }
     }
 
     // Debug específico para requisições de planos

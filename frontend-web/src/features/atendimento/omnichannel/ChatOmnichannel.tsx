@@ -1,19 +1,95 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { User, X } from 'lucide-react';
 import { AtendimentosSidebar } from './components/AtendimentosSidebar';
 import { ChatArea } from './components/ChatArea';
 import { ClientePanel } from './components/ClientePanel';
+import { PopupNotifications, PopupNotificationItem } from './components/PopupNotifications';
 import { NovoAtendimentoModal, NovoAtendimentoData } from './modals/NovoAtendimentoModal';
 import { TransferirAtendimentoModal, TransferenciaData } from './modals/TransferirAtendimentoModal';
 import { EncerrarAtendimentoModal, EncerramentoData } from './modals/EncerrarAtendimentoModal';
 import { EditarContatoModal, ContatoEditado } from './modals/EditarContatoModal';
 import { VincularClienteModal } from './modals/VincularClienteModal';
 import { AbrirDemandaModal, NovaDemanda } from './modals/AbrirDemandaModal';
-import { Mensagem, NotaCliente, Demanda } from './types';
+import { Mensagem, NotaCliente, Demanda, StatusAtendimento, Ticket, CanalTipo } from './types';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useSidebar } from '../../../contexts/SidebarContext';
 import { useAtendimentos } from './hooks/useAtendimentos';
 import { useMensagens } from './hooks/useMensagens';
-import { mockHistorico, mockDemandas, mockNotas } from './mockData';
+import { useHistoricoCliente } from './hooks/useHistoricoCliente';
+import { useContextoCliente } from './hooks/useContextoCliente';
+import { useWebSocket } from './hooks/useWebSocket';
+import { useToast } from './contexts/ToastContext';
+import { useNotas } from '../../../hooks/useNotas'; // ✅ Hook real de notas
+import { useDemandas } from '../../../hooks/useDemandas'; // ✅ Hook real de demandas
+import { atendimentoService } from './services/atendimentoService'; // ✅ Service para atualizar contato e vincular cliente
+import { resolveAvatarUrl } from '../../../utils/avatar';
+import { resolverNomeExibicao } from './utils';
+
+const DEBUG = false; // ✅ Desabilitado após resolução do problema de tempo real
+
+const MAX_NOTIFICATION_PREVIEW = 140;
+
+const gerarPreviewTexto = (valor?: string | null): string => {
+  if (!valor) return '';
+  const texto = valor.toString().trim();
+  if (!texto) return '';
+  return texto.length > MAX_NOTIFICATION_PREVIEW
+    ? `${texto.slice(0, MAX_NOTIFICATION_PREVIEW - 3)}...`
+    : texto;
+};
+
+const gerarResumoNovaMensagem = (mensagem: Mensagem): string => {
+  if (!mensagem) {
+    return 'Nova mensagem recebida';
+  }
+
+  const texto = gerarPreviewTexto(mensagem.conteudo);
+  if (texto) {
+    return texto;
+  }
+
+  if (mensagem.audio) {
+    return 'Mensagem de áudio recebida';
+  }
+
+  if (mensagem.anexos && mensagem.anexos.length > 0) {
+    const quantidade = mensagem.anexos.length;
+    const plural = quantidade > 1 ? 's' : '';
+    return `${quantidade} arquivo${plural} recebido${plural}`;
+  }
+
+  return 'Nova mensagem recebida';
+};
+
+const gerarResumoNovoTicket = (ticket: any): string => {
+  const texto = gerarPreviewTexto(ticket?.ultimaMensagem || ticket?.ultima_mensagem);
+  if (texto) {
+    return texto;
+  }
+
+  return 'Um cliente está aguardando atendimento.';
+};
+
+const normalizarCanalNotificacao = (valor: unknown): CanalTipo => {
+  if (typeof valor === 'string') {
+    const canal = valor.toLowerCase();
+    if (['whatsapp', 'telegram', 'email', 'chat', 'telefone'].includes(canal)) {
+      return canal as CanalTipo;
+    }
+  }
+
+  if (valor && typeof valor === 'object') {
+    return normalizarCanalNotificacao(
+      (valor as any).tipo ||
+      (valor as any).nome ||
+      (valor as any).canal ||
+      (valor as any).canalTipo ||
+      (valor as any).canal_tipo
+    );
+  }
+
+  return 'chat';
+};
 
 /**
  * ChatOmnichannel - Componente principal do chat omnichannel
@@ -25,39 +101,730 @@ import { mockHistorico, mockDemandas, mockNotas } from './mockData';
  * 
  * TEMA: Integrado com ThemeContext do CRM
  * RESPONSIVE: Adapta larguras quando sidebar global está expandida/colapsada
+ * 
+ * INTEGRAÇÃO BACKEND:
+ * - ✅ Tickets: 100% integrado (listar, criar, transferir, encerrar)
+ * - ✅ Mensagens: 100% integrado (listar, enviar texto/áudio/anexos)
+ * - ✅ Histórico: 100% integrado (busca histórico real do cliente)
+ * - ✅ Contexto: 100% integrado (dados do cliente, faturas, contratos)
+ * - ✅ WebSocket: 100% integrado (mensagens e eventos em tempo real)
+ * - ⚠️ Demandas: Ainda em mock (módulo CRM)
+ * - ⚠️ Notas: Ainda em mock (módulo CRM)
  */
 export const ChatOmnichannel: React.FC = () => {
   const { currentPalette } = useTheme();
   const { sidebarCollapsed } = useSidebar();
-  
-  // Hooks do backend real
-  const { 
-    tickets, 
-    ticketSelecionado, 
+  const { showToast } = useToast();
+
+  const [popupNotifications, setPopupNotifications] = useState<PopupNotificationItem[]>([]);
+  const popupTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const notifiedMessagesSetRef = useRef<Set<string>>(new Set());
+  const notifiedMessagesQueueRef = useRef<string[]>([]);
+  const notifiedTicketsSetRef = useRef<Set<string>>(new Set());
+  const notifiedTicketsQueueRef = useRef<string[]>([]);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const browserPermissionPendingRef = useRef(false);
+  const browserNotificationsRef = useRef<Record<string, Notification>>({});
+
+  const removePopupNotification = useCallback((id: string) => {
+    setPopupNotifications(prev => prev.filter(notification => notification.id !== id));
+
+    const timeoutId = popupTimeoutsRef.current[id];
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      delete popupTimeoutsRef.current[id];
+    }
+
+    const browserNotification = browserNotificationsRef.current[id];
+    if (browserNotification) {
+      browserNotification.close();
+      delete browserNotificationsRef.current[id];
+    }
+  }, []);
+
+  const playPopupSound = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextCtor) {
+      return;
+    }
+
+    try {
+      let audioCtx = audioContextRef.current;
+      if (!audioCtx) {
+        audioCtx = new AudioContextCtor();
+        audioContextRef.current = audioCtx;
+      }
+
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => undefined);
+      }
+
+      const oscillator = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      const now = audioCtx.currentTime;
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(660, now);
+      oscillator.frequency.exponentialRampToValueAtTime(880, now + 0.2);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.04, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+
+      oscillator.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      oscillator.start(now);
+      oscillator.stop(now + 0.65);
+    } catch (error) {
+      if (DEBUG) console.warn('Não foi possível reproduzir som da notificação:', error);
+    }
+  }, []);
+
+  const showBrowserNotification = useCallback((notification: PopupNotificationItem) => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return;
+    }
+
+    if (!('Notification' in window)) {
+      return;
+    }
+
+    if (!document.hidden) {
+      return;
+    }
+
+    const trigger = () => {
+      try {
+        const brandName = 'ConectCRM';
+        const appOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+        const defaultIcon = `${appOrigin}/logo192.png`;
+        const browserNotification = new Notification(
+          `${brandName} • ${notification.title}`,
+          {
+            body: notification.message,
+            icon: notification.avatarUrl || defaultIcon,
+            badge: `${appOrigin}/favicon.ico`,
+            tag: notification.ticketId ? `ticket-${notification.ticketId}` : notification.id,
+            data: {
+              ticketId: notification.ticketId,
+              type: notification.type,
+            },
+          }
+        );
+
+        browserNotification.onclick = () => {
+          window.focus();
+          notification.onClick?.();
+          browserNotification.close();
+        };
+
+        browserNotification.onclose = () => {
+          delete browserNotificationsRef.current[notification.id];
+        };
+
+        browserNotificationsRef.current[notification.id] = browserNotification;
+      } catch (error) {
+        if (DEBUG) {
+          console.warn('Falha ao exibir notificação do navegador:', error);
+        }
+      }
+    };
+
+    const permission = Notification.permission;
+    if (permission === 'granted') {
+      trigger();
+      return;
+    }
+
+    if (permission === 'default' && !browserPermissionPendingRef.current) {
+      browserPermissionPendingRef.current = true;
+      Notification.requestPermission().then(result => {
+        browserPermissionPendingRef.current = false;
+        if (result === 'granted') {
+          trigger();
+        }
+      }).catch(() => {
+        browserPermissionPendingRef.current = false;
+      });
+    }
+  }, []);
+
+  const addPopupNotification = useCallback((
+    notification: Omit<PopupNotificationItem, 'id' | 'createdAt' | 'onClick'> & {
+      duration?: number;
+      onClick?: (id: string) => void;
+    }
+  ) => {
+    const id = `popup-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const createdAt = new Date();
+
+    const finalNotification: PopupNotificationItem = {
+      ...notification,
+      id,
+      createdAt,
+      onClick: () => {
+        if (notification.onClick) {
+          notification.onClick(id);
+        }
+        removePopupNotification(id);
+      }
+    };
+
+    setPopupNotifications(prev => {
+      const sanitized = prev.filter(existing => {
+        const sameTicket = notification.ticketId && existing.ticketId === notification.ticketId;
+        const sameType = existing.type === notification.type;
+
+        if (sameTicket && sameType) {
+          const timeoutId = popupTimeoutsRef.current[existing.id];
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            delete popupTimeoutsRef.current[existing.id];
+          }
+          return false;
+        }
+
+        return true;
+      });
+
+      const next = [...sanitized, finalNotification];
+
+      if (next.length > 4) {
+        const excess = next.length - 4;
+        const toRemove = next.slice(0, excess);
+        toRemove.forEach(item => {
+          const timeoutId = popupTimeoutsRef.current[item.id];
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            delete popupTimeoutsRef.current[item.id];
+          }
+        });
+
+        return next.slice(excess);
+      }
+
+      return next;
+    });
+
+    const timeoutId = setTimeout(() => {
+      removePopupNotification(id);
+    }, notification.duration ?? 8000);
+
+    popupTimeoutsRef.current[id] = timeoutId;
+    playPopupSound();
+    showBrowserNotification(finalNotification);
+
+    return id;
+  }, [removePopupNotification, playPopupSound, showBrowserNotification]);
+
+  const hasMessageNotification = useCallback((messageId?: string) => {
+    if (!messageId) {
+      return false;
+    }
+
+    return notifiedMessagesSetRef.current.has(messageId);
+  }, []);
+
+  const registerMessageNotification = useCallback((messageId?: string) => {
+    if (!messageId) {
+      return;
+    }
+
+    if (notifiedMessagesSetRef.current.has(messageId)) {
+      return;
+    }
+
+    notifiedMessagesSetRef.current.add(messageId);
+    notifiedMessagesQueueRef.current.push(messageId);
+
+    if (notifiedMessagesQueueRef.current.length > 50) {
+      const removed = notifiedMessagesQueueRef.current.shift();
+      if (removed) {
+        notifiedMessagesSetRef.current.delete(removed);
+      }
+    }
+  }, []);
+
+  const hasTicketNotification = useCallback((ticketId?: string) => {
+    if (!ticketId) {
+      return false;
+    }
+
+    return notifiedTicketsSetRef.current.has(ticketId);
+  }, []);
+
+  const registerTicketNotification = useCallback((ticketId?: string) => {
+    if (!ticketId) {
+      return;
+    }
+
+    if (notifiedTicketsSetRef.current.has(ticketId)) {
+      return;
+    }
+
+    notifiedTicketsSetRef.current.add(ticketId);
+    notifiedTicketsQueueRef.current.push(ticketId);
+
+    if (notifiedTicketsQueueRef.current.length > 50) {
+      const removed = notifiedTicketsQueueRef.current.shift();
+      if (removed) {
+        notifiedTicketsSetRef.current.delete(removed);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      Object.values(popupTimeoutsRef.current).forEach(timeoutId => {
+        clearTimeout(timeoutId);
+      });
+
+      popupTimeoutsRef.current = {};
+
+      Object.values(browserNotificationsRef.current).forEach(notification => {
+        notification.close();
+      });
+      browserNotificationsRef.current = {};
+
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => undefined);
+        audioContextRef.current = null;
+      }
+    };
+  }, []);
+
+  // Estados para controle responsivo
+  const [clientePanelAberto, setClientePanelAberto] = useState(false);
+  const [mobileView, setMobileView] = useState<'tickets' | 'chat' | 'cliente'>('tickets');
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  // Detectar mudanças no tamanho da tela
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+
+      // Auto-fechar cliente panel em breakpoints menores
+      if (window.innerWidth < 1280) {
+        setClientePanelAberto(false);
+      }
+
+      // Reset para view de tickets no mobile quando redimensiona
+      if (window.innerWidth < 768 && mobileView !== 'tickets') {
+        setMobileView('tickets');
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [mobileView]);
+
+  // Breakpoints responsivos
+  const isDesktop = windowWidth >= 1280;
+  const isTablet = windowWidth >= 768 && windowWidth < 1280;
+  const isMobile = windowWidth < 768;
+
+  // Hooks do backend real - TICKETS
+  const {
+    tickets,
+    ticketSelecionado,
     selecionarTicket,
     criarTicket,
     transferirTicket,
     encerrarTicket,
-    loading: loadingTickets 
+    recarregar: recarregarTickets,
+    sincronizarTicketRealtime: syncTicketRealtime,
+    atualizarTicketLocal, // 🆕 NOVA: Atualiza ticket sem reload
+    loading: loadingTickets,
+    filtros,
+    setFiltros,
+    totaisPorStatus
   } = useAtendimentos({
-    autoRefresh: true,
+    autoRefresh: false, // WebSocket já cuida dos updates como nas principais plataformas
     filtroInicial: { status: 'aberto' }
   });
 
+  const [tabAtiva, setTabAtiva] = useState<StatusAtendimento>(filtros.status || 'aberto');
+
+  useEffect(() => {
+    if (filtros.status && filtros.status !== tabAtiva) {
+      setTabAtiva(filtros.status);
+    }
+  }, [filtros.status, tabAtiva]);
+
+  const handleChangeTab = useCallback((status: StatusAtendimento) => {
+    setTabAtiva(prev => (prev === status ? prev : status));
+    setFiltros(prev => {
+      if (prev.status === status && (prev.page ?? 1) === 1) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        status,
+        page: 1,
+      };
+    });
+  }, [setFiltros]);
+
+  // Hooks do backend real - MENSAGENS
   const {
     mensagens,
     enviarMensagem,
     enviarMensagemComAnexos,
+    enviarAudio,
     marcarComoLidas,
-    loading: loadingMensagens
+    recarregar: recarregarMensagens,
+    adicionarMensagemRecebida, // 🔥 NOVA: para WebSocket
+    loading: loadingMensagens,
+    enviando: enviandoMensagem
   } = useMensagens({
     ticketId: ticketSelecionado?.id || null
   });
 
-  // Dados que ainda vêm do mock (serão implementados depois)
-  const [historico] = useState(mockHistorico);
-  const [demandas, setDemandas] = useState(mockDemandas);
-  const [notas, setNotas] = useState<NotaCliente[]>(mockNotas);
+  // 🆕 Hooks do backend real - HISTÓRICO DO CLIENTE
+  const {
+    historico,
+    loading: loadingHistorico
+  } = useHistoricoCliente({
+    clienteId: ticketSelecionado?.contato?.clienteVinculado?.id || null,
+    autoLoad: true
+  });
+
+  // 🆕 Hooks do backend real - CONTEXTO DO CLIENTE
+  const {
+    contexto,
+    loading: loadingContexto
+  } = useContextoCliente({
+    clienteId: ticketSelecionado?.contato?.clienteVinculado?.id || null,
+    telefone: ticketSelecionado?.contato?.telefone || null,
+    autoLoad: true
+  });
+
+  const handleSelecionarTicketResponsivo = useCallback((ticketId: string) => {
+    selecionarTicket(ticketId);
+    if (isMobile) {
+      setMobileView('chat');
+    }
+  }, [selecionarTicket, isMobile]);
+
+  // 🔧 REFS ESTÁVEIS PARA WEBSOCKET - Evita loop infinito de reconexões
+  type WebsocketCallbacks = {
+    recarregarTickets: () => void;
+    recarregarMensagens: () => void;
+    adicionarMensagemRecebida: (mensagem: Mensagem) => void;
+    atualizarTicketLocal: (ticketId: string, updates: any) => void;
+    mostrarPopupMensagem: (mensagem: Mensagem) => void;
+    mostrarPopupNovoTicket: (ticket: Ticket | any) => void;
+    sincronizarTicketRealtime: (ticket: any) => Ticket | null;
+    ticketAtualId: string | null;
+  };
+
+  const websocketCallbacksRef = useRef<WebsocketCallbacks>({
+    recarregarTickets: () => { },
+    recarregarMensagens: () => { },
+    adicionarMensagemRecebida: () => { },
+    atualizarTicketLocal: () => { },
+    mostrarPopupMensagem: () => { },
+    mostrarPopupNovoTicket: () => { },
+    sincronizarTicketRealtime: () => null,
+    ticketAtualId: null,
+  });
+
+  // Atualizar refs quando funções ou ticket mudarem
+  useEffect(() => {
+    const chatVisivel = Boolean(ticketSelecionado) && (!isMobile || mobileView === 'chat');
+
+    websocketCallbacksRef.current = {
+      recarregarTickets: () => {
+        if (DEBUG) console.log('🔄 Recarregando tickets via WebSocket...');
+        recarregarTickets();
+      },
+      recarregarMensagens: () => {
+        if (DEBUG) console.log('🔄 Recarregando mensagens via WebSocket...');
+        recarregarMensagens();
+      },
+      adicionarMensagemRecebida: (mensagem: Mensagem) => {
+        if (DEBUG) console.log('📩 Adicionando mensagem via WebSocket...');
+        adicionarMensagemRecebida(mensagem);
+      },
+      atualizarTicketLocal: (ticketId: string, updates: any) => {
+        if (DEBUG) console.log('🔄 Atualizando ticket localmente (sem reload)...');
+        atualizarTicketLocal(ticketId, updates);
+      },
+      sincronizarTicketRealtime: (ticket: any) => {
+        if (DEBUG) console.log('🔄 Sincronizando ticket em tempo real...', ticket);
+        return syncTicketRealtime(ticket);
+      },
+      mostrarPopupMensagem: (mensagem: Mensagem) => {
+        if (!mensagem) {
+          return;
+        }
+
+        const mensagemId = mensagem.id;
+
+        if (hasMessageNotification(mensagemId)) {
+          return;
+        }
+
+        if (!mensagem.ticketId) {
+          registerMessageNotification(mensagemId);
+          return;
+        }
+
+        if (mensagem.remetente?.tipo !== 'cliente') {
+          registerMessageNotification(mensagemId);
+          return;
+        }
+
+        const ticketAtualId = ticketSelecionado?.id || null;
+        const isTicketAtual = mensagem.ticketId === ticketAtualId;
+        const chatAbertoParaTicket = isTicketAtual && chatVisivel;
+
+        if (chatAbertoParaTicket) {
+          registerMessageNotification(mensagemId);
+          return;
+        }
+
+        const ticketAlvo = tickets.find(item => item.id === mensagem.ticketId);
+        // 🎯 Usar nome do cliente vinculado se disponível
+        const titulo = ticketAlvo?.contato
+          ? resolverNomeExibicao(ticketAlvo.contato)
+          : (mensagem.remetente?.nome || 'Cliente');
+        const avatarUrl = resolveAvatarUrl(ticketAlvo?.contato?.foto || mensagem.remetente?.foto || null) || undefined;
+        const canal = ticketAlvo?.canal || normalizarCanalNotificacao((mensagem as any)?.canal);
+
+        addPopupNotification({
+          type: 'nova-mensagem',
+          title: titulo,
+          message: gerarResumoNovaMensagem(mensagem),
+          ticketId: mensagem.ticketId,
+          messageId: mensagemId,
+          avatarUrl,
+          canal,
+          onClick: () => {
+            if (tabAtiva !== 'aberto') {
+              handleChangeTab('aberto');
+            }
+            handleSelecionarTicketResponsivo(mensagem.ticketId);
+          }
+        });
+
+        registerMessageNotification(mensagemId);
+      },
+      mostrarPopupNovoTicket: (ticket: Ticket | any) => {
+        const ticketId = ticket?.id;
+        if (!ticketId || hasTicketNotification(ticketId)) {
+          return;
+        }
+
+        const contato = ticket?.contato || {};
+        // 🎯 Usar nome do cliente vinculado se disponível
+        const titulo = contato.clienteVinculado?.nome || contato.nome || ticket?.contatoNome || ticket?.contato_nome || 'Novo atendimento';
+        const avatarUrl = resolveAvatarUrl(contato.foto || ticket?.contatoFoto || ticket?.contato_foto || null) || undefined;
+        const canal = normalizarCanalNotificacao(ticket?.canal ?? ticket?.canalTipo ?? ticket?.canal_tipo);
+
+        addPopupNotification({
+          type: 'novo-ticket',
+          title: titulo,
+          message: gerarResumoNovoTicket(ticket),
+          ticketId,
+          avatarUrl,
+          canal,
+          onClick: () => {
+            if (tabAtiva !== 'aberto') {
+              handleChangeTab('aberto');
+            }
+            handleSelecionarTicketResponsivo(ticketId);
+          }
+        });
+
+        registerTicketNotification(ticketId);
+      },
+      ticketAtualId: ticketSelecionado?.id || null,
+    };
+  }, [
+    recarregarTickets,
+    recarregarMensagens,
+    adicionarMensagemRecebida,
+    atualizarTicketLocal,
+    syncTicketRealtime,
+    ticketSelecionado,
+    tickets,
+    isMobile,
+    mobileView,
+    addPopupNotification,
+    hasMessageNotification,
+    registerMessageNotification,
+    hasTicketNotification,
+    registerTicketNotification,
+    handleSelecionarTicketResponsivo,
+    handleChangeTab,
+    tabAtiva
+  ]);
+
+  // 🆕 Hooks do backend real - WEBSOCKET TEMPO REAL
+  const { connected: wsConnected, entrarNoTicket, sairDoTicket } = useWebSocket({
+    enabled: true,  // ✅ RE-HABILITADO com callbacks estáveis
+    autoConnect: true,
+    events: {
+      // ✅ Callbacks estáveis usando refs (não mudam a cada render)
+      onNovoTicket: (ticket: any) => {
+        if (DEBUG) console.log('📨 Novo ticket recebido via WebSocket', ticket);
+        const ticketSincronizado = websocketCallbacksRef.current.sincronizarTicketRealtime(ticket);
+
+        if (!ticketSincronizado) {
+          websocketCallbacksRef.current.recarregarTickets();
+        }
+
+        websocketCallbacksRef.current.mostrarPopupNovoTicket(ticketSincronizado || ticket);
+      },
+
+      onNovaMensagem: (mensagem: any) => {
+        if (DEBUG) console.log('💬 Nova mensagem via WebSocket:', mensagem);
+
+        // 🔥 OTIMIZAÇÃO 1: Adicionar mensagem diretamente ao chat atual (sem reload)
+        if (mensagem.ticketId === websocketCallbacksRef.current.ticketAtualId) {
+          websocketCallbacksRef.current.adicionarMensagemRecebida(mensagem);
+        }
+
+        // 🔥 OTIMIZAÇÃO 2: Atualizar apenas o ticket afetado na sidebar (sem reload total)
+        websocketCallbacksRef.current.atualizarTicketLocal(mensagem.ticketId, {
+          ultimaMensagemEm: mensagem.timestamp || new Date().toISOString(),
+          // Outras propriedades que podem ser atualizadas:
+          // mensagensNaoLidas: ticket.mensagensNaoLidas + 1,
+        });
+
+        websocketCallbacksRef.current.mostrarPopupMensagem(mensagem);
+      },
+
+      onTicketAtualizado: (ticket: any) => {
+        if (DEBUG) console.log('🔄 Ticket atualizado via WebSocket:', ticket);
+
+        const ticketSincronizado = websocketCallbacksRef.current.sincronizarTicketRealtime(ticket);
+
+        if (!ticketSincronizado) {
+          websocketCallbacksRef.current.atualizarTicketLocal(ticket.id, ticket);
+        }
+
+        const precisaRecarregarMensagens = Boolean(
+          (ticketSincronizado as any)?.recarregarMensagens || (ticket as any)?.recarregarMensagens
+        );
+
+        if (
+          (ticketSincronizado?.id || ticket.id) === websocketCallbacksRef.current.ticketAtualId &&
+          precisaRecarregarMensagens
+        ) {
+          websocketCallbacksRef.current.recarregarMensagens();
+        }
+      },
+
+      onTicketTransferido: (data: any) => {
+        if (DEBUG) console.log('👤 Ticket transferido via WebSocket:', data);
+
+        const { ticket, novoAtendente } = data;
+
+        const ticketReferencia = ticket || data?.ticket || null;
+        const ticketSincronizado = ticketReferencia
+          ? websocketCallbacksRef.current.sincronizarTicketRealtime(ticketReferencia)
+          : null;
+
+        if (!ticketSincronizado) {
+          websocketCallbacksRef.current.atualizarTicketLocal(ticket?.id || data.ticketId, {
+            atendenteId: novoAtendente?.id || data.novoAtendenteId,
+            status: 'EM_ATENDIMENTO',
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      },
+
+      onTicketEncerrado: (ticket: any) => {
+        if (DEBUG) console.log('🏁 Ticket encerrado via WebSocket:', ticket);
+
+        const ticketSincronizado = websocketCallbacksRef.current.sincronizarTicketRealtime(ticket);
+
+        if (!ticketSincronizado) {
+          websocketCallbacksRef.current.atualizarTicketLocal(ticket.id || ticket.ticketId, {
+            status: 'RESOLVIDO',
+            dataFechamento: ticket.dataFechamento || new Date().toISOString(),
+            dataResolucao: ticket.dataResolucao || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      },
+    }
+  });
+
+  // 🔥 NOVO: Entrar/sair da sala WebSocket quando ticket muda
+  useEffect(() => {
+    if (!ticketSelecionado?.id || !wsConnected) return;
+
+    if (DEBUG) console.log('🚪 Entrando na sala do ticket:', ticketSelecionado.id);
+    entrarNoTicket(ticketSelecionado.id);
+
+    // Sair da sala ao desmontar ou trocar de ticket
+    return () => {
+      if (DEBUG) console.log('🚪 Saindo da sala do ticket:', ticketSelecionado.id);
+      sairDoTicket(ticketSelecionado.id);
+    };
+  }, [ticketSelecionado?.id, wsConnected, entrarNoTicket, sairDoTicket]);
+
+  // ✅ Hook de notas (dados reais do backend)
+  const {
+    notas,
+    loading: loadingNotas,
+    error: errorNotas,
+    carregarNotas,
+    criarNota,
+    atualizarNota,
+    deletarNota,
+  } = useNotas();
+
+  // ✅ Hook de demandas (dados reais do backend)
+  const {
+    demandas,
+    loading: loadingDemandas,
+    error: errorDemandas,
+    carregarDemandas,
+    criarDemanda,
+    atualizarDemanda,
+    deletarDemanda,
+    alterarStatus,
+  } = useDemandas();
+
+  // 🔄 Carregar notas quando ticket ou contexto mudar
+  useEffect(() => {
+    if (!ticketSelecionado) return;
+
+    const clienteId = contexto?.cliente?.id;
+    const ticketId = ticketSelecionado.id;
+    const telefone = ticketSelecionado.contato?.telefone;
+
+    // Carregar notas (prioridade: clienteId > ticketId > telefone)
+    carregarNotas(clienteId, ticketId, telefone);
+  }, [ticketSelecionado?.id, contexto?.cliente?.id, carregarNotas]);
+
+  // 🔄 Carregar demandas quando ticket ou contexto mudar
+  useEffect(() => {
+    if (!ticketSelecionado) return;
+
+    const clienteId = contexto?.cliente?.id;
+    const ticketId = ticketSelecionado.id;
+    const telefone = ticketSelecionado.contato?.telefone;
+
+    // Carregar demandas (prioridade: clienteId > ticketId > telefone)
+    if (clienteId) {
+      carregarDemandas({ clienteId });
+    } else if (ticketId) {
+      carregarDemandas({ ticketId });
+    } else if (telefone) {
+      carregarDemandas({ telefone });
+    }
+  }, [ticketSelecionado?.id, contexto?.cliente?.id, carregarDemandas]);
 
   // Estados dos modais
   const [modalNovoAtendimento, setModalNovoAtendimento] = useState(false);
@@ -83,54 +850,86 @@ export const ChatOmnichannel: React.FC = () => {
   const handleConfirmarNovoAtendimento = useCallback(async (dados: NovoAtendimentoData) => {
     try {
       const novoTicket = await criarTicket(dados);
-      
+
       // Seleciona o novo ticket
       selecionarTicket(novoTicket.id);
       setModalNovoAtendimento(false);
+      showToast('success', 'Atendimento criado com sucesso!');
     } catch (error) {
       console.error('Erro ao criar ticket:', error);
-      alert('Erro ao criar atendimento. Tente novamente.');
+      showToast('error', 'Erro ao criar atendimento. Tente novamente.');
     }
-  }, [criarTicket, selecionarTicket]);
+  }, [criarTicket, selecionarTicket, showToast]);
 
-  const handleEnviarMensagem = useCallback(async (conteudo: string, anexos?: File[]) => {
+  const handleEnviarMensagem = useCallback(async (conteudo: string, anexos: File[] = []) => {
     if (!ticketSelecionado) return;
 
+    const texto = conteudo.trim();
+    const possuiAnexos = anexos.length > 0;
+
+    if (!texto && !possuiAnexos) {
+      return;
+    }
+
     try {
-      if (anexos && anexos.length > 0) {
-        await enviarMensagemComAnexos(conteudo, anexos);
+      if (possuiAnexos) {
+        await enviarMensagemComAnexos(texto, anexos);
       } else {
-        await enviarMensagem(conteudo);
+        await enviarMensagem(texto);
       }
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
-      alert('Erro ao enviar mensagem. Tente novamente.');
+      showToast('error', 'Erro ao enviar mensagem. Tente novamente.');
     }
-  }, [ticketSelecionado, enviarMensagem, enviarMensagemComAnexos]);
+  }, [ticketSelecionado, enviarMensagem, enviarMensagemComAnexos, showToast]);
 
   const handleTransferir = useCallback(() => {
+    if (!ticketSelecionado) return;
+    if (ticketSelecionado.status === 'resolvido') {
+      showToast('info', 'Este atendimento já está resolvido.');
+      return;
+    }
+
     setModalTransferir(true);
-  }, []);
+  }, [ticketSelecionado, showToast]);
+
+  const handleEnviarAudio = useCallback(async (audio: Blob, duracao: number) => {
+    if (!ticketSelecionado) return;
+
+    try {
+      await enviarAudio(audio, duracao);
+    } catch (error) {
+      console.error('Erro ao enviar áudio:', error);
+      showToast('error', 'Erro ao enviar áudio. Tente novamente.');
+    }
+  }, [ticketSelecionado, enviarAudio, showToast]);
 
   const handleConfirmarTransferencia = useCallback(async (dados: TransferenciaData) => {
     if (!ticketSelecionado) return;
-    
+
     try {
       await transferirTicket(ticketSelecionado.id, dados);
       setModalTransferir(false);
+      showToast('success', 'Atendimento transferido com sucesso!');
     } catch (error) {
       console.error('Erro ao transferir ticket:', error);
-      alert('Erro ao transferir atendimento. Tente novamente.');
+      showToast('error', 'Erro ao transferir atendimento. Tente novamente.');
     }
-  }, [ticketSelecionado, transferirTicket]);
+  }, [ticketSelecionado, transferirTicket, showToast]);
 
   const handleEncerrar = useCallback(() => {
+    if (!ticketSelecionado) return;
+    if (ticketSelecionado.status === 'resolvido') {
+      showToast('info', 'Este atendimento já está resolvido.');
+      return;
+    }
+
     setModalEncerrar(true);
-  }, []);
+  }, [ticketSelecionado, showToast]);
 
   const handleConfirmarEncerramento = useCallback(async (dados: EncerramentoData) => {
     if (!ticketSelecionado) return;
-    
+
     try {
       await encerrarTicket(ticketSelecionado.id, {
         motivo: dados.motivo as any,
@@ -140,11 +939,12 @@ export const ChatOmnichannel: React.FC = () => {
         solicitarAvaliacao: dados.solicitarAvaliacao
       });
       setModalEncerrar(false);
+      showToast('success', 'Atendimento encerrado com sucesso!');
     } catch (error) {
       console.error('Erro ao encerrar ticket:', error);
-      alert('Erro ao encerrar atendimento. Tente novamente.');
+      showToast('error', 'Erro ao encerrar atendimento. Tente novamente.');
     }
-  }, [ticketSelecionado, encerrarTicket]);
+  }, [ticketSelecionado, encerrarTicket, showToast]);
 
   const handleLigar = useCallback(() => {
     if (!ticketSelecionado) return;
@@ -156,120 +956,434 @@ export const ChatOmnichannel: React.FC = () => {
     setModalEditarContato(true);
   }, []);
 
-  const handleConfirmarEdicaoContato = useCallback((dados: ContatoEditado) => {
-    console.log('Editar contato:', dados);
-    // TODO: Integrar com API
-    // TODO: Atualizar dados do contato
-  }, []);
+  const handleConfirmarEdicaoContato = useCallback(async (dados: ContatoEditado) => {
+    if (!ticketSelecionado?.contato?.id) return;
+
+    try {
+      console.log('📝 Atualizando contato:', dados);
+
+      const contatoAtualizado = await atendimentoService.atualizarContato(
+        ticketSelecionado.contato.id,
+        dados
+      );
+
+      // Atualizar ticket local com novo contato
+      atualizarTicketLocal(ticketSelecionado.id, {
+        contato: contatoAtualizado
+      });
+
+      showToast('success', 'Contato atualizado com sucesso!');
+      setModalEditarContato(false);
+    } catch (error) {
+      console.error('❌ Erro ao atualizar contato:', error);
+      showToast('error', 'Erro ao atualizar contato');
+    }
+  }, [ticketSelecionado, atualizarTicketLocal, showToast]);
 
   const handleVincularCliente = useCallback(() => {
     setModalVincularCliente(true);
   }, []);
 
-  const handleConfirmarVinculoCliente = useCallback((clienteId: string) => {
-    console.log('Vincular cliente:', clienteId);
-    // TODO: Integrar com API
-    // TODO: Atualizar vinculação
-  }, []);
+  const handleConfirmarVinculoCliente = useCallback(async (clienteId: string) => {
+    if (!ticketSelecionado?.contato?.id) return;
+
+    try {
+      console.log('🔗 Vinculando cliente:', clienteId);
+
+      const contatoAtualizado = await atendimentoService.vincularCliente(
+        ticketSelecionado.contato.id,
+        clienteId
+      );
+
+      // Atualizar ticket local com novo contato vinculado
+      atualizarTicketLocal(ticketSelecionado.id, {
+        contato: contatoAtualizado
+      });
+
+      showToast('success', 'Cliente vinculado com sucesso!');
+      setModalVincularCliente(false);
+    } catch (error) {
+      console.error('❌ Erro ao vincular cliente:', error);
+      showToast('error', 'Erro ao vincular cliente');
+    }
+  }, [ticketSelecionado, atualizarTicketLocal, showToast]);
 
   const handleAbrirDemanda = useCallback(() => {
     setModalAbrirDemanda(true);
   }, []);
 
-  const handleConfirmarNovaDemanda = useCallback((dados: NovaDemanda) => {
-    const novaDemanda: Demanda = {
-      id: `d${Date.now()}`,
-      tipo: dados.tipo,
-      descricao: dados.descricao,
-      status: 'aberta' as const,
-      dataAbertura: new Date()
-    };
-    setDemandas(prev => [novaDemanda, ...prev]);
-    console.log('Nova demanda criada:', novaDemanda);
-    // TODO: Integrar com API
-    // TODO: Criar oportunidade vinculada
+  const handleConfirmarNovaDemanda = useCallback(async (dados: NovaDemanda) => {
+    if (!ticketSelecionado) return;
+
+    try {
+      const clienteId = contexto?.cliente?.id;
+      const ticketId = ticketSelecionado.id;
+      const telefone = ticketSelecionado.contato?.telefone;
+
+      // Mapear tipo da modal para tipo do backend
+      const tipoMapping: Record<string, 'tecnica' | 'comercial' | 'financeira' | 'suporte' | 'reclamacao' | 'solicitacao' | 'outros'> = {
+        'bug': 'tecnica',
+        'feature': 'comercial',
+        'suporte': 'suporte',
+        'melhoria': 'solicitacao'
+      };
+
+      // ✅ Criar demanda no backend
+      const novaDemanda = await criarDemanda({
+        clienteId,
+        ticketId,
+        contatoTelefone: telefone,
+        titulo: dados.titulo,
+        descricao: dados.descricao,
+        tipo: tipoMapping[dados.tipo] || 'outros',
+        prioridade: dados.prioridade,
+        status: 'aberta',
+        dataVencimento: dados.prazo?.toISOString(),
+        responsavelId: dados.responsavelId,
+      });
+
+      if (novaDemanda) {
+        showToast('success', 'Demanda criada com sucesso!', 2000);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao criar demanda:', error);
+      showToast('error', 'Erro ao criar demanda. Tente novamente.');
+    }
+  }, [ticketSelecionado, contexto, criarDemanda, showToast]);
+
+  const handleAdicionarNota = useCallback(async (conteudo: string, importante: boolean) => {
+    if (!ticketSelecionado) return;
+
+    try {
+      const clienteId = contexto?.cliente?.id;
+      const ticketId = ticketSelecionado.id;
+      const telefone = ticketSelecionado.contato?.telefone;
+
+      // ✅ Criar nota no backend
+      await criarNota({
+        clienteId,
+        ticketId,
+        contatoTelefone: telefone,
+        conteudo,
+        importante,
+      });
+
+      showToast('success', 'Nota adicionada com sucesso!', 2000);
+    } catch (error) {
+      console.error('❌ Erro ao adicionar nota:', error);
+      showToast('error', 'Erro ao adicionar nota. Tente novamente.');
+    }
+  }, [ticketSelecionado, contexto, criarNota, showToast]);
+
+  const handleExcluirNota = useCallback(async (notaId: string) => {
+    try {
+      // ✅ Deletar nota no backend
+      await deletarNota(notaId);
+      showToast('success', 'Nota excluída com sucesso!', 2000);
+    } catch (error) {
+      console.error('❌ Erro ao excluir nota:', error);
+      showToast('error', 'Erro ao excluir nota. Tente novamente.');
+    }
+  }, [deletarNota, showToast]);
+
+  // Handlers específicos para controle responsivo
+  const handleToggleClientePanel = useCallback(() => {
+    if (isTablet) {
+      setClientePanelAberto(prev => !prev);
+    }
+  }, [isTablet]);
+
+  const handleMobileViewChange = useCallback((view: 'tickets' | 'chat' | 'cliente') => {
+    setMobileView(view);
   }, []);
 
-  const handleAdicionarNota = useCallback((conteudo: string, importante: boolean) => {
-    if (!ticketAtual) return;
-
-    const novaNota: NotaCliente = {
-      id: `n${Date.now()}`,
-      conteudo,
-      autor: {
-        id: ticketAtual.atendente?.id || 'a1',
-        nome: ticketAtual.atendente?.nome || 'Atendente',
-        foto: ticketAtual.atendente?.foto
-      },
-      dataCriacao: new Date(),
-      importante
-    };
-
-    setNotas(prev => [novaNota, ...prev]);
-    console.log('Nova nota criada:', novaNota);
-    // TODO: Salvar no backend
-  }, [ticketAtual]);
-
-  const handleExcluirNota = useCallback((notaId: string) => {
-    setNotas(prev => prev.filter(n => n.id !== notaId));
-    console.log('Nota excluída:', notaId);
-    // TODO: Excluir no backend
-  }, []);
-
-  if (!ticketAtual) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-100">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Nenhum atendimento selecionado
-          </h2>
-          <p className="text-gray-600">
-            Selecione um atendimento na lista para começar
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex h-full bg-gray-100 overflow-hidden">
-      {/* Coluna 1: Lista de Atendimentos - Adaptável ao estado da sidebar */}
-      <div className={`flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'w-96' : 'w-80'
-        }`}>
+  // Renderização de layouts por breakpoint
+  const renderDesktopLayout = () => (
+    <div className="chat-layout-responsive">
+      {/* Coluna 1: Lista de Atendimentos */}
+      <div className="sidebar-responsive">
         <AtendimentosSidebar
           tickets={tickets}
           ticketSelecionado={ticketSelecionado?.id || ''}
-          onSelecionarTicket={handleSelecionarTicket}
+          onSelecionarTicket={handleSelecionarTicketResponsivo}
           onNovoAtendimento={handleNovoAtendimento}
           theme={currentPalette}
+          loading={loadingTickets}
+          tabAtiva={tabAtiva}
+          onChangeTab={handleChangeTab}
+          contagemPorStatus={totaisPorStatus}
         />
       </div>
 
-      {/* Coluna 2: Área do Chat - Flex para usar espaço disponível */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <ChatArea
-          ticket={ticketAtual}
-          mensagens={mensagensDoTicket}
-          onEnviarMensagem={handleEnviarMensagem}
-          onTransferir={handleTransferir}
-          onEncerrar={handleEncerrar}
-          onLigar={handleLigar}
+      {/* Coluna 2: Área Central do Chat */}
+      <div className="chat-area-responsive">
+        {!ticketSelecionado ? (
+          // Estado vazio - Nenhum ticket selecionado
+          <div className="flex items-center justify-center h-full bg-white">
+            <div className="text-center px-4">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                Nenhum atendimento selecionado
+              </h2>
+              <p className="text-gray-600 text-sm">
+                Selecione um atendimento na lista à esquerda ou crie um novo
+              </p>
+            </div>
+          </div>
+        ) : (
+          <ChatArea
+            ticket={ticketSelecionado}
+            mensagens={mensagensDoTicket}
+            onEnviarMensagem={handleEnviarMensagem}
+            onEnviarAudio={handleEnviarAudio}
+            onTransferir={handleTransferir}
+            onEncerrar={handleEncerrar}
+            onLigar={handleLigar}
+            theme={currentPalette}
+            loading={loadingMensagens}
+            enviandoMensagem={enviandoMensagem}
+          />
+        )}
+      </div>
+
+      {/* Coluna 3: Painel do Cliente */}
+      {ticketSelecionado && (
+        <div className="cliente-panel-responsive">
+          <ClientePanel
+            contato={ticketSelecionado.contato}
+            historico={historico || []}
+            demandas={demandas || []}
+            notas={notas || []}
+            onEditarContato={handleEditarContato}
+            onVincularCliente={handleVincularCliente}
+            onAbrirDemanda={handleAbrirDemanda}
+            onAdicionarNota={handleAdicionarNota}
+            onExcluirNota={handleExcluirNota}
+            theme={currentPalette}
+          />
+        </div>
+      )}
+    </div>
+  );
+
+  const renderTabletLayout = () => (
+    <div className="chat-layout-responsive">
+      {/* Coluna 1: Lista de Atendimentos */}
+      <div className="sidebar-responsive">
+        <AtendimentosSidebar
+          tickets={tickets}
+          ticketSelecionado={ticketSelecionado?.id || ''}
+          onSelecionarTicket={handleSelecionarTicketResponsivo}
+          onNovoAtendimento={handleNovoAtendimento}
           theme={currentPalette}
+          loading={loadingTickets}
+          tabAtiva={tabAtiva}
+          onChangeTab={handleChangeTab}
+          contagemPorStatus={totaisPorStatus}
         />
       </div>
 
-      {/* Coluna 3: Painel do Cliente - Largura fixa otimizada (320px) */}
-      <ClientePanel
-        contato={ticketAtual.contato}
-        historico={historico}
-        demandas={demandas}
-        notas={notas}
-        onEditarContato={handleEditarContato}
-        onVincularCliente={handleVincularCliente}
-        onAbrirDemanda={handleAbrirDemanda}
-        onAdicionarNota={handleAdicionarNota}
-        onExcluirNota={handleExcluirNota}
-        theme={currentPalette}
+      {/* Coluna 2: Área Central do Chat com botão para abrir cliente */}
+      <div className="chat-area-responsive">
+        {!ticketSelecionado ? (
+          <div className="flex items-center justify-center h-full bg-white">
+            <div className="text-center px-4">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                Nenhum atendimento selecionado
+              </h2>
+              <p className="text-gray-600 text-sm">
+                Selecione um atendimento na lista à esquerda
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="h-full flex flex-col">
+            {/* Header com botão do cliente */}
+            <div className="flex items-center justify-between p-4 bg-white border-b border-gray-200">
+              <h3 className="font-semibold text-gray-900">
+                Chat - {ticketSelecionado.contato.nome}
+              </h3>
+              <button
+                onClick={handleToggleClientePanel}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+              >
+                <User className="w-4 h-4" />
+                Informações do Cliente
+              </button>
+            </div>
+
+            <div className="flex-1">
+              <ChatArea
+                ticket={ticketSelecionado}
+                mensagens={mensagensDoTicket}
+                onEnviarMensagem={handleEnviarMensagem}
+                onEnviarAudio={handleEnviarAudio}
+                onTransferir={handleTransferir}
+                onEncerrar={handleEncerrar}
+                onLigar={handleLigar}
+                theme={currentPalette}
+                loading={loadingMensagens}
+                enviandoMensagem={enviandoMensagem}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Drawer do Cliente Panel */}
+      {ticketSelecionado && (
+        <>
+          <div
+            className={`cliente-panel-overlay ${clientePanelAberto ? 'open' : ''}`}
+            onClick={() => setClientePanelAberto(false)}
+          />
+          <div className={`cliente-panel-drawer ${clientePanelAberto ? 'open' : ''}`}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="font-semibold text-gray-900">Informações do Cliente</h3>
+              <button
+                onClick={() => setClientePanelAberto(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <ClientePanel
+                contato={ticketSelecionado.contato}
+                historico={historico || []}
+                demandas={demandas || []}
+                notas={notas || []}
+                onEditarContato={handleEditarContato}
+                onVincularCliente={handleVincularCliente}
+                onAbrirDemanda={handleAbrirDemanda}
+                onAdicionarNota={handleAdicionarNota}
+                onExcluirNota={handleExcluirNota}
+                theme={currentPalette}
+              />
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  const renderMobileLayout = () => (
+    <div className="h-full flex flex-col">
+      {/* Navegação em Tabs */}
+      <div className="mobile-chat-tabs">
+        <button
+          className={`mobile-chat-tab ${mobileView === 'tickets' ? 'active' : ''}`}
+          onClick={() => handleMobileViewChange('tickets')}
+          style={{
+            borderBottomColor: mobileView === 'tickets' ? currentPalette.colors.primary : 'transparent',
+            color: mobileView === 'tickets' ? currentPalette.colors.primary : '#6b7280'
+          }}
+        >
+          Atendimentos
+        </button>
+
+        {ticketSelecionado && (
+          <button
+            className={`mobile-chat-tab ${mobileView === 'chat' ? 'active' : ''}`}
+            onClick={() => handleMobileViewChange('chat')}
+            style={{
+              borderBottomColor: mobileView === 'chat' ? currentPalette.colors.primary : 'transparent',
+              color: mobileView === 'chat' ? currentPalette.colors.primary : '#6b7280'
+            }}
+          >
+            Chat
+          </button>
+        )}
+
+        {ticketSelecionado && (
+          <button
+            className={`mobile-chat-tab ${mobileView === 'cliente' ? 'active' : ''}`}
+            onClick={() => handleMobileViewChange('cliente')}
+            style={{
+              borderBottomColor: mobileView === 'cliente' ? currentPalette.colors.primary : 'transparent',
+              color: mobileView === 'cliente' ? currentPalette.colors.primary : '#6b7280'
+            }}
+          >
+            Cliente
+          </button>
+        )}
+      </div>
+
+      {/* Conteúdo das Tabs */}
+      <div className="flex-1 overflow-hidden">
+        {/* Tab Atendimentos */}
+        <div className={`mobile-content-panels ${mobileView === 'tickets' ? 'active' : ''}`}>
+          <AtendimentosSidebar
+            tickets={tickets}
+            ticketSelecionado={ticketSelecionado?.id || ''}
+            onSelecionarTicket={handleSelecionarTicketResponsivo}
+            onNovoAtendimento={handleNovoAtendimento}
+            theme={currentPalette}
+            loading={loadingTickets}
+            tabAtiva={tabAtiva}
+            onChangeTab={handleChangeTab}
+            contagemPorStatus={totaisPorStatus}
+          />
+        </div>
+
+        {/* Tab Chat */}
+        {ticketSelecionado && (
+          <div className={`mobile-content-panels ${mobileView === 'chat' ? 'active' : ''}`}>
+            <ChatArea
+              ticket={ticketSelecionado}
+              mensagens={mensagensDoTicket}
+              onEnviarMensagem={handleEnviarMensagem}
+              onEnviarAudio={handleEnviarAudio}
+              onTransferir={handleTransferir}
+              onEncerrar={handleEncerrar}
+              onLigar={handleLigar}
+              theme={currentPalette}
+              loading={loadingMensagens}
+              enviandoMensagem={enviandoMensagem}
+            />
+          </div>
+        )}
+
+        {/* Tab Cliente */}
+        {ticketSelecionado && (
+          <div className={`mobile-content-panels ${mobileView === 'cliente' ? 'active' : ''}`}>
+            <ClientePanel
+              contato={ticketSelecionado.contato}
+              historico={historico || []}
+              demandas={demandas || []}
+              notas={notas || []}
+              onEditarContato={handleEditarContato}
+              onVincularCliente={handleVincularCliente}
+              onAbrirDemanda={handleAbrirDemanda}
+              onAdicionarNota={handleAdicionarNota}
+              onExcluirNota={handleExcluirNota}
+              theme={currentPalette}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // ✅ RENDERIZAÇÃO RESPONSIVA COMPLETA
+  return (
+    <div className="layout-transition h-full bg-gray-100 overflow-hidden">
+      {isDesktop && renderDesktopLayout()}
+      {isTablet && renderTabletLayout()}
+      {isMobile && renderMobileLayout()}
+
+      <PopupNotifications
+        notifications={popupNotifications}
+        onDismiss={removePopupNotification}
       />
 
       {/* Modais */}
@@ -283,35 +1397,35 @@ export const ChatOmnichannel: React.FC = () => {
         isOpen={modalTransferir}
         onClose={() => setModalTransferir(false)}
         onConfirm={handleConfirmarTransferencia}
-        ticketAtual={ticketAtual}
+        ticketAtual={ticketSelecionado}
       />
 
       <EncerrarAtendimentoModal
         isOpen={modalEncerrar}
         onClose={() => setModalEncerrar(false)}
         onConfirm={handleConfirmarEncerramento}
-        ticketAtual={ticketAtual}
+        ticketAtual={ticketSelecionado}
       />
 
       <EditarContatoModal
         isOpen={modalEditarContato}
         onClose={() => setModalEditarContato(false)}
         onConfirm={handleConfirmarEdicaoContato}
-        contato={ticketAtual.contato}
+        contato={ticketSelecionado?.contato}
       />
 
       <VincularClienteModal
         isOpen={modalVincularCliente}
         onClose={() => setModalVincularCliente(false)}
         onConfirm={handleConfirmarVinculoCliente}
-        contatoAtual={ticketAtual.contato}
+        contatoAtual={ticketSelecionado?.contato}
       />
 
       <AbrirDemandaModal
         isOpen={modalAbrirDemanda}
         onClose={() => setModalAbrirDemanda(false)}
         onConfirm={handleConfirmarNovaDemanda}
-        ticketAtual={ticketAtual}
+        ticketAtual={ticketSelecionado}
       />
     </div>
   );

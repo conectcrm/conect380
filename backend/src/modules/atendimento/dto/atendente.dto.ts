@@ -10,6 +10,10 @@ export class CriarAtendenteDto {
 
   @IsOptional()
   @IsString()
+  telefone?: string;
+
+  @IsOptional()
+  @IsString()
   usuarioId?: string;
 
   @IsOptional()
@@ -30,6 +34,10 @@ export class AtualizarAtendenteDto {
   @IsOptional()
   @IsEmail()
   email?: string;
+
+  @IsOptional()
+  @IsString()
+  telefone?: string;
 
   @IsOptional()
   @IsString()

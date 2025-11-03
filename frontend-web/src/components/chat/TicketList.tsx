@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AvatarWithStatus } from './OnlineIndicator';
 
 interface Ticket {
   id: string;
@@ -14,6 +15,9 @@ interface Ticket {
   descricao?: string;
   contatoNome?: string;
   contatoTelefone?: string;
+  contatoOnline?: boolean;
+  contatoLastActivity?: string;
+  mensagensNaoLidas?: number;
   ultimaMensagemEm?: string | Date;
   criadoEm: Date | string;
 }
@@ -62,7 +66,7 @@ export function TicketList({ tickets, activeTicketId, onTicketSelect }: TicketLi
     }
   };
 
-  const formatarData = (data: Date) => {
+  const formatarData = (data: Date | string) => {
     const agora = new Date();
     const dataTicket = new Date(data);
     const diffMs = agora.getTime() - dataTicket.getTime();
@@ -140,44 +144,65 @@ export function TicketList({ tickets, activeTicketId, onTicketSelect }: TicketLi
                 className={`w-full p-4 text-left hover:bg-gray-50 transition-colors ${activeTicketId === ticket.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
                   }`}
               >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-gray-500">#{ticket.numero}</span>
-                    <span className="text-lg">{getPrioridadeIcon(ticket.prioridade)}</span>
+                <div className="flex gap-3">
+                  {/* Avatar com status online/offline */}
+                  <div className="flex-shrink-0">
+                    <AvatarWithStatus
+                      nome={ticket.contatoNome || ticket.contatoTelefone || 'Contato'}
+                      isOnline={ticket.contatoOnline || false}
+                      size="md"
+                    />
                   </div>
-                  <span className="text-xs text-gray-400">{formatarData(ticket.criadoEm)}</span>
-                </div>
 
-                <h3 className="font-medium text-gray-900 mb-1 line-clamp-1">
-                  {ticket.assunto || 'Sem assunto'}
-                </h3>
+                  {/* Conteúdo do ticket */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-gray-500">#{ticket.numero}</span>
+                        <span className="text-lg">{getPrioridadeIcon(ticket.prioridade)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {ticket.mensagensNaoLidas && ticket.mensagensNaoLidas > 0 && (
+                          <span className="bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5 min-w-[20px] text-center">
+                            {ticket.mensagensNaoLidas > 99 ? '99+' : ticket.mensagensNaoLidas}
+                          </span>
+                        )}
+                        <span className="text-xs text-gray-400">{formatarData(ticket.criadoEm)}</span>
+                      </div>
+                    </div>
 
-                {ticket.descricao && (
-                  <p className="text-sm text-gray-600 mb-2 line-clamp-2">{ticket.descricao}</p>
-                )}
+                    <h3 className="font-medium text-gray-900 mb-1 line-clamp-1">
+                      {ticket.assunto || 'Sem assunto'}
+                    </h3>
 
-                <div className="flex items-center gap-2">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(ticket.status)}`}>
-                    {ticket.status}
-                  </span>
-                  {ticket.atendenteId && (
-                    <span className="text-xs text-gray-500">
-                      <svg
-                        className="inline w-3 h-3 mr-1"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                        />
-                      </svg>
-                      Atribuído
-                    </span>
-                  )}
+                    {ticket.descricao && (
+                      <p className="text-sm text-gray-600 mb-2 line-clamp-2">{ticket.descricao}</p>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(ticket.status)}`}>
+                        {ticket.status}
+                      </span>
+                      {ticket.atendenteId && (
+                        <span className="text-xs text-gray-500">
+                          <svg
+                            className="inline w-3 h-3 mr-1"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                            />
+                          </svg>
+                          Atribuído
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </button>
             ))}

@@ -13,7 +13,8 @@ import {
   Star
 } from 'lucide-react';
 import { Contato, HistoricoAtendimento, Demanda, NotaCliente } from '../types';
-import { formatarTempoDecorrido, getIconeCanal } from '../utils';
+import { formatarTempoDecorrido, getIconeCanal, resolverNomeExibicao } from '../utils';
+import { resolveAvatarUrl } from '../../../../utils/avatar';
 import { ThemePalette } from '../../../../contexts/ThemeContext';
 
 interface ClientePanelProps {
@@ -90,6 +91,8 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
     }
   };
 
+  const avatarContato = resolveAvatarUrl(contato?.foto || null);
+
   if (!expandido) {
     return (
       <div className="w-12 bg-white border-l border-gray-200 flex flex-col items-center py-4">
@@ -124,14 +127,14 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-2.5">
               <img
-                src={contato.foto || `https://ui-avatars.com/api/?name=${encodeURIComponent(contato.nome)}&background=random`}
-                alt={contato.nome}
+                src={avatarContato || `https://ui-avatars.com/api/?name=${encodeURIComponent(resolverNomeExibicao(contato))}&background=random`}
+                alt={resolverNomeExibicao(contato)}
                 className="w-12 h-12 rounded-full object-cover"
               />
               <div>
-                <h4 className="font-semibold text-sm text-gray-900">{contato.nome}</h4>
+                <h4 className="font-semibold text-sm text-gray-900">{resolverNomeExibicao(contato)}</h4>
                 <p className="text-xs text-gray-500">
-                  {contato.online ? 'Online agora' : 'Offline'}
+                  {contato?.online ? 'Online agora' : 'Offline'}
                 </p>
               </div>
             </div>
@@ -148,17 +151,17 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
           <div className="space-y-2.5">
             <div>
               <label className="text-xs font-medium text-gray-500 uppercase">Telefone</label>
-              <p className="text-sm text-gray-900 mt-0.5">{contato.telefone}</p>
+              <p className="text-sm text-gray-900 mt-0.5">{contato?.telefone || 'Não informado'}</p>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-500 uppercase">E-mail</label>
-              <p className="text-sm text-gray-900 mt-0.5">{contato.email}</p>
+              <p className="text-sm text-gray-900 mt-0.5">{contato?.email || 'Não informado'}</p>
             </div>
           </div>
 
           {/* Cliente Vinculado */}
           <div className="mt-3 pt-3 border-t border-gray-200">
-            {contato.clienteVinculado ? (
+            {contato?.clienteVinculado ? (
               <div className="flex items-center justify-between p-2.5 bg-green-50 rounded-lg">
                 <div className="flex items-center gap-2">
                   <div className="p-1 bg-green-100 rounded">
@@ -167,7 +170,7 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                   <div>
                     <p className="text-xs text-green-600 font-medium">Vinculado a</p>
                     <p className="text-xs text-green-900 font-semibold">
-                      {contato.clienteVinculado.nome}
+                      {contato.clienteVinculado?.nome || 'Cliente'}
                     </p>
                   </div>
                 </div>
@@ -215,7 +218,7 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                 : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
-              Histórico ({historico.length})
+              Histórico ({Array.isArray(historico) ? historico.length : 0})
             </button>
             <button
               onClick={() => setAbaAtiva('demandas')}
@@ -228,7 +231,7 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                 : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
-              Demandas ({demandas.length})
+              Demandas ({Array.isArray(demandas) ? demandas.length : 0})
             </button>
             <button
               onClick={() => setAbaAtiva('notas')}
@@ -241,7 +244,7 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                 : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
-              Notas ({notas.length})
+              Notas ({Array.isArray(notas) ? notas.length : 0})
             </button>
           </div>
         </div>
@@ -250,7 +253,7 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
         <div className="p-3">
           {abaAtiva === 'historico' ? (
             <div className="space-y-2">
-              {historico.length === 0 ? (
+              {!Array.isArray(historico) || historico.length === 0 ? (
                 <p className="text-xs text-gray-500 text-center py-6">
                   Nenhum histórico encontrado
                 </p>
@@ -384,7 +387,7 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
 
               {/* Lista de Demandas */}
               <div className="space-y-2">
-                {demandas.length === 0 ? (
+                {!Array.isArray(demandas) || demandas.length === 0 ? (
                   <p className="text-xs text-gray-500 text-center py-3">
                     Nenhuma demanda aberta
                   </p>
@@ -480,7 +483,7 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
 
               {/* Lista de Notas */}
               <div className="space-y-2">
-                {notas.length === 0 ? (
+                {!Array.isArray(notas) || notas.length === 0 ? (
                   <div className="text-center py-6">
                     <FileText className="w-10 h-10 text-gray-300 mx-auto mb-1.5" />
                     <p className="text-xs text-gray-500">Nenhuma nota adicionada</p>

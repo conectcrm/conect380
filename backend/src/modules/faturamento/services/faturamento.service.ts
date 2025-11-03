@@ -23,21 +23,26 @@ export class FaturamentoService {
 
   async criarFatura(createFaturaDto: CreateFaturaDto): Promise<Fatura> {
     try {
-      // Verificar se o contrato existe
-      const contrato = await this.contratoRepository.findOne({
-        where: { id: createFaturaDto.contratoId },
-        relations: ['proposta'],
-      });
+      let contrato: Contrato | null = null;
 
-      if (!contrato) {
-        throw new NotFoundException('Contrato não encontrado');
+      if (createFaturaDto.contratoId) {
+        contrato = await this.contratoRepository.findOne({
+          where: { id: createFaturaDto.contratoId },
+          relations: ['proposta'],
+        });
+
+        if (!contrato) {
+          throw new NotFoundException('Contrato não encontrado');
+        }
       }
 
       // Gerar número único da fatura
       const numero = await this.gerarNumeroFatura();
 
       // Calcular valor total dos itens
-      const valorTotal = this.calcularValorTotalItens(createFaturaDto.itens);
+      const valorItens = this.calcularValorTotalItens(createFaturaDto.itens);
+      const descontoGlobal = createFaturaDto.valorDesconto || 0;
+      const valorTotal = Math.max(valorItens - descontoGlobal, 0);
 
       // Criar fatura
       const fatura = this.faturaRepository.create({
@@ -56,7 +61,7 @@ export class FaturamentoService {
         this.itemFaturaRepository.create({
           ...item,
           faturaId: faturaSalva.id,
-          valorTotal: item.quantidade * item.valorUnitario - (item.valorDesconto || 0),
+          valorTotal: this.calcularValorTotalItem(item),
         })
       );
 
@@ -167,13 +172,11 @@ export class FaturamentoService {
   }
 
   async buscarFaturasPaginadas(
-    page: number = 1, 
+    page: number = 1,
     pageSize: number = 10,
     sortBy: string = 'createdAt',
     sortOrder: 'ASC' | 'DESC' = 'DESC'
   ): Promise<{ faturas: any[]; total: number; resumo: any }> {
-    console.log('🔍🔍🔍 [NOVO DEBUG CORRIGIDO] Executando buscarFaturasPaginadas...');
-    
     const queryBuilder = this.faturaRepository
       .createQueryBuilder('fatura')
       .leftJoinAndSelect('fatura.contrato', 'contrato')
@@ -189,9 +192,6 @@ export class FaturamentoService {
       .limit(pageSize)
       .offset((page - 1) * pageSize)
       .getManyAndCount();
-
-    console.log('🔍🔍🔍 [NOVO DEBUG CORRIGIDO] Faturas encontradas:', faturas.length);
-    console.log('🔍🔍🔍 [NOVO DEBUG CORRIGIDO] Primeira fatura cliente:', faturas[0]?.cliente?.nome || 'NÃO ENCONTRADO');
 
     const resumo = await this.faturaRepository.query(`
       SELECT 
@@ -210,8 +210,6 @@ export class FaturamentoService {
   }
 
   async buscarFaturaPorId(id: number): Promise<Fatura> {
-    console.log('🔍 [DEBUGGING CORRIGIDO] Buscando fatura por ID:', id);
-    
     const fatura = await this.faturaRepository.findOne({
       where: { id, ativo: true },
       relations: ['contrato', 'contrato.proposta', 'usuarioResponsavel', 'itens', 'pagamentos', 'cliente'],
@@ -221,14 +219,10 @@ export class FaturamentoService {
       throw new NotFoundException('Fatura não encontrada');
     }
 
-    console.log(`🔍 [DEBUG CORRIGIDO] Cliente para fatura ${id}:`, fatura.cliente?.nome || 'NÃO ENCONTRADO');
-
     return fatura;
   }
 
   async buscarFaturaPorNumero(numero: string): Promise<any> {
-    console.log('🔍 [DEBUGGING] Buscando fatura por número:', numero);
-    
     const fatura = await this.faturaRepository.findOne({
       where: { numero, ativo: true },
       relations: ['contrato', 'contrato.proposta', 'usuarioResponsavel', 'itens', 'pagamentos', 'cliente'],
@@ -237,9 +231,6 @@ export class FaturamentoService {
     if (!fatura) {
       throw new NotFoundException('Fatura não encontrada');
     }
-
-    console.log(`🔍 [DEBUG] Fatura ${numero} cliente UUID:`, fatura.clienteId);
-    console.log(`🔍 [DEBUG] Cliente para fatura ${numero}:`, fatura.cliente?.nome || 'NÃO ENCONTRADO');
 
     return fatura;
   }
@@ -306,7 +297,7 @@ export class FaturamentoService {
 
   async cancelarFatura(id: number, motivo?: string): Promise<Fatura> {
     this.logger.log(`🔍 [CANCELAR] Iniciando cancelamento da fatura ID: ${id}`);
-    
+
     try {
       const fatura = await this.buscarFaturaPorId(id);
       this.logger.log(`🔍 [CANCELAR] Fatura encontrada: ${fatura.numero}, Status: ${fatura.status}`);
@@ -318,7 +309,7 @@ export class FaturamentoService {
       }
 
       this.logger.log(`🔍 [CANCELAR] Fatura não está paga, prosseguindo com cancelamento`);
-      
+
       fatura.status = StatusFatura.CANCELADA;
       if (motivo) {
         fatura.observacoes = `${fatura.observacoes || ''}\n\nCancelada: ${motivo}`;
@@ -337,7 +328,7 @@ export class FaturamentoService {
 
   async excluirFatura(id: number): Promise<Fatura> {
     this.logger.log(`🔍 [EXCLUIR] Iniciando exclusão da fatura ID: ${id}`);
-    
+
     try {
       const fatura = await this.buscarFaturaPorId(id);
       this.logger.log(`🔍 [EXCLUIR] Fatura encontrada: ${fatura.numero}, Status: ${fatura.status}`);
@@ -349,7 +340,7 @@ export class FaturamentoService {
       }
 
       this.logger.log(`🔍 [EXCLUIR] Fatura não está paga, prosseguindo com exclusão`);
-      
+
       // Marcar como inativa (exclusão lógica) e cancelada
       fatura.ativo = false;
       fatura.status = StatusFatura.CANCELADA;
@@ -414,11 +405,20 @@ export class FaturamentoService {
   }
 
   private calcularValorTotalItens(itens: any[]): number {
-    return itens.reduce((total, item) => {
-      const subtotal = item.quantidade * item.valorUnitario;
-      const desconto = item.valorDesconto || 0;
-      return total + (subtotal - desconto);
-    }, 0);
+    return itens.reduce((total, item) => total + this.calcularValorTotalItem(item), 0);
+  }
+
+  private calcularValorTotalItem(item: any): number {
+    const subtotal = (item.quantidade || 0) * (item.valorUnitario || 0);
+    const descontoPercentual = item.percentualDesconto
+      ? (subtotal * item.percentualDesconto) / 100
+      : 0;
+    const descontoValor = item.valorDesconto || 0;
+
+    const valorFinal = subtotal - descontoPercentual - descontoValor;
+
+    // Evita valores negativos e limita a duas casas decimais
+    return Math.max(Number(valorFinal.toFixed(2)), 0);
   }
 
   private async gerarNumeroFatura(): Promise<string> {

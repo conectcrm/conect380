@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { 
-  Plus, 
-  Calendar, 
-  Clock, 
-  Trash2, 
-  Edit, 
-  User, 
-  FileText, 
+import type { ReminderEntityType } from '../../contexts/NotificationContext';
+import {
+  Plus,
+  Calendar,
+  Clock,
+  Trash2,
+  Edit,
+  User,
+  FileText,
   CheckSquare,
   Repeat,
   Bell,
@@ -24,7 +25,7 @@ interface NewReminderForm {
   title: string;
   message: string;
   scheduledFor: string;
-  entityType: 'cliente' | 'proposta' | 'tarefa' | 'agenda';
+  entityType: ReminderEntityType;
   entityId: string;
   recurring?: {
     type: 'daily' | 'weekly' | 'monthly';
@@ -48,7 +49,7 @@ export const ReminderManager: React.FC<ReminderManagerProps> = ({ isOpen, onClos
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const reminderData = {
       ...formData,
       scheduledFor: new Date(formData.scheduledFor),
@@ -193,7 +194,7 @@ export const ReminderManager: React.FC<ReminderManagerProps> = ({ isOpen, onClos
                   </label>
                   <select
                     value={formData.entityType}
-                    onChange={(e) => setFormData(prev => ({ ...prev, entityType: e.target.value as any }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, entityType: e.target.value as ReminderEntityType }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   >
                     <option value="cliente">Cliente</option>
@@ -289,11 +290,9 @@ export const ReminderManager: React.FC<ReminderManagerProps> = ({ isOpen, onClos
                 return (
                   <div
                     key={reminder.id}
-                    className={`p-6 hover:bg-gray-50 transition-colors ${
-                      !reminder.active ? 'opacity-50' : ''
-                    } ${isOverdue ? 'bg-red-50 border-l-4 border-l-red-500' : ''} ${
-                      isUpcoming && !isOverdue ? 'bg-yellow-50 border-l-4 border-l-yellow-500' : ''
-                    }`}
+                    className={`p-6 hover:bg-gray-50 transition-colors ${!reminder.active ? 'opacity-50' : ''
+                      } ${isOverdue ? 'bg-red-50 border-l-4 border-l-red-500' : ''} ${isUpcoming && !isOverdue ? 'bg-yellow-50 border-l-4 border-l-yellow-500' : ''
+                      }`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -350,11 +349,10 @@ export const ReminderManager: React.FC<ReminderManagerProps> = ({ isOpen, onClos
                         </button>
                         <button
                           onClick={() => updateReminder(reminder.id, { active: !reminder.active })}
-                          className={`p-2 rounded-lg transition-colors ${
-                            reminder.active
+                          className={`p-2 rounded-lg transition-colors ${reminder.active
                               ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
                               : 'text-green-400 hover:text-green-600 hover:bg-green-50'
-                          }`}
+                            }`}
                           title={reminder.active ? 'Desativar' : 'Ativar'}
                         >
                           <Bell className="w-4 h-4" />

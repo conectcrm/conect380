@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { Cliente } from '../../clientes/cliente.entity';
+import { Contato } from '../../clientes/contato.entity';
 import { Ticket } from '../entities/ticket.entity';
 import { ContextoClienteResponseDto } from '../dto/contexto-cliente.dto';
 
@@ -12,6 +13,9 @@ export class ContextoClienteService {
   constructor(
     @InjectRepository(Cliente)
     private clienteRepository: Repository<Cliente>,
+
+    @InjectRepository(Contato)
+    private contatoRepository: Repository<Contato>,
 
     @InjectRepository(Ticket)
     private ticketRepository: Repository<Ticket>,
@@ -36,8 +40,8 @@ export class ContextoClienteService {
 
       // 2. Buscar dados em paralelo
       const [estatisticas, historico] = await Promise.all([
-        this.calcularEstatisticas(clienteId, empresaId),
-        this.obterHistorico(clienteId, empresaId),
+        this.calcularEstatisticas(clienteId, empresaId, cliente),
+        this.obterHistorico(clienteId, empresaId, cliente),
       ]);
 
       // 3. Montar resposta
@@ -162,23 +166,24 @@ export class ContextoClienteService {
   private async calcularEstatisticas(
     clienteId: string,
     empresaId?: string,
+    clienteCache?: Cliente,
   ): Promise<ContextoClienteResponseDto['estatisticas']> {
     this.logger.log(`📈 Calculando estatísticas do cliente ${clienteId}`);
 
     try {
-      // Buscar tickets do cliente
-      const whereTickets: any = { clienteId };
-      if (empresaId) {
-        whereTickets.empresaId = empresaId;
-      }
-
-      const tickets = await this.ticketRepository.find({
-        where: whereTickets,
-      });
+      const telefonesRelacionados = await this.coletarTelefonesRelacionados(clienteId, empresaId, clienteCache);
+      const tickets = await this.buscarTicketsDoCliente(clienteId, empresaId, telefonesRelacionados);
 
       const totalTickets = tickets.length;
-      const ticketsResolvidos = tickets.filter(t => t.status === 'resolvido' || t.status === 'fechado').length;
-      const ticketsAbertos = tickets.filter(t => t.status === 'aberto' || t.status === 'aguardando').length;
+      const ticketsResolvidos = tickets.filter((t) => {
+        const status = (t.status || '').toString().toLowerCase();
+        return ['resolvido', 'fechado'].includes(status);
+      }).length;
+
+      const ticketsAbertos = tickets.filter((t) => {
+        const status = (t.status || '').toString().toLowerCase();
+        return ['aberto', 'em_atendimento', 'aguardando', 'aguardando_cliente'].includes(status);
+      }).length;
 
       // Calcular avaliação média (mock - implementar quando tiver tabela de avaliações)
       const avaliacaoMedia = 4.5;
@@ -219,21 +224,21 @@ export class ContextoClienteService {
   private async obterHistorico(
     clienteId: string,
     empresaId?: string,
+    clienteCache?: Cliente,
   ): Promise<ContextoClienteResponseDto['historico']> {
     this.logger.log(`📜 Obtendo histórico do cliente ${clienteId}`);
 
     try {
-      // Buscar últimos tickets
-      const whereTickets: any = { clienteId };
-      if (empresaId) {
-        whereTickets.empresaId = empresaId;
-      }
+      const telefonesRelacionados = await this.coletarTelefonesRelacionados(clienteId, empresaId, clienteCache);
+      const tickets = await this.buscarTicketsDoCliente(clienteId, empresaId, telefonesRelacionados);
 
-      const tickets = await this.ticketRepository.find({
-        where: whereTickets,
-        order: { createdAt: 'DESC' },
-        take: 5,
-      });
+      const ticketsRecentes = tickets
+        .sort((a, b) => {
+          const dataA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dataB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dataB - dataA;
+        })
+        .slice(0, 5);
 
       // TODO: Buscar propostas quando integrar com módulo de propostas
       const propostas = [];
@@ -244,7 +249,7 @@ export class ContextoClienteService {
       return {
         propostas,
         faturas,
-        tickets: tickets.map(t => ({
+        tickets: ticketsRecentes.map(t => ({
           id: t.id,
           numero: t.numero,
           status: t.status,
@@ -309,5 +314,84 @@ export class ContextoClienteService {
     empresaId?: string,
   ): Promise<ContextoClienteResponseDto['historico']> {
     return this.obterHistorico(clienteId, empresaId);
+  }
+
+  private normalizarTelefone(telefone?: string | null): string | null {
+    if (!telefone) {
+      return null;
+    }
+
+    const numeros = telefone.replace(/\D/g, '');
+    if (numeros.length < 8) {
+      return null;
+    }
+
+    return numeros;
+  }
+
+  private async coletarTelefonesRelacionados(
+    clienteId: string,
+    empresaId?: string,
+    clienteCache?: Cliente,
+  ): Promise<string[]> {
+    const telefones = new Set<string>();
+
+    let clienteReferencia = clienteCache;
+    if (!clienteReferencia) {
+      clienteReferencia = await this.buscarCliente(clienteId, empresaId);
+    }
+
+    const telefonePrincipal = this.normalizarTelefone(clienteReferencia?.telefone);
+    if (telefonePrincipal) {
+      telefones.add(telefonePrincipal);
+    }
+
+    const contatos = await this.contatoRepository.find({ where: { clienteId } });
+    contatos.forEach((contato) => {
+      const telefoneContato = this.normalizarTelefone(contato.telefone);
+      if (telefoneContato) {
+        telefones.add(telefoneContato);
+      }
+    });
+
+    return Array.from(telefones);
+  }
+
+  private async buscarTicketsDoCliente(
+    clienteId: string,
+    empresaId: string | undefined,
+    telefones: string[],
+  ): Promise<Ticket[]> {
+    const colunaClienteId = this.ticketRepository.metadata.findColumnWithPropertyName('clienteId');
+    const colunaEmpresaId = this.ticketRepository.metadata.findColumnWithPropertyName('empresaId');
+    const possuiColunaClienteId = Boolean(colunaClienteId);
+
+    if (!possuiColunaClienteId && telefones.length === 0) {
+      this.logger.warn(`⚠️ Nenhuma forma de correlacionar tickets para cliente ${clienteId} (sem telefone e sem coluna clienteId).`);
+      return [];
+    }
+
+    const query = this.ticketRepository.createQueryBuilder('ticket');
+
+    if (empresaId && colunaEmpresaId) {
+      query.andWhere(`ticket.${colunaEmpresaId.databaseName} = :empresaId`, { empresaId });
+    }
+
+    const campoTelefoneNormalizado = `REGEXP_REPLACE(COALESCE(ticket.contato_telefone, ''), '\\D', '', 'g')`;
+
+    if (possuiColunaClienteId && telefones.length > 0) {
+      query.andWhere(new Brackets((qb) => {
+        qb.where(`ticket.${colunaClienteId!.databaseName} = :clienteId`, { clienteId });
+        qb.orWhere(`${campoTelefoneNormalizado} IN (:...telefones)`, { telefones });
+      }));
+    } else if (possuiColunaClienteId) {
+      query.andWhere(`ticket.${colunaClienteId.databaseName} = :clienteId`, { clienteId });
+    } else if (telefones.length > 0) {
+      query.andWhere(`${campoTelefoneNormalizado} IN (:...telefones)`, { telefones });
+    }
+
+    query.orderBy('ticket.created_at', 'DESC');
+
+    return query.getMany();
   }
 }

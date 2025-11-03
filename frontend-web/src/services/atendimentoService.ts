@@ -17,6 +17,9 @@ export interface Ticket {
   contatoNome?: string;
   contatoTelefone?: string;
   contatoEmail?: string;
+  contatoOnline?: boolean; // ✅ Status online/offline do contato
+  contatoLastActivity?: string; // ✅ Última atividade do contato
+  mensagensNaoLidas?: number; // ✅ BONUS: Contador de mensagens não lidas
   ultimaMensagemEm?: string;
   criadoEm: string;
   atualizadoEm: string;

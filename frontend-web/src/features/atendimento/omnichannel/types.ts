@@ -24,6 +24,7 @@ export interface Ticket {
   contato: Contato;
   canal: CanalTipo;
   status: StatusAtendimento;
+  statusOriginal?: string;
   ultimaMensagem: string;
   tempoUltimaMensagem: Date;
   tempoAtendimento: number; // em segundos
@@ -38,6 +39,7 @@ export interface Ticket {
 export interface Mensagem {
   id: string;
   ticketId: string;
+  tipo?: string;
   remetente: {
     id: string;
     nome: string;
@@ -45,16 +47,23 @@ export interface Mensagem {
     tipo: 'cliente' | 'atendente';
   };
   conteudo: string;
-  timestamp: Date;
+  timestamp: Date | string;
   status: StatusMensagem;
   anexos?: {
     nome: string;
-    url: string;
-    tipo: string;
+    url?: string | null;
+    downloadUrl?: string | null;
+    originalUrl?: string | null;
+    tipo?: string | null;
+    tamanho?: number | null;
+    duracao?: number | null;
   }[];
   audio?: {
     url: string;
-    duracao: number;
+    downloadUrl?: string | null;
+    tipo?: string | null;
+    duracao?: number | null;
+    nome?: string | null;
   };
 }
 
@@ -68,24 +77,50 @@ export interface HistoricoAtendimento {
   resumo: string;
 }
 
+// ✅ Interfaces atualizadas para espelhar backend
 export interface Demanda {
   id: string;
-  tipo: string;
-  descricao: string;
-  status: 'aberta' | 'em_andamento' | 'concluida';
-  dataAbertura: Date;
-  dataConclusao?: Date;
+  clienteId?: string;
+  ticketId?: string;
+  contatoTelefone?: string;
+  empresaId: string;
+  titulo: string;
+  descricao?: string;
+  tipo: 'tecnica' | 'comercial' | 'financeira' | 'suporte' | 'reclamacao' | 'solicitacao' | 'outros';
+  prioridade: 'baixa' | 'media' | 'alta' | 'urgente';
+  status: 'aberta' | 'em_andamento' | 'aguardando' | 'concluida' | 'cancelada';
+  dataVencimento?: string;
+  dataConclusao?: string;
+  responsavelId?: string;
+  responsavel?: {
+    id: string;
+    username: string;
+    nome?: string;
+  };
+  autorId: string;
+  autor?: {
+    id: string;
+    username: string;
+    nome?: string;
+  };
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface NotaCliente {
   id: string;
+  clienteId?: string;
+  ticketId?: string;
+  contatoTelefone?: string;
+  empresaId: string;
   conteudo: string;
-  autor: {
+  importante: boolean;
+  autorId: string;
+  autor?: {
     id: string;
-    nome: string;
-    foto?: string;
+    username: string;
+    nome?: string;
   };
-  dataCriacao: Date;
-  dataEdicao?: Date;
-  importante?: boolean;
+  createdAt: string;
+  updatedAt: string;
 }

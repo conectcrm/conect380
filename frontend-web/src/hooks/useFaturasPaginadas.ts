@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { faturamentoService, FiltrosFatura, FaturasPaginadasResponse } from '../services/faturamentoService';
 
 /**
@@ -7,15 +7,13 @@ import { faturamentoService, FiltrosFatura, FaturasPaginadasResponse } from '../
  * - Tipos fortes via FaturasPaginadasResponse.
  */
 export const useFaturasPaginadas = (filtros?: FiltrosFatura) => {
-  return useQuery<FaturasPaginadasResponse, any>(
-    ['faturas-paginadas', filtros],
-    () => faturamentoService.listarFaturasPaginadas(filtros),
-    {
-      keepPreviousData: true,
-      staleTime: 0, // Reduzido para 0 para garantir atualizações imediatas após mutações
-      cacheTime: 5 * 60 * 1000, // Mantém os dados em cache por 5 minutos para performance
-    }
-  );
+  return useQuery<FaturasPaginadasResponse, unknown>({
+    queryKey: ['faturas-paginadas', filtros],
+    queryFn: () => faturamentoService.listarFaturasPaginadas(filtros),
+    placeholderData: keepPreviousData,
+    staleTime: 0, // Reduzido para 0 para garantir atualizações imediatas após mutações
+    gcTime: 5 * 60 * 1000, // Mantém os dados em cache por 5 minutos para performance
+  });
 };
 
 export default useFaturasPaginadas;

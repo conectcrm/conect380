@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { createHmac } from 'crypto';
@@ -10,6 +10,8 @@ import { TicketService } from './ticket.service';
 import { MensagemService } from './mensagem.service';
 import { RemetenteMensagem, TipoMensagem } from '../entities/mensagem.entity';
 import { AtendimentoGateway } from '../gateways/atendimento.gateway';
+import { TriagemBotService } from '../../triagem/services/triagem-bot.service';
+import { WhatsAppInteractiveService } from './whatsapp-interactive.service';
 
 @Injectable()
 export class WhatsAppWebhookService {
@@ -22,9 +24,12 @@ export class WhatsAppWebhookService {
     private canalRepo: Repository<Canal>,
     private aiService: AIResponseService,
     private senderService: WhatsAppSenderService,
+    private interactiveService: WhatsAppInteractiveService,
     private ticketService: TicketService,
     private mensagemService: MensagemService,
     private atendimentoGateway: AtendimentoGateway,
+    @Inject(forwardRef(() => TriagemBotService))
+    private triagemBotService: TriagemBotService,
   ) { }
 
   async validarTokenVerificacao(empresaId: string, verifyToken: string): Promise<boolean> {
@@ -176,12 +181,25 @@ export class WhatsAppWebhookService {
 
       if (type === 'text') {
         conteudo = message.text?.body || '';
+      } else if (type === 'interactive') {
+        // ✨ Processar resposta de botão interativo
+        const interactive = message.interactive;
+        if (interactive?.type === 'button_reply') {
+          // Resposta de Reply Button
+          conteudo = interactive.button_reply?.id || interactive.button_reply?.title || '';
+          this.logger.log(`🔘 Resposta de botão: ${conteudo}`);
+        } else if (interactive?.type === 'list_reply') {
+          // Resposta de List Message
+          conteudo = interactive.list_reply?.id || interactive.list_reply?.title || '';
+          this.logger.log(`📋 Resposta de lista: ${conteudo}`);
+        }
       } else if (type === 'image') {
         conteudo = `[Imagem] ${message.image?.caption || ''}`;
       } else if (type === 'video') {
         conteudo = `[Vídeo] ${message.video?.caption || ''}`;
       } else if (type === 'audio') {
-        conteudo = '[Áudio]';
+        // ✨ Áudio: sem texto, apenas player visual
+        conteudo = '';
       } else if (type === 'document') {
         conteudo = `[Documento] ${message.document?.filename || ''}`;
       } else if (type === 'location') {
@@ -226,26 +244,227 @@ export class WhatsAppWebhookService {
       console.log(`✅ [WEBHOOK DEBUG] Canal OK - prosseguindo...`);
       this.logger.log(`📱 Canal encontrado: ${canal.nome} (${canal.id})`);
 
-      // 3. Buscar ou criar ticket
-      const nomeCliente = value?.contacts?.[0]?.profile?.name || from;
+      // 3. Antes de qualquer ação, verificar se é resposta de CSAT
+      const resultadoCsat = await this.ticketService.registrarRespostaCsat({
+        empresaId,
+        telefone: from,
+        mensagem: conteudo,
+      });
+
+      if (resultadoCsat.registrado) {
+        this.logger.log(
+          `⭐ Resposta CSAT registrada (nota ${resultadoCsat.nota}) para contato ${from}`,
+        );
+
+        await this.senderService.marcarComoLida(empresaId, messageId);
+
+        try {
+          await this.senderService.enviarMensagem(
+            empresaId,
+            from,
+            'Muito obrigado pela sua avaliação! Sua opinião é essencial para continuarmos melhorando. 😊',
+          );
+        } catch (erroAgradecimento) {
+          this.logger.warn(`⚠️ Falha ao enviar agradecimento do CSAT: ${erroAgradecimento.message}`);
+        }
+
+        console.log('═══════════════════════════════════════════════════════════');
+        return;
+      }
+
+      // 4. Enviar para triagem bot antes de seguir com atendimento humano
+      console.log(`🔍 [WEBHOOK DEBUG] Estrutura value.contacts:`, JSON.stringify(value?.contacts, null, 2));
+
+      const contatoProfile = value?.contacts?.[0]?.profile || {};
+      const nomeCliente = contatoProfile?.name || from;
+      const fotoCliente = contatoProfile?.photo_url
+        || contatoProfile?.photo
+        || contatoProfile?.profile_pic_url
+        || contatoProfile?.profile_pic
+        || contatoProfile?.profilePicUrl
+        || contatoProfile?.profilePic
+        || null;
+
+      console.log(`👤 [WEBHOOK DEBUG] Nome extraído:`);
+      console.log(`   value.contacts[0]?.profile?.name: ${value?.contacts?.[0]?.profile?.name}`);
+      console.log(`   from (fallback): ${from}`);
+      console.log(`   ✅ nomeCliente final: ${nomeCliente}`);
+      console.log(`🖼️ [WEBHOOK DEBUG] Foto extraída do payload: ${fotoCliente || 'nenhuma'}`);
+
+      // 🆕 Se não houver foto no payload, tentar buscar na API do WhatsApp
+      let fotoFinal = fotoCliente;
+      if (!fotoCliente) {
+        console.log(`🔍 [WEBHOOK DEBUG] Foto não veio no payload - buscando na API...`);
+        try {
+          fotoFinal = await this.senderService.buscarFotoPerfilContato(empresaId, from);
+          console.log(`✅ [WEBHOOK DEBUG] Foto obtida da API: ${fotoFinal || 'não encontrada'}`);
+        } catch (error) {
+          console.log(`⚠️ [WEBHOOK DEBUG] Erro ao buscar foto: ${error.message}`);
+        }
+      }
+
+      let triagemTicketId: string = null;
+      let triagemProcessada = false;
+
+      try {
+        const triagemPayload = {
+          from,
+          body: conteudo,
+          name: nomeCliente,
+          messageId,
+          canalId: canal.id, // UUID do canal, não phone_number_id
+        };
+
+        const resultadoTriagem = await this.triagemBotService.processarMensagemWhatsApp(
+          empresaId,
+          triagemPayload,
+        );
+
+        console.log('🤖 [WEBHOOK DEBUG] Resultado triagem:', JSON.stringify(resultadoTriagem, null, 2));
+
+        if (resultadoTriagem?.ignorado) {
+          this.logger.debug('🤖 TriagemBot ignorou mensagem, seguindo com atendimento padrão.');
+        }
+
+        if (resultadoTriagem?.resposta) {
+          triagemProcessada = true;
+          const resposta = resultadoTriagem.resposta;
+          triagemTicketId = resposta.ticketId || null;
+
+          console.log(`🔍 [DEBUG] Resposta completa:`, JSON.stringify(resposta, null, 2));
+          console.log(`🔍 [DEBUG] usarBotoes: ${resposta.usarBotoes}, tipoBotao: ${resposta.tipoBotao}, opcoes: ${resposta.opcoes?.length || 0}`);
+
+          if (resposta.mensagem && resposta.mensagem.trim().length > 0) {
+            try {
+              // ✨ Enviar com botões interativos se disponível
+              if (resposta.usarBotoes && resposta.opcoes && resposta.opcoes.length > 0) {
+                console.log(`✅ [DEBUG] Condição de botões ATIVADA! Tipo: ${resposta.tipoBotao}`);
+
+                if (resposta.tipoBotao === 'reply' && resposta.opcoes.length <= 3) {
+                  // Reply Buttons (até 3)
+                  const botoes = resposta.opcoes.map(op => ({
+                    id: op.valor,
+                    titulo: op.texto,
+                  }));
+
+                  console.log(`🔘 [DEBUG] Enviando Reply Buttons:`, JSON.stringify(botoes, null, 2));
+
+                  const resultadoEnvio = await this.interactiveService.enviarMensagemComBotoes(
+                    empresaId,
+                    from,
+                    resposta.mensagem,
+                    botoes,
+                  );
+
+                  if (resultadoEnvio?.sucesso) {
+                    this.logger.log('🔘 Resposta com botões interativos enviada.');
+                  } else {
+                    this.logger.warn('⚠️ Falha ao enviar botões interativos. Utilizando fallback em texto.');
+                    const mensagemFallback = this.montarMensagemFallbackTriagem(resposta);
+                    await this.senderService.enviarMensagem(empresaId, from, mensagemFallback);
+                    this.logger.log('💬 Resposta de texto enviada após fallback.');
+                  }
+                } else if (resposta.tipoBotao === 'list' && resposta.opcoes.length <= 10) {
+                  // List Message (até 10)
+                  const opcoes = resposta.opcoes.map(op => ({
+                    id: op.valor,
+                    titulo: op.texto,
+                    descricao: op.descricao,
+                  }));
+
+                  console.log(`📋 [DEBUG] Enviando List Message:`, JSON.stringify(opcoes, null, 2));
+
+                  const resultadoEnvio = await this.interactiveService.enviarMensagemComLista(
+                    empresaId,
+                    from,
+                    resposta.mensagem,
+                    'Escolha uma opção',
+                    opcoes,
+                  );
+
+                  if (resultadoEnvio?.sucesso) {
+                    this.logger.log('📋 Resposta com lista interativa enviada.');
+                  } else {
+                    this.logger.warn('⚠️ Falha ao enviar lista interativa. Utilizando fallback em texto.');
+                    const mensagemFallback = this.montarMensagemFallbackTriagem(resposta);
+                    await this.senderService.enviarMensagem(empresaId, from, mensagemFallback);
+                    this.logger.log('💬 Resposta de texto enviada após fallback.');
+                  }
+                } else {
+                  // Fallback para mensagem de texto
+                  console.log(`⚠️ [DEBUG] Fallback para texto (tipoBotao: ${resposta.tipoBotao}, opcoes: ${resposta.opcoes.length})`);
+                  await this.senderService.enviarMensagem(empresaId, from, resposta.mensagem);
+                  this.logger.log('💬 Resposta de texto enviada (fallback).');
+                }
+              } else {
+                // Mensagem de texto simples
+                console.log(`ℹ️ [DEBUG] Enviando texto simples (usarBotoes: ${resposta.usarBotoes}, opcoes: ${resposta.opcoes?.length || 0})`);
+                await this.senderService.enviarMensagem(empresaId, from, resposta.mensagem);
+                this.logger.log('🤖 Resposta automática da triagem enviada.');
+              }
+            } catch (erroEnvio) {
+              this.logger.error(`❌ Falha ao enviar resposta da triagem: ${erroEnvio.message}`);
+              console.error(`❌ [DEBUG] Stack:`, erroEnvio.stack);
+            }
+          }
+
+          if (!resposta.finalizado) {
+            this.logger.log('🕑 Triagem em andamento - atendimento humano aguardará nova interação.');
+            await this.senderService.marcarComoLida(empresaId, messageId);
+            console.log('═══════════════════════════════════════════════════════════');
+            return;
+          }
+
+          if (resposta.finalizado && !triagemTicketId) {
+            this.logger.log('✅ Triagem finalizada sem ticket - nenhuma ação adicional necessária.');
+            await this.senderService.marcarComoLida(empresaId, messageId);
+            console.log('═══════════════════════════════════════════════════════════');
+            return;
+          }
+        }
+      } catch (erroTriagem) {
+        this.logger.warn(`⚠️ Falha ao processar triagem: ${erroTriagem.message}`);
+      }
+
+      if (triagemProcessada && !triagemTicketId) {
+        this.logger.log('🤖 Triagem tratou a interação sem gerar ticket.');
+        await this.senderService.marcarComoLida(empresaId, messageId);
+        console.log('═══════════════════════════════════════════════════════════');
+        return;
+      }
 
       console.log(`🎫 [WEBHOOK DEBUG] Chamando ticketService.buscarOuCriarTicket...`);
       console.log(`   nomeCliente: ${nomeCliente}`);
+      console.log(`   clienteFoto: ${fotoFinal || 'null'}`);
+      console.log(`   assunto: ${conteudo.substring(0, 100)}`);
       console.log(`   assunto: ${conteudo.substring(0, 100)}`);
 
-      const ticket = await this.ticketService.buscarOuCriarTicket({
-        empresaId,
-        canalId: canal.id,
-        clienteNumero: from,
-        clienteNome: nomeCliente,
-        assunto: conteudo.substring(0, 100) || 'Novo atendimento',
-        origem: 'WHATSAPP',
-      });
+      let ticket;
+      if (triagemTicketId) {
+        try {
+          ticket = await this.ticketService.buscarPorId(triagemTicketId, empresaId);
+          console.log(`✅ [WEBHOOK DEBUG] Ticket recuperado da triagem: ${JSON.stringify({ id: ticket.id, numero: ticket.numero })}`);
+        } catch (erroBusca) {
+          this.logger.error(`❌ Falha ao recuperar ticket da triagem (${triagemTicketId}): ${erroBusca.message}`);
+        }
+      }
+
+      if (!ticket) {
+        ticket = await this.ticketService.buscarOuCriarTicket({
+          empresaId,
+          canalId: canal.id,
+          clienteNumero: from,
+          clienteNome: nomeCliente,
+          clienteFoto: fotoFinal || undefined,
+          assunto: conteudo.substring(0, 100) || 'Novo atendimento',
+          origem: 'WHATSAPP',
+        });
+      }
 
       console.log(`✅ [WEBHOOK DEBUG] Ticket retornado: ${ticket ? JSON.stringify({ id: ticket.id, numero: ticket.numero }) : 'NULL'}`);
       this.logger.log(`🎫 Ticket: ${ticket.id} (Número: ${ticket.numero})`);
 
-      // 4. Salvar mensagem
+      // 5. Salvar mensagem
       console.log(`💾 [WEBHOOK DEBUG] Salvando mensagem no banco...`);
       console.log(`   ticketId: ${ticket.id}`);
       console.log(`   tipo original: ${type}`);
@@ -274,25 +493,52 @@ export class WhatsAppWebhookService {
       console.log(`✅ [WEBHOOK DEBUG] Mensagem salva: ${mensagem ? mensagem.id : 'NULL'}`);
       this.logger.log(`💾 Mensagem salva: ${mensagem.id}`);
 
-      // 5. Atualizar última mensagem do ticket
+      // 6. Atualizar última mensagem do ticket
       console.log(`🔄 [WEBHOOK DEBUG] Atualizando última mensagem do ticket...`);
       await this.ticketService.atualizarUltimaMensagem(ticket.id);
 
-      // 6. Notificar atendentes via WebSocket
+      // 7. Notificar atendentes via WebSocket
       console.log(`📢 [WEBHOOK DEBUG] Notificando via WebSocket...`);
       console.log(`   mensagem.id: ${mensagem.id}`);
 
-      this.atendimentoGateway.notificarNovaMensagem(mensagem);
+      // 🔧 Transformar mensagem para formato esperado pelo frontend
+      const mensagemFormatada: any = this.mensagemService.formatarMensagemParaFrontend(
+        mensagem,
+        {
+          fotoContato: ticket.contatoFoto || fotoFinal || null,
+        },
+      );
+
+      mensagemFormatada.criadoEm = mensagem.createdAt;
+      mensagemFormatada.status = mensagemFormatada.status || 'lido';
+
+      if (mensagemFormatada.audio) {
+        console.log('🎵 [WEBHOOK DEBUG] Audio final:', {
+          url: mensagemFormatada.audio.url,
+          downloadUrl: mensagemFormatada.audio.downloadUrl,
+          duracao: mensagemFormatada.audio.duracao,
+          nome: mensagemFormatada.audio.nome,
+        });
+      } else if (mensagemFormatada.anexos?.length) {
+        console.log('📎 [WEBHOOK DEBUG] Anexos finais:', mensagemFormatada.anexos.map((anexo: any) => ({
+          nome: anexo.nome,
+          tipo: anexo.tipo,
+          url: anexo.url,
+          downloadUrl: anexo.downloadUrl,
+        })));
+      }
+
+      this.atendimentoGateway.notificarNovaMensagem(mensagemFormatada);
 
       console.log(`✅ [WEBHOOK DEBUG] WebSocket notificado com sucesso`);
       console.log('═══════════════════════════════════════════════════════════');
 
       this.logger.log(`🔔 Notificação enviada via WebSocket`);
 
-      // 7. Marcar mensagem como lida
+      // 8. Marcar mensagem como lida
       await this.senderService.marcarComoLida(empresaId, messageId);
 
-      // 8. Verificar se deve acionar IA para resposta automática
+      // 9. Verificar se deve acionar IA para resposta automática
       const deveUsarIA = await this.aiService.deveAcionarIA(empresaId);
 
       if (deveUsarIA && type === 'text' && conteudo) {
@@ -355,6 +601,30 @@ export class WhatsAppWebhookService {
     } catch (error) {
       this.logger.error(`❌ Erro ao processar mensagem: ${error.message}`, error.stack);
     }
+  }
+
+  private montarMensagemFallbackTriagem(resposta: { mensagem?: string; opcoes?: Array<{ texto: string; descricao?: string }> }): string {
+    const mensagemBase = resposta?.mensagem ? String(resposta.mensagem).trim() : '';
+    const opcoes = Array.isArray(resposta?.opcoes) ? resposta.opcoes : [];
+
+    if (opcoes.length === 0) {
+      return mensagemBase.length > 0 ? mensagemBase : 'Por favor, escolha uma das opções disponíveis.';
+    }
+
+    const linhasOpcoes = opcoes.map((opcao, index) => {
+      const titulo = opcao?.texto ? String(opcao.texto).trim() : `Opção ${index + 1}`;
+      const descricao = opcao?.descricao ? ` - ${String(opcao.descricao).trim()}` : '';
+      return `${index + 1}. ${titulo}${descricao}`;
+    });
+
+    const corpoOpcoes = linhasOpcoes.join('\n');
+    const mensagemOrientacao = '\n\nEnvie o número da opção desejada ou digite SAIR para cancelar.';
+
+    if (mensagemBase.length === 0) {
+      return `${corpoOpcoes}${mensagemOrientacao}`;
+    }
+
+    return `${mensagemBase}\n\n${corpoOpcoes}${mensagemOrientacao}`;
   }
 
   /**

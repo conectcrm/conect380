@@ -45,15 +45,9 @@ class OportunidadesService {
 
   async criarOportunidade(oportunidade: NovaOportunidade): Promise<Oportunidade> {
     console.log('Service - Dados recebidos:', oportunidade);
-    
-    // Validar se clienteId é número válido ou null
-    let cliente_id: number | null = null;
-    if (
-      typeof oportunidade.clienteId === 'number' &&
-      !isNaN(oportunidade.clienteId)
-    ) {
-      cliente_id = oportunidade.clienteId;
-    }
+
+    const cliente_id = oportunidade.clienteId ?? null;
+    const dataFechamento = this.serializeDate(oportunidade.dataFechamentoEsperado);
 
     // Transformar campos para o formato esperado pelo backend
     const dadosBackend = {
@@ -65,17 +59,18 @@ class OportunidadesService {
       prioridade: oportunidade.prioridade,
       origem: oportunidade.origem,
       tags: oportunidade.tags,
-      dataFechamentoEsperado: oportunidade.dataFechamentoEsperado?.toISOString(),
+      dataFechamentoEsperado: dataFechamento,
       responsavel_id: oportunidade.responsavelId,
       cliente_id,
       nomeContato: oportunidade.nomeContato,
       emailContato: oportunidade.emailContato,
       telefoneContato: oportunidade.telefoneContato,
-      empresaContato: oportunidade.empresaContato
+      empresaContato: oportunidade.empresaContato,
+      observacoes: oportunidade.observacoes
     };
-    
+
     console.log('Service - Dados transformados:', dadosBackend);
-    
+
     const response = await this.api.post('/', dadosBackend);
     return this.formatarOportunidade(response.data);
   }
@@ -88,7 +83,8 @@ class OportunidadesService {
 
   async atualizarOportunidade(oportunidade: AtualizarOportunidade): Promise<Oportunidade> {
     const { id, ...dados } = oportunidade;
-    
+    const dataFechamento = this.serializeDate(dados.dataFechamentoEsperado);
+
     // Transformar campos para o formato esperado pelo backend
     const dadosBackend = {
       titulo: dados.titulo,
@@ -99,15 +95,16 @@ class OportunidadesService {
       prioridade: dados.prioridade,
       origem: dados.origem,
       tags: dados.tags,
-      dataFechamentoEsperado: dados.dataFechamentoEsperado?.toISOString(),
+      dataFechamentoEsperado: dataFechamento,
       responsavel_id: dados.responsavelId,
       cliente_id: dados.clienteId,
       nomeContato: dados.nomeContato,
       emailContato: dados.emailContato,
       telefoneContato: dados.telefoneContato,
-      empresaContato: dados.empresaContato
+      empresaContato: dados.empresaContato,
+      observacoes: dados.observacoes
     };
-    
+
     const response = await this.api.put(`/${id}`, dadosBackend);
     return this.formatarOportunidade(response.data);
   }
@@ -144,7 +141,7 @@ class OportunidadesService {
 
   async obterDadosKanban(filtros?: Partial<FiltrosOportunidade>): Promise<DadosKanban> {
     const response = await this.api.get('/pipeline', { params: filtros });
-    
+
     // Converter formato do backend para o formato esperado pelo frontend
     const stages = response.data.stages || {};
     const estagios = Object.values(stages).map((stage: any) => ({
@@ -155,7 +152,7 @@ class OportunidadesService {
       valor: stage.opportunities?.reduce((total: number, opp: any) => total + parseFloat(opp.valor || 0), 0) || 0,
       oportunidades: stage.opportunities?.map((opp: any) => this.formatarOportunidade(opp)) || []
     }));
-    
+
     return {
       estagios,
       totalValor: response.data.totalValue || 0,
@@ -165,6 +162,9 @@ class OportunidadesService {
 
   // Utilitários
   private formatarOportunidade(oportunidade: any): Oportunidade {
+    const createdAt = oportunidade.createdAt ? new Date(oportunidade.createdAt) : new Date();
+    const updatedAt = oportunidade.updatedAt ? new Date(oportunidade.updatedAt) : createdAt;
+
     return {
       id: oportunidade.id,
       titulo: oportunidade.titulo,
@@ -175,13 +175,13 @@ class OportunidadesService {
       prioridade: oportunidade.prioridade,
       origem: oportunidade.origem,
       tags: oportunidade.tags || [],
-      dataFechamentoEsperado: oportunidade.dataFechamentoEsperado 
-        ? new Date(oportunidade.dataFechamentoEsperado) 
+      dataFechamentoEsperado: oportunidade.dataFechamentoEsperado
+        ? new Date(oportunidade.dataFechamentoEsperado)
         : undefined,
-      dataFechamentoReal: oportunidade.dataFechamentoReal 
-        ? new Date(oportunidade.dataFechamentoReal) 
+      dataFechamentoReal: oportunidade.dataFechamentoReal
+        ? new Date(oportunidade.dataFechamentoReal)
         : undefined,
-      
+
       // Responsável (obrigatório)
       responsavel: oportunidade.responsavel ? {
         id: oportunidade.responsavel.id,
@@ -194,7 +194,7 @@ class OportunidadesService {
         email: '',
         avatar: undefined
       },
-      
+
       // Cliente (opcional)
       cliente: oportunidade.cliente ? {
         id: oportunidade.cliente.id,
@@ -203,29 +203,45 @@ class OportunidadesService {
         telefone: oportunidade.cliente.telefone,
         empresa: oportunidade.cliente.empresa
       } : undefined,
-      
+
       // Informações de contato direto
       nomeContato: oportunidade.nomeContato,
       emailContato: oportunidade.emailContato,
       telefoneContato: oportunidade.telefoneContato,
       empresaContato: oportunidade.empresaContato,
-      
+      observacoes: oportunidade.observacoes,
+      criadoEm: oportunidade.criadoEm ?? createdAt,
+      atualizadoEm: oportunidade.atualizadoEm ?? updatedAt,
+
       // Atividades
       atividades: oportunidade.atividades || [],
-      
+
       // Metadados
-      createdAt: new Date(oportunidade.createdAt),
-      updatedAt: new Date(oportunidade.updatedAt),
-      
+      createdAt,
+      updatedAt,
+
       // Campos calculados
       valorFormatado: this.formatarMoeda(oportunidade.valor ? parseFloat(oportunidade.valor) : 0),
       diasNoEstagio: this.calcularDiasNoEstagio(oportunidade.updatedAt),
-      ultimaAtividade: oportunidade.ultimaAtividade 
-        ? new Date(oportunidade.ultimaAtividade) 
+      ultimaAtividade: oportunidade.ultimaAtividade
+        ? new Date(oportunidade.ultimaAtividade)
         : undefined,
       tempoNoEstagio: this.formatarTempoNoEstagio(oportunidade.updatedAt),
       probabilidadeVisual: this.classificarProbabilidade(oportunidade.probabilidade)
     };
+  }
+
+  private serializeDate(value?: Date | string | null): string | null {
+    if (!value) {
+      return null;
+    }
+
+    const date = typeof value === 'string' ? new Date(value) : value;
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+
+    return date.toISOString();
   }
 
   private formatarMoeda(valor: number): string {
@@ -233,7 +249,7 @@ class OportunidadesService {
     if (isNaN(valor) || valor === null || valor === undefined) {
       valor = 0;
     }
-    
+
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
@@ -249,13 +265,13 @@ class OportunidadesService {
 
   private formatarTempoNoEstagio(dataAtualizacao: string): string {
     const dias = this.calcularDiasNoEstagio(dataAtualizacao);
-    
+
     if (dias === 0) return 'Hoje';
     if (dias === 1) return '1 dia';
     if (dias < 7) return `${dias} dias`;
     if (dias < 30) return `${Math.floor(dias / 7)} semana${Math.floor(dias / 7) > 1 ? 's' : ''}`;
     if (dias < 365) return `${Math.floor(dias / 30)} mês${Math.floor(dias / 30) > 1 ? 'es' : ''}`;
-    
+
     return `${Math.floor(dias / 365)} ano${Math.floor(dias / 365) > 1 ? 's' : ''}`;
   }
 
@@ -267,8 +283,8 @@ class OportunidadesService {
 
   // Busca e sugestões
   async buscarOportunidades(termo: string): Promise<Oportunidade[]> {
-    const response = await this.api.get('/buscar', { 
-      params: { q: termo } 
+    const response = await this.api.get('/buscar', {
+      params: { q: termo }
     });
     return response.data.map((oportunidade: any) => this.formatarOportunidade(oportunidade));
   }

@@ -15,7 +15,7 @@ export interface EventoCreate {
   empresaId: string;
 }
 
-export interface EventoUpdate extends Partial<EventoCreate> {}
+export interface EventoUpdate extends Partial<EventoCreate> { }
 
 export interface EventoResponse {
   id: string;
@@ -63,7 +63,7 @@ class EventosService {
       location: evento.local || '',
       type: this.mapTipoToType(evento.tipo),
       priority: 'medium',
-      status: 'confirmado',
+      status: 'confirmed',
       category: 'meeting',
       color: evento.cor,
       collaborator: evento.usuario?.name || '',
@@ -100,7 +100,7 @@ class EventosService {
         return 'reuniao';
       case 'call':
         return 'ligacao';
-      case 'presentation':
+      case 'event':
         return 'apresentacao';
       case 'task':
         return 'visita';
@@ -112,14 +112,14 @@ class EventosService {
   }
 
   // Mapear tipos do backend para frontend
-  private mapTipoToType(tipo: string): 'meeting' | 'call' | 'task' | 'follow-up' | 'presentation' {
+  private mapTipoToType(tipo: string): 'meeting' | 'call' | 'task' | 'follow-up' | 'event' {
     switch (tipo) {
       case 'reuniao':
         return 'meeting';
       case 'ligacao':
         return 'call';
       case 'apresentacao':
-        return 'presentation';
+        return 'event';
       case 'visita':
         return 'task';
       case 'follow-up':
@@ -144,7 +144,7 @@ class EventosService {
   }): Promise<CalendarEvent[]> {
     try {
       const params = new URLSearchParams();
-      
+
       if (filtros?.startDate) {
         params.append('startDate', filtros.startDate.toISOString());
       }
@@ -157,7 +157,7 @@ class EventosService {
 
       const url = params.toString() ? `${this.baseUrl}?${params.toString()}` : this.baseUrl;
       const response = await api.get<EventoResponse[]>(url);
-      
+
       return response.data.map(evento => this.toCalendarEvent(evento));
     } catch (error) {
       console.error('Erro ao listar eventos:', error);
@@ -190,7 +190,7 @@ class EventosService {
   async atualizarEvento(id: string, updates: Partial<CalendarEvent>): Promise<CalendarEvent> {
     try {
       const updateData: EventoUpdate = {};
-      
+
       if (updates.title !== undefined) updateData.titulo = updates.title;
       if (updates.description !== undefined) updateData.descricao = updates.description;
       if (updates.start !== undefined) updateData.dataInicio = updates.start.toISOString();
@@ -225,7 +225,7 @@ class EventosService {
           start: start.toISOString(),
           end: end.toISOString()
         });
-        
+
         const response = await api.get<EventoResponse[]>(`${this.baseUrl}/${eventoId}/conflicts?${params.toString()}`);
         return response.data.map(evento => this.toCalendarEvent(evento));
       } else {
@@ -234,7 +234,7 @@ class EventosService {
           dataInicio: start.toISOString(),
           dataFim: end.toISOString()
         };
-        
+
         const response = await api.post<EventoResponse[]>(`${this.baseUrl}/check-conflicts`, conflictData);
         return response.data.map(evento => this.toCalendarEvent(evento));
       }

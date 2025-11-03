@@ -1,5 +1,41 @@
 import { MessageCircle, Send, Mail, Phone, MessageSquare } from 'lucide-react';
-import { CanalTipo } from './types';
+import { CanalTipo, Contato } from './types';
+
+/**
+ * 🎯 Resolve o nome do CONTATO para exibição
+ * 
+ * Usado em: Sidebar, Header do Chat, Lista de Tickets
+ * SEMPRE retorna o nome do contato (pessoa conversando), não do cliente
+ */
+export const resolverNomeExibicao = (contato: Contato | null | undefined): string => {
+  if (!contato) return 'Sem nome';
+
+  // ✅ Retorna o nome do contato (pessoa que está conversando)
+  if (contato.nome) {
+    return contato.nome;
+  }
+
+  // ❌ Fallback
+  return 'Sem nome';
+};
+
+/**
+ * 🏢 Resolve o nome do CLIENTE vinculado ao contato
+ * 
+ * Usado em: Painel "Informações do Cliente" (lado direito)
+ * Retorna o nome do cliente CRM se estiver vinculado, ou null
+ */
+export const resolverNomeCliente = (contato: Contato | null | undefined): string | null => {
+  if (!contato) return null;
+
+  // ✅ Retorna o nome do cliente vinculado (empresa/pessoa no CRM)
+  if (contato.clienteVinculado?.nome) {
+    return contato.clienteVinculado.nome;
+  }
+
+  // Não tem cliente vinculado
+  return null;
+};
 
 // Retorna o ícone apropriado para cada canal
 export const getIconeCanal = (canal: CanalTipo) => {
@@ -36,9 +72,18 @@ export const getCorCanal = (canal: CanalTipo): string => {
 };
 
 // Formata tempo em formato legível
-export const formatarTempoDecorrido = (data: Date): string => {
+export const formatarTempoDecorrido = (data: Date | string | undefined): string => {
+  // ✅ Validação: retornar fallback se data for undefined/null
+  if (!data) return '-';
+
+  // ✅ Converter string para Date se necessário
+  const dataObj = typeof data === 'string' ? new Date(data) : data;
+
+  // ✅ Validar se é uma data válida
+  if (isNaN(dataObj.getTime())) return '-';
+
   const agora = new Date();
-  const diff = agora.getTime() - data.getTime();
+  const diff = agora.getTime() - dataObj.getTime();
   const minutos = Math.floor(diff / 60000);
   const horas = Math.floor(diff / 3600000);
   const dias = Math.floor(diff / 86400000);
@@ -63,19 +108,24 @@ export const formatarTempoAtendimento = (segundos: number): string => {
 };
 
 // Formata horário da mensagem
-export const formatarHorarioMensagem = (data: Date): string => {
-  const hoje = new Date();
-  const ehHoje = data.toDateString() === hoje.toDateString();
+export const formatarHorarioMensagem = (data: Date | string | null | undefined): string => {
+  if (!data) return '--:--';
 
-  const horas = data.getHours().toString().padStart(2, '0');
-  const minutos = data.getMinutes().toString().padStart(2, '0');
+  const dataObj = typeof data === 'string' ? new Date(data) : data;
+  if (isNaN(dataObj.getTime())) return '--:--';
+
+  const hoje = new Date();
+  const ehHoje = dataObj.toDateString() === hoje.toDateString();
+
+  const horas = dataObj.getHours().toString().padStart(2, '0');
+  const minutos = dataObj.getMinutes().toString().padStart(2, '0');
 
   if (ehHoje) {
     return `${horas}:${minutos}`;
   }
 
-  const dia = data.getDate().toString().padStart(2, '0');
-  const mes = (data.getMonth() + 1).toString().padStart(2, '0');
+  const dia = dataObj.getDate().toString().padStart(2, '0');
+  const mes = (dataObj.getMonth() + 1).toString().padStart(2, '0');
 
   return `${dia}/${mes} ${horas}:${minutos}`;
 };

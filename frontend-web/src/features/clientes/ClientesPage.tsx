@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useI18n } from '../../contexts/I18nContext';
@@ -68,14 +68,35 @@ const ClientesPage: React.FC = () => {
     leads: 0
   });
 
-  // Carregar clientes
-  const loadClientes = async () => {
+  // Ref para rastrear se é a primeira montagem (evitar execução desnecessária)
+  const isFirstMount = useRef(true);
+
+  // Função para calcular estatísticas baseadas nos dados carregados
+  const calcularEstatisticasLocais = (clientesData: Cliente[]) => {
+    if (clientesData.length === 0) {
+      setEstatisticas({ total: 0, ativos: 0, prospects: 0, leads: 0 });
+      return;
+    }
+
+    const total = clientesData.length;
+    const ativos = clientesData.filter(c => c.status === 'cliente').length;
+    const prospects = clientesData.filter(c => c.status === 'prospect').length;
+    const leads = clientesData.filter(c => c.status === 'lead').length;
+
+    setEstatisticas({ total, ativos, prospects, leads });
+  };
+
+  // Carregar clientes (memoizado para evitar loops)
+  const loadClientes = useCallback(async () => {
     try {
       setIsLoading(true);
 
       const data = await clientesService.getClientes(filters);
       setClientesData(data);
       setClientes(data.data);
+
+      // Calcular estatísticas locais após carregar dados
+      calcularEstatisticasLocais(data.data);
 
     } catch (error) {
       console.error('❌ Erro ao carregar clientes:', error);
@@ -95,50 +116,36 @@ const ClientesPage: React.FC = () => {
         limit: 10,
         totalPages: 0
       });
+      calcularEstatisticasLocais([]);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Carregar estatísticas
-  const loadEstatisticas = async () => {
-    try {
-      const stats = await clientesService.getEstartisticas();
-      setEstatisticas(stats);
-    } catch (error) {
-      console.error('Erro ao carregar estatísticas do servidor:', error);
-      // Em caso de erro, calcular estatísticas dos dados locais
-      calcularEstatisticasLocais();
-    }
-  };
-
-  // Função para calcular estatísticas baseadas nos dados carregados
-  const calcularEstatisticasLocais = () => {
-    if (clientes.length === 0) {
-      setEstatisticas({ total: 0, ativos: 0, prospects: 0, leads: 0 });
-      return;
-    }
-
-    const total = clientes.length;
-    const ativos = clientes.filter(c => c.status === 'cliente').length;
-    const prospects = clientes.filter(c => c.status === 'prospect').length;
-    const leads = clientes.filter(c => c.status === 'lead').length;
-
-    setEstatisticas({ total, ativos, prospects, leads });
-  };
+  }, [
+    filters.page,
+    filters.limit,
+    filters.search,
+    filters.status,
+    filters.tipo,
+    filters.sortBy,
+    filters.sortOrder
+  ]);
 
   // Aplicar filtros com debounce para busca
   useEffect(() => {
+    // Pular execução na primeira montagem (valores iniciais vazios)
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+
     const delayDebounce = setTimeout(() => {
-      const newFilters = {
-        ...filters,
+      setFilters(prev => ({
+        ...prev,
         search: searchTerm,
         status: selectedStatus,
         tipo: selectedTipo,
         page: 1 // Reset para primeira página quando filtros mudam
-      };
-
-      setFilters(newFilters);
+      }));
     }, 300); // 300ms de delay para busca
 
     return () => clearTimeout(delayDebounce);
@@ -146,17 +153,9 @@ const ClientesPage: React.FC = () => {
 
   useEffect(() => {
     loadClientes();
-  }, [filters]);
+  }, [loadClientes]);
 
   useEffect(() => {
-    // Recalcular estatísticas quando os dados mudarem
-    calcularEstatisticasLocais();
-  }, [clientes]);
-
-  useEffect(() => {
-    // Carregar estatísticas do servidor na primeira carga
-    loadEstatisticas();
-
     // Notificação de boas-vindas (apenas uma vez)
     const hasWelcomeNotification = localStorage.getItem('conect_welcome_notification');
     if (!hasWelcomeNotification) {
@@ -319,10 +318,10 @@ const ClientesPage: React.FC = () => {
         // Criar lembrete para primeiro contato
         addReminder({
           title: 'Primeiro Contato',
+          message: `Realizar contato com o cliente ${clienteData.nome}`,
           entityType: 'cliente',
           entityId: clienteData.nome, // Temporário até ter ID
-          dateTime: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 horas
-          isRecurring: false
+          scheduledFor: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 horas
         });
       }
 

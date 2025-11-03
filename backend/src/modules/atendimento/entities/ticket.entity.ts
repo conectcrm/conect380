@@ -70,6 +70,9 @@ export class Ticket {
   @Column({ type: 'varchar', length: 255, name: 'contato_nome', nullable: true })
   contatoNome: string;
 
+  @Column({ type: 'varchar', length: 512, name: 'contato_foto', nullable: true })
+  contatoFoto: string;
+
   @Column({ type: 'timestamp', name: 'data_abertura', nullable: true })
   data_abertura: Date;
 

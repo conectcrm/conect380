@@ -218,7 +218,7 @@ class StripeService {
       console.log('🔄 Confirmando pagamento...');
 
       const result = await this.stripe.confirmPayment({
-        elements,
+        elements: elementos,
         confirmParams: {
           return_url: `${window.location.origin}/billing/success`
         }

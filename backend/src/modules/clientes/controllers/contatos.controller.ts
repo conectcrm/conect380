@@ -36,6 +36,16 @@ export class ContatosController {
   constructor(private readonly contatosService: ContatosService) { }
 
   /**
+   * Lista TODOS os contatos da empresa (de todos os clientes)
+   * GET /api/crm/contatos
+   */
+  @Get('contatos')
+  async listarTodos(@Request() req): Promise<ResponseContatoDto[]> {
+    const empresaId = req.user?.empresa_id ?? req.user?.empresaId;
+    return this.contatosService.listarTodos(empresaId);
+  }
+
+  /**
    * Lista todos os contatos de um cliente
    * GET /api/crm/clientes/:clienteId/contatos
    */
@@ -44,7 +54,7 @@ export class ContatosController {
     @Param('clienteId') clienteId: string,
     @Request() req,
   ): Promise<ResponseContatoDto[]> {
-    const empresaId = req.user?.empresaId;
+    const empresaId = req.user?.empresa_id ?? req.user?.empresaId;
     return this.contatosService.listarPorCliente(clienteId, empresaId);
   }
 
@@ -81,7 +91,7 @@ export class ContatosController {
     @Body() createContatoDto: CreateContatoDto,
     @Request() req,
   ): Promise<ResponseContatoDto> {
-    const empresaId = req.user?.empresaId;
+    const empresaId = req.user?.empresa_id ?? req.user?.empresaId;
     return this.contatosService.criar(clienteId, createContatoDto, empresaId);
   }
 

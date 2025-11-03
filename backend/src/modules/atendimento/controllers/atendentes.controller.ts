@@ -9,11 +9,8 @@ import {
   UseGuards,
   Req,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
-import { Atendente, StatusAtendente } from '../entities/atendente.entity';
-import { Ticket, StatusTicket } from '../entities/ticket.entity';
+import { AtendenteService } from '../services/atendente.service';
 import {
   CriarAtendenteDto,
   AtualizarAtendenteDto,
@@ -24,11 +21,7 @@ import {
 @UseGuards(JwtAuthGuard)
 export class AtendentesController {
   constructor(
-    @InjectRepository(Atendente)
-    private atendenteRepo: Repository<Atendente>,
-
-    // @InjectRepository(Ticket)
-    // private ticketRepo: Repository<Ticket>,
+    private atendenteService: AtendenteService,
   ) {
     console.log('✅ AtendentesController inicializado');
   }
@@ -36,12 +29,7 @@ export class AtendentesController {
   @Get()
   async listar(@Req() req) {
     const empresaId = req.user.empresa_id || req.user.empresaId;
-
-    const atendentes = await this.atendenteRepo.find({
-      where: { empresaId },
-      // relations: ['filas'], // TODO: adicionar quando AtendenteFila estiver disponível
-
-    });
+    const atendentes = await this.atendenteService.listar(empresaId);
 
     return {
       success: true,
@@ -53,31 +41,11 @@ export class AtendentesController {
   @Get(':id')
   async buscarPorId(@Req() req, @Param('id') id: string) {
     const empresaId = req.user.empresa_id || req.user.empresaId;
-
-    const atendente = await this.atendenteRepo.findOne({
-      where: { id, empresaId },
-      relations: ['filas'],
-    });
-
-    if (!atendente) {
-      return {
-        success: false,
-        message: 'Atendente não encontrado',
-      };
-    }
-
-    // TODO: Adicionar estatísticas quando Ticket estiver disponível
-    // const [ticketsAtivos, ticketsResolvidos] = await Promise.all([
-    //   this.ticketRepo.count({ where: { atendenteId: id, status: StatusTicket.EM_ATENDIMENTO } }),
-    //   this.ticketRepo.count({ where: { atendenteId: id, status: StatusTicket.RESOLVIDO } }),
-    // ]);
+    const atendente = await this.atendenteService.buscarPorId(id, empresaId);
 
     return {
       success: true,
-      data: {
-        ...atendente,
-        // estatisticas: { ticketsAtivos, ticketsResolvidos },
-      },
+      data: atendente,
     };
   }
 
@@ -85,18 +53,16 @@ export class AtendentesController {
   async criar(@Req() req, @Body() dto: CriarAtendenteDto) {
     const empresaId = req.user.empresa_id || req.user.empresaId;
 
-    const atendente = this.atendenteRepo.create({
-      ...dto,
-      empresaId,
-      status: StatusAtendente.OFFLINE,
-    });
-
-    await this.atendenteRepo.save(atendente);
+    // ⚡ Service cria User automaticamente se não existir
+    const resultado = await this.atendenteService.criar(dto, empresaId);
 
     return {
       success: true,
-      message: 'Atendente criado com sucesso',
-      data: atendente,
+      message: resultado.usuarioCriado
+        ? 'Atendente criado! Usuário gerado automaticamente.'
+        : 'Atendente criado e vinculado ao usuário existente',
+      data: resultado.atendente,
+      senhaTemporaria: resultado.senhaTemporaria,  // ⚡ Frontend vai usar isso!
     };
   }
 
@@ -107,20 +73,7 @@ export class AtendentesController {
     @Body() dto: AtualizarAtendenteDto,
   ) {
     const empresaId = req.user.empresa_id || req.user.empresaId;
-
-    const atendente = await this.atendenteRepo.findOne({
-      where: { id, empresaId },
-    });
-
-    if (!atendente) {
-      return {
-        success: false,
-        message: 'Atendente não encontrado',
-      };
-    }
-
-    Object.assign(atendente, dto);
-    await this.atendenteRepo.save(atendente);
+    const atendente = await this.atendenteService.atualizar(id, dto, empresaId);
 
     return {
       success: true,
@@ -132,19 +85,7 @@ export class AtendentesController {
   @Delete(':id')
   async deletar(@Req() req, @Param('id') id: string) {
     const empresaId = req.user.empresa_id || req.user.empresaId;
-
-    const atendente = await this.atendenteRepo.findOne({
-      where: { id, empresaId },
-    });
-
-    if (!atendente) {
-      return {
-        success: false,
-        message: 'Atendente não encontrado',
-      };
-    }
-
-    await this.atendenteRepo.softDelete(id);
+    await this.atendenteService.deletar(id, empresaId);
 
     return {
       success: true,
@@ -159,20 +100,7 @@ export class AtendentesController {
     @Body() dto: AtualizarStatusAtendenteDto,
   ) {
     const empresaId = req.user.empresa_id || req.user.empresaId;
-
-    const atendente = await this.atendenteRepo.findOne({
-      where: { id, empresaId },
-    });
-
-    if (!atendente) {
-      return {
-        success: false,
-        message: 'Atendente não encontrado',
-      };
-    }
-
-    atendente.status = dto.status as any;
-    await this.atendenteRepo.save(atendente);
+    const atendente = await this.atendenteService.atualizarStatus(id, dto.status, empresaId);
 
     return {
       success: true,
@@ -180,29 +108,5 @@ export class AtendentesController {
       data: atendente,
     };
   }
-
-  // TODO: Reabilitar quando Ticket estiver disponível
-  /*
-  @Get(':id/tickets')
-  async listarTickets(@Req() req, @Param('id') id: string) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
-
-    const tickets = await this.ticketRepo.find({
-      where: {
-        atendenteId: id,
-        empresaId,
-      },
-      relations: ['canal', 'fila'],
-      order: { createdAt: 'DESC' },
-      take: 50,
-    });
-
-    return {
-      success: true,
-      data: tickets,
-      total: tickets.length,
-    };
-  }
-  */
 }
 

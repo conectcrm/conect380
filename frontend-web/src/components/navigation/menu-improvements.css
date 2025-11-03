@@ -101,6 +101,7 @@ nav.sidebar-collapsed {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 60;
+  min-width: 120px;
 }
 
 .tooltip-improved::before {
@@ -113,7 +114,10 @@ nav.sidebar-collapsed {
   border-right-color: #002333;
 }
 
-.sidebar-collapsed .menu-item-improved:hover .tooltip-improved {
+/* Aplicar tooltip hover em elementos com sidebar colapsada */
+.sidebar-collapsed .menu-item-improved:hover .tooltip-improved,
+nav a:hover .tooltip-improved,
+nav .group:hover .tooltip-improved {
   opacity: 1;
   visibility: visible;
   transform: translateY(-50%) translateX(0.25rem);

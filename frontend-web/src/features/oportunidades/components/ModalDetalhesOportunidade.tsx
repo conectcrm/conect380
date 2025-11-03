@@ -1,6 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { Oportunidade, AtualizarOportunidade, EstagioOportunidade, PrioridadeOportunidade } from '../../../types/oportunidades/index';
-import { User, DollarSign, Calendar, Target, Building, X, Edit2, Save, AlertCircle } from 'lucide-react';
+import {
+  Oportunidade,
+  AtualizarOportunidade,
+  EstagioOportunidade,
+  PrioridadeOportunidade,
+  OrigemOportunidade
+} from '../../../types/oportunidades/index';
+import {
+  type LucideIcon,
+  User,
+  DollarSign,
+  Target,
+  Building,
+  X,
+  Edit2,
+  Save,
+  AlertCircle
+} from 'lucide-react';
+
+const asIcon = (IconComponent: LucideIcon) => IconComponent as React.FC<React.SVGProps<SVGSVGElement>>;
+
+const UserIcon = asIcon(User);
+const DollarSignIcon = asIcon(DollarSign);
+const TargetIcon = asIcon(Target);
+const BuildingIcon = asIcon(Building);
+const CloseIcon = asIcon(X);
+const EditIcon = asIcon(Edit2);
+const SaveIcon = asIcon(Save);
+const AlertIcon = asIcon(AlertCircle);
 import { useOportunidades } from '../hooks/useOportunidades';
 
 interface ModalDetalhesOportunidadeProps {
@@ -10,20 +37,31 @@ interface ModalDetalhesOportunidadeProps {
   onUpdateSuccess?: () => void;
 }
 
-const estagiosOptions = [
-  { value: 'lead', label: 'Lead' },
-  { value: 'qualified', label: 'Qualificado' },
-  { value: 'proposal', label: 'Proposta' },
-  { value: 'negotiation', label: 'Negociação' },
-  { value: 'won', label: 'Ganhou' },
-  { value: 'lost', label: 'Perdeu' }
+const estagiosOptions: Array<{ value: EstagioOportunidade; label: string }> = [
+  { value: EstagioOportunidade.LEADS, label: 'Leads' },
+  { value: EstagioOportunidade.QUALIFICACAO, label: 'Qualificação' },
+  { value: EstagioOportunidade.PROPOSTA, label: 'Proposta' },
+  { value: EstagioOportunidade.NEGOCIACAO, label: 'Negociação' },
+  { value: EstagioOportunidade.FECHAMENTO, label: 'Fechamento' },
+  { value: EstagioOportunidade.GANHO, label: 'Ganhou' },
+  { value: EstagioOportunidade.PERDIDO, label: 'Perdeu' }
 ];
 
-const prioridadeOptions = [
-  { value: 'baixa', label: 'Baixa' },
-  { value: 'media', label: 'Média' },
-  { value: 'alta', label: 'Alta' },
-  { value: 'urgente', label: 'Urgente' }
+const prioridadeOptions: Array<{ value: PrioridadeOportunidade; label: string }> = [
+  { value: PrioridadeOportunidade.BAIXA, label: 'Baixa' },
+  { value: PrioridadeOportunidade.MEDIA, label: 'Média' },
+  { value: PrioridadeOportunidade.ALTA, label: 'Alta' }
+];
+
+const origemOptions: Array<{ value: OrigemOportunidade; label: string }> = [
+  { value: OrigemOportunidade.WEBSITE, label: 'Website' },
+  { value: OrigemOportunidade.INDICACAO, label: 'Indicação' },
+  { value: OrigemOportunidade.TELEFONE, label: 'Telefone' },
+  { value: OrigemOportunidade.EMAIL, label: 'Email' },
+  { value: OrigemOportunidade.REDES_SOCIAIS, label: 'Redes Sociais' },
+  { value: OrigemOportunidade.EVENTO, label: 'Evento' },
+  { value: OrigemOportunidade.PARCEIRO, label: 'Parceiro' },
+  { value: OrigemOportunidade.CAMPANHA, label: 'Campanha' }
 ];
 
 export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
@@ -39,15 +77,15 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
     titulo: '',
     descricao: '',
     valor: 0,
-    estagio: 'lead' as EstagioOportunidade,
+    estagio: EstagioOportunidade.LEADS,
     probabilidade: 50,
-    prioridade: 'media' as PrioridadeOportunidade,
+    prioridade: PrioridadeOportunidade.MEDIA,
     nomeContato: '',
     emailContato: '',
     telefoneContato: '',
     empresaContato: '',
     dataFechamentoEsperado: '',
-    origem: '',
+    origem: OrigemOportunidade.WEBSITE,
     observacoes: ''
   });
 
@@ -67,8 +105,10 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
         emailContato: oportunidade.emailContato || '',
         telefoneContato: oportunidade.telefoneContato || '',
         empresaContato: oportunidade.empresaContato || '',
-        dataFechamentoEsperado: oportunidade.dataFechamentoEsperado || '',
-        origem: oportunidade.origem || '',
+        dataFechamentoEsperado: oportunidade.dataFechamentoEsperado
+          ? new Date(oportunidade.dataFechamentoEsperado).toISOString().split('T')[0]
+          : '',
+        origem: oportunidade.origem || OrigemOportunidade.WEBSITE,
         observacoes: oportunidade.observacoes || ''
       });
     }
@@ -109,7 +149,16 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
     }
 
     try {
-      await atualizarOportunidade(formData);
+      const payload: AtualizarOportunidade = {
+        ...formData,
+        dataFechamentoEsperado: formData.dataFechamentoEsperado
+          ? typeof formData.dataFechamentoEsperado === 'string'
+            ? formData.dataFechamentoEsperado
+            : formData.dataFechamentoEsperado.toISOString()
+          : null
+      };
+
+      await atualizarOportunidade(payload);
       setIsEditing(false);
       onUpdateSuccess?.();
     } catch (error) {
@@ -131,8 +180,10 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
         emailContato: oportunidade.emailContato || '',
         telefoneContato: oportunidade.telefoneContato || '',
         empresaContato: oportunidade.empresaContato || '',
-        dataFechamentoEsperado: oportunidade.dataFechamentoEsperado || '',
-        origem: oportunidade.origem || '',
+        dataFechamentoEsperado: oportunidade.dataFechamentoEsperado
+          ? new Date(oportunidade.dataFechamentoEsperado).toISOString().split('T')[0]
+          : '',
+        origem: oportunidade.origem || OrigemOportunidade.WEBSITE,
         observacoes: oportunidade.observacoes || ''
       });
     }
@@ -146,39 +197,47 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
   };
 
   const handleInputChange = (field: keyof AtualizarOportunidade, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    if (field === 'dataFechamentoEsperado') {
+      const coercedValue = value ? String(value) : '';
+      setFormData(prev => ({ ...prev, [field]: coercedValue }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
+
     if (errors[field as string]) {
       setErrors(prev => ({ ...prev, [field as string]: '' }));
     }
   };
 
-  const getPrioridadeColor = (prioridade: string) => {
+  const getPrioridadeColor = (prioridade: PrioridadeOportunidade) => {
     switch (prioridade) {
-      case 'baixa':
+      case PrioridadeOportunidade.BAIXA:
         return 'bg-green-100 text-green-800';
-      case 'media':
+      case PrioridadeOportunidade.MEDIA:
         return 'bg-yellow-100 text-yellow-800';
-      case 'alta':
+      case PrioridadeOportunidade.ALTA:
         return 'bg-orange-100 text-orange-800';
-      case 'urgente':
-        return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getEstagioColor = (estagio: string) => {
+  const getEstagioColor = (estagio: EstagioOportunidade) => {
     switch (estagio) {
-      case 'won':
+      case EstagioOportunidade.GANHO:
         return 'bg-green-100 text-green-800';
-      case 'lost':
+      case EstagioOportunidade.PERDIDO:
         return 'bg-red-100 text-red-800';
-      case 'negotiation':
+      case EstagioOportunidade.NEGOCIACAO:
         return 'bg-orange-100 text-orange-800';
-      case 'proposal':
+      case EstagioOportunidade.PROPOSTA:
         return 'bg-blue-100 text-blue-800';
-      case 'qualified':
+      case EstagioOportunidade.QUALIFICACAO:
         return 'bg-purple-100 text-purple-800';
+      case EstagioOportunidade.LEADS:
+        return 'bg-gray-100 text-gray-800';
+      case EstagioOportunidade.FECHAMENTO:
+        return 'bg-indigo-100 text-indigo-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -190,7 +249,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={handleClose} />
-        
+
         <div className="inline-block w-full max-w-4xl px-6 py-4 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-3">
@@ -202,7 +261,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                   onClick={() => setIsEditing(true)}
                   className="flex items-center px-3 py-1 text-sm text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100"
                 >
-                  <Edit2 className="w-4 h-4 mr-1" />
+                  <EditIcon className="w-4 h-4 mr-1" />
                   Editar
                 </button>
               )}
@@ -211,7 +270,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
               onClick={handleClose}
               className="text-gray-400 hover:text-gray-600"
             >
-              <X className="w-6 h-6" />
+              <CloseIcon className="w-6 h-6" />
             </button>
           </div>
 
@@ -219,10 +278,10 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
             {/* Informações Básicas */}
             <div className="space-y-4">
               <h4 className="text-lg font-medium text-gray-900 flex items-center">
-                <Target className="w-5 h-5 mr-2" />
+                <TargetIcon className="w-5 h-5 mr-2" />
                 Informações Básicas
               </h4>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -242,7 +301,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                     <p className="text-gray-900">{oportunidade.titulo}</p>
                   )}
                 </div>
-                
+
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Descrição
@@ -264,10 +323,10 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
             {/* Informações de Venda */}
             <div className="space-y-4">
               <h4 className="text-lg font-medium text-gray-900 flex items-center">
-                <DollarSign className="w-5 h-5 mr-2" />
+                <DollarSignIcon className="w-5 h-5 mr-2" />
                 Informações de Venda
               </h4>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -289,7 +348,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                     <p className="text-lg font-semibold text-green-600">{oportunidade.valorFormatado}</p>
                   )}
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Estágio
@@ -312,7 +371,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                     </span>
                   )}
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Probabilidade
@@ -332,8 +391,8 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                   ) : (
                     <div className="flex items-center">
                       <div className="w-full bg-gray-200 rounded-full h-2 mr-2">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full" 
+                        <div
+                          className="bg-blue-600 h-2 rounded-full"
                           style={{ width: `${oportunidade.probabilidade}%` }}
                         />
                       </div>
@@ -342,7 +401,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                   )}
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -366,7 +425,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                     </span>
                   )}
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Data de Fechamento Esperada
@@ -374,13 +433,17 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                   {isEditing ? (
                     <input
                       type="date"
-                      value={formData.dataFechamentoEsperado}
+                      value={formData.dataFechamentoEsperado
+                        ? typeof formData.dataFechamentoEsperado === 'string'
+                          ? formData.dataFechamentoEsperado
+                          : new Date(formData.dataFechamentoEsperado).toISOString().split('T')[0]
+                        : ''}
                       onChange={(e) => handleInputChange('dataFechamentoEsperado', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   ) : (
                     <p className="text-gray-900">
-                      {oportunidade.dataFechamentoEsperado 
+                      {oportunidade.dataFechamentoEsperado
                         ? new Date(oportunidade.dataFechamentoEsperado).toLocaleDateString('pt-BR')
                         : 'Não informado'
                       }
@@ -393,10 +456,10 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
             {/* Informações de Contato */}
             <div className="space-y-4">
               <h4 className="text-lg font-medium text-gray-900 flex items-center">
-                <User className="w-5 h-5 mr-2" />
+                <UserIcon className="w-5 h-5 mr-2" />
                 Informações de Contato
               </h4>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -416,7 +479,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                     <p className="text-gray-900">{oportunidade.nomeContato || 'Não informado'}</p>
                   )}
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Email do Contato
@@ -435,7 +498,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                     <p className="text-gray-900">{oportunidade.emailContato || 'Não informado'}</p>
                   )}
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Telefone
@@ -451,7 +514,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                     <p className="text-gray-900">{oportunidade.telefoneContato || 'Não informado'}</p>
                   )}
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Empresa
@@ -473,27 +536,36 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
             {/* Informações Adicionais */}
             <div className="space-y-4">
               <h4 className="text-lg font-medium text-gray-900 flex items-center">
-                <Building className="w-5 h-5 mr-2" />
+                <BuildingIcon className="w-5 h-5 mr-2" />
                 Informações Adicionais
               </h4>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Origem
                   </label>
                   {isEditing ? (
-                    <input
-                      type="text"
+                    <select
                       value={formData.origem}
-                      onChange={(e) => handleInputChange('origem', e.target.value)}
+                      onChange={(e) => handleInputChange('origem', e.target.value as OrigemOportunidade)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    >
+                      {origemOptions.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
                   ) : (
-                    <p className="text-gray-900">{oportunidade.origem || 'Não informado'}</p>
+                    <p className="text-gray-900">
+                      {oportunidade.origem
+                        ? origemOptions.find(option => option.value === oportunidade.origem)?.label || oportunidade.origem
+                        : 'Não informado'}
+                    </p>
                   )}
                 </div>
-                
+
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Observações
@@ -523,13 +595,17 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                 <div>
                   <span className="text-gray-500">Criado em:</span>
                   <p className="font-medium">
-                    {new Date(oportunidade.criadoEm).toLocaleDateString('pt-BR')}
+                    {oportunidade.criadoEm
+                      ? new Date(oportunidade.criadoEm).toLocaleDateString('pt-BR')
+                      : 'Não informado'}
                   </p>
                 </div>
                 <div>
                   <span className="text-gray-500">Atualizado em:</span>
                   <p className="font-medium">
-                    {new Date(oportunidade.atualizadoEm).toLocaleDateString('pt-BR')}
+                    {oportunidade.atualizadoEm
+                      ? new Date(oportunidade.atualizadoEm).toLocaleDateString('pt-BR')
+                      : 'Não informado'}
                   </p>
                 </div>
               </div>
@@ -553,7 +629,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                     disabled={loading}
                     className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                   >
-                    <Save className="w-4 h-4 mr-1" />
+                    <SaveIcon className="w-4 h-4 mr-1" />
                     {loading ? 'Salvando...' : 'Salvar Alterações'}
                   </button>
                 </>

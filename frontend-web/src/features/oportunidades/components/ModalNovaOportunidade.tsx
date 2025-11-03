@@ -1,6 +1,20 @@
 import React, { useState } from 'react';
 import { NovaOportunidade, EstagioOportunidade, PrioridadeOportunidade, OrigemOportunidade } from '../../../types/oportunidades/index';
-import { User, DollarSign, Target, Building, X } from 'lucide-react';
+import {
+  type LucideIcon,
+  User,
+  DollarSign,
+  Target,
+  Building,
+  X
+} from 'lucide-react';
+
+const asIcon = (IconComponent: LucideIcon) => IconComponent as React.FC<React.SVGProps<SVGSVGElement>>;
+const TargetIcon = asIcon(Target);
+const DollarSignIcon = asIcon(DollarSign);
+const UserIcon = asIcon(User);
+const BuildingIcon = asIcon(Building);
+const CloseIcon = asIcon(X);
 import { useOportunidades } from '../hooks/useOportunidades';
 
 interface ModalNovaOportunidadeProps {
@@ -11,7 +25,7 @@ interface ModalNovaOportunidadeProps {
 export const ModalNovaOportunidade: React.FC<ModalNovaOportunidadeProps> = ({ isOpen, onClose }) => {
   const { criarOportunidade } = useOportunidades();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const [formData, setFormData] = useState<NovaOportunidade>({
     titulo: '',
     descricao: '',
@@ -97,7 +111,7 @@ export const ModalNovaOportunidade: React.FC<ModalNovaOportunidadeProps> = ({ is
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100"
           >
-            <X className="w-5 h-5" />
+            <CloseIcon className="w-5 h-5" />
           </button>
         </div>
 
@@ -105,10 +119,10 @@ export const ModalNovaOportunidade: React.FC<ModalNovaOportunidadeProps> = ({ is
           {/* Informações Básicas */}
           <div className="bg-gray-50 p-4 rounded-lg">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-              <Target className="w-5 h-5 mr-2 text-blue-600" />
+              <TargetIcon className="w-5 h-5 mr-2 text-blue-600" />
               Informações da Oportunidade
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -129,7 +143,7 @@ export const ModalNovaOportunidade: React.FC<ModalNovaOportunidadeProps> = ({ is
                   Valor Estimado *
                 </label>
                 <div className="relative">
-                  <DollarSign className="w-5 h-5 absolute left-3 top-2.5 text-gray-400" />
+                  <DollarSignIcon className="w-5 h-5 absolute left-3 top-2.5 text-gray-400" />
                   <input
                     type="text"
                     required
@@ -240,10 +254,10 @@ export const ModalNovaOportunidade: React.FC<ModalNovaOportunidadeProps> = ({ is
           {/* Informações do Cliente */}
           <div className="bg-gray-50 p-4 rounded-lg">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-              <User className="w-5 h-5 mr-2 text-green-600" />
+              <UserIcon className="w-5 h-5 mr-2 text-green-600" />
               Informações do Cliente
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -264,7 +278,7 @@ export const ModalNovaOportunidade: React.FC<ModalNovaOportunidadeProps> = ({ is
                   Empresa
                 </label>
                 <div className="relative">
-                  <Building className="w-5 h-5 absolute left-3 top-2.5 text-gray-400" />
+                  <BuildingIcon className="w-5 h-5 absolute left-3 top-2.5 text-gray-400" />
                   <input
                     type="text"
                     value={formData.empresaContato}

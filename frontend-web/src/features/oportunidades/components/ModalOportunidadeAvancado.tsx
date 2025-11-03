@@ -174,7 +174,9 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
       telefoneContato: oportunidade?.telefoneContato || '',
       empresaContato: oportunidade?.empresaContato || '',
       tags: oportunidade?.tags || [],
-      dataFechamentoEsperado: oportunidade?.dataFechamentoEsperado || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      dataFechamentoEsperado: oportunidade?.dataFechamentoEsperado
+        ? new Date(oportunidade.dataFechamentoEsperado)
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
     },
     mode: 'onChange'
   });
