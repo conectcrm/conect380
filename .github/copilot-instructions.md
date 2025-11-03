@@ -66,6 +66,173 @@ className="border-[#B4BEC9]"       # Crevasse-1 border
 className="bg-[#DEEFE7]"           # Crevasse-4 background soft
 ```
 
+---
+
+## 🚫 PREVENÇÃO DE DUPLICAÇÕES (CRÍTICO)
+
+### ⚠️ REGRAS ANTI-DUPLICAÇÃO
+
+**NUNCA** duplique código ao editar arquivos! Siga estas regras **RIGOROSAMENTE**:
+
+#### 1. **SEMPRE Ler Arquivo Completo ANTES de Editar**
+
+```typescript
+// ❌ ERRADO - Editar sem ler
+replace_string_in_file() // Sem contexto completo = risco de duplicar!
+
+// ✅ CORRETO - Ler primeiro
+read_file() // Ver conteúdo completo
+// Analisar o que JÁ existe
+// SÓ ENTÃO editar
+```
+
+#### 2. **Usar grep_search Para Verificar Existência**
+
+```bash
+# ✅ ANTES de adicionar rota nova:
+grep_search("path=\"/nuclei/configuracoes/empresas\"")
+
+# ✅ ANTES de adicionar import:
+grep_search("import.*EmpresasListPage")
+
+# ✅ ANTES de adicionar função:
+grep_search("function handleSave|const handleSave")
+```
+
+#### 3. **Incluir Contexto Suficiente no replace_string_in_file**
+
+```typescript
+// ❌ ERRADO - Contexto insuficiente (pode duplicar!)
+oldString: "<Route path=\"/nuclei/configuracoes/empresas\" />"
+// Problema: Pode haver múltiplas rotas similares!
+
+// ✅ CORRETO - Contexto de 3-5 linhas
+oldString: `
+          <Route path="/gestao/nucleos" element={...} />
+          <Route path="/nuclei/configuracoes/empresas" element={...} />
+          <Route path="/gestao/fluxos" element={...} />
+`
+// Contexto único: IMPOSSÍVEL duplicar!
+```
+
+#### 4. **Verificar Após Edição (Smoke Test)**
+
+```typescript
+// ✅ Após replace_string_in_file, SEMPRE:
+grep_search("nuclei/configuracoes/empresas") // Deve retornar APENAS 1 ocorrência!
+
+// Se retornar 2+ ocorrências = DUPLICAÇÃO ACIDENTAL
+// Reverter e editar novamente com mais contexto
+```
+
+#### 5. **Checklist Obrigatório ANTES de replace_string_in_file**
+
+- [ ] Li o arquivo completo com `read_file()`?
+- [ ] Verifiquei se linha/bloco já existe com `grep_search()`?
+- [ ] Inclui **3-5 linhas** de contexto antes E depois?
+- [ ] Garanti que `oldString` é **ÚNICO** no arquivo?
+- [ ] Testei mentalmente se outro bloco similar poderia dar match?
+
+### 🎯 Exemplos Práticos de Duplicação e Como Evitar
+
+#### Exemplo 1: Rotas Duplicadas (App.tsx)
+
+```typescript
+// ❌ PROBLEMA COMUM:
+// Ao adicionar rota nova, acabou duplicando uma existente
+
+// ANTES (arquivo original):
+<Route path="/nuclei/configuracoes/empresas" element={<EmpresasListPage />} />
+
+// TENTATIVA DE ADICIONAR USUÁRIOS:
+<Route path="/nuclei/configuracoes/empresas" element={<EmpresasListPage />} /> // DUPLICOU!
+<Route path="/nuclei/configuracoes/usuarios" element={<GestaoUsuariosPage />} />
+
+// ✅ SOLUÇÃO - Usar contexto único:
+oldString: `
+          <Route path="/gestao/nucleos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoNucleosPage />)} />
+          <Route path="/gestao/fluxos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoFluxosPage />)} />
+`
+
+newString: `
+          <Route path="/gestao/nucleos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoNucleosPage />)} />
+          <Route path="/nuclei/configuracoes/usuarios" element={<GestaoUsuariosPage />} />
+          <Route path="/gestao/fluxos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoFluxosPage />)} />
+`
+```
+
+#### Exemplo 2: Menu Items Duplicados (menuConfig.ts)
+
+```typescript
+// ❌ PROBLEMA:
+// Menu item "Usuários" aparece 2x (Configurações e Gestão)
+
+// ✅ PREVENÇÃO:
+// 1. Ler menuConfig completo
+read_file("menuConfig.ts", 1, 500)
+
+// 2. Buscar todas ocorrências
+grep_search("id.*usuarios|title.*'Usuários'")
+
+// 3. Analisar TODAS as ocorrências encontradas
+// 4. SÓ ENTÃO editar com contexto do bloco correto
+```
+
+#### Exemplo 3: Imports Duplicados
+
+```typescript
+// ❌ PROBLEMA COMUM:
+import { EmpresasListPage } from './pages/EmpresasListPage';
+// ... 200 linhas depois ...
+import { EmpresasListPage } from './pages/EmpresasListPage'; // DUPLICOU!
+
+// ✅ PREVENÇÃO:
+grep_search("import.*EmpresasListPage") // ANTES de adicionar
+// Se retornar resultado = JÁ EXISTE, não adicionar!
+```
+
+### 🔧 Comandos de Verificação Pós-Edição
+
+```bash
+# Após editar App.tsx (rotas):
+grep_search("Route path=\"/nuclei/configuracoes/empresas\"")
+# Espera: 1 ocorrência ✅
+# Se >1: DUPLICAÇÃO ❌ - reverter!
+
+# Após editar menuConfig.ts:
+grep_search("id: 'configuracoes-usuarios'")
+# Espera: 1 ocorrência ✅
+
+# Após adicionar import:
+grep_search("import.*GestaoUsuariosPage")
+# Espera: 1 ocorrência ✅
+```
+
+### 📋 Checklist Final Anti-Duplicação
+
+Antes de **qualquer** `replace_string_in_file`:
+
+1. ✅ **LER**: `read_file()` para ver arquivo completo
+2. ✅ **BUSCAR**: `grep_search()` para verificar se já existe
+3. ✅ **CONTEXTUALIZAR**: Incluir 3-5 linhas antes/depois no `oldString`
+4. ✅ **VALIDAR**: Confirmar que `oldString` é ÚNICO no arquivo
+5. ✅ **TESTAR**: Após edição, `grep_search()` novamente para contar ocorrências
+6. ✅ **CONFIRMAR**: Se >1 ocorrência do mesmo elemento = REVERTER e refazer!
+
+### 🚨 Sinais de Alerta de Duplicação
+
+**PARE imediatamente** se você notar:
+
+- ❌ Mesma rota aparecendo 2x no resultado de `grep_search`
+- ❌ Mesmo import aparecendo 2x
+- ❌ Mesmo menu item com IDs diferentes
+- ❌ Código idêntico em blocos diferentes
+- ❌ `replace_string_in_file` retornou "success" mas linha ainda existe 2x
+
+**AÇÃO**: Reverter com git, ler arquivo completo, refazer com mais contexto!
+
+---
+
 ## 🚀 Templates Base para Novas Telas
 
 ### Regra Principal
