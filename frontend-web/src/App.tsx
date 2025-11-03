@@ -143,14 +143,14 @@ const AppRoutes: React.FC = () => {
           {/* Rotas administrativas do sistema - Protegidas */}
           <Route path="/admin/empresas" element={protegerRota(ModuloEnum.ADMINISTRACAO, <EmpresasListPage />)} />
           <Route path="/gestao/empresas" element={protegerRota(ModuloEnum.ADMINISTRACAO, <EmpresasListPage />)} />
-          <Route path="/gestao/usuarios" element={<UsuariosPage />} /> {/* Base platform */}
           <Route path="/gestao/nucleos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoNucleosPage />)} />
           <Route path="/gestao/fluxos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoFluxosPage />)} />
           <Route path="/gestao/fluxos/:id/builder" element={protegerRota(ModuloEnum.ATENDIMENTO, <FluxoBuilderPage />)} />
           <Route path="/gestao/fluxos/novo/builder" element={protegerRota(ModuloEnum.ATENDIMENTO, <FluxoBuilderPage />)} />
           <Route path="/gestao/equipes" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoEquipesPage />)} />
           <Route path="/gestao/atendentes" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoAtendentesPage />)} />
-          <Route path="/gestao/usuarios" element={<GestaoUsuariosPage />} /> {/* Base platform */}
+          <Route path="/nuclei/configuracoes/usuarios" element={<GestaoUsuariosPage />} /> {/* Base platform - Nova rota */}
+          <Route path="/gestao/usuarios" element={<UsuariosPage />} /> {/* DEPRECATED - Manter por compatibilidade */}
           <Route path="/gestao/atribuicoes" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoAtribuicoesPage />)} />
           <Route path="/gestao/departamentos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoDepartamentosPage />)} />
 

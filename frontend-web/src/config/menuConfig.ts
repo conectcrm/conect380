@@ -381,7 +381,7 @@ export const menuConfig: MenuConfig[] = [
         id: 'configuracoes-usuarios',
         title: 'Usuários',
         icon: UserCog,
-        href: '/gestao/usuarios',
+        href: '/nuclei/configuracoes/usuarios',
         color: 'purple'
       },
       // ❌ REMOVIDO: 'Núcleos' - Owner é Atendimento (não é config global)
