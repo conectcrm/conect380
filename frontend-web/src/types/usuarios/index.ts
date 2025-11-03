@@ -5,6 +5,13 @@ export enum UserRole {
   USER = 'user',
 }
 
+export enum StatusAtendente {
+  DISPONIVEL = 'DISPONIVEL',
+  OCUPADO = 'OCUPADO',
+  AUSENTE = 'AUSENTE',
+  OFFLINE = 'OFFLINE',
+}
+
 export interface Usuario {
   id: string;
   nome: string;
@@ -31,6 +38,10 @@ export interface Usuario {
     nome: string;
     slug: string;
   };
+  // Campos específicos para atendentes (quando permissoes inclui 'ATENDIMENTO')
+  status_atendente?: StatusAtendente;
+  capacidade_maxima?: number;
+  tickets_ativos?: number;
 }
 
 export interface NovoUsuario {
@@ -105,4 +116,18 @@ export const ROLE_COLORS: Record<UserRole, string> = {
   [UserRole.MANAGER]: 'bg-blue-100 text-blue-800',
   [UserRole.VENDEDOR]: 'bg-green-100 text-green-800',
   [UserRole.USER]: 'bg-gray-100 text-gray-800',
+};
+
+export const STATUS_ATENDENTE_LABELS: Record<StatusAtendente, string> = {
+  [StatusAtendente.DISPONIVEL]: 'Disponível',
+  [StatusAtendente.OCUPADO]: 'Ocupado',
+  [StatusAtendente.AUSENTE]: 'Ausente',
+  [StatusAtendente.OFFLINE]: 'Offline',
+};
+
+export const STATUS_ATENDENTE_COLORS: Record<StatusAtendente, string> = {
+  [StatusAtendente.DISPONIVEL]: 'bg-green-100 text-green-800',
+  [StatusAtendente.OCUPADO]: 'bg-yellow-100 text-yellow-800',
+  [StatusAtendente.AUSENTE]: 'bg-orange-100 text-orange-800',
+  [StatusAtendente.OFFLINE]: 'bg-gray-100 text-gray-800',
 };

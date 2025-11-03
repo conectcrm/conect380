@@ -99,6 +99,12 @@ class UsuariosService {
     return this.formatarUsuario(response.data.data);
   }
 
+  // Listar usuários com permissão de atendimento
+  async listarAtendentes(): Promise<Usuario[]> {
+    const response = await this.api.get('/atendentes');
+    return response.data.data.map((usuario: any) => this.formatarUsuario(usuario));
+  }
+
   // Buscar usuários da equipe/empresa
   async buscarUsuariosEquipe(): Promise<User[]> {
     try {
