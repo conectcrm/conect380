@@ -4,15 +4,40 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { CustomLogger } from './common/logger/custom-logger';
 import * as express from 'express';
+import * as fs from 'fs';
+import * as path from 'path';
 
 async function bootstrap() {
   const customLogger = new CustomLogger();
-  
+
   console.log('🚀 [NestJS] Iniciando aplicação...');
 
   try {
+    // Configuração HTTPS (se habilitado)
+    const sslEnabled = process.env.SSL_ENABLED === 'true';
+    let httpsOptions;
+
+    if (sslEnabled) {
+      const certPath = process.env.SSL_CERT_PATH || path.join(__dirname, '../../certs/cert.pem');
+      const keyPath = process.env.SSL_KEY_PATH || path.join(__dirname, '../../certs/key.pem');
+
+      if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+        httpsOptions = {
+          cert: fs.readFileSync(certPath),
+          key: fs.readFileSync(keyPath),
+        };
+        console.log('🔐 [SSL] HTTPS habilitado');
+        console.log(`   Certificado: ${certPath}`);
+        console.log(`   Chave: ${keyPath}`);
+      } else {
+        console.warn('⚠️  [SSL] Certificados não encontrados. Usando HTTP.');
+        console.warn(`   Esperado: ${certPath} e ${keyPath}`);
+      }
+    }
+
     const app = await NestFactory.create(AppModule, {
       logger: customLogger,
+      httpsOptions,
     });
     console.log('✅ [NestJS] AppModule criado com sucesso');
 
@@ -91,8 +116,15 @@ async function bootstrap() {
     const port = process.env.APP_PORT || 3001;
     await app.listen(port);
 
-    console.log(`🚀 Conect CRM Backend rodando na porta ${port}`);
-    console.log(`📖 Documentação disponível em: http://localhost:${port}/api-docs`);
+    const protocol = sslEnabled && httpsOptions ? 'https' : 'http';
+    console.log(`🚀 Conect CRM Backend rodando na porta ${port} (${protocol.toUpperCase()})`);
+    console.log(`📖 Documentação disponível em: ${protocol}://localhost:${port}/api-docs`);
+    
+    if (sslEnabled && httpsOptions) {
+      console.log(`🔐 Conexão segura HTTPS ativada`);
+    } else if (sslEnabled) {
+      console.log(`⚠️  SSL_ENABLED=true mas certificados não encontrados`);
+    }
   } catch (error) {
     console.error('❌ [NestJS] Erro ao inicializar aplicação:', error);
     throw error;

@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { HttpsRedirectMiddleware } from './common/middleware/https-redirect.middleware';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { ClientesModule } from './modules/clientes/clientes.module';
@@ -94,6 +95,11 @@ import { BullModule } from '@nestjs/bull';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
+    // 🔒 HTTPS Redirect (Força HTTPS em produção)
+    consumer
+      .apply(HttpsRedirectMiddleware)
+      .forRoutes('*');
+
     // 🔒 CRÍTICO: Middleware de Tenant Context (Multi-Tenancy)
     // Define automaticamente o empresaId no PostgreSQL para RLS funcionar
     consumer
