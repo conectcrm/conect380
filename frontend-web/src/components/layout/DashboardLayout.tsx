@@ -54,7 +54,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   // ⚡ LICENCIAMENTO: Filtrar menu baseado nos módulos ativos
   const menuFiltrado = useMemo(() => {
     if (loadingModulos) return []; // Não mostrar menu enquanto carrega
-    return getMenuParaEmpresa(menuConfig, modulosAtivos);
+    return getMenuParaEmpresa(modulosAtivos);
   }, [modulosAtivos, loadingModulos]);
 
   // Verificação se é admin
@@ -274,7 +274,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
   // Estados para funcionalidades da barra superior
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [showUserMenu, setShowUserMenu] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [showCompanySelector, setShowCompanySelector] = useState(false);
 

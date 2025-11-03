@@ -16,15 +16,38 @@ import { UpdateEmpresaModuloDto } from '../dto/update-empresa-modulo.dto';
 import { ModuloEnum, PlanoEnum } from '../entities/empresa-modulo.entity';
 
 @Controller('empresas/modulos')
-@UseGuards(JwtAuthGuard)
 export class EmpresaModuloController {
-  constructor(private readonly empresaModuloService: EmpresaModuloService) {}
+  constructor(private readonly empresaModuloService: EmpresaModuloService) { }
+
+  /**
+   * POST /empresas/modulos/seed-all-public
+   * [TEMPORÁRIO] Popular módulos para TODAS as empresas com plano ENTERPRISE
+   * ⚠️ SEM AUTENTICAÇÃO - Apenas para setup inicial
+   * ⚠️ REMOVER ESTE ENDPOINT após uso
+   */
+  @Post('seed-all-public')
+  async seedAllEmpresasPublic() {
+    try {
+      const result = await this.empresaModuloService.seedAllEmpresas();
+      return {
+        success: true,
+        message: 'Todas as empresas foram configuradas com plano ENTERPRISE',
+        data: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
 
   /**
    * GET /empresas/modulos/ativos
    * Lista módulos ativos da empresa do usuário logado
    */
   @Get('ativos')
+  @UseGuards(JwtAuthGuard)
   async listarModulosAtivos(@Request() req) {
     const empresa_id = req.user.empresa_id;
     const modulos = await this.empresaModuloService.listarModulosAtivos(empresa_id);
@@ -40,6 +63,7 @@ export class EmpresaModuloController {
    * Lista todos os módulos da empresa (ativos e inativos)
    */
   @Get()
+  @UseGuards(JwtAuthGuard)
   async listar(@Request() req) {
     const empresa_id = req.user.empresa_id;
     const modulos = await this.empresaModuloService.listar(empresa_id);
@@ -55,6 +79,7 @@ export class EmpresaModuloController {
    * Verifica se empresa tem módulo ativo
    */
   @Get('verificar/:modulo')
+  @UseGuards(JwtAuthGuard)
   async verificarModulo(@Request() req, @Param('modulo') modulo: ModuloEnum) {
     const empresa_id = req.user.empresa_id;
     const ativo = await this.empresaModuloService.isModuloAtivo(empresa_id, modulo);
@@ -85,6 +110,7 @@ export class EmpresaModuloController {
    * Ativa módulo para empresa
    */
   @Post('ativar')
+  @UseGuards(JwtAuthGuard)
   async ativarModulo(@Request() req, @Body() dto: CreateEmpresaModuloDto) {
     const empresa_id = req.user.empresa_id;
     const modulo = await this.empresaModuloService.ativar(empresa_id, dto);
@@ -101,6 +127,7 @@ export class EmpresaModuloController {
    * Desativa módulo da empresa
    */
   @Delete(':modulo')
+  @UseGuards(JwtAuthGuard)
   async desativarModulo(@Request() req, @Param('modulo') modulo: ModuloEnum) {
     const empresa_id = req.user.empresa_id;
     await this.empresaModuloService.desativar(empresa_id, modulo);
@@ -116,6 +143,7 @@ export class EmpresaModuloController {
    * Atualiza dados do módulo
    */
   @Patch(':modulo')
+  @UseGuards(JwtAuthGuard)
   async atualizarModulo(
     @Request() req,
     @Param('modulo') modulo: ModuloEnum,
@@ -136,6 +164,7 @@ export class EmpresaModuloController {
    * Ativa plano completo (Starter, Business, Enterprise)
    */
   @Post('plano/:plano')
+  @UseGuards(JwtAuthGuard)
   async ativarPlano(@Request() req, @Param('plano') plano: PlanoEnum) {
     const empresa_id = req.user.empresa_id;
     await this.empresaModuloService.ativarPlano(empresa_id, plano);

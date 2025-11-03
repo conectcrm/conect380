@@ -10,7 +10,7 @@ export class EmpresaModuloService {
   constructor(
     @InjectRepository(EmpresaModulo)
     private readonly empresaModuloRepository: Repository<EmpresaModulo>,
-  ) {}
+  ) { }
 
   /**
    * Verifica se empresa tem módulo ativo
@@ -228,5 +228,60 @@ export class EmpresaModuloService {
     return Object.keys(planoCounts).sort(
       (a, b) => planoCounts[b as PlanoEnum] - planoCounts[a as PlanoEnum],
     )[0] as PlanoEnum;
+  }
+
+  /**
+   * [TEMPORÁRIO] Popula módulos para TODAS as empresas com plano ENTERPRISE
+   * ⚠️ Método de migração - remover após uso inicial
+   */
+  async seedAllEmpresas(): Promise<any> {
+    try {
+      // Buscar todas as empresas
+      const empresas = await this.empresaModuloRepository.query(
+        'SELECT id, nome FROM empresas'
+      );
+
+      const modulos = Object.values(ModuloEnum);
+      const results = [];
+
+      for (const empresa of empresas) {
+        for (const modulo of modulos) {
+          // Verificar se já existe
+          const existe = await this.empresaModuloRepository.findOne({
+            where: { empresa_id: empresa.id, modulo },
+          });
+
+          if (!existe) {
+            // Criar novo registro
+            const novoModulo = this.empresaModuloRepository.create({
+              empresa_id: empresa.id,
+              modulo,
+              ativo: true,
+              plano: PlanoEnum.ENTERPRISE,
+              data_ativacao: new Date(),
+            });
+            await this.empresaModuloRepository.save(novoModulo);
+            results.push({ empresa: empresa.nome, modulo, status: 'criado' });
+          } else {
+            // Atualizar para ENTERPRISE e ativo
+            await this.empresaModuloRepository.update(existe.id, {
+              ativo: true,
+              plano: PlanoEnum.ENTERPRISE,
+            });
+            results.push({ empresa: empresa.nome, modulo, status: 'atualizado' });
+          }
+        }
+      }
+
+      return {
+        total_empresas: empresas.length,
+        total_modulos: modulos.length,
+        total_registros: results.length,
+        detalhes: results,
+      };
+    } catch (error) {
+      console.error('Erro ao popular módulos:', error);
+      throw new BadRequestException(`Erro ao popular módulos: ${error.message}`);
+    }
   }
 }
