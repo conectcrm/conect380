@@ -137,6 +137,12 @@ jobs:
         env:
           CI: true
       
+      - name: 🎨 Validar tema Crevasse
+        working-directory: frontend-web
+        run: npm test -- theme-validation.test.ts --watchAll=false
+        env:
+          CI: true
+      
       - name: 📊 Upload coverage para Codecov
         uses: codecov/codecov-action@v3
         with:
