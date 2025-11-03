@@ -2,13 +2,18 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { CustomLogger } from './common/logger/custom-logger';
 import * as express from 'express';
 
 async function bootstrap() {
+  const customLogger = new CustomLogger();
+  
   console.log('🚀 [NestJS] Iniciando aplicação...');
 
   try {
-    const app = await NestFactory.create(AppModule);
+    const app = await NestFactory.create(AppModule, {
+      logger: customLogger,
+    });
     console.log('✅ [NestJS] AppModule criado com sucesso');
 
     // Listar todas as rotas registradas
