@@ -374,7 +374,7 @@ export const menuConfig: MenuConfig[] = [
         id: 'configuracoes-empresa',
         title: 'Empresa',
         icon: Building2,
-        href: '/configuracoes/empresa',
+        href: '/nuclei/configuracoes/empresas',
         color: 'purple'
       },
       {
@@ -390,21 +390,21 @@ export const menuConfig: MenuConfig[] = [
         id: 'configuracoes-integracoes',
         title: 'Integrações',
         icon: Zap,
-        href: '/configuracoes/integracoes',
+        href: '/nuclei/configuracoes/integracoes',
         color: 'purple'
       },
       {
         id: 'configuracoes-chatwoot',
         title: 'Chatwoot',
         icon: MessageSquare,
-        href: '/configuracoes/chatwoot',
+        href: '/nuclei/configuracoes/chatwoot',
         color: 'purple'
       },
       {
         id: 'configuracoes-notificacoes',
         title: 'Notificações',
         icon: Bell,
-        href: '/configuracoes/notificacoes',
+        href: '/nuclei/configuracoes/notificacoes',
         color: 'purple'
       },
       {

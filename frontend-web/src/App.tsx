@@ -142,15 +142,12 @@ const AppRoutes: React.FC = () => {
 
           {/* Rotas administrativas do sistema - Protegidas */}
           <Route path="/admin/empresas" element={protegerRota(ModuloEnum.ADMINISTRACAO, <EmpresasListPage />)} />
-          <Route path="/gestao/empresas" element={protegerRota(ModuloEnum.ADMINISTRACAO, <EmpresasListPage />)} />
           <Route path="/gestao/nucleos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoNucleosPage />)} />
           <Route path="/gestao/fluxos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoFluxosPage />)} />
           <Route path="/gestao/fluxos/:id/builder" element={protegerRota(ModuloEnum.ATENDIMENTO, <FluxoBuilderPage />)} />
           <Route path="/gestao/fluxos/novo/builder" element={protegerRota(ModuloEnum.ATENDIMENTO, <FluxoBuilderPage />)} />
           <Route path="/gestao/equipes" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoEquipesPage />)} />
           <Route path="/gestao/atendentes" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoAtendentesPage />)} />
-          <Route path="/nuclei/configuracoes/usuarios" element={<GestaoUsuariosPage />} /> {/* Base platform - Nova rota */}
-          <Route path="/gestao/usuarios" element={<UsuariosPage />} /> {/* DEPRECATED - Manter por compatibilidade */}
           <Route path="/gestao/atribuicoes" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoAtribuicoesPage />)} />
           <Route path="/gestao/departamentos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoDepartamentosPage />)} />
 
@@ -252,13 +249,26 @@ const AppRoutes: React.FC = () => {
           <Route path="/empresas/:empresaId/permissoes" element={<SistemaPermissoesPage />} />
           <Route path="/empresas/:empresaId/backup" element={<BackupSincronizacaoPage />} />
 
-          {/* Configurações globais da empresa ativa */}
-          <Route path="/configuracoes/empresa" element={<ConfiguracaoEmpresaPage />} />
-          <Route path="/configuracoes/email" element={<ConfiguracaoEmailPage />} />
-          <Route path="/configuracoes/chatwoot" element={<ChatwootConfiguracao />} />
-          <Route path="/configuracoes/metas" element={<MetasConfiguracao />} />
-          <Route path="/configuracoes/integracoes" element={<IntegracoesPage />} />
-          <Route path="/configuracoes/departamentos" element={<DepartamentosPage />} />
+          {/* Configurações globais da empresa ativa - Padrão consolidado */}
+          <Route path="/nuclei/configuracoes/empresas" element={protegerRota(ModuloEnum.ADMINISTRACAO, <EmpresasListPage />)} />
+          <Route path="/nuclei/configuracoes/usuarios" element={<GestaoUsuariosPage />} />
+          <Route path="/nuclei/configuracoes/empresa" element={<ConfiguracaoEmpresaPage />} />
+          <Route path="/nuclei/configuracoes/email" element={<ConfiguracaoEmailPage />} />
+          <Route path="/nuclei/configuracoes/chatwoot" element={<ChatwootConfiguracao />} />
+          <Route path="/nuclei/configuracoes/metas" element={<MetasConfiguracao />} />
+          <Route path="/nuclei/configuracoes/integracoes" element={<IntegracoesPage />} />
+          <Route path="/nuclei/configuracoes/departamentos" element={<DepartamentosPage />} />
+          
+          {/* Rotas legadas - Redirects para compatibilidade */}
+          <Route path="/gestao/empresas" element={<Navigate to="/nuclei/configuracoes/empresas" replace />} />
+          <Route path="/gestao/usuarios" element={<Navigate to="/nuclei/configuracoes/usuarios" replace />} />
+          <Route path="/configuracoes/empresa" element={<Navigate to="/nuclei/configuracoes/empresa" replace />} />
+          <Route path="/configuracoes/email" element={<Navigate to="/nuclei/configuracoes/email" replace />} />
+          <Route path="/configuracoes/chatwoot" element={<Navigate to="/nuclei/configuracoes/chatwoot" replace />} />
+          <Route path="/configuracoes/metas" element={<Navigate to="/nuclei/configuracoes/metas" replace />} />
+          <Route path="/configuracoes/integracoes" element={<Navigate to="/nuclei/configuracoes/integracoes" replace />} />
+          <Route path="/configuracoes/departamentos" element={<Navigate to="/nuclei/configuracoes/departamentos" replace />} />
+          
           <Route path="/relatorios/analytics" element={<RelatoriosAnalyticsPage />} />
           <Route path="/gestao/permissoes" element={<SistemaPermissoesPage />} />
           <Route path="/sistema/backup" element={<BackupSincronizacaoPage />} />
