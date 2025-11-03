@@ -1,7 +1,8 @@
 # ✅ Configuração Profissional do Repositório - CONCLUÍDA
 
 **Data**: 03 de Novembro de 2025  
-**Projeto**: ConectCRM  
+**Projeto**: ConectSuite  
+**Repositório**: https://github.com/Dhonleno/conectsuite.git  
 **Branch**: consolidacao-atendimento  
 **Status**: ✅ Pronto para commit organizado
 
@@ -211,7 +212,7 @@ git push -f origin consolidacao-atendimento
 
 ### 3. Criar Pull Request
 
-1. Ir para GitHub: https://github.com/Dhonleno/conectcrm
+1. Ir para GitHub: https://github.com/Dhonleno/conectsuite
 2. Clicar em "Compare & pull request"
 3. Preencher template:
    ```markdown
@@ -260,7 +261,7 @@ git push -f origin consolidacao-atendimento
 Se tiver dúvidas:
 - Consultar: `GUIA_COMMIT_PROFISSIONAL.md`
 - Consultar: `CONTRIBUTING.md`
-- GitHub Issues: https://github.com/Dhonleno/conectcrm/issues
+- GitHub Issues: https://github.com/Dhonleno/conectsuite/issues
 
 ---
 
