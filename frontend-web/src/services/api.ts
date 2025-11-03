@@ -187,19 +187,25 @@ api.interceptors.response.use(
       console.warn('⚠️ [API] URL da requisição:', error.config?.url);
 
       // Evitar loop infinito: não redirecionar se já estiver na página de login
-      // ou se for a requisição inicial de verificação de perfil
       const isLoginPage = window.location.pathname === '/login';
-      const isProfileCheck = error.config?.url?.includes('/users/profile');
+      const isAuthEndpoint = error.config?.url?.includes('/auth/');
 
-      if (!isLoginPage) {
-        console.warn('⚠️ [API] Removendo token e redirecionando para login...');
-        localStorage.removeItem('authToken'); // ✅ Corrigido para 'authToken'
+      if (!isLoginPage && !isAuthEndpoint) {
+        console.warn('⚠️ [API] Token inválido - Limpando sessão e redirecionando...');
+        
+        // Limpar localStorage
+        localStorage.removeItem('authToken');
         localStorage.removeItem('user_data');
-
-        // Apenas redirecionar se não for a verificação inicial do perfil
-        if (!isProfileCheck) {
+        localStorage.removeItem('empresaAtiva');
+        localStorage.removeItem('selectedProfileId');
+        
+        // Adicionar mensagem para o usuário
+        localStorage.setItem('sessionExpired', 'true');
+        
+        // Redirecionar após pequeno delay para permitir que a mensagem seja mostrada
+        setTimeout(() => {
           window.location.href = '/login';
-        }
+        }, 100);
       }
     }
     return Promise.reject(error);

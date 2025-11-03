@@ -26,6 +26,13 @@ const LoginPage: React.FC = () => {
         setEmail(state.email);
       }
     }
+
+    // Verificar se a sessão expirou
+    const sessionExpired = localStorage.getItem('sessionExpired');
+    if (sessionExpired === 'true') {
+      toast.error('Sua sessão expirou. Por favor, faça login novamente.');
+      localStorage.removeItem('sessionExpired');
+    }
   }, [location]);
 
   const validateForm = () => {
