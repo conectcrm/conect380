@@ -38,6 +38,7 @@ import { AtendenteEquipe } from '../modules/triagem/entities/atendente-equipe.en
 import { AtendenteAtribuicao } from '../modules/triagem/entities/atendente-atribuicao.entity';
 import { EquipeAtribuicao } from '../modules/triagem/entities/equipe-atribuicao.entity';
 import { TriagemLog } from '../modules/triagem/entities/triagem-log.entity';
+import { EmpresaModulo } from '../modules/empresas/entities/empresa-modulo.entity'; // ✅ Sistema de licenciamento modular
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
@@ -89,6 +90,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         AtendenteAtribuicao, // Módulo triagem
         EquipeAtribuicao, // Módulo triagem
         TriagemLog, // Módulo triagem
+        EmpresaModulo, // ✅ Sistema de licenciamento modular
       ],
       synchronize: false, // Desabilitado - apenas tabelas base criadas manualmente
       logging: this.configService.get('APP_ENV') === 'development',

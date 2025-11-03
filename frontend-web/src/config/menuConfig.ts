@@ -41,6 +41,7 @@ export interface MenuConfig {
   children?: MenuConfig[];
   permissions?: string[];
   adminOnly?: boolean;
+  requiredModule?: string; // ⚡ Novo: módulo necessário para exibir item
 }
 
 export const menuConfig: MenuConfig[] = [
@@ -57,6 +58,7 @@ export const menuConfig: MenuConfig[] = [
     icon: MessageSquare,
     href: '/atendimento',
     color: 'purple',
+    requiredModule: 'ATENDIMENTO', // ⚡ Requer licença de Atendimento
     children: [
       {
         id: 'atendimento-dashboard',
@@ -79,13 +81,7 @@ export const menuConfig: MenuConfig[] = [
         href: '/atendimento/chat',
         color: 'purple'
       },
-      {
-        id: 'atendimento-clientes',
-        title: 'Clientes',
-        icon: Users,
-        href: '/clientes',
-        color: 'purple'
-      },
+      // ❌ REMOVIDO: 'Clientes' - Owner é CRM (arquitetura modular)
       {
         id: 'atendimento-nucleos',
         title: 'Núcleos de Atendimento',
@@ -158,6 +154,7 @@ export const menuConfig: MenuConfig[] = [
     icon: Users,
     href: '/nuclei/crm',
     color: 'blue',
+    requiredModule: 'CRM', // ⚡ Requer licença de CRM
     children: [
       {
         id: 'crm-dashboard',
@@ -209,6 +206,7 @@ export const menuConfig: MenuConfig[] = [
     icon: ShoppingBag,
     href: '/nuclei/vendas',
     color: 'green',
+    requiredModule: 'VENDAS', // ⚡ Requer licença de Vendas
     children: [
       {
         id: 'vendas-dashboard',
@@ -267,6 +265,7 @@ export const menuConfig: MenuConfig[] = [
     icon: DollarSign,
     href: '/nuclei/financeiro',
     color: 'orange',
+    requiredModule: 'FINANCEIRO', // ⚡ Requer licença de Financeiro
     children: [
       {
         id: 'financeiro-dashboard',
@@ -318,6 +317,7 @@ export const menuConfig: MenuConfig[] = [
     icon: CreditCard,
     href: '/billing',
     color: 'green',
+    requiredModule: 'BILLING', // ⚡ Requer licença de Billing
     children: [
       {
         id: 'billing-dashboard',
@@ -384,20 +384,8 @@ export const menuConfig: MenuConfig[] = [
         href: '/gestao/usuarios',
         color: 'purple'
       },
-      {
-        id: 'configuracoes-nucleos',
-        title: 'Núcleos de Atendimento',
-        icon: Target,
-        href: '/gestao/nucleos',
-        color: 'purple'
-      },
-      {
-        id: 'configuracoes-departamentos',
-        title: 'Departamentos',
-        icon: GitBranch,
-        href: '/gestao/departamentos',
-        color: 'purple'
-      },
+      // ❌ REMOVIDO: 'Núcleos' - Owner é Atendimento (não é config global)
+      // ❌ REMOVIDO: 'Departamentos' - Owner é Atendimento (não é config global)
       {
         id: 'configuracoes-integracoes',
         title: 'Integrações',
@@ -442,6 +430,7 @@ export const menuConfig: MenuConfig[] = [
     href: '/nuclei/administracao',
     color: 'blue',
     adminOnly: true,
+    requiredModule: 'ADMINISTRACAO', // ⚡ Requer licença de Administração (Enterprise)
     children: [
       {
         id: 'admin-dashboard',
@@ -481,5 +470,22 @@ export const menuConfig: MenuConfig[] = [
     ]
   }
 ];
+
+/**
+ * Filtra menu com base nos módulos ativos da empresa
+ * @param modulosAtivos Array de módulos que a empresa tem licença
+ * @returns Menu filtrado
+ */
+export const getMenuParaEmpresa = (modulosAtivos: string[]): MenuConfig[] => {
+  return menuConfig.filter((item) => {
+    // Dashboard e Configurações são sempre visíveis (Plataforma Base)
+    if (!item.requiredModule) {
+      return true;
+    }
+
+    // Verificar se empresa tem o módulo ativo
+    return modulosAtivos.includes(item.requiredModule);
+  });
+};
 
 export default menuConfig;
