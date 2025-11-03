@@ -4,6 +4,68 @@
 
 **OBRIGATÓRIO**: Sempre consulte `frontend-web/DESIGN_GUIDELINES.md` antes de criar ou modificar páginas React.
 
+## 🎨 Tema Padrão: Crevasse Professional
+
+**TEMA OFICIAL DO SISTEMA**: O ConectCRM usa a paleta **Crevasse Professional** como tema padrão.
+
+### Paleta Crevasse (5 cores principais)
+```typescript
+// PALETA OFICIAL - NÃO ALTERAR
+const CREVASSE_PALETTE = {
+  crevasse1: '#B4BEC9',  // Cinza azulado (secundário, bordas, texto secundário)
+  crevasse2: '#159A9C',  // Teal (primary, ações principais, destaques)
+  crevasse3: '#002333',  // Azul escuro profundo (texto principal, títulos)
+  crevasse4: '#DEEFE7',  // Verde claro suave (fundos secundários, bordas claras)
+  crevasse5: '#FFFFFF',  // Branco puro (background principal)
+};
+```
+
+### Aplicação da Paleta
+```typescript
+// Configuração em ThemeContext.tsx (PADRÃO)
+const [currentPaletteId, setCurrentPaletteId] = useState<string>('crevasse');
+
+// Cores do sistema derivadas da paleta Crevasse:
+colors: {
+  primary: '#159A9C',        // Crevasse-2
+  primaryHover: '#0F7B7D',   // Variação escura do teal
+  primaryLight: '#DEEFE7',   // Crevasse-4
+  secondary: '#B4BEC9',      // Crevasse-1
+  text: '#002333',           // Crevasse-3
+  textSecondary: '#B4BEC9',  // Crevasse-1
+  background: '#FFFFFF',     // Crevasse-5
+  backgroundSecondary: '#DEEFE7', // Crevasse-4
+  border: '#B4BEC9',         // Crevasse-1
+  borderLight: '#DEEFE7',    // Crevasse-4
+}
+```
+
+### ⚠️ REGRAS CRÍTICAS DO TEMA
+
+1. **NUNCA** altere as cores da paleta Crevasse
+2. **SEMPRE** use as cores definidas no ThemeContext
+3. **NUNCA** use cores hardcoded que não sejam da paleta
+4. **SEMPRE** mantenha `currentPaletteId = 'crevasse'` como padrão
+5. Use `#159A9C` (Crevasse-2 teal) para ações principais e destaques
+6. Use `#002333` (Crevasse-3) para texto principal e títulos
+7. Use `#B4BEC9` (Crevasse-1) para elementos secundários
+8. Use `#DEEFE7` (Crevasse-4) para fundos suaves e bordas claras
+
+### Verificação de Cores
+
+```bash
+# ❌ ERRADO - cores não Crevasse
+className="bg-blue-500"      # Não é da paleta!
+className="text-gray-900"    # Deve ser #002333!
+className="border-gray-300"  # Deve ser #B4BEC9!
+
+# ✅ CORRETO - cores Crevasse
+className="bg-[#159A9C]"           # Crevasse-2 primary
+className="text-[#002333]"         # Crevasse-3 text
+className="border-[#B4BEC9]"       # Crevasse-1 border
+className="bg-[#DEEFE7]"           # Crevasse-4 background soft
+```
+
 ## 🚀 Template Base para Novas Telas
 
 **Arquivo**: `frontend-web/src/pages/_TemplatePage.tsx`
