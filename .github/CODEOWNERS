@@ -1,0 +1,169 @@
+# CODEOWNERS - Definição de Revisores Automáticos
+# Este arquivo define quem é responsável por revisar mudanças em partes específicas do código
+# Quando um PR modifica arquivos, os owners são automaticamente solicitados para revisão
+
+# Documentação: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# ==============================================================================
+# GLOBAL OWNERSHIP
+# ==============================================================================
+# Por padrão, estas pessoas revisam TUDO se nenhuma regra específica se aplicar
+* @Dhonleno
+
+# ==============================================================================
+# BACKEND (NestJS + TypeORM)
+# ==============================================================================
+
+# Toda a pasta backend
+/backend/ @Dhonleno
+
+# Configurações críticas
+/backend/src/config/ @Dhonleno
+/backend/src/main.ts @Dhonleno
+
+# Autenticação e Segurança
+/backend/src/modules/auth/ @Dhonleno
+/backend/src/guards/ @Dhonleno
+/backend/src/decorators/ @Dhonleno
+
+# Banco de Dados
+/backend/src/migrations/ @Dhonleno
+/backend/src/entities/ @Dhonleno
+
+# Módulos críticos
+/backend/src/modules/empresa/ @Dhonleno
+/backend/src/modules/usuario/ @Dhonleno
+/backend/src/modules/webhook/ @Dhonleno
+/backend/src/modules/whatsapp/ @Dhonleno
+
+# ==============================================================================
+# FRONTEND (React + TypeScript)
+# ==============================================================================
+
+# Toda a pasta frontend
+/frontend-web/ @Dhonleno
+
+# Páginas principais
+/frontend-web/src/pages/ @Dhonleno
+
+# Componentes de navegação
+/frontend-web/src/components/navigation/ @Dhonleno
+/frontend-web/src/components/layout/ @Dhonleno
+
+# Services (API)
+/frontend-web/src/services/ @Dhonleno
+
+# Configurações
+/frontend-web/src/config/ @Dhonleno
+
+# Rotas
+/frontend-web/src/App.tsx @Dhonleno
+
+# ==============================================================================
+# CHAT E REAL-TIME
+# ==============================================================================
+
+# Sistema de chat completo
+/frontend-web/src/components/chat/ @Dhonleno
+/frontend-web/src/hooks/useWebSocket.ts @Dhonleno
+/backend/src/modules/chat/ @Dhonleno
+/backend/src/websocket/ @Dhonleno
+
+# ==============================================================================
+# BOT E IA
+# ==============================================================================
+
+# Lógica de bot
+/backend/src/modules/bot/ @Dhonleno
+/backend/src/modules/fluxo-conversa/ @Dhonleno
+
+# Integrações IA (Anthropic, OpenAI)
+/backend/src/services/ai/ @Dhonleno
+/backend/src/modules/triagem/ @Dhonleno
+
+# ==============================================================================
+# INTEGRAÇÕES EXTERNAS
+# ==============================================================================
+
+# WhatsApp
+/backend/src/modules/whatsapp/ @Dhonleno
+/backend/src/services/whatsapp/ @Dhonleno
+
+# Webhooks
+/backend/src/modules/webhook/ @Dhonleno
+
+# ==============================================================================
+# DOCUMENTAÇÃO
+# ==============================================================================
+
+# README e documentação principal
+/README.md @Dhonleno
+/CHANGELOG.md @Dhonleno
+/CONTRIBUTING.md @Dhonleno
+
+# Design Guidelines
+/frontend-web/DESIGN_GUIDELINES.md @Dhonleno
+
+# Documentação técnica
+/docs/ @Dhonleno
+*.md @Dhonleno
+
+# ==============================================================================
+# CONFIGURAÇÕES DE INFRAESTRUTURA
+# ==============================================================================
+
+# Docker
+/Dockerfile @Dhonleno
+/docker-compose.yml @Dhonleno
+/.dockerignore @Dhonleno
+
+# CI/CD
+/.github/workflows/ @Dhonleno
+
+# Configurações de ambiente
+/.env.example @Dhonleno
+/backend/.env.example @Dhonleno
+/frontend-web/.env.example @Dhonleno
+
+# ==============================================================================
+# SEGURANÇA
+# ==============================================================================
+
+# Políticas de segurança
+/SECURITY.md @Dhonleno
+/CODE_OF_CONDUCT.md @Dhonleno
+
+# Dependências (revisão obrigatória)
+/backend/package.json @Dhonleno
+/frontend-web/package.json @Dhonleno
+/backend/package-lock.json @Dhonleno
+/frontend-web/package-lock.json @Dhonleno
+
+# ==============================================================================
+# BANCO DE DADOS
+# ==============================================================================
+
+# Migrations (CRÍTICO - sempre revisar)
+/backend/src/migrations/*.ts @Dhonleno
+
+# Scripts SQL diretos
+*.sql @Dhonleno
+
+# ==============================================================================
+# GITHUB CONFIGURATION
+# ==============================================================================
+
+# Configurações do GitHub
+/.github/ @Dhonleno
+/.github/CODEOWNERS @Dhonleno
+/.github/ISSUE_TEMPLATE/ @Dhonleno
+/.github/pull_request_template.md @Dhonleno
+
+# ==============================================================================
+# NOTAS
+# ==============================================================================
+# - Ordem importa: regras mais específicas devem vir DEPOIS das genéricas
+# - Use @ + username do GitHub
+# - Pode adicionar times: @organization/team-name
+# - Múltiplos owners: /path/ @user1 @user2
+# - Owners são notificados automaticamente em PRs
