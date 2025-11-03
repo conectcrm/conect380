@@ -191,7 +191,7 @@ function DepartamentosPage() {
       <div className="bg-white border-b px-6 py-4">
         <BackToNucleus
           nucleusName="Configurações"
-          nucleusPath="/configuracoes"
+          nucleusPath="/nuclei/configuracoes"
         />
       </div>
 

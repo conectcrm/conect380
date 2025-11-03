@@ -305,7 +305,7 @@ const GestaoAtendentesPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header com navegação */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
+        <BackToNucleus nucleusName="Atendimento" nucleusPath="/nuclei/atendimento" />
       </div>
 
       {/* Conteúdo Principal */}

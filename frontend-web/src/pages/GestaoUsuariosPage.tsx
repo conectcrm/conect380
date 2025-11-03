@@ -365,7 +365,7 @@ const GestaoUsuariosPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header com BackToNucleus */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Gestão" nucleusPath="/gestao" />
+        <BackToNucleus nucleusName="Configurações" nucleusPath="/nuclei/configuracoes" />
       </div>
 
       {/* Container principal */}
