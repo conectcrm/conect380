@@ -367,6 +367,65 @@ npm run cypress:open
 
 ---
 
+## 📚 Documentação Completa
+
+### 🆘 Começando
+
+- **[TROUBLESHOOTING_GUIDE.md](TROUBLESHOOTING_GUIDE.md)** - Guia completo de resolução de problemas
+  - 30+ problemas comuns com soluções passo a passo
+  - Diagnóstico, causas e múltiplas opções de solução
+  - Comandos prontos para copiar e executar
+  - Seções: Crítico, Auth, Chat, WebSocket, WhatsApp, DB, Docker, Performance
+
+- **[ROADMAP_MELHORIAS.md](ROADMAP_MELHORIAS.md)** - Planejamento de melhorias futuras
+  - 47 melhorias identificadas e priorizadas
+  - Organizado por: Segurança, Performance, Features, Docs
+  - Sugestão de sprints para implementação
+  - Métricas de progresso por categoria
+
+### 🎨 Desenvolvimento Frontend
+
+- **[frontend-web/DESIGN_GUIDELINES.md](frontend-web/DESIGN_GUIDELINES.md)** - Guia de design system
+  - Tema Crevasse Professional (5 cores oficiais)
+  - Componentes prontos copy-paste
+  - Padrões de UI/UX obrigatórios
+
+- **[frontend-web/TEMPLATES_GUIDE.md](frontend-web/TEMPLATES_GUIDE.md)** - Sistema de templates
+  - Template SIMPLES (sem KPIs) para CRUD básico
+  - Template COM KPIs (com métricas) para dashboards
+  - Fluxo de decisão: qual template usar?
+
+- **[frontend-web/COMPONENTS_GUIDE.md](frontend-web/COMPONENTS_GUIDE.md)** - Biblioteca de componentes
+  - 50+ componentes prontos
+  - 13 tipos de componentes documentados
+  - Código copy-paste com tema Crevasse
+
+### 🔧 Desenvolvimento Backend
+
+- **[STATUS_BACKEND_ATENDIMENTO.md](STATUS_BACKEND_ATENDIMENTO.md)** - Status do módulo de atendimento
+- **[BACKEND_INTEGRATION_README.md](BACKEND_INTEGRATION_README.md)** - Integração com APIs
+- **[docs/relatorio-vulnerabilidades.md](docs/relatorio-vulnerabilidades.md)** - Segurança
+
+### 🚀 Deploy e Produção
+
+- **[PRODUCTION_READY.md](PRODUCTION_READY.md)** - Checklist de produção
+- **[SPRINT_1_COMPLETO_MULTITENANT.md](SPRINT_1_COMPLETO_MULTITENANT.md)** - Deploy AWS EC2
+- **[docs/RELATORIO_FINAL.md](docs/RELATORIO_FINAL.md)** - Lições aprendidas
+
+### 📖 Documentação de Features
+
+- **[SISTEMA_WHATSAPP_CONCLUIDO.md](SISTEMA_WHATSAPP_CONCLUIDO.md)** - Integração WhatsApp
+- **[CHAT_REALTIME_README.md](CHAT_REALTIME_README.md)** - WebSocket e tempo real
+- **[CONSOLIDACAO_CONSTRUTOR_VISUAL.md](CONSOLIDACAO_CONSTRUTOR_VISUAL.md)** - Editor de fluxos
+- **[MISSAO_CUMPRIDA_ATENDIMENTO.md](MISSAO_CUMPRIDA_ATENDIMENTO.md)** - Sistema de atendimento completo
+
+### 🧪 Testes
+
+- **[frontend-web/tests/theme-validation.test.ts](frontend-web/tests/theme-validation.test.ts)** - Testes de tema
+- **[backend/test/isolamento-multi-tenant.e2e-spec.ts](backend/test/isolamento-multi-tenant.e2e-spec.ts)** - Testes E2E
+
+---
+
 ## 🤝 Contribuindo
 
 Contribuições são bem-vindas! Por favor:
@@ -381,6 +440,11 @@ Consulte [CONTRIBUTING.md](CONTRIBUTING.md) para detalhes sobre:
 - Padrões de commit (Conventional Commits)
 - Code style (ESLint, Prettier)
 - Processo de revisão
+
+**📖 Antes de contribuir**:
+- Leia [TROUBLESHOOTING_GUIDE.md](TROUBLESHOOTING_GUIDE.md) se encontrar problemas
+- Consulte [ROADMAP_MELHORIAS.md](ROADMAP_MELHORIAS.md) para ver melhorias planejadas
+- Verifique [frontend-web/DESIGN_GUIDELINES.md](frontend-web/DESIGN_GUIDELINES.md) para padrões de UI
 
 ---
 
