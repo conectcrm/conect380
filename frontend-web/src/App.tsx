@@ -56,6 +56,7 @@ import GestaoFluxosPage from './pages/GestaoFluxosPage';
 import FluxoBuilderPage from './pages/FluxoBuilderPage';
 import GestaoEquipesPage from './pages/GestaoEquipesPage';
 import GestaoAtendentesPage from './pages/GestaoAtendentesPage';
+import GestaoUsuariosPage from './pages/GestaoUsuariosPage';
 import GestaoAtribuicoesPage from './pages/GestaoAtribuicoesPage';
 import GestaoDepartamentosPage from './pages/GestaoDepartamentosPage';
 // Importar novas páginas do sistema de empresas
@@ -147,6 +148,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/gestao/fluxos/novo/builder" element={<FluxoBuilderPage />} />
           <Route path="/gestao/equipes" element={<GestaoEquipesPage />} />
           <Route path="/gestao/atendentes" element={<GestaoAtendentesPage />} />
+          <Route path="/gestao/usuarios" element={<GestaoUsuariosPage />} />
           <Route path="/gestao/atribuicoes" element={<GestaoAtribuicoesPage />} />
           <Route path="/gestao/departamentos" element={<GestaoDepartamentosPage />} />
 

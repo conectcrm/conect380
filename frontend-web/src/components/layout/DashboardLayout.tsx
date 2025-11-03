@@ -243,9 +243,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         title: 'Relatórios e Analytics',
         subtitle: 'Análise detalhada de performance e resultados'
       },
-      '/gestao/permissoes': {
-        title: 'Sistema de Permissões',
-        subtitle: 'Gerencie usuários e suas permissões de acesso'
+      '/gestao/usuarios': {
+        title: 'Gestão de Usuários',
+        subtitle: 'Gerencie usuários, permissões e atendentes do sistema'
       },
       '/sistema/backup': {
         title: 'Backup e Sincronização',
@@ -726,11 +726,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                                   Relatórios
                                 </Link>
                                 <Link
-                                  to="/gestao/permissoes"
+                                  to="/gestao/usuarios"
                                   className="text-xs text-gray-600 hover:text-[#159A9C] transition-colors hover:bg-white rounded-lg py-1.5 px-2 text-center"
                                   onClick={() => setShowCompanySelector(false)}
                                 >
-                                  Permissões
+                                  Usuários
                                 </Link>
                                 <Link
                                   to="/sistema/backup"

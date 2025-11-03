@@ -381,7 +381,7 @@ export const menuConfig: MenuConfig[] = [
         id: 'configuracoes-usuarios',
         title: 'Usuários',
         icon: UserCog,
-        href: '/gestao/permissoes',
+        href: '/gestao/usuarios',
         color: 'purple'
       },
       {
