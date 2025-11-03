@@ -250,7 +250,6 @@ const AppRoutes: React.FC = () => {
           <Route path="/empresas/:empresaId/backup" element={<BackupSincronizacaoPage />} />
 
           {/* Configurações globais da empresa ativa - Padrão consolidado */}
-          <Route path="/nuclei/configuracoes/empresas" element={protegerRota(ModuloEnum.ADMINISTRACAO, <EmpresasListPage />)} />
           <Route path="/nuclei/configuracoes/usuarios" element={<GestaoUsuariosPage />} />
           <Route path="/nuclei/configuracoes/empresa" element={<ConfiguracaoEmpresaPage />} />
           <Route path="/nuclei/configuracoes/email" element={<ConfiguracaoEmailPage />} />
@@ -260,7 +259,8 @@ const AppRoutes: React.FC = () => {
           <Route path="/nuclei/configuracoes/departamentos" element={<DepartamentosPage />} />
           
           {/* Rotas legadas - Redirects para compatibilidade */}
-          <Route path="/gestao/empresas" element={<Navigate to="/nuclei/configuracoes/empresas" replace />} />
+          <Route path="/gestao/empresas" element={<Navigate to="/admin/empresas" replace />} /> {/* Redirect para gestão admin */}
+          <Route path="/nuclei/configuracoes/empresas" element={<Navigate to="/admin/empresas" replace />} /> {/* Redirect para gestão admin */}
           <Route path="/gestao/usuarios" element={<Navigate to="/nuclei/configuracoes/usuarios" replace />} />
           <Route path="/configuracoes/empresa" element={<Navigate to="/nuclei/configuracoes/empresa" replace />} />
           <Route path="/configuracoes/email" element={<Navigate to="/nuclei/configuracoes/email" replace />} />

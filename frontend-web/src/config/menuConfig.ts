@@ -374,7 +374,7 @@ export const menuConfig: MenuConfig[] = [
         id: 'configuracoes-empresa',
         title: 'Empresa',
         icon: Building2,
-        href: '/nuclei/configuracoes/empresas',
+        href: '/nuclei/configuracoes/empresa',
         color: 'purple'
       },
       {
