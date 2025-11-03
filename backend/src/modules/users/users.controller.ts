@@ -110,6 +110,17 @@ export class UsersController {
     };
   }
 
+  @Get('atendentes')
+  @ApiOperation({ summary: 'Listar usuários com permissão de atendimento' })
+  @ApiResponse({ status: 200, description: 'Atendentes retornados com sucesso' })
+  async listarAtendentes(@CurrentUser() user: User) {
+    const atendentes = await this.usersService.listarAtendentes(user.empresa_id);
+    return {
+      success: true,
+      data: atendentes,
+    };
+  }
+
   @Post()
   @ApiOperation({ summary: 'Criar novo usuário' })
   @ApiResponse({ status: 201, description: 'Usuário criado com sucesso' })

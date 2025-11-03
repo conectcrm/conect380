@@ -134,6 +134,24 @@ export class UsersService {
     };
   }
 
+  async listarAtendentes(empresa_id: string): Promise<User[]> {
+    return await this.userRepository.find({
+      where: { 
+        empresa_id,
+        ativo: true
+      },
+      order: { nome: 'ASC' }
+    }).then(users => 
+      users.filter(user => 
+        user.permissoes && 
+        (
+          user.permissoes.includes('ATENDIMENTO') ||
+          user.permissoes.some(p => p === 'ATENDIMENTO')
+        )
+      )
+    );
+  }
+
   async criar(userData: Partial<User>): Promise<User> {
     console.log('🚀 UsersService.criar - Recebendo dados:', userData);
 

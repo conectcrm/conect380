@@ -8,6 +8,13 @@ export enum UserRole {
   USER = 'user',
 }
 
+export enum StatusAtendente {
+  DISPONIVEL = 'DISPONIVEL',
+  OCUPADO = 'OCUPADO',
+  AUSENTE = 'AUSENTE',
+  OFFLINE = 'OFFLINE',
+}
+
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
@@ -51,6 +58,15 @@ export class User {
 
   @Column({ default: true })
   ativo: boolean;
+
+  @Column({ type: 'enum', enum: StatusAtendente, nullable: true })
+  status_atendente: StatusAtendente;
+
+  @Column({ type: 'integer', default: 5, nullable: true })
+  capacidade_maxima: number;
+
+  @Column({ type: 'integer', default: 0, nullable: true })
+  tickets_ativos: number;
 
   @Column({ type: 'timestamp', nullable: true })
   ultimo_login: Date;
