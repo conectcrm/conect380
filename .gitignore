@@ -14,6 +14,9 @@ dist/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
+# Mas permitir .example
+!.env*.example
 
 # Logs
 npm-debug.log*
@@ -101,109 +104,55 @@ dist
 # 🚫 ARQUIVOS TEMPORÁRIOS E DE DESENVOLVIMENTO
 # ==================================================
 
-# Scripts de teste e debug
-test-*.js
-test-*.ts
-test-*.html
-debug-*.js
-debug-*.ts
-debug-*.sql
-*-test.js
-*-debug.js
+# Scripts de teste e debug (APENAS raiz e scripts/)
+/test-*.js
+/test-*.ts
+/test-*.html
+/debug-*.js
+/debug-*.ts
+/debug-*.sql
+/script-*.js
+/temp-*.js
+/tmp-*.js
+/exemplo-*.js
+/fix-*.js
+/setup-*.js
+/validar-*.js
+/verificar-*.js
+/testar-*.js
+/check-*.js
+scripts/test-*.js
+scripts/debug-*.js
+scripts/temp-*.js
 
-# Scripts temporários
-script-*.js
-temp-*.js
-tmp-*.js
-exemplo-*.js
-demonstracao-*.js
-assistente-*.js
-monitor-*.js
-validar-*.js
-verificar-*.js
-investigar-*.js
-diagnostico-*.js
-correcao-*.js
-fix-*.js
-setup-*.js
-listar-*.js
-buscar-*.js
-coletor-*.js
-auditoria-*.js
-analise-*.js
-analisar-*.js
-resumo-*.js
-testar-*.js
-teste-*.js
-teste-*.html
-check-*.js
-create-test-*.js
-create-demo-*.js
-simular-*.js
+# SQL temporários (APENAS raiz)
+/*.sql
+!init-database.sql
+!init-db.sql
 
-# Documentação temporária
-*_IMPLEMENTADO*.md
-*_COMPLETA*.md
-*_CONCLUIDA*.md
-*_SUCESSO*.md
-CORRECAO_*.md
-CORRECOES_*.md
-CAMPO_*.md
-COLUNA_*.md
-LAYOUT_*.md
-NOVA_*.md
-OTIMIZACAO_*.md
-EXPLICACAO_*.md
-REMOCAO_*.md
-DEBUG_*.md
-FIX_*.md
-MELHORIAS_*.md
-MODAL_*.md
-SISTEMA_*.md
-TESTE_*.md
-FASE*.md
-RELATORIO_*.md
-GUIA_*.md
-PLANO_*.md
-SUGESTOES_*.md
-ANALISE_*.md
-TEMP_*.md
-DRAFT_*.md
+# Scripts batch/powershell temporários (APENAS raiz)
+/fix-*.bat
+/fix-*.ps1
+/setup-*.bat
+/test-*.bat
+/test-*.ps1
+/executar-*.ps1
+/otimizar-*.ps1
+/limpar-*.ps1
+/verificar-*.ps1
+/validar-*.ps1
+/testar-*.ps1
 
-# Scripts batch/powershell temporários
-fix-*.bat
-setup-*.bat
-test-*.bat
-test-*.ps1
-manage-*.bat
-resolve-*.bat
-start-*.bat
-executar-*.bat
-executar-*.ps1
-otimizar-*.ps1
-otimizar-*.bat
-desabilitar-*.ps1
-limpar-*.ps1
-fechar-*.bat
-identificar-*.ps1
-reorganizar-*.ps1
-migrate-*.bat
-migrate-*.js
-migrate-*.sh
+# ⚠️ IMPORTANTE: Documentação .md é PERMITIDA por padrão
+# Apenas bloquear arquivos temporários ESPECÍFICOS na raiz:
+/TEMP_*.md
+/DRAFT_*.md
+/DEBUG_SESSAO_*.md
+/TEMP_DEBUG_*.md
 
-# Arquivos SQL temporários
-create-test-*.sql
-insert-*-teste.sql
-debug-*.sql
-test-*.sql
-
-# Templates e exemplos não utilizados
-TEMPLATE_*.tsx
-TEMPLATE_*.jsx
-TEMPLATE_*.ts
-TEMPLATE_*.js
-exemplo-*.tsx
-exemplo-*.jsx
+# Templates não utilizados
+TEMPLATE_UNUSED_*.tsx
+TEMPLATE_UNUSED_*.jsx
 
 # Arquivos de backup automático
 *.bak
@@ -219,6 +168,7 @@ exemplo-*.jsx
 playground/
 sandbox/
 experiments/
+temp-docker-export/
 
 # ==================================================
 # 🤖 SISTEMA DE AUTO-LIMPEZA COPILOT

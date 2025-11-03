@@ -1,0 +1,84 @@
+# ==================================================
+# 📝 EditorConfig - ConectCRM
+# ==================================================
+# https://editorconfig.org
+
+root = true
+
+# ==================================================
+# 🌐 Padrão para todos os arquivos
+# ==================================================
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# ==================================================
+# 📜 JavaScript/TypeScript
+# ==================================================
+[*.{js,jsx,ts,tsx,mjs,cjs}]
+indent_size = 2
+max_line_length = 100
+
+# ==================================================
+# 📄 JSON
+# ==================================================
+[*.json]
+indent_size = 2
+insert_final_newline = false
+
+# ==================================================
+# 📦 Package files (não formatar)
+# ==================================================
+[package-lock.json]
+indent_size = 2
+insert_final_newline = false
+trim_trailing_whitespace = false
+
+[yarn.lock]
+indent_size = 2
+insert_final_newline = false
+trim_trailing_whitespace = false
+
+# ==================================================
+# 🎨 CSS/SCSS
+# ==================================================
+[*.{css,scss,sass}]
+indent_size = 2
+
+# ==================================================
+# 📝 Markdown
+# ==================================================
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off
+
+# ==================================================
+# 🗄️ SQL
+# ==================================================
+[*.sql]
+indent_size = 2
+
+# ==================================================
+# 🐳 Docker
+# ==================================================
+[Dockerfile*]
+indent_size = 2
+
+[docker-compose*.yml]
+indent_size = 2
+
+# ==================================================
+# 🪟 Windows Scripts
+# ==================================================
+[*.{bat,cmd,ps1}]
+end_of_line = crlf
+
+# ==================================================
+# 📋 YAML
+# ==================================================
+[*.{yml,yaml}]
+indent_size = 2
