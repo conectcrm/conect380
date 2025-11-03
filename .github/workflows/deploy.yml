@@ -1,0 +1,297 @@
+name: CD - Deploy para Produção
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*.*.*' ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Ambiente de deploy'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ==============================================================================
+  # Job 1: Build e Preparação
+  # ==============================================================================
+  build:
+    name: Build Backend e Frontend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      # Backend Build
+      - name: 📦 Instalar dependências (Backend)
+        working-directory: backend
+        run: npm ci --production=false
+      
+      - name: 🏗️ Build Backend
+        working-directory: backend
+        run: npm run build
+      
+      - name: 📦 Upload Backend Build
+        uses: actions/upload-artifact@v3
+        with:
+          name: backend-dist
+          path: backend/dist
+      
+      # Frontend Build
+      - name: 📦 Instalar dependências (Frontend)
+        working-directory: frontend-web
+        run: npm ci --production=false
+      
+      - name: 🏗️ Build Frontend
+        working-directory: frontend-web
+        run: npm run build
+        env:
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
+      
+      - name: 📦 Upload Frontend Build
+        uses: actions/upload-artifact@v3
+        with:
+          name: frontend-build
+          path: frontend-web/build
+
+  # ==============================================================================
+  # Job 2: Deploy Backend
+  # ==============================================================================
+  deploy-backend:
+    name: Deploy Backend para AWS/Azure
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+      
+      - name: 📦 Download Backend Build
+        uses: actions/download-artifact@v3
+        with:
+          name: backend-dist
+          path: backend/dist
+      
+      # Opção 1: Deploy para AWS EC2
+      - name: 🚀 Deploy para AWS EC2 (SSH)
+        if: ${{ secrets.AWS_EC2_HOST }}
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.AWS_EC2_HOST }}
+          username: ${{ secrets.AWS_EC2_USER }}
+          key: ${{ secrets.AWS_SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            cd /var/www/conectsuite/backend
+            git pull origin main
+            npm ci --production
+            npm run build
+            npm run migration:run
+            pm2 restart conectsuite-backend
+            pm2 save
+      
+      # Opção 2: Deploy para Azure App Service
+      - name: 🚀 Deploy para Azure App Service
+        if: ${{ secrets.AZURE_WEBAPP_NAME }}
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: backend
+      
+      # Opção 3: Deploy com Docker
+      - name: 🐳 Build e Push Docker Image
+        if: ${{ secrets.DOCKER_HUB_USERNAME }}
+        run: |
+          echo ${{ secrets.DOCKER_HUB_PASSWORD }} | docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} --password-stdin
+          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/conectsuite-backend:${{ github.sha }} ./backend
+          docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/conectsuite-backend:${{ github.sha }} ${{ secrets.DOCKER_HUB_USERNAME }}/conectsuite-backend:latest
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/conectsuite-backend:${{ github.sha }}
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/conectsuite-backend:latest
+
+  # ==============================================================================
+  # Job 3: Deploy Frontend
+  # ==============================================================================
+  deploy-frontend:
+    name: Deploy Frontend para Vercel/Netlify
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+      
+      - name: 📦 Download Frontend Build
+        uses: actions/download-artifact@v3
+        with:
+          name: frontend-build
+          path: frontend-web/build
+      
+      # Opção 1: Deploy para Vercel
+      - name: 🚀 Deploy para Vercel
+        if: ${{ secrets.VERCEL_TOKEN }}
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: frontend-web
+          vercel-args: '--prod'
+      
+      # Opção 2: Deploy para Netlify
+      - name: 🚀 Deploy para Netlify
+        if: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        uses: nwtgck/actions-netlify@v2.0
+        with:
+          publish-dir: frontend-web/build
+          production-branch: main
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "Deploy from GitHub Actions"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+      
+      # Opção 3: Deploy para AWS S3 + CloudFront
+      - name: 🚀 Deploy para AWS S3
+        if: ${{ secrets.AWS_S3_BUCKET }}
+        uses: jakejarvis/s3-sync-action@v0.5.1
+        with:
+          args: --acl public-read --follow-symlinks --delete
+        env:
+          AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: 'us-east-1'
+          SOURCE_DIR: 'frontend-web/build'
+      
+      - name: 🔄 Invalidar CloudFront Cache
+        if: ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION }}
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION }} \
+            --paths "/*"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  # ==============================================================================
+  # Job 4: Rodar Migrations
+  # ==============================================================================
+  run-migrations:
+    name: Executar Migrations no Banco de Dados
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: 📦 Instalar dependências
+        working-directory: backend
+        run: npm ci
+      
+      - name: 🗄️ Rodar Migrations
+        working-directory: backend
+        run: npm run migration:run
+        env:
+          DATABASE_HOST: ${{ secrets.DATABASE_HOST }}
+          DATABASE_PORT: ${{ secrets.DATABASE_PORT }}
+          DATABASE_USERNAME: ${{ secrets.DATABASE_USERNAME }}
+          DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+          DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
+
+  # ==============================================================================
+  # Job 5: Health Check Pós-Deploy
+  # ==============================================================================
+  health-check:
+    name: Verificação de Saúde Pós-Deploy
+    runs-on: ubuntu-latest
+    needs: [deploy-backend, deploy-frontend]
+    if: always()
+    
+    steps:
+      - name: 🏥 Verificar Backend
+        run: |
+          echo "Verificando backend em ${{ secrets.BACKEND_URL }}"
+          response=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.BACKEND_URL }}/health || echo "000")
+          
+          if [ "$response" = "200" ]; then
+            echo "✅ Backend está saudável (200 OK)"
+          else
+            echo "❌ Backend não respondeu corretamente (HTTP $response)"
+            exit 1
+          fi
+      
+      - name: 🏥 Verificar Frontend
+        run: |
+          echo "Verificando frontend em ${{ secrets.FRONTEND_URL }}"
+          response=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.FRONTEND_URL }} || echo "000")
+          
+          if [ "$response" = "200" ]; then
+            echo "✅ Frontend está acessível (200 OK)"
+          else
+            echo "❌ Frontend não respondeu corretamente (HTTP $response)"
+            exit 1
+          fi
+      
+      - name: 📊 Notificar Sucesso
+        if: success()
+        run: echo "🎉 Deploy concluído com sucesso!"
+      
+      - name: 📊 Notificar Falha
+        if: failure()
+        run: echo "❌ Deploy falhou! Verifique os logs."
+
+  # ==============================================================================
+  # Job 6: Notificações
+  # ==============================================================================
+  notify:
+    name: Enviar Notificações
+    runs-on: ubuntu-latest
+    needs: [deploy-backend, deploy-frontend, health-check]
+    if: always()
+    
+    steps:
+      - name: 📧 Notificar Slack
+        if: ${{ secrets.SLACK_WEBHOOK }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            Deploy do ConectSuite ${{ job.status }}!
+            Branch: ${{ github.ref }}
+            Commit: ${{ github.sha }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+      
+      - name: 📧 Notificar Discord
+        if: ${{ secrets.DISCORD_WEBHOOK }}
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          status: ${{ job.status }}
+          title: "Deploy ConectSuite"
+          description: |
+            **Branch**: ${{ github.ref }}
+            **Commit**: ${{ github.sha }}
+            **Status**: ${{ job.status }}
