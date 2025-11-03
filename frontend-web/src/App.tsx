@@ -11,6 +11,8 @@ import { ProfileProvider } from './contexts/ProfileContext';
 import { SidebarProvider } from './contexts/SidebarContext';
 import { MenuProvider } from './contexts/MenuContext';
 import { ToastProvider } from './features/atendimento/omnichannel/contexts/ToastContext';
+import { protegerRota } from './utils/routeGuardHelper';
+import { ModuloEnum } from './services/modulosService';
 import LoginPage from './features/auth/LoginPage';
 import RegistroEmpresaPage from './features/auth/RegistroEmpresaPage';
 import VerificacaoEmailPage from './features/auth/VerificacaoEmailPage';
@@ -131,26 +133,26 @@ const AppRoutes: React.FC = () => {
           {/* Debug de Login */}
           <Route path="/debug-login" element={<LoginDebug />} />
 
-          {/* Rotas das páginas de núcleos */}
-          <Route path="/nuclei/crm" element={<CrmNucleusPage />} />
-          <Route path="/nuclei/vendas" element={<VendasNucleusPage />} />
-          <Route path="/nuclei/financeiro" element={<FinanceiroNucleusPage />} />
-          <Route path="/nuclei/configuracoes" element={<ConfiguracoesNucleusPage />} />
-          <Route path="/nuclei/administracao" element={<AdministracaoNucleusPage />} />
+          {/* Rotas das páginas de núcleos - Protegidas por licença */}
+          <Route path="/nuclei/crm" element={protegerRota(ModuloEnum.CRM, <CrmNucleusPage />)} />
+          <Route path="/nuclei/vendas" element={protegerRota(ModuloEnum.VENDAS, <VendasNucleusPage />)} />
+          <Route path="/nuclei/financeiro" element={protegerRota(ModuloEnum.FINANCEIRO, <FinanceiroNucleusPage />)} />
+          <Route path="/nuclei/configuracoes" element={<ConfiguracoesNucleusPage />} /> {/* Configurações: base platform */}
+          <Route path="/nuclei/administracao" element={protegerRota(ModuloEnum.ADMINISTRACAO, <AdministracaoNucleusPage />)} />
 
-          {/* Rotas administrativas do sistema */}
-          <Route path="/admin/empresas" element={<EmpresasListPage />} />
-          <Route path="/gestao/empresas" element={<EmpresasListPage />} />
-          <Route path="/gestao/usuarios" element={<UsuariosPage />} />
-          <Route path="/gestao/nucleos" element={<GestaoNucleosPage />} />
-          <Route path="/gestao/fluxos" element={<GestaoFluxosPage />} />
-          <Route path="/gestao/fluxos/:id/builder" element={<FluxoBuilderPage />} />
-          <Route path="/gestao/fluxos/novo/builder" element={<FluxoBuilderPage />} />
-          <Route path="/gestao/equipes" element={<GestaoEquipesPage />} />
-          <Route path="/gestao/atendentes" element={<GestaoAtendentesPage />} />
-          <Route path="/gestao/usuarios" element={<GestaoUsuariosPage />} />
-          <Route path="/gestao/atribuicoes" element={<GestaoAtribuicoesPage />} />
-          <Route path="/gestao/departamentos" element={<GestaoDepartamentosPage />} />
+          {/* Rotas administrativas do sistema - Protegidas */}
+          <Route path="/admin/empresas" element={protegerRota(ModuloEnum.ADMINISTRACAO, <EmpresasListPage />)} />
+          <Route path="/gestao/empresas" element={protegerRota(ModuloEnum.ADMINISTRACAO, <EmpresasListPage />)} />
+          <Route path="/gestao/usuarios" element={<UsuariosPage />} /> {/* Base platform */}
+          <Route path="/gestao/nucleos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoNucleosPage />)} />
+          <Route path="/gestao/fluxos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoFluxosPage />)} />
+          <Route path="/gestao/fluxos/:id/builder" element={protegerRota(ModuloEnum.ATENDIMENTO, <FluxoBuilderPage />)} />
+          <Route path="/gestao/fluxos/novo/builder" element={protegerRota(ModuloEnum.ATENDIMENTO, <FluxoBuilderPage />)} />
+          <Route path="/gestao/equipes" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoEquipesPage />)} />
+          <Route path="/gestao/atendentes" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoAtendentesPage />)} />
+          <Route path="/gestao/usuarios" element={<GestaoUsuariosPage />} /> {/* Base platform */}
+          <Route path="/gestao/atribuicoes" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoAtribuicoesPage />)} />
+          <Route path="/gestao/departamentos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoDepartamentosPage />)} />
 
           {/* Rotas do módulo de Administração */}
           <Route path="/admin/relatorios" element={
@@ -261,40 +263,40 @@ const AppRoutes: React.FC = () => {
           <Route path="/gestao/permissoes" element={<SistemaPermissoesPage />} />
           <Route path="/sistema/backup" element={<BackupSincronizacaoPage />} />
 
-          {/* Atendimento Omnichannel */}
-          <Route path="/atendimento" element={<AtendimentoDashboard />} />
-          <Route path="/atendimento/chat" element={<AtendimentoIntegradoPage />} />
+          {/* Atendimento Omnichannel - Protegido */}
+          <Route path="/atendimento" element={protegerRota(ModuloEnum.ATENDIMENTO, <AtendimentoDashboard />)} />
+          <Route path="/atendimento/chat" element={protegerRota(ModuloEnum.ATENDIMENTO, <AtendimentoIntegradoPage />)} />
 
           {/* Perfil do Usuário */}
           <Route path="/perfil" element={<PerfilPage />} />
 
-          {/* Sistema de Billing e Assinaturas */}
-          <Route path="/billing" element={<BillingPage />} />
-          <Route path="/assinaturas" element={<BillingPage />} />
+          {/* Sistema de Billing e Assinaturas - Protegido */}
+          <Route path="/billing" element={protegerRota(ModuloEnum.BILLING, <BillingPage />)} />
+          <Route path="/assinaturas" element={protegerRota(ModuloEnum.BILLING, <BillingPage />)} />
 
-          {/* Sistema de Faturamento */}
-          <Route path="/faturamento" element={<FaturamentoPage />} />
+          {/* Sistema de Faturamento - Protegido */}
+          <Route path="/faturamento" element={protegerRota(ModuloEnum.BILLING, <FaturamentoPage />)} />
 
           {/* Exemplo Modal Produto */}
           <Route path="/exemplo-produto" element={<ExemploModalProduto />} />
 
-          {/* Rotas dos módulos existentes */}
-          <Route path="/clientes" element={<ClientesPage />} />
-          <Route path="/contatos" element={<ContatosPage />} />
-          <Route path="/propostas" element={<PropostasPage />} />
-          <Route path="/cotacoes" element={<CotacaoPage />} />
-          <Route path="/orcamentos" element={<CotacaoPage />} />
-          <Route path="/funil-vendas" element={<FunilVendas />} />
-          <Route path="/produtos" element={<ProdutosPage />} />
-          <Route path="/produtos/categorias" element={<CategoriasProdutosPage />} />
+          {/* Rotas dos módulos existentes - Protegidas */}
+          <Route path="/clientes" element={protegerRota(ModuloEnum.CRM, <ClientesPage />)} />
+          <Route path="/contatos" element={protegerRota(ModuloEnum.CRM, <ContatosPage />)} />
+          <Route path="/propostas" element={protegerRota(ModuloEnum.VENDAS, <PropostasPage />)} />
+          <Route path="/cotacoes" element={protegerRota(ModuloEnum.VENDAS, <CotacaoPage />)} />
+          <Route path="/orcamentos" element={protegerRota(ModuloEnum.VENDAS, <CotacaoPage />)} />
+          <Route path="/funil-vendas" element={protegerRota(ModuloEnum.VENDAS, <FunilVendas />)} />
+          <Route path="/produtos" element={protegerRota(ModuloEnum.VENDAS, <ProdutosPage />)} />
+          <Route path="/produtos/categorias" element={protegerRota(ModuloEnum.VENDAS, <CategoriasProdutosPage />)} />
 
-          {/* Rotas dos Combos */}
-          <Route path="/combos" element={<CombosPage />} />
-          <Route path="/combos/novo" element={<NovoComboPage />} />
-          <Route path="/combos/:id/editar" element={<NovoComboPage />} />
+          {/* Rotas dos Combos - Protegidas */}
+          <Route path="/combos" element={protegerRota(ModuloEnum.VENDAS, <CombosPage />)} />
+          <Route path="/combos/novo" element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)} />
+          <Route path="/combos/:id/editar" element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)} />
 
-          <Route path="/agenda" element={<AgendaPage />} />
-          <Route path="/oportunidades" element={<OportunidadesPage />} />
+          <Route path="/agenda" element={protegerRota(ModuloEnum.CRM, <AgendaPage />)} />
+          <Route path="/oportunidades" element={protegerRota(ModuloEnum.VENDAS, <OportunidadesPage />)} />
 
           {/* Upload Demo */}
           <Route path="/upload-demo" element={<UploadDemoPage />} />
@@ -305,14 +307,14 @@ const AppRoutes: React.FC = () => {
           {/* Portal do Cliente - Gestão */}
           <Route path="/portal" element={<PortalClientePage />} />
 
-          {/* Rotas do Núcleo Financeiro */}
-          <Route path="/financeiro" element={<FinanceiroPage />} />
-          <Route path="/financeiro/contas-receber" element={<ContasReceberPage />} />
-          <Route path="/financeiro/contas-pagar" element={<ContasPagarPage />} />
-          <Route path="/financeiro/fornecedores" element={<FornecedoresPage />} />
+          {/* Rotas do Núcleo Financeiro - Protegidas */}
+          <Route path="/financeiro" element={protegerRota(ModuloEnum.FINANCEIRO, <FinanceiroPage />)} />
+          <Route path="/financeiro/contas-receber" element={protegerRota(ModuloEnum.FINANCEIRO, <ContasReceberPage />)} />
+          <Route path="/financeiro/contas-pagar" element={protegerRota(ModuloEnum.FINANCEIRO, <ContasPagarPage />)} />
+          <Route path="/financeiro/fornecedores" element={protegerRota(ModuloEnum.FINANCEIRO, <FornecedoresPage />)} />
 
-          {/* Módulos financeiros */}
-          <Route path="/financeiro/faturamento" element={<FaturamentoPage />} />
+          {/* Módulos financeiros - Protegidos */}
+          <Route path="/financeiro/faturamento" element={protegerRota(ModuloEnum.BILLING, <FaturamentoPage />)} />
 
           <Route path="/financeiro/relatorios" element={
             <ModuleUnderConstruction

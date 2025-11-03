@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../../contexts/I18nContext';
@@ -7,7 +7,8 @@ import { useProfile } from '../../contexts/ProfileContext';
 import { useSidebar } from '../../contexts/SidebarContext';
 import { formatCompanyName, formatUserName } from '../../utils/textUtils';
 import HierarchicalNavGroup from '../navigation/HierarchicalNavGroup';
-import { menuConfig } from '../../config/menuConfig';
+import { menuConfig, getMenuParaEmpresa } from '../../config/menuConfig';
+import { useModulosAtivos } from '../../hooks/useModuloAtivo';
 import NotificationCenter from '../notifications/NotificationCenter';
 import ConectCRMLogoFinal from '../ui/ConectCRMLogoFinal';
 import LanguageSelector from '../common/LanguageSelector';
@@ -39,12 +40,22 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const { sidebarCollapsed, setSidebarCollapsed } = useSidebar();
   const [showProfileSelector, setShowProfileSelector] = useState(false);
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const { user, logout } = useAuth();
   const { t, language, availableLanguages } = useI18n();
 
   const { currentPalette } = useTheme();
   const { perfilSelecionado, setPerfilSelecionado } = useProfile();
   const location = useLocation();
+
+  // ⚡ LICENCIAMENTO: Buscar módulos ativos da empresa
+  const [modulosAtivos, loadingModulos] = useModulosAtivos();
+
+  // ⚡ LICENCIAMENTO: Filtrar menu baseado nos módulos ativos
+  const menuFiltrado = useMemo(() => {
+    if (loadingModulos) return []; // Não mostrar menu enquanto carrega
+    return getMenuParaEmpresa(menuConfig, modulosAtivos);
+  }, [modulosAtivos, loadingModulos]);
 
   // Verificação se é admin
   const isAdmin = user?.role === 'admin' || user?.role === 'manager' || user?.email?.includes('admin');
@@ -492,7 +503,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             </div>
             {/* Navegação Mobile */}
             <HierarchicalNavGroup
-              menuItems={menuConfig}
+              menuItems={menuFiltrado}
               sidebarCollapsed={false}
             />
           </div>
@@ -573,7 +584,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
               {/* Navegação Hierárquica */}
               <HierarchicalNavGroup
-                menuItems={menuConfig}
+                menuItems={menuFiltrado}
                 sidebarCollapsed={sidebarCollapsed}
               />
             </div>
