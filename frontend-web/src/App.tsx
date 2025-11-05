@@ -16,6 +16,8 @@ import { ModuloEnum } from './services/modulosService';
 import LoginPage from './features/auth/LoginPage';
 import RegistroEmpresaPage from './features/auth/RegistroEmpresaPage';
 import VerificacaoEmailPage from './features/auth/VerificacaoEmailPage';
+import ForgotPasswordPage from './features/auth/ForgotPasswordPage';
+import ResetPasswordPage from './features/auth/ResetPasswordPage';
 import TrocarSenhaPage from './pages/TrocarSenhaPage'; // ✅ Troca de senha (primeiro acesso)
 import DashboardLayout from './components/layout/DashboardLayout';
 import DashboardRouter from './features/dashboard/DashboardRouter';
@@ -26,7 +28,7 @@ import ProdutosPage from './features/produtos/ProdutosPage';
 import FinanceiroPage from './features/financeiro/FinanceiroPage';
 import ConfiguracoesPage from './features/configuracoes/ConfiguracoesPage';
 import ContasReceberPage from './features/financeiro/ContasReceberPage';
-import ContasPagarPage from './pages/gestao/financeiro/ContasPagarSimplificada';
+import ContasPagarPage from './pages/gestao/financeiro/ContasPagarPage';
 import FornecedoresPage from './features/financeiro/fornecedores/FornecedoresPage';
 import ContratosPage from './features/contratos/ContratosPage';
 import DebugContratos from './components/DebugContratos';
@@ -51,34 +53,34 @@ import { MinhasEmpresasPage } from './features/empresas/MinhasEmpresasPage';
 import ContatosPage from './features/contatos/ContatosPage';
 import { UsuariosPage } from './features/gestao/usuarios/UsuariosPage';
 import PerfilPage from './features/perfil/PerfilPage';
-import AtendimentoIntegradoPage from './pages/AtendimentoIntegradoPage';
-import AtendimentoDashboard from './pages/AtendimentoDashboard';
-import GestaoNucleosPage from './pages/GestaoNucleosPage';
-import GestaoFluxosPage from './pages/GestaoFluxosPage';
-import FluxoBuilderPage from './pages/FluxoBuilderPage';
-import GestaoEquipesPage from './pages/GestaoEquipesPage';
-import GestaoAtendentesPage from './pages/GestaoAtendentesPage';
-import GestaoUsuariosPage from './pages/GestaoUsuariosPage';
-import GestaoAtribuicoesPage from './pages/GestaoAtribuicoesPage';
-import GestaoDepartamentosPage from './pages/GestaoDepartamentosPage';
+import AtendimentoIntegradoPage from './features/atendimento/pages/AtendimentoIntegradoPage';
+import AtendimentoDashboard from './features/atendimento/pages/AtendimentoDashboard';
+import GestaoNucleosPage from './features/gestao/pages/GestaoNucleosPage';
+import GestaoFluxosPage from './features/gestao/pages/GestaoFluxosPage';
+import FluxoBuilderPage from './features/atendimento/pages/FluxoBuilderPage';
+import GestaoEquipesPage from './features/gestao/pages/GestaoEquipesPage';
+import GestaoAtendentesPage from './features/gestao/pages/GestaoAtendentesPage';
+import GestaoUsuariosPage from './features/gestao/pages/GestaoUsuariosPage';
+import GestaoAtribuicoesPage from './features/gestao/pages/GestaoAtribuicoesPage';
+import GestaoDepartamentosPage from './features/gestao/pages/GestaoDepartamentosPage';
+import ConfiguracoesAtendimentoPage from './features/atendimento/configuracoes/ConfiguracoesAtendimentoPage';
 // Importar novas páginas do sistema de empresas
-import { ConfiguracaoEmpresaPage } from './pages/empresas/ConfiguracaoEmpresaPage';
+import ConfiguracaoEmpresaPage from './pages/empresas/ConfiguracaoEmpresaPage';
 import { RelatoriosAnalyticsPage } from './pages/empresas/RelatoriosAnalyticsPage';
 import { SistemaPermissoesPage } from './pages/empresas/SistemaPermissoesPage';
 import { BackupSincronizacaoPage } from './pages/empresas/BackupSincronizacaoPage';
 import { useAuth } from './hooks/useAuth';
 import PortalRoutes from './routes/PortalRoutes';
-import ChatwootConfiguracao from './pages/configuracoes/ChatwootConfiguracao';
 import MetasConfiguracao from './pages/configuracoes/MetasConfiguracao';
 import IntegracoesPage from './pages/configuracoes/IntegracoesPage';
 import TestePortalPage from './pages/TestePortalPage';
 import PortalClientePage from './pages/PortalClientePage';
-import ConfiguracaoEmailPage from './pages/ConfiguracaoEmailPage';
+import ConfiguracaoEmailPage from './features/configuracoes/pages/ConfiguracaoEmailPage';
 import ScrollToTop from './components/common/ScrollToTop';
 import { BillingPage } from './pages/billing';
 import FaturamentoPage from './pages/faturamento/FaturamentoPage';
-import CotacaoPage from './pages/CotacaoPage';
-import DepartamentosPage from './pages/DepartamentosPage';
+import CotacaoPage from './features/comercial/pages/CotacaoPage';
+import DepartamentosPage from './features/gestao/pages/DepartamentosPage';
 
 // Configuração do React Query
 const queryClient = new QueryClient({
@@ -142,14 +144,21 @@ const AppRoutes: React.FC = () => {
 
           {/* Rotas administrativas do sistema - Protegidas */}
           <Route path="/admin/empresas" element={protegerRota(ModuloEnum.ADMINISTRACAO, <EmpresasListPage />)} />
-          <Route path="/gestao/nucleos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoNucleosPage />)} />
-          <Route path="/gestao/fluxos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoFluxosPage />)} />
+
+          {/* ⭐ NOVA ROTA: Configurações de Atendimento com Abas */}
+          <Route path="/atendimento/configuracoes" element={protegerRota(ModuloEnum.ATENDIMENTO, <ConfiguracoesAtendimentoPage />)} />
+
+          {/* 🔄 REDIRECTS: Rotas antigas redirecionam para abas específicas */}
+          <Route path="/gestao/nucleos" element={<Navigate to="/atendimento/configuracoes?tab=nucleos" replace />} />
+          <Route path="/gestao/equipes" element={<Navigate to="/atendimento/configuracoes?tab=equipes" replace />} />
+          <Route path="/gestao/atendentes" element={<Navigate to="/atendimento/configuracoes?tab=atendentes" replace />} />
+          <Route path="/gestao/atribuicoes" element={<Navigate to="/atendimento/configuracoes?tab=atribuicoes" replace />} />
+          <Route path="/gestao/departamentos" element={<Navigate to="/atendimento/configuracoes?tab=departamentos" replace />} />
+
+          {/* ✅ Fluxos mantém rotas separadas (tem sub-rotas para o builder) */}
+          <Route path="/gestao/fluxos" element={<Navigate to="/atendimento/configuracoes?tab=fluxos" replace />} />
           <Route path="/gestao/fluxos/:id/builder" element={protegerRota(ModuloEnum.ATENDIMENTO, <FluxoBuilderPage />)} />
           <Route path="/gestao/fluxos/novo/builder" element={protegerRota(ModuloEnum.ATENDIMENTO, <FluxoBuilderPage />)} />
-          <Route path="/gestao/equipes" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoEquipesPage />)} />
-          <Route path="/gestao/atendentes" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoAtendentesPage />)} />
-          <Route path="/gestao/atribuicoes" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoAtribuicoesPage />)} />
-          <Route path="/gestao/departamentos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoDepartamentosPage />)} />
 
           {/* Rotas do módulo de Administração */}
           <Route path="/admin/relatorios" element={
@@ -253,22 +262,20 @@ const AppRoutes: React.FC = () => {
           <Route path="/nuclei/configuracoes/usuarios" element={<GestaoUsuariosPage />} />
           <Route path="/nuclei/configuracoes/empresa" element={<ConfiguracaoEmpresaPage />} />
           <Route path="/nuclei/configuracoes/email" element={<ConfiguracaoEmailPage />} />
-          <Route path="/nuclei/configuracoes/chatwoot" element={<ChatwootConfiguracao />} />
           <Route path="/nuclei/configuracoes/metas" element={<MetasConfiguracao />} />
           <Route path="/nuclei/configuracoes/integracoes" element={<IntegracoesPage />} />
           <Route path="/nuclei/configuracoes/departamentos" element={<DepartamentosPage />} />
-          
+
           {/* Rotas legadas - Redirects para compatibilidade */}
           <Route path="/gestao/empresas" element={<Navigate to="/admin/empresas" replace />} /> {/* Redirect para gestão admin */}
-          <Route path="/nuclei/configuracoes/empresas" element={<Navigate to="/admin/empresas" replace />} /> {/* Redirect para gestão admin */}
+          <Route path="/nuclei/configuracoes/empresas" element={<ConfiguracaoEmpresaPage />} />
           <Route path="/gestao/usuarios" element={<Navigate to="/nuclei/configuracoes/usuarios" replace />} />
           <Route path="/configuracoes/empresa" element={<Navigate to="/nuclei/configuracoes/empresa" replace />} />
           <Route path="/configuracoes/email" element={<Navigate to="/nuclei/configuracoes/email" replace />} />
-          <Route path="/configuracoes/chatwoot" element={<Navigate to="/nuclei/configuracoes/chatwoot" replace />} />
           <Route path="/configuracoes/metas" element={<Navigate to="/nuclei/configuracoes/metas" replace />} />
           <Route path="/configuracoes/integracoes" element={<Navigate to="/nuclei/configuracoes/integracoes" replace />} />
           <Route path="/configuracoes/departamentos" element={<Navigate to="/nuclei/configuracoes/departamentos" replace />} />
-          
+
           <Route path="/relatorios/analytics" element={<RelatoriosAnalyticsPage />} />
           <Route path="/gestao/permissoes" element={<SistemaPermissoesPage />} />
           <Route path="/sistema/backup" element={<BackupSincronizacaoPage />} />
@@ -405,6 +412,8 @@ const AppRoutes: React.FC = () => {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/registro" element={<RegistroEmpresaPage />} />
       <Route path="/verificar-email" element={<VerificacaoEmailPage />} />
+      <Route path="/esqueci-minha-senha" element={<ForgotPasswordPage />} />
+      <Route path="/recuperar-senha" element={<ResetPasswordPage />} />
       <Route path="/trocar-senha" element={<TrocarSenhaPage />} /> {/* ✅ Troca de senha (primeiro acesso) */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>

@@ -7,7 +7,8 @@
  * - Atendentes (usuários com permissão ATENDIMENTO)
  * 
  * Padrão: HubSpot/Salesforce/Pipedrive
- * Cor do módulo: Gestão (#2563EB - blue)
+ * Tema: Crevasse Professional
+ * Cor primary: #159A9C (Crevasse-2 teal)
  */
 
 import React, { useState, useEffect } from 'react';
@@ -28,10 +29,12 @@ import {
   Mail,
   Phone,
   Upload,
+  Copy,
   ChevronDown,
+  Info,
 } from 'lucide-react';
-import { BackToNucleus } from '../components/navigation/BackToNucleus';
-import { usuariosService } from '../services/usuariosService';
+import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
+import { usuariosService } from '../../../services/usuariosService';
 import {
   Usuario,
   NovoUsuario,
@@ -42,15 +45,33 @@ import {
   ROLE_COLORS,
   STATUS_ATENDENTE_LABELS,
   STATUS_ATENDENTE_COLORS,
-} from '../types/usuarios';
+} from '../../../types/usuarios';
 
 type AbaAtiva = 'todos' | 'atendentes';
+
+type FeedbackState = {
+  type: 'success' | 'error' | 'info';
+  message: string;
+  title?: string;
+};
+
+type ConfirmDialogState = {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  variant?: 'primary' | 'danger';
+  onConfirm?: () => Promise<void> | void;
+  errorMessage?: string;
+};
 
 const GestaoUsuariosPage: React.FC = () => {
   // Estados principais
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [totalUsuariosSistema, setTotalUsuariosSistema] = useState(0);
   const [busca, setBusca] = useState('');
   const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>('todos');
 
@@ -77,6 +98,107 @@ const GestaoUsuariosPage: React.FC = () => {
     ativo: true,
     idioma_preferido: 'pt-BR',
   });
+  const [formError, setFormError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackState | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({
+    open: false,
+    title: '',
+    description: '',
+  });
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  const [resetSenhaLoading, setResetSenhaLoading] = useState(false);
+  const [novaSenhaGerada, setNovaSenhaGerada] = useState<string | null>(null);
+  const [resetSenhaError, setResetSenhaError] = useState<string | null>(null);
+
+  const showFeedback = (type: FeedbackState['type'], message: string, title?: string) => {
+    setFeedback({ type, message, title });
+  };
+
+  const dismissFeedback = () => setFeedback(null);
+
+  const feedbackStyles: Record<FeedbackState['type'], { container: string; icon: string }> = {
+    success: {
+      container: 'bg-white border border-[#159A9C]/40 text-[#002333] shadow-lg shadow-[#159A9C]/10',
+      icon: 'text-[#159A9C]',
+    },
+    error: {
+      container: 'bg-white border border-red-200 text-red-700 shadow-lg shadow-red-200/70',
+      icon: 'text-red-500',
+    },
+    info: {
+      container: 'bg-white border border-sky-200 text-sky-700 shadow-lg shadow-sky-200/70',
+      icon: 'text-sky-500',
+    },
+  };
+
+  useEffect(() => {
+    if (!feedback) return;
+    const timeoutId = window.setTimeout(() => {
+      setFeedback(null);
+    }, 5000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [feedback]);
+
+  const feedbackIconMap: Record<FeedbackState['type'], React.ElementType> = {
+    success: CheckCircle,
+    error: AlertCircle,
+    info: Info,
+  };
+
+  const getConfirmButtonClasses = (variant?: 'primary' | 'danger') =>
+    variant === 'danger'
+      ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
+      : 'bg-[#159A9C] hover:bg-[#0F7B7D] focus:ring-[#159A9C]';
+
+  const openConfirmDialog = (config: Omit<ConfirmDialogState, 'open'>) => {
+    setConfirmDialog({
+      open: true,
+      ...config,
+      errorMessage: undefined,
+    });
+  };
+
+  const closeConfirmDialog = () => {
+    setConfirmLoading(false);
+    setConfirmDialog({
+      open: false,
+      title: '',
+      description: '',
+      confirmLabel: undefined,
+      cancelLabel: undefined,
+      variant: undefined,
+      onConfirm: undefined,
+      errorMessage: undefined,
+    });
+  };
+
+  const handleConfirmDialog = async () => {
+    if (!confirmDialog.onConfirm) {
+      closeConfirmDialog();
+      return;
+    }
+
+    try {
+      setConfirmLoading(true);
+      await confirmDialog.onConfirm();
+      closeConfirmDialog();
+    } catch (error) {
+      console.error('Erro na ação confirmada:', error);
+      setConfirmLoading(false);
+      const responseMessage = (error as any)?.response?.data?.message;
+      const normalizedMessage = Array.isArray(responseMessage)
+        ? responseMessage.join('. ')
+        : responseMessage;
+      const fallbackMessage = error instanceof Error ? error.message : undefined;
+      const message = normalizedMessage || fallbackMessage || 'Não foi possível concluir a ação. Tente novamente.';
+      setConfirmDialog((prev) => ({
+        ...prev,
+        errorMessage: message,
+      }));
+      showFeedback('error', message);
+    }
+  };
 
   // Carregar dados ao montar componente
   useEffect(() => {
@@ -96,8 +218,9 @@ const GestaoUsuariosPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const dados = await usuariosService.listarUsuarios();
-      setUsuarios(Array.isArray(dados) ? dados : []);
+      const { usuarios: lista, total } = await usuariosService.listarUsuarios({ limite: 1000, pagina: 1 });
+      setUsuarios(lista);
+      setTotalUsuariosSistema(total);
     } catch (err: unknown) {
       console.error('Erro ao carregar usuários:', err);
       const responseMessage = (err as any)?.response?.data?.message;
@@ -107,6 +230,7 @@ const GestaoUsuariosPage: React.FC = () => {
       const fallbackMessage = err instanceof Error ? err.message : undefined;
       setError(normalizedMessage || fallbackMessage || 'Erro ao carregar usuários');
       setUsuarios([]);
+      setTotalUsuariosSistema(0);
     } finally {
       setLoading(false);
     }
@@ -139,7 +263,7 @@ const GestaoUsuariosPage: React.FC = () => {
   });
 
   // Calcular KPIs
-  const totalUsuarios = usuarios.length;
+  const totalUsuarios = totalUsuariosSistema;
   const usuariosAtivos = usuarios.filter(u => u.ativo).length;
   const administradores = usuarios.filter(u => u.role === UserRole.ADMIN).length;
   const onlineHoje = usuarios.filter(u => {
@@ -150,6 +274,7 @@ const GestaoUsuariosPage: React.FC = () => {
   }).length;
 
   const handleOpenDialog = (usuario?: Usuario) => {
+    setFormError(null);
     if (usuario) {
       setEditingUsuario(usuario);
       setFormData({
@@ -181,6 +306,7 @@ const GestaoUsuariosPage: React.FC = () => {
   const handleCloseDialog = () => {
     setShowDialog(false);
     setEditingUsuario(null);
+    setFormError(null);
     setFormData({
       nome: '',
       email: '',
@@ -195,8 +321,10 @@ const GestaoUsuariosPage: React.FC = () => {
 
   const handleSave = async () => {
     try {
+      setFormError(null);
+      let successMessage = '';
+
       if (editingUsuario) {
-        // Atualizar
         const dadosAtualizacao: AtualizarUsuario = {
           id: editingUsuario.id,
           nome: formData.nome,
@@ -209,23 +337,23 @@ const GestaoUsuariosPage: React.FC = () => {
           idioma_preferido: formData.idioma_preferido,
         };
         await usuariosService.atualizarUsuario(dadosAtualizacao);
-        
-        // Atualizar lista local
         setUsuarios(prev =>
           prev.map(u => (u.id === editingUsuario.id ? { ...u, ...dadosAtualizacao } : u))
         );
+        successMessage = 'Usuário atualizado com sucesso.';
       } else {
-        // Criar novo
         if (!formData.senha) {
-          alert('Senha é obrigatória para criar novo usuário');
+          setFormError('Senha é obrigatória para criar novo usuário.');
           return;
         }
         const novoUsuario = await usuariosService.criarUsuario(formData as NovoUsuario);
         setUsuarios(prev => [...prev, novoUsuario]);
+        successMessage = 'Usuário criado com sucesso.';
       }
-      
+
       handleCloseDialog();
-      await carregarDados(); // Recarregar para sincronizar com backend
+      await carregarDados();
+      showFeedback('success', successMessage);
     } catch (err: unknown) {
       console.error('Erro ao salvar usuário:', err);
       const responseMessage = (err as any)?.response?.data?.message;
@@ -233,29 +361,36 @@ const GestaoUsuariosPage: React.FC = () => {
         ? responseMessage.join('. ')
         : responseMessage;
       const fallbackMessage = err instanceof Error ? err.message : undefined;
-      alert(normalizedMessage || fallbackMessage || 'Erro ao salvar usuário');
+      const message = normalizedMessage || fallbackMessage || 'Erro ao salvar usuário';
+      setFormError(message);
+      showFeedback('error', message);
     }
   };
 
-  const handleDelete = async (usuario: Usuario) => {
-    const confirmacao = window.confirm(
-      `Deseja realmente excluir o usuário "${usuario.nome}"? Esta ação não pode ser desfeita.`
-    );
-    
-    if (!confirmacao) return;
-
-    try {
-      await usuariosService.excluirUsuario(usuario.id);
-      setUsuarios(prev => prev.filter(u => u.id !== usuario.id));
-    } catch (err: unknown) {
-      console.error('Erro ao excluir usuário:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      alert(normalizedMessage || fallbackMessage || 'Erro ao excluir usuário');
-    }
+  const handleDelete = (usuario: Usuario) => {
+    openConfirmDialog({
+      title: 'Excluir usuário',
+      description: `Deseja realmente excluir o usuário "${usuario.nome}"? Esta ação não pode ser desfeita.`,
+      confirmLabel: 'Excluir',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await usuariosService.excluirUsuario(usuario.id);
+          setUsuarios(prev => prev.filter(u => u.id !== usuario.id));
+          showFeedback('success', `Usuário "${usuario.nome}" excluído com sucesso.`);
+        } catch (err: unknown) {
+          console.error('Erro ao excluir usuário:', err);
+          const responseMessage = (err as any)?.response?.data?.message;
+          const normalizedMessage = Array.isArray(responseMessage)
+            ? responseMessage.join('. ')
+            : responseMessage;
+          const fallbackMessage = err instanceof Error ? err.message : undefined;
+          const message = normalizedMessage || fallbackMessage || 'Erro ao excluir usuário';
+          throw new Error(message);
+        }
+      },
+    });
   };
 
   const handleToggleStatus = async (usuario: Usuario) => {
@@ -265,28 +400,74 @@ const GestaoUsuariosPage: React.FC = () => {
       setUsuarios(prev =>
         prev.map(u => (u.id === usuario.id ? { ...u, ativo: novoStatus } : u))
       );
+      showFeedback(
+        'success',
+        `Usuário "${usuario.nome}" ${novoStatus ? 'ativado' : 'desativado'} com sucesso.`
+      );
     } catch (err: unknown) {
       console.error('Erro ao alterar status:', err);
-      alert('Erro ao alterar status do usuário');
+      const responseMessage = (err as any)?.response?.data?.message;
+      const normalizedMessage = Array.isArray(responseMessage)
+        ? responseMessage.join('. ')
+        : responseMessage;
+      const fallbackMessage = err instanceof Error ? err.message : undefined;
+      showFeedback('error', normalizedMessage || fallbackMessage || 'Erro ao alterar status do usuário');
     }
   };
 
   const handleResetSenha = (usuario: Usuario) => {
     setUsuarioResetSenha(usuario);
+    setNovaSenhaGerada(null);
+    setResetSenhaError(null);
+    setResetSenhaLoading(false);
     setShowResetSenhaDialog(true);
   };
 
   const handleConfirmResetSenha = async () => {
     if (!usuarioResetSenha) return;
-    
+
     try {
-      // TODO: Implementar endpoint de reset de senha
-      alert(`Link de reset de senha enviado para ${usuarioResetSenha.email}`);
-      setShowResetSenhaDialog(false);
-      setUsuarioResetSenha(null);
+      setResetSenhaLoading(true);
+      setResetSenhaError(null);
+      const novaSenha = await usuariosService.resetarSenha(usuarioResetSenha.id);
+      setNovaSenhaGerada(novaSenha);
+      showFeedback('success', `Senha temporária gerada para ${usuarioResetSenha.email}.`);
     } catch (err: unknown) {
       console.error('Erro ao resetar senha:', err);
-      alert('Erro ao enviar link de reset de senha');
+      const responseMessage = (err as any)?.response?.data?.message;
+      const normalizedMessage = Array.isArray(responseMessage)
+        ? responseMessage.join('. ')
+        : responseMessage;
+      const fallbackMessage = err instanceof Error ? err.message : undefined;
+      const message = normalizedMessage || fallbackMessage || 'Erro ao resetar senha do usuário';
+      setResetSenhaError(message);
+      showFeedback('error', message);
+    } finally {
+      setResetSenhaLoading(false);
+    }
+  };
+
+  const handleCloseResetSenhaDialog = () => {
+    setShowResetSenhaDialog(false);
+    setUsuarioResetSenha(null);
+    setNovaSenhaGerada(null);
+    setResetSenhaError(null);
+    setResetSenhaLoading(false);
+  };
+
+  const handleCopyNovaSenha = async () => {
+    if (!novaSenhaGerada) return;
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(novaSenhaGerada);
+        showFeedback('success', 'Senha temporária copiada para a área de transferência.');
+      } else {
+        throw new Error('Recurso de copiar não disponível');
+      }
+    } catch (err) {
+      console.error('Erro ao copiar senha temporária:', err);
+      showFeedback('error', 'Não foi possível copiar a senha automaticamente. Copie manualmente.');
     }
   };
 
@@ -306,41 +487,60 @@ const GestaoUsuariosPage: React.FC = () => {
     }
   };
 
-  const handleBulkAction = async (acao: 'ativar' | 'desativar' | 'excluir') => {
+  const handleBulkAction = (acao: 'ativar' | 'desativar' | 'excluir') => {
     if (usuariosSelecionados.length === 0) {
-      alert('Selecione pelo menos um usuário');
+      showFeedback('info', 'Selecione pelo menos um usuário para realizar a ação.');
       return;
     }
 
-    const confirmacao = window.confirm(
-      `Deseja ${acao} ${usuariosSelecionados.length} usuário(s) selecionado(s)?`
-    );
-    
-    if (!confirmacao) return;
+    const quantidade = usuariosSelecionados.length;
+    const descricaoAcao = `Deseja ${acao} ${quantidade} usuário(s) selecionado(s)?`;
+    const tituloAcao =
+      acao === 'excluir'
+        ? 'Excluir usuários selecionados'
+        : 'Atualizar status dos usuários';
 
-    try {
-      if (acao === 'ativar' || acao === 'desativar') {
-        const novoStatus = acao === 'ativar';
-        for (const id of usuariosSelecionados) {
-          await usuariosService.alterarStatusUsuario(id, novoStatus);
+    openConfirmDialog({
+      title: tituloAcao,
+      description: descricaoAcao,
+      confirmLabel: acao === 'excluir' ? 'Excluir' : 'Confirmar',
+      cancelLabel: 'Cancelar',
+      variant: acao === 'excluir' ? 'danger' : 'primary',
+      onConfirm: async () => {
+        try {
+          if (acao === 'ativar' || acao === 'desativar') {
+            const novoStatus = acao === 'ativar';
+            await Promise.all(
+              usuariosSelecionados.map((id) => usuariosService.alterarStatusUsuario(id, novoStatus))
+            );
+            setUsuarios(prev =>
+              prev.map(u =>
+                usuariosSelecionados.includes(u.id) ? { ...u, ativo: novoStatus } : u
+              )
+            );
+            showFeedback(
+              'success',
+              `Usuários ${novoStatus ? 'ativados' : 'desativados'} com sucesso.`
+            );
+          } else {
+            await Promise.all(usuariosSelecionados.map((id) => usuariosService.excluirUsuario(id)));
+            setUsuarios(prev => prev.filter(u => !usuariosSelecionados.includes(u.id)));
+            showFeedback('success', 'Usuários excluídos com sucesso.');
+          }
+
+          setUsuariosSelecionados([]);
+        } catch (err: unknown) {
+          console.error(`Erro ao ${acao} usuários:`, err);
+          const responseMessage = (err as any)?.response?.data?.message;
+          const normalizedMessage = Array.isArray(responseMessage)
+            ? responseMessage.join('. ')
+            : responseMessage;
+          const fallbackMessage = err instanceof Error ? err.message : undefined;
+          const message = normalizedMessage || fallbackMessage || `Erro ao ${acao} usuários`;
+          throw new Error(message);
         }
-        setUsuarios(prev =>
-          prev.map(u =>
-            usuariosSelecionados.includes(u.id) ? { ...u, ativo: novoStatus } : u
-          )
-        );
-      } else if (acao === 'excluir') {
-        for (const id of usuariosSelecionados) {
-          await usuariosService.excluirUsuario(id);
-        }
-        setUsuarios(prev => prev.filter(u => !usuariosSelecionados.includes(u.id)));
-      }
-      
-      setUsuariosSelecionados([]);
-    } catch (err: unknown) {
-      console.error(`Erro ao ${acao} usuários:`, err);
-      alert(`Erro ao ${acao} usuários`);
-    }
+      },
+    });
   };
 
   const handleTogglePermissao = (permissao: string) => {
@@ -363,6 +563,39 @@ const GestaoUsuariosPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {feedback && (
+        <div className="fixed top-24 right-8 z-50 w-full max-w-sm">
+          <div
+            className={`flex items-start gap-3 rounded-xl px-4 py-3 backdrop-blur-sm ${feedbackStyles[feedback.type].container}`}
+          >
+            {(() => {
+              const IconComponent = feedbackIconMap[feedback.type];
+              return (
+                <IconComponent
+                  className={`h-5 w-5 mt-0.5 flex-shrink-0 ${feedbackStyles[feedback.type].icon}`}
+                />
+              );
+            })()}
+            <div className="flex-1">
+              {feedback.title && (
+                <p className="text-sm font-semibold leading-5 text-inherit">
+                  {feedback.title}
+                </p>
+              )}
+              <p className="text-sm leading-5 text-inherit">{feedback.message}</p>
+            </div>
+            <button
+              type="button"
+              onClick={dismissFeedback}
+              aria-label="Fechar mensagem"
+              className="flex-shrink-0 rounded-full p-1 text-inherit transition-colors hover:bg-gray-100"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header com BackToNucleus */}
       <div className="bg-white border-b px-6 py-4">
         <BackToNucleus nucleusName="Configurações" nucleusPath="/nuclei/configuracoes" />
@@ -371,20 +604,20 @@ const GestaoUsuariosPage: React.FC = () => {
       {/* Container principal */}
       <div className="p-6">
         <div className="max-w-7xl mx-auto">
-          
+
           {/* Header da página */}
           <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
                 <h1 className="text-3xl font-bold text-[#002333] flex items-center">
-                  <Users className="h-8 w-8 mr-3 text-[#2563EB]" />
+                  <Users className="h-8 w-8 mr-3 text-[#159A9C]" />
                   Gestão de Usuários
                 </h1>
                 <p className="text-gray-600 mt-1">
                   Gerencie usuários, permissões e atendentes do sistema
                 </p>
               </div>
-              
+
               <div className="flex gap-3">
                 <button
                   onClick={carregarDados}
@@ -394,10 +627,10 @@ const GestaoUsuariosPage: React.FC = () => {
                   <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                   Atualizar
                 </button>
-                
+
                 <button
                   onClick={() => handleOpenDialog()}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors"
                 >
                   <Plus className="h-4 w-4" />
                   Novo Usuário
@@ -405,7 +638,6 @@ const GestaoUsuariosPage: React.FC = () => {
               </div>
             </div>
           </div>
-
           {/* Dashboard Cards (4 KPIs) */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
             {/* Card 1 - Total de Usuários */}
@@ -417,8 +649,8 @@ const GestaoUsuariosPage: React.FC = () => {
                     {totalUsuarios}
                   </p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl">
-                  <Users className="h-8 w-8 text-[#2563EB]" />
+                <div className="p-4 bg-[#159A9C]/10 rounded-xl">
+                  <Users className="h-8 w-8 text-[#159A9C]" />
                 </div>
               </div>
             </div>
@@ -432,7 +664,7 @@ const GestaoUsuariosPage: React.FC = () => {
                     {usuariosAtivos}
                   </p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-xl">
+                <div className="p-4 bg-green-500/10 rounded-xl">
                   <CheckCircle className="h-8 w-8 text-green-600" />
                 </div>
               </div>
@@ -447,7 +679,7 @@ const GestaoUsuariosPage: React.FC = () => {
                     {administradores}
                   </p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-red-100 to-red-200 rounded-xl">
+                <div className="p-4 bg-red-500/10 rounded-xl">
                   <Shield className="h-8 w-8 text-red-600" />
                 </div>
               </div>
@@ -462,8 +694,8 @@ const GestaoUsuariosPage: React.FC = () => {
                     {onlineHoje}
                   </p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl">
-                  <UserCheck className="h-8 w-8 text-purple-600" />
+                <div className="p-4 bg-[#159A9C]/10 rounded-xl">
+                  <UserCheck className="h-8 w-8 text-[#159A9C]" />
                 </div>
               </div>
             </div>
@@ -475,21 +707,19 @@ const GestaoUsuariosPage: React.FC = () => {
               <div className="flex">
                 <button
                   onClick={() => setAbaAtiva('todos')}
-                  className={`px-6 py-3 font-medium transition-colors border-b-2 ${
-                    abaAtiva === 'todos'
-                      ? 'border-[#2563EB] text-[#2563EB]'
-                      : 'border-transparent text-gray-600 hover:text-gray-900'
-                  }`}
+                  className={`px-6 py-3 font-medium transition-colors border-b-2 ${abaAtiva === 'todos'
+                    ? 'border-[#159A9C] text-[#159A9C]'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                    }`}
                 >
                   Todos os Usuários
                 </button>
                 <button
                   onClick={() => setAbaAtiva('atendentes')}
-                  className={`px-6 py-3 font-medium transition-colors border-b-2 ${
-                    abaAtiva === 'atendentes'
-                      ? 'border-[#2563EB] text-[#2563EB]'
-                      : 'border-transparent text-gray-600 hover:text-gray-900'
-                  }`}
+                  className={`px-6 py-3 font-medium transition-colors border-b-2 ${abaAtiva === 'atendentes'
+                    ? 'border-[#159A9C] text-[#159A9C]'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                    }`}
                 >
                   Atendentes
                 </button>
@@ -507,7 +737,7 @@ const GestaoUsuariosPage: React.FC = () => {
                     placeholder="Buscar por nome ou email..."
                     value={busca}
                     onChange={(e) => setBusca(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                   />
                 </div>
 
@@ -516,7 +746,7 @@ const GestaoUsuariosPage: React.FC = () => {
                   <select
                     value={filtroRole}
                     onChange={(e) => setFiltroRole(e.target.value as UserRole | '')}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent appearance-none bg-white pr-10"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent appearance-none bg-white pr-10"
                   >
                     <option value="">Todos os papéis</option>
                     <option value={UserRole.ADMIN}>Administrador</option>
@@ -532,7 +762,7 @@ const GestaoUsuariosPage: React.FC = () => {
                   <select
                     value={filtroStatus}
                     onChange={(e) => setFiltroStatus(e.target.value as typeof filtroStatus)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent appearance-none bg-white pr-10"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent appearance-none bg-white pr-10"
                   >
                     <option value="todos">Todos os status</option>
                     <option value="ativos">Apenas ativos</option>
@@ -549,7 +779,7 @@ const GestaoUsuariosPage: React.FC = () => {
                       id="apenasAtendentes"
                       checked={apenasAtendentes}
                       onChange={(e) => setApenasAtendentes(e.target.checked)}
-                      className="h-4 w-4 text-[#2563EB] focus:ring-[#2563EB] border-gray-300 rounded"
+                      className="h-4 w-4 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
                     />
                     <label
                       htmlFor="apenasAtendentes"
@@ -597,7 +827,7 @@ const GestaoUsuariosPage: React.FC = () => {
           {/* Loading */}
           {loading && (
             <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
-              <RefreshCw className="h-8 w-8 text-[#2563EB] animate-spin mx-auto mb-4" />
+              <RefreshCw className="h-8 w-8 text-[#159A9C] animate-spin mx-auto mb-4" />
               <p className="text-gray-600">Carregando usuários...</p>
             </div>
           )}
@@ -610,7 +840,7 @@ const GestaoUsuariosPage: React.FC = () => {
               <p className="text-gray-600 mb-4">{error}</p>
               <button
                 onClick={carregarDados}
-                className="px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors"
               >
                 Tentar Novamente
               </button>
@@ -634,7 +864,7 @@ const GestaoUsuariosPage: React.FC = () => {
               {!busca && !filtroRole && filtroStatus === 'todos' && !apenasAtendentes && (
                 <button
                   onClick={() => handleOpenDialog()}
-                  className="px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
+                  className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors inline-flex items-center gap-2"
                 >
                   <Plus className="h-4 w-4" />
                   Criar Primeiro Usuário
@@ -658,7 +888,7 @@ const GestaoUsuariosPage: React.FC = () => {
                             usuariosFiltrados.length > 0
                           }
                           onChange={handleSelecionarTodos}
-                          className="h-4 w-4 text-[#2563EB] focus:ring-[#2563EB] border-gray-300 rounded"
+                          className="h-4 w-4 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
                         />
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -694,7 +924,7 @@ const GestaoUsuariosPage: React.FC = () => {
                             type="checkbox"
                             checked={usuariosSelecionados.includes(usuario.id)}
                             onChange={() => handleToggleSelecionado(usuario.id)}
-                            className="h-4 w-4 text-[#2563EB] focus:ring-[#2563EB] border-gray-300 rounded"
+                            className="h-4 w-4 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
                           />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -707,7 +937,7 @@ const GestaoUsuariosPage: React.FC = () => {
                                   alt={usuario.nome}
                                 />
                               ) : (
-                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
+                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] flex items-center justify-center">
                                   <span className="text-white font-medium text-sm">
                                     {usuario.nome?.charAt(0).toUpperCase()}
                                   </span>
@@ -730,11 +960,10 @@ const GestaoUsuariosPage: React.FC = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            usuario.ativo
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${usuario.ativo
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                            }`}>
                             {usuario.ativo ? 'Ativo' : 'Inativo'}
                           </span>
                         </td>
@@ -756,18 +985,17 @@ const GestaoUsuariosPage: React.FC = () => {
                           <div className="flex justify-end gap-2">
                             <button
                               onClick={() => handleOpenDialog(usuario)}
-                              className="text-blue-600 hover:text-blue-900 p-1 hover:bg-blue-50 rounded transition-colors"
+                              className="text-[#159A9C] hover:text-blue-900 p-1 hover:bg-blue-50 rounded transition-colors"
                               title="Editar"
                             >
                               <Edit2 className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => handleToggleStatus(usuario)}
-                              className={`${
-                                usuario.ativo
-                                  ? 'text-yellow-600 hover:text-yellow-900 hover:bg-yellow-50'
-                                  : 'text-green-600 hover:text-green-900 hover:bg-green-50'
-                              } p-1 rounded transition-colors`}
+                              className={`${usuario.ativo
+                                ? 'text-yellow-600 hover:text-yellow-900 hover:bg-yellow-50'
+                                : 'text-green-600 hover:text-green-900 hover:bg-green-50'
+                                } p-1 rounded transition-colors`}
                               title={usuario.ativo ? 'Desativar' : 'Ativar'}
                             >
                               {usuario.ativo ? (
@@ -832,7 +1060,7 @@ const GestaoUsuariosPage: React.FC = () => {
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, nome: e.target.value }))
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                   placeholder="Nome completo do usuário"
                   required
                 />
@@ -851,7 +1079,7 @@ const GestaoUsuariosPage: React.FC = () => {
                     onChange={(e) =>
                       setFormData((prev) => ({ ...prev, email: e.target.value }))
                     }
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                     placeholder="email@exemplo.com"
                     required
                   />
@@ -871,7 +1099,7 @@ const GestaoUsuariosPage: React.FC = () => {
                     onChange={(e) =>
                       setFormData((prev) => ({ ...prev, telefone: e.target.value }))
                     }
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                     placeholder="(11) 99999-9999"
                   />
                 </div>
@@ -889,7 +1117,7 @@ const GestaoUsuariosPage: React.FC = () => {
                     onChange={(e) =>
                       setFormData((prev) => ({ ...prev, senha: e.target.value }))
                     }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                     placeholder="Mínimo 6 caracteres"
                     required
                   />
@@ -906,7 +1134,7 @@ const GestaoUsuariosPage: React.FC = () => {
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, role: e.target.value as UserRole }))
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                   required
                 >
                   <option value={UserRole.USER}>Usuário</option>
@@ -928,7 +1156,7 @@ const GestaoUsuariosPage: React.FC = () => {
                         type="checkbox"
                         checked={formData.permissoes?.includes(perm) || false}
                         onChange={() => handleTogglePermissao(perm)}
-                        className="h-4 w-4 text-[#2563EB] focus:ring-[#2563EB] border-gray-300 rounded"
+                        className="h-4 w-4 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
                       />
                       <span className="ml-2 text-sm text-gray-700">{perm}</span>
                     </label>
@@ -949,7 +1177,7 @@ const GestaoUsuariosPage: React.FC = () => {
                     onChange={(e) =>
                       setFormData((prev) => ({ ...prev, avatar_url: e.target.value }))
                     }
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                     placeholder="https://exemplo.com/avatar.jpg"
                   />
                 </div>
@@ -964,13 +1192,22 @@ const GestaoUsuariosPage: React.FC = () => {
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, ativo: e.target.checked }))
                   }
-                  className="h-4 w-4 text-[#2563EB] focus:ring-[#2563EB] border-gray-300 rounded"
+                  className="h-4 w-4 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
                 />
                 <label htmlFor="ativo" className="ml-2 text-sm text-gray-700 cursor-pointer">
                   Usuário ativo
                 </label>
               </div>
             </div>
+
+            {formError && (
+              <div className="px-6">
+                <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              </div>
+            )}
 
             <div className="p-6 border-t flex justify-end gap-3">
               <button
@@ -981,7 +1218,7 @@ const GestaoUsuariosPage: React.FC = () => {
               </button>
               <button
                 onClick={handleSave}
-                className="px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors"
               >
                 {editingUsuario ? 'Salvar Alterações' : 'Criar Usuário'}
               </button>
@@ -996,12 +1233,9 @@ const GestaoUsuariosPage: React.FC = () => {
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
             <div className="p-6 border-b">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-900">Resetar Senha</h2>
+                <h2 className="text-xl font-bold text-gray-900">Resetar senha do usuário</h2>
                 <button
-                  onClick={() => {
-                    setShowResetSenhaDialog(false);
-                    setUsuarioResetSenha(null);
-                  }}
+                  onClick={handleCloseResetSenhaDialog}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   <X className="h-6 w-6" />
@@ -1009,34 +1243,142 @@ const GestaoUsuariosPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-6">
-              <p className="text-gray-700">
-                Um link de reset de senha será enviado para:
-              </p>
-              <p className="font-medium text-gray-900 mt-2">
-                {usuarioResetSenha.email}
-              </p>
-              <p className="text-sm text-gray-600 mt-4">
-                O usuário {usuarioResetSenha.nome} receberá um email com instruções para
-                redefinir a senha.
-              </p>
+            <div className="p-6 space-y-4">
+              {resetSenhaError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {resetSenhaError}
+                </div>
+              )}
+
+              {novaSenhaGerada ? (
+                <>
+                  <div>
+                    <p className="text-gray-700">
+                      Uma senha temporária foi gerada para o usuário <span className="font-medium">{usuarioResetSenha.nome}</span>.
+                    </p>
+                    <p className="text-sm text-gray-600 mt-2">
+                      Compartilhe esta senha de forma segura e oriente o usuário a alterá-la após o próximo acesso.
+                    </p>
+                    <p className="text-sm text-gray-600 mt-2">
+                      No próximo login, o sistema solicitará obrigatoriamente o cadastro de uma nova senha pessoal.
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-[#B4BEC9] bg-[#DEEFE7] px-4 py-3">
+                    <span className="text-xs uppercase text-[#002333]/70">Senha temporária</span>
+                    <p className="mt-1 font-mono text-lg font-semibold text-[#002333] break-all">
+                      {novaSenhaGerada}
+                    </p>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    Registre esta senha de forma segura. Ela não ficará visível novamente.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-gray-700">
+                    Geraremos uma senha temporária forte e segura para que o usuário acesse novamente a plataforma.
+                  </p>
+                  <div className="rounded-lg border border-[#B4BEC9] bg-white px-4 py-3">
+                    <p className="text-sm text-gray-600">Usuário selecionado</p>
+                    <p className="font-medium text-[#002333]">{usuarioResetSenha.nome}</p>
+                    <p className="text-sm text-gray-600">{usuarioResetSenha.email}</p>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    Após a geração, exibiremos a senha temporária para compartilhamento. Ao acessar com ela, o sistema exigirá o cadastro de uma nova senha definitiva.
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="p-6 border-t flex justify-end gap-3">
               <button
-                onClick={() => {
-                  setShowResetSenhaDialog(false);
-                  setUsuarioResetSenha(null);
-                }}
+                onClick={handleCloseResetSenhaDialog}
                 className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                Cancelar
+                {novaSenhaGerada ? 'Fechar' : 'Cancelar'}
+              </button>
+              {novaSenhaGerada ? (
+                <button
+                  onClick={handleCopyNovaSenha}
+                  className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors flex items-center gap-2"
+                >
+                  <Copy className="h-4 w-4" />
+                  Copiar senha
+                </button>
+              ) : (
+                <button
+                  onClick={handleConfirmResetSenha}
+                  disabled={resetSenhaLoading}
+                  className={`px-4 py-2 rounded-lg text-white transition-colors flex items-center gap-2 ${resetSenhaLoading ? 'bg-[#159A9C]/80 cursor-not-allowed' : 'bg-[#159A9C] hover:bg-[#0F7B7D]'}`}
+                >
+                  {resetSenhaLoading && <RefreshCw className="h-4 w-4 animate-spin" />}
+                  {resetSenhaLoading ? 'Gerando...' : 'Gerar senha temporária'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDialog.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-[#002333] bg-opacity-50"
+            aria-hidden="true"
+            onClick={closeConfirmDialog}
+          />
+          <div className="relative w-full max-w-md overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b px-6 py-5">
+              <div>
+                <h3 className="text-lg font-semibold text-[#002333]">
+                  {confirmDialog.title || 'Confirmação necessária'}
+                </h3>
+                {confirmDialog.description && (
+                  <p className="mt-2 text-sm text-gray-600">
+                    {confirmDialog.description}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={closeConfirmDialog}
+                aria-label="Fechar confirmação"
+                className="rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {confirmDialog.errorMessage && (
+              <div className="px-6 py-4 bg-red-50 border-t border-red-100">
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-white/70 px-4 py-3 text-sm text-red-700">
+                  <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <span>{confirmDialog.errorMessage}</span>
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end gap-2 bg-gray-50 px-6 py-4">
+              <button
+                type="button"
+                onClick={closeConfirmDialog}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-white focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-offset-2"
+              >
+                {confirmDialog.cancelLabel || 'Cancelar'}
               </button>
               <button
-                onClick={handleConfirmResetSenha}
-                className="px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-blue-700 transition-colors"
+                type="button"
+                onClick={handleConfirmDialog}
+                disabled={confirmLoading}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${confirmLoading ? 'cursor-not-allowed opacity-80' : ''
+                  } ${getConfirmButtonClasses(confirmDialog.variant)}`}
               >
-                Enviar Link
+                {confirmLoading ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  confirmDialog.confirmLabel || 'Confirmar'
+                )}
               </button>
             </div>
           </div>

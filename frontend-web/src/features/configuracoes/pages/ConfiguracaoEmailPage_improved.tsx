@@ -19,8 +19,8 @@ import {
   Globe
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { emailServiceReal } from '../services/emailServiceReal';
-import { EMAIL_PROVIDERS } from '../config/emailConfig';
+import { emailServiceReal } from '../../../services/emailServiceReal';
+import { EMAIL_PROVIDERS } from '../../../config/emailConfig';
 
 const ConfiguracaoEmailPage: React.FC = () => {
   const [providerAtual, setProviderAtual] = useState('gmail');
@@ -210,9 +210,9 @@ const ConfiguracaoEmailPage: React.FC = () => {
                 const IconComponent = status.icon;
                 return (
                   <div className={`flex items-center px-3 py-1 rounded-full text-sm font-medium ${status.color === 'green' ? 'bg-green-100 text-green-800' :
-                      status.color === 'blue' ? 'bg-blue-100 text-blue-800' :
-                        status.color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'
+                    status.color === 'blue' ? 'bg-blue-100 text-blue-800' :
+                      status.color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-gray-100 text-gray-800'
                     }`}>
                     <IconComponent className="w-4 h-4 mr-2" />
                     {status.label}
@@ -231,8 +231,8 @@ const ConfiguracaoEmailPage: React.FC = () => {
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div
                 className={`h-2 rounded-full transition-all duration-300 ${progressoConfig === 100 ? 'bg-green-500' :
-                    progressoConfig >= 50 ? 'bg-blue-500' :
-                      progressoConfig > 0 ? 'bg-yellow-500' : 'bg-gray-400'
+                  progressoConfig >= 50 ? 'bg-blue-500' :
+                    progressoConfig > 0 ? 'bg-yellow-500' : 'bg-gray-400'
                   }`}
                 style={{ width: `${progressoConfig}%` }}
               ></div>
@@ -271,10 +271,10 @@ const ConfiguracaoEmailPage: React.FC = () => {
             </div>
             <div className="flex items-center">
               <div className={`px-3 py-1 rounded-full text-sm font-medium ${resultadoTeste?.success
-                  ? 'bg-green-100 text-green-800'
-                  : resultadoTeste?.success === false
-                    ? 'bg-red-100 text-red-800'
-                    : 'bg-gray-100 text-gray-600'
+                ? 'bg-green-100 text-green-800'
+                : resultadoTeste?.success === false
+                  ? 'bg-red-100 text-red-800'
+                  : 'bg-gray-100 text-gray-600'
                 }`}>
                 {resultadoTeste?.success
                   ? '✅ Configurado'
@@ -311,8 +311,8 @@ const ConfiguracaoEmailPage: React.FC = () => {
                       key={key}
                       onClick={() => setProviderAtual(key)}
                       className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md ${isSelected
-                          ? 'border-blue-500 bg-blue-50 shadow-sm'
-                          : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-blue-500 bg-blue-50 shadow-sm'
+                        : 'border-gray-200 hover:border-gray-300'
                         }`}
                     >
                       {/* Badge de configurado */}

@@ -19,24 +19,29 @@ import {
   GripVertical,
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { BackToNucleus } from '../components/navigation/BackToNucleus';
-import { Button } from '../components/ui/button';
-import { departamentoService } from '../services/departamentoService';
-import nucleoService, { Nucleo } from '../services/nucleoService';
-import AgentSelector from '../components/atendimento/AgentSelector';
+import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
+import { KPICard } from '../../../components/common/KPICard';
+import { Button } from '../../../components/ui/button';
+import { departamentoService } from '../../../services/departamentoService';
+import nucleoService, { Nucleo } from '../../../services/nucleoService';
+import AgentSelector from '../../../components/atendimento/AgentSelector';
 import {
   Departamento,
   CreateDepartamentoDto,
   UpdateDepartamentoDto,
   CORES_DEPARTAMENTO,
   TIPOS_DISTRIBUICAO,
-} from '../types/departamentoTypes';
+} from '../../../types/departamentoTypes';
 
 // ========================================================================
 // COMPONENTE PRINCIPAL
 // ========================================================================
 
-const GestaoDepartamentosPage: React.FC = () => {
+interface GestaoDepartamentosPageProps {
+  hideBackButton?: boolean;
+}
+
+const GestaoDepartamentosPage: React.FC<GestaoDepartamentosPageProps> = ({ hideBackButton = false }) => {
   // ========================================================================
   // STATES
   // ========================================================================
@@ -358,378 +363,342 @@ const GestaoDepartamentosPage: React.FC = () => {
   // ========================================================================
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 p-6">
       {/* Header com BackToNucleus */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Atendimento" nucleusPath="/nuclei/atendimento" />
+      {!hideBackButton && (
+        <div className="bg-white border-b px-6 py-4 -mx-6 -mt-6 mb-6">
+          <BackToNucleus nucleusName="Atendimento" nucleusPath="/nuclei/atendimento" />
+        </div>
+      )}
+
+      {/* Dashboard Cards - Tema Crevasse */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <KPICard
+          titulo="Total de Departamentos"
+          valor={departamentos.length}
+          icone={Building2}
+          color="crevasse"
+        />
+
+        <KPICard
+          titulo="Departamentos Ativos"
+          valor={totalAtivos}
+          icone={CheckCircle}
+          color="crevasse"
+        />
+
+        <KPICard
+          titulo="Departamentos Inativos"
+          valor={totalInativos}
+          icone={AlertCircle}
+          color="crevasse"
+        />
+
+        <KPICard
+          titulo="Total de Atendentes"
+          valor={totalAtendentes}
+          icone={Users}
+          color="crevasse"
+        />
       </div>
 
-      {/* Container principal */}
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header da página */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-[#002333] flex items-center gap-3">
-                  <Building2 className="h-8 w-8 text-[#9333EA]" />
-                  Gestão de Departamentos
-                </h1>
-                <p className="text-gray-600 mt-2">
-                  Organize seus atendentes em departamentos especializados para um atendimento mais eficiente
-                </p>
-              </div>
-              <Button
-                onClick={handleNovoClick}
-                className="bg-[#9333EA] hover:bg-purple-700 text-white"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Departamento
-              </Button>
-            </div>
-          </div>
-
-          {/* Dashboard Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            {/* Card 1 - Total */}
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Total de Departamentos</p>
-                  <p className="text-3xl font-bold text-gray-900">{departamentos.length}</p>
-                </div>
-                <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl">
-                  <Building2 className="h-8 w-8 text-blue-600" />
-                </div>
-              </div>
-            </div>
-
-            {/* Card 2 - Ativos */}
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Departamentos Ativos</p>
-                  <p className="text-3xl font-bold text-green-600">{totalAtivos}</p>
-                </div>
-                <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-xl">
-                  <CheckCircle className="h-8 w-8 text-green-600" />
-                </div>
-              </div>
-            </div>
-
-            {/* Card 3 - Inativos */}
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Departamentos Inativos</p>
-                  <p className="text-3xl font-bold text-gray-600">{totalInativos}</p>
-                </div>
-                <div className="p-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl">
-                  <AlertCircle className="h-8 w-8 text-gray-600" />
-                </div>
-              </div>
-            </div>
-
-            {/* Card 4 - Atendentes */}
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Total de Atendentes</p>
-                  <p className="text-3xl font-bold text-purple-600">{totalAtendentes}</p>
-                </div>
-                <div className="p-4 bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl">
-                  <Users className="h-8 w-8 text-purple-600" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Mensagens de erro/sucesso */}
-          {error && (
-            <div className="mb-6 flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
-              <AlertCircle className="h-5 w-5 flex-shrink-0" />
-              <p>{error}</p>
-              <button onClick={() => setError(null)} className="ml-auto">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-
-          {success && (
-            <div className="mb-6 flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">
-              <CheckCircle className="h-5 w-5 flex-shrink-0" />
-              <p>{success}</p>
-              <button onClick={() => setSuccess(null)} className="ml-auto">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-
-          {/* Info sobre drag-and-drop */}
-          <div className="mb-6 flex items-center gap-3 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-            <GripVertical className="h-5 w-5 text-purple-600 flex-shrink-0" />
-            <p className="text-sm text-purple-800">
-              <strong>Dica:</strong> Arraste os cards usando o ícone{' '}
-              <GripVertical className="inline h-4 w-4" /> para reordenar os departamentos.
-              A nova ordem será salva automaticamente.
-            </p>
-          </div>
-
-          {/* Barra de filtros */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Filter className="h-5 w-5 text-gray-600" />
-              <h2 className="text-lg font-semibold text-gray-900">Filtros</h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Busca */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    value={filtros.busca}
-                    onChange={(e) => setFiltros({ ...filtros, busca: e.target.value })}
-                    placeholder="Nome do departamento..."
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-              </div>
-
-              {/* Núcleo */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Núcleo</label>
-                <select
-                  value={filtros.nucleoId}
-                  onChange={(e) => setFiltros({ ...filtros, nucleoId: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">Todos os núcleos</option>
-                  {nucleos.map((nucleo) => (
-                    <option key={nucleo.id} value={nucleo.id}>
-                      {nucleo.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select
-                  value={filtros.ativo === undefined ? '' : filtros.ativo ? 'true' : 'false'}
-                  onChange={(e) =>
-                    setFiltros({
-                      ...filtros,
-                      ativo: e.target.value === '' ? undefined : e.target.value === 'true',
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">Todos</option>
-                  <option value="true">Ativos</option>
-                  <option value="false">Inativos</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 mt-4">
-              <Button variant="outline" onClick={limparFiltros} className="text-sm">
-                <X className="h-4 w-4 mr-1" />
-                Limpar Filtros
-              </Button>
-              <Button
-                onClick={() => carregarDados()}
-                variant="outline"
-                className="text-sm"
-              >
-                <RefreshCw className="h-4 w-4 mr-1" />
-                Atualizar
-              </Button>
-            </div>
-          </div>
-
-          {/* Lista/Grid de departamentos */}
-          {loading ? (
-            <div className="flex items-center justify-center py-16 bg-white rounded-lg shadow-sm border">
-              <div className="flex items-center gap-2 text-gray-600">
-                <div className="animate-spin rounded-full h-6 w-6 border-2 border-purple-500 border-t-transparent"></div>
-                <span>Carregando departamentos...</span>
-              </div>
-            </div>
-          ) : departamentosFiltrados.length === 0 ? (
-            <div className="text-center py-16 bg-white rounded-lg shadow-sm border">
-              <Building2 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Nenhum departamento encontrado
-              </h3>
-              <p className="text-gray-600 mb-6">
-                {filtros.busca || filtros.nucleoId
-                  ? 'Tente ajustar os filtros'
-                  : 'Comece criando seu primeiro departamento'}
-              </p>
-              {!filtros.busca && !filtros.nucleoId && (
-                <Button onClick={handleNovoClick} className="bg-purple-600 hover:bg-purple-700">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Criar Primeiro Departamento
-                </Button>
-              )}
-            </div>
-          ) : (
-            <DragDropContext onDragEnd={handleDragEnd}>
-              <Droppable droppableId="departamentos-list">
-                {(provided) => (
-                  <div
-                    {...provided.droppableProps}
-                    ref={provided.innerRef}
-                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                  >
-                    {departamentosFiltrados.map((dept, index) => {
-                      const nucleo = nucleos.find((n) => n.id === dept.nucleoId);
-                      const numAtendentes = dept.atendentesIds?.length || 0;
-
-                      return (
-                        <Draggable key={dept.id} draggableId={dept.id} index={index}>
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              className={`bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow ${snapshot.isDragging ? 'shadow-2xl ring-2 ring-purple-500' : ''
-                                }`}
-                            >
-                              {/* Header do card */}
-                              <div className="p-6 border-b border-gray-100">
-                                <div className="flex items-start justify-between mb-3">
-                                  <div className="flex items-center gap-2">
-                                    {/* Drag Handle */}
-                                    <div
-                                      {...provided.dragHandleProps}
-                                      className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded"
-                                      title="Arrastar para reordenar"
-                                    >
-                                      <GripVertical className="h-5 w-5 text-gray-400" />
-                                    </div>
-                                    <div
-                                      className="w-12 h-12 rounded-lg flex items-center justify-center text-white text-xl font-bold"
-                                      style={{ backgroundColor: dept.cor }}
-                                    >
-                                      {dept.nome.charAt(0).toUpperCase()}
-                                    </div>
-                                  </div>
-                                  <div className="flex gap-1">
-                                    <button
-                                      onClick={() => handleToggleStatus(dept)}
-                                      className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                                      title={dept.ativo ? 'Desativar' : 'Ativar'}
-                                    >
-                                      {dept.ativo ? (
-                                        <Eye className="h-4 w-4" />
-                                      ) : (
-                                        <EyeOff className="h-4 w-4" />
-                                      )}
-                                    </button>
-                                    <button
-                                      onClick={() => handleEditClick(dept)}
-                                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                      title="Editar"
-                                    >
-                                      <Edit2 className="h-4 w-4" />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDelete(dept)}
-                                      className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                      title="Excluir"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                </div>
-
-                                <h3 className="text-lg font-semibold text-gray-900 mb-1">{dept.nome}</h3>
-                                {dept.descricao && (
-                                  <p className="text-sm text-gray-600 line-clamp-2 mb-3">{dept.descricao}</p>
-                                )}
-
-                                <div className="flex flex-wrap gap-2">
-                                  {!dept.ativo && (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                      Inativo
-                                    </span>
-                                  )}
-                                  {dept.visivelNoBot && (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                      Bot ✓
-                                    </span>
-                                  )}
-                                  {dept.codigo && (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                      {dept.codigo}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Info do card */}
-                              <div className="p-6 space-y-3">
-                                {/* Núcleo */}
-                                {nucleo && (
-                                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                                    <Building2 className="h-4 w-4" />
-                                    <span>Núcleo: {nucleo.nome}</span>
-                                  </div>
-                                )}
-
-                                {/* Atendentes */}
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                                    <Users className="h-4 w-4" />
-                                    <span>{numAtendentes} atendente{numAtendentes !== 1 ? 's' : ''}</span>
-                                  </div>
-                                  <button
-                                    onClick={() => handleGerenciarAgentes(dept)}
-                                    className="text-xs text-purple-600 hover:text-purple-800 font-medium"
-                                  >
-                                    Gerenciar
-                                  </button>
-                                </div>
-
-                                {/* SLA */}
-                                {dept.slaRespostaMinutos && (
-                                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                                    <Clock className="h-4 w-4" />
-                                    <span>SLA: {dept.slaRespostaMinutos}min / {dept.slaResolucaoHoras}h</span>
-                                  </div>
-                                )}
-
-                                {/* Capacidade */}
-                                <div className="flex items-center gap-2 text-sm text-gray-600">
-                                  <TrendingUp className="h-4 w-4" />
-                                  <span>Cap: {dept.capacidadeMaximaTickets} tickets</span>
-                                </div>
-
-                                {/* Tipo distribuição */}
-                                <div className="pt-3 border-t border-gray-100">
-                                  <p className="text-xs text-gray-500">
-                                    {TIPOS_DISTRIBUICAO.find((t) => t.value === dept.tipoDistribuicao)
-                                      ?.label || dept.tipoDistribuicao}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </Draggable>
-                      );
-                    })}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </DragDropContext>
-          )}
+      {/* Barra de Ações */}
+      <div className="bg-white rounded-lg shadow-sm border border-[#DEEFE7] p-6 mb-6">
+        <div className="flex justify-end">
+          <Button
+            onClick={handleNovoClick}
+            className="bg-[#9333EA] hover:bg-purple-700 text-white"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Departamento
+          </Button>
         </div>
       </div>
+
+      {/* Mensagens de erro/sucesso */}
+      {error && (
+        <div className="mb-6 flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+          <AlertCircle className="h-5 w-5 flex-shrink-0" />
+          <p>{error}</p>
+          <button onClick={() => setError(null)} className="ml-auto">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {success && (
+        <div className="mb-6 flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">
+          <CheckCircle className="h-5 w-5 flex-shrink-0" />
+          <p>{success}</p>
+          <button onClick={() => setSuccess(null)} className="ml-auto">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Info sobre drag-and-drop */}
+      <div className="mb-6 flex items-center gap-3 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+        <GripVertical className="h-5 w-5 text-purple-600 flex-shrink-0" />
+        <p className="text-sm text-purple-800">
+          <strong>Dica:</strong> Arraste os cards usando o ícone{' '}
+          <GripVertical className="inline h-4 w-4" /> para reordenar os departamentos.
+          A nova ordem será salva automaticamente.
+        </p>
+      </div>
+
+      {/* Barra de filtros */}
+      <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Filter className="h-5 w-5 text-gray-600" />
+          <h2 className="text-lg font-semibold text-gray-900">Filtros</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Busca */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                value={filtros.busca}
+                onChange={(e) => setFiltros({ ...filtros, busca: e.target.value })}
+                placeholder="Nome do departamento..."
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+          </div>
+
+          {/* Núcleo */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Núcleo</label>
+            <select
+              value={filtros.nucleoId}
+              onChange={(e) => setFiltros({ ...filtros, nucleoId: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="">Todos os núcleos</option>
+              {nucleos.map((nucleo) => (
+                <option key={nucleo.id} value={nucleo.id}>
+                  {nucleo.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select
+              value={filtros.ativo === undefined ? '' : filtros.ativo ? 'true' : 'false'}
+              onChange={(e) =>
+                setFiltros({
+                  ...filtros,
+                  ativo: e.target.value === '' ? undefined : e.target.value === 'true',
+                })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="">Todos</option>
+              <option value="true">Ativos</option>
+              <option value="false">Inativos</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 mt-4">
+          <Button variant="outline" onClick={limparFiltros} className="text-sm">
+            <X className="h-4 w-4 mr-1" />
+            Limpar Filtros
+          </Button>
+          <Button
+            onClick={() => carregarDados()}
+            variant="outline"
+            className="text-sm"
+          >
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Atualizar
+          </Button>
+        </div>
+      </div>
+
+      {/* Lista/Grid de departamentos */}
+      {loading ? (
+        <div className="flex items-center justify-center py-16 bg-white rounded-lg shadow-sm border">
+          <div className="flex items-center gap-2 text-gray-600">
+            <div className="animate-spin rounded-full h-6 w-6 border-2 border-purple-500 border-t-transparent"></div>
+            <span>Carregando departamentos...</span>
+          </div>
+        </div>
+      ) : departamentosFiltrados.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-lg shadow-sm border">
+          <Building2 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            Nenhum departamento encontrado
+          </h3>
+          <p className="text-gray-600 mb-6">
+            {filtros.busca || filtros.nucleoId
+              ? 'Tente ajustar os filtros'
+              : 'Comece criando seu primeiro departamento'}
+          </p>
+          {!filtros.busca && !filtros.nucleoId && (
+            <Button onClick={handleNovoClick} className="bg-purple-600 hover:bg-purple-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Criar Primeiro Departamento
+            </Button>
+          )}
+        </div>
+      ) : (
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="departamentos-list">
+            {(provided) => (
+              <div
+                {...provided.droppableProps}
+                ref={provided.innerRef}
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              >
+                {departamentosFiltrados.map((dept, index) => {
+                  const nucleo = nucleos.find((n) => n.id === dept.nucleoId);
+                  const numAtendentes = dept.atendentesIds?.length || 0;
+
+                  return (
+                    <Draggable key={dept.id} draggableId={dept.id} index={index}>
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          className={`bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow ${snapshot.isDragging ? 'shadow-2xl ring-2 ring-purple-500' : ''
+                            }`}
+                        >
+                          {/* Header do card */}
+                          <div className="p-6 border-b border-gray-100">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                {/* Drag Handle */}
+                                <div
+                                  {...provided.dragHandleProps}
+                                  className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded"
+                                  title="Arrastar para reordenar"
+                                >
+                                  <GripVertical className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <div
+                                  className="w-12 h-12 rounded-lg flex items-center justify-center text-white text-xl font-bold"
+                                  style={{ backgroundColor: dept.cor }}
+                                >
+                                  {dept.nome.charAt(0).toUpperCase()}
+                                </div>
+                              </div>
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => handleToggleStatus(dept)}
+                                  className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                                  title={dept.ativo ? 'Desativar' : 'Ativar'}
+                                >
+                                  {dept.ativo ? (
+                                    <Eye className="h-4 w-4" />
+                                  ) : (
+                                    <EyeOff className="h-4 w-4" />
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => handleEditClick(dept)}
+                                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                  title="Editar"
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(dept)}
+                                  className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  title="Excluir"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+
+                            <h3 className="text-lg font-semibold text-gray-900 mb-1">{dept.nome}</h3>
+                            {dept.descricao && (
+                              <p className="text-sm text-gray-600 line-clamp-2 mb-3">{dept.descricao}</p>
+                            )}
+
+                            <div className="flex flex-wrap gap-2">
+                              {!dept.ativo && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                  Inativo
+                                </span>
+                              )}
+                              {dept.visivelNoBot && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  Bot ✓
+                                </span>
+                              )}
+                              {dept.codigo && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                  {dept.codigo}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Info do card */}
+                          <div className="p-6 space-y-3">
+                            {/* Núcleo */}
+                            {nucleo && (
+                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Building2 className="h-4 w-4" />
+                                <span>Núcleo: {nucleo.nome}</span>
+                              </div>
+                            )}
+
+                            {/* Atendentes */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Users className="h-4 w-4" />
+                                <span>{numAtendentes} atendente{numAtendentes !== 1 ? 's' : ''}</span>
+                              </div>
+                              <button
+                                onClick={() => handleGerenciarAgentes(dept)}
+                                className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+                              >
+                                Gerenciar
+                              </button>
+                            </div>
+
+                            {/* SLA */}
+                            {dept.slaRespostaMinutos && (
+                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Clock className="h-4 w-4" />
+                                <span>SLA: {dept.slaRespostaMinutos}min / {dept.slaResolucaoHoras}h</span>
+                              </div>
+                            )}
+
+                            {/* Capacidade */}
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <TrendingUp className="h-4 w-4" />
+                              <span>Cap: {dept.capacidadeMaximaTickets} tickets</span>
+                            </div>
+
+                            {/* Tipo distribuição */}
+                            <div className="pt-3 border-t border-gray-100">
+                              <p className="text-xs text-gray-500">
+                                {TIPOS_DISTRIBUICAO.find((t) => t.value === dept.tipoDistribuicao)
+                                  ?.label || dept.tipoDistribuicao}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </Draggable>
+                  );
+                })}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
+      )}
 
       {/* Modal de Criar/Editar (simplificado - abre como dialog) */}
       {showDialog && (
@@ -772,8 +741,8 @@ const GestaoDepartamentosPage: React.FC = () => {
                   value={formData.nucleoId}
                   onChange={(e) => setFormData({ ...formData, nucleoId: e.target.value })}
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${!formData.nucleoId
-                      ? 'border-red-300 focus:ring-red-500 bg-red-50'
-                      : 'border-gray-300 focus:ring-purple-500'
+                    ? 'border-red-300 focus:ring-red-500 bg-red-50'
+                    : 'border-gray-300 focus:ring-purple-500'
                     }`}
                 >
                   <option value="">⚠️ Selecione um núcleo primeiro</option>
@@ -982,3 +951,5 @@ const GestaoDepartamentosPage: React.FC = () => {
 };
 
 export default GestaoDepartamentosPage;
+
+

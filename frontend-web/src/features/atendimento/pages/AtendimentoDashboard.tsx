@@ -1,7 +1,7 @@
 import React from 'react';
-import { useI18n } from '../contexts/I18nContext';
-import { useTheme } from '../contexts/ThemeContext';
-import { KPICard } from '../components/common/KPICard';
+import { useI18n } from '../../../contexts/I18nContext';
+import { useTheme } from '../../../contexts/ThemeContext';
+import { KPICard } from '../../../components/common/KPICard';
 import {
   HeadphonesIcon,
   MessageSquare,
@@ -139,20 +139,20 @@ const AtendimentoDashboard: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="p-6">
         {/* Header Atendimento */}
-        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg shadow-sm p-6 mb-6">
+        <div className="bg-white border border-[#DEEFE7] rounded-lg shadow-sm p-6 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-3xl font-bold flex items-center text-purple-900">
-                <HeadphonesIcon className="h-8 w-8 mr-3 text-purple-600" />
+              <h1 className="text-3xl font-bold flex items-center text-[#002333]">
+                <HeadphonesIcon className="h-8 w-8 mr-3 text-[#159A9C]" />
                 Dashboard de Atendimento
               </h1>
-              <p className="mt-2 text-purple-700">
+              <p className="mt-2 text-[#64748B]">
                 Visão geral do atendimento omnichannel em tempo real
               </p>
             </div>
             <div className="mt-4 sm:mt-0 flex items-center space-x-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-purple-900">{atendimentoData.tickets.abertos}</div>
+                <div className="text-2xl font-bold text-[#002333]">{atendimentoData.tickets.abertos}</div>
                 <div className="text-sm text-purple-600">Tickets Abertos</div>
               </div>
               <div className="text-center">

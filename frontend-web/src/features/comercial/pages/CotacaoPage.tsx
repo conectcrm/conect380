@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { cotacaoService } from '../services/cotacaoService';
-import { fornecedorService } from '../services/fornecedorService';
-import { Cotacao, FiltroCotacao, StatusCotacao, PrioridadeCotacao } from '../types/cotacaoTypes';
-import ModalCadastroCotacao from '../components/modals/ModalCadastroCotacao';
-import ModalDetalhesCotacao from '../components/modals/ModalDetalhesCotacao';
+import { cotacaoService } from '../../../services/cotacaoService';
+import { fornecedorService } from '../../../services/fornecedorService';
+import { Cotacao, FiltroCotacao, StatusCotacao, PrioridadeCotacao } from '../../../types/cotacaoTypes';
+import ModalCadastroCotacao from '../../../components/modals/ModalCadastroCotacao';
+import ModalDetalhesCotacao from '../../../components/modals/ModalDetalhesCotacao';
 import {
   Plus,
   Search,
@@ -29,7 +29,7 @@ import {
   Mail,
   Copy
 } from 'lucide-react';
-import { BackToNucleus } from '../components/navigation/BackToNucleus';
+import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 
 // Tipos locais
 interface DashboardCards {
@@ -372,9 +372,9 @@ function CotacaoPage() {
                 <div className="mt-4 sm:mt-0 flex items-center gap-3">
                   <button
                     onClick={abrirModalNovo}
-                    className="bg-[#159A9C] hover:bg-[#0d7a7c] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                    className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium"
                   >
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-4 h-4" />
                     Nova Cotação
                   </button>
                 </div>
@@ -384,54 +384,54 @@ function CotacaoPage() {
 
           {/* Dashboard Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total de Cotações</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-2">{dashboardCards.totalCotacoes}</p>
-                  <p className="text-xs text-gray-400 mt-1">📊 Visão geral</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Total de Cotações</p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.totalCotacoes}</p>
+                  <p className="text-sm text-[#002333]/70 mt-3">📊 Visão geral</p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl">
-                  <FileText className="w-8 h-8 text-blue-600" />
+                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                  <FileText className="w-6 h-6 text-[#159A9C]" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Pendentes</p>
-                  <p className="text-3xl font-bold text-yellow-600 mt-2">{dashboardCards.cotacoesPendentes}</p>
-                  <p className="text-xs text-yellow-500 mt-1">⏳ Em andamento</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Pendentes</p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.cotacoesPendentes}</p>
+                  <p className="text-sm text-[#002333]/70 mt-3">⏳ Em andamento</p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-xl">
-                  <Clock className="w-8 h-8 text-yellow-600" />
+                <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
+                  <Clock className="w-6 h-6 text-yellow-600" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Aprovadas</p>
-                  <p className="text-3xl font-bold text-green-600 mt-2">{dashboardCards.cotacoesAprovadas}</p>
-                  <p className="text-xs text-green-500 mt-1">✅ Aprovadas</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Aprovadas</p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.cotacoesAprovadas}</p>
+                  <p className="text-sm text-[#002333]/70 mt-3">✅ Aprovadas</p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-xl">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
+                <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
+                  <CheckCircle className="w-6 h-6 text-green-600" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Vencidas</p>
-                  <p className="text-3xl font-bold text-red-600 mt-2">{dashboardCards.cotacoesVencidas}</p>
-                  <p className="text-xs text-red-500 mt-1">❌ Atrasadas</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Vencidas</p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.cotacoesVencidas}</p>
+                  <p className="text-sm text-[#002333]/70 mt-3">❌ Atrasadas</p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-red-100 to-red-200 rounded-xl">
-                  <AlertCircle className="w-8 h-8 text-red-600" />
+                <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center shadow-sm">
+                  <AlertCircle className="w-6 h-6 text-red-600" />
                 </div>
               </div>
             </div>
@@ -488,7 +488,7 @@ function CotacaoPage() {
                   <button
                     onClick={exportarParaCSV}
                     disabled={cotacoes.length === 0}
-                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                    className="px-3 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 transition-colors text-sm font-medium"
                     title="Exportar para CSV"
                   >
                     <Download className="w-4 h-4" />
@@ -497,7 +497,7 @@ function CotacaoPage() {
                   <button
                     onClick={exportarParaExcel}
                     disabled={cotacoes.length === 0}
-                    className="px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                    className="px-3 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 transition-colors text-sm font-medium"
                     title="Exportar para Excel"
                   >
                     <FileSpreadsheet className="w-4 h-4" />
@@ -510,7 +510,7 @@ function CotacaoPage() {
 
           {/* Ações em Massa */}
           {mostrarAcoesMassa && (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
@@ -531,28 +531,28 @@ function CotacaoPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
                     onClick={() => alterarStatusSelecionadas('aprovada')}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 flex items-center gap-2 transition-colors"
+                    className="px-4 py-2 bg-[#159A9C] text-white rounded-lg text-sm font-medium hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors"
                   >
                     <Check className="w-4 h-4" />
                     Aprovar
                   </button>
                   <button
                     onClick={() => alterarStatusSelecionadas('rejeitada')}
-                    className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm hover:bg-orange-700 flex items-center gap-2 transition-colors"
+                    className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 flex items-center gap-2 transition-colors"
                   >
                     <X className="w-4 h-4" />
                     Rejeitar
                   </button>
                   <button
                     onClick={exportarSelecionadas}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 flex items-center gap-2 transition-colors"
+                    className="px-4 py-2 bg-[#159A9C] text-white rounded-lg text-sm font-medium hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors"
                   >
                     <Download className="w-4 h-4" />
                     Exportar
                   </button>
                   <button
                     onClick={excluirSelecionadas}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 flex items-center gap-2 transition-colors"
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 flex items-center gap-2 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                     Excluir
@@ -585,7 +585,7 @@ function CotacaoPage() {
                 </p>
                 <button
                   onClick={abrirModalNovo}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg inline-flex items-center gap-2"
+                  className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg inline-flex items-center gap-2 text-sm font-medium"
                 >
                   <Plus className="w-4 h-4" />
                   Criar Primeira Cotação
@@ -594,7 +594,7 @@ function CotacaoPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                  <thead className="bg-white border-b border-gray-200">
                     <tr>
                       <th className="px-4 py-4 text-left">
                         <div className="flex items-center">

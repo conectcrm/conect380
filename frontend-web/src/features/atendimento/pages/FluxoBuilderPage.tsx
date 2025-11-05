@@ -21,20 +21,20 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Play, AlertCircle, CheckCircle2, Smartphone, History } from 'lucide-react';
 
 // Components
-import { BlockLibrary } from '../features/bot-builder/components/BlockLibrary';
-import { BlockConfig } from '../features/bot-builder/components/BlockConfig';
-import { WhatsAppPreview } from '../features/bot-builder/components/WhatsAppPreview';
-import { ModalHistoricoVersoes } from '../features/bot-builder/components/ModalHistoricoVersoes';
-import { BackToNucleus } from '../components/navigation/BackToNucleus';
+import { BlockLibrary } from '../../bot-builder/components/BlockLibrary';
+import { BlockConfig } from '../../bot-builder/components/BlockConfig';
+import { WhatsAppPreview } from '../../bot-builder/components/WhatsAppPreview';
+import { ModalHistoricoVersoes } from '../../bot-builder/components/ModalHistoricoVersoes';
+import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 
 // Blocks
-import { StartBlock } from '../features/bot-builder/components/blocks/StartBlock';
-import { MessageBlock } from '../features/bot-builder/components/blocks/MessageBlock';
-import { MenuBlock } from '../features/bot-builder/components/blocks/MenuBlock';
-import { QuestionBlock } from '../features/bot-builder/components/blocks/QuestionBlock';
-import { ConditionBlock } from '../features/bot-builder/components/blocks/ConditionBlock';
-import { ActionBlock } from '../features/bot-builder/components/blocks/ActionBlock';
-import { EndBlock } from '../features/bot-builder/components/blocks/EndBlock';
+import { StartBlock } from '../../bot-builder/components/blocks/StartBlock';
+import { MessageBlock } from '../../bot-builder/components/blocks/MessageBlock';
+import { MenuBlock } from '../../bot-builder/components/blocks/MenuBlock';
+import { QuestionBlock } from '../../bot-builder/components/blocks/QuestionBlock';
+import { ConditionBlock } from '../../bot-builder/components/blocks/ConditionBlock';
+import { ActionBlock } from '../../bot-builder/components/blocks/ActionBlock';
+import { EndBlock } from '../../bot-builder/components/blocks/EndBlock';
 
 // Utils
 import {
@@ -43,16 +43,16 @@ import {
   validateFlow,
   generateNodeId,
   calculateNewNodePosition
-} from '../features/bot-builder/utils/flowConverter';
-import { corrigirLoopsAutomaticamente } from '../features/bot-builder/utils/loop-fixer';
+} from '../../bot-builder/utils/flowConverter';
+import { corrigirLoopsAutomaticamente } from '../../bot-builder/utils/loop-fixer';
 
 // Types
-import { FlowNode, FlowEdge, Etapa, BlockData, EstruturaFluxo } from '../features/bot-builder/types/flow-builder.types';
+import { FlowNode, FlowEdge, Etapa, BlockData, EstruturaFluxo } from '../../bot-builder/types/flow-builder.types';
 
 // Services
-import fluxoService from '../services/fluxoService';
-import nucleoService from '../services/nucleoService';
-import { FlowTestModal } from '../features/bot-builder/components/FlowTestModal';
+import fluxoService from '../../../services/fluxoService';
+import nucleoService from '../../../services/nucleoService';
+import { FlowTestModal } from '../../bot-builder/components/FlowTestModal';
 
 // Node Types
 const nodeTypes = {

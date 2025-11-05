@@ -13,13 +13,18 @@ import {
   CheckCircle,
   AlertCircle,
 } from 'lucide-react';
-import { BackToNucleus } from '../components/navigation/BackToNucleus';
+import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
+import { KPICard } from '../../../components/common/KPICard';
 import equipeService, {
   Equipe,
   CreateEquipeDto,
-} from '../services/equipeService';
+} from '../../../services/equipeService';
 
-const GestaoEquipesPage: React.FC = () => {
+interface GestaoEquipesPageProps {
+  hideBackButton?: boolean;
+}
+
+const GestaoEquipesPage: React.FC<GestaoEquipesPageProps> = ({ hideBackButton = false }) => {
   const [equipes, setEquipes] = useState<Equipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -181,233 +186,187 @@ const GestaoEquipesPage: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 p-6">
       {/* Header */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusName="Atendimento"
-          nucleusPath="/nuclei/atendimento"
+      {!hideBackButton && (
+        <div className="bg-white border-b px-6 py-4 -mx-6 -mt-6 mb-6">
+          <BackToNucleus
+            nucleusName="Atendimento"
+            nucleusPath="/nuclei/atendimento"
+          />
+        </div>
+      )}
+
+      {/* Dashboard Cards - Tema Crevasse */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <KPICard
+          titulo="Total de Equipes"
+          valor={totalEquipes}
+          icone={Users}
+          descricao="📊 Visão geral"
+          color="crevasse"
+        />
+
+        <KPICard
+          titulo="Equipes Ativas"
+          valor={equipesAtivas}
+          icone={CheckCircle}
+          descricao="✅ Operacionais"
+          color="crevasse"
+        />
+
+        <KPICard
+          titulo="Inativas"
+          valor={equipesInativas}
+          icone={AlertCircle}
+          descricao="⏸️ Pausadas"
+          color="crevasse"
+        />
+
+        <KPICard
+          titulo="Total de Membros"
+          valor={totalMembros}
+          icone={UserPlus}
+          descricao="👥 Atendentes"
+          color="crevasse"
         />
       </div>
 
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="bg-white rounded-lg shadow-sm border mb-6">
-            <div className="px-6 py-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start">
-                <div>
-                  <h1 className="text-3xl font-bold text-[#002333] flex items-center">
-                    <Users className="h-8 w-8 mr-3 text-[#9333EA]" />
-                    Gestão de Equipes
-                    {loading && (
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#9333EA] ml-3"></div>
-                    )}
-                  </h1>
-                  <p className="mt-2 text-[#B4BEC9]">
-                    {loading ? 'Carregando equipes...' : `Gerencie suas ${totalEquipes} equipes de atendimento`}
-                  </p>
-                </div>
-                <div className="mt-4 sm:mt-0 flex items-center gap-3">
-                  <button
-                    onClick={carregarEquipes}
-                    disabled={loading}
-                    className="px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                  >
-                    <RefreshCw className={`w-5 h-5 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
-                  </button>
-                  <button
-                    onClick={() => handleOpenDialog()}
-                    className="bg-[#9333EA] hover:bg-[#7E22CE] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-                  >
-                    <Plus className="w-5 h-5" />
-                    Nova Equipe
-                  </button>
-                </div>
-              </div>
-            </div>
+      {/* Barra de Busca e Ações */}
+      <div className="bg-white rounded-lg shadow-sm border border-[#DEEFE7] p-6 mb-6">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="Buscar equipes..."
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent"
+            />
           </div>
-
-          {/* Dashboard Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total de Equipes</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-2">{totalEquipes}</p>
-                  <p className="text-xs text-gray-400 mt-1">📊 Visão geral</p>
-                </div>
-                <div className="p-4 bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl">
-                  <Users className="w-8 h-8 text-purple-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Equipes Ativas</p>
-                  <p className="text-3xl font-bold text-green-600 mt-2">{equipesAtivas}</p>
-                  <p className="text-xs text-green-500 mt-1">✅ Operacionais</p>
-                </div>
-                <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-xl">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Inativas</p>
-                  <p className="text-3xl font-bold text-gray-600 mt-2">{equipesInativas}</p>
-                  <p className="text-xs text-gray-500 mt-1">⏸️ Pausadas</p>
-                </div>
-                <div className="p-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl">
-                  <AlertCircle className="w-8 h-8 text-gray-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total de Membros</p>
-                  <p className="text-3xl font-bold text-blue-600 mt-2">{totalMembros}</p>
-                  <p className="text-xs text-blue-500 mt-1">👥 Atendentes</p>
-                </div>
-                <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl">
-                  <UserPlus className="w-8 h-8 text-blue-600" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Filtros */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Buscar Equipes</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="text"
-                    placeholder="Buscar por nome ou descrição..."
-                    value={busca}
-                    onChange={(e) => setBusca(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent transition-colors"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Error Alert */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-              <p className="text-red-800">{error}</p>
-            </div>
-          )}
-
-          {/* Estado vazio */}
-          {!loading && equipesFiltradas.length === 0 && (
-            <div className="bg-white rounded-lg shadow-sm border">
-              <div className="text-center py-12 px-6">
-                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  {busca ? 'Nenhuma equipe encontrada' : 'Nenhuma equipe cadastrada'}
-                </h3>
-                <p className="text-gray-600 mb-4">
-                  {busca
-                    ? 'Tente ajustar os filtros de busca'
-                    : 'Crie sua primeira equipe para começar a organizar seus atendentes'}
-                </p>
-                {!busca && (
-                  <button
-                    onClick={() => handleOpenDialog()}
-                    className="bg-[#9333EA] hover:bg-[#7E22CE] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm mx-auto"
-                  >
-                    <Plus className="w-5 h-5" />
-                    Criar Primeira Equipe
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Cards de Equipes */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {equipesFiltradas.map((equipe) => (
-              <div key={equipe.id} className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow duration-300">
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3 flex-1">
-                      <div
-                        className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-md flex-shrink-0"
-                        style={{ backgroundColor: equipe.cor }}
-                      >
-                        <Users className="h-6 w-6" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-semibold text-gray-900 truncate">{equipe.nome}</h3>
-                        <p className="text-sm">
-                          {equipe.ativo ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              Ativa
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                              Inativa
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-1 flex-shrink-0 ml-2">
-                      <button
-                        onClick={() => handleOpenDialog(equipe)}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="Editar"
-                      >
-                        <Edit2 className="h-4 w-4 text-gray-600" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(equipe.id)}
-                        className="p-2 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Excluir"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {equipe.descricao && (
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                      {equipe.descricao}
-                    </p>
-                  )}
-
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <UserPlus className="h-4 w-4" />
-                      <span>{equipe.atendenteEquipes?.length || 0} membros</span>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setManagingEquipeId(equipe.id);
-                        setShowMembersDialog(true);
-                      }}
-                      className="text-[#9333EA] hover:text-[#7E22CE] text-sm font-medium flex items-center gap-1 transition-colors"
-                    >
-                      <Settings className="h-4 w-4" />
-                      Gerenciar
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="flex gap-2">
+            <button
+              onClick={carregarEquipes}
+              disabled={loading}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => handleOpenDialog()}
+              className="inline-flex items-center px-4 py-2 bg-[#9333EA] text-white rounded-lg hover:bg-[#7E22CE] transition-colors"
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Nova Equipe
+            </button>
           </div>
         </div>
+      </div>
+
+      {/* Error Alert */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <p className="text-red-800">{error}</p>
+        </div>
+      )}
+
+      {/* Estado vazio */}
+      {!loading && equipesFiltradas.length === 0 && (
+        <div className="bg-white rounded-lg shadow-sm border">
+          <div className="text-center py-12 px-6">
+            <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {busca ? 'Nenhuma equipe encontrada' : 'Nenhuma equipe cadastrada'}
+            </h3>
+            <p className="text-gray-600 mb-4">
+              {busca
+                ? 'Tente ajustar os filtros de busca'
+                : 'Crie sua primeira equipe para começar a organizar seus atendentes'}
+            </p>
+            {!busca && (
+              <button
+                onClick={() => handleOpenDialog()}
+                className="bg-[#9333EA] hover:bg-[#7E22CE] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm mx-auto"
+              >
+                <Plus className="w-5 h-5" />
+                Criar Primeira Equipe
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Cards de Equipes */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {equipesFiltradas.map((equipe) => (
+          <div key={equipe.id} className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow duration-300">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3 flex-1">
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-md flex-shrink-0"
+                    style={{ backgroundColor: equipe.cor }}
+                  >
+                    <Users className="h-6 w-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-gray-900 truncate">{equipe.nome}</h3>
+                    <p className="text-sm">
+                      {equipe.ativo ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Ativa
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          Inativa
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-1 flex-shrink-0 ml-2">
+                  <button
+                    onClick={() => handleOpenDialog(equipe)}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Editar"
+                  >
+                    <Edit2 className="h-4 w-4 text-gray-600" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(equipe.id)}
+                    className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 className="h-4 w-4 text-red-500" />
+                  </button>
+                </div>
+              </div>
+
+              {equipe.descricao && (
+                <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                  {equipe.descricao}
+                </p>
+              )}
+
+              <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <UserPlus className="h-4 w-4" />
+                  <span>{equipe.atendenteEquipes?.length || 0} membros</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setManagingEquipeId(equipe.id);
+                    setShowMembersDialog(true);
+                  }}
+                  className="text-[#9333EA] hover:text-[#7E22CE] text-sm font-medium flex items-center gap-1 transition-colors"
+                >
+                  <Settings className="h-4 w-4" />
+                  Gerenciar
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Dialog de Criação/Edição */}
@@ -745,8 +704,8 @@ const MembersDialog: React.FC<MembersDialogProps> = ({ equipeId, onClose }) => {
                       onClick={() => handleAddMember(user)}
                       disabled={!user.usuarioId}
                       className={`px-4 py-2 text-sm flex items-center gap-2 rounded-lg transition-colors ${user.usuarioId
-                          ? 'bg-[#9333EA] text-white hover:bg-[#7E22CE]'
-                          : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                        ? 'bg-[#9333EA] text-white hover:bg-[#7E22CE]'
+                        : 'bg-gray-200 text-gray-500 cursor-not-allowed'
                         }`}
                     >
                       <UserPlus className="h-4 w-4" />

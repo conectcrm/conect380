@@ -24,9 +24,9 @@ import {
   Download
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { emailServiceReal } from '../services/emailServiceReal';
-import { EMAIL_PROVIDERS } from '../config/emailConfig';
-import { BackToNucleus } from '../components/navigation/BackToNucleus';
+import { emailServiceReal } from '../../../services/emailServiceReal';
+import { EMAIL_PROVIDERS } from '../../../config/emailConfig';
+import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 
 const ConfiguracaoEmailPage: React.FC = () => {
   const [providerAtual, setProviderAtual] = useState('gmail');
@@ -697,7 +697,7 @@ const ConfiguracaoEmailPage: React.FC = () => {
                     <button
                       onClick={salvarConfiguracao}
                       disabled={salvando}
-                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="flex items-center px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                     >
                       {salvando ? (
                         <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -763,7 +763,7 @@ const ConfiguracaoEmailPage: React.FC = () => {
                     <button
                       onClick={testarEmail}
                       disabled={testando || !emailTeste}
-                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="flex items-center px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                     >
                       {testando ? (
                         <RefreshCw className="w-4 h-4 mr-2 animate-spin" />

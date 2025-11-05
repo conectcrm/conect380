@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import toast from 'react-hot-toast';
 import {
   RefreshCw,
@@ -14,10 +14,11 @@ import {
   Briefcase,
   AlertCircle,
 } from 'lucide-react';
-import { BackToNucleus } from '../components/navigation/BackToNucleus';
-import equipeService from '../services/equipeService';
-import nucleoService from '../services/nucleoService';
-import { departamentoService } from '../services/departamentoService';
+import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
+import { KPICard } from '../../../components/common/KPICard';
+import equipeService from '../../../services/equipeService';
+import nucleoService from '../../../services/nucleoService';
+import { departamentoService } from '../../../services/departamentoService';
 
 interface Nucleo {
   id: string;
@@ -69,7 +70,11 @@ interface GrupoNucleo {
   itens: AtribuicaoView[];
 }
 
-const GestaoAtribuicoesPage: React.FC = () => {
+interface GestaoAtribuicoesPageProps {
+  hideBackButton?: boolean;
+}
+
+const GestaoAtribuicoesPage: React.FC<GestaoAtribuicoesPageProps> = ({ hideBackButton = false }) => {
   const [atribuicoes, setAtribuicoes] = useState<AtribuicaoView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,19 +93,51 @@ const GestaoAtribuicoesPage: React.FC = () => {
   const [formNucleoId, setFormNucleoId] = useState('');
   const [formDepartamentoId, setFormDepartamentoId] = useState('');
 
+  // ✅ Controle para evitar execução duplicada (React StrictMode)
+  const carregandoRef = useRef(false);
+
   useEffect(() => {
+    if (carregandoRef.current) {
+      console.log('⚠️ Carregamento já em andamento, ignorando duplicação');
+      return;
+    }
     carregarDados();
   }, []);
 
+  // Função auxiliar para executar promises com limite de concorrência
+  const executarComLimite = async <T,>(
+    promises: (() => Promise<T>)[],
+    limite: number = 3
+  ): Promise<T[]> => {
+    const resultados: T[] = [];
+    for (let i = 0; i < promises.length; i += limite) {
+      const lote = promises.slice(i, i + limite);
+      const resultadosLote = await Promise.all(lote.map(fn => fn()));
+      resultados.push(...resultadosLote);
+      // Aguardar 500ms entre lotes para evitar rate limit
+      if (i + limite < promises.length) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+    return resultados;
+  };
+
   const carregarDados = async () => {
+    // ✅ Verificar se já está carregando
+    if (carregandoRef.current) {
+      console.log('⚠️ Carregamento já em andamento, abortando duplicação');
+      return;
+    }
+
     try {
+      carregandoRef.current = true; // ✅ Marcar como carregando
       setLoading(true);
       setError(null);
 
       const [equipesResponse, atendentesResponse, nucleosResponse] = await Promise.all([
         equipeService.listar(),
         equipeService.listarTodosAtendentes(),
-        nucleoService.listar({ ativo: true, visivelNoBot: true }),
+        nucleoService.listar({ ativo: true }), // visivelNoBot removido - não existe no DTO
       ]);
 
       const equipesNormalizadas: Equipe[] = Array.isArray(equipesResponse)
@@ -121,31 +158,32 @@ const GestaoAtribuicoesPage: React.FC = () => {
         ? nucleosResponse.filter((nucleo: any) => nucleo?.visivelNoBot)
         : [];
 
-      const nucleosComDepartamentos: Nucleo[] = await Promise.all(
-        nucleosVisiveis.map(async (nucleo: any) => {
-          try {
-            const departamentos = await departamentoService.listarPorNucleo(nucleo.id);
-            const departamentosNormalizados: Departamento[] = Array.isArray(departamentos)
-              ? departamentos.map((dep: any) => ({ id: dep.id, nome: dep.nome || 'Departamento' }))
-              : [];
+      // ✅ LIMITAR CONCORRÊNCIA: 3 núcleos por vez com delay entre lotes
+      const promisesDepartamentos = nucleosVisiveis.map((nucleo: any) => async () => {
+        try {
+          const departamentos = await departamentoService.listarPorNucleo(nucleo.id);
+          const departamentosNormalizados: Departamento[] = Array.isArray(departamentos)
+            ? departamentos.map((dep: any) => ({ id: dep.id, nome: dep.nome || 'Departamento' }))
+            : [];
 
-            return {
-              id: nucleo.id,
-              nome: nucleo.nome,
-              visivelNoBot: nucleo.visivelNoBot,
-              departamentos: departamentosNormalizados,
-            };
-          } catch (departamentoErro) {
-            console.error('Erro ao carregar departamentos do núcleo', nucleo.id, departamentoErro);
-            return {
-              id: nucleo.id,
-              nome: nucleo.nome,
-              visivelNoBot: nucleo.visivelNoBot,
-              departamentos: [],
-            };
-          }
-        }),
-      );
+          return {
+            id: nucleo.id,
+            nome: nucleo.nome,
+            visivelNoBot: nucleo.visivelNoBot,
+            departamentos: departamentosNormalizados,
+          };
+        } catch (departamentoErro) {
+          console.error('Erro ao carregar departamentos do núcleo', nucleo.id, departamentoErro);
+          return {
+            id: nucleo.id,
+            nome: nucleo.nome,
+            visivelNoBot: nucleo.visivelNoBot,
+            departamentos: [],
+          };
+        }
+      });
+
+      const nucleosComDepartamentos = await executarComLimite(promisesDepartamentos, 3);
 
       setEquipes(equipesNormalizadas);
       setAtendentes(atendentesNormalizados);
@@ -156,12 +194,14 @@ const GestaoAtribuicoesPage: React.FC = () => {
       console.error('Erro ao carregar matriz de atribuições:', err);
       setError('Não foi possível carregar os dados. Tente novamente.');
     } finally {
+      carregandoRef.current = false; // ✅ Liberar para próxima chamada
       setLoading(false);
     }
   };
 
   const carregarAtribuicoes = async (equipesLista: Equipe[], atendentesLista: Atendente[]) => {
-    const atribuicoesEquipePromises = equipesLista.map(async (equipe) => {
+    // ✅ LIMITAR CONCORRÊNCIA: 3 equipes por vez
+    const promisesEquipes = equipesLista.map((equipe) => async () => {
       try {
         const registros = await equipeService.listarAtribuicoes(equipe.id);
         if (!Array.isArray(registros)) return [];
@@ -183,7 +223,8 @@ const GestaoAtribuicoesPage: React.FC = () => {
       }
     });
 
-    const atribuicoesAtendentePromises = atendentesLista.map(async (atendente) => {
+    // ✅ LIMITAR CONCORRÊNCIA: 3 atendentes por vez
+    const promisesAtendentes = atendentesLista.map((atendente) => async () => {
       try {
         const registros = await equipeService.listarAtribuicoesAtendente(atendente.id);
         if (!Array.isArray(registros)) return [];
@@ -204,10 +245,9 @@ const GestaoAtribuicoesPage: React.FC = () => {
       }
     });
 
-    const [atribuicoesEquipe, atribuicoesAtendentes] = await Promise.all([
-      Promise.all(atribuicoesEquipePromises),
-      Promise.all(atribuicoesAtendentePromises),
-    ]);
+    // ✅ Executar com controle de concorrência
+    const atribuicoesEquipe = await executarComLimite(promisesEquipes, 3);
+    const atribuicoesAtendentes = await executarComLimite(promisesAtendentes, 3);
 
     const todasAtribuicoes = [...atribuicoesEquipe.flat(), ...atribuicoesAtendentes.flat()];
     setAtribuicoes(todasAtribuicoes);
@@ -443,146 +483,123 @@ const GestaoAtribuicoesPage: React.FC = () => {
   const nucleoSelecionado = nucleos.find((n) => n.id === formNucleoId);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Atendimento" nucleusPath="/nuclei/atendimento" />
-      </div>
-
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto">
-          <header className="bg-white rounded-lg shadow-sm border mb-6">
-            <div className="px-6 py-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                <div>
-                  <h1 className="text-3xl font-bold text-[#002333] flex items-center">
-                    <Briefcase className="h-8 w-8 mr-3 text-[#9333EA]" />
-                    Matriz de Atribuições
-                    {loading && (
-                      <span className="ml-3">
-                        <RefreshCw className="h-6 w-6 text-[#9333EA] animate-spin" />
-                      </span>
-                    )}
-                  </h1>
-                  <p className="mt-2 text-[#B4BEC9]">
-                    Defina quem atende cada núcleo e departamento do atendimento
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={carregarDados}
-                    className="px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    disabled={loading}
-                  >
-                    <RefreshCw className={`w-5 h-5 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
-                  </button>
-                  <button
-                    onClick={() => setShowDialog(true)}
-                    className="bg-[#9333EA] hover:bg-[#7E22CE] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-                  >
-                    <Plus className="w-5 h-5" />
-                    Nova Atribuição
-                  </button>
-                </div>
-              </div>
-            </div>
-          </header>
-
-          <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            <DashboardCard
-              titulo="Total Atribuições"
-              valor={totalAtribuicoes}
-              icone={<Target className="h-8 w-8 text-blue-600" />}
-              gradiente="from-blue-100 to-blue-200"
-            />
-            <DashboardCard
-              titulo="Atendentes"
-              valor={totalAtendentes}
-              icone={<User className="h-8 w-8 text-green-600" />}
-              gradiente="from-green-100 to-green-200"
-            />
-            <DashboardCard
-              titulo="Equipes"
-              valor={totalEquipes}
-              icone={<Users className="h-8 w-8 text-purple-600" />}
-              gradiente="from-purple-100 to-purple-200"
-            />
-            <DashboardCard
-              titulo="Núcleos"
-              valor={totalNucleos}
-              icone={<GitBranch className="h-8 w-8 text-yellow-600" />}
-              gradiente="from-yellow-100 to-yellow-200"
-            />
-          </section>
-
-          <section className="bg-white rounded-lg shadow-sm border p-4 mb-6">
-            <div className="flex gap-2">
-              <button
-                onClick={() => setViewMode('atendente')}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${viewMode === 'atendente'
-                    ? 'bg-[#9333EA] text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-              >
-                <User className="h-4 w-4" />
-                Por Atendente/Equipe
-              </button>
-              <button
-                onClick={() => setViewMode('nucleo')}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${viewMode === 'nucleo'
-                    ? 'bg-[#9333EA] text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-              >
-                <Target className="h-4 w-4" />
-                Por Núcleo
-              </button>
-            </div>
-          </section>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex gap-3 items-start">
-              <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          )}
-
-          {loading ? (
-            <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
-              <RefreshCw className="h-12 w-12 text-gray-400 animate-spin mx-auto mb-4" />
-              <p className="text-gray-600">Carregando atribuições...</p>
-            </div>
-          ) : atribuicoes.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
-              <Target className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhuma atribuição configurada</h3>
-              <p className="text-gray-500 mb-6">
-                Cadastre atribuições para direcionar atendentes e equipes aos núcleos corretos.
-              </p>
-              <button
-                onClick={() => setShowDialog(true)}
-                className="bg-[#9333EA] hover:bg-[#7E22CE] text-white px-6 py-3 rounded-lg inline-flex items-center gap-2 transition-colors"
-              >
-                <Plus className="w-5 h-5" />
-                Criar primeira atribuição
-              </button>
-            </div>
-          ) : viewMode === 'atendente' ? (
-            <ViewPorResponsavel
-              grupos={gruposResponsavel}
-              expandedItems={expandedItems}
-              onToggle={toggleExpanded}
-              onRemover={handleRemoverAtribuicao}
-            />
-          ) : (
-            <ViewPorNucleo
-              grupos={gruposNucleo}
-              expandedItems={expandedItems}
-              onToggle={toggleExpanded}
-              onRemover={handleRemoverAtribuicao}
-            />
-          )}
+    <div className="min-h-screen bg-gray-50 p-6">
+      {!hideBackButton && (
+        <div className="bg-white border-b px-6 py-4 -mx-6 -mt-6 mb-6">
+          <BackToNucleus nucleusName="Atendimento" nucleusPath="/nuclei/atendimento" />
         </div>
-      </div>
+      )}
+
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <KPICard
+          titulo="Total Atribuições"
+          valor={totalAtribuicoes}
+          icone={Target}
+          color="crevasse"
+        />
+        <KPICard
+          titulo="Atendentes"
+          valor={totalAtendentes}
+          icone={User}
+          color="crevasse"
+        />
+        <KPICard
+          titulo="Equipes"
+          valor={totalEquipes}
+          icone={Users}
+          color="crevasse"
+        />
+        <KPICard
+          titulo="Núcleos"
+          valor={totalNucleos}
+          icone={GitBranch}
+          color="crevasse"
+        />
+      </section>
+
+      <section className="bg-white rounded-lg shadow-sm border border-[#DEEFE7] p-6 mb-6">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setViewMode('atendente')}
+              className={`px-4 py-2 rounded-lg transition-colors ${viewMode === 'atendente'
+                ? 'bg-[#9333EA] text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+            >
+              Por Atendente
+            </button>
+            <button
+              onClick={() => setViewMode('nucleo')}
+              className={`px-4 py-2 rounded-lg transition-colors ${viewMode === 'nucleo'
+                ? 'bg-[#9333EA] text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+            >
+              Por Núcleo
+            </button>
+          </div>
+          <div className="flex gap-2 sm:ml-auto">
+            <button
+              onClick={carregarDados}
+              disabled={loading}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => setShowDialog(true)}
+              className="inline-flex items-center px-4 py-2 bg-[#9333EA] text-white rounded-lg hover:bg-[#7E22CE] transition-colors"
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Nova Atribuição
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex gap-3 items-start">
+          <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+          <p className="text-sm text-red-800">{error}</p>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
+          <RefreshCw className="h-12 w-12 text-gray-400 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Carregando atribuições...</p>
+        </div>
+      ) : atribuicoes.length === 0 ? (
+        <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
+          <Target className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhuma atribuição configurada</h3>
+          <p className="text-gray-500 mb-6">
+            Cadastre atribuições para direcionar atendentes e equipes aos núcleos corretos.
+          </p>
+          <button
+            onClick={() => setShowDialog(true)}
+            className="bg-[#9333EA] hover:bg-[#7E22CE] text-white px-6 py-3 rounded-lg inline-flex items-center gap-2 transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            Criar primeira atribuição
+          </button>
+        </div>
+      ) : viewMode === 'atendente' ? (
+        <ViewPorResponsavel
+          grupos={gruposResponsavel}
+          expandedItems={expandedItems}
+          onToggle={toggleExpanded}
+          onRemover={handleRemoverAtribuicao}
+        />
+      ) : (
+        <ViewPorNucleo
+          grupos={gruposNucleo}
+          expandedItems={expandedItems}
+          onToggle={toggleExpanded}
+          onRemover={handleRemoverAtribuicao}
+        />
+      )}
 
       {showDialog && (
         <ModalNovaAtribuicao
@@ -615,24 +632,7 @@ const GestaoAtribuicoesPage: React.FC = () => {
   );
 };
 
-interface DashboardCardProps {
-  titulo: string;
-  valor: number;
-  icone: React.ReactNode;
-  gradiente: string;
-}
-
-const DashboardCard: React.FC<DashboardCardProps> = ({ titulo, valor, icone, gradiente }) => (
-  <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-shadow">
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">{titulo}</p>
-        <p className="mt-2 text-3xl font-bold text-[#002333]">{valor}</p>
-      </div>
-      <div className={`p-4 bg-gradient-to-br ${gradiente} rounded-xl`}>{icone}</div>
-    </div>
-  </div>
-);
+// DashboardCard removido - agora usa KPICard padronizado
 
 interface ViewPorResponsavelProps {
   grupos: GrupoResponsavel[];
@@ -820,8 +820,8 @@ const ModalNovaAtribuicao: React.FC<ModalNovaAtribuicaoProps> = ({
             <button
               onClick={() => setFormTipo('atendente')}
               className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${formTipo === 'atendente'
-                  ? 'border-[#9333EA] bg-purple-50 text-[#9333EA]'
-                  : 'border-gray-200 hover:border-gray-300'
+                ? 'border-[#9333EA] bg-purple-50 text-[#9333EA]'
+                : 'border-gray-200 hover:border-gray-300'
                 }`}
             >
               <User className="h-5 w-5 mx-auto mb-1" />
@@ -830,8 +830,8 @@ const ModalNovaAtribuicao: React.FC<ModalNovaAtribuicaoProps> = ({
             <button
               onClick={() => setFormTipo('equipe')}
               className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${formTipo === 'equipe'
-                  ? 'border-[#9333EA] bg-purple-50 text-[#9333EA]'
-                  : 'border-gray-200 hover:border-gray-300'
+                ? 'border-[#9333EA] bg-purple-50 text-[#9333EA]'
+                : 'border-gray-200 hover:border-gray-300'
                 }`}
             >
               <Users className="h-5 w-5 mx-auto mb-1" />

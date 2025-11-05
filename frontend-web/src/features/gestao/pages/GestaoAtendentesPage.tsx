@@ -17,12 +17,13 @@ import {
   Copy,
   KeyRound,
 } from 'lucide-react';
-import { BackToNucleus } from '../components/navigation/BackToNucleus';
+import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
+import { KPICard } from '../../../components/common/KPICard';
 import atendenteService, {
   Atendente,
   CreateAtendenteDto,
   StatusAtendente,
-} from '../services/atendenteService';
+} from '../../../services/atendenteService';
 
 const formatTelefone = (valor: string): string => {
   const numeros = valor.replace(/\D/g, '').slice(0, 11);
@@ -46,7 +47,11 @@ const formatTelefone = (valor: string): string => {
   return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 7)}-${numeros.slice(7)}`;
 };
 
-const GestaoAtendentesPage: React.FC = () => {
+interface GestaoAtendentesPageProps {
+  hideBackButton?: boolean;
+}
+
+const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackButton = false }) => {
   // Estados principais
   const [atendentes, setAtendentes] = useState<Atendente[]>([]);
   const [loading, setLoading] = useState(true);
@@ -302,212 +307,194 @@ const GestaoAtendentesPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 p-6">
       {/* Header com navegação */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Atendimento" nucleusPath="/nuclei/atendimento" />
+      {!hideBackButton && (
+        <div className="bg-white border-b px-6 py-4 -mx-6 -mt-6 mb-6">
+          <BackToNucleus nucleusName="Atendimento" nucleusPath="/nuclei/atendimento" />
+        </div>
+      )}
+
+      {/* Dashboard Cards - Tema Crevasse */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <KPICard
+          titulo="Total"
+          valor={atendentes.length}
+          icone={Users}
+          color="crevasse"
+        />
+
+        <KPICard
+          titulo="Online"
+          valor={atendentesOnline}
+          icone={CheckCircle}
+          color="crevasse"
+        />
+
+        <KPICard
+          titulo="Ocupados"
+          valor={atendentesOcupados}
+          icone={AlertCircle}
+          color="crevasse"
+        />
+
+        <KPICard
+          titulo="Ativos"
+          valor={atendentesAtivos}
+          icone={UserPlus}
+          color="crevasse"
+        />
       </div>
 
-      {/* Conteúdo Principal */}
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header da Página */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h1 className="text-3xl font-bold text-[#002333] flex items-center gap-3">
-                  <Users className="h-8 w-8 text-[#9333EA]" />
-                  Gestão de Atendentes
-                </h1>
-                <p className="text-gray-600 mt-2">
-                  Cadastre e gerencie os atendentes do sistema
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={carregarAtendentes}
-                  disabled={loading}
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                >
-                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                  Atualizar
-                </button>
-                <button
-                  onClick={() => handleOpenDialog()}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#9333EA] text-white rounded-lg hover:bg-[#7e22ce] transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                  Novo Atendente
-                </button>
-              </div>
-            </div>
+      {/* Barra de Busca e Ações */}
+      <div className="bg-white rounded-lg shadow-sm border border-[#DEEFE7] p-6 mb-6">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="Buscar atendentes..."
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent"
+            />
           </div>
-
-          {/* Dashboard Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl">
-                <p className="text-sm font-medium text-blue-900 uppercase tracking-wider">Total</p>
-                <p className="text-3xl font-bold text-blue-900 mt-2">{atendentes.length}</p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-xl">
-                <p className="text-sm font-medium text-green-900 uppercase tracking-wider">Online</p>
-                <p className="text-3xl font-bold text-green-900 mt-2">{atendentesOnline}</p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <div className="p-4 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-xl">
-                <p className="text-sm font-medium text-yellow-900 uppercase tracking-wider">Ocupados</p>
-                <p className="text-3xl font-bold text-yellow-900 mt-2">{atendentesOcupados}</p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <div className="p-4 bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl">
-                <p className="text-sm font-medium text-purple-900 uppercase tracking-wider">Ativos</p>
-                <p className="text-3xl font-bold text-purple-900 mt-2">{atendentesAtivos}</p>
-              </div>
-            </div>
+          <div className="flex gap-2">
+            <button
+              onClick={carregarAtendentes}
+              disabled={loading}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => handleOpenDialog()}
+              className="inline-flex items-center px-4 py-2 bg-[#9333EA] text-white rounded-lg hover:bg-[#7E22CE] transition-colors"
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Novo Atendente
+            </button>
           </div>
-
-          {/* Barra de Busca */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Buscar por nome ou email..."
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9333EA] focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          {/* Mensagem de Erro */}
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-red-800 font-medium">Erro</p>
-                <p className="text-red-700 text-sm">{error}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Lista de Atendentes */}
-          {loading ? (
-            <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
-              <RefreshCw className="h-8 w-8 text-gray-400 animate-spin mx-auto mb-4" />
-              <p className="text-gray-600">Carregando atendentes...</p>
-            </div>
-          ) : atendentesFiltrados.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
-              <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                {busca ? 'Nenhum atendente encontrado' : 'Nenhum atendente cadastrado'}
-              </h3>
-              <p className="text-gray-600 mb-6">
-                {busca
-                  ? 'Tente buscar com outros termos.'
-                  : 'Comece cadastrando seu primeiro atendente.'}
-              </p>
-              {!busca && (
-                <button
-                  onClick={() => handleOpenDialog()}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#9333EA] text-white rounded-lg hover:bg-[#7e22ce] transition-colors"
-                >
-                  <UserPlus className="h-4 w-4" />
-                  Cadastrar Primeiro Atendente
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {atendentesFiltrados.map((atendente) => (
-                <div
-                  key={atendente.id}
-                  className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow"
-                >
-                  <div className="p-6">
-                    {/* Avatar e Status */}
-                    <div className="flex items-start gap-4 mb-4">
-                      <div className="relative">
-                        <div className="h-16 w-16 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white text-xl font-bold">
-                          {atendente.nome.charAt(0).toUpperCase()}
-                        </div>
-                        <div
-                          className={`absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-white ${atendente.status === StatusAtendente.ONLINE
-                              ? 'bg-green-500'
-                              : atendente.status === StatusAtendente.OCUPADO
-                                ? 'bg-yellow-500'
-                                : 'bg-gray-400'
-                            }`}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-semibold text-gray-900 truncate">
-                          {atendente.nome}
-                        </h3>
-                        <div className="mt-1">{getStatusBadge(atendente.status)}</div>
-                      </div>
-                    </div>
-
-                    {/* Informações de Contato */}
-                    <div className="space-y-2 mb-4">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Mail className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate">{atendente.email}</span>
-                      </div>
-                      {atendente.telefone && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Phone className="h-4 w-4 flex-shrink-0" />
-                          <span>{atendente.telefone}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Badge Ativo/Inativo */}
-                    <div className="mb-4">
-                      {atendente.ativo ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Ativo
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                          Inativo
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Ações */}
-                    <div className="flex gap-2 pt-4 border-t">
-                      <button
-                        onClick={() => handleOpenDialog(atendente)}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleDelete(atendente.id)}
-                        className="flex items-center justify-center gap-2 px-3 py-2 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Mensagem de Erro */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-red-800 font-medium">Erro</p>
+            <p className="text-red-700 text-sm">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Lista de Atendentes */}
+      {loading ? (
+        <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
+          <RefreshCw className="h-8 w-8 text-gray-400 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Carregando atendentes...</p>
+        </div>
+      ) : atendentesFiltrados.length === 0 ? (
+        <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
+          <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            {busca ? 'Nenhum atendente encontrado' : 'Nenhum atendente cadastrado'}
+          </h3>
+          <p className="text-gray-600 mb-6">
+            {busca
+              ? 'Tente buscar com outros termos.'
+              : 'Comece cadastrando seu primeiro atendente.'}
+          </p>
+          {!busca && (
+            <button
+              onClick={() => handleOpenDialog()}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#9333EA] text-white rounded-lg hover:bg-[#7e22ce] transition-colors"
+            >
+              <UserPlus className="h-4 w-4" />
+              Cadastrar Primeiro Atendente
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {atendentesFiltrados.map((atendente) => (
+            <div
+              key={atendente.id}
+              className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow"
+            >
+              <div className="p-6">
+                {/* Avatar e Status */}
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="relative">
+                    <div className="h-16 w-16 rounded-full bg-[#159A9C]/10 flex items-center justify-center text-[#159A9C] text-xl font-bold border-2 border-[#159A9C]/20">
+                      {atendente.nome.charAt(0).toUpperCase()}
+                    </div>
+                    <div
+                      className={`absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-white ${atendente.status === StatusAtendente.ONLINE
+                        ? 'bg-green-500'
+                        : atendente.status === StatusAtendente.OCUPADO
+                          ? 'bg-yellow-500'
+                          : 'bg-gray-400'
+                        }`}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-gray-900 truncate">
+                      {atendente.nome}
+                    </h3>
+                    <div className="mt-1">{getStatusBadge(atendente.status)}</div>
+                  </div>
+                </div>
+
+                {/* Informações de Contato */}
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Mail className="h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">{atendente.email}</span>
+                  </div>
+                  {atendente.telefone && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Phone className="h-4 w-4 flex-shrink-0" />
+                      <span>{atendente.telefone}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Badge Ativo/Inativo */}
+                <div className="mb-4">
+                  {atendente.ativo ? (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Ativo
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      Inativo
+                    </span>
+                  )}
+                </div>
+
+                {/* Ações */}
+                <div className="flex gap-2 pt-4 border-t">
+                  <button
+                    onClick={() => handleOpenDialog(atendente)}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => handleDelete(atendente.id)}
+                    className="flex items-center justify-center gap-2 px-3 py-2 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Modal de Cadastro/Edição */}
       {showDialog && (

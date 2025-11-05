@@ -11,17 +11,17 @@ import {
   Users,
   Building2,
 } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../../../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import nucleoService, {
   Nucleo,
   CreateNucleoDto,
   TipoDistribuicao,
-} from '../services/nucleoService';
-import { departamentoService } from '../services/departamentoService';
-import ModalGerenciarAgentesNucleo from '../components/atendimento/ModalGerenciarAgentesNucleo';
-import { ModalGerenciarDepartamentos } from '../components/atendimento/ModalGerenciarDepartamentos';
-import { ModalDepartamento } from '../components/atendimento/ModalDepartamento';
+} from '../../../services/nucleoService';
+import { departamentoService } from '../../../services/departamentoService';
+import ModalGerenciarAgentesNucleo from '../../../components/atendimento/ModalGerenciarAgentesNucleo';
+import { ModalGerenciarDepartamentos } from '../../../components/atendimento/ModalGerenciarDepartamentos';
+import { ModalDepartamento } from '../../../components/atendimento/ModalDepartamento';
 
 interface NucleoExpanded extends Nucleo {
   departamentos?: any[];

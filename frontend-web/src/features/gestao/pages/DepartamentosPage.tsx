@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { departamentoService } from '../services/departamentoService';
-import { Departamento, FilterDepartamentoDto, TIPOS_DISTRIBUICAO } from '../types/departamentoTypes';
-import ModalCadastroDepartamento from '../components/modals/ModalCadastroDepartamento';
-import { useNucleos } from '../hooks/useNucleos';
+import { departamentoService } from '../../../services/departamentoService';
+import { Departamento, FilterDepartamentoDto, TIPOS_DISTRIBUICAO } from '../../../types/departamentoTypes';
+import ModalCadastroDepartamento from '../../../components/modals/ModalCadastroDepartamento';
+import { useNucleos } from '../../../hooks/useNucleos';
 import {
   Plus,
   Search,
@@ -20,7 +20,7 @@ import {
   CheckCircle,
   XCircle
 } from 'lucide-react';
-import { BackToNucleus } from '../components/navigation/BackToNucleus';
+import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 import toast from 'react-hot-toast';
 
 // Tipos locais
@@ -216,9 +216,9 @@ function DepartamentosPage() {
                 <div className="mt-4 sm:mt-0 flex items-center gap-3">
                   <button
                     onClick={abrirModalNovo}
-                    className="bg-[#159A9C] hover:bg-[#0d7a7c] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                    className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium"
                   >
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-4 h-4" />
                     Novo Departamento
                   </button>
                 </div>
@@ -228,54 +228,54 @@ function DepartamentosPage() {
 
           {/* Dashboard Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-2">{dashboardCards.totalDepartamentos}</p>
-                  <p className="text-xs text-gray-400 mt-1">📊 Departamentos</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Total</p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.totalDepartamentos}</p>
+                  <p className="text-sm text-[#002333]/70 mt-3">📊 Departamentos</p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl">
-                  <Building2 className="w-8 h-8 text-blue-600" />
+                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                  <Building2 className="w-6 h-6 text-[#159A9C]" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Ativos</p>
-                  <p className="text-3xl font-bold text-green-600 mt-2">{dashboardCards.departamentosAtivos}</p>
-                  <p className="text-xs text-gray-400 mt-1">✅ Em operação</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Ativos</p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.departamentosAtivos}</p>
+                  <p className="text-sm text-[#002333]/70 mt-3">✅ Em operação</p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-xl">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
+                <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
+                  <CheckCircle className="w-6 h-6 text-green-600" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Atendentes</p>
-                  <p className="text-3xl font-bold text-purple-600 mt-2">{dashboardCards.totalAtendentes}</p>
-                  <p className="text-xs text-gray-400 mt-1">👥 Total alocados</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Atendentes</p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.totalAtendentes}</p>
+                  <p className="text-sm text-[#002333]/70 mt-3">👥 Total alocados</p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl">
-                  <Users className="w-8 h-8 text-purple-600" />
+                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                  <Users className="w-6 h-6 text-[#159A9C]" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Inativos</p>
-                  <p className="text-3xl font-bold text-gray-600 mt-2">{dashboardCards.departamentosInativos}</p>
-                  <p className="text-xs text-gray-400 mt-1">⏸️ Pausados</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Inativos</p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.departamentosInativos}</p>
+                  <p className="text-sm text-[#002333]/70 mt-3">⏸️ Pausados</p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl">
-                  <XCircle className="w-8 h-8 text-gray-600" />
+                <div className="h-12 w-12 rounded-2xl bg-gray-500/10 flex items-center justify-center shadow-sm">
+                  <XCircle className="w-6 h-6 text-gray-600" />
                 </div>
               </div>
             </div>

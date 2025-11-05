@@ -1,5 +1,5 @@
 import React from 'react';
-import ChatOmnichannel from '../features/atendimento/omnichannel/ChatOmnichannel';
+import ChatOmnichannel from '../omnichannel/ChatOmnichannel';
 
 /**
  * Página de Atendimento Integrado
