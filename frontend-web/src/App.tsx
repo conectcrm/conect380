@@ -64,6 +64,17 @@ import GestaoUsuariosPage from './features/gestao/pages/GestaoUsuariosPage';
 import GestaoAtribuicoesPage from './features/gestao/pages/GestaoAtribuicoesPage';
 import GestaoDepartamentosPage from './features/gestao/pages/GestaoDepartamentosPage';
 import ConfiguracoesAtendimentoPage from './features/atendimento/configuracoes/ConfiguracoesAtendimentoPage';
+// Sistema de Filas - ETAPA 5 (Núcleo Atendimento)
+import GestaoFilasPage from './features/atendimento/pages/GestaoFilasPage';
+// Sistema de Distribuição Automática - Núcleo Atendimento
+import DashboardDistribuicaoPage from './pages/DashboardDistribuicaoPage';
+import ConfiguracaoDistribuicaoPage from './pages/ConfiguracaoDistribuicaoPage';
+import GestaoSkillsPage from './pages/GestaoSkillsPage';
+// Sistema de Templates de Mensagens - Núcleo Atendimento
+import GestaoTemplatesPage from './pages/GestaoTemplatesPage';
+// Sistema de SLA Tracking - Núcleo Atendimento
+import ConfiguracaoSLAPage from './pages/ConfiguracaoSLAPage';
+import DashboardSLAPage from './pages/DashboardSLAPage';
 // Importar novas páginas do sistema de empresas
 import ConfiguracaoEmpresaPage from './pages/empresas/ConfiguracaoEmpresaPage';
 import { RelatoriosAnalyticsPage } from './pages/empresas/RelatoriosAnalyticsPage';
@@ -152,8 +163,12 @@ const AppRoutes: React.FC = () => {
           <Route path="/gestao/nucleos" element={<Navigate to="/atendimento/configuracoes?tab=nucleos" replace />} />
           <Route path="/gestao/equipes" element={<Navigate to="/atendimento/configuracoes?tab=equipes" replace />} />
           <Route path="/gestao/atendentes" element={<Navigate to="/atendimento/configuracoes?tab=atendentes" replace />} />
-          <Route path="/gestao/atribuicoes" element={<Navigate to="/atendimento/configuracoes?tab=atribuicoes" replace />} />
-          <Route path="/gestao/departamentos" element={<Navigate to="/atendimento/configuracoes?tab=departamentos" replace />} />
+          <Route path="/gestao/tags" element={<Navigate to="/atendimento/configuracoes?tab=tags" replace />} />
+
+          {/* ❌ REMOVIDO: Atribuições e Departamentos descontinuados */}
+          {/* Redirecionar para Tags (sistema flexível que substitui departamentos) */}
+          <Route path="/gestao/atribuicoes" element={<Navigate to="/atendimento/distribuicao" replace />} />
+          <Route path="/gestao/departamentos" element={<Navigate to="/atendimento/configuracoes?tab=tags" replace />} />
 
           {/* ✅ Fluxos mantém rotas separadas (tem sub-rotas para o builder) */}
           <Route path="/gestao/fluxos" element={<Navigate to="/atendimento/configuracoes?tab=fluxos" replace />} />
@@ -266,6 +281,17 @@ const AppRoutes: React.FC = () => {
           <Route path="/nuclei/configuracoes/integracoes" element={<IntegracoesPage />} />
           <Route path="/nuclei/configuracoes/departamentos" element={<DepartamentosPage />} />
 
+          {/* ROTAS DO NÚCLEO ATENDIMENTO */}
+          <Route path="/nuclei/atendimento/filas" element={<GestaoFilasPage />} />
+          <Route path="/nuclei/atendimento/templates" element={<GestaoTemplatesPage />} />
+          {/* SLA Tracking */}
+          <Route path="/nuclei/atendimento/sla/configuracoes" element={<ConfiguracaoSLAPage />} />
+          <Route path="/nuclei/atendimento/sla/dashboard" element={<DashboardSLAPage />} />
+          {/* Distribuição Automática */}
+          <Route path="/nuclei/atendimento/distribuicao/dashboard" element={<DashboardDistribuicaoPage />} />
+          <Route path="/nuclei/atendimento/distribuicao/configuracao" element={<ConfiguracaoDistribuicaoPage />} />
+          <Route path="/nuclei/atendimento/distribuicao/skills" element={<GestaoSkillsPage />} />
+
           {/* Rotas legadas - Redirects para compatibilidade */}
           <Route path="/gestao/empresas" element={<Navigate to="/admin/empresas" replace />} /> {/* Redirect para gestão admin */}
           <Route path="/nuclei/configuracoes/empresas" element={<ConfiguracaoEmpresaPage />} />
@@ -283,6 +309,8 @@ const AppRoutes: React.FC = () => {
           {/* Atendimento Omnichannel - Protegido */}
           <Route path="/atendimento" element={protegerRota(ModuloEnum.ATENDIMENTO, <AtendimentoDashboard />)} />
           <Route path="/atendimento/chat" element={protegerRota(ModuloEnum.ATENDIMENTO, <AtendimentoIntegradoPage />)} />
+          <Route path="/atendimento/distribuicao" element={protegerRota(ModuloEnum.ATENDIMENTO, <ConfiguracaoDistribuicaoPage />)} />
+          <Route path="/atendimento/distribuicao/dashboard" element={protegerRota(ModuloEnum.ATENDIMENTO, <DashboardDistribuicaoPage />)} />
 
           {/* Perfil do Usuário */}
           <Route path="/perfil" element={<PerfilPage />} />

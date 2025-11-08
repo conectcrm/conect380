@@ -15,7 +15,6 @@ import {
   Shield,
   Database,
   UserCog,
-  Bell,
   Archive,
   Phone,
   Monitor,
@@ -28,7 +27,10 @@ import {
   Wallet,
   CreditCard as CreditCardIcon,
   GitBranch,
-  Workflow
+  Workflow,
+  Mail,
+  Shuffle,
+  Clock
 } from 'lucide-react';
 
 export interface MenuConfig {
@@ -42,6 +44,7 @@ export interface MenuConfig {
   permissions?: string[];
   adminOnly?: boolean;
   requiredModule?: string; // ⚡ Novo: módulo necessário para exibir item
+  section?: string;
 }
 
 export const menuConfig: MenuConfig[] = [
@@ -50,7 +53,8 @@ export const menuConfig: MenuConfig[] = [
     title: 'Dashboard',
     icon: Home,
     href: '/dashboard',
-    color: 'blue'
+    color: 'blue',
+    section: 'Visão Geral'
   },
   {
     id: 'atendimento',
@@ -59,6 +63,7 @@ export const menuConfig: MenuConfig[] = [
     href: '/atendimento',
     color: 'purple',
     requiredModule: 'ATENDIMENTO', // ⚡ Requer licença de Atendimento
+    section: 'Operações',
     children: [
       {
         id: 'atendimento-dashboard',
@@ -81,47 +86,78 @@ export const menuConfig: MenuConfig[] = [
         href: '/atendimento/chat',
         color: 'purple'
       },
-      // ❌ REMOVIDO: 'Clientes' - Owner é CRM (arquitetura modular)
       {
-        id: 'atendimento-nucleos',
-        title: 'Núcleos de Atendimento',
-        icon: Target,
-        href: '/gestao/nucleos',
-        color: 'purple'
-      },
-      {
-        id: 'atendimento-equipes',
-        title: 'Equipes',
+        id: 'atendimento-filas',
+        title: 'Gestão de Filas',
         icon: Users,
-        href: '/gestao/equipes',
+        href: '/nuclei/atendimento/filas',
         color: 'purple'
       },
       {
-        id: 'atendimento-atendentes',
-        title: 'Atendentes',
-        icon: UserCog,
-        href: '/gestao/atendentes',
+        id: 'atendimento-templates',
+        title: 'Templates de Mensagens',
+        icon: FileText,
+        href: '/nuclei/atendimento/templates',
         color: 'purple'
       },
       {
-        id: 'atendimento-atribuicoes',
-        title: 'Matriz de Atribuições',
-        icon: UserCog,
-        href: '/gestao/atribuicoes',
-        color: 'purple'
+        id: 'atendimento-sla',
+        title: 'SLA Tracking',
+        icon: Clock,
+        href: '/nuclei/atendimento/sla/dashboard',
+        color: 'purple',
+        children: [
+          {
+            id: 'atendimento-sla-dashboard',
+            title: 'Dashboard SLA',
+            icon: BarChart3,
+            href: '/nuclei/atendimento/sla/dashboard',
+            color: 'purple'
+          },
+          {
+            id: 'atendimento-sla-configuracoes',
+            title: 'Configurações',
+            icon: Settings,
+            href: '/nuclei/atendimento/sla/configuracoes',
+            color: 'purple'
+          }
+        ]
       },
       {
-        id: 'atendimento-departamentos',
-        title: 'Departamentos',
-        icon: GitBranch,
-        href: '/gestao/departamentos',
-        color: 'purple'
+        id: 'atendimento-distribuicao',
+        title: 'Distribuição Automática',
+        icon: Shuffle,
+        href: '/nuclei/atendimento/distribuicao/dashboard',
+        color: 'purple',
+        children: [
+          {
+            id: 'atendimento-distribuicao-dashboard',
+            title: 'Dashboard',
+            icon: BarChart3,
+            href: '/nuclei/atendimento/distribuicao/dashboard',
+            color: 'purple'
+          },
+          {
+            id: 'atendimento-distribuicao-config',
+            title: 'Configurações',
+            icon: Settings,
+            href: '/nuclei/atendimento/distribuicao/configuracao',
+            color: 'purple'
+          },
+          {
+            id: 'atendimento-distribuicao-skills',
+            title: 'Gestão de Skills',
+            icon: Target,
+            href: '/nuclei/atendimento/distribuicao/skills',
+            color: 'purple'
+          }
+        ]
       },
       {
-        id: 'atendimento-fluxos',
-        title: 'Fluxos de Triagem',
-        icon: Workflow,
-        href: '/gestao/fluxos',
+        id: 'atendimento-configuracoes',
+        title: 'Configurações',
+        icon: Settings,
+        href: '/atendimento/configuracoes',
         color: 'purple'
       },
       {
@@ -129,13 +165,6 @@ export const menuConfig: MenuConfig[] = [
         title: 'Relatórios',
         icon: BarChart3,
         href: '/relatorios/atendimento',
-        color: 'purple'
-      },
-      {
-        id: 'atendimento-configuracoes',
-        title: 'Configurações',
-        icon: Settings,
-        href: '/configuracoes/atendimento',
         color: 'purple'
       },
       {
@@ -155,6 +184,7 @@ export const menuConfig: MenuConfig[] = [
     href: '/nuclei/crm',
     color: 'blue',
     requiredModule: 'CRM', // ⚡ Requer licença de CRM
+    section: 'Operações',
     children: [
       {
         id: 'crm-dashboard',
@@ -207,6 +237,7 @@ export const menuConfig: MenuConfig[] = [
     href: '/nuclei/vendas',
     color: 'green',
     requiredModule: 'VENDAS', // ⚡ Requer licença de Vendas
+    section: 'Operações',
     children: [
       {
         id: 'vendas-dashboard',
@@ -266,6 +297,7 @@ export const menuConfig: MenuConfig[] = [
     href: '/nuclei/financeiro',
     color: 'orange',
     requiredModule: 'FINANCEIRO', // ⚡ Requer licença de Financeiro
+    section: 'Operações',
     children: [
       {
         id: 'financeiro-dashboard',
@@ -318,6 +350,7 @@ export const menuConfig: MenuConfig[] = [
     href: '/billing',
     color: 'green',
     requiredModule: 'BILLING', // ⚡ Requer licença de Billing
+    section: 'Operações',
     children: [
       {
         id: 'billing-dashboard',
@@ -362,12 +395,20 @@ export const menuConfig: MenuConfig[] = [
     icon: Settings,
     href: '/nuclei/configuracoes',
     color: 'purple',
+    section: 'Administração',
     children: [
       {
-        id: 'configuracoes-dashboard',
-        title: 'Visão Geral',
-        icon: Settings,
+        id: 'configuracoes-home',
+        title: 'Início',
+        icon: Home,
         href: '/nuclei/configuracoes',
+        color: 'purple'
+      },
+      {
+        id: 'configuracoes-sistema',
+        title: 'Sistema & Preferências',
+        icon: Settings,
+        href: '/configuracoes/sistema',
         color: 'purple'
       },
       {
@@ -384,8 +425,20 @@ export const menuConfig: MenuConfig[] = [
         href: '/nuclei/configuracoes/usuarios',
         color: 'purple'
       },
-      // ❌ REMOVIDO: 'Núcleos' - Owner é Atendimento (não é config global)
-      // ❌ REMOVIDO: 'Departamentos' - Owner é Atendimento (não é config global)
+      {
+        id: 'configuracoes-metas',
+        title: 'Metas Comerciais',
+        icon: Target,
+        href: '/configuracoes/metas',
+        color: 'purple'
+      },
+      {
+        id: 'configuracoes-email',
+        title: 'E-mail',
+        icon: Mail,
+        href: '/configuracoes/email',
+        color: 'purple'
+      },
       {
         id: 'configuracoes-integracoes',
         title: 'Integrações',
@@ -394,17 +447,10 @@ export const menuConfig: MenuConfig[] = [
         color: 'purple'
       },
       {
-        id: 'configuracoes-chatwoot',
-        title: 'Chatwoot',
-        icon: MessageSquare,
-        href: '/nuclei/configuracoes/chatwoot',
-        color: 'purple'
-      },
-      {
-        id: 'configuracoes-notificacoes',
-        title: 'Notificações',
-        icon: Bell,
-        href: '/nuclei/configuracoes/notificacoes',
+        id: 'configuracoes-backup',
+        title: 'Backup & Sincronização',
+        icon: Database,
+        href: '/sistema/backup',
         color: 'purple'
       },
       {
@@ -412,13 +458,6 @@ export const menuConfig: MenuConfig[] = [
         title: 'Segurança',
         icon: Shield,
         href: '/configuracoes/seguranca',
-        color: 'purple'
-      },
-      {
-        id: 'configuracoes-backup',
-        title: 'Backup',
-        icon: Database,
-        href: '/sistema/backup',
         color: 'purple'
       }
     ]
@@ -431,6 +470,7 @@ export const menuConfig: MenuConfig[] = [
     color: 'blue',
     adminOnly: true,
     requiredModule: 'ADMINISTRACAO', // ⚡ Requer licença de Administração (Enterprise)
+    section: 'Administração',
     children: [
       {
         id: 'admin-dashboard',
