@@ -224,10 +224,10 @@ const DashboardSLAPage: React.FC = () => {
                         Taxa de Cumprimento
                       </p>
                       <p className="mt-2 text-3xl font-bold text-[#002333]">
-                        {metricas.taxaCumprimento.toFixed(1)}%
+                        {metricas?.taxaCumprimento?.toFixed(1) ?? '0.0'}%
                       </p>
                       <p className="mt-3 text-sm text-[#002333]/70">
-                        {metricas.ticketsCumpridos} de {metricas.totalTickets} tickets
+                        {metricas?.ticketsCumpridos ?? 0} de {metricas?.totalTickets ?? 0} tickets
                       </p>
                     </div>
                     <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
@@ -243,12 +243,12 @@ const DashboardSLAPage: React.FC = () => {
                         Tickets em Risco
                       </p>
                       <p className="mt-2 text-3xl font-bold text-[#002333]">
-                        {metricas.ticketsEmRisco}
+                        {metricas?.ticketsEmRisco ?? 0}
                       </p>
                       <p className="mt-3 text-sm text-[#002333]/70">
-                        {metricas.totalTickets > 0 
-                          ? ((metricas.ticketsEmRisco / metricas.totalTickets) * 100).toFixed(1)
-                          : 0}% do total
+                        {(metricas?.totalTickets ?? 0) > 0 
+                          ? (((metricas?.ticketsEmRisco ?? 0) / (metricas?.totalTickets ?? 1)) * 100).toFixed(1)
+                          : '0.0'}% do total
                       </p>
                     </div>
                     <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
@@ -264,12 +264,12 @@ const DashboardSLAPage: React.FC = () => {
                         Tickets Violados
                       </p>
                       <p className="mt-2 text-3xl font-bold text-[#002333]">
-                        {metricas.ticketsViolados}
+                        {metricas?.ticketsViolados ?? 0}
                       </p>
                       <p className="mt-3 text-sm text-[#002333]/70">
-                        {metricas.totalTickets > 0 
-                          ? ((metricas.ticketsViolados / metricas.totalTickets) * 100).toFixed(1)
-                          : 0}% do total
+                        {(metricas?.totalTickets ?? 0) > 0 
+                          ? (((metricas?.ticketsViolados ?? 0) / (metricas?.totalTickets ?? 1)) * 100).toFixed(1)
+                          : '0.0'}% do total
                       </p>
                     </div>
                     <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center shadow-sm">
@@ -285,10 +285,10 @@ const DashboardSLAPage: React.FC = () => {
                         Tempo Médio Resposta
                       </p>
                       <p className="mt-2 text-3xl font-bold text-[#002333]">
-                        {formatarTempo(metricas.tempoMedioRespostaMinutos)}
+                        {formatarTempo(metricas?.tempoMedioRespostaMinutos ?? 0)}
                       </p>
                       <p className="mt-3 text-sm text-[#002333]/70">
-                        Média de {metricas.totalTickets} tickets
+                        Média de {metricas?.totalTickets ?? 0} tickets
                       </p>
                     </div>
                     <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
@@ -306,7 +306,7 @@ const DashboardSLAPage: React.FC = () => {
                     Distribuição por Prioridade
                   </h3>
                   <div className="space-y-4">
-                    {metricas.distribuicaoPorPrioridade.map((item) => {
+                    {(metricas?.distribuicaoPorPrioridade ?? []).map((item) => {
                       const total = item.total || 1;
                       const percentCumpridos = (item.cumpridos / total) * 100;
                       const percentEmRisco = (item.emRisco / total) * 100;
@@ -365,7 +365,7 @@ const DashboardSLAPage: React.FC = () => {
                     Distribuição por Canal
                   </h3>
                   <div className="space-y-4">
-                    {metricas.distribuicaoPorCanal.map((item) => {
+                    {(metricas?.distribuicaoPorCanal ?? []).map((item) => {
                       const total = item.total || 1;
                       const percentCumpridos = (item.cumpridos / total) * 100;
                       const percentEmRisco = (item.emRisco / total) * 100;
