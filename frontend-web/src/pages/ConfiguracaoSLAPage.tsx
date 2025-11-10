@@ -130,13 +130,34 @@ const ConfiguracaoSLAPage: React.FC = () => {
   // Salvar (criar ou atualizar)
   const handleSalvar = async () => {
     try {
+      // Validações
+      if (!formData.nome || formData.nome.trim() === '') {
+        alert('Nome é obrigatório!');
+        return;
+      }
+
+      if (formData.tempoRespostaMinutos <= 0) {
+        alert('Tempo de resposta deve ser maior que 0!');
+        return;
+      }
+
+      if (formData.tempoResolucaoMinutos <= 0) {
+        alert('Tempo de resolução deve ser maior que 0!');
+        return;
+      }
+
       if (formData.tempoRespostaMinutos >= formData.tempoResolucaoMinutos) {
         alert('Tempo de resposta deve ser menor que tempo de resolução!');
         return;
       }
 
+      // Garantir que os tempos sejam números inteiros
       const dto: CreateSlaConfigDto | UpdateSlaConfigDto = {
         ...formData,
+        nome: formData.nome.trim(),
+        tempoRespostaMinutos: Number(formData.tempoRespostaMinutos),
+        tempoResolucaoMinutos: Number(formData.tempoResolucaoMinutos),
+        alertaPercentual: Number(formData.alertaPercentual),
         horariosFuncionamento: horariosFuncionamento,
       };
 
