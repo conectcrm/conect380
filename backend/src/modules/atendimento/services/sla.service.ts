@@ -49,7 +49,15 @@ export class SlaService {
     private readonly slaConfigRepository: Repository<SlaConfig>,
     @InjectRepository(SlaEventLog)
     private readonly slaEventLogRepository: Repository<SlaEventLog>,
-  ) {}
+  ) { }
+
+  private ensureEmpresaId(empresaId?: string): string {
+    const normalized = typeof empresaId === 'string' ? empresaId.trim() : '';
+    if (!normalized) {
+      throw new BadRequestException('empresaId é obrigatório para operações de SLA');
+    }
+    return normalized;
+  }
 
   // ==================== CRUD DE CONFIGURAÇÕES ====================
 
@@ -58,6 +66,8 @@ export class SlaService {
     empresaId: string,
   ): Promise<SlaConfig> {
     try {
+      const tenantId = this.ensureEmpresaId(empresaId);
+
       // Validar que tempo de resposta < tempo de resolução
       if (dto.tempoRespostaMinutos >= dto.tempoResolucaoMinutos) {
         throw new BadRequestException(
@@ -68,7 +78,7 @@ export class SlaService {
       // Verificar se já existe config para essa prioridade + canal
       const existe = await this.slaConfigRepository.findOne({
         where: {
-          empresaId,
+          empresaId: tenantId,
           prioridade: dto.prioridade,
           canal: dto.canal || null,
           ativo: true,
@@ -83,11 +93,13 @@ export class SlaService {
 
       const config = this.slaConfigRepository.create({
         ...dto,
-        empresaId,
+        empresaId: tenantId,
       });
 
-      return await this.slaConfigRepository.save(config);
+      const saved = await this.slaConfigRepository.save(config);
+      return saved;
     } catch (error) {
+
       if (
         error instanceof BadRequestException ||
         error instanceof NotFoundException
@@ -106,7 +118,8 @@ export class SlaService {
     apenasAtivas: boolean = true,
   ): Promise<SlaConfig[]> {
     try {
-      const where: any = { empresaId };
+      const tenantId = this.ensureEmpresaId(empresaId);
+      const where: any = { empresaId: tenantId };
       if (apenasAtivas) {
         where.ativo = true;
       }
@@ -128,8 +141,9 @@ export class SlaService {
 
   async buscarPorId(id: string, empresaId: string): Promise<SlaConfig> {
     try {
+      const tenantId = this.ensureEmpresaId(empresaId);
       const config = await this.slaConfigRepository.findOne({
-        where: { id, empresaId },
+        where: { id, empresaId: tenantId },
       });
 
       if (!config) {
@@ -154,7 +168,8 @@ export class SlaService {
     empresaId: string,
   ): Promise<SlaConfig> {
     try {
-      const config = await this.buscarPorId(id, empresaId);
+      const tenantId = this.ensureEmpresaId(empresaId);
+      const config = await this.buscarPorId(id, tenantId);
 
       // Validar tempos se ambos fornecidos
       if (dto.tempoRespostaMinutos && dto.tempoResolucaoMinutos) {
@@ -183,7 +198,8 @@ export class SlaService {
 
   async deletar(id: string, empresaId: string): Promise<void> {
     try {
-      const config = await this.buscarPorId(id, empresaId);
+      const tenantId = this.ensureEmpresaId(empresaId);
+      const config = await this.buscarPorId(id, tenantId);
       await this.slaConfigRepository.remove(config);
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -206,11 +222,12 @@ export class SlaService {
     empresaId: string,
   ): Promise<SlaCalculoResult> {
     try {
+      const tenantId = this.ensureEmpresaId(empresaId);
       // Buscar configuração SLA apropriada
       const config = await this.buscarConfigParaTicket(
         prioridade,
         canal,
-        empresaId,
+        tenantId,
       );
 
       if (!config) {
@@ -248,7 +265,7 @@ export class SlaService {
       // Calcular data limite
       const dataLimite = new Date(
         ticketCriadoEm.getTime() +
-          config.tempoRespostaMinutos * 60 * 1000,
+        config.tempoRespostaMinutos * 60 * 1000,
       );
 
       return {
@@ -279,10 +296,11 @@ export class SlaService {
     canal: string,
     empresaId: string,
   ): Promise<SlaConfig | null> {
+    const tenantId = this.ensureEmpresaId(empresaId);
     // Tentar buscar config específica para canal
     let config = await this.slaConfigRepository.findOne({
       where: {
-        empresaId,
+        empresaId: tenantId,
         prioridade,
         canal,
         ativo: true,
@@ -293,7 +311,7 @@ export class SlaService {
     if (!config) {
       config = await this.slaConfigRepository.findOne({
         where: {
-          empresaId,
+          empresaId: tenantId,
           prioridade,
           canal: null,
           ativo: true,
@@ -308,13 +326,14 @@ export class SlaService {
 
   async verificarViolacoes(empresaId: string): Promise<SlaEventLog[]> {
     try {
+      const tenantId = this.ensureEmpresaId(empresaId);
       // Buscar eventos de violação recentes (últimas 24h)
       const dataLimite = new Date();
       dataLimite.setHours(dataLimite.getHours() - 24);
 
       return await this.slaEventLogRepository.find({
         where: {
-          empresaId,
+          empresaId: tenantId,
           status: 'violado',
         },
         order: { createdAt: 'DESC' },
@@ -337,6 +356,7 @@ export class SlaService {
     empresaId: string,
   ): Promise<SlaEventLog> {
     try {
+      const tenantId = this.ensureEmpresaId(empresaId);
       const alerta = this.slaEventLogRepository.create({
         ticketId,
         slaConfigId,
@@ -346,7 +366,7 @@ export class SlaService {
         tempoLimiteMinutos,
         percentualUsado,
         detalhes: `Ticket atingiu ${percentualUsado}% do tempo limite de resposta`,
-        empresaId,
+        empresaId: tenantId,
       });
 
       return await this.slaEventLogRepository.save(alerta);
@@ -366,6 +386,7 @@ export class SlaService {
     empresaId: string,
   ): Promise<SlaEventLog> {
     try {
+      const tenantId = this.ensureEmpresaId(empresaId);
       const percentualUsado = Math.floor(
         (tempoRespostaMinutos / tempoLimiteMinutos) * 100,
       );
@@ -379,7 +400,7 @@ export class SlaService {
         tempoLimiteMinutos,
         percentualUsado,
         detalhes: `SLA violado - Tempo limite excedido em ${tempoRespostaMinutos - tempoLimiteMinutos} minutos`,
-        empresaId,
+        empresaId: tenantId,
       });
 
       return await this.slaEventLogRepository.save(violacao);
@@ -393,9 +414,10 @@ export class SlaService {
 
   async buscarAlertas(empresaId: string): Promise<SlaEventLog[]> {
     try {
+      const tenantId = this.ensureEmpresaId(empresaId);
       return await this.slaEventLogRepository.find({
         where: {
-          empresaId,
+          empresaId: tenantId,
           status: 'em_risco',
         },
         order: { createdAt: 'DESC' },
@@ -416,10 +438,11 @@ export class SlaService {
     filtros?: SlaMetricasFilterDto,
   ): Promise<SlaMetricas> {
     try {
+      const tenantId = this.ensureEmpresaId(empresaId);
       // Query builder para métricas
       const query = this.slaEventLogRepository
         .createQueryBuilder('log')
-        .where('log.empresaId = :empresaId', { empresaId });
+        .where('log.empresaId = :empresaId', { empresaId: tenantId });
 
       // Aplicar filtros
       if (filtros?.dataInicio) {
@@ -456,9 +479,9 @@ export class SlaService {
       const tempoMedioResposta =
         temposResposta.length > 0
           ? Math.round(
-              temposResposta.reduce((a, b) => a + b, 0) /
-                temposResposta.length,
-            )
+            temposResposta.reduce((a, b) => a + b, 0) /
+            temposResposta.length,
+          )
           : 0;
 
       // Tempo médio de resolução
@@ -468,9 +491,9 @@ export class SlaService {
       const tempoMedioResolucao =
         temposResolucao.length > 0
           ? Math.round(
-              temposResolucao.reduce((a, b) => a + b, 0) /
-                temposResolucao.length,
-            )
+            temposResolucao.reduce((a, b) => a + b, 0) /
+            temposResolucao.length,
+          )
           : 0;
 
       // Violações por prioridade (buscar da config)
@@ -508,10 +531,11 @@ export class SlaService {
     empresaId: string,
   ): Promise<SlaEventLog[]> {
     try {
+      const tenantId = this.ensureEmpresaId(empresaId);
       return await this.slaEventLogRepository.find({
         where: {
           ticketId,
-          empresaId,
+          empresaId: tenantId,
         },
         order: { createdAt: 'ASC' },
       });

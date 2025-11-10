@@ -21,14 +21,14 @@ import { SlaMetricasFilterDto } from '../dto/sla/sla-metricas-filter.dto';
 @Controller('atendimento/sla')
 @UseGuards(JwtAuthGuard)
 export class SlaController {
-  constructor(private readonly slaService: SlaService) {}
+  constructor(private readonly slaService: SlaService) { }
 
   // ==================== CRUD DE CONFIGURAÇÕES ====================
 
   @Post('configs')
   @HttpCode(HttpStatus.CREATED)
   async criarConfig(@Body() dto: CreateSlaConfigDto, @Request() req) {
-    const empresaId = req.user.empresaId;
+    const empresaId = req.user?.empresa_id || req.user?.empresaId;
     return await this.slaService.criar(dto, empresaId);
   }
 
@@ -37,14 +37,14 @@ export class SlaController {
     @Request() req,
     @Query('apenasAtivas') apenasAtivas?: string,
   ) {
-    const empresaId = req.user.empresaId;
+    const empresaId = req.user?.empresa_id || req.user?.empresaId;
     const filtrarAtivas = apenasAtivas === 'true';
     return await this.slaService.listar(empresaId, filtrarAtivas);
   }
 
   @Get('configs/:id')
   async buscarConfig(@Param('id') id: string, @Request() req) {
-    const empresaId = req.user.empresaId;
+    const empresaId = req.user?.empresa_id || req.user?.empresaId;
     return await this.slaService.buscarPorId(id, empresaId);
   }
 
@@ -54,14 +54,14 @@ export class SlaController {
     @Body() dto: UpdateSlaConfigDto,
     @Request() req,
   ) {
-    const empresaId = req.user.empresaId;
+    const empresaId = req.user?.empresa_id || req.user?.empresaId;
     return await this.slaService.atualizar(id, dto, empresaId);
   }
 
   @Delete('configs/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deletarConfig(@Param('id') id: string, @Request() req) {
-    const empresaId = req.user.empresaId;
+    const empresaId = req.user?.empresa_id || req.user?.empresaId;
     await this.slaService.deletar(id, empresaId);
   }
 
@@ -78,7 +78,7 @@ export class SlaController {
     },
     @Request() req,
   ) {
-    const empresaId = req.user.empresaId;
+    const empresaId = req.user?.empresa_id || req.user?.empresaId;
     const ticketCriadoEm = new Date(body.ticketCriadoEm);
 
     return await this.slaService.calcularSlaTicket(
@@ -92,13 +92,13 @@ export class SlaController {
 
   @Get('violacoes')
   async buscarViolacoes(@Request() req) {
-    const empresaId = req.user.empresaId;
+    const empresaId = req.user?.empresa_id || req.user?.empresaId;
     return await this.slaService.verificarViolacoes(empresaId);
   }
 
   @Get('alertas')
   async buscarAlertas(@Request() req) {
-    const empresaId = req.user.empresaId;
+    const empresaId = req.user?.empresa_id || req.user?.empresaId;
     return await this.slaService.buscarAlertas(empresaId);
   }
 
@@ -109,13 +109,13 @@ export class SlaController {
     @Request() req,
     @Query() filtros?: SlaMetricasFilterDto,
   ) {
-    const empresaId = req.user.empresaId;
+    const empresaId = req.user?.empresa_id || req.user?.empresaId;
     return await this.slaService.buscarMetricas(empresaId, filtros);
   }
 
   @Get('tickets/:ticketId/historico')
   async buscarHistorico(@Param('ticketId') ticketId: string, @Request() req) {
-    const empresaId = req.user.empresaId;
+    const empresaId = req.user?.empresa_id || req.user?.empresaId;
     return await this.slaService.buscarHistorico(ticketId, empresaId);
   }
 
@@ -134,7 +134,7 @@ export class SlaController {
     },
     @Request() req,
   ) {
-    const empresaId = req.user.empresaId;
+    const empresaId = req.user?.empresa_id || req.user?.empresaId;
     return await this.slaService.gerarAlerta(
       ticketId,
       body.slaConfigId,
@@ -157,7 +157,7 @@ export class SlaController {
     },
     @Request() req,
   ) {
-    const empresaId = req.user.empresaId;
+    const empresaId = req.user?.empresa_id || req.user?.empresaId;
     return await this.slaService.registrarViolacao(
       ticketId,
       body.slaConfigId,
