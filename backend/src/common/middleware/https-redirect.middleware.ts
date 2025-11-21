@@ -3,13 +3,13 @@ import { Request, Response, NextFunction } from 'express';
 
 /**
  * Middleware para forçar redirecionamento HTTP → HTTPS em produção
- * 
+ *
  * @description
  * Este middleware verifica se a requisição é HTTP e, se estiver em produção,
  * redireciona automaticamente para HTTPS (301 Permanent Redirect).
- * 
+ *
  * Em desenvolvimento, permite HTTP para facilitar testes locais.
- * 
+ *
  * @example
  * // Registrar no AppModule:
  * export class AppModule implements NestModule {
@@ -19,7 +19,7 @@ import { Request, Response, NextFunction } from 'express';
  *       .forRoutes('*');
  *   }
  * }
- * 
+ *
  * @environment
  * - NODE_ENV=production → Força HTTPS
  * - NODE_ENV=development → Permite HTTP
@@ -44,9 +44,9 @@ export class HttpsRedirectMiddleware implements NestMiddleware {
 
     // Redirecionar para HTTPS
     const httpsUrl = `https://${req.headers.host}${req.url}`;
-    
+
     console.log(`🔒 [HTTPS Redirect] ${req.method} ${req.url} → ${httpsUrl}`);
-    
+
     // 301 = Permanent Redirect (browsers vão cachear)
     return res.redirect(301, httpsUrl);
   }

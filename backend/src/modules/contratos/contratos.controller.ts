@@ -18,12 +18,18 @@ import { ContratosService } from './services/contratos.service';
 import { AssinaturaDigitalService } from './services/assinatura-digital.service';
 import { PdfContratoService } from './services/pdf-contrato.service';
 import { CreateContratoDto, UpdateContratoDto } from './dto/contrato.dto';
-import { CreateAssinaturaDto, ProcessarAssinaturaDto, RejeitarAssinaturaDto } from './dto/assinatura.dto';
+import {
+  CreateAssinaturaDto,
+  ProcessarAssinaturaDto,
+  RejeitarAssinaturaDto,
+} from './dto/assinatura.dto';
 import { StatusContrato } from './entities/contrato.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { EmpresaId, SkipEmpresaValidation } from '../../common/decorators/empresa.decorator';
 
 @Controller('contratos')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class ContratosController {
   private readonly logger = new Logger(ContratosController.name);
 
@@ -37,9 +43,9 @@ export class ContratosController {
    * Criar novo contrato
    */
   @Post()
-  async criarContrato(@Body() createContratoDto: CreateContratoDto) {
+  async criarContrato(@Body() createContratoDto: CreateContratoDto, @EmpresaId() empresaId: string) {
     try {
-      const contrato = await this.contratosService.criarContrato(createContratoDto);
+      const contrato = await this.contratosService.criarContrato(createContratoDto, empresaId);
 
       this.logger.log(`Contrato criado: ${contrato.numero}`);
 
@@ -63,7 +69,7 @@ export class ContratosController {
    */
   @Get()
   async listarContratos(
-    @Query('empresaId', ParseIntPipe) empresaId: number,
+    @EmpresaId() empresaId: string,
     @Query('status') status?: StatusContrato,
     @Query('clienteId') clienteId?: string,
     @Query('dataInicio') dataInicio?: string,
@@ -98,46 +104,37 @@ export class ContratosController {
    * Buscar contrato por ID
    */
   @Get(':id')
-  async buscarContrato(@Param('id', ParseIntPipe) id: number) {
-    try {
-      const contrato = await this.contratosService.buscarContratoPorId(id);
+  async buscarContrato(
+    @Param('id', ParseIntPipe) id: number,
+    @EmpresaId() empresaId: string,
+  ) {
+    // 🔒 MULTI-TENANCY: Passar empresa_id para validar isolamento
+    const contrato = await this.contratosService.buscarContratoPorId(id, empresaId);
+    // Se não encontrar, buscarContratoPorId lança NotFoundException automaticamente
 
-      return {
-        success: true,
-        message: 'Contrato encontrado',
-        data: contrato,
-      };
-    } catch (error) {
-      this.logger.error(`Erro ao buscar contrato: ${error.message}`);
-      return {
-        success: false,
-        message: error.message,
-        data: null,
-      };
-    }
+    return {
+      success: true,
+      message: 'Contrato encontrado',
+      data: contrato,
+    };
   }
 
   /**
    * Buscar contrato por número
    */
   @Get('numero/:numero')
-  async buscarContratoPorNumero(@Param('numero') numero: string) {
-    try {
-      const contrato = await this.contratosService.buscarContratoPorNumero(numero);
+  async buscarContratoPorNumero(
+    @Param('numero') numero: string,
+    @EmpresaId() empresaId: string,
+  ) {
+    // 🔒 MULTI-TENANCY: Passar empresa_id para validar isolamento
+    const contrato = await this.contratosService.buscarContratoPorNumero(numero, empresaId);
 
-      return {
-        success: true,
-        message: 'Contrato encontrado',
-        data: contrato,
-      };
-    } catch (error) {
-      this.logger.error(`Erro ao buscar contrato: ${error.message}`);
-      return {
-        success: false,
-        message: error.message,
-        data: null,
-      };
-    }
+    return {
+      success: true,
+      message: 'Contrato encontrado',
+      data: contrato,
+    };
   }
 
   /**
@@ -147,9 +144,11 @@ export class ContratosController {
   async atualizarContrato(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateContratoDto: UpdateContratoDto,
+    @EmpresaId() empresaId: string,
   ) {
     try {
-      const contrato = await this.contratosService.atualizarContrato(id, updateContratoDto);
+      // 🔒 MULTI-TENANCY: Passar empresa_id
+      const contrato = await this.contratosService.atualizarContrato(id, updateContratoDto, empresaId);
 
       this.logger.log(`Contrato atualizado: ${contrato.numero}`);
 
@@ -174,10 +173,12 @@ export class ContratosController {
   @Delete(':id')
   async cancelarContrato(
     @Param('id', ParseIntPipe) id: number,
-    @Body('motivo') motivo?: string,
+    @Body('motivo') motivo: string | undefined,
+    @EmpresaId() empresaId: string,
   ) {
     try {
-      const contrato = await this.contratosService.cancelarContrato(id, motivo);
+      // 🔒 MULTI-TENANCY: Passar empresa_id
+      const contrato = await this.contratosService.cancelarContrato(id, empresaId, motivo);
 
       this.logger.log(`Contrato cancelado: ${contrato.numero}`);
 
@@ -202,10 +203,12 @@ export class ContratosController {
   @Get(':id/pdf')
   async downloadPDF(
     @Param('id', ParseIntPipe) id: number,
+    @EmpresaId() empresaId: string,
     @Res() res: Response,
   ) {
     try {
-      const contrato = await this.contratosService.buscarContratoPorId(id);
+      // 🔒 MULTI-TENANCY: Validar empresa_id
+      const contrato = await this.contratosService.buscarContratoPorId(id, empresaId);
 
       if (!contrato.caminhoArquivoPDF) {
         return res.status(HttpStatus.NOT_FOUND).json({
@@ -217,7 +220,10 @@ export class ContratosController {
       const arquivo = await this.pdfService.obterArquivoPDF(contrato.caminhoArquivoPDF);
 
       res.setHeader('Content-Type', 'text/html');
-      res.setHeader('Content-Disposition', `attachment; filename="contrato-${contrato.numero}.html"`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="contrato-${contrato.numero}.html"`,
+      );
 
       return res.send(arquivo);
     } catch (error) {
@@ -288,6 +294,7 @@ export class ContratosController {
    * Página de assinatura (sem autenticação JWT)
    */
   @Get('assinar/:token')
+  @SkipEmpresaValidation()
   async paginaAssinatura(@Param('token') token: string) {
     try {
       const assinatura = await this.assinaturaService.buscarAssinaturaPorToken(token);
@@ -311,6 +318,7 @@ export class ContratosController {
    * Processar assinatura digital (sem autenticação JWT)
    */
   @Post('assinar/processar')
+  @SkipEmpresaValidation()
   async processarAssinatura(@Body() processarAssinaturaDto: ProcessarAssinaturaDto) {
     try {
       const assinatura = await this.assinaturaService.processarAssinatura(processarAssinaturaDto);
@@ -336,6 +344,7 @@ export class ContratosController {
    * Rejeitar assinatura (sem autenticação JWT)
    */
   @Post('assinar/rejeitar')
+  @SkipEmpresaValidation()
   async rejeitarAssinatura(@Body() rejeitarAssinaturaDto: RejeitarAssinaturaDto) {
     try {
       const assinatura = await this.assinaturaService.rejeitarAssinatura(rejeitarAssinaturaDto);

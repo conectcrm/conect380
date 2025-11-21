@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  TrendingUp, Clock, AlertTriangle, CheckCircle, 
+import {
+  TrendingUp, Clock, AlertTriangle, CheckCircle,
   XCircle, RefreshCw, Filter, BarChart3
 } from 'lucide-react';
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
@@ -89,9 +89,9 @@ const DashboardSLAPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header com BackToNucleus */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus 
-          nucleusName="Atendimento" 
-          nucleusPath="/nuclei/atendimento" 
+        <BackToNucleus
+          nucleusName="Atendimento"
+          nucleusPath="/nuclei/atendimento"
         />
       </div>
 
@@ -112,11 +112,10 @@ const DashboardSLAPage: React.FC = () => {
               <div className="flex gap-3">
                 <button
                   onClick={() => setAutoRefresh(!autoRefresh)}
-                  className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium ${
-                    autoRefresh 
+                  className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium ${autoRefresh
                       ? 'bg-[#159A9C] text-white hover:bg-[#0F7B7D]'
                       : 'bg-white text-[#002333] border border-[#B4BEC9] hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   <RefreshCw className={`h-4 w-4 ${autoRefresh ? 'animate-spin' : ''}`} />
                   Auto-refresh {autoRefresh ? 'ON' : 'OFF'}
@@ -246,7 +245,7 @@ const DashboardSLAPage: React.FC = () => {
                         {metricas?.ticketsEmRisco ?? 0}
                       </p>
                       <p className="mt-3 text-sm text-[#002333]/70">
-                        {(metricas?.totalTickets ?? 0) > 0 
+                        {(metricas?.totalTickets ?? 0) > 0
                           ? (((metricas?.ticketsEmRisco ?? 0) / (metricas?.totalTickets ?? 1)) * 100).toFixed(1)
                           : '0.0'}% do total
                       </p>
@@ -267,7 +266,7 @@ const DashboardSLAPage: React.FC = () => {
                         {metricas?.ticketsViolados ?? 0}
                       </p>
                       <p className="mt-3 text-sm text-[#002333]/70">
-                        {(metricas?.totalTickets ?? 0) > 0 
+                        {(metricas?.totalTickets ?? 0) > 0
                           ? (((metricas?.ticketsViolados ?? 0) / (metricas?.totalTickets ?? 1)) * 100).toFixed(1)
                           : '0.0'}% do total
                       </p>
@@ -509,12 +508,12 @@ const DashboardSLAPage: React.FC = () => {
                               {badgeStatus(violacao.status)}
                             </td>
                             <td className="px-4 py-3 text-sm text-[#002333]">
-                              {violacao.tempoResolucaoMinutos 
+                              {violacao.tempoResolucaoMinutos
                                 ? formatarTempo(violacao.tempoResolucaoMinutos)
                                 : '-'}
                             </td>
                             <td className="px-4 py-3 text-sm text-[#002333]">
-                              {violacao.tempoLimiteMinutos 
+                              {violacao.tempoLimiteMinutos
                                 ? formatarTempo(violacao.tempoLimiteMinutos)
                                 : '-'}
                             </td>

@@ -1,0 +1,59 @@
+# ========================================================
+# Prometheus Configuration
+# ========================================================
+# 
+# Scrape targets: ConectCRM Backend
+# Scrape interval: 15s
+# Retention: 15 dias
+# Alert Rules: backend/config/alert-rules.yml
+
+global:
+  scrape_interval: 15s # Coletar métricas a cada 15 segundos
+  evaluation_interval: 30s # Avaliar regras de alerta a cada 30 segundos
+  
+  external_labels:
+    monitor: 'conectcrm-monitor'
+    environment: 'development'
+    cluster: 'main'
+
+# ========================================
+# Alerting Configuration
+# ========================================
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+      timeout: 10s
+
+# ========================================
+# Alert Rules
+# ========================================
+rule_files:
+  - '/etc/prometheus/alert-rules.yml'
+
+# Scrape configurations
+scrape_configs:
+  # ========================================
+  # ConectCRM Backend (NestJS)
+  # ========================================
+  - job_name: 'conectcrm-backend'
+    static_configs:
+      - targets: ['host.docker.internal:3001'] # Backend na máquina host
+        labels:
+          service: 'backend'
+          app: 'conectcrm'
+    
+    # Endpoint de métricas
+    metrics_path: '/metrics'
+    
+    # Scrape timeout
+    scrape_timeout: 10s
+
+  # ========================================
+  # Prometheus Self-Monitoring
+  # ========================================
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'

@@ -9,7 +9,7 @@ import { ModuloSistema } from './entities/modulo-sistema.entity';
 @Controller('planos')
 @UseGuards(JwtAuthGuard)
 export class PlanosController {
-  constructor(private readonly planosService: PlanosService) { }
+  constructor(private readonly planosService: PlanosService) {}
 
   @Get()
   async listarTodos(): Promise<Plano[]> {
@@ -41,7 +41,7 @@ export class PlanosController {
       limiteUsuarios: typeof dados.limiteUsuarios,
       limiteClientes: typeof dados.limiteClientes,
       limiteStorage: typeof dados.limiteStorage,
-      limiteApiCalls: typeof dados.limiteApiCalls
+      limiteApiCalls: typeof dados.limiteApiCalls,
     });
 
     const novoPlano = await this.planosService.criar(dados);
@@ -51,10 +51,7 @@ export class PlanosController {
   }
 
   @Put(':id')
-  async atualizar(
-    @Param('id') id: string,
-    @Body() dados: AtualizarPlanoDto
-  ): Promise<Plano> {
+  async atualizar(@Param('id') id: string, @Body() dados: AtualizarPlanoDto): Promise<Plano> {
     console.log('📊 [PLANOS UPDATE] Dados recebidos para atualização:', {
       id,
       data: dados,
@@ -64,7 +61,7 @@ export class PlanosController {
         limiteClientes: typeof dados.limiteClientes,
         limiteStorage: typeof dados.limiteStorage,
         limiteApiCalls: typeof dados.limiteApiCalls,
-      }
+      },
     });
 
     const planoAtualizado = await this.planosService.atualizar(id, dados);

@@ -1,5 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
+import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
+import { Smile, Paperclip, X, Zap } from 'lucide-react';
+import { FileUpload } from './FileUpload';
+import { RespostasRapidas } from './RespostasRapidas';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -14,10 +18,34 @@ export function MessageInput({ ticketId, onTyping, onEnviarMensagem, enviando: e
   const [mensagem, setMensagem] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [mostrarEmojiPicker, setMostrarEmojiPicker] = useState(false);
+  const [mostrarFileUpload, setMostrarFileUpload] = useState(false);
+  const [mostrarRespostasRapidas, setMostrarRespostasRapidas] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const enviandoAtual = enviandoExterno !== undefined ? enviandoExterno : enviando;
+
+  // Fechar emoji picker ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(event.target as Node)
+      ) {
+        setMostrarEmojiPicker(false);
+      }
+    };
+
+    if (mostrarEmojiPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [mostrarEmojiPicker]);
 
   // Auto-resize do textarea
   useEffect(() => {
@@ -44,8 +72,14 @@ export function MessageInput({ ticketId, onTyping, onEnviarMensagem, enviando: e
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMensagem(e.target.value);
+    const newValue = e.target.value;
+    setMensagem(newValue);
     handleTyping();
+
+    // Detectar trigger "/" para Respostas Rápidas
+    if (newValue === '/' || (newValue.length > 1 && newValue[newValue.length - 1] === '/' && newValue[newValue.length - 2] === ' ')) {
+      setMostrarRespostasRapidas(true);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -103,6 +137,49 @@ export function MessageInput({ ticketId, onTyping, onEnviarMensagem, enviando: e
     }
   };
 
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    const emoji = emojiData.emoji;
+    const textarea = textareaRef.current;
+
+    if (!textarea) return;
+
+    // Inserir emoji na posição do cursor
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const textBefore = mensagem.substring(0, start);
+    const textAfter = mensagem.substring(end);
+    const newText = textBefore + emoji + textAfter;
+
+    setMensagem(newText);
+
+    // Mover cursor para depois do emoji
+    setTimeout(() => {
+      textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
+      textarea.focus();
+    }, 0);
+
+    // Fechar picker
+    setMostrarEmojiPicker(false);
+  };
+
+  const handleUploadSucesso = (arquivos: any[]) => {
+    console.log('[MessageInput] Arquivos enviados com sucesso:', arquivos);
+    setMostrarFileUpload(false);
+    // Recarregar mensagens (implementar callback se necessário)
+  };
+
+  const handleSelecionarTemplate = (conteudo: string) => {
+    // Substituir "/" pelo conteúdo do template
+    const novaMensagem = mensagem.replace(/\/\s*$/, conteudo);
+    setMensagem(novaMensagem);
+    setMostrarRespostasRapidas(false);
+
+    // Focar no textarea
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 0);
+  };
+
   return (
     <div className="bg-white border-t p-4">
       {erro && (
@@ -111,7 +188,56 @@ export function MessageInput({ ticketId, onTyping, onEnviarMensagem, enviando: e
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="flex items-end gap-2">
+      <form onSubmit={handleSubmit} className="flex items-end gap-2 relative">
+        {/* Botão Respostas Rápidas */}
+        <button
+          type="button"
+          onClick={() => setMostrarRespostasRapidas(true)}
+          disabled={enviandoAtual}
+          className="p-2 text-gray-500 hover:text-[#159A9C] hover:bg-[#159A9C]/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Respostas rápidas (ou digite /)"
+        >
+          <Zap className="h-5 w-5" />
+        </button>
+
+        {/* Botão Anexar Arquivo */}
+        <button
+          type="button"
+          onClick={() => setMostrarFileUpload(true)}
+          disabled={enviandoAtual}
+          className="p-2 text-gray-500 hover:text-[#159A9C] hover:bg-[#159A9C]/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Anexar arquivo"
+        >
+          <Paperclip className="h-5 w-5" />
+        </button>
+
+        {/* Botão Emoji */}
+        <div className="relative" ref={emojiPickerRef}>
+          <button
+            type="button"
+            onClick={() => setMostrarEmojiPicker(!mostrarEmojiPicker)}
+            disabled={enviandoAtual}
+            className="p-2 text-gray-500 hover:text-[#159A9C] hover:bg-[#159A9C]/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Adicionar emoji"
+          >
+            <Smile className="h-5 w-5" />
+          </button>
+
+          {/* Emoji Picker Popover */}
+          {mostrarEmojiPicker && (
+            <div className="absolute bottom-full left-0 mb-2 z-50">
+              <EmojiPicker
+                onEmojiClick={handleEmojiClick}
+                theme={Theme.LIGHT}
+                width={350}
+                height={400}
+                searchPlaceHolder="Buscar emoji..."
+                previewConfig={{ showPreview: false }}
+              />
+            </div>
+          )}
+        </div>
+
         <textarea
           ref={textareaRef}
           value={mensagem}
@@ -168,8 +294,59 @@ export function MessageInput({ ticketId, onTyping, onEnviarMensagem, enviando: e
       </form>
 
       <p className="text-xs text-gray-400 mt-2">
-        Pressione <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded">Enter</kbd> para enviar, <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded">Shift + Enter</kbd> para quebrar linha
+        <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded">Enter</kbd> para enviar •
+        <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded ml-1">Shift+Enter</kbd> quebrar linha •
+        <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded ml-1">/</kbd> respostas rápidas
       </p>
+
+      {/* Modal de FileUpload */}
+      {mostrarFileUpload && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Enviar Arquivos</h3>
+              <button
+                onClick={() => setMostrarFileUpload(false)}
+                className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Conteúdo */}
+            <div className="p-4">
+              <FileUpload ticketId={ticketId} onUploadSuccess={handleUploadSucesso} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Respostas Rápidas */}
+      {mostrarRespostasRapidas && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b flex-shrink-0">
+              <h3 className="text-lg font-semibold text-gray-900">Respostas Rápidas</h3>
+              <button
+                onClick={() => setMostrarRespostasRapidas(false)}
+                className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Conteúdo */}
+            <div className="overflow-y-auto flex-1">
+              <RespostasRapidas
+                onSelecionarTemplate={handleSelecionarTemplate}
+                ticketAtual={{ id: ticketId }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

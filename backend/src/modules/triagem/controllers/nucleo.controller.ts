@@ -14,16 +14,12 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../modules/auth/jwt-auth.guard';
 import { NucleoService } from '../services/nucleo.service';
-import {
-  CreateNucleoDto,
-  UpdateNucleoDto,
-  FilterNucleoDto,
-} from '../dto';
+import { CreateNucleoDto, UpdateNucleoDto, FilterNucleoDto } from '../dto';
 
 @Controller('nucleos')
 @UseGuards(JwtAuthGuard)
 export class NucleoController {
-  constructor(private readonly nucleoService: NucleoService) { }
+  constructor(private readonly nucleoService: NucleoService) {}
 
   /**
    * POST /nucleos
@@ -71,11 +67,7 @@ export class NucleoController {
    * Atualiza um núcleo
    */
   @Put(':id')
-  async update(
-    @Request() req,
-    @Param('id') id: string,
-    @Body() updateNucleoDto: UpdateNucleoDto,
-  ) {
+  async update(@Request() req, @Param('id') id: string, @Body() updateNucleoDto: UpdateNucleoDto) {
     const empresaId = req.user.empresa_id;
     return this.nucleoService.update(empresaId, id, updateNucleoDto);
   }
@@ -118,10 +110,7 @@ export class NucleoController {
   @Get('disponivel/:canal')
   async findDisponivel(@Request() req, @Param('canal') canal: string) {
     const empresaId = req.user.empresa_id;
-    const nucleo = await this.nucleoService.findNucleoComMenorCarga(
-      empresaId,
-      canal,
-    );
+    const nucleo = await this.nucleoService.findNucleoComMenorCarga(empresaId, canal);
 
     if (!nucleo) {
       return {

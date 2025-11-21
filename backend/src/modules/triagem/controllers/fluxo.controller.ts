@@ -15,16 +15,12 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../modules/auth/jwt-auth.guard';
 import { FluxoTriagemService } from '../services/fluxo-triagem.service';
-import {
-  CreateFluxoDto,
-  UpdateFluxoDto,
-  PublicarFluxoDto,
-} from '../dto';
+import { CreateFluxoDto, UpdateFluxoDto, PublicarFluxoDto } from '../dto';
 
 @Controller('fluxos')
 @UseGuards(JwtAuthGuard)
 export class FluxoController {
-  constructor(private readonly fluxoService: FluxoTriagemService) { }
+  constructor(private readonly fluxoService: FluxoTriagemService) {}
 
   /**
    * POST /fluxos
@@ -81,7 +77,7 @@ export class FluxoController {
     if (!fluxo) {
       return {
         encontrado: false,
-        mensagem: `Nenhum fluxo padrão encontrado para o canal ${canal}`
+        mensagem: `Nenhum fluxo padrão encontrado para o canal ${canal}`,
       };
     }
 
@@ -103,11 +99,7 @@ export class FluxoController {
    * Atualizar fluxo
    */
   @Put(':id')
-  async update(
-    @Request() req,
-    @Param('id') id: string,
-    @Body() updateFluxoDto: UpdateFluxoDto,
-  ) {
+  async update(@Request() req, @Param('id') id: string, @Body() updateFluxoDto: UpdateFluxoDto) {
     const empresaId = req.user.empresa_id;
     return this.fluxoService.update(empresaId, id, updateFluxoDto);
   }
@@ -128,11 +120,7 @@ export class FluxoController {
    * Publicar fluxo (tornar ativo para uso)
    */
   @Post(':id/publicar')
-  async publicar(
-    @Request() req,
-    @Param('id') id: string,
-    @Body() dto: PublicarFluxoDto,
-  ) {
+  async publicar(@Request() req, @Param('id') id: string, @Body() dto: PublicarFluxoDto) {
     const empresaId = req.user.empresa_id;
     const usuarioId = req.user.id;
     return this.fluxoService.publicar(empresaId, id, dto, usuarioId);
@@ -153,11 +141,7 @@ export class FluxoController {
    * Duplicar fluxo existente
    */
   @Post(':id/duplicar')
-  async duplicar(
-    @Request() req,
-    @Param('id') id: string,
-    @Body('novoNome') novoNome?: string,
-  ) {
+  async duplicar(@Request() req, @Param('id') id: string, @Body('novoNome') novoNome?: string) {
     const empresaId = req.user.empresa_id;
     const usuarioId = req.user.id;
     return this.fluxoService.duplicar(empresaId, id, novoNome, usuarioId);
@@ -212,12 +196,7 @@ export class FluxoController {
     const empresaId = req.user.empresa_id;
     const usuarioId = req.user.id;
 
-    const fluxo = await this.fluxoService.salvarVersao(
-      empresaId,
-      id,
-      usuarioId,
-      descricao,
-    );
+    const fluxo = await this.fluxoService.salvarVersao(empresaId, id, usuarioId, descricao);
 
     return {
       success: true,
@@ -243,12 +222,7 @@ export class FluxoController {
       throw new BadRequestException('Número de versão inválido');
     }
 
-    const fluxo = await this.fluxoService.restaurarVersao(
-      empresaId,
-      id,
-      numeroVersao,
-      usuarioId,
-    );
+    const fluxo = await this.fluxoService.restaurarVersao(empresaId, id, numeroVersao, usuarioId);
 
     return {
       success: true,

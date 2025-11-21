@@ -1,4 +1,13 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray, IsNumber, IsEnum, Min, Max } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsArray,
+  IsNumber,
+  IsEnum,
+  Min,
+  Max,
+} from 'class-validator';
 
 /**
  * Tipos de recursos que podem ser buscados

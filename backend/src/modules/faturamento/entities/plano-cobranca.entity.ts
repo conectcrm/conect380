@@ -1,4 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+} from 'typeorm';
 import { Contrato } from '../../contratos/entities/contrato.entity';
 import { User } from '../../users/user.entity';
 import { Fatura } from './fatura.entity';
@@ -7,7 +16,7 @@ export enum StatusPlanoCobranca {
   ATIVO = 'ativo',
   PAUSADO = 'pausado',
   CANCELADO = 'cancelado',
-  EXPIRADO = 'expirado'
+  EXPIRADO = 'expirado',
 }
 
 export enum TipoRecorrencia {
@@ -15,7 +24,7 @@ export enum TipoRecorrencia {
   TRIMESTRAL = 'trimestral',
   SEMESTRAL = 'semestral',
   ANUAL = 'anual',
-  PERSONALIZADO = 'personalizado'
+  PERSONALIZADO = 'personalizado',
 }
 
 @Entity('planos_cobranca')
@@ -52,7 +61,7 @@ export class PlanoCobranca {
   @Column({
     type: 'enum',
     enum: TipoRecorrencia,
-    default: TipoRecorrencia.MENSAL
+    default: TipoRecorrencia.MENSAL,
   })
   tipoRecorrencia: TipoRecorrencia;
 
@@ -62,7 +71,7 @@ export class PlanoCobranca {
   @Column({
     type: 'enum',
     enum: StatusPlanoCobranca,
-    default: StatusPlanoCobranca.ATIVO
+    default: StatusPlanoCobranca.ATIVO,
   })
   status: StatusPlanoCobranca;
 
@@ -111,7 +120,7 @@ export class PlanoCobranca {
     webhookUrl?: string;
   };
 
-  @OneToMany(() => Fatura, fatura => fatura.contrato)
+  @OneToMany(() => Fatura, (fatura) => fatura.contrato)
   faturas: Fatura[];
 
   @Column({ type: 'boolean', default: true })
@@ -140,10 +149,10 @@ export class PlanoCobranca {
         proxima.setMonth(proxima.getMonth() + this.intervaloRecorrencia);
         break;
       case TipoRecorrencia.TRIMESTRAL:
-        proxima.setMonth(proxima.getMonth() + (3 * this.intervaloRecorrencia));
+        proxima.setMonth(proxima.getMonth() + 3 * this.intervaloRecorrencia);
         break;
       case TipoRecorrencia.SEMESTRAL:
-        proxima.setMonth(proxima.getMonth() + (6 * this.intervaloRecorrencia));
+        proxima.setMonth(proxima.getMonth() + 6 * this.intervaloRecorrencia);
         break;
       case TipoRecorrencia.ANUAL:
         proxima.setFullYear(proxima.getFullYear() + this.intervaloRecorrencia);

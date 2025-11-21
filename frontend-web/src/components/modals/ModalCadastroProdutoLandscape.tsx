@@ -369,7 +369,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
       {/* Modal de Confirmação de Alterações Não Salvas */}
       {showUnsavedChangesModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-xl w-[calc(100%-2rem)] sm:w-[450px] max-w-[500px]">
             <div className="p-6">
               <div className="flex items-center mb-4">
                 <AlertTriangle className="w-6 h-6 text-amber-500 mr-3" />
@@ -409,7 +409,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
         {/* Modal - Layout Paisagem */}
         <div className="flex min-h-full items-center justify-center p-2 sm:p-4">
-          <div className="relative w-full max-w-6xl bg-white rounded-xl shadow-2xl transform transition-all">
+          <div className="relative w-[calc(100%-2rem)] sm:w-[700px] md:w-[900px] lg:w-[1100px] xl:w-[1200px] max-w-[1400px] bg-white rounded-xl shadow-2xl transform transition-all">
             {/* Header */}
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
               <div className="flex items-center space-x-3">
@@ -507,8 +507,8 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
                         <option value="">Selecione uma categoria</option>
-                        {categorias.map((categoria) => (
-                          <option key={categoria} value={categoria}>
+                        {categorias.map((categoria, index) => (
+                          <option key={`${categoria}-${index}`} value={categoria}>
                             {categoria}
                           </option>
                         ))}

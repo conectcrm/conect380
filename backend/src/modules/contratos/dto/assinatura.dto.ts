@@ -1,4 +1,12 @@
-import { IsString, IsNumber, IsEnum, IsOptional, IsObject, IsIP, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsEnum,
+  IsOptional,
+  IsObject,
+  IsIP,
+  IsDateString,
+} from 'class-validator';
 import { TipoAssinatura } from '../entities/assinatura-contrato.entity';
 
 export class CreateAssinaturaDto {

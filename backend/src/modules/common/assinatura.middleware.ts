@@ -12,19 +12,13 @@ interface AuthenticatedRequest extends Request {
 
 @Injectable()
 export class AssinaturaMiddleware implements NestMiddleware {
-  constructor(private readonly assinaturasService: AssinaturasService) { }
+  constructor(private readonly assinaturasService: AssinaturasService) {}
 
   async use(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     // Pular verificação para rotas de autenticação e planos
-    const skipRoutes = [
-      '/auth/',
-      '/planos',
-      '/assinaturas',
-      '/health',
-      '/docs'
-    ];
+    const skipRoutes = ['/auth/', '/planos', '/assinaturas', '/health', '/docs'];
 
-    const shouldSkip = skipRoutes.some(route => req.path.startsWith(route));
+    const shouldSkip = skipRoutes.some((route) => req.path.startsWith(route));
 
     if (shouldSkip) {
       return next();
@@ -40,20 +34,26 @@ export class AssinaturaMiddleware implements NestMiddleware {
       const assinatura = await this.assinaturasService.buscarPorEmpresa(req.user.empresaId);
 
       if (!assinatura) {
-        throw new HttpException({
-          message: 'Empresa não possui assinatura ativa',
-          code: 'NO_SUBSCRIPTION',
-          redirect: '/billing'
-        }, HttpStatus.PAYMENT_REQUIRED);
+        throw new HttpException(
+          {
+            message: 'Empresa não possui assinatura ativa',
+            code: 'NO_SUBSCRIPTION',
+            redirect: '/billing',
+          },
+          HttpStatus.PAYMENT_REQUIRED,
+        );
       }
 
       if (assinatura.status !== 'ativa') {
-        throw new HttpException({
-          message: `Assinatura ${assinatura.status}. Entre em contato com o suporte.`,
-          code: 'SUBSCRIPTION_INACTIVE',
-          status: assinatura.status,
-          redirect: '/billing'
-        }, HttpStatus.PAYMENT_REQUIRED);
+        throw new HttpException(
+          {
+            message: `Assinatura ${assinatura.status}. Entre em contato com o suporte.`,
+            code: 'SUBSCRIPTION_INACTIVE',
+            status: assinatura.status,
+            redirect: '/billing',
+          },
+          HttpStatus.PAYMENT_REQUIRED,
+        );
       }
 
       // Verificar se o módulo está incluído no plano
@@ -61,17 +61,20 @@ export class AssinaturaMiddleware implements NestMiddleware {
 
       if (moduloAtual) {
         const temAcesso = assinatura.plano.modulosInclusos?.some(
-          pm => pm.modulo.codigo === moduloAtual
+          (pm) => pm.modulo.codigo === moduloAtual,
         );
 
         if (!temAcesso) {
-          throw new HttpException({
-            message: `Módulo ${moduloAtual} não incluído no plano atual`,
-            code: 'MODULE_NOT_INCLUDED',
-            module: moduloAtual,
-            currentPlan: assinatura.plano.nome,
-            redirect: '/billing/upgrade'
-          }, HttpStatus.FORBIDDEN);
+          throw new HttpException(
+            {
+              message: `Módulo ${moduloAtual} não incluído no plano atual`,
+              code: 'MODULE_NOT_INCLUDED',
+              module: moduloAtual,
+              currentPlan: assinatura.plano.nome,
+              redirect: '/billing/upgrade',
+            },
+            HttpStatus.FORBIDDEN,
+          );
         }
       }
 
@@ -80,11 +83,14 @@ export class AssinaturaMiddleware implements NestMiddleware {
         const permitido = await this.assinaturasService.registrarChamadaApi(req.user.empresaId);
 
         if (!permitido) {
-          throw new HttpException({
-            message: 'Limite de chamadas da API excedido para hoje',
-            code: 'API_LIMIT_EXCEEDED',
-            redirect: '/billing/upgrade'
-          }, HttpStatus.TOO_MANY_REQUESTS);
+          throw new HttpException(
+            {
+              message: 'Limite de chamadas da API excedido para hoje',
+              code: 'API_LIMIT_EXCEEDED',
+              redirect: '/billing/upgrade',
+            },
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
         }
       }
 
@@ -95,14 +101,14 @@ export class AssinaturaMiddleware implements NestMiddleware {
           usuarios: assinatura.plano.limiteUsuarios,
           clientes: assinatura.plano.limiteClientes,
           storage: assinatura.plano.limiteStorage,
-          apiCalls: assinatura.plano.limiteApiCalls
+          apiCalls: assinatura.plano.limiteApiCalls,
         },
         uso: {
           usuarios: assinatura.usuariosAtivos,
           clientes: assinatura.clientesCadastrados,
           storage: assinatura.storageUtilizado,
-          apiCallsHoje: assinatura.apiCallsHoje
-        }
+          apiCallsHoje: assinatura.apiCallsHoje,
+        },
       };
 
       next();
@@ -133,7 +139,7 @@ export class AssinaturaMiddleware implements NestMiddleware {
       '/email': 'email',
       '/chat': 'chat',
       '/automacao': 'automacao',
-      '/analytics': 'analytics'
+      '/analytics': 'analytics',
     };
 
     for (const [route, module] of Object.entries(moduleMap)) {
@@ -150,16 +156,10 @@ export class AssinaturaMiddleware implements NestMiddleware {
     const resourceOperations = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
     // Ou operações específicas que queremos monitorar
-    const monitoredPaths = [
-      '/api/',
-      '/export/',
-      '/import/',
-      '/upload/',
-      '/reports/'
-    ];
+    const monitoredPaths = ['/api/', '/export/', '/import/', '/upload/', '/reports/'];
 
     const isResourceMethod = resourceOperations.includes(req.method);
-    const isMonitoredPath = monitoredPaths.some(path => req.path.includes(path));
+    const isMonitoredPath = monitoredPaths.some((path) => req.path.includes(path));
 
     return isResourceMethod || isMonitoredPath;
   }

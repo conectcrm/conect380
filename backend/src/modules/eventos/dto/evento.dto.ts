@@ -1,4 +1,12 @@
-import { IsString, IsOptional, IsDateString, IsBoolean, IsEnum, IsUUID, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsDateString,
+  IsBoolean,
+  IsEnum,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 import { TipoEvento } from '../evento.entity';
 
 export class CreateEventoDto {

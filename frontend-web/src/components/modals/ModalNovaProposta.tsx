@@ -711,7 +711,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-1 sm:p-2">
-      <div className="modal-content modal-nova-proposta bg-white rounded-lg sm:rounded-xl shadow-2xl w-full max-w-6xl mx-auto h-[98vh] max-h-[98vh] overflow-hidden flex flex-col">
+      <div className="modal-content modal-nova-proposta bg-white rounded-lg sm:rounded-xl shadow-2xl w-[calc(100%-2rem)] sm:w-[700px] md:w-[900px] lg:w-[1100px] xl:w-[1200px] max-w-[1400px] h-[98vh] max-h-[98vh] overflow-hidden flex flex-col">
         {/* Header do Modal - Compacto */}
         <div className="bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white px-3 py-2 flex-shrink-0">
           <div className="flex items-center justify-between">

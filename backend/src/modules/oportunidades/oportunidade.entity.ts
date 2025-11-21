@@ -1,7 +1,17 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+} from 'typeorm';
 import { User } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
 import { Atividade } from './atividade.entity';
+import { Empresa } from '../../empresas/entities/empresa.entity';
 
 export enum EstagioOportunidade {
   LEADS = 'leads',
@@ -10,13 +20,13 @@ export enum EstagioOportunidade {
   NEGOCIACAO = 'negotiation',
   FECHAMENTO = 'closing',
   GANHO = 'won',
-  PERDIDO = 'lost'
+  PERDIDO = 'lost',
 }
 
 export enum PrioridadeOportunidade {
   BAIXA = 'low',
   MEDIA = 'medium',
-  ALTA = 'high'
+  ALTA = 'high',
 }
 
 export enum OrigemOportunidade {
@@ -27,7 +37,7 @@ export enum OrigemOportunidade {
   REDES_SOCIAIS = 'redes_sociais',
   EVENTO = 'evento',
   PARCEIRO = 'parceiro',
-  CAMPANHA = 'campanha'
+  CAMPANHA = 'campanha',
 }
 
 @Entity('oportunidades')
@@ -50,21 +60,21 @@ export class Oportunidade {
   @Column({
     type: 'enum',
     enum: EstagioOportunidade,
-    default: EstagioOportunidade.LEADS
+    default: EstagioOportunidade.LEADS,
   })
   estagio: EstagioOportunidade;
 
   @Column({
     type: 'enum',
     enum: PrioridadeOportunidade,
-    default: PrioridadeOportunidade.MEDIA
+    default: PrioridadeOportunidade.MEDIA,
   })
   prioridade: PrioridadeOportunidade;
 
   @Column({
     type: 'enum',
     enum: OrigemOportunidade,
-    default: OrigemOportunidade.WEBSITE
+    default: OrigemOportunidade.WEBSITE,
   })
   origem: OrigemOportunidade;
 
@@ -89,8 +99,8 @@ export class Oportunidade {
   @JoinColumn({ name: 'cliente_id' })
   cliente: Cliente;
 
-  @Column('int', { nullable: true })
-  cliente_id: number;
+  @Column('uuid', { nullable: true })
+  cliente_id: string;
 
   // Informações de contato (se não houver cliente cadastrado)
   @Column({ length: 255, nullable: true })
@@ -105,8 +115,16 @@ export class Oportunidade {
   @Column({ length: 255, nullable: true })
   empresaContato: string;
 
+  // Multi-tenancy
+  @ManyToOne(() => Empresa, { nullable: false })
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
+
+  @Column('uuid')
+  empresa_id: string;
+
   // Atividades relacionadas
-  @OneToMany(() => Atividade, atividade => atividade.oportunidade, { cascade: true })
+  @OneToMany(() => Atividade, (atividade) => atividade.oportunidade, { cascade: true })
   atividades: Atividade[];
 
   @CreateDateColumn()

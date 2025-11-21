@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
+import { toast } from 'react-hot-toast';
 import { 
   Plus, 
   Search, 
@@ -21,12 +22,6 @@ import {
 import { useCalculosProposta } from './hooks/useCalculosProposta';
 import { propostasService, PropostaCompleta } from './services/propostasService';
 import { clientesService, Cliente as ClienteService } from '../../services/clientesService';
-
-// Toast simples para demonstração
-const toast = {
-  success: (message: string) => console.log('✅', message),
-  error: (message: string) => console.error('❌', message)
-};
 
 // Types e Interfaces Básicas
 interface Cliente {
@@ -345,8 +340,7 @@ const NovaPropostaPage: React.FC = () => {
           tipoPessoa: cliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica'
         }));
         
-        setClientes(clientesFormatados);
-        console.log('✅ Clientes carregados:', clientesFormatados.length);
+  setClientes(clientesFormatados);
       } catch (error) {
         console.error('❌ Erro ao carregar clientes:', error);
         toast.error('Erro ao carregar clientes. Usando dados de exemplo.');
@@ -507,12 +501,8 @@ const NovaPropostaPage: React.FC = () => {
         status: 'rascunho' as const
       };
 
-      console.log('📝 Criando proposta via serviço real...', propostaData);
-      
       // Usar o serviço real de propostas
       const propostaCriada = await propostasService.criarProposta(propostaData);
-      
-      console.log('✅ Proposta criada com sucesso:', propostaCriada);
       toast.success(`Proposta ${propostaCriada.numero} criada com sucesso!`);
       
       // Reset do formulário

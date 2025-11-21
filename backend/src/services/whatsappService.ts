@@ -35,7 +35,7 @@ class WhatsAppService {
   private client: Client | null = null;
   private status: WhatsAppStatus = {
     isConnected: false,
-    isAuthenticated: false
+    isAuthenticated: false,
   };
   private qrCodeCallbacks: ((qr: string) => void)[] = [];
   private statusCallbacks: ((status: WhatsAppStatus) => void)[] = [];
@@ -49,7 +49,7 @@ class WhatsAppService {
     this.client = new Client({
       authStrategy: new LocalAuth({
         clientId: 'conectcrm-whatsapp',
-        dataPath: './whatsapp-session'
+        dataPath: './whatsapp-session',
       }),
       puppeteer: {
         headless: true,
@@ -60,9 +60,9 @@ class WhatsAppService {
           '--disable-accelerated-2d-canvas',
           '--no-first-run',
           '--no-zygote',
-          '--disable-gpu'
-        ]
-      }
+          '--disable-gpu',
+        ],
+      },
     });
 
     this.setupEventHandlers();
@@ -80,7 +80,7 @@ class WhatsAppService {
         this.status.qrCode = qrCodeData;
 
         // Notifica todos os callbacks
-        this.qrCodeCallbacks.forEach(callback => callback(qrCodeData));
+        this.qrCodeCallbacks.forEach((callback) => callback(qrCodeData));
         this.notifyStatusChange();
       } catch (error) {
         console.error('❌ Erro ao gerar QR Code:', error);
@@ -95,7 +95,7 @@ class WhatsAppService {
         isAuthenticated: true,
         qrCode: undefined,
         clientInfo: this.client?.info,
-        lastConnected: new Date()
+        lastConnected: new Date(),
       };
       this.notifyStatusChange();
     });
@@ -112,7 +112,7 @@ class WhatsAppService {
       console.error('❌ Falha na autenticação WhatsApp:', msg);
       this.status = {
         isConnected: false,
-        isAuthenticated: false
+        isAuthenticated: false,
       };
       this.notifyStatusChange();
     });
@@ -122,7 +122,7 @@ class WhatsAppService {
       console.log('🔌 WhatsApp desconectado:', reason);
       this.status = {
         isConnected: false,
-        isAuthenticated: false
+        isAuthenticated: false,
       };
       this.notifyStatusChange();
     });
@@ -155,7 +155,7 @@ class WhatsAppService {
       this.client = null;
       this.status = {
         isConnected: false,
-        isAuthenticated: false
+        isAuthenticated: false,
       };
       this.notifyStatusChange();
       console.log('🛑 Cliente WhatsApp parado');
@@ -174,7 +174,7 @@ class WhatsAppService {
 
   // Notificar mudanças de status
   private notifyStatusChange(): void {
-    this.statusCallbacks.forEach(callback => callback(this.status));
+    this.statusCallbacks.forEach((callback) => callback(this.status));
   }
 
   // Obter status atual
@@ -215,11 +215,11 @@ class WhatsAppService {
         const media = new MessageMedia(
           data.media.mimetype,
           data.media.data.toString('base64'),
-          data.media.filename
+          data.media.filename,
         );
 
         await this.client.sendMessage(formattedNumber, media, {
-          caption: data.message
+          caption: data.message,
         });
       } else {
         await this.client.sendMessage(formattedNumber, data.message);
@@ -237,12 +237,13 @@ class WhatsAppService {
   async enviarProposta(dadosProposta: WhatsAppPropostaData): Promise<boolean> {
     try {
       // Mensagem padrão da proposta
-      const mensagem = dadosProposta.mensagemPersonalizada || this.gerarMensagemProposta(dadosProposta);
+      const mensagem =
+        dadosProposta.mensagemPersonalizada || this.gerarMensagemProposta(dadosProposta);
 
       // Dados para envio
       const messageData: WhatsAppMessage = {
         to: dadosProposta.clienteWhatsApp,
-        message: mensagem
+        message: mensagem,
       };
 
       // Adicionar PDF se fornecido
@@ -250,14 +251,16 @@ class WhatsAppService {
         messageData.media = {
           data: dadosProposta.pdfBuffer,
           mimetype: 'application/pdf',
-          filename: `Proposta_${dadosProposta.propostaNumero}.pdf`
+          filename: `Proposta_${dadosProposta.propostaNumero}.pdf`,
         };
       }
 
       const sucesso = await this.sendMessageWithMedia(messageData);
 
       if (sucesso) {
-        console.log(`📋 Proposta ${dadosProposta.propostaNumero} enviada via WhatsApp para ${dadosProposta.clienteNome}`);
+        console.log(
+          `📋 Proposta ${dadosProposta.propostaNumero} enviada via WhatsApp para ${dadosProposta.clienteNome}`,
+        );
       }
 
       return sucesso;
@@ -271,7 +274,7 @@ class WhatsAppService {
   private gerarMensagemProposta(dados: WhatsAppPropostaData): string {
     const valorFormatado = new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(dados.valorTotal);
 
     return `🎯 *Nova Proposta Comercial*

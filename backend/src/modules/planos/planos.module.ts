@@ -10,16 +10,9 @@ import { AssinaturasService } from './assinaturas.service';
 import { AssinaturasController } from './assinaturas.controller';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([
-      Plano,
-      ModuloSistema,
-      PlanoModulo,
-      AssinaturaEmpresa
-    ])
-  ],
+  imports: [TypeOrmModule.forFeature([Plano, ModuloSistema, PlanoModulo, AssinaturaEmpresa])],
   controllers: [PlanosController, AssinaturasController],
   providers: [PlanosService, AssinaturasService],
-  exports: [PlanosService, AssinaturasService]
+  exports: [PlanosService, AssinaturasService],
 })
-export class PlanosModule { }
+export class PlanosModule {}

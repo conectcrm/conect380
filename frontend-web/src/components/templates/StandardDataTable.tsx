@@ -78,7 +78,10 @@ export function StandardDataTable<T>({
   const handleSelectAll = () => {
     if (!getItemId || !onSelectionChange) return;
 
-    const allIds = data.map(item => getItemId(item));
+    const safeData = data || [];
+    if (safeData.length === 0) return;
+
+    const allIds = safeData.map(item => getItemId(item));
     const allSelected = allIds.every(id => selectedItems.includes(id));
 
     if (allSelected) {
@@ -131,7 +134,10 @@ export function StandardDataTable<T>({
     );
   }
 
-  if (data.length === 0) {
+  // Guard: Se data for undefined ou null, tratar como array vazio
+  const safeData = data || [];
+
+  if (safeData.length === 0) {
     const EmptyIcon = emptyState?.icon;
 
     return (
@@ -169,7 +175,7 @@ export function StandardDataTable<T>({
                 <th className="w-12 px-6 py-3">
                   <input
                     type="checkbox"
-                    checked={data.length > 0 && selectedItems.length === data.length}
+                    checked={safeData.length > 0 && selectedItems.length === safeData.length}
                     onChange={handleSelectAll}
                     className="h-4 w-4 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
                   />
@@ -206,7 +212,7 @@ export function StandardDataTable<T>({
           </thead>
 
           <tbody className="bg-white divide-y divide-gray-200">
-            {data.map((item, rowIndex) => {
+            {safeData.map((item, rowIndex) => {
               const itemId = getItemId?.(item);
               const isSelected = itemId ? selectedItems.includes(itemId) : false;
 
@@ -233,7 +239,7 @@ export function StandardDataTable<T>({
                     <td
                       key={colIndex}
                       className={`px-6 py-4 whitespace-nowrap text-sm text-gray-900 ${column.align === 'center' ? 'text-center' :
-                          column.align === 'right' ? 'text-right' : 'text-left'
+                        column.align === 'right' ? 'text-right' : 'text-left'
                         }`}
                     >
                       {renderCell(item, column)}
@@ -262,8 +268,8 @@ export function StandardDataTable<T>({
                                   key={actionIndex}
                                   onClick={() => action.onClick(item)}
                                   className={`w-full px-4 py-2 text-left text-sm flex items-center space-x-2 hover:bg-gray-100 transition-colors ${action.variant === 'danger' ? 'text-red-700 hover:bg-red-50' :
-                                      action.variant === 'success' ? 'text-green-700 hover:bg-green-50' :
-                                        'text-gray-700'
+                                    action.variant === 'success' ? 'text-green-700 hover:bg-green-50' :
+                                      'text-gray-700'
                                     }`}
                                 >
                                   {ActionIcon && <ActionIcon className="w-4 h-4" />}
@@ -310,8 +316,8 @@ export function StandardDataTable<T>({
                   key={page}
                   onClick={() => pagination.onPageChange(page)}
                   className={`px-3 py-2 text-sm border rounded-md ${isCurrentPage
-                      ? 'bg-[#159A9C] border-[#159A9C] text-white'
-                      : 'border-gray-300 hover:bg-gray-50'
+                    ? 'bg-[#159A9C] border-[#159A9C] text-white'
+                    : 'border-gray-300 hover:bg-gray-50'
                     }`}
                 >
                   {page}

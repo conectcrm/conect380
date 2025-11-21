@@ -8,10 +8,10 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 
 /**
  * 🖼️ SCRIPT: ATUALIZAR FOTOS DOS CONTATOS
- * 
+ *
  * Este script busca todos os tickets que não têm foto do contato (contatoFoto = null)
  * e tenta buscar a foto do perfil na API do WhatsApp.
- * 
+ *
  * Como executar:
  * ```bash
  * cd backend
@@ -71,8 +71,7 @@ async function atualizarFotosContatos() {
         }
 
         // Aguardar 500ms entre requisições para evitar rate limit
-        await new Promise(resolve => setTimeout(resolve, 500));
-
+        await new Promise((resolve) => setTimeout(resolve, 500));
       } catch (error) {
         console.log(`   ❌ Erro: ${error.message}`);
         erros++;
@@ -89,7 +88,6 @@ async function atualizarFotosContatos() {
     console.log(`❌ Erros: ${erros}`);
     console.log(`📊 Total processado: ${ticketsSemFoto.length}`);
     console.log('═══════════════════════════════════════════════════════════\n');
-
   } catch (error) {
     console.error('❌ Erro ao atualizar fotos:', error);
   } finally {

@@ -2,15 +2,15 @@
  * ========================================
  * UTILITÁRIO: Normalização de Telefones Brasileiros
  * ========================================
- * 
+ *
  * Contexto: Em 2015-2017, o Brasil adicionou o dígito 9 no início
  * de todos os números de celular móvel.
- * 
+ *
  * Formato correto:
  * - Internacional: +55 (DDD) 9XXXX-XXXX
  * - Limpo: 55 + DDD (2 dígitos) + 9 + número (8 dígitos) = 13 dígitos
  * - Sem código país: DDD + 9 + número = 11 dígitos
- * 
+ *
  * Exemplos:
  * - +55 62 99668-9991  → 5562996689991 (13 dígitos com +55)
  * - (62) 99668-9991    → 62996689991   (11 dígitos sem +55)
@@ -30,9 +30,7 @@ export class TelefoneBrasilUtil {
    */
   static temDigito9(numeroLimpo: string): boolean {
     // Remove código do país (55) se presente
-    const semPais = numeroLimpo.startsWith('55')
-      ? numeroLimpo.substring(2)
-      : numeroLimpo;
+    const semPais = numeroLimpo.startsWith('55') ? numeroLimpo.substring(2) : numeroLimpo;
 
     // Deve ter 11 dígitos (DDD 2 + 9 + número 8)
     if (semPais.length !== 11) return false;
@@ -43,7 +41,7 @@ export class TelefoneBrasilUtil {
 
   /**
    * Adiciona o dígito 9 se necessário (números antigos sem o 9)
-   * 
+   *
    * ⚠️ IMPORTANTE: Alguns números antigos realmente NÃO TÊM o 9!
    * Esta função agora é mais conservadora:
    * - Só adiciona o 9 se o número tem EXATAMENTE 10 dígitos (DDD + 8 dígitos)
@@ -74,11 +72,11 @@ export class TelefoneBrasilUtil {
 
   /**
    * Normaliza o número de telefone brasileiro para o formato WhatsApp
-   * 
+   *
    * @param telefone - Número em qualquer formato
    * @param incluirCodigoPais - Se deve incluir o código do país (55)
    * @returns Número normalizado
-   * 
+   *
    * Exemplos:
    * - normalizarParaWhatsApp('(62) 9668-9991') → '62996689991' (adiciona o 9)
    * - normalizarParaWhatsApp('62 99668-9991') → '62996689991'
@@ -102,7 +100,9 @@ export class TelefoneBrasilUtil {
     // 4. Validação final: deve ter 13 dígitos (com +55) ou 11 (sem +55)
     const tamanhoEsperado = incluirCodigoPais ? 13 : 11;
     if (numeroLimpo.length !== tamanhoEsperado) {
-      console.warn(`⚠️  [TelefoneBrasil] Número com tamanho inesperado: ${numeroLimpo} (esperado: ${tamanhoEsperado})`);
+      console.warn(
+        `⚠️  [TelefoneBrasil] Número com tamanho inesperado: ${numeroLimpo} (esperado: ${tamanhoEsperado})`,
+      );
     }
 
     return numeroLimpo;
@@ -110,7 +110,7 @@ export class TelefoneBrasilUtil {
 
   /**
    * Valida se o número está no formato correto
-   * 
+   *
    * ⚠️ ATUALIZADO: Aceita números com ou sem o dígito 9
    * Alguns números antigos realmente não têm o 9 e são válidos na whitelist
    */
@@ -127,7 +127,7 @@ export class TelefoneBrasilUtil {
     if (semPais.length !== 11) {
       return {
         valido: false,
-        erro: `Número deve ter 11 dígitos (tem ${semPais.length})`
+        erro: `Número deve ter 11 dígitos (tem ${semPais.length})`,
       };
     }
 
@@ -136,7 +136,7 @@ export class TelefoneBrasilUtil {
     if (ddd < 11 || ddd > 99) {
       return {
         valido: false,
-        erro: `DDD inválido: ${ddd}`
+        erro: `DDD inválido: ${ddd}`,
       };
     }
 
@@ -148,7 +148,7 @@ export class TelefoneBrasilUtil {
 
   /**
    * Formata o número para exibição amigável
-   * 
+   *
    * Exemplos:
    * - 5562996689991 → +55 (62) 99668-9991 (com 9)
    * - 556284709519  → +55 (62) 8470-9519  (sem 9, número antigo)
@@ -217,15 +217,15 @@ export class TelefoneBrasilUtil {
  * ========================================
  * EXEMPLOS DE USO:
  * ========================================
- * 
+ *
  * // Normalizar para envio WhatsApp
  * const numero = TelefoneBrasilUtil.normalizarParaWhatsApp('(62) 9668-9991');
  * // → '5562996689991' (adiciona código país + dígito 9)
- * 
+ *
  * // Validar número
  * const validacao = TelefoneBrasilUtil.validarNumero('5562996689991');
  * // → { valido: true }
- * 
+ *
  * // Detectar e corrigir
  * const resultado = TelefoneBrasilUtil.detectarECorrigir('556296689991');
  * // → {
@@ -234,7 +234,7 @@ export class TelefoneBrasilUtil {
  * //     foiCorrigido: true,
  * //     validacao: { valido: true }
  * //   }
- * 
+ *
  * // Formatar para exibição
  * const formatado = TelefoneBrasilUtil.formatarParaExibicao('5562996689991');
  * // → '+55 (62) 99668-9991'

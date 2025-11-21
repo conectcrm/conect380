@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useI18n } from '../../contexts/I18nContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../hooks/useAuth';
 import { KPICard } from '../../components/common/KPICard';
-import { ResponsiveFilters } from '../../components/common/ResponsiveFilters';
-import ColorPaletteSelector from '../../components/common/ColorPaletteSelector';
-import { BackToNucleus } from '../../components/navigation/BackToNucleus';
+import { ResponsiveFilters, FilterOption } from '../../components/common/ResponsiveFilters';
 import { useDashboard } from '../../hooks/useDashboard';
 import {
   VendasChart,
@@ -14,10 +13,36 @@ import {
   AtividadesChart
 } from '../../components/charts/DashboardCharts';
 import {
-  AlertTriangle, Activity, Target, Users, FileText, DollarSign,
-  TrendingUp, UserPlus, BarChart3, ChevronRight, Filter, ArrowUp, ArrowDown,
-  CheckSquare, Clock, Eye, Edit, Plus, Calendar, Bell, RefreshCw
+  AlertTriangle, Target, FileText, DollarSign,
+  UserPlus, BarChart3, ArrowUp, ArrowDown,
+  CheckSquare, Clock, Calendar, Bell, RefreshCw
 } from 'lucide-react';
+
+const PERIOD_LABELS: Record<string, string> = {
+  semanal: 'Esta semana',
+  mensal: 'Este mês',
+  trimestral: 'Último trimestre',
+  semestral: 'Último semestre',
+  anual: 'Ano atual'
+};
+
+const DEFAULT_PERIOD_OPTIONS: FilterOption[] = Object.entries(PERIOD_LABELS).map(([value, label]) => ({
+  value,
+  label
+}));
+
+const DEFAULT_REGION_OPTIONS: FilterOption[] = [
+  { value: 'Todas', label: 'Todas as regiões' },
+  { value: 'Norte', label: 'Norte' },
+  { value: 'Nordeste', label: 'Nordeste' },
+  { value: 'Centro-Oeste', label: 'Centro-Oeste' },
+  { value: 'Sudeste', label: 'Sudeste' },
+  { value: 'Sul', label: 'Sul' }
+];
+
+const DEFAULT_VENDOR_OPTIONS: FilterOption[] = [
+  { value: 'Todos', label: 'Todos os vendedores' }
+];
 
 // CSS personalizado para animações premium
 const animationStyles = `
@@ -132,12 +157,21 @@ const getProgressColor = (percentage: number) => {
 const DashboardPage: React.FC = () => {
   const { t } = useI18n();
   const { currentPalette } = useTheme();
+  const { user } = useAuth();
 
   const [filtros, setFiltros] = useState({
     periodo: "mensal",
     vendedor: "Todos",
     regiao: "Todas"
   });
+
+  const firstName = user?.nome?.split(' ')[0] ?? undefined;
+  const saudacao = (() => {
+    const hora = new Date().getHours();
+    if (hora < 12) return 'Bom dia';
+    if (hora < 18) return 'Boa tarde';
+    return 'Boa noite';
+  })();
 
 
 
@@ -149,6 +183,63 @@ const DashboardPage: React.FC = () => {
     autoRefresh: true,
     refreshInterval: 15 * 60 * 1000 // 15 minutos
   });
+
+  const periodOptions = useMemo<FilterOption[]>(() => {
+    const metadataPeriodos = (data?.metadata as { periodosDisponiveis?: string[] } | null)?.periodosDisponiveis;
+    if (Array.isArray(metadataPeriodos) && metadataPeriodos.length > 0) {
+      const mapped = metadataPeriodos
+        .filter((periodo): periodo is keyof typeof PERIOD_LABELS => periodo in PERIOD_LABELS)
+        .map((periodo) => ({ value: periodo, label: PERIOD_LABELS[periodo] }));
+
+      if (mapped.length > 0) {
+        return mapped;
+      }
+    }
+
+    return DEFAULT_PERIOD_OPTIONS;
+  }, [data?.metadata]);
+
+  const vendedorOptions = useMemo<FilterOption[]>(() => {
+    const metadataVendedores = (data?.metadata as { vendedoresDisponiveis?: Array<{ id: string; nome: string }> } | null)?.vendedoresDisponiveis;
+    const source = Array.isArray(metadataVendedores) && metadataVendedores.length > 0
+      ? metadataVendedores.map(({ id, nome }) => ({ value: id, label: nome }))
+      : (Array.isArray(data?.vendedoresRanking) ? data.vendedoresRanking.map((vendedor) => ({ value: vendedor.id, label: vendedor.nome })) : []);
+
+    const unique = new Map<string, string>();
+    DEFAULT_VENDOR_OPTIONS.forEach(({ value, label }) => unique.set(value, label));
+    source.forEach(({ value, label }) => {
+      if (value && label && !unique.has(value)) {
+        unique.set(value, label);
+      }
+    });
+
+    return Array.from(unique.entries()).map(([value, label]) => ({ value, label }));
+  }, [data?.metadata, data?.vendedoresRanking]);
+
+  const regiaoOptions = useMemo<FilterOption[]>(() => {
+    const metadataRegioes = (data?.metadata as { regioesDisponiveis?: string[] } | null)?.regioesDisponiveis;
+    if (Array.isArray(metadataRegioes) && metadataRegioes.length > 0) {
+      const unique = new Map<string, string>();
+      DEFAULT_REGION_OPTIONS.forEach(({ value, label }) => unique.set(value, label));
+
+      metadataRegioes.forEach((regiao) => {
+        if (!unique.has(regiao)) {
+          unique.set(regiao, regiao === 'Todas' ? 'Todas as regiões' : regiao);
+        }
+      });
+
+      const mapped = Array.from(unique.entries()).map(([value, label]) => ({
+        value,
+        label
+      }));
+
+      if (mapped.length > 0) {
+        return mapped;
+      }
+    }
+
+    return DEFAULT_REGION_OPTIONS;
+  }, [data?.metadata]);
 
   // Atualizar filtros quando o usuário muda
   const handleFiltroChange = (novosFiltros: typeof filtros) => {
@@ -207,36 +298,93 @@ const DashboardPage: React.FC = () => {
     );
   }
 
+  const totalAlertas = data.alertas?.length ?? 0;
+  const propostasAtivas = data.kpis?.emNegociacao?.quantidade ?? 0;
+  const periodoAtivoLabel = PERIOD_LABELS[filtros.periodo] ?? filtros.periodo;
+  const faturamentoTendencia = Array.isArray((data.kpis?.faturamentoTotal as any)?.tendencia)
+    ? ((data.kpis?.faturamentoTotal as any)?.tendencia as number[])
+    : undefined;
+  const propostasEmFoco = Array.isArray(data.kpis?.emNegociacao?.propostas)
+    ? data.kpis?.emNegociacao?.propostas ?? []
+    : [];
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="p-6">
         {/* Header da Página */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-                <BarChart3 className="h-8 w-8 mr-3 text-blue-600" />
-                Dashboard
-              </h1>
-              <p className="mt-2 text-gray-600">
-                Visão geral dos indicadores e performance do seu negócio
-              </p>
+        <div className="bg-white border border-[#DEEFE7] rounded-2xl shadow-sm p-6 mb-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-xl border border-[#159A9C] bg-[#159A9C] bg-opacity-10 flex items-center justify-center text-[#159A9C] shadow-sm">
+                <BarChart3 className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#B4BEC9]">visão geral</p>
+                <h1 className="text-2xl font-semibold text-[#002333]">Painel de performance</h1>
+                <p className="text-sm font-semibold text-[#0F7B7D]">
+                  {firstName ? `${saudacao}, ${firstName}!` : `${saudacao}!`}
+                </p>
+                <p className="text-sm text-[#0F7B7D] mt-1">
+                  Indicadores críticos em um layout enxuto para decisões rápidas
+                </p>
+              </div>
             </div>
-            <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#B4BEC9] bg-[#DEEFE7] text-sm text-[#0F7B7D]">
+                <Clock className="h-4 w-4" />
+                <span>Atualização automática a cada 15 min</span>
+              </div>
               <button
                 onClick={refresh}
                 disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center space-x-2"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-[#159A9C] text-[#159A9C] hover:bg-[#DEEFE7] disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/40"
               >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                <span>Atualizar</span>
+                <RefreshCw className={`${loading ? 'animate-spin' : ''} h-4 w-4`} />
+                <span>Sincronizar agora</span>
               </button>
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-[#DEEFE7] bg-[#FFFFFF] shadow-sm">
+              <div>
+                <p className="text-xs font-semibold uppercase text-[#B4BEC9]">Alertas ativos</p>
+                <p className="text-xl font-semibold text-[#002333]">{totalAlertas}</p>
+              </div>
+              <div className="h-10 w-10 rounded-lg bg-[#DEEFE7] text-[#0F7B7D] flex items-center justify-center">
+                <Bell className="h-5 w-5" />
+              </div>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-[#DEEFE7] bg-[#FFFFFF] shadow-sm">
+              <div>
+                <p className="text-xs font-semibold uppercase text-[#B4BEC9]">Propostas ativas</p>
+                <p className="text-xl font-semibold text-[#002333]">{propostasAtivas}</p>
+              </div>
+              <div className="h-10 w-10 rounded-lg bg-[#DEEFE7] text-[#159A9C] flex items-center justify-center">
+                <Target className="h-5 w-5" />
+              </div>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-[#DEEFE7] bg-[#FFFFFF] shadow-sm">
+              <div>
+                <p className="text-xs font-semibold uppercase text-[#B4BEC9]">Período ativo</p>
+                <p className="text-xl font-semibold text-[#002333]">{periodoAtivoLabel}</p>
+              </div>
+              <div className="h-10 w-10 rounded-lg bg-[#DEEFE7] text-[#002333] flex items-center justify-center">
+                <Calendar className="h-5 w-5" />
+              </div>
             </div>
           </div>
         </div>
 
         {/* Filtros */}
-        <ResponsiveFilters filtros={filtros} setFiltros={handleFiltroChange} />
+        <ResponsiveFilters
+          filtros={filtros}
+          onChange={handleFiltroChange}
+          periodOptions={periodOptions}
+          vendedorOptions={vendedorOptions}
+          regiaoOptions={regiaoOptions}
+          loading={loading}
+        />
 
         {/* Alertas Inteligentes */}
         {data.alertas && data.alertas.length > 0 && (
@@ -253,7 +401,6 @@ const DashboardPage: React.FC = () => {
                   ${alerta.severidade === 'baixa' ? 'bg-blue-50 border-blue-500' : ''}
                   ${alerta.tipo === 'conquista' ? 'bg-green-50 border-green-500' : ''}
                 `}
-                  style={{ backgroundColor: currentPalette.colors.backgroundSecondary }}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -279,99 +426,178 @@ const DashboardPage: React.FC = () => {
           </div>
         )}
 
-        {/* Widgets de Atividades e Resumo do Dia */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Atividades Hoje */}
-          <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm hover:shadow-md transition-all">
+        {/* Painel Comercial Dinâmico */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-[#DEEFE7] shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Atividades Hoje</h3>
-                <p className="text-gray-600">Tarefas e compromissos</p>
+                <h3 className="text-lg font-semibold text-[#002333]">Ranking de vendedores</h3>
+                <p className="text-sm text-[#0F7B7D]">Metas atingidas no período selecionado</p>
               </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Activity className="h-8 w-8 text-blue-600" />
-              </div>
+              {data.metadata?.atualizadoEm && (
+                <span className="text-xs font-semibold text-[#B4BEC9]">
+                  Atualizado em {new Date(data.metadata.atualizadoEm).toLocaleString('pt-BR')}
+                </span>
+              )}
             </div>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Reuniões</span>
-                <span className="font-bold text-blue-600">3</span>
+            {data.vendedoresRanking && data.vendedoresRanking.length > 0 ? (
+              <div className="space-y-3">
+                {data.vendedoresRanking.slice(0, 5).map((vendedor, index) => {
+                  const percentualMeta = vendedor.meta
+                    ? Math.round((vendedor.vendas / vendedor.meta) * 100)
+                    : null;
+                  return (
+                    <div
+                      key={vendedor.id}
+                      className="flex items-center justify-between p-3 rounded-xl border border-[#DEEFE7] bg-[#FFFFFF]"
+                    >
+                      <div className="flex items-center gap-4">
+                        <span className="h-8 w-8 rounded-full bg-[#DEEFE7] text-[#159A9C] flex items-center justify-center font-semibold">
+                          #{index + 1}
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-[#002333]">{vendedor.nome}</p>
+                          <p className="text-xs text-[#0F7B7D]">
+                            {percentualMeta !== null ? `${percentualMeta}% da meta` : 'Meta não informada'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-[#002333]">
+                          {vendedor.vendas.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                            minimumFractionDigits: 0
+                          })}
+                        </p>
+                        <p
+                          className="text-xs font-semibold"
+                          style={{
+                            color: vendedor.variacao >= 0
+                              ? currentPalette.colors.success
+                              : currentPalette.colors.error
+                          }}
+                        >
+                          {vendedor.variacao >= 0 ? '+' : ''}{vendedor.variacao}% vs período anterior
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Follow-ups</span>
-                <span className="font-bold text-green-600">7</span>
+            ) : (
+              <div className="p-4 rounded-lg border border-dashed border-[#B4BEC9] text-sm text-[#0F7B7D]">
+                Nenhum vendedor com desempenho registrado para o filtro atual.
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Calls</span>
-                <span className="font-bold text-orange-600">12</span>
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* Ciclo de Vendas */}
-          <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm hover:shadow-md transition-all">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Ciclo Médio</h3>
-                <p className="text-gray-600">Tempo para fechar</p>
+          <div className="bg-white rounded-2xl p-6 border border-[#DEEFE7] shadow-sm">
+            <h3 className="text-lg font-semibold text-[#002333] mb-4">Pipeline atual</h3>
+            <div className="space-y-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-[#002333]">Em negociação</p>
+                  <p className="text-xs text-[#0F7B7D]">Valor potencial do pipeline</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-[#002333]">
+                    {(data.kpis?.emNegociacao?.valor ?? 0).toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                      minimumFractionDigits: 0
+                    })}
+                  </p>
+                  <span className="text-xs text-[#0F7B7D]">
+                    {data.kpis?.emNegociacao?.quantidade ?? 0} propostas
+                  </span>
+                </div>
               </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Clock className="h-8 w-8 text-green-600" />
-              </div>
-            </div>
-            <div className="mt-4">
-              <p className="text-2xl font-bold text-gray-900">28 dias</p>
-              <p className="text-sm text-green-600 flex items-center">
-                <ArrowDown className="w-4 h-4 mr-1" />
-                -3 dias vs mês anterior
-              </p>
-            </div>
-          </div>
 
-          {/* Conversão do Funil */}
-          <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm hover:shadow-md transition-all">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Conversão</h3>
-                <p className="text-gray-600">Lead → Venda</p>
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-[#002333]">Taxa de sucesso</p>
+                  <p className="text-xs text-[#0F7B7D]">Conversão geral do período</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-[#002333]">
+                    {(data.kpis?.taxaSucessoGeral?.percentual ?? 0).toFixed(1)}%
+                  </p>
+                  <span
+                    className="text-xs font-semibold"
+                    style={{
+                      color: (data.kpis?.taxaSucessoGeral?.variacao ?? 0) >= 0
+                        ? currentPalette.colors.success
+                        : currentPalette.colors.error
+                    }}
+                  >
+                    {(data.kpis?.taxaSucessoGeral?.variacao ?? 0) >= 0 ? '+' : ''}
+                    {data.kpis?.taxaSucessoGeral?.variacao ?? 0}% vs período anterior
+                  </span>
+                </div>
               </div>
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <Target className="h-8 w-8 text-purple-600" />
-              </div>
-            </div>
-            <div className="mt-4">
-              <p className="text-2xl font-bold text-gray-900">18.5%</p>
-              <p className="text-sm text-purple-600 flex items-center">
-                <ArrowUp className="w-4 h-4 mr-1" />
-                +2.3% vs mês anterior
-              </p>
-            </div>
-          </div>
 
-          {/* Alertas e Pendências */}
-          <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm hover:shadow-md transition-all">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Alertas</h3>
-                <p className="text-gray-600">Requerem atenção</p>
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-[#002333]">Novos clientes</p>
+                  <p className="text-xs text-[#0F7B7D]">Crescimento da base</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-[#002333]">
+                    {data.kpis?.novosClientesMes?.quantidade ?? 0}
+                  </p>
+                  <span
+                    className="text-xs font-semibold"
+                    style={{
+                      color: (data.kpis?.novosClientesMes?.variacao ?? 0) >= 0
+                        ? currentPalette.colors.primary
+                        : currentPalette.colors.error
+                    }}
+                  >
+                    {(data.kpis?.novosClientesMes?.variacao ?? 0) >= 0 ? '+' : ''}
+                    {data.kpis?.novosClientesMes?.variacao ?? 0}% vs mês anterior
+                  </span>
+                </div>
               </div>
-              <div className="p-3 bg-red-100 rounded-lg">
-                <AlertTriangle className="h-8 w-8 text-red-600" />
+
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-[#002333]">Leads qualificados</p>
+                  <p className="text-xs text-[#0F7B7D]">Entradas prontas para venda</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-[#002333]">
+                    {data.kpis?.leadsQualificados?.quantidade ?? 0}
+                  </p>
+                  <span
+                    className="text-xs font-semibold"
+                    style={{
+                      color: (data.kpis?.leadsQualificados?.variacao ?? 0) >= 0
+                        ? currentPalette.colors.primary
+                        : currentPalette.colors.error
+                    }}
+                  >
+                    {(data.kpis?.leadsQualificados?.variacao ?? 0) >= 0 ? '+' : ''}
+                    {data.kpis?.leadsQualificados?.variacao ?? 0}% vs mês anterior
+                  </span>
+                </div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Propostas vencendo</span>
-                <span className="font-bold text-red-600">4</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Follow-ups atrasados</span>
-                <span className="font-bold text-orange-600">2</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Contratos a renovar</span>
-                <span className="font-bold text-yellow-600">6</span>
-              </div>
+
+              {propostasEmFoco.length > 0 && (
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-[#B4BEC9] mb-2">Propostas em foco</p>
+                  <div className="flex flex-wrap gap-2">
+                    {propostasEmFoco.slice(0, 6).map((codigo) => (
+                      <span
+                        key={codigo}
+                        className="px-3 py-1 rounded-full text-xs font-semibold bg-[#DEEFE7] text-[#159A9C]"
+                      >
+                        {codigo}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -497,13 +723,13 @@ const DashboardPage: React.FC = () => {
                 </div>
 
                 {/* Mini gráfico de tendência dos últimos 7 dias */}
-                {data.kpis.faturamentoTotal.tendencia && (
+                {faturamentoTendencia && faturamentoTendencia.length > 0 && (
                   <div className="mt-3">
                     <span className="text-xs font-medium" style={{ color: currentPalette.colors.textSecondary }}>
                       Últimos 7 dias:
                     </span>
                     <MiniTrendChart
-                      data={data.kpis.faturamentoTotal.tendencia}
+                      data={faturamentoTendencia}
                       isPositive={data.kpis.faturamentoTotal.variacao >= 0}
                     />
                   </div>
@@ -685,145 +911,52 @@ const DashboardPage: React.FC = () => {
         {/* KPIs Secundários */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <KPICard
-            title="Novos Clientes"
-            value={data.kpis?.novosClientesMes?.quantidade || 0}
-            icon={<UserPlus size={24} />}
-            trend={{
-              value: data.kpis?.novosClientesMes?.variacao || 0,
-              isPositive: (data.kpis?.novosClientesMes?.variacao || 0) >= 0,
-              period: "vs mês anterior"
-            }}
-            currentPalette={currentPalette}
-          />
-
-          <KPICard
             title="Leads Qualificados"
             value={data.kpis?.leadsQualificados?.quantidade || 0}
             icon={<Target size={24} />}
             trend={{
               value: data.kpis?.leadsQualificados?.variacao || 0,
               isPositive: (data.kpis?.leadsQualificados?.variacao || 0) >= 0,
-              period: "vs mês anterior"
+              label: 'vs mês anterior'
             }}
-            currentPalette={currentPalette}
           />
 
           <KPICard
             title="Propostas Enviadas"
-            value={data.kpis?.propostasEnviadas?.valor || 0}
-            prefix="R$"
+            value={(data.kpis?.propostasEnviadas?.valor ?? 0).toLocaleString('pt-BR', {
+              style: 'currency',
+              currency: 'BRL',
+              minimumFractionDigits: 0
+            })}
             icon={<FileText size={24} />}
             trend={{
               value: data.kpis?.propostasEnviadas?.variacao || 0,
               isPositive: (data.kpis?.propostasEnviadas?.variacao || 0) >= 0,
-              period: "vs mês anterior"
+              label: 'vs mês anterior'
             }}
-            currentPalette={currentPalette}
           />
 
           <KPICard
             title="Taxa de Sucesso"
-            value={data.kpis?.taxaSucessoGeral?.percentual || 0}
-            suffix="%"
+            value={`${(data.kpis?.taxaSucessoGeral?.percentual ?? 0).toFixed(1)}%`}
             icon={<BarChart3 size={24} />}
             trend={{
               value: data.kpis?.taxaSucessoGeral?.variacao || 0,
               isPositive: (data.kpis?.taxaSucessoGeral?.variacao || 0) >= 0,
-              period: "vs mês anterior"
+              label: 'vs mês anterior'
             }}
-            currentPalette={currentPalette}
           />
-        </div>
 
-        {/* Próximas Atividades e Resumo Rápido */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Próximas Atividades */}
-          <div className="lg:col-span-2 bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Próximas Atividades</h3>
-              <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                Ver todas
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
-                <div className="p-2 bg-blue-100 rounded-full mr-3">
-                  <Calendar className="w-4 h-4 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-gray-900">Reunião com Tech Solutions</p>
-                  <p className="text-sm text-gray-600">Hoje, 14:30 - Apresentação da proposta</p>
-                </div>
-                <span className="text-sm font-medium text-blue-600">Em 2h</span>
-              </div>
-
-              <div className="flex items-center p-3 bg-green-50 rounded-lg border-l-4 border-green-500">
-                <div className="p-2 bg-green-100 rounded-full mr-3">
-                  <Users className="w-4 h-4 text-green-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-gray-900">Follow-up StartUp Growth</p>
-                  <p className="text-sm text-gray-600">Hoje, 16:00 - Negociação de contrato</p>
-                </div>
-                <span className="text-sm font-medium text-green-600">Em 4h</span>
-              </div>
-
-              <div className="flex items-center p-3 bg-orange-50 rounded-lg border-l-4 border-orange-500">
-                <div className="p-2 bg-orange-100 rounded-full mr-3">
-                  <AlertTriangle className="w-4 h-4 text-orange-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-gray-900">Proposta vencendo - Digital Pro</p>
-                  <p className="text-sm text-gray-600">Amanhã - Prazo para resposta</p>
-                </div>
-                <span className="text-sm font-medium text-orange-600">24h</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Performance da Semana */}
-          <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Semanal</h3>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Meta de Vendas</span>
-                <div className="flex items-center">
-                  <div className="w-20 bg-gray-200 rounded-full h-2 mr-2">
-                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: '75%' }}></div>
-                  </div>
-                  <span className="text-sm font-medium">75%</span>
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Calls Realizadas</span>
-                <div className="flex items-center">
-                  <div className="w-20 bg-gray-200 rounded-full h-2 mr-2">
-                    <div className="bg-green-500 h-2 rounded-full" style={{ width: '90%' }}></div>
-                  </div>
-                  <span className="text-sm font-medium">90%</span>
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Follow-ups</span>
-                <div className="flex items-center">
-                  <div className="w-20 bg-gray-200 rounded-full h-2 mr-2">
-                    <div className="bg-yellow-500 h-2 rounded-full" style={{ width: '60%' }}></div>
-                  </div>
-                  <span className="text-sm font-medium">60%</span>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600 mb-1">8.5</div>
-                  <div className="text-sm text-gray-600">Nota Semanal</div>
-                  <div className="text-xs text-green-600 mt-1">🔥 Excelente!</div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <KPICard
+            title="Novos Clientes"
+            value={data.kpis?.novosClientesMes?.quantidade || 0}
+            icon={<UserPlus size={24} />}
+            trend={{
+              value: data.kpis?.novosClientesMes?.variacao || 0,
+              isPositive: (data.kpis?.novosClientesMes?.variacao || 0) >= 0,
+              label: 'vs mês anterior'
+            }}
+          />
         </div>
 
         {/* Gráficos */}

@@ -13,7 +13,7 @@ import {
   IsEmail,
   IsBoolean,
   ArrayMinSize,
-  Length
+  Length,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { StatusCotacao, PrioridadeCotacao, OrigemCotacao } from '../entities/cotacao.entity';
@@ -152,6 +152,11 @@ export class CriarCotacaoDto {
   @IsEnum(OrigemCotacao)
   origem: OrigemCotacao;
 
+  @ApiPropertyOptional({ description: 'ID do usuário responsável pela aprovação' })
+  @IsOptional()
+  @IsUUID()
+  aprovadorId?: string;
+
   @ApiProperty({ description: 'Itens da cotação', type: [CriarItemCotacaoDto] })
   @IsArray()
   @ArrayMinSize(1)
@@ -199,12 +204,27 @@ export class AtualizarCotacaoDto {
   @IsString()
   condicoesPagamento?: string;
 
+  @ApiPropertyOptional({ description: 'Prazo de entrega' })
+  @IsOptional()
+  @IsString()
+  prazoEntrega?: string;
+
+  @ApiPropertyOptional({ description: 'Local de entrega' })
+  @IsOptional()
+  @IsString()
+  localEntrega?: string;
+
   @ApiPropertyOptional({ description: 'Validade do orçamento em dias' })
   @IsOptional()
   @IsNumber()
   @Min(1)
   @Max(365)
   validadeOrcamento?: number;
+
+  @ApiPropertyOptional({ description: 'ID do usuário aprovador' })
+  @IsOptional()
+  @IsUUID()
+  aprovadorId?: string;
 
   @ApiPropertyOptional({ description: 'Itens da cotação', type: [CriarItemCotacaoDto] })
   @IsOptional()
@@ -396,6 +416,9 @@ export class CotacaoResponseDto {
   @ApiPropertyOptional({ description: 'Prazo máximo para resposta da cotação' })
   prazoResposta?: Date;
 
+  @ApiPropertyOptional({ description: 'Data de vencimento (alias para prazoResposta)' })
+  dataVencimento?: Date;
+
   @ApiPropertyOptional({ description: 'Observações' })
   observacoes?: string;
 
@@ -428,6 +451,16 @@ export class CotacaoResponseDto {
 
   @ApiPropertyOptional({ description: 'Dados do responsável' })
   responsavel?: {
+    id: string;
+    nome: string;
+    email: string;
+  };
+
+  @ApiPropertyOptional({ description: 'ID do aprovador' })
+  aprovadorId?: string;
+
+  @ApiPropertyOptional({ description: 'Dados do aprovador' })
+  aprovador?: {
     id: string;
     nome: string;
     email: string;
@@ -469,4 +502,49 @@ export class CotacaoResponseDto {
 
   @ApiProperty({ description: 'Atualizado por' })
   atualizadoPor: string;
+}
+
+// DTOs para aprovação/reprovação em lote
+export class AprovarLoteDto {
+  @ApiProperty({ description: 'IDs das cotações a serem aprovadas', type: [String] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsUUID('4', { each: true })
+  cotacaoIds: string[];
+
+  @ApiPropertyOptional({ description: 'Justificativa da aprovação (opcional)' })
+  @IsOptional()
+  @IsString()
+  @Length(0, 1000)
+  justificativa?: string;
+}
+
+export class ReprovarLoteDto {
+  @ApiProperty({ description: 'IDs das cotações a serem reprovadas', type: [String] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsUUID('4', { each: true })
+  cotacaoIds: string[];
+
+  @ApiProperty({ description: 'Justificativa da reprovação (obrigatória)' })
+  @IsString()
+  @Length(10, 1000)
+  justificativa: string;
+}
+
+export class ResultadoLoteDto {
+  @ApiProperty({ description: 'Total de cotações processadas' })
+  total: number;
+
+  @ApiProperty({ description: 'Quantidade de sucessos' })
+  sucessos: number;
+
+  @ApiProperty({ description: 'Quantidade de falhas' })
+  falhas: number;
+
+  @ApiProperty({ description: 'IDs das cotações processadas com sucesso', type: [String] })
+  cotacoesProcessadas: string[];
+
+  @ApiProperty({ description: 'Erros ocorridos', type: [Object] })
+  erros: Array<{ cotacaoId: string; erro: string }>;
 }

@@ -1,5 +1,14 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  Index,
+} from 'typeorm';
 import { Fatura } from './fatura.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 export enum StatusPagamento {
   PENDENTE = 'pendente',
@@ -7,14 +16,14 @@ export enum StatusPagamento {
   APROVADO = 'aprovado',
   REJEITADO = 'rejeitado',
   CANCELADO = 'cancelado',
-  ESTORNADO = 'estornado'
+  ESTORNADO = 'estornado',
 }
 
 export enum TipoPagamento {
   PAGAMENTO = 'pagamento',
   ESTORNO = 'estorno',
   AJUSTE = 'ajuste',
-  DESCONTO = 'desconto'
+  DESCONTO = 'desconto',
 }
 
 @Entity('pagamentos')
@@ -25,9 +34,17 @@ export class Pagamento {
   @Column()
   faturaId: number;
 
-  @ManyToOne(() => Fatura, fatura => fatura.pagamentos)
+  @ManyToOne(() => Fatura, (fatura) => fatura.pagamentos)
   @JoinColumn({ name: 'faturaId' })
   fatura: Fatura;
+
+  @Column('uuid')
+  @Index('idx_pagamentos_empresa_id')
+  empresa_id: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column({ unique: true })
   transacaoId: string;
@@ -35,14 +52,14 @@ export class Pagamento {
   @Column({
     type: 'enum',
     enum: TipoPagamento,
-    default: TipoPagamento.PAGAMENTO
+    default: TipoPagamento.PAGAMENTO,
   })
   tipo: TipoPagamento;
 
   @Column({
     type: 'enum',
     enum: StatusPagamento,
-    default: StatusPagamento.PENDENTE
+    default: StatusPagamento.PENDENTE,
   })
   status: StatusPagamento;
 

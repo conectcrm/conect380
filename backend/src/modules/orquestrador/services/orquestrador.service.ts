@@ -3,7 +3,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, LessThan } from 'typeorm';
 import { FluxoAutomatizado, StatusFluxo } from '../entities/fluxo-automatizado.entity';
 import { EventoFluxo, TipoEvento, StatusEvento } from '../entities/evento-fluxo.entity';
-import { CreateFluxoAutomatizadoDto, UpdateFluxoAutomatizadoDto, FiltroFluxosDto, EstatisticasFluxoDto, ProcessarFluxoDto } from '../dto/fluxo-automatizado.dto';
+import {
+  CreateFluxoAutomatizadoDto,
+  UpdateFluxoAutomatizadoDto,
+  FiltroFluxosDto,
+  EstatisticasFluxoDto,
+  ProcessarFluxoDto,
+} from '../dto/fluxo-automatizado.dto';
 
 @Injectable()
 export class OrquestradorService {
@@ -14,8 +20,8 @@ export class OrquestradorService {
     private fluxoRepository: Repository<FluxoAutomatizado>,
 
     @InjectRepository(EventoFluxo)
-    private eventoRepository: Repository<EventoFluxo>
-  ) { }
+    private eventoRepository: Repository<EventoFluxo>,
+  ) {}
 
   /**
    * Cria um novo fluxo automatizado a partir de uma proposta aceita
@@ -39,9 +45,9 @@ export class OrquestradorService {
           criarFaturaAutomatica: true,
           cobrarRecorrentemente: false,
           intervaloDias: 30,
-          ...createDto.configuracoes
+          ...createDto.configuracoes,
         },
-        maxTentativas: createDto.maxTentativas || 3
+        maxTentativas: createDto.maxTentativas || 3,
       });
 
       const fluxoSalvo = await this.fluxoRepository.save(fluxo);
@@ -56,8 +62,8 @@ export class OrquestradorService {
         dadosEvento: {
           entityId: createDto.propostaId,
           entityType: 'proposta',
-          parametrosExecucao: fluxoSalvo.configuracoes
-        }
+          parametrosExecucao: fluxoSalvo.configuracoes,
+        },
       });
 
       // Agendar próxima ação (geração de contrato)
@@ -66,7 +72,6 @@ export class OrquestradorService {
 
       this.logger.log(`Fluxo automatizado criado: ${fluxoSalvo.id} (${numeroFluxo})`);
       return fluxoSalvo;
-
     } catch (error) {
       this.logger.error(`Erro ao criar fluxo automatizado: ${error.message}`, error.stack);
       throw error;
@@ -81,7 +86,7 @@ export class OrquestradorService {
 
     try {
       const fluxo = await this.fluxoRepository.findOne({
-        where: { id: fluxoId }
+        where: { id: fluxoId },
       });
 
       if (!fluxo) {
@@ -97,7 +102,6 @@ export class OrquestradorService {
       const resultado = await this.executarEtapaAtual(fluxo, parametrosCustomizados);
 
       return resultado;
-
     } catch (error) {
       this.logger.error(`Erro ao processar fluxo ${fluxoId}: ${error.message}`, error.stack);
       throw error;
@@ -118,11 +122,11 @@ export class OrquestradorService {
             StatusFluxo.CONTRATO_GERADO,
             StatusFluxo.CONTRATO_ENVIADO,
             StatusFluxo.CONTRATO_ASSINADO,
-            StatusFluxo.FATURA_GERADA
+            StatusFluxo.FATURA_GERADA,
           ]),
-          dataProximaAcao: LessThan(new Date())
+          dataProximaAcao: LessThan(new Date()),
         },
-        take: 10 // Processar no máximo 10 por vez
+        take: 10, // Processar no máximo 10 por vez
       });
 
       this.logger.log(`Encontrados ${fluxosPendentes.length} fluxos para processar`);
@@ -135,7 +139,6 @@ export class OrquestradorService {
           await this.marcarFluxoComErro(fluxo, error.message);
         }
       }
-
     } catch (error) {
       this.logger.error(`Erro no processamento automático: ${error.message}`, error.stack);
     }
@@ -144,7 +147,10 @@ export class OrquestradorService {
   /**
    * Executa a etapa atual do fluxo (versão simplificada para demonstração)
    */
-  private async executarEtapaAtual(fluxo: FluxoAutomatizado, parametrosCustomizados?: any): Promise<FluxoAutomatizado> {
+  private async executarEtapaAtual(
+    fluxo: FluxoAutomatizado,
+    parametrosCustomizados?: any,
+  ): Promise<FluxoAutomatizado> {
     this.logger.log(`Executando etapa ${fluxo.etapaAtual} para fluxo ${fluxo.numeroFluxo}`);
 
     // Simulação das etapas por enquanto
@@ -187,7 +193,7 @@ export class OrquestradorService {
       fluxoId: fluxo.id,
       tipoEvento: TipoEvento.CONTRATO_CRIADO,
       titulo: 'Contrato Gerado (Simulação)',
-      descricao: `Contrato simulado gerado para proposta ${fluxo.propostaId}`
+      descricao: `Contrato simulado gerado para proposta ${fluxo.propostaId}`,
     });
 
     return await this.fluxoRepository.save(fluxo);
@@ -206,7 +212,7 @@ export class OrquestradorService {
       fluxoId: fluxo.id,
       tipoEvento: TipoEvento.CONTRATO_ENVIADO,
       titulo: 'Contrato Enviado (Simulação)',
-      descricao: `Contrato simulado enviado por email`
+      descricao: `Contrato simulado enviado por email`,
     });
 
     return await this.fluxoRepository.save(fluxo);
@@ -229,7 +235,7 @@ export class OrquestradorService {
         fluxoId: fluxo.id,
         tipoEvento: TipoEvento.CONTRATO_ASSINADO,
         titulo: 'Contrato Assinado (Simulação)',
-        descricao: `Contrato simulado foi assinado`
+        descricao: `Contrato simulado foi assinado`,
       });
     } else {
       // Reagendar verificação
@@ -254,7 +260,7 @@ export class OrquestradorService {
       fluxoId: fluxo.id,
       tipoEvento: TipoEvento.FATURA_CRIADA,
       titulo: 'Fatura Gerada (Simulação)',
-      descricao: `Fatura simulada gerada`
+      descricao: `Fatura simulada gerada`,
     });
 
     return await this.fluxoRepository.save(fluxo);
@@ -274,7 +280,7 @@ export class OrquestradorService {
         fluxoId: fluxo.id,
         tipoEvento: TipoEvento.PAGAMENTO_RECEBIDO,
         titulo: 'Pagamento Recebido (Simulação)',
-        descricao: `Pagamento simulado recebido. Fluxo concluído.`
+        descricao: `Pagamento simulado recebido. Fluxo concluído.`,
       });
     } else {
       // Reagendar verificação
@@ -302,9 +308,9 @@ export class OrquestradorService {
         entityType: 'erro',
         parametrosExecucao: {
           tentativa: fluxo.tentativasProcessamento,
-          maxTentativas: fluxo.maxTentativas
-        }
-      }
+          maxTentativas: fluxo.maxTentativas,
+        },
+      },
     });
   }
 
@@ -314,7 +320,7 @@ export class OrquestradorService {
   private async criarEvento(dadosEvento: any): Promise<EventoFluxo> {
     const evento = this.eventoRepository.create({
       ...dadosEvento,
-      status: StatusEvento.CONCLUIDO
+      status: StatusEvento.CONCLUIDO,
     });
 
     const savedEvento = await this.eventoRepository.save(evento);
@@ -327,14 +333,16 @@ export class OrquestradorService {
   private async gerarNumeroFluxo(tenantId: string): Promise<string> {
     const ano = new Date().getFullYear();
     const count = await this.fluxoRepository.count({
-      where: { tenantId }
+      where: { tenantId },
     });
 
     return `FL${ano}${String(count + 1).padStart(6, '0')}`;
   }
 
   // Métodos de consulta
-  async listarFluxos(filtros: FiltroFluxosDto): Promise<{ fluxos: FluxoAutomatizado[]; total: number }> {
+  async listarFluxos(
+    filtros: FiltroFluxosDto,
+  ): Promise<{ fluxos: FluxoAutomatizado[]; total: number }> {
     const { limite = 20, offset = 0, ordenarPor = 'createdAt', direcao = 'DESC' } = filtros;
 
     const queryBuilder = this.fluxoRepository.createQueryBuilder('fluxo');
@@ -352,12 +360,16 @@ export class OrquestradorService {
     }
 
     if (filtros.comErros) {
-      queryBuilder.andWhere('fluxo.status = :statusErro', { statusErro: StatusFluxo.ERRO_PROCESSAMENTO });
+      queryBuilder.andWhere('fluxo.status = :statusErro', {
+        statusErro: StatusFluxo.ERRO_PROCESSAMENTO,
+      });
     }
 
     if (filtros.vencidos) {
       queryBuilder.andWhere('fluxo.dataProximaAcao < :agora', { agora: new Date() });
-      queryBuilder.andWhere('fluxo.status != :concluido', { concluido: StatusFluxo.WORKFLOW_CONCLUIDO });
+      queryBuilder.andWhere('fluxo.status != :concluido', {
+        concluido: StatusFluxo.WORKFLOW_CONCLUIDO,
+      });
     }
 
     const [fluxos, total] = await queryBuilder
@@ -392,13 +404,13 @@ export class OrquestradorService {
 
     return {
       resumo: estatisticas,
-      totalFluxos: estatisticas.reduce((acc, stat) => acc + parseInt(stat.total), 0)
+      totalFluxos: estatisticas.reduce((acc, stat) => acc + parseInt(stat.total), 0),
     };
   }
 
   async buscarPorId(id: string): Promise<FluxoAutomatizado> {
     const fluxo = await this.fluxoRepository.findOne({
-      where: { id }
+      where: { id },
     });
 
     if (!fluxo) {

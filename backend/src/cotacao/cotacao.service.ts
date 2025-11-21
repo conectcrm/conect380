@@ -1,4 +1,4 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder, In, Between } from 'typeorm';
 import { Cotacao, StatusCotacao } from './entities/cotacao.entity';
@@ -6,17 +6,23 @@ import { ItemCotacao } from './entities/item-cotacao.entity';
 import { AnexoCotacao } from './entities/anexo-cotacao.entity';
 import { Fornecedor } from '../modules/financeiro/entities/fornecedor.entity';
 import { User } from '../modules/users/user.entity';
+import { CotacaoEmailService } from './cotacao-email.service';
+import { NotificationService } from '../notifications/notification.service';
+import { NotificationType } from '../notifications/entities/notification.entity';
 import {
   CriarCotacaoDto,
   AtualizarCotacaoDto,
   CotacaoQueryDto,
   DuplicarCotacaoDto,
   EnviarEmailDto,
-  CotacaoResponseDto
+  CotacaoResponseDto,
+  CriarItemCotacaoDto,
 } from './dto/cotacao.dto';
 
 @Injectable()
 export class CotacaoService {
+  private readonly logger = new Logger(CotacaoService.name);
+
   constructor(
     @InjectRepository(Cotacao)
     private cotacaoRepository: Repository<Cotacao>,
@@ -31,13 +37,16 @@ export class CotacaoService {
     private fornecedorRepository: Repository<Fornecedor>,
 
     @InjectRepository(User)
-    private userRepository: Repository<User>
+    private userRepository: Repository<User>,
+
+    private cotacaoEmailService: CotacaoEmailService,
+    private notificationService: NotificationService,
   ) { }
 
   async criar(criarCotacaoDto: CriarCotacaoDto, userId: string): Promise<CotacaoResponseDto> {
     // Validar fornecedor
     const fornecedor = await this.fornecedorRepository.findOne({
-      where: { id: criarCotacaoDto.fornecedorId }
+      where: { id: criarCotacaoDto.fornecedorId },
     });
 
     if (!fornecedor) {
@@ -46,47 +55,116 @@ export class CotacaoService {
 
     // Validar usuário responsável
     const responsavel = await this.userRepository.findOne({
-      where: { id: userId }
+      where: { id: userId },
     });
 
     if (!responsavel) {
       throw new HttpException('Usuário não encontrado', HttpStatus.NOT_FOUND);
     }
 
+    // Validar aprovador (se fornecido)
+    if (criarCotacaoDto.aprovadorId) {
+      const aprovador = await this.userRepository.findOne({
+        where: { id: criarCotacaoDto.aprovadorId },
+      });
+
+      if (!aprovador) {
+        throw new HttpException('Aprovador não encontrado', HttpStatus.NOT_FOUND);
+      }
+    }
+
     // Gerar número da cotação
     const numero = await this.gerarNumeroCotacao();
 
-    // Criar cotação
+    // Criar cotação (SEM itens - serão criados separadamente)
+    const { itens, ...cotacaoData } = criarCotacaoDto;
     const cotacao = this.cotacaoRepository.create({
-      ...criarCotacaoDto,
+      ...cotacaoData,
       numero,
       status: StatusCotacao.RASCUNHO,
       responsavelId: userId,
       prazoResposta: criarCotacaoDto.prazoResposta ? new Date(criarCotacaoDto.prazoResposta) : null,
       criadoPor: userId,
-      atualizadoPor: userId
+      atualizadoPor: userId,
     });
 
     const cotacaoSalva = await this.cotacaoRepository.save(cotacao);
 
     // Criar itens
     if (criarCotacaoDto.itens && criarCotacaoDto.itens.length > 0) {
-      const itens = criarCotacaoDto.itens.map(item =>
-        this.itemCotacaoRepository.create({
-          ...item,
+      const itemEntities = criarCotacaoDto.itens.map((item, index) =>
+        this.buildItemCotacaoEntity(item, {
           cotacaoId: cotacaoSalva.id,
-          valorTotal: item.quantidade * item.valorUnitario
-        })
+          userId,
+          ordem: index + 1,
+        }),
       );
 
-      await this.itemCotacaoRepository.save(itens);
+      this.logger.debug(
+        `Itens antes do save: ${JSON.stringify(
+          itemEntities.map((e) => ({
+            valorTotal: e.valorTotal,
+            valorUnitario: e.valorUnitario,
+            quantidade: e.quantidade,
+            desconto: e.desconto,
+          })),
+        )}`,
+      );
+
+      // Atualizar valores calculados dos itens
+      itemEntities.forEach((item) => {
+        item.atualizarValores();
+      });
+      // ===================================
+
+      // Usar save() ao invés de insert() para garantir que defaults sejam aplicados
+      await this.itemCotacaoRepository.save(itemEntities);
+      this.logger.debug('Itens salvos com sucesso.');
     }
 
     // Calcular e atualizar valor total
     await this.calcularValorTotal(cotacaoSalva.id);
 
+    // Recarregar cotação com valor total atualizado
+    const cotacaoAtualizada = await this.cotacaoRepository.findOne({
+      where: { id: cotacaoSalva.id },
+    });
+
     // Log simples de auditoria
-    console.log(`[AUDIT] COTACAO CREATE - ID: ${cotacaoSalva.id}, User: ${userId}, Numero: ${cotacaoSalva.numero}`);
+    console.log(
+      `[AUDIT] COTACAO CREATE - ID: ${cotacaoSalva.id}, User: ${userId}, Numero: ${cotacaoSalva.numero}, Status: ${cotacaoSalva.status}`,
+    );
+
+    // ✅ FLUXO CORRETO: Só notifica se status = PENDENTE (não em RASCUNHO)
+    // RASCUNHO = usuário ainda está editando, não está pronta
+    // PENDENTE = foi enviada para aprovação, aprovador deve ser notificado
+    if (criarCotacaoDto.aprovadorId && cotacaoSalva.status === StatusCotacao.PENDENTE) {
+      const aprovador = await this.userRepository.findOne({
+        where: { id: criarCotacaoDto.aprovadorId }
+      });
+
+      if (aprovador) {
+        const valorFormatado = cotacaoAtualizada.valorTotal
+          ? `R$ ${Number(cotacaoAtualizada.valorTotal).toFixed(2)}`
+          : 'A definir';
+
+        this.notificationService
+          .create({
+            userId: aprovador.id,
+            type: NotificationType.COTACAO_PENDENTE,
+            title: `Nova cotação #${cotacaoAtualizada.numero} aguardando aprovação`,
+            message: `${responsavel.nome} criou uma cotação que precisa da sua aprovação. Valor: ${valorFormatado}`,
+            data: {
+              cotacaoId: cotacaoAtualizada.id,
+              cotacaoNumero: cotacaoAtualizada.numero,
+              criadorId: userId,
+              criadorNome: responsavel.nome,
+              valorTotal: cotacaoAtualizada.valorTotal,
+            },
+          })
+          .catch((err) => console.error('Erro ao criar notificação:', err));
+      }
+    }
 
     return this.buscarPorId(cotacaoSalva.id, userId);
   }
@@ -121,28 +199,60 @@ export class CotacaoService {
         page,
         limit,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / limit),
       },
       statistics: {
         total,
         totalValue,
         byStatus: await this.getStatusStatistics(userId),
-        byPriority: await this.getPriorityStatistics(userId)
-      }
+        byPriority: await this.getPriorityStatistics(userId),
+      },
     };
+  }
+
+  async minhasAprovacoes(userId: string): Promise<CotacaoResponseDto[]> {
+    const cotacoes = await this.cotacaoRepository.find({
+      where: [
+        {
+          aprovadorId: userId,
+          status: StatusCotacao.RASCUNHO
+        },
+        {
+          aprovadorId: userId,
+          status: StatusCotacao.ENVIADA
+        },
+        {
+          aprovadorId: userId,
+          status: StatusCotacao.EM_ANALISE
+        }
+      ],
+      relations: [
+        'fornecedor',
+        'responsavel',
+        'aprovador',
+        'itens',
+        'criadoPorUser'
+      ],
+      order: {
+        dataCriacao: 'DESC'
+      }
+    });
+
+    return cotacoes.map(cotacao => this.formatarCotacaoResponse(cotacao));
   }
 
   async buscarPorId(id: string, userId: string): Promise<CotacaoResponseDto> {
     const cotacao = await this.cotacaoRepository.findOne({
       where: { id },
       relations: [
-        'cliente',
+        'fornecedor',
         'responsavel',
+        'aprovador',
         'itens',
         'anexos',
         'criadoPorUser',
-        'atualizadoPorUser'
-      ]
+        'atualizadoPorUser',
+      ],
     });
 
     if (!cotacao) {
@@ -155,11 +265,11 @@ export class CotacaoService {
   async atualizar(
     id: string,
     atualizarCotacaoDto: AtualizarCotacaoDto,
-    userId: string
+    userId: string,
   ): Promise<CotacaoResponseDto> {
     const cotacao = await this.cotacaoRepository.findOne({
       where: { id },
-      relations: ['itens']
+      relations: ['itens'],
     });
 
     if (!cotacao) {
@@ -170,14 +280,17 @@ export class CotacaoService {
     if (!this.podeSerEditada(cotacao.status)) {
       throw new HttpException(
         'Cotação não pode ser editada no status atual',
-        HttpStatus.BAD_REQUEST
+        HttpStatus.BAD_REQUEST,
       );
     }
 
     // Validar fornecedor se foi alterado
-    if (atualizarCotacaoDto.fornecedorId && atualizarCotacaoDto.fornecedorId !== cotacao.fornecedorId) {
+    if (
+      atualizarCotacaoDto.fornecedorId &&
+      atualizarCotacaoDto.fornecedorId !== cotacao.fornecedorId
+    ) {
       const fornecedor = await this.fornecedorRepository.findOne({
-        where: { id: atualizarCotacaoDto.fornecedorId }
+        where: { id: atualizarCotacaoDto.fornecedorId },
       });
 
       if (!fornecedor) {
@@ -185,11 +298,24 @@ export class CotacaoService {
       }
     }
 
+    // Validar aprovador se foi alterado
+    if (atualizarCotacaoDto.aprovadorId) {
+      const aprovador = await this.userRepository.findOne({
+        where: { id: atualizarCotacaoDto.aprovadorId },
+      });
+
+      if (!aprovador) {
+        throw new HttpException('Aprovador não encontrado', HttpStatus.NOT_FOUND);
+      }
+    }
+
     // Atualizar cotação
+    const { itens, ...dadosAtualizacao } = atualizarCotacaoDto;
+
     Object.assign(cotacao, {
-      ...atualizarCotacaoDto,
+      ...dadosAtualizacao,
       atualizadoPor: userId,
-      dataAtualizacao: new Date()
+      dataAtualizacao: new Date(),
     });
 
     if (atualizarCotacaoDto.prazoResposta) {
@@ -199,18 +325,18 @@ export class CotacaoService {
     await this.cotacaoRepository.save(cotacao);
 
     // Atualizar itens se fornecidos
-    if (atualizarCotacaoDto.itens) {
+    if (itens) {
       // Remover itens existentes
       await this.itemCotacaoRepository.delete({ cotacaoId: id });
 
       // Criar novos itens
       if (atualizarCotacaoDto.itens.length > 0) {
-        const novosItens = atualizarCotacaoDto.itens.map(item =>
-          this.itemCotacaoRepository.create({
-            ...item,
+        const novosItens = atualizarCotacaoDto.itens.map((item, index) =>
+          this.buildItemCotacaoEntity(item, {
             cotacaoId: id,
-            valorTotal: item.quantidade * item.valorUnitario
-          })
+            userId,
+            ordem: index + 1,
+          }),
         );
 
         await this.itemCotacaoRepository.save(novosItens);
@@ -228,7 +354,7 @@ export class CotacaoService {
 
   async deletar(id: string, userId: string): Promise<void> {
     const cotacao = await this.cotacaoRepository.findOne({
-      where: { id }
+      where: { id },
     });
 
     if (!cotacao) {
@@ -239,7 +365,7 @@ export class CotacaoService {
     if (!this.podeSerDeletada(cotacao.status)) {
       throw new HttpException(
         'Cotação não pode ser deletada no status atual',
-        HttpStatus.BAD_REQUEST
+        HttpStatus.BAD_REQUEST,
       );
     }
 
@@ -252,14 +378,354 @@ export class CotacaoService {
     console.log(`[AUDIT] COTACAO DELETE - ID: ${id}, User: ${userId}, Numero: ${cotacao.numero}`);
   }
 
+  /**
+   * Envia cotação em RASCUNHO para aprovação
+   * Muda status para PENDENTE e notifica o aprovador
+   */
+  async enviarParaAprovacao(id: string, userId: string): Promise<CotacaoResponseDto> {
+    try {
+      // Buscar cotação com relações
+      const cotacao = await this.cotacaoRepository.findOne({
+        where: { id },
+        relations: ['aprovador', 'criadoPorUser', 'fornecedor', 'itens'],
+      });
+
+      if (!cotacao) {
+        throw new HttpException('Cotação não encontrada', HttpStatus.NOT_FOUND);
+      }
+
+      // Verificar se o usuário é o criador
+      if (cotacao.criadoPor !== userId) {
+        throw new HttpException(
+          'Apenas o criador pode enviar esta cotação para aprovação',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      // Verificar se está em RASCUNHO
+      if (cotacao.status !== StatusCotacao.RASCUNHO) {
+        throw new HttpException(
+          `Apenas cotações em RASCUNHO podem ser enviadas para aprovação. Status atual: ${cotacao.status}`,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Verificar se tem aprovador definido
+      if (!cotacao.aprovadorId) {
+        throw new HttpException(
+          'É necessário definir um aprovador antes de enviar para aprovação',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Verificar se tem itens
+      if (!cotacao.itens || cotacao.itens.length === 0) {
+        throw new HttpException(
+          'É necessário adicionar ao menos um item antes de enviar para aprovação',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Mudar status para PENDENTE
+      cotacao.status = StatusCotacao.PENDENTE;
+      await this.cotacaoRepository.save(cotacao);
+
+      // Criar notificação para o aprovador
+      const aprovador = cotacao.aprovador;
+      const criador = cotacao.criadoPorUser;
+
+      if (aprovador && criador) {
+        const valorFormatado = cotacao.valorTotal
+          ? `R$ ${Number(cotacao.valorTotal).toFixed(2)}`
+          : 'A definir';
+
+        await this.notificationService.create({
+          userId: aprovador.id,
+          type: NotificationType.COTACAO_PENDENTE,
+          title: `Nova cotação #${cotacao.numero} aguardando aprovação`,
+          message: `${criador.nome} enviou uma cotação que precisa da sua aprovação. Valor: ${valorFormatado}`,
+          data: {
+            cotacaoId: cotacao.id,
+            cotacaoNumero: cotacao.numero,
+            criadorId: criador.id,
+            criadorNome: criador.nome,
+            valorTotal: cotacao.valorTotal,
+          },
+        });
+      }
+
+      // Log de auditoria
+      console.log(`[AUDIT] COTACAO SEND_TO_APPROVAL - ID: ${id}, User: ${userId}, Numero: ${cotacao.numero}`);
+
+      return this.buscarPorId(id, userId);
+    } catch (error) {
+      console.error('Erro ao enviar cotação para aprovação:', error.message);
+      throw error;
+    }
+  }
+
+  async aprovar(
+    id: string,
+    userId: string,
+    justificativa?: string,
+  ): Promise<Cotacao> {
+    const cotacao = await this.cotacaoRepository.findOne({
+      where: { id },
+      relations: ['aprovador', 'fornecedor', 'itens', 'criadoPorUser'],
+    });
+
+    if (!cotacao) {
+      throw new HttpException('Cotação não encontrada', HttpStatus.NOT_FOUND);
+    }
+
+    // Verificar se tem aprovador definido
+    if (!cotacao.aprovadorId) {
+      throw new HttpException(
+        'Esta cotação não possui um aprovador definido',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Verificar se o usuário é o aprovador
+    if (cotacao.aprovadorId !== userId) {
+      throw new HttpException(
+        'Apenas o aprovador pode aprovar esta cotação',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    // Verificar se já foi aprovada/reprovada
+    if (cotacao.statusAprovacao) {
+      throw new HttpException(
+        `Cotação já foi ${cotacao.statusAprovacao}`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Atualizar campos de aprovação
+    cotacao.statusAprovacao = 'aprovado';
+    cotacao.dataAprovacao = new Date();
+    cotacao.justificativaAprovacao = justificativa || null;
+    cotacao.status = StatusCotacao.APROVADA;
+
+    await this.cotacaoRepository.save(cotacao);
+
+    console.log(
+      `[AUDIT] COTACAO APROVADA - ID: ${id}, Aprovador: ${userId}, Numero: ${cotacao.numero}`,
+    );
+
+    // Enviar email de notificação (async, não bloqueia resposta)
+    const aprovador = await this.userRepository.findOne({ where: { id: userId } });
+    if (aprovador) {
+      // Enviar email
+      this.cotacaoEmailService
+        .notificarCotacaoAprovada(cotacao, aprovador, justificativa)
+        .catch((err) => console.error('Erro ao enviar email de aprovação:', err));
+
+      // Criar notificação no sistema
+      if (cotacao.criadoPor) {
+        this.notificationService
+          .create({
+            userId: cotacao.criadoPor,
+            type: NotificationType.COTACAO_APROVADA,
+            title: `Cotação #${cotacao.numero} aprovada`,
+            message: `Sua cotação foi aprovada por ${aprovador.nome}${justificativa ? `. Justificativa: ${justificativa}` : ''}`,
+            data: {
+              cotacaoId: cotacao.id,
+              cotacaoNumero: cotacao.numero,
+              aprovadorId: aprovador.id,
+              aprovadorNome: aprovador.nome,
+              dataAprovacao: cotacao.dataAprovacao,
+            },
+          })
+          .then(() => console.log(`✅ Notificação criada para cotação #${cotacao.numero}`))
+          .catch((err) => console.error(`❌ Erro ao criar notificação:`, err));
+      }
+    }
+
+    return cotacao;
+  }
+
+  async reprovar(
+    id: string,
+    userId: string,
+    justificativa: string,
+  ): Promise<Cotacao> {
+    const cotacao = await this.cotacaoRepository.findOne({
+      where: { id },
+      relations: ['aprovador', 'fornecedor', 'itens', 'criadoPorUser'],
+    });
+
+    if (!cotacao) {
+      throw new HttpException('Cotação não encontrada', HttpStatus.NOT_FOUND);
+    }
+
+    // Verificar se o usuário é o aprovador
+    if (cotacao.aprovadorId !== userId) {
+      throw new HttpException(
+        'Apenas o aprovador pode reprovar esta cotação',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    // Verificar se já foi aprovada/reprovada
+    if (cotacao.statusAprovacao) {
+      throw new HttpException(
+        `Cotação já foi ${cotacao.statusAprovacao}`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Justificativa é obrigatória para reprovação
+    if (!justificativa || justificativa.trim() === '') {
+      throw new HttpException(
+        'Justificativa é obrigatória para reprovar uma cotação',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Atualizar campos de reprovação
+    cotacao.statusAprovacao = 'reprovado';
+    cotacao.dataAprovacao = new Date();
+    cotacao.justificativaAprovacao = justificativa;
+    cotacao.status = StatusCotacao.REJEITADA;
+
+    await this.cotacaoRepository.save(cotacao);
+
+    console.log(
+      `[AUDIT] COTACAO REPROVADA - ID: ${id}, Aprovador: ${userId}, Numero: ${cotacao.numero}`,
+    );
+
+    // Enviar email de notificação (async, não bloqueia resposta)
+    const aprovador = await this.userRepository.findOne({ where: { id: userId } });
+    if (aprovador) {
+      // Enviar email
+      this.cotacaoEmailService
+        .notificarCotacaoReprovada(cotacao, aprovador, justificativa)
+        .then(() => console.log(`✅ Email de reprovação enviado para cotação #${cotacao.numero}`))
+        .catch((err) => console.error(`❌ Erro ao enviar email de reprovação:`, err));
+
+      // Criar notificação no sistema
+      if (cotacao.criadoPor) {
+        this.notificationService
+          .create({
+            userId: cotacao.criadoPor,
+            type: NotificationType.COTACAO_REPROVADA,
+            title: `Cotação #${cotacao.numero} reprovada`,
+            message: `Sua cotação foi reprovada por ${aprovador.nome}. Justificativa: ${justificativa}`,
+            data: {
+              cotacaoId: cotacao.id,
+              cotacaoNumero: cotacao.numero,
+              aprovadorId: aprovador.id,
+              aprovadorNome: aprovador.nome,
+              dataReprovacao: cotacao.dataAprovacao,
+              justificativa,
+            },
+          })
+          .then(() => console.log(`✅ Notificação criada para cotação #${cotacao.numero}`))
+          .catch((err) => console.error(`❌ Erro ao criar notificação:`, err));
+      }
+    }
+
+    return cotacao;
+  }
+
+  async aprovarLote(
+    cotacaoIds: string[],
+    userId: string,
+    justificativa?: string,
+  ): Promise<{
+    total: number;
+    sucessos: number;
+    falhas: number;
+    cotacoesProcessadas: string[];
+    erros: Array<{ cotacaoId: string; erro: string }>;
+  }> {
+    const resultado = {
+      total: cotacaoIds.length,
+      sucessos: 0,
+      falhas: 0,
+      cotacoesProcessadas: [] as string[],
+      erros: [] as Array<{ cotacaoId: string; erro: string }>,
+    };
+
+    for (const cotacaoId of cotacaoIds) {
+      try {
+        await this.aprovar(cotacaoId, userId, justificativa);
+        resultado.sucessos++;
+        resultado.cotacoesProcessadas.push(cotacaoId);
+      } catch (error) {
+        resultado.falhas++;
+        resultado.erros.push({
+          cotacaoId,
+          erro: error.message || 'Erro desconhecido',
+        });
+      }
+    }
+
+    console.log(
+      `[AUDIT] APROVACAO LOTE - Total: ${resultado.total}, Sucessos: ${resultado.sucessos}, Falhas: ${resultado.falhas}, Aprovador: ${userId}`,
+    );
+
+    return resultado;
+  }
+
+  async reprovarLote(
+    cotacaoIds: string[],
+    userId: string,
+    justificativa: string,
+  ): Promise<{
+    total: number;
+    sucessos: number;
+    falhas: number;
+    cotacoesProcessadas: string[];
+    erros: Array<{ cotacaoId: string; erro: string }>;
+  }> {
+    // Validar justificativa
+    if (!justificativa || justificativa.trim() === '') {
+      throw new HttpException(
+        'Justificativa é obrigatória para reprovar cotações',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const resultado = {
+      total: cotacaoIds.length,
+      sucessos: 0,
+      falhas: 0,
+      cotacoesProcessadas: [] as string[],
+      erros: [] as Array<{ cotacaoId: string; erro: string }>,
+    };
+
+    for (const cotacaoId of cotacaoIds) {
+      try {
+        await this.reprovar(cotacaoId, userId, justificativa);
+        resultado.sucessos++;
+        resultado.cotacoesProcessadas.push(cotacaoId);
+      } catch (error) {
+        resultado.falhas++;
+        resultado.erros.push({
+          cotacaoId,
+          erro: error.message || 'Erro desconhecido',
+        });
+      }
+    }
+
+    console.log(
+      `[AUDIT] REPROVACAO LOTE - Total: ${resultado.total}, Sucessos: ${resultado.sucessos}, Falhas: ${resultado.falhas}, Aprovador: ${userId}`,
+    );
+
+    return resultado;
+  }
+
   async alterarStatus(
     id: string,
     novoStatus: StatusCotacao,
     observacao?: string,
-    userId?: string
+    userId?: string,
   ): Promise<CotacaoResponseDto> {
     const cotacao = await this.cotacaoRepository.findOne({
-      where: { id }
+      where: { id },
     });
 
     if (!cotacao) {
@@ -270,7 +736,7 @@ export class CotacaoService {
     if (!this.isValidStatusTransition(cotacao.status, novoStatus)) {
       throw new HttpException(
         `Transição de status inválida: ${cotacao.status} → ${novoStatus}`,
-        HttpStatus.BAD_REQUEST
+        HttpStatus.BAD_REQUEST,
       );
     }
 
@@ -296,13 +762,16 @@ export class CotacaoService {
     }
 
     if (observacao) {
-      cotacao.observacoes = (cotacao.observacoes || '') + `\n[${new Date().toLocaleString()}] ${observacao}`;
+      cotacao.observacoes =
+        (cotacao.observacoes || '') + `\n[${new Date().toLocaleString()}] ${observacao}`;
     }
 
     await this.cotacaoRepository.save(cotacao);
 
     // Log simples de auditoria
-    console.log(`[AUDIT] COTACAO UPDATE_STATUS - ID: ${id}, User: ${userId}, ${statusAnterior} → ${novoStatus}`);
+    console.log(
+      `[AUDIT] COTACAO UPDATE_STATUS - ID: ${id}, User: ${userId}, ${statusAnterior} → ${novoStatus}`,
+    );
 
     return this.buscarPorId(id, userId);
   }
@@ -311,28 +780,32 @@ export class CotacaoService {
     const cotacao = await this.buscarPorId(id, userId);
 
     // Log simples de auditoria
-    console.log(`[AUDIT] COTACAO GENERATE_PDF - ID: ${id}, User: ${userId}, Numero: ${cotacao.numero}`);
+    console.log(
+      `[AUDIT] COTACAO GENERATE_PDF - ID: ${id}, User: ${userId}, Numero: ${cotacao.numero}`,
+    );
 
     // Implementação básica - retorna dados como buffer JSON
-    const dados = JSON.stringify({
-      type: 'cotacao_pdf',
-      cotacao,
-      geradoEm: new Date(),
-      geradoPor: userId
-    }, null, 2);
+    const dados = JSON.stringify(
+      {
+        type: 'cotacao_pdf',
+        cotacao,
+        geradoEm: new Date(),
+        geradoPor: userId,
+      },
+      null,
+      2,
+    );
 
     return Buffer.from(dados, 'utf-8');
   }
 
-  async enviarEmail(
-    id: string,
-    enviarEmailDto: EnviarEmailDto,
-    userId: string
-  ): Promise<void> {
+  async enviarEmail(id: string, enviarEmailDto: EnviarEmailDto, userId: string): Promise<void> {
     const cotacao = await this.buscarPorId(id, userId);
 
     // Log simples em vez de envio real
-    console.log(`[EMAIL] COTACAO SEND - ID: ${id}, Destinatarios: ${enviarEmailDto.destinatarios.join(', ')}, Assunto: ${enviarEmailDto.assunto}`);
+    console.log(
+      `[EMAIL] COTACAO SEND - ID: ${id}, Destinatarios: ${enviarEmailDto.destinatarios.join(', ')}, Assunto: ${enviarEmailDto.assunto}`,
+    );
 
     // Atualizar status se ainda for rascunho
     if (cotacao.status === StatusCotacao.RASCUNHO) {
@@ -340,7 +813,9 @@ export class CotacaoService {
     }
 
     // Log simples de auditoria
-    console.log(`[AUDIT] COTACAO SEND_EMAIL - ID: ${id}, User: ${userId}, Destinatarios: ${enviarEmailDto.destinatarios.length}`);
+    console.log(
+      `[AUDIT] COTACAO SEND_EMAIL - ID: ${id}, User: ${userId}, Destinatarios: ${enviarEmailDto.destinatarios.length}`,
+    );
   }
 
   async obterHistorico(id: string, userId: string) {
@@ -349,7 +824,7 @@ export class CotacaoService {
       message: 'Histórico não disponível - módulo de auditoria não configurado',
       cotacaoId: id,
       consultadoPor: userId,
-      consultadoEm: new Date()
+      consultadoEm: new Date(),
     };
   }
 
@@ -357,16 +832,23 @@ export class CotacaoService {
   private createQueryBuilder(): SelectQueryBuilder<Cotacao> {
     return this.cotacaoRepository
       .createQueryBuilder('cotacao')
-      .leftJoinAndSelect('cotacao.cliente', 'cliente')
+      .leftJoinAndSelect('cotacao.fornecedor', 'fornecedor')
       .leftJoinAndSelect('cotacao.responsavel', 'responsavel')
+      .leftJoinAndSelect('cotacao.aprovador', 'aprovador')
       .leftJoinAndSelect('cotacao.itens', 'itens')
       .where('cotacao.deletadoEm IS NULL');
   }
 
-  private applyFilters(queryBuilder: SelectQueryBuilder<Cotacao>, query: CotacaoQueryDto, userId: string) {
+  private applyFilters(
+    queryBuilder: SelectQueryBuilder<Cotacao>,
+    query: CotacaoQueryDto,
+    userId: string,
+  ) {
     // Filtro por cliente
     if (query.fornecedorId) {
-      queryBuilder.andWhere('cotacao.fornecedorId = :fornecedorId', { fornecedorId: query.fornecedorId });
+      queryBuilder.andWhere('cotacao.fornecedorId = :fornecedorId', {
+        fornecedorId: query.fornecedorId,
+      });
     }
 
     // Filtro por status
@@ -385,7 +867,9 @@ export class CotacaoService {
 
     // Filtro por responsável
     if (query.responsavelId) {
-      queryBuilder.andWhere('cotacao.responsavelId = :responsavelId', { responsavelId: query.responsavelId });
+      queryBuilder.andWhere('cotacao.responsavelId = :responsavelId', {
+        responsavelId: query.responsavelId,
+      });
     }
 
     // Filtro por período
@@ -401,7 +885,7 @@ export class CotacaoService {
     if (query.busca) {
       queryBuilder.andWhere(
         '(cotacao.numero ILIKE :busca OR cotacao.titulo ILIKE :busca OR cliente.nome ILIKE :busca)',
-        { busca: `%${query.busca}%` }
+        { busca: `%${query.busca}%` },
       );
     }
   }
@@ -434,7 +918,78 @@ export class CotacaoService {
 
     const valorTotal = parseFloat(resultado?.total || '0');
 
+    console.log(`🧮 calcularValorTotal - Cotacao ID: ${cotacaoId}`);
+    console.log(`🧮 Soma dos itens: ${resultado?.total}`);
+    console.log(`🧮 Valor total calculado: ${valorTotal}`);
+
     await this.cotacaoRepository.update(cotacaoId, { valorTotal });
+
+    console.log(`✅ Valor total atualizado no banco: ${valorTotal}`);
+  }
+
+  private buildItemCotacaoEntity(
+    item: CriarItemCotacaoDto,
+    context: { cotacaoId: string; userId: string; ordem: number },
+  ): ItemCotacao {
+    const quantidade = Number(item.quantidade) || 0;
+    const valorUnitario = Number(item.valorUnitario) || 0;
+    const descontoPercentual = item.desconto ?? 0;
+    const aliquotaImposto = item.aliquotaImposto ?? 0;
+
+    const valorBruto = quantidade * valorUnitario;
+    const valorDesconto = (valorBruto * descontoPercentual) / 100;
+    const valorBase = valorBruto - valorDesconto;
+    const valorImposto = (valorBase * aliquotaImposto) / 100;
+    const valorTotal = valorBase + valorImposto;
+    const valorLiquido = valorTotal - valorImposto;
+
+    // Log para debug
+    this.logger.debug(
+      `Cálculos do item: ${JSON.stringify({
+        quantidade,
+        valorUnitario,
+        valorBruto,
+        descontoPercentual,
+        valorDesconto,
+        valorBase,
+        aliquotaImposto,
+        valorImposto,
+        valorTotal,
+        valorLiquido,
+      })}`,
+    );
+
+    // Criar entidade diretamente ao invés de usar repository.create()
+    const entity = new ItemCotacao();
+    entity.descricao = item.descricao;
+    entity.unidade = item.unidade;
+    entity.observacoes = item.observacoes;
+    entity.codigo = item.codigo;
+    entity.categoria = item.categoria;
+    entity.prazoEntregaDias = item.prazoEntregaDias;
+    entity.especificacoes = item.especificacoes;
+    entity.quantidade = quantidade;
+    entity.valorUnitario = valorUnitario;
+    entity.desconto = descontoPercentual;
+    entity.aliquotaImposto = aliquotaImposto;
+    entity.cotacaoId = context.cotacaoId;
+    entity.ordem = context.ordem;
+    entity.valorDesconto = valorDesconto;
+    entity.valorImposto = valorImposto;
+    entity.valorTotal = valorTotal;
+    entity.valorLiquido = valorLiquido;
+    entity.criadoPor = context.userId;
+    entity.atualizadoPor = context.userId;
+
+    this.logger.debug(
+      `Entidade montada: ${JSON.stringify({
+        valorTotal: entity.valorTotal,
+        valorDesconto: entity.valorDesconto,
+        criadoPor: entity.criadoPor,
+      })}`,
+    );
+
+    return entity;
   }
 
   private podeSerEditada(status: StatusCotacao): boolean {
@@ -442,19 +997,30 @@ export class CotacaoService {
   }
 
   private podeSerDeletada(status: StatusCotacao): boolean {
-    return [StatusCotacao.RASCUNHO, StatusCotacao.REJEITADA, StatusCotacao.VENCIDA].includes(status);
+    return [StatusCotacao.RASCUNHO, StatusCotacao.REJEITADA, StatusCotacao.VENCIDA].includes(
+      status,
+    );
   }
 
   private isValidStatusTransition(statusAtual: StatusCotacao, novoStatus: StatusCotacao): boolean {
     const transicoes = {
       [StatusCotacao.RASCUNHO]: [StatusCotacao.ENVIADA, StatusCotacao.CANCELADA],
-      [StatusCotacao.ENVIADA]: [StatusCotacao.EM_ANALISE, StatusCotacao.APROVADA, StatusCotacao.REJEITADA, StatusCotacao.VENCIDA],
-      [StatusCotacao.EM_ANALISE]: [StatusCotacao.APROVADA, StatusCotacao.REJEITADA, StatusCotacao.VENCIDA],
+      [StatusCotacao.ENVIADA]: [
+        StatusCotacao.EM_ANALISE,
+        StatusCotacao.APROVADA,
+        StatusCotacao.REJEITADA,
+        StatusCotacao.VENCIDA,
+      ],
+      [StatusCotacao.EM_ANALISE]: [
+        StatusCotacao.APROVADA,
+        StatusCotacao.REJEITADA,
+        StatusCotacao.VENCIDA,
+      ],
       [StatusCotacao.APROVADA]: [StatusCotacao.CONVERTIDA],
       [StatusCotacao.REJEITADA]: [StatusCotacao.RASCUNHO],
       [StatusCotacao.VENCIDA]: [StatusCotacao.RASCUNHO],
       [StatusCotacao.CONVERTIDA]: [],
-      [StatusCotacao.CANCELADA]: []
+      [StatusCotacao.CANCELADA]: [],
     };
 
     return transicoes[statusAtual]?.includes(novoStatus) || false;
@@ -469,9 +1035,9 @@ export class CotacaoService {
       .groupBy('cotacao.status')
       .getRawMany();
 
-    return result.map(item => ({
+    return result.map((item) => ({
       status: item.status,
-      quantidade: parseInt(item.quantidade)
+      quantidade: parseInt(item.quantidade),
     }));
   }
 
@@ -484,9 +1050,9 @@ export class CotacaoService {
       .groupBy('cotacao.prioridade')
       .getRawMany();
 
-    return result.map(item => ({
+    return result.map((item) => ({
       prioridade: item.prioridade,
-      quantidade: parseInt(item.quantidade)
+      quantidade: parseInt(item.quantidade),
     }));
   }
 
@@ -500,45 +1066,60 @@ export class CotacaoService {
       prioridade: cotacao.prioridade,
       valorTotal: cotacao.valorTotal,
       prazoResposta: cotacao.prazoResposta,
+      dataVencimento: cotacao.prazoResposta, // Alias para compatibilidade frontend
       observacoes: cotacao.observacoes,
       condicoesPagamento: cotacao.condicoesPagamento,
       prazoEntrega: cotacao.prazoEntrega,
       validadeOrcamento: cotacao.validadeOrcamento,
       origem: cotacao.origem,
       fornecedorId: cotacao.fornecedorId,
-      fornecedor: cotacao.fornecedor ? {
-        id: cotacao.fornecedor.id,
-        nome: cotacao.fornecedor.nome,
-        email: cotacao.fornecedor.email,
-        telefone: cotacao.fornecedor.telefone
-      } : null,
+      fornecedor: cotacao.fornecedor
+        ? {
+          id: cotacao.fornecedor.id,
+          nome: cotacao.fornecedor.nome,
+          email: cotacao.fornecedor.email,
+          telefone: cotacao.fornecedor.telefone,
+        }
+        : null,
       responsavelId: cotacao.responsavelId,
-      responsavel: cotacao.responsavel ? {
-        id: cotacao.responsavel.id,
-        nome: cotacao.responsavel.nome,
-        email: cotacao.responsavel.email
-      } : null,
-      itens: cotacao.itens?.map(item => ({
-        id: item.id,
-        descricao: item.descricao,
-        quantidade: item.quantidade,
-        unidade: item.unidade,
-        valorUnitario: item.valorUnitario,
-        valorTotal: item.valorTotal,
-        valorDesconto: item.valorDesconto || 0,
-        valorImposto: item.valorImposto || 0,
-        valorLiquido: item.valorLiquido || item.valorTotal,
-        observacoes: item.observacoes,
-        dataCriacao: item.dataCriacao || new Date()
-      })) || [],
-      anexos: cotacao.anexos?.map(anexo => ({
-        id: anexo.id,
-        nome: anexo.nome,
-        tipo: anexo.tipo,
-        url: anexo.url,
-        tamanho: anexo.tamanho,
-        dataCriacao: anexo.dataCriacao
-      })) || [],
+      responsavel: cotacao.responsavel
+        ? {
+          id: cotacao.responsavel.id,
+          nome: cotacao.responsavel.nome,
+          email: cotacao.responsavel.email,
+        }
+        : null,
+      aprovadorId: cotacao.aprovadorId,
+      aprovador: cotacao.aprovador
+        ? {
+          id: cotacao.aprovador.id,
+          nome: cotacao.aprovador.nome,
+          email: cotacao.aprovador.email,
+        }
+        : null,
+      itens:
+        cotacao.itens?.map((item) => ({
+          id: item.id,
+          descricao: item.descricao,
+          quantidade: item.quantidade,
+          unidade: item.unidade,
+          valorUnitario: item.valorUnitario,
+          valorTotal: item.valorTotal,
+          valorDesconto: item.valorDesconto || 0,
+          valorImposto: item.valorImposto || 0,
+          valorLiquido: item.valorLiquido || item.valorTotal,
+          observacoes: item.observacoes,
+          dataCriacao: item.dataCriacao || new Date(),
+        })) || [],
+      anexos:
+        cotacao.anexos?.map((anexo) => ({
+          id: anexo.id,
+          nome: anexo.nome,
+          tipo: anexo.tipo,
+          url: anexo.url,
+          tamanho: anexo.tamanho,
+          dataCriacao: anexo.dataCriacao,
+        })) || [],
       dataCriacao: cotacao.dataCriacao,
       dataAtualizacao: cotacao.dataAtualizacao,
       dataEnvio: cotacao.dataEnvio,
@@ -546,27 +1127,27 @@ export class CotacaoService {
       dataRejeicao: cotacao.dataRejeicao,
       dataConversao: cotacao.dataConversao,
       criadoPor: cotacao.criadoPor,
-      atualizadoPor: cotacao.atualizadoPor
+      atualizadoPor: cotacao.atualizadoPor,
     };
   }
 
   async obterEstatisticas(userId: string): Promise<any> {
     const total = await this.cotacaoRepository.count();
     const pendentes = await this.cotacaoRepository.count({
-      where: { status: StatusCotacao.RASCUNHO }
+      where: { status: StatusCotacao.RASCUNHO },
     });
     const aprovadas = await this.cotacaoRepository.count({
-      where: { status: StatusCotacao.APROVADA }
+      where: { status: StatusCotacao.APROVADA },
     });
     const rejeitadas = await this.cotacaoRepository.count({
-      where: { status: StatusCotacao.REJEITADA }
+      where: { status: StatusCotacao.REJEITADA },
     });
 
     return {
       total,
       pendentes,
       aprovadas,
-      rejeitadas
+      rejeitadas,
     };
   }
 
@@ -574,11 +1155,15 @@ export class CotacaoService {
     const estatisticas = await this.obterEstatisticas(userId);
     return {
       ...estatisticas,
-      recentes: await this.listar({ page: 1, limit: 5 }, userId)
+      recentes: await this.listar({ page: 1, limit: 5 }, userId),
     };
   }
 
-  async duplicar(id: string, duplicarDto: DuplicarCotacaoDto, userId: string): Promise<CotacaoResponseDto> {
+  async duplicar(
+    id: string,
+    duplicarDto: DuplicarCotacaoDto,
+    userId: string,
+  ): Promise<CotacaoResponseDto> {
     const cotacaoOriginal = await this.buscarPorId(id, userId);
 
     const novaCotacao = {
@@ -589,40 +1174,10 @@ export class CotacaoService {
       dataAprovacao: null,
       dataRejeicao: null,
       dataConversao: null,
-      observacoes: duplicarDto.observacoes || cotacaoOriginal.observacoes
+      observacoes: duplicarDto.observacoes || cotacaoOriginal.observacoes,
     };
 
     return this.criar(novaCotacao as any, userId);
-  }
-
-  async aprovar(id: string, observacao: string, userId: string): Promise<CotacaoResponseDto> {
-    const cotacao = await this.cotacaoRepository.findOne({ where: { id } });
-    if (!cotacao) {
-      throw new HttpException('Cotação não encontrada', HttpStatus.NOT_FOUND);
-    }
-
-    cotacao.status = StatusCotacao.APROVADA;
-    cotacao.dataAprovacao = new Date();
-    cotacao.observacoes = observacao;
-    cotacao.atualizadoPor = userId;
-
-    await this.cotacaoRepository.save(cotacao);
-    return this.buscarPorId(id, userId);
-  }
-
-  async rejeitar(id: string, motivo: string, userId: string): Promise<CotacaoResponseDto> {
-    const cotacao = await this.cotacaoRepository.findOne({ where: { id } });
-    if (!cotacao) {
-      throw new HttpException('Cotação não encontrada', HttpStatus.NOT_FOUND);
-    }
-
-    cotacao.status = StatusCotacao.REJEITADA;
-    cotacao.dataRejeicao = new Date();
-    cotacao.observacoes = motivo;
-    cotacao.atualizadoPor = userId;
-
-    await this.cotacaoRepository.save(cotacao);
-    return this.buscarPorId(id, userId);
   }
 
   async converterEmPedido(id: string, observacoes: string, userId: string): Promise<any> {
@@ -632,7 +1187,10 @@ export class CotacaoService {
     }
 
     if (cotacao.status !== StatusCotacao.APROVADA) {
-      throw new HttpException('Apenas cotações aprovadas podem ser convertidas em pedido', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Apenas cotações aprovadas podem ser convertidas em pedido',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     cotacao.status = StatusCotacao.CONVERTIDA;
@@ -646,11 +1204,15 @@ export class CotacaoService {
       id: `PED-${Date.now()}`,
       cotacaoId: id,
       status: 'CRIADO',
-      observacoes
+      observacoes,
     };
   }
 
-  async exportar(formato: string, filtros: any, userId?: string): Promise<{ buffer: Buffer; filename: string; mimeType: string }> {
+  async exportar(
+    formato: string,
+    filtros: any,
+    userId?: string,
+  ): Promise<{ buffer: Buffer; filename: string; mimeType: string }> {
     const cotacoes = await this.cotacaoRepository.find();
 
     if (formato === 'PDF') {
@@ -659,7 +1221,7 @@ export class CotacaoService {
       return {
         buffer: Buffer.from(pdfContent),
         filename: `cotacoes_${Date.now()}.pdf`,
-        mimeType: 'application/pdf'
+        mimeType: 'application/pdf',
       };
     } else if (formato === 'EXCEL') {
       // Implementar exportação Excel
@@ -667,7 +1229,7 @@ export class CotacaoService {
       return {
         buffer: Buffer.from(excelContent),
         filename: `cotacoes_${Date.now()}.xlsx`,
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       };
     }
 
@@ -679,13 +1241,13 @@ export class CotacaoService {
     return {
       sucesso: 0,
       erros: 0,
-      mensagens: []
+      mensagens: [],
     };
   }
 
   async listarAnexos(id: string, userId: string): Promise<any[]> {
     const anexos = await this.anexoCotacaoRepository.find({
-      where: { cotacaoId: id }
+      where: { cotacaoId: id },
     });
 
     return anexos;
@@ -698,7 +1260,7 @@ export class CotacaoService {
       tipo: body.tipo,
       url: body.url,
       tamanho: body.tamanho,
-      criadoPor: userId
+      criadoPor: userId,
     });
 
     return this.anexoCotacaoRepository.save(anexo);
@@ -707,7 +1269,7 @@ export class CotacaoService {
   async removerAnexo(id: string, anexoId: string, userId: string): Promise<void> {
     await this.anexoCotacaoRepository.delete({
       id: anexoId,
-      cotacaoId: id
+      cotacaoId: id,
     });
   }
 
@@ -740,8 +1302,8 @@ export class CotacaoService {
         dados: {
           observacoes: 'Cotação válida por 30 dias',
           condicoesPagamento: 'À vista',
-          prazoEntrega: '7 dias úteis'
-        }
+          prazoEntrega: '7 dias úteis',
+        },
       },
       {
         id: '2',
@@ -750,13 +1312,16 @@ export class CotacaoService {
         dados: {
           observacoes: 'Serviços sob demanda',
           condicoesPagamento: '50% antecipado, 50% na entrega',
-          prazoEntrega: 'A combinar'
-        }
-      }
+          prazoEntrega: 'A combinar',
+        },
+      },
     ];
   }
 
-  async salvarTemplate(dados: { nome: string; descricao?: string; dados: any }, userId: string): Promise<any> {
+  async salvarTemplate(
+    dados: { nome: string; descricao?: string; dados: any },
+    userId: string,
+  ): Promise<any> {
     // Por enquanto retorna sucesso
     // Futuramente implementar tabela de templates
     return {
@@ -765,7 +1330,7 @@ export class CotacaoService {
       descricao: dados.descricao,
       dados: dados.dados,
       criadoPor: userId,
-      criadoEm: new Date()
+      criadoEm: new Date(),
     };
   }
 }

@@ -1,4 +1,16 @@
-import { IsString, IsNumber, IsEnum, IsOptional, IsDateString, IsArray, ValidateNested, IsBoolean, Min, Max, IsUUID } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsEnum,
+  IsOptional,
+  IsDateString,
+  IsArray,
+  ValidateNested,
+  IsBoolean,
+  Min,
+  Max,
+  IsUUID,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { TipoFatura, FormaPagamento } from '../entities/fatura.entity';
 

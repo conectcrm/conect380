@@ -2,9 +2,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Migration: Habilitar Row Level Security (RLS) em todas as tabelas multi-tenant
- * 
+ *
  * OBJETIVO: Garantir isolamento total de dados entre empresas no nível do banco de dados
- * 
+ *
  * IMPORTANTE: Esta migration adiciona uma camada CRÍTICA de segurança.
  * Após executá-la, queries sem empresaId correto NÃO retornarão dados de outras empresas.
  */
@@ -103,9 +103,10 @@ export class EnableRowLevelSecurity1730476887000 implements MigrationInterface {
         const colunaQuotada = coluna.includes('_') ? coluna : `"${coluna}"`;
 
         // ✅ CONVERSÃO DE TIPO: Se coluna não é UUID, converter
-        const comparacao = tipoDado === 'uuid'
-          ? `${colunaQuotada} = get_current_tenant()`
-          : `${colunaQuotada}::uuid = get_current_tenant()`;
+        const comparacao =
+          tipoDado === 'uuid'
+            ? `${colunaQuotada} = get_current_tenant()`
+            : `${colunaQuotada}::uuid = get_current_tenant()`;
 
         // Criar política
         await queryRunner.query(`
@@ -114,7 +115,6 @@ export class EnableRowLevelSecurity1730476887000 implements MigrationInterface {
         `);
 
         console.log(`✅ RLS habilitado em: ${tabela} (coluna: ${coluna}, tipo: ${tipoDado})`);
-
       } catch (error) {
         console.error(`❌ Erro ao processar tabela "${tabela}":`, error.message);
         // Continuar para próxima tabela mesmo se houver erro
@@ -165,9 +165,15 @@ export class EnableRowLevelSecurity1730476887000 implements MigrationInterface {
     `);
 
     // Índices para performance
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_empresa_id ON audit_logs(empresa_id);`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_entidade ON audit_logs(entidade);`);
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS idx_audit_logs_empresa_id ON audit_logs(empresa_id);`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS idx_audit_logs_entidade ON audit_logs(entidade);`,
+    );
 
     // Habilitar RLS na tabela de auditoria
     await queryRunner.query(`ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;`);
@@ -193,11 +199,26 @@ export class EnableRowLevelSecurity1730476887000 implements MigrationInterface {
     console.log('🔓 Revertendo Row Level Security...');
 
     const tabelas = [
-      'clientes', 'propostas', 'usuarios', 'produtos', 'faturas',
-      'atendentes', 'equipes', 'departamentos', 'fluxos_triagem',
-      'sessoes_triagem', 'demandas', 'fornecedores', 'contas_pagar',
-      'eventos', 'canais_simples', 'nucleos_atendimento', 'triagem_logs',
-      'user_activities', 'empresas', 'audit_logs'
+      'clientes',
+      'propostas',
+      'usuarios',
+      'produtos',
+      'faturas',
+      'atendentes',
+      'equipes',
+      'departamentos',
+      'fluxos_triagem',
+      'sessoes_triagem',
+      'demandas',
+      'fornecedores',
+      'contas_pagar',
+      'eventos',
+      'canais_simples',
+      'nucleos_atendimento',
+      'triagem_logs',
+      'user_activities',
+      'empresas',
+      'audit_logs',
     ];
 
     for (const tabela of tabelas) {

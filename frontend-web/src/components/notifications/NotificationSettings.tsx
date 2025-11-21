@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { 
-  Settings, 
-  Bell, 
-  Volume2, 
-  VolumeX, 
-  Mail, 
-  MailOff, 
-  Monitor, 
+import {
+  Settings,
+  Bell,
+  Volume2,
+  VolumeX,
+  Mail,
+  MailX,
+  Monitor,
   MonitorOff,
   Clock,
   Save,
@@ -152,7 +152,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
               {localSettings.emailNotifications ? (
                 <Mail className="w-5 h-5 text-yellow-500" />
               ) : (
-                <MailOff className="w-5 h-5 text-gray-400" />
+                <MailX className="w-5 h-5 text-gray-400" />
               )}
               <div>
                 <p className="font-medium text-gray-900">Email</p>

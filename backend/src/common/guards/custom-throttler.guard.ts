@@ -3,14 +3,14 @@ import { ThrottlerGuard, ThrottlerException } from '@nestjs/throttler';
 
 /**
  * 🛡️ Guard de Rate Limiting Customizado
- * 
+ *
  * Protege APIs contra abuso e ataques de força bruta.
- * 
+ *
  * Limites aplicados:
  * - SHORT: 10 requisições/segundo
- * - MEDIUM: 100 requisições/minuto  
+ * - MEDIUM: 100 requisições/minuto
  * - LONG: 1000 requisições/15 minutos
- * 
+ *
  * Para bypasses em rotas específicas, use @SkipThrottle()
  * Para customizar limites, use @Throttle()
  */
@@ -36,8 +36,7 @@ export class CustomThrottlerGuard extends ThrottlerGuard {
    */
   protected async throwThrottlingException(context: ExecutionContext): Promise<void> {
     throw new ThrottlerException(
-      'Muitas requisições. Por favor, aguarde antes de tentar novamente.'
+      'Muitas requisições. Por favor, aguarde antes de tentar novamente.',
     );
   }
 }
-

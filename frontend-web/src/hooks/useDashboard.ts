@@ -76,8 +76,11 @@ interface DashboardData {
     periodo: string;
     vendedorId?: string;
     regiao?: string;
-    atualizadoEm: string;
-    proximaAtualizacao: string;
+    atualizadoEm?: string;
+    proximaAtualizacao?: string;
+    periodosDisponiveis?: string[];
+    vendedoresDisponiveis?: Array<{ id: string; nome: string }>;
+    regioesDisponiveis?: string[];
   } | null;
 }
 
@@ -159,11 +162,33 @@ export const useDashboard = (options: UseDashboardOptions = {}): UseDashboardRet
         timestamp: new Date(alerta.timestamp)
       }));
 
+      const metadataDefaults = {
+        periodo: filters.periodo,
+        vendedorId: filters.vendedorId,
+        regiao: filters.regiao,
+        atualizadoEm: new Date().toISOString(),
+        proximaAtualizacao: new Date(Date.now() + refreshInterval).toISOString(),
+        periodosDisponiveis: ['semanal', 'mensal', 'trimestral', 'semestral', 'anual']
+      };
+
+      const metadata = result.metadata
+        ? {
+          ...metadataDefaults,
+          ...result.metadata,
+          periodosDisponiveis: result.metadata.periodosDisponiveis ?? metadataDefaults.periodosDisponiveis,
+          vendedoresDisponiveis: result.metadata.vendedoresDisponiveis ?? result.vendedoresRanking?.map(({ id, nome }: VendedorRanking) => ({ id, nome })),
+          regioesDisponiveis: result.metadata.regioesDisponiveis
+        }
+        : {
+          ...metadataDefaults,
+          vendedoresDisponiveis: result.vendedoresRanking?.map(({ id, nome }: VendedorRanking) => ({ id, nome }))
+        };
+
       setData({
         kpis: result.kpis,
         vendedoresRanking: result.vendedoresRanking,
         alertas: alertasComData,
-        metadata: result.metadata
+        metadata
       });
 
     } catch (err) {
@@ -367,8 +392,15 @@ const getMockData = (): DashboardData => ({
   ],
   metadata: {
     periodo: 'mensal',
+    vendedorId: undefined,
+    regiao: undefined,
     atualizadoEm: new Date().toISOString(),
-    proximaAtualizacao: new Date(Date.now() + 15 * 60 * 1000).toISOString()
+    proximaAtualizacao: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    periodosDisponiveis: ['semanal', 'mensal', 'trimestral', 'semestral', 'anual'],
+    vendedoresDisponiveis: [
+      { id: '1', nome: 'João Silva' }
+    ],
+    regioesDisponiveis: ['Todas', 'Norte', 'Nordeste', 'Centro-Oeste', 'Sudeste', 'Sul']
   }
 });
 

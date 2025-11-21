@@ -7,7 +7,7 @@ import { UpdateDemandaDto } from '../dto/update-demanda.dto';
 
 /**
  * Service para gerenciar demandas dos clientes
- * 
+ *
  * Funcionalidades:
  * - CRUD completo de demandas
  * - Buscar demandas por cliente
@@ -24,16 +24,12 @@ export class DemandaService {
   constructor(
     @InjectRepository(Demanda)
     private readonly demandaRepository: Repository<Demanda>,
-  ) { }
+  ) {}
 
   /**
    * Criar nova demanda
    */
-  async criar(
-    dto: CreateDemandaDto,
-    autorId: string,
-    empresaId: string,
-  ): Promise<Demanda> {
+  async criar(dto: CreateDemandaDto, autorId: string, empresaId: string): Promise<Demanda> {
     this.logger.log(`📋 Criando demanda: ${dto.titulo}`);
 
     // Validar que pelo menos um identificador foi fornecido
@@ -77,10 +73,7 @@ export class DemandaService {
    * Buscar todas as demandas de um cliente
    * Ordena por: urgente primeiro, depois por data de criação (mais recente)
    */
-  async buscarPorCliente(
-    clienteId: string,
-    empresaId?: string,
-  ): Promise<Demanda[]> {
+  async buscarPorCliente(clienteId: string, empresaId?: string): Promise<Demanda[]> {
     this.logger.log(`📋 Buscando demandas do cliente ${clienteId}`);
 
     const where: any = { clienteId };
@@ -104,10 +97,7 @@ export class DemandaService {
   /**
    * Buscar demandas por telefone do contato
    */
-  async buscarPorTelefone(
-    contatoTelefone: string,
-    empresaId?: string,
-  ): Promise<Demanda[]> {
+  async buscarPorTelefone(contatoTelefone: string, empresaId?: string): Promise<Demanda[]> {
     this.logger.log(`📋 Buscando demandas do telefone ${contatoTelefone}`);
 
     const where: any = { contatoTelefone };
@@ -131,10 +121,7 @@ export class DemandaService {
   /**
    * Buscar demandas de um ticket específico
    */
-  async buscarPorTicket(
-    ticketId: string,
-    empresaId?: string,
-  ): Promise<Demanda[]> {
+  async buscarPorTicket(ticketId: string, empresaId?: string): Promise<Demanda[]> {
     this.logger.log(`📋 Buscando demandas do ticket ${ticketId}`);
 
     const where: any = { ticketId };
@@ -158,10 +145,7 @@ export class DemandaService {
   /**
    * Buscar demandas por status
    */
-  async buscarPorStatus(
-    status: Demanda['status'],
-    empresaId?: string,
-  ): Promise<Demanda[]> {
+  async buscarPorStatus(status: Demanda['status'], empresaId?: string): Promise<Demanda[]> {
     const where: any = { status };
     if (empresaId) {
       where.empresaId = empresaId;
@@ -180,10 +164,7 @@ export class DemandaService {
   /**
    * Atualizar demanda
    */
-  async atualizar(
-    id: string,
-    dto: UpdateDemandaDto,
-  ): Promise<Demanda> {
+  async atualizar(id: string, dto: UpdateDemandaDto): Promise<Demanda> {
     const demanda = await this.buscarPorId(id);
 
     // Atualizar campos permitidos

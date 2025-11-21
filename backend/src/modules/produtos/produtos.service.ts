@@ -9,19 +9,20 @@ export class ProdutosService {
   constructor(
     @InjectRepository(Produto)
     private produtoRepository: Repository<Produto>,
-  ) {}
+  ) { }
 
-  async findAll(): Promise<Produto[]> {
+  async findAll(empresaId: string): Promise<Produto[]> {
     return this.produtoRepository.find({
+      where: { empresa_id: empresaId },
       order: {
         criadoEm: 'DESC',
       },
     });
   }
 
-  async findOne(id: string): Promise<Produto> {
+  async findOne(id: string, empresaId: string): Promise<Produto> {
     const produto = await this.produtoRepository.findOne({
-      where: { id },
+      where: { id, empresa_id: empresaId },
     });
 
     if (!produto) {
@@ -31,39 +32,44 @@ export class ProdutosService {
     return produto;
   }
 
-  async create(createProdutoDto: CreateProdutoDto): Promise<Produto> {
+  async create(createProdutoDto: CreateProdutoDto, empresaId: string): Promise<Produto> {
     try {
-      // Gerar SKU único se não fornecido
-      if (!createProdutoDto.sku) {
-        createProdutoDto.sku = await this.generateUniqueSku(createProdutoDto.nome, createProdutoDto.tipoItem);
+      const payload = { ...createProdutoDto };
+
+      if (!payload.sku) {
+        payload.sku = await this.generateUniqueSku(
+          payload.nome,
+          payload.tipoItem,
+          empresaId,
+        );
       } else {
-        // Verificar se SKU já existe
+        // Verificar se SKU já existe dentro da mesma empresa
         const existingSku = await this.produtoRepository.findOne({
-          where: { sku: createProdutoDto.sku },
+          where: { sku: payload.sku, empresa_id: empresaId },
         });
         if (existingSku) {
-          throw new ConflictException(`SKU ${createProdutoDto.sku} já existe`);
+          throw new ConflictException(`SKU ${payload.sku} já existe para esta empresa`);
         }
       }
 
-      // Calcular custo unitário padrão se não fornecido (70% do preço)
-      if (!createProdutoDto.custoUnitario) {
-        createProdutoDto.custoUnitario = createProdutoDto.preco * 0.7;
+      if (!payload.custoUnitario) {
+        payload.custoUnitario = payload.preco * 0.7;
       }
 
-      // Configurar valores padrão para estoque baseado no tipo
-      if (createProdutoDto.tipoItem === 'produto' || !createProdutoDto.tipoItem) {
-        createProdutoDto.estoqueAtual = createProdutoDto.estoqueAtual ?? 10;
-        createProdutoDto.estoqueMinimo = createProdutoDto.estoqueMinimo ?? 5;
-        createProdutoDto.estoqueMaximo = createProdutoDto.estoqueMaximo ?? 100;
+      if (payload.tipoItem === 'produto' || !payload.tipoItem) {
+        payload.estoqueAtual = payload.estoqueAtual ?? 10;
+        payload.estoqueMinimo = payload.estoqueMinimo ?? 5;
+        payload.estoqueMaximo = payload.estoqueMaximo ?? 100;
       } else {
-        // Serviços, licenças, etc. não têm estoque físico
-        createProdutoDto.estoqueAtual = 0;
-        createProdutoDto.estoqueMinimo = 0;
-        createProdutoDto.estoqueMaximo = 0;
+        payload.estoqueAtual = 0;
+        payload.estoqueMinimo = 0;
+        payload.estoqueMaximo = 0;
       }
 
-      const produto = this.produtoRepository.create(createProdutoDto);
+      const produto = this.produtoRepository.create({
+        ...payload,
+        empresa_id: empresaId,
+      });
       return await this.produtoRepository.save(produto);
     } catch (error) {
       if (error instanceof ConflictException) {
@@ -73,16 +79,15 @@ export class ProdutosService {
     }
   }
 
-  async update(id: string, updateProdutoDto: UpdateProdutoDto): Promise<Produto> {
-    const produto = await this.findOne(id);
+  async update(id: string, updateProdutoDto: UpdateProdutoDto, empresaId: string): Promise<Produto> {
+    const produto = await this.findOne(id, empresaId);
 
-    // Se SKU está sendo atualizado, verificar se não conflita
     if (updateProdutoDto.sku && updateProdutoDto.sku !== produto.sku) {
       const existingSku = await this.produtoRepository.findOne({
-        where: { sku: updateProdutoDto.sku },
+        where: { sku: updateProdutoDto.sku, empresa_id: empresaId },
       });
       if (existingSku) {
-        throw new ConflictException(`SKU ${updateProdutoDto.sku} já existe`);
+        throw new ConflictException(`SKU ${updateProdutoDto.sku} já existe para esta empresa`);
       }
     }
 
@@ -90,38 +95,43 @@ export class ProdutosService {
     return await this.produtoRepository.save(produto);
   }
 
-  async remove(id: string): Promise<void> {
-    const produto = await this.findOne(id);
+  async remove(id: string, empresaId: string): Promise<void> {
+    const produto = await this.findOne(id, empresaId);
     await this.produtoRepository.remove(produto);
   }
 
-  async findByCategoria(categoria: string): Promise<Produto[]> {
+  async findByCategoria(categoria: string, empresaId: string): Promise<Produto[]> {
     return this.produtoRepository.find({
-      where: { categoria },
+      where: { categoria, empresa_id: empresaId },
       order: { nome: 'ASC' },
     });
   }
 
-  async findByStatus(status: string): Promise<Produto[]> {
+  async findByStatus(status: string, empresaId: string): Promise<Produto[]> {
     return this.produtoRepository.find({
-      where: { status },
+      where: { status, empresa_id: empresaId },
       order: { nome: 'ASC' },
     });
   }
 
-  async getEstatisticas() {
-    const totalProdutos = await this.produtoRepository.count();
+  async getEstatisticas(empresaId: string) {
+    const totalProdutos = await this.produtoRepository.count({
+      where: { empresa_id: empresaId },
+    });
+
     const produtosAtivos = await this.produtoRepository.count({
-      where: { status: 'ativo' },
+      where: { status: 'ativo', empresa_id: empresaId },
     });
-    
+
     const vendasMes = await this.produtoRepository
       .createQueryBuilder('produto')
+      .where('produto.empresa_id = :empresaId', { empresaId })
       .select('SUM(produto.vendasMes)', 'total')
       .getRawOne();
 
     const valorTotal = await this.produtoRepository
       .createQueryBuilder('produto')
+      .where('produto.empresa_id = :empresaId', { empresaId })
       .select('SUM(produto.preco * produto.vendasMes)', 'total')
       .getRawOne();
 
@@ -129,6 +139,7 @@ export class ProdutosService {
       .createQueryBuilder('produto')
       .where('produto.estoqueAtual <= produto.estoqueMinimo')
       .andWhere('produto.tipoItem = :tipo', { tipo: 'produto' })
+      .andWhere('produto.empresa_id = :empresaId', { empresaId })
       .getCount();
 
     return {
@@ -140,19 +151,28 @@ export class ProdutosService {
     };
   }
 
-  private async generateUniqueSku(nome: string, tipoItem: string = 'produto'): Promise<string> {
+  private async generateUniqueSku(
+    nome: string,
+    tipoItem: string = 'produto',
+    empresaId: string,
+  ): Promise<string> {
     const prefix = tipoItem.substring(0, 3).toUpperCase();
     const timestamp = Date.now().toString().slice(-6);
-    const nomeParte = nome.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, '');
-    
+    const nomeParte = nome
+      .substring(0, 3)
+      .toUpperCase()
+      .replace(/[^A-Z]/g, '');
+
     let tentativa = 1;
     let sku = `${prefix}-${nomeParte}-${timestamp}`;
-    
-    while (await this.produtoRepository.findOne({ where: { sku } })) {
+
+    while (
+      await this.produtoRepository.findOne({ where: { sku, empresa_id: empresaId } })
+    ) {
       sku = `${prefix}-${nomeParte}-${timestamp}-${tentativa}`;
       tentativa++;
     }
-    
+
     return sku;
   }
 }

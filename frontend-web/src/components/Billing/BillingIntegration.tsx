@@ -14,7 +14,7 @@ import {
   Send,
   RotateCcw
 } from 'lucide-react';
-import PaymentComponent from './PaymentComponent';
+import PaymentComponent from '../payments/PaymentComponent';
 import stripeService from '../../services/stripeService';
 import mercadoPagoService from '../../services/mercadoPagoService';
 import { toast } from 'react-hot-toast';
@@ -195,7 +195,7 @@ const BillingIntegration: React.FC<BillingIntegrationProps> = ({
           onFaturaUpdate(faturaAtualizada);
           toast.success(`Status da fatura ${fatura.numero} atualizado para PAGA`);
         } else {
-          toast.info(`Status atual: ${pagamento.status}`);
+          toast(`Status atual: ${pagamento.status}`);
         }
       }
     } catch (error) {

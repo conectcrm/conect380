@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Fornecedor } from './fornecedor.entity';
 
 export type StatusContaPagar = 'pendente' | 'paga' | 'vencida' | 'cancelada';
@@ -23,7 +31,7 @@ export class ContaPagar {
   @Column({
     type: 'enum',
     enum: ['pendente', 'paga', 'vencida', 'cancelada'],
-    default: 'pendente'
+    default: 'pendente',
   })
   status: StatusContaPagar;
 
@@ -33,7 +41,7 @@ export class ContaPagar {
   @ManyToOne(() => Fornecedor, { onDelete: 'RESTRICT' })
   @JoinColumn({
     name: 'fornecedor_id',
-    foreignKeyConstraintName: 'fk_contas_pagar_fornecedor'
+    foreignKeyConstraintName: 'fk_contas_pagar_fornecedor',
   })
   fornecedor: Fornecedor;
 

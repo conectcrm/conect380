@@ -92,7 +92,7 @@ describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
       valorDesconto: 0,
     };
 
-    const fatura = await service.criarFatura(dto);
+    const fatura = await service.criarFatura(dto, 'empresa-teste');
     expect(fatura.id).toBeDefined();
     expect(fatura.itens.length).toBe(1);
     const item = fatura.itens[0];
@@ -111,7 +111,7 @@ describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
       ],
     };
 
-    const fatura = await service.criarFatura(dto);
+    const fatura = await service.criarFatura(dto, 'empresa-teste');
     const item = fatura.itens[0];
     expect(Number(item.valorTotal)).toBe(90);
   });
@@ -128,7 +128,7 @@ describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
       ],
     };
 
-    const fatura = await service.criarFatura(dto);
+    const fatura = await service.criarFatura(dto, 'empresa-teste');
     const item = fatura.itens[0];
     expect(Number(item.valorTotal)).toBe(75);
   });
@@ -148,7 +148,7 @@ describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
       ], // Total esperado = 100 + 60 + 90 + 80 = 330
     };
 
-    const fatura = await service.criarFatura(dto);
+    const fatura = await service.criarFatura(dto, 'empresa-teste');
     const totalItens = fatura.itens.reduce((acc, i) => acc + Number(i.valorTotal), 0);
     expect(Number(totalItens.toFixed(2))).toBe(330);
   });

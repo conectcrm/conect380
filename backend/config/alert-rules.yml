@@ -1,0 +1,290 @@
+# Prometheus Alert Rules - ConectCRM
+# Regras de alerta críticas para monitoramento de produção
+
+groups:
+  # ========================================
+  # GRUPO 1: Disponibilidade do Sistema
+  # ========================================
+  - name: system_availability
+    interval: 30s
+    rules:
+      # Alerta 1: API está fora do ar
+      - alert: APIDown
+        expr: up{job="conectcrm-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "API ConectCRM está fora do ar"
+          description: "A instância {{ $labels.instance }} não está respondendo há {{ $value }} minutos"
+          runbook: "https://docs.conectcrm.com/runbooks/api-down"
+          impact: "Clientes não conseguem acessar o sistema"
+          action: "Verificar logs da aplicação e reiniciar se necessário"
+
+      # Alerta 2: Database connection pool esgotado
+      - alert: DatabaseConnectionPoolExhausted
+        expr: |
+          (typeorm_connection_pool_active / typeorm_connection_pool_max) > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Pool de conexões PostgreSQL quase esgotado"
+          description: "{{ $value | humanizePercentage }} das conexões em uso"
+          runbook: "https://docs.conectcrm.com/runbooks/db-pool-exhausted"
+
+      # Alerta 3: Taxa de erro HTTP > 5%
+      - alert: HighHTTPErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m])) 
+            / 
+            sum(rate(http_requests_total[5m]))
+          ) > 0.05
+        for: 3m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "Taxa de erros HTTP elevada"
+          description: "{{ $value | humanizePercentage }} de requisições falhando"
+
+  # ========================================
+  # GRUPO 2: Performance & Latência
+  # ========================================
+  - name: performance
+    interval: 30s
+    rules:
+      # Alerta 4: Latência P95 > 2s
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, method, route)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "Latência P95 acima do SLO"
+          description: "Rota {{ $labels.route }} com P95 de {{ $value }}s"
+          slo: "Latência P95 < 2s"
+
+      # Alerta 5: Latência P99 > 5s
+      - alert: HighLatencyP99
+        expr: |
+          histogram_quantile(0.99, 
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, method, route)
+          ) > 5
+        for: 3m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "Latência P99 crítica"
+          description: "Rota {{ $labels.route }} com P99 de {{ $value }}s"
+
+      # Alerta 6: Tempo de query no banco > 1s
+      - alert: SlowDatabaseQueries
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(typeorm_query_duration_seconds_bucket[5m])) by (le, entity)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Queries lentas detectadas"
+          description: "Entity {{ $labels.entity }} com P95 de {{ $value }}s"
+
+  # ========================================
+  # GRUPO 3: Recursos do Sistema
+  # ========================================
+  - name: system_resources
+    interval: 30s
+    rules:
+      # Alerta 7: CPU > 80%
+      - alert: HighCPUUsage
+        expr: |
+          (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "Uso de CPU elevado"
+          description: "CPU em {{ $value }}% de uso na instância {{ $labels.instance }}"
+
+      # Alerta 8: Memória > 85%
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "Uso de memória elevado"
+          description: "Memória em {{ $value }}% de uso"
+
+      # Alerta 9: Disco > 90%
+      - alert: DiskSpaceRunningOut
+        expr: |
+          (1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+          component: infrastructure
+        annotations:
+          summary: "Espaço em disco crítico"
+          description: "Disco {{ $labels.mountpoint }} com {{ $value }}% de uso"
+          action: "Limpar logs antigos ou expandir volume"
+
+  # ========================================
+  # GRUPO 4: Atendimento & Tickets
+  # ========================================
+  - name: atendimento
+    interval: 1m
+    rules:
+      # Alerta 10: Tickets na fila > 50
+      - alert: HighTicketQueueSize
+        expr: |
+          tickets_em_fila_total > 50
+        for: 10m
+        labels:
+          severity: warning
+          component: atendimento
+        annotations:
+          summary: "Fila de tickets elevada"
+          description: "{{ $value }} tickets aguardando atendimento"
+
+      # Alerta 11: Tempo médio de resposta > 30min
+      - alert: SlowTicketResponseTime
+        expr: |
+          avg(ticket_tempo_primeira_resposta_seconds) / 60 > 30
+        for: 15m
+        labels:
+          severity: warning
+          component: atendimento
+        annotations:
+          summary: "Tempo de resposta elevado"
+          description: "Tempo médio de {{ $value }} minutos"
+          slo: "Primeira resposta < 30min"
+
+      # Alerta 12: Taxa de abandono > 15%
+      - alert: HighTicketAbandonmentRate
+        expr: |
+          (
+            sum(rate(tickets_abandonados_total[1h])) 
+            / 
+            sum(rate(tickets_criados_total[1h]))
+          ) > 0.15
+        for: 30m
+        labels:
+          severity: critical
+          component: atendimento
+        annotations:
+          summary: "Taxa de abandono crítica"
+          description: "{{ $value | humanizePercentage }} dos tickets abandonados"
+
+  # ========================================
+  # GRUPO 5: SLOs (Service Level Objectives)
+  # ========================================
+  - name: slos
+    interval: 1m
+    rules:
+      # SLO 1: Disponibilidade 99.9% (monthly)
+      - alert: SLOAvailabilityViolation
+        expr: |
+          (
+            1 - (
+              sum(rate(http_requests_total{status=~"5.."}[30d]))
+              /
+              sum(rate(http_requests_total[30d]))
+            )
+          ) < 0.999
+        labels:
+          severity: critical
+          type: slo
+          slo_name: availability
+          window: 30d
+        annotations:
+          summary: "SLO de Disponibilidade violado"
+          description: "Disponibilidade atual: {{ $value | humanizePercentage }}"
+          target: "99.9%"
+
+      # SLO 2: Latência P95 < 2s (weekly)
+      - alert: SLOLatencyViolation
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[7d])) by (le)
+          ) > 2
+        labels:
+          severity: warning
+          type: slo
+          slo_name: latency_p95
+          window: 7d
+        annotations:
+          summary: "SLO de Latência P95 violado"
+          description: "P95 atual: {{ $value }}s"
+          target: "< 2s"
+
+      # SLO 3: Error Budget consumido > 80%
+      - alert: ErrorBudgetExhausted
+        expr: |
+          (
+            sum(increase(http_requests_total{status=~"5.."}[30d]))
+            /
+            (sum(increase(http_requests_total[30d])) * 0.001)
+          ) > 0.8
+        for: 1h
+        labels:
+          severity: critical
+          type: slo
+          slo_name: error_budget
+          window: 30d
+        annotations:
+          summary: "Error Budget quase esgotado"
+          description: "{{ $value | humanizePercentage }} do budget consumido"
+          action: "Congelar deploys e focar em estabilidade"
+
+  # ========================================
+  # GRUPO 6: Business Metrics
+  # ========================================
+  - name: business_metrics
+    interval: 5m
+    rules:
+      # Alerta 13: Queda brusca de tráfego
+      - alert: TrafficDropDetected
+        expr: |
+          (
+            sum(rate(http_requests_total[5m]))
+            /
+            sum(rate(http_requests_total[5m] offset 1h))
+          ) < 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "Queda significativa de tráfego"
+          description: "Tráfego {{ $value | humanizePercentage }} menor que 1h atrás"
+
+      # Alerta 14: Taxa de conversão baixa
+      - alert: LowConversionRate
+        expr: |
+          (
+            sum(rate(tickets_resolvidos_total[1h]))
+            /
+            sum(rate(tickets_criados_total[1h]))
+          ) < 0.5
+        for: 2h
+        labels:
+          severity: info
+          component: business
+        annotations:
+          summary: "Taxa de conversão abaixo do esperado"
+          description: "Apenas {{ $value | humanizePercentage }} dos tickets resolvidos"

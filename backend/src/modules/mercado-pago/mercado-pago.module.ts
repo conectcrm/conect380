@@ -9,4 +9,4 @@ import { MercadoPagoService } from './mercado-pago.service';
   providers: [MercadoPagoService],
   exports: [MercadoPagoService],
 })
-export class MercadoPagoModule { }
+export class MercadoPagoModule {}

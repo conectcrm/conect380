@@ -11,4 +11,4 @@ import { ContaPagar } from './entities/conta-pagar.entity';
   controllers: [FornecedorController],
   exports: [FornecedorService],
 })
-export class FinanceiroModule { }
+export class FinanceiroModule {}

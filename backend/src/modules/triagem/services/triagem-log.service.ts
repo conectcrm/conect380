@@ -26,7 +26,7 @@ export class TriagemLogService {
   constructor(
     @InjectRepository(TriagemLog)
     private readonly triagemLogRepository: Repository<TriagemLog>,
-  ) { }
+  ) {}
 
   async registrar(input: RegistrarTriagemLogInput): Promise<TriagemLog | null> {
     try {
@@ -49,7 +49,9 @@ export class TriagemLogService {
     } catch (erro) {
       if (erro instanceof QueryFailedError && (erro as any)?.code === '42P01') {
         if (!this.missingTableWarned) {
-          this.logger.warn('⚠️ Tabela triagem_logs não encontrada. Pulando registro até que a migration seja executada.');
+          this.logger.warn(
+            '⚠️ Tabela triagem_logs não encontrada. Pulando registro até que a migration seja executada.',
+          );
           this.missingTableWarned = true;
         }
         return null;
@@ -62,23 +64,25 @@ export class TriagemLogService {
     }
   }
 
-  async registrarEntrada(params: Omit<RegistrarTriagemLogInput, 'direcao'>): Promise<TriagemLog | null> {
+  async registrarEntrada(
+    params: Omit<RegistrarTriagemLogInput, 'direcao'>,
+  ): Promise<TriagemLog | null> {
     return this.registrar({ ...params, direcao: 'entrada' });
   }
 
-  async registrarSaida(params: Omit<RegistrarTriagemLogInput, 'direcao'>): Promise<TriagemLog | null> {
+  async registrarSaida(
+    params: Omit<RegistrarTriagemLogInput, 'direcao'>,
+  ): Promise<TriagemLog | null> {
     return this.registrar({ ...params, direcao: 'saida' });
   }
 
-  async registrarSistema(params: Omit<RegistrarTriagemLogInput, 'direcao'>): Promise<TriagemLog | null> {
+  async registrarSistema(
+    params: Omit<RegistrarTriagemLogInput, 'direcao'>,
+  ): Promise<TriagemLog | null> {
     return this.registrar({ ...params, direcao: 'sistema' });
   }
 
-  async listarPorSessao(
-    empresaId: string,
-    sessaoId: string,
-    limite = 100,
-  ): Promise<TriagemLog[]> {
+  async listarPorSessao(empresaId: string, sessaoId: string, limite = 100): Promise<TriagemLog[]> {
     return this.triagemLogRepository.find({
       where: { empresaId, sessaoId },
       order: { createdAt: 'DESC' },

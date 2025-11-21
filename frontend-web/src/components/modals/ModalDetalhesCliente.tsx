@@ -3,7 +3,7 @@
  */
 
 import React, { useState } from 'react';
-import { 
+import {
   X,
   User,
   Phone,
@@ -82,19 +82,19 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Overlay */}
-        <div 
+        <div
           className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
           onClick={onClose}
         />
 
         {/* Modal */}
-        <div className="inline-block w-full max-w-4xl my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
+        <div className="inline-block w-[calc(100%-2rem)] sm:w-[700px] md:w-[800px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
           {/* Header */}
           <div className="bg-white px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <AvatarUpload
-                  currentAvatar={cliente.avatar}
+                  currentAvatar={cliente.avatar ?? cliente.avatarUrl}
                   onAvatarChange={handleAvatarChange}
                   size="lg"
                   className="border-2 border-gray-200 hover:border-[#159A9C] transition-colors"
@@ -117,7 +117,7 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(cliente.status)}`}>
                   {getStatusLabel(cliente.status)}
                 </span>
-                
+
                 <button
                   onClick={() => onEdit?.(cliente)}
                   className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -125,7 +125,7 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
                 >
                   <Edit className="w-5 h-5" />
                 </button>
-                
+
                 <button
                   onClick={() => {
                     if (window.confirm('Tem certeza que deseja excluir este cliente?')) {
@@ -138,7 +138,7 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
                 >
                   <Trash2 className="w-5 h-5" />
                 </button>
-                
+
                 <button
                   onClick={onClose}
                   className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -152,31 +152,28 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
             <div className="flex space-x-8 mt-4">
               <button
                 onClick={() => setActiveTab('info')}
-                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'info'
-                    ? 'border-[#159A9C] text-[#159A9C]'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
+                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'info'
+                  ? 'border-[#159A9C] text-[#159A9C]'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
               >
                 Informações
               </button>
               <button
                 onClick={() => setActiveTab('anexos')}
-                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'anexos'
-                    ? 'border-[#159A9C] text-[#159A9C]'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
+                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'anexos'
+                  ? 'border-[#159A9C] text-[#159A9C]'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
               >
                 Anexos
               </button>
               <button
                 onClick={() => setActiveTab('historico')}
-                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'historico'
-                    ? 'border-[#159A9C] text-[#159A9C]'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
+                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'historico'
+                  ? 'border-[#159A9C] text-[#159A9C]'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
               >
                 Histórico
               </button>
@@ -202,7 +199,7 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
                         </div>
                       </div>
                     )}
-                    
+
                     {cliente.telefone && (
                       <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
                         <Phone className="w-5 h-5 text-gray-400" />
@@ -214,7 +211,7 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
                         </div>
                       </div>
                     )}
-                    
+
                     {cliente.endereco && (
                       <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg md:col-span-2">
                         <MapPin className="w-5 h-5 text-gray-400" />
@@ -255,7 +252,7 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
                         {cliente.tipo === 'pessoa_fisica' ? 'Pessoa Física' : 'Pessoa Jurídica'}
                       </p>
                     </div>
-                    
+
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <p className="text-sm font-medium text-gray-900">Data de Cadastro</p>
                       <p className="text-sm text-gray-600">
@@ -282,7 +279,7 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
                     compact={false}
                   />
                 </div>
-                
+
                 {/* Lista de anexos */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -299,7 +296,7 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
                       <Download className="w-4 h-4" />
                     </button>
                   </div>
-                  
+
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center space-x-3">
                       <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
@@ -321,7 +318,7 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
             {activeTab === 'historico' && (
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900">Histórico de Atividades</h3>
-                
+
                 <div className="space-y-4">
                   <div className="flex space-x-3">
                     <div className="flex-shrink-0 w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
@@ -335,7 +332,7 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex space-x-3">
                     <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                       <Edit className="w-4 h-4 text-blue-600" />
@@ -345,7 +342,7 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
                       <p className="text-xs text-gray-500">15/01/2024 às 14:30</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex space-x-3">
                     <div className="flex-shrink-0 w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
                       <Paperclip className="w-4 h-4 text-yellow-600" />

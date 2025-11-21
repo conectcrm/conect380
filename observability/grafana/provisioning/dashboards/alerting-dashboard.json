@@ -1,0 +1,651 @@
+{
+  "dashboard": {
+    "uid": "alerting-dashboard",
+    "title": "ConectCRM - Alerting & On-Call",
+    "tags": [
+      "observability",
+      "alerting",
+      "slo",
+      "week-9"
+    ],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "🚨 Active Alerts",
+        "type": "stat",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "count(ALERTS{alertstate=\"firing\"})",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "colorMode": "background",
+          "textMode": "value_and_name",
+          "reduceOptions": {
+            "values": false,
+            "calcs": [
+              "lastNotNull"
+            ]
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "green"
+                },
+                {
+                  "value": 1,
+                  "color": "yellow"
+                },
+                {
+                  "value": 5,
+                  "color": "red"
+                }
+              ]
+            },
+            "unit": "short",
+            "decimals": 0
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "⚠️ Critical Alerts",
+        "type": "stat",
+        "gridPos": {
+          "x": 6,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "count(ALERTS{alertstate=\"firing\", severity=\"critical\"})",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "colorMode": "background",
+          "textMode": "value_and_name"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "green"
+                },
+                {
+                  "value": 1,
+                  "color": "red"
+                }
+              ]
+            },
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "⏰ Pending Alerts",
+        "type": "stat",
+        "gridPos": {
+          "x": 12,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "count(ALERTS{alertstate=\"pending\"})",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "colorMode": "background",
+          "textMode": "value_and_name"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "green"
+                },
+                {
+                  "value": 1,
+                  "color": "orange"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "📊 Alerts by Severity",
+        "type": "piechart",
+        "gridPos": {
+          "x": 18,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "count by (severity) (ALERTS{alertstate=\"firing\"})",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "legendFormat": "{{severity}}"
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": [
+              "value"
+            ]
+          },
+          "pieType": "donut"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "🔥 Firing Alerts Timeline",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 0,
+          "y": 4,
+          "w": 24,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "count by (alertname) (ALERTS{alertstate=\"firing\"})",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "legendFormat": "{{alertname}}"
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": [
+              "lastNotNull",
+              "max"
+            ]
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "stepAfter",
+              "fillOpacity": 20,
+              "pointSize": 5
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "📋 All Firing Alerts",
+        "type": "table",
+        "gridPos": {
+          "x": 0,
+          "y": 10,
+          "w": 24,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "ALERTS{alertstate=\"firing\"}",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "displayName": "severity",
+              "desc": false
+            }
+          ]
+        },
+        "fieldConfig": {
+          "defaults": {},
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "severity"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 100
+                },
+                {
+                  "id": "mappings",
+                  "value": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "critical": {
+                          "text": "🔴 CRITICAL",
+                          "color": "red"
+                        },
+                        "warning": {
+                          "text": "⚠️ WARNING",
+                          "color": "orange"
+                        },
+                        "info": {
+                          "text": "ℹ️ INFO",
+                          "color": "blue"
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "alertname"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 250
+                },
+                {
+                  "id": "links",
+                  "value": [
+                    {
+                      "title": "View in Prometheus",
+                      "url": "http://localhost:9090/alerts?search=${__value.text}"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Time"
+              },
+              "properties": [
+                {
+                  "id": "custom.hidden",
+                  "value": true
+                }
+              ]
+            }
+          ]
+        },
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "__name__": true,
+                "Value": true,
+                "prometheus": true,
+                "job": true
+              },
+              "indexByName": {
+                "severity": 0,
+                "alertname": 1,
+                "component": 2,
+                "instance": 3,
+                "alertstate": 4
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "⏸️ Silenced Alerts (via Alertmanager API)",
+        "type": "table",
+        "gridPos": {
+          "x": 0,
+          "y": 18,
+          "w": 12,
+          "h": 6
+        },
+        "datasource": {
+          "type": "yesoreyeram-infinity-datasource",
+          "uid": "infinity"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "type": "json",
+            "source": "url",
+            "url": "http://localhost:9093/api/v2/silences",
+            "format": "table",
+            "root_selector": "$",
+            "columns": [
+              {
+                "selector": "id",
+                "text": "ID",
+                "type": "string"
+              },
+              {
+                "selector": "matchers[0].name",
+                "text": "Matcher",
+                "type": "string"
+              },
+              {
+                "selector": "matchers[0].value",
+                "text": "Value",
+                "type": "string"
+              },
+              {
+                "selector": "startsAt",
+                "text": "Starts",
+                "type": "timestamp"
+              },
+              {
+                "selector": "endsAt",
+                "text": "Ends",
+                "type": "timestamp"
+              },
+              {
+                "selector": "createdBy",
+                "text": "Created By",
+                "type": "string"
+              },
+              {
+                "selector": "comment",
+                "text": "Comment",
+                "type": "string"
+              },
+              {
+                "selector": "status.state",
+                "text": "State",
+                "type": "string"
+              }
+            ]
+          }
+        ],
+        "options": {
+          "showHeader": true
+        }
+      },
+      {
+        "id": 8,
+        "title": "📈 Alert Frequency (Last 24h)",
+        "type": "bargauge",
+        "gridPos": {
+          "x": 12,
+          "y": 18,
+          "w": 12,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "sort_desc(sum by (alertname) (count_over_time(ALERTS{alertstate=\"firing\"}[24h])))",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "legendFormat": "{{alertname}}"
+          }
+        ],
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient",
+          "showUnfilled": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "green"
+                },
+                {
+                  "value": 10,
+                  "color": "yellow"
+                },
+                {
+                  "value": 50,
+                  "color": "red"
+                }
+              ]
+            },
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "🔗 Quick Links",
+        "type": "text",
+        "gridPos": {
+          "x": 0,
+          "y": 24,
+          "w": 24,
+          "h": 3
+        },
+        "options": {
+          "mode": "html",
+          "content": "<div style=\"text-align: center; padding: 20px; font-size: 16px;\">\n  <a href=\"http://localhost:9090/alerts\" target=\"_blank\" style=\"margin: 0 15px; color: #E02F44; text-decoration: none; font-weight: bold;\">📊 Prometheus Alerts</a> |\n  <a href=\"http://localhost:9093\" target=\"_blank\" style=\"margin: 0 15px; color: #F05A28; text-decoration: none; font-weight: bold;\">🔔 Alertmanager UI</a> |\n  <a href=\"http://localhost:3100/loki/api/v1/rules\" target=\"_blank\" style=\"margin: 0 15px; color: #00AB55; text-decoration: none; font-weight: bold;\">📝 Loki Rules API</a> |\n  <a href=\"http://localhost:3002/explore?left=%7B%22datasource%22:%22loki%22,%22queries%22:%5B%7B%22expr%22:%22%7Bjob%3D%5C%22conectcrm-backend%5C%22,level%3D%5C%22error%5C%22%7D%22%7D%5D%7D\" target=\"_blank\" style=\"margin: 0 15px; color: #159A9C; text-decoration: none; font-weight: bold;\">🔍 Error Logs</a>\n</div>"
+        }
+      },
+      {
+        "id": 10,
+        "title": "📖 Alert Rules Status",
+        "type": "table",
+        "gridPos": {
+          "x": 0,
+          "y": 27,
+          "w": 24,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "prometheus_rule_group_rules",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "options": {
+          "showHeader": true
+        },
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true,
+                "job": true,
+                "instance": true
+              },
+              "indexByName": {
+                "rule_group": 0,
+                "Value": 1
+              },
+              "renameByName": {
+                "rule_group": "Rule Group",
+                "Value": "Rules Count"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "enable": true,
+          "expr": "ALERTS{alertstate=\"firing\", severity=\"critical\"}",
+          "iconColor": "red",
+          "name": "Critical Alerts",
+          "step": "60s",
+          "tagKeys": "alertname,severity",
+          "textFormat": "🔴 {{alertname}}: {{description}}",
+          "titleFormat": "Critical Alert"
+        }
+      ]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "severity",
+          "label": "Severity",
+          "type": "custom",
+          "options": [
+            {
+              "text": "All",
+              "value": "",
+              "selected": true
+            },
+            {
+              "text": "Critical",
+              "value": "critical",
+              "selected": false
+            },
+            {
+              "text": "Warning",
+              "value": "warning",
+              "selected": false
+            },
+            {
+              "text": "Info",
+              "value": "info",
+              "selected": false
+            }
+          ],
+          "current": {
+            "text": "All",
+            "value": ""
+          },
+          "query": "critical,warning,info",
+          "queryValue": "",
+          "skipUrlSync": false,
+          "hide": 0
+        }
+      ]
+    },
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": [
+        "10s",
+        "30s",
+        "1m",
+        "5m",
+        "15m",
+        "30m"
+      ],
+      "time_options": [
+        "5m",
+        "15m",
+        "1h",
+        "6h",
+        "12h",
+        "24h",
+        "2d",
+        "7d"
+      ]
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 1,
+    "links": [],
+    "liveNow": false,
+    "panels": [],
+    "style": "dark"
+  },
+  "overwrite": true,
+  "folderUid": "",
+  "message": "Week 9 - Alerting & On-Call Dashboard"
+}

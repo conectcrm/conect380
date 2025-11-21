@@ -70,7 +70,7 @@ export class PropostasService {
   private async inicializarContador() {
     try {
       const ultimaProposta = await this.propostaRepository.findOne({
-        order: { criadaEm: 'DESC' }
+        order: { criadaEm: 'DESC' },
       });
 
       if (ultimaProposta?.numero) {
@@ -111,16 +111,20 @@ export class PropostasService {
       updatedAt: entity.atualizadaEm?.toISOString(),
       source: entity.source,
       vendedor: entity.vendedor_id,
-      portalAccess: entity.portalAccess ? {
-        accessedAt: entity.portalAccess.accessedAt,
-        ip: entity.portalAccess.ip,
-        userAgent: entity.portalAccess.userAgent
-      } : undefined,
-      emailDetails: entity.emailDetails ? {
-        sentAt: entity.emailDetails.sentAt,
-        emailCliente: entity.emailDetails.emailCliente,
-        linkPortal: entity.emailDetails.linkPortal
-      } : undefined
+      portalAccess: entity.portalAccess
+        ? {
+            accessedAt: entity.portalAccess.accessedAt,
+            ip: entity.portalAccess.ip,
+            userAgent: entity.portalAccess.userAgent,
+          }
+        : undefined,
+      emailDetails: entity.emailDetails
+        ? {
+            sentAt: entity.emailDetails.sentAt,
+            emailCliente: entity.emailDetails.emailCliente,
+            linkPortal: entity.emailDetails.linkPortal,
+          }
+        : undefined,
     };
   }
 
@@ -141,11 +145,11 @@ export class PropostasService {
     try {
       const entities = await this.propostaRepository.find({
         order: { criadaEm: 'DESC' },
-        relations: ['vendedor']
+        relations: ['vendedor'],
       });
 
       console.log(`📊 ${entities.length} propostas encontradas no banco`);
-      return entities.map(entity => this.entityToInterface(entity));
+      return entities.map((entity) => this.entityToInterface(entity));
     } catch (error) {
       console.error('❌ Erro ao listar propostas:', error);
       return [];
@@ -159,7 +163,7 @@ export class PropostasService {
     try {
       const entity = await this.propostaRepository.findOne({
         where: { id },
-        relations: ['vendedor']
+        relations: ['vendedor'],
       });
 
       return entity ? this.entityToInterface(entity) : null;
@@ -183,7 +187,7 @@ export class PropostasService {
         cliente: dadosProposta.cliente || {
           id: 'cliente-default',
           nome: 'Cliente Temporário',
-          email: 'temp@exemplo.com'
+          email: 'temp@exemplo.com',
         },
         produtos: dadosProposta.produtos || [],
         subtotal: dadosProposta.subtotal || 0,
@@ -200,7 +204,7 @@ export class PropostasService {
           ? new Date(dadosProposta.dataVencimento)
           : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         source: dadosProposta.source || 'api',
-        vendedor_id: dadosProposta.vendedor
+        vendedor_id: dadosProposta.vendedor,
       });
 
       const propostaSalva = await this.propostaRepository.save(novaProposta);
@@ -233,11 +237,11 @@ export class PropostasService {
     propostaId: string,
     status: string,
     source?: string,
-    observacoes?: string
+    observacoes?: string,
   ): Promise<Proposta> {
     try {
       const proposta = await this.propostaRepository.findOne({
-        where: { id: propostaId }
+        where: { id: propostaId },
       });
 
       if (!proposta) {
@@ -264,11 +268,11 @@ export class PropostasService {
   async marcarComoVisualizada(
     propostaId: string,
     ip?: string,
-    userAgent?: string
+    userAgent?: string,
   ): Promise<Proposta> {
     try {
       const proposta = await this.propostaRepository.findOne({
-        where: { id: propostaId }
+        where: { id: propostaId },
       });
 
       if (!proposta) {
@@ -279,7 +283,7 @@ export class PropostasService {
       proposta.portalAccess = {
         accessedAt: new Date().toISOString(),
         ip,
-        userAgent
+        userAgent,
       };
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
@@ -298,11 +302,11 @@ export class PropostasService {
   async registrarEnvioEmail(
     propostaId: string,
     emailCliente: string,
-    linkPortal?: string
+    linkPortal?: string,
   ): Promise<Proposta> {
     try {
       const proposta = await this.propostaRepository.findOne({
-        where: { id: propostaId }
+        where: { id: propostaId },
       });
 
       if (!proposta) {
@@ -313,7 +317,7 @@ export class PropostasService {
       proposta.emailDetails = {
         sentAt: new Date().toISOString(),
         emailCliente,
-        linkPortal
+        linkPortal,
       };
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);

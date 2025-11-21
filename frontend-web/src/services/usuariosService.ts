@@ -10,6 +10,13 @@ import { User } from '../types';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
+export interface ListarUsuariosResponse {
+  usuarios: Usuario[];
+  total: number;
+  pagina: number;
+  limite: number;
+}
+
 class UsuariosService {
   private api = axios.create({
     baseURL: `${API_BASE_URL}/users`,
@@ -21,7 +28,7 @@ class UsuariosService {
   constructor() {
     // Interceptor para adicionar token de autenticação
     this.api.interceptors.request.use((config) => {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem('auth_token') || localStorage.getItem('authToken');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -30,11 +37,44 @@ class UsuariosService {
   }
 
   // CRUD Usuários
-  async listarUsuarios(filtros?: Partial<FiltrosUsuarios>): Promise<Usuario[]> {
-    console.log('Frontend - Chamando listarUsuarios com filtros:', filtros);
+  async listarUsuarios(filtros?: Partial<FiltrosUsuarios>): Promise<ListarUsuariosResponse> {
     const response = await this.api.get('/', { params: filtros });
-    console.log('Frontend - Resposta do backend:', response.data);
-    return response.data.map((usuario: any) => this.formatarUsuario(usuario));
+
+    const payload = response.data;
+
+    const paginaBase = filtros?.pagina ?? 1;
+    const limiteBase = filtros?.limite ?? 10;
+
+    let usuariosRaw: any[] = [];
+    let total = 0;
+    let pagina = paginaBase;
+    let limite = limiteBase;
+
+    if (Array.isArray(payload)) {
+      usuariosRaw = payload;
+      total = payload.length;
+    } else if (payload?.data) {
+      const data = payload.data;
+      if (Array.isArray(data)) {
+        usuariosRaw = data;
+        total = data.length;
+      } else {
+        usuariosRaw = data?.items || data?.usuarios || [];
+        total = typeof data?.total === 'number' ? data.total : usuariosRaw.length;
+        pagina = data?.pagina ?? paginaBase;
+        limite = data?.limite ?? limiteBase;
+      }
+    } else {
+      usuariosRaw = payload?.items || payload?.usuarios || [];
+      total = typeof payload?.total === 'number' ? payload.total : usuariosRaw.length;
+    }
+
+    return {
+      usuarios: usuariosRaw.map((usuario: any) => this.formatarUsuario(usuario)),
+      total,
+      pagina,
+      limite,
+    };
   }
 
   async obterUsuario(id: string): Promise<Usuario> {
@@ -43,8 +83,6 @@ class UsuariosService {
   }
 
   async criarUsuario(usuario: NovoUsuario): Promise<Usuario> {
-    console.log('Service - Dados recebidos:', usuario);
-
     const dadosBackend = {
       nome: usuario.nome,
       email: usuario.email,
@@ -64,8 +102,6 @@ class UsuariosService {
       },
       ativo: usuario.ativo !== undefined ? usuario.ativo : true
     };
-
-    console.log('Service - Dados transformados:', dadosBackend);
 
     const response = await this.api.post('/', dadosBackend);
     return this.formatarUsuario(response.data.data);
@@ -145,9 +181,21 @@ class UsuariosService {
     };
   }
 
-  async resetarSenha(id: string): Promise<{ novaSenha: string }> {
-    const response = await this.api.post(`/${id}/reset-senha`);
-    return response.data;
+  async resetarSenha(id: string): Promise<string> {
+    const response = await this.api.put(`/${id}/reset-senha`);
+    const payload = response.data;
+
+    const novaSenha = payload?.data?.novaSenha ?? payload?.novaSenha ?? payload?.data?.senhaTemp;
+
+    if (typeof novaSenha === 'string' && novaSenha.length > 0) {
+      return novaSenha;
+    }
+
+    if (typeof payload === 'string' && payload.length > 0) {
+      return payload;
+    }
+
+    throw new Error('Resposta inválida do servidor ao resetar a senha.');
   }
 
   // Estatísticas
@@ -221,6 +269,7 @@ class UsuariosService {
         }
       },
       ativo: usuario.ativo,
+      deve_trocar_senha: Boolean(usuario.deve_trocar_senha),
       ultimo_login: usuario.ultimo_login ? new Date(usuario.ultimo_login) : undefined,
       created_at: new Date(usuario.created_at),
       updated_at: new Date(usuario.updated_at),

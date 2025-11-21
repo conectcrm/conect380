@@ -32,6 +32,15 @@ export interface Cotacao {
     nome: string;
     email: string;
   };
+  aprovadorId?: string;
+  aprovador?: {
+    id: string;
+    nome: string;
+    email: string;
+  };
+  dataAprovacao?: string;
+  statusAprovacao?: 'aprovado' | 'reprovado';
+  justificativaAprovacao?: string;
   itens: ItemCotacao[];
   anexos?: AnexoCotacao[];
   historico?: HistoricoCotacao[];
@@ -78,7 +87,35 @@ export interface HistoricoCotacao {
   dadosNovos?: Record<string, any>;
 }
 
-export type StatusCotacao =
+export enum StatusCotacao {
+  RASCUNHO = 'rascunho',
+  ENVIADA = 'enviada',
+  EM_ANALISE = 'em_analise',
+  APROVADA = 'aprovada',
+  REJEITADA = 'rejeitada',
+  VENCIDA = 'vencida',
+  CONVERTIDA = 'convertida',
+  CANCELADA = 'cancelada',
+  PENDENTE = 'pendente', // Alias para EM_ANALISE
+}
+
+export enum PrioridadeCotacao {
+  BAIXA = 'baixa',
+  MEDIA = 'media',
+  ALTA = 'alta',
+  URGENTE = 'urgente',
+}
+
+export enum OrigemCotacao {
+  MANUAL = 'manual',
+  WEBSITE = 'website',
+  EMAIL = 'email',
+  API = 'api',
+  IMPORTACAO = 'importacao',
+}
+
+// Tipos alternativos (para compatibilidade)
+export type StatusCotacaoType =
   | 'rascunho'
   | 'enviada'
   | 'em_analise'
@@ -86,11 +123,10 @@ export type StatusCotacao =
   | 'rejeitada'
   | 'vencida'
   | 'convertida'
-  | 'cancelada';
+  | 'cancelada'
+  | 'pendente';
 
-export type PrioridadeCotacao = 'baixa' | 'media' | 'alta' | 'urgente';
-
-export type OrigemCotacao = 'manual' | 'website' | 'email' | 'telefone' | 'whatsapp' | 'indicacao';
+export type PrioridadeCotacaoType = 'baixa' | 'media' | 'alta' | 'urgente';
 
 export interface CriarCotacaoRequest {
   fornecedorId: string;
@@ -121,6 +157,7 @@ export interface AtualizarCotacaoRequest {
   prazoEntrega?: string;
   localEntrega?: string;
   validadeOrcamento?: number;
+  aprovadorId?: string;
   itens?: Omit<ItemCotacao, 'id' | 'valorTotal'>[];
   tags?: string[];
 }
@@ -137,4 +174,28 @@ export interface FiltroCotacao {
   valorMaximo?: number;
   origem?: OrigemCotacao[];
   tags?: string[];
+}
+
+export interface CotacaoListResponse {
+  items: Cotacao[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+  statistics: {
+    total: number;
+    totalValue: number;
+    byStatus: Array<{ status: StatusCotacao; quantidade: number }>;
+    byPriority: Array<{ prioridade: PrioridadeCotacao; quantidade: number }>;
+  };
+}
+
+export interface AprovarCotacaoRequest {
+  justificativa?: string;
+}
+
+export interface ReprovarCotacaoRequest {
+  justificativa: string;
 }

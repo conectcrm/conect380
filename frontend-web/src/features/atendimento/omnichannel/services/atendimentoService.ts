@@ -15,7 +15,7 @@ import {
   Mensagem,
   Contato,
   CanalTipo,
-  StatusAtendimento,
+  StatusAtendimentoType,
   Demanda,
   NotaCliente,
   HistoricoAtendimento
@@ -181,7 +181,7 @@ export const normalizarMensagemPayload = (mensagem: Mensagem): Mensagem => {
 // ===== INTERFACES DE REQUEST/RESPONSE =====
 
 export interface ListarTicketsParams {
-  status?: StatusAtendimento;
+  status?: StatusAtendimentoType;
   canal?: CanalTipo;
   atendenteId?: string;
   busca?: string;
@@ -501,6 +501,48 @@ class AtendimentoService {
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao reabrir ticket:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 🆕 Atualiza apenas o status do ticket (sem encerramento formal)
+   * Usado para transições rápidas: aberto → em_atendimento, em_atendimento → aguardando, etc.
+   */
+  async atualizarStatusTicket(
+    ticketId: string,
+    novoStatus: StatusAtendimentoType
+  ): Promise<Ticket> {
+    try {
+      const response = await api.patch<Ticket>(
+        `${this.baseUrl}/tickets/${ticketId}/status`,
+        { status: novoStatus.toUpperCase() } // Backend espera UPPERCASE
+      );
+      console.log('✅ Status do ticket atualizado:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Erro ao atualizar status do ticket:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Atualiza um ticket (campos gerais como filaId, atendenteId, etc)
+   * 🆕 Sistema de Filas
+   */
+  async atualizarTicket(
+    ticketId: string,
+    dados: Partial<{ filaId?: string | null; atendenteId?: string | null;[key: string]: any }>
+  ): Promise<Ticket> {
+    try {
+      const response = await api.patch<Ticket>(
+        `${this.baseUrl}/tickets/${ticketId}`,
+        dados
+      );
+      console.log('✅ Ticket atualizado:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Erro ao atualizar ticket:', error);
       throw error;
     }
   }
@@ -859,11 +901,25 @@ class AtendimentoService {
   async buscarHistoricoCliente(clienteId: string): Promise<HistoricoAtendimento[]> {
     try {
       console.log('📜 Buscando histórico do cliente:', clienteId);
-      const response = await api.get<HistoricoAtendimento[]>(
+      const response = await api.get<any>(
         `/api/atendimento/clientes/${clienteId}/historico`
       );
-      console.log('✅ Histórico carregado:', response.data.length, 'atendimentos');
-      return response.data;
+
+      // ✅ CORREÇÃO: Backend retorna { propostas, faturas, tickets }, não array direto
+      const historico = response.data;
+      const tickets = historico?.tickets || [];
+
+      console.log('✅ Histórico carregado:', tickets.length, 'atendimentos');
+
+      // Transformar tickets do backend para formato do frontend
+      return tickets.map((t: any) => ({
+        id: t.id,
+        numero: t.numero,
+        status: t.status,
+        assunto: t.assunto || 'Sem assunto',
+        criadoEm: t.criadoEm || t.createdAt,
+        canalId: t.canalId,
+      }));
     } catch (error) {
       console.error('❌ Erro ao buscar histórico do cliente:', error);
       return []; // Retorna array vazio em caso de erro

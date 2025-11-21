@@ -13,7 +13,12 @@ import { SessaoTriagem } from './sessao-triagem.entity';
 
 export type TipoFluxo = 'menu_opcoes' | 'arvore_decisao' | 'keyword_match' | 'condicional';
 export type TipoEtapa = 'mensagem_menu' | 'pergunta_aberta' | 'validacao' | 'acao' | 'condicional';
-export type TipoAcao = 'criar_ticket' | 'transferir_humano' | 'enviar_mensagem' | 'coletar_info' | 'finalizar';
+export type TipoAcao =
+  | 'criar_ticket'
+  | 'transferir_humano'
+  | 'enviar_mensagem'
+  | 'coletar_info'
+  | 'finalizar';
 
 export interface OpcaoMenu {
   numero: number;
@@ -53,11 +58,14 @@ export interface EstruturaFluxo {
   etapaInicial: string;
   versao: string;
   etapas: Record<string, Etapa>;
-  variaveis?: Record<string, {
-    tipo: 'texto' | 'numero' | 'telefone' | 'email' | 'cpf' | 'cnpj';
-    obrigatorio?: boolean;
-    valorPadrao?: any;
-  }>;
+  variaveis?: Record<
+    string,
+    {
+      tipo: 'texto' | 'numero' | 'telefone' | 'email' | 'cpf' | 'cnpj';
+      obrigatorio?: boolean;
+      valorPadrao?: any;
+    }
+  >;
 }
 
 export interface VersaoFluxo {
@@ -153,7 +161,7 @@ export class FluxoTriagem {
   @Column({
     type: 'boolean',
     default: false,
-    name: 'tentar_entender_texto_livre'
+    name: 'tentar_entender_texto_livre',
   })
   tentarEntenderTextoLivre: boolean;
 
@@ -174,21 +182,21 @@ export class FluxoTriagem {
     precision: 5,
     scale: 2,
     default: 0,
-    name: 'taxa_conclusao'
+    name: 'taxa_conclusao',
   })
   taxaConclusao: number;
 
   @Column({
     type: 'integer',
     default: 0,
-    name: 'tempo_medio_conclusao_segundos'
+    name: 'tempo_medio_conclusao_segundos',
   })
   tempoMedioConclusaoSegundos: number;
 
   // ===================================================================
   // Relacionamentos
   // ===================================================================
-  @OneToMany(() => SessaoTriagem, sessao => sessao.fluxo)
+  @OneToMany(() => SessaoTriagem, (sessao) => sessao.fluxo)
   sessoes: SessaoTriagem[];
 
   // ===================================================================
@@ -255,7 +263,7 @@ export class FluxoTriagem {
         for (const opcao of etapa.opcoes) {
           if (opcao.proximaEtapa && !this.estrutura.etapas[opcao.proximaEtapa]) {
             erros.push(
-              `Etapa '${etapaId}': opção ${opcao.numero} referencia etapa inexistente '${opcao.proximaEtapa}'`
+              `Etapa '${etapaId}': opção ${opcao.numero} referencia etapa inexistente '${opcao.proximaEtapa}'`,
             );
           }
         }
@@ -264,7 +272,7 @@ export class FluxoTriagem {
 
     return {
       valido: erros.length === 0,
-      erros
+      erros,
     };
   }
 
@@ -297,7 +305,7 @@ export class FluxoTriagem {
       timestamp: new Date(),
       autor,
       descricao,
-      publicada: this.publicado
+      publicada: this.publicado,
     };
 
     this.historicoVersoes.push(novaVersao);
@@ -308,7 +316,7 @@ export class FluxoTriagem {
    * Restaurar versão anterior
    */
   restaurarVersao(numeroVersao: number): boolean {
-    const versao = this.historicoVersoes?.find(v => v.numero === numeroVersao);
+    const versao = this.historicoVersoes?.find((v) => v.numero === numeroVersao);
 
     if (!versao) {
       return false;
@@ -355,9 +363,7 @@ export class FluxoTriagem {
 
   private recalcularTaxaConclusao(): void {
     if (this.totalExecucoes > 0) {
-      this.taxaConclusao = Number(
-        ((this.totalConclusoes / this.totalExecucoes) * 100).toFixed(2)
-      );
+      this.taxaConclusao = Number(((this.totalConclusoes / this.totalExecucoes) * 100).toFixed(2));
     }
   }
 }

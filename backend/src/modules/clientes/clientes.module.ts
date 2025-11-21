@@ -12,6 +12,6 @@ import { ContatosTestController } from './controllers/contatos-test.controller';
   imports: [TypeOrmModule.forFeature([Cliente, Contato])],
   providers: [ClientesService, ContatosService],
   controllers: [ClientesController, ContatosController, ContatosTestController],
-  exports: [ClientesService, ContatosService],
+  exports: [ClientesService, ContatosService, TypeOrmModule],
 })
 export class ClientesModule { }

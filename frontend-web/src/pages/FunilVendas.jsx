@@ -8,24 +8,18 @@ import {
   Plus,
   Filter,
   Search,
-  Calendar,
   DollarSign,
   Users,
   TrendingUp,
-  Eye,
   Edit,
-  Trash2,
-  Phone,
-  Mail,
-  Clock,
   Target,
-  BarChart3
+  BarChart3,
+  ShoppingBag
 } from 'lucide-react';
-import ConectCRMLogoFinal from '../components/ui/ConectCRMLogoFinal';
 import OpportunityModal from '../components/OpportunityModal';
 import { ModalCriarOportunidade } from '../components/modals/ModalCriarOportunidade';
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { opportunitiesService } from '../services/opportunitiesService';
 import toast from 'react-hot-toast';
 
@@ -44,60 +38,60 @@ const FunilVendas = () => {
   });
 
   // Queries para dados da API
-  const { data: pipelineData, isLoading: loadingPipeline, error: pipelineError } = useQuery(
-    'pipeline',
-    () => opportunitiesService.getPipelineData(),
-    {
-      refetchInterval: 30000,
-      retry: 3,
-      retryDelay: 1000
-    }
-  );
+  const {
+    data: pipelineData,
+    isLoading: loadingPipeline,
+    error: pipelineError
+  } = useQuery({
+    queryKey: ['pipeline'],
+    queryFn: () => opportunitiesService.getPipelineData(),
+    refetchInterval: 30000,
+    retry: 3,
+    retryDelay: 1000
+  });
 
-  const { data: metrics, isLoading: loadingMetrics, error: metricsError } = useQuery(
-    'metrics',
-    () => opportunitiesService.getMetrics(),
-    {
-      refetchInterval: 30000,
-      retry: 3,
-      retryDelay: 1000
-    }
-  );
+  const {
+    data: metrics,
+    isLoading: loadingMetrics,
+    error: metricsError
+  } = useQuery({
+    queryKey: ['metrics'],
+    queryFn: () => opportunitiesService.getMetrics(),
+    refetchInterval: 30000,
+    retry: 3,
+    retryDelay: 1000
+  });
 
   // Mutation para atualizar estágio (drag and drop)
-  const updateStageMutation = useMutation(
-    ({ id, estagio }) => opportunitiesService.updateStage(id, estagio),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('pipeline');
-        queryClient.invalidateQueries('metrics');
-        toast.success('Oportunidade movida com sucesso!');
-      },
-      onError: (error) => {
-        console.error('Erro ao mover oportunidade:', error);
-        toast.error('Erro ao mover oportunidade. Tente novamente.');
-        // Recarregar dados em caso de erro
-        queryClient.invalidateQueries('pipeline');
-      }
+  const updateStageMutation = useMutation({
+    mutationFn: ({ id, estagio }) => opportunitiesService.updateStage(id, estagio),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pipeline'] });
+      queryClient.invalidateQueries({ queryKey: ['metrics'] });
+      toast.success('Oportunidade movida com sucesso!');
+    },
+    onError: (error) => {
+      console.error('Erro ao mover oportunidade:', error);
+      toast.error('Erro ao mover oportunidade. Tente novamente.');
+      // Recarregar dados em caso de erro
+      queryClient.invalidateQueries({ queryKey: ['pipeline'] });
     }
-  );
+  });
 
   // Mutation para criar nova oportunidade
-  const createOpportunityMutation = useMutation(
-    (oportunidadeData) => opportunitiesService.create(oportunidadeData),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('pipeline');
-        queryClient.invalidateQueries('metrics');
-        setShowCreateModal(false);
-        toast.success('Oportunidade criada com sucesso!');
-      },
-      onError: (error) => {
-        console.error('Erro ao criar oportunidade:', error);
-        toast.error('Erro ao criar oportunidade. Tente novamente.');
-      }
+  const createOpportunityMutation = useMutation({
+    mutationFn: (oportunidadeData) => opportunitiesService.create(oportunidadeData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pipeline'] });
+      queryClient.invalidateQueries({ queryKey: ['metrics'] });
+      setShowCreateModal(false);
+      toast.success('Oportunidade criada com sucesso!');
+    },
+    onError: (error) => {
+      console.error('Erro ao criar oportunidade:', error);
+      toast.error('Erro ao criar oportunidade. Tente novamente.');
     }
-  );
+  });
 
   // Handler para criar oportunidade
   const handleCreateOpportunity = (oportunidadeData) => {
@@ -107,10 +101,10 @@ const FunilVendas = () => {
   // Loading states
   if (loadingPipeline || loadingMetrics) {
     return (
-      <div className="p-6 bg-gray-50 min-h-screen flex items-center justify-center">
+      <div className="p-6 bg-[#DEEFE7] min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#159A9C] mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando funil de vendas...</p>
+          <p className="text-[#002333]/70">Carregando funil de vendas...</p>
         </div>
       </div>
     );
@@ -119,18 +113,18 @@ const FunilVendas = () => {
   // Error states
   if (pipelineError || metricsError) {
     return (
-      <div className="p-6 bg-gray-50 min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            <p className="font-bold">Erro ao carregar dados</p>
-            <p>Verifique se o backend está rodando e tente novamente.</p>
+      <div className="p-6 bg-[#DEEFE7] min-h-screen flex items-center justify-center">
+        <div className="text-center max-w-sm w-full">
+          <div className="bg-[#FFFFFF] border border-[#B4BEC9] text-[#002333] px-4 py-3 rounded-xl mb-4 shadow-sm">
+            <p className="font-bold text-[#002333]">Erro ao carregar dados</p>
+            <p className="text-sm text-[#002333]/70">Verifique se o backend está ativo e tente novamente.</p>
           </div>
           <button
             onClick={() => {
-              queryClient.invalidateQueries('pipeline');
-              queryClient.invalidateQueries('metrics');
+              queryClient.invalidateQueries({ queryKey: ['pipeline'] });
+              queryClient.invalidateQueries({ queryKey: ['metrics'] });
             }}
-            className="bg-[#159A9C] text-white px-4 py-2 rounded-lg hover:bg-[#0F7B7D] transition-colors"
+            className="inline-flex items-center justify-center bg-[#159A9C] text-white px-4 py-2 rounded-lg hover:bg-[#0F7B7D] transition-colors"
           >
             Tentar Novamente
           </button>
@@ -201,11 +195,11 @@ const FunilVendas = () => {
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          className={`bg-white rounded-xl p-4 mb-3 shadow-sm border border-gray-200 hover:shadow-md transition-all cursor-pointer
+          className={`bg-[#FFFFFF] rounded-xl p-4 mb-3 shadow-sm border border-[#DEEFE7] hover:shadow-md transition-all cursor-pointer
             ${snapshot.isDragging ? 'rotate-2 shadow-lg' : ''}
-            ${opportunity.prioridade === 'high' ? 'border-l-4 border-l-red-500' : ''}
-            ${opportunity.prioridade === 'medium' ? 'border-l-4 border-l-yellow-500' : ''}
-            ${opportunity.prioridade === 'low' ? 'border-l-4 border-l-green-500' : ''}
+            ${opportunity.prioridade === 'high' ? 'border-l-4 border-l-[#159A9C]' : ''}
+            ${opportunity.prioridade === 'medium' ? 'border-l-4 border-l-[#002333]' : ''}
+            ${opportunity.prioridade === 'low' ? 'border-l-4 border-l-[#B4BEC9]' : ''}
           `}
           onClick={() => {
             setSelectedOpportunity(opportunity);
@@ -213,7 +207,7 @@ const FunilVendas = () => {
           }}
         >
           <div className="flex justify-between items-start mb-2">
-            <h4 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2">
+            <h4 className="font-semibold text-[#002333] text-sm leading-tight line-clamp-2">
               {opportunity.titulo}
             </h4>
             <div className="flex gap-1 ml-2">
@@ -222,32 +216,34 @@ const FunilVendas = () => {
                   e.stopPropagation();
                   // Editar oportunidade
                 }}
-                className="p-1 hover:bg-gray-100 rounded"
+                className="p-1 hover:bg-[#DEEFE7] rounded transition-colors"
               >
-                <Edit className="w-3 h-3 text-gray-400" />
+                <Edit className="w-3 h-3 text-[#B4BEC9]" />
               </button>
             </div>
           </div>
 
-          <div className="text-xs text-gray-600 mb-2">
-            <div className="flex items-center gap-1 mb-1">
-              <Users className="w-3 h-3" />
-              {opportunity.cliente?.nome || opportunity.empresaContato || 'Cliente não informado'}
+          <div className="text-xs text-[#002333]/70 mb-2 space-y-1">
+            <div className="flex items-center gap-1">
+              <Users className="w-3 h-3 text-[#159A9C]" />
+              <span>{opportunity.cliente?.nome || opportunity.empresaContato || 'Cliente não informado'}</span>
             </div>
             <div className="flex items-center gap-1">
-              <DollarSign className="w-3 h-3" />
-              {new Intl.NumberFormat('pt-BR', {
-                style: 'currency',
-                currency: 'BRL'
-              }).format(opportunity.valor || 0)}
+              <DollarSign className="w-3 h-3 text-[#159A9C]" />
+              <span>
+                {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL'
+                }).format(opportunity.valor || 0)}
+              </span>
             </div>
           </div>
 
-          <div className="flex justify-between items-center text-xs">
-            <span className="text-gray-500">
+          <div className="flex justify-between items-center text-xs text-[#002333]/60">
+            <span>
               {opportunity.probabilidade || 0}% prob.
             </span>
-            <span className="text-gray-500">
+            <span>
               {opportunity.dataFechamentoEsperado
                 ? new Date(opportunity.dataFechamentoEsperado).toLocaleDateString('pt-BR')
                 : 'Sem data'
@@ -255,8 +251,8 @@ const FunilVendas = () => {
             </span>
           </div>
 
-          <div className="flex items-center justify-between mt-2">
-            <span className="text-xs bg-gray-100 px-2 py-1 rounded-full">
+          <div className="flex items-center justify-between mt-3">
+            <span className="text-xs bg-[#DEEFE7] text-[#002333] px-2 py-1 rounded-full">
               {opportunity.responsavel?.nome || 'Sem responsável'}
             </span>
             <div className="flex gap-1">
@@ -273,15 +269,17 @@ const FunilVendas = () => {
   );
 
   const StageColumn = ({ stage, opportunities = [] }) => (
-    <div className="flex-1 min-w-[280px] bg-gray-50 rounded-xl p-4">
+    <div className="flex-1 min-w-[280px] bg-[#FFFFFF] border border-[#DEEFE7] rounded-2xl p-4 shadow-sm">
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <div
-            className="w-3 h-3 rounded-full"
-            style={{ backgroundColor: stage?.color || '#6B7280' }}
+            className="w-2.5 h-2.5 rounded-full"
+            style={{ backgroundColor: stage?.color || '#159A9C' }}
           />
-          <h3 className="font-semibold text-gray-900">{stage?.title || 'Estágio'}</h3>
-          <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded-full">
+          <h3 className="font-semibold text-[#002333] text-sm">
+            {stage?.title || 'Estágio'}
+          </h3>
+          <span className="bg-[#DEEFE7] text-[#002333] text-xs font-medium px-2.5 py-1 rounded-full">
             {opportunities.length}
           </span>
         </div>
@@ -289,9 +287,9 @@ const FunilVendas = () => {
           onClick={() => {
             // Adicionar nova oportunidade neste estágio
           }}
-          className="p-1 hover:bg-white rounded-lg transition-colors"
+          className="p-1 hover:bg-[#DEEFE7] rounded-lg transition-colors"
         >
-          <Plus className="w-4 h-4 text-gray-500" />
+          <Plus className="w-4 h-4 text-[#159A9C]" />
         </button>
       </div>
 
@@ -300,7 +298,7 @@ const FunilVendas = () => {
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
-            className={`min-h-[400px] transition-colors rounded-lg ${snapshot.isDraggingOver ? 'bg-[#159A9C] bg-opacity-10' : ''
+            className={`min-h-[400px] transition-colors rounded-xl border border-dashed border-transparent ${snapshot.isDraggingOver ? 'bg-[#DEEFE7] border-[#159A9C]' : 'bg-transparent'
               }`}
           >
             {opportunities.map((opportunity, index) => (
@@ -316,8 +314,8 @@ const FunilVendas = () => {
       </Droppable>
 
       {/* Valor total do estágio */}
-      <div className="mt-4 pt-3 border-t border-gray-200">
-        <div className="text-xs text-gray-600">
+      <div className="mt-4 pt-3 border-t border-[#DEEFE7]">
+        <div className="text-xs text-[#002333]/70">
           Total: {new Intl.NumberFormat('pt-BR', {
             style: 'currency',
             currency: 'BRL'
@@ -331,218 +329,234 @@ const FunilVendas = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <BackToNucleus
-        nucleusName="Vendas"
-        nucleusPath="/nuclei/vendas"
-      />
-      <div className="p-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <ConectCRMLogoFinal variant="icon" size="sm" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Funil de Vendas</h1>
-              <p className="text-gray-600">Gerencie suas oportunidades de vendas</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${showFilters
-                  ? 'bg-[#159A9C] text-white border-[#159A9C]'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                }`}
-            >
-              <Filter className="w-4 h-4" />
-              Filtros
-            </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 bg-[#159A9C] text-white px-4 py-2 rounded-lg hover:bg-[#0F7B7D] transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Nova Oportunidade
-            </button>
-          </div>
+      <div className="bg-[#FFFFFF] border-b border-[#DEEFE7]">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <BackToNucleus
+            nucleusName="Vendas"
+            nucleusPath="/nuclei/vendas"
+          />
         </div>
-
-        {/* Métricas */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Target className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Total de Oportunidades</p>
-                <p className="text-2xl font-bold text-gray-900">{metricsData.totalOportunidades}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <DollarSign className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Valor Total Pipeline</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {new Intl.NumberFormat('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL',
-                    notation: 'compact',
-                    maximumFractionDigits: 1
-                  }).format(metricsData.valorTotalPipeline)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-100 rounded-lg">
-                <TrendingUp className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Vendas Fechadas</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {new Intl.NumberFormat('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL',
-                    notation: 'compact',
-                    maximumFractionDigits: 1
-                  }).format(metricsData.valorGanho)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <BarChart3 className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Taxa de Conversão</p>
-                <p className="text-2xl font-bold text-gray-900">{metricsData.taxaConversao}%</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Filtros */}
-        {showFilters && (
-          <div className="bg-white rounded-xl p-4 mb-6 shadow-sm border border-gray-200">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Buscar
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Buscar oportunidades..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                  />
+      </div>
+      <div className="px-6 py-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="bg-[#FFFFFF] border border-[#DEEFE7] rounded-3xl shadow-sm mb-8">
+            <div className="flex flex-col gap-6 p-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-2xl bg-[#159A9C] bg-opacity-10 flex items-center justify-center">
+                  <ShoppingBag className="h-7 w-7 text-[#159A9C]" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold text-[#002333]">Funil de Vendas</h1>
+                  <p className="text-sm text-[#002333]/70">
+                    Monitore oportunidades, valores e performance da equipe comercial.
+                  </p>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Vendedor
-                </label>
-                <select
-                  value={filters.assignedTo}
-                  onChange={(e) => setFilters({ ...filters, assignedTo: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl border transition-colors font-medium ${showFilters
+                    ? 'bg-[#159A9C] text-white border-[#159A9C] shadow-sm'
+                    : 'bg-[#FFFFFF] text-[#002333] border-[#B4BEC9] hover:bg-[#DEEFE7]'
+                    }`}
                 >
-                  <option value="all">Todos</option>
-                  <option value="Ana Silva">Ana Silva</option>
-                  <option value="Carlos Vendas">Carlos Vendas</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Prioridade
-                </label>
-                <select
-                  value={filters.priority}
-                  onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                  <Filter className="w-4 h-4" />
+                  Filtros
+                </button>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="flex items-center justify-center gap-2 bg-[#159A9C] text-white px-4 py-2 rounded-xl hover:bg-[#0F7B7D] transition-colors font-medium shadow-sm"
                 >
-                  <option value="all">Todas</option>
-                  <option value="high">Alta</option>
-                  <option value="medium">Média</option>
-                  <option value="low">Baixa</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Período
-                </label>
-                <select
-                  value={filters.dateRange}
-                  onChange={(e) => setFilters({ ...filters, dateRange: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                >
-                  <option value="all">Todos</option>
-                  <option value="this_month">Este mês</option>
-                  <option value="next_month">Próximo mês</option>
-                  <option value="this_quarter">Este trimestre</option>
-                </select>
+                  <Plus className="w-4 h-4" />
+                  Nova Oportunidade
+                </button>
               </div>
             </div>
           </div>
-        )}
 
-        {/* Pipeline Kanban */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          <DragDropContext onDragEnd={onDragEnd}>
-            <div className="flex gap-4 overflow-x-auto pb-4">
-              {pipelineData?.stageOrder?.map(stageId => (
-                <StageColumn
-                  key={stageId}
-                  stage={organizedStages[stageId]}
-                  opportunities={organizedStages[stageId]?.opportunities || []}
-                />
-              ))}
+          {/* Métricas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Total de Oportunidades</p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">{metricsData.totalOportunidades}</p>
+                  <p className="mt-3 text-sm text-[#002333]/70">Fluxo atual de negócios ativos no pipeline.</p>
+                </div>
+                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                  <Target className="h-6 w-6 text-[#159A9C]" />
+                </div>
+              </div>
             </div>
-          </DragDropContext>
-        </div>
 
-        {/* Modal de Detalhes */}
-        {showModal && selectedOpportunity && (
-          <OpportunityModal
-            opportunity={selectedOpportunity}
-            onClose={() => {
-              setShowModal(false);
-              setSelectedOpportunity(null);
-            }}
-            onUpdate={(updatedOpportunity) => {
-              // Invalidar queries para recarregar dados
-              queryClient.invalidateQueries('pipeline');
-              queryClient.invalidateQueries('metrics');
-              setShowModal(false);
-              setSelectedOpportunity(null);
-              toast.success('Oportunidade atualizada com sucesso!');
-            }}
+            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Valor Total Pipeline</p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">
+                    {new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                      notation: 'compact',
+                      maximumFractionDigits: 1
+                    }).format(metricsData.valorTotalPipeline)}
+                  </p>
+                  <p className="mt-3 text-sm text-[#002333]/70">Receita potencial considerando o estágio atual.</p>
+                </div>
+                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                  <DollarSign className="h-6 w-6 text-[#159A9C]" />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Vendas Fechadas</p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">
+                    {new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                      notation: 'compact',
+                      maximumFractionDigits: 1
+                    }).format(metricsData.valorGanho)}
+                  </p>
+                  <p className="mt-3 text-sm text-[#002333]/70">Valor conquistado no período selecionado.</p>
+                </div>
+                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                  <TrendingUp className="h-6 w-6 text-[#159A9C]" />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Taxa de Conversão</p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">{metricsData.taxaConversao}%</p>
+                  <p className="mt-3 text-sm text-[#002333]/70">Indicador de eficiência do funil comercial.</p>
+                </div>
+                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                  <BarChart3 className="h-6 w-6 text-[#159A9C]" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Filtros */}
+          {showFilters && (
+            <div className="bg-[#FFFFFF] rounded-3xl p-6 mb-8 shadow-sm border border-[#DEEFE7]">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+                <div>
+                  <label className="block text-sm font-semibold text-[#002333] mb-2">
+                    Buscar
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#159A9C]" />
+                    <input
+                      type="text"
+                      placeholder="Buscar oportunidades..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 border border-[#B4BEC9] rounded-xl bg-[#FFFFFF] text-[#002333] placeholder:text-[#002333]/40 focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-[#002333] mb-2">
+                    Vendedor
+                  </label>
+                  <select
+                    value={filters.assignedTo}
+                    onChange={(e) => setFilters({ ...filters, assignedTo: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-[#B4BEC9] rounded-xl bg-[#FFFFFF] text-[#002333] focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="Ana Silva">Ana Silva</option>
+                    <option value="Carlos Vendas">Carlos Vendas</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-[#002333] mb-2">
+                    Prioridade
+                  </label>
+                  <select
+                    value={filters.priority}
+                    onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-[#B4BEC9] rounded-xl bg-[#FFFFFF] text-[#002333] focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition"
+                  >
+                    <option value="all">Todas</option>
+                    <option value="high">Alta</option>
+                    <option value="medium">Média</option>
+                    <option value="low">Baixa</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-[#002333] mb-2">
+                    Período
+                  </label>
+                  <select
+                    value={filters.dateRange}
+                    onChange={(e) => setFilters({ ...filters, dateRange: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-[#B4BEC9] rounded-xl bg-[#FFFFFF] text-[#002333] focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="this_month">Este mês</option>
+                    <option value="next_month">Próximo mês</option>
+                    <option value="this_quarter">Este trimestre</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Pipeline Kanban */}
+          <div className="bg-[#FFFFFF] rounded-3xl p-6 shadow-sm border border-[#DEEFE7]">
+            <DragDropContext onDragEnd={onDragEnd}>
+              <div className="flex gap-6 overflow-x-auto pb-2">
+                {pipelineData?.stageOrder?.map(stageId => (
+                  <StageColumn
+                    key={stageId}
+                    stage={organizedStages[stageId]}
+                    opportunities={organizedStages[stageId]?.opportunities || []}
+                  />
+                ))}
+              </div>
+            </DragDropContext>
+          </div>
+
+          {/* Modal de Detalhes */}
+          {showModal && selectedOpportunity && (
+            <OpportunityModal
+              opportunity={selectedOpportunity}
+              onClose={() => {
+                setShowModal(false);
+                setSelectedOpportunity(null);
+              }}
+              onUpdate={(updatedOpportunity) => {
+                // Invalidar queries para recarregar dados
+                queryClient.invalidateQueries({ queryKey: ['pipeline'] });
+                queryClient.invalidateQueries({ queryKey: ['metrics'] });
+                setShowModal(false);
+                setSelectedOpportunity(null);
+                toast.success('Oportunidade atualizada com sucesso!');
+              }}
+            />
+          )}
+
+          {/* Modal de Criação de Oportunidade */}
+          <ModalCriarOportunidade
+            isOpen={showCreateModal}
+            onClose={() => setShowCreateModal(false)}
+            onSave={handleCreateOpportunity}
+            isLoading={createOpportunityMutation.isLoading}
           />
-        )}
-
-        {/* Modal de Criação de Oportunidade */}
-        <ModalCriarOportunidade
-          isOpen={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          onSave={handleCreateOpportunity}
-          isLoading={createOpportunityMutation.isLoading}
-        />
+        </div>
       </div>
     </div>
   );

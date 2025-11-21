@@ -4,7 +4,6 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { KPICard } from '../../components/common/KPICard';
 import { ResponsiveFilters } from '../../components/common/ResponsiveFilters';
 import ColorPaletteSelector from '../../components/common/ColorPaletteSelector';
-import ChatwootQuickAccess from '../../components/chatwoot/ChatwootQuickAccess';
 import { useDashboard } from '../../hooks/useDashboard';
 import {
   VendasChart,
@@ -605,8 +604,6 @@ const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* Acesso Rápido Chatwoot */}
-      <ChatwootQuickAccess />
     </div>
   );
 };

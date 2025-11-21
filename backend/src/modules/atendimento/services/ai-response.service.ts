@@ -6,7 +6,7 @@ import { IntegracoesConfig } from '../entities/integracoes-config.entity';
 
 /**
  * 🤖 SERVIÇO DE RESPOSTAS AUTOMÁTICAS COM IA
- * 
+ *
  * Este serviço integra com OpenAI (GPT) ou Anthropic (Claude)
  * para gerar respostas automáticas inteligentes
  */
@@ -17,7 +17,7 @@ export class AIResponseService {
   constructor(
     @InjectRepository(IntegracoesConfig)
     private integracaoRepo: Repository<IntegracoesConfig>,
-  ) { }
+  ) {}
 
   /**
    * Gera resposta automática usando IA
@@ -45,11 +45,7 @@ export class AIResponseService {
 
       // Decidir qual IA usar (prioridade: OpenAI > Anthropic)
       if (configOpenAI && configOpenAI.credenciais?.openai_api_key) {
-        return await this.gerarRespostaOpenAI(
-          configOpenAI.credenciais,
-          mensagemCliente,
-          contexto,
-        );
+        return await this.gerarRespostaOpenAI(configOpenAI.credenciais, mensagemCliente, contexto);
       } else if (configAnthropic && configAnthropic.credenciais?.anthropic_api_key) {
         return await this.gerarRespostaAnthropic(
           configAnthropic.credenciais,
@@ -59,7 +55,8 @@ export class AIResponseService {
       } else {
         this.logger.warn('⚠️  Nenhuma IA configurada, usando resposta padrão');
         return {
-          resposta: 'Olá! Obrigado por entrar em contato. Um de nossos atendentes responderá em breve.',
+          resposta:
+            'Olá! Obrigado por entrar em contato. Um de nossos atendentes responderá em breve.',
           provedor: 'default',
         };
       }
@@ -107,7 +104,7 @@ export class AIResponseService {
         },
         {
           headers: {
-            'Authorization': `Bearer ${apiKey}`,
+            Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
           },
           timeout: 30000,
@@ -122,7 +119,6 @@ export class AIResponseService {
         resposta,
         provedor: 'openai',
       };
-
     } catch (error) {
       this.logger.error(`❌ Erro ao chamar OpenAI: ${error.message}`);
       throw error;
@@ -153,9 +149,7 @@ export class AIResponseService {
           model: modelo,
           max_tokens: 500,
           system: systemPrompt,
-          messages: [
-            { role: 'user', content: mensagem },
-          ],
+          messages: [{ role: 'user', content: mensagem }],
         },
         {
           headers: {
@@ -175,7 +169,6 @@ export class AIResponseService {
         resposta,
         provedor: 'anthropic',
       };
-
     } catch (error) {
       this.logger.error(`❌ Erro ao chamar Anthropic: ${error.message}`);
       throw error;
@@ -229,12 +222,12 @@ Responda sempre em português do Brasil.`;
       });
 
       // Verificar se resposta automática está habilitada
-      const respostaAutomatica = configOpenAI?.credenciais?.auto_responder ||
+      const respostaAutomatica =
+        configOpenAI?.credenciais?.auto_responder ||
         configAnthropic?.credenciais?.auto_responder ||
         false;
 
       return (configOpenAI || configAnthropic) && respostaAutomatica;
-
     } catch (error) {
       this.logger.error(`Erro ao verificar IA: ${error.message}`);
       return false;

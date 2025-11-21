@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EmpresaModulo, ModuloEnum, PlanoEnum } from '../entities/empresa-modulo.entity';
@@ -7,6 +7,8 @@ import { UpdateEmpresaModuloDto } from '../dto/update-empresa-modulo.dto';
 
 @Injectable()
 export class EmpresaModuloService {
+  private readonly logger = new Logger(EmpresaModuloService.name);
+
   constructor(
     @InjectRepository(EmpresaModulo)
     private readonly empresaModuloRepository: Repository<EmpresaModulo>,
@@ -97,33 +99,42 @@ export class EmpresaModuloService {
    * @returns Módulo criado/atualizado
    */
   async ativar(empresa_id: string, dto: CreateEmpresaModuloDto): Promise<EmpresaModulo> {
-    // Verificar se já existe
-    const existente = await this.empresaModuloRepository.findOne({
-      where: { empresa_id, modulo: dto.modulo },
-    });
-
-    if (existente) {
-      // Atualizar existente
-      await this.empresaModuloRepository.update(existente.id, {
-        ativo: true,
-        data_ativacao: new Date(),
-        data_expiracao: dto.data_expiracao ? new Date(dto.data_expiracao) : null,
-        plano: dto.plano || existente.plano,
+    try {
+      // Verificar se já existe
+      const existente = await this.empresaModuloRepository.findOne({
+        where: { empresa_id, modulo: dto.modulo },
       });
 
-      return await this.empresaModuloRepository.findOne({ where: { id: existente.id } });
+      if (existente) {
+        await this.empresaModuloRepository.update(existente.id, {
+          ativo: true,
+          data_ativacao: new Date(),
+          data_expiracao: dto.data_expiracao ? new Date(dto.data_expiracao) : null,
+          plano: dto.plano || existente.plano,
+        });
+
+        return await this.empresaModuloRepository.findOne({ where: { id: existente.id } });
+      }
+
+      const novoModulo = this.empresaModuloRepository.create({
+        empresa_id,
+        modulo: dto.modulo,
+        ativo: dto.ativo !== undefined ? dto.ativo : true,
+        data_expiracao: dto.data_expiracao ? new Date(dto.data_expiracao) : null,
+        plano: dto.plano || PlanoEnum.STARTER,
+      });
+
+      return await this.empresaModuloRepository.save(novoModulo);
+
+    } catch (error) {
+      this.logger.error(
+        `Erro ao ativar módulo ${dto.modulo} para empresa ${empresa_id}: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException(
+        `Erro ao ativar módulo ${dto.modulo}`,
+      );
     }
-
-    // Criar novo
-    const novoModulo = this.empresaModuloRepository.create({
-      empresa_id,
-      modulo: dto.modulo,
-      ativo: dto.ativo !== undefined ? dto.ativo : true,
-      data_expiracao: dto.data_expiracao ? new Date(dto.data_expiracao) : null,
-      plano: dto.plano || PlanoEnum.STARTER,
-    });
-
-    return await this.empresaModuloRepository.save(novoModulo);
   }
 
   /**
@@ -173,11 +184,16 @@ export class EmpresaModuloService {
    */
   async ativarPlano(empresa_id: string, plano: PlanoEnum): Promise<void> {
     const modulosPorPlano = {
-      [PlanoEnum.STARTER]: [ModuloEnum.ATENDIMENTO], // Exemplo: Starter só Atendimento
-      [PlanoEnum.BUSINESS]: [ModuloEnum.ATENDIMENTO, ModuloEnum.CRM, ModuloEnum.VENDAS],
-      [PlanoEnum.ENTERPRISE]: [
-        ModuloEnum.ATENDIMENTO,
+      [PlanoEnum.STARTER]: [ModuloEnum.CRM, ModuloEnum.ATENDIMENTO],
+      [PlanoEnum.BUSINESS]: [
         ModuloEnum.CRM,
+        ModuloEnum.ATENDIMENTO,
+        ModuloEnum.VENDAS,
+        ModuloEnum.FINANCEIRO,
+      ],
+      [PlanoEnum.ENTERPRISE]: [
+        ModuloEnum.CRM,
+        ModuloEnum.ATENDIMENTO,
         ModuloEnum.VENDAS,
         ModuloEnum.FINANCEIRO,
         ModuloEnum.BILLING,
@@ -187,10 +203,17 @@ export class EmpresaModuloService {
 
     const modulos = modulosPorPlano[plano] || [];
 
+    if (modulos.length === 0) {
+      this.logger.warn(`Nenhum módulo encontrado para plano ${plano}`);
+      return;
+    }
+
     // Ativar módulos do plano
     for (const modulo of modulos) {
       await this.ativar(empresa_id, { modulo, ativo: true, plano });
     }
+
+    this.logger.log(`Plano ${plano} ativado para empresa ${empresa_id}: ${modulos.length} módulos`);
 
     // Desativar módulos que não estão no plano
     const todosModulos = Object.values(ModuloEnum);
@@ -203,6 +226,8 @@ export class EmpresaModuloService {
         }
       }
     }
+
+    console.log(`  ✅ [EmpresaModuloService] ativarPlano() concluído\n`);
   }
 
   /**
@@ -218,12 +243,15 @@ export class EmpresaModuloService {
     const planosAtivos = modulos.filter((m) => m.ativo).map((m) => m.plano);
     if (planosAtivos.length === 0) return null;
 
-    const planoCounts = planosAtivos.reduce((acc, plano) => {
-      if (plano) {
-        acc[plano] = (acc[plano] || 0) + 1;
-      }
-      return acc;
-    }, {} as Record<PlanoEnum, number>);
+    const planoCounts = planosAtivos.reduce(
+      (acc, plano) => {
+        if (plano) {
+          acc[plano] = (acc[plano] || 0) + 1;
+        }
+        return acc;
+      },
+      {} as Record<PlanoEnum, number>,
+    );
 
     return Object.keys(planoCounts).sort(
       (a, b) => planoCounts[b as PlanoEnum] - planoCounts[a as PlanoEnum],
@@ -237,9 +265,7 @@ export class EmpresaModuloService {
   async seedAllEmpresas(): Promise<any> {
     try {
       // Buscar todas as empresas
-      const empresas = await this.empresaModuloRepository.query(
-        'SELECT id, nome FROM empresas'
-      );
+      const empresas = await this.empresaModuloRepository.query('SELECT id, nome FROM empresas');
 
       const modulos = Object.values(ModuloEnum);
       const results = [];

@@ -154,7 +154,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
       const carregarUsuarios = async () => {
         setLoadingUsuarios(true);
         try {
-          const listaUsuarios = await usuariosService.listarUsuarios();
+          const { usuarios: listaUsuarios } = await usuariosService.listarUsuarios({ limite: 1000 });
           setUsuarios(listaUsuarios.map(user => ({
             id: user.id,
             nome: user.nome,
@@ -420,7 +420,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[95vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl w-[calc(100%-2rem)] sm:w-[700px] md:w-[900px] lg:w-[1100px] xl:w-[1200px] max-w-[1400px] max-h-[95vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="text-lg font-semibold text-gray-900">

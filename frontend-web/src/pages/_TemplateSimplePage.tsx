@@ -214,10 +214,10 @@ const SuaPaginaPage: React.FC = () => {
                   </button>
                   <button
                     onClick={() => handleOpenDialog()}
-                    className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                    className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium"
                   >
                     {/* [PERSONALIZAR] Cor do botão (Crevasse-2 para Comercial) */}
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-4 h-4" />
                     Novo Item {/* [PERSONALIZAR] */}
                   </button>
                 </div>
@@ -272,8 +272,8 @@ const SuaPaginaPage: React.FC = () => {
             <div className="bg-white rounded-lg shadow-sm border">
               <div className="text-center py-20 px-6">
                 <div className="flex justify-center mb-6">
-                  <div className="p-6 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full">
-                    <Package className="w-16 h-16 text-blue-600" /> {/* [PERSONALIZAR] */}
+                  <div className="h-20 w-20 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                    <Package className="w-12 h-12 text-[#159A9C]" /> {/* [PERSONALIZAR] */}
                   </div>
                 </div>
                 <h3 className="text-2xl font-bold text-[#002333] mb-3">
@@ -287,7 +287,7 @@ const SuaPaginaPage: React.FC = () => {
                 {!busca && (
                   <button
                     onClick={() => handleOpenDialog()}
-                    className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-8 py-4 rounded-lg inline-flex items-center gap-2 text-lg shadow-lg transition-colors"
+                    className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg inline-flex items-center gap-2 text-sm font-medium shadow-lg transition-colors"
                   >
                     <Plus className="w-6 h-6" />
                     Criar Primeiro Item {/* [PERSONALIZAR] */}
@@ -317,11 +317,10 @@ const SuaPaginaPage: React.FC = () => {
                         </p>
                       )}
                     </div>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      item.ativo 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.ativo
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-gray-100 text-gray-800'
+                      }`}>
                       {item.ativo ? 'Ativo' : 'Inativo'}
                     </span>
                   </div>
@@ -438,14 +437,14 @@ const SuaPaginaPage: React.FC = () => {
                   setShowDialog(false);
                   setEditingItem(null);
                 }}
-                className="px-6 py-3 border-2 border-[#B4BEC9] text-[#002333] rounded-lg hover:bg-[#DEEFE7] transition-colors"
+                className="px-4 py-2 border-2 border-[#B4BEC9] text-[#002333] rounded-lg hover:bg-[#DEEFE7] transition-colors text-sm font-medium"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleSave}
                 disabled={!formData.nome.trim()}
-                className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
               >
                 {editingItem ? 'Salvar' : 'Criar'}
               </button>

@@ -267,12 +267,12 @@ const ContasReceberPage: React.FC = () => {
 
             {/* Botão de ação principal */}
             <div className="mt-4 sm:mt-0 flex items-center gap-3">
-              <button className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center gap-2 transition-colors">
+              <button className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center gap-2 transition-colors text-sm font-medium">
                 <Download className="w-4 h-4" />
                 Exportar
               </button>
-              <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm">
-                <Plus className="w-5 h-5" />
+              <button className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium">
+                <Plus className="w-4 h-4" />
                 Nova Conta
               </button>
             </div>
@@ -281,54 +281,54 @@ const ContasReceberPage: React.FC = () => {
 
         {/* Cards de Dashboard */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+          <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total a Receber</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{formatCurrency(resumo.totalGeral)}</p>
-                <p className="text-xs text-gray-400 mt-1">💰 Valor total</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Total a Receber</p>
+                <p className="text-3xl font-bold text-[#002333] mt-2">{formatCurrency(resumo.totalGeral)}</p>
+                <p className="text-sm text-[#002333]/70 mt-1">Valor total</p>
               </div>
-              <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl">
-                <DollarSign className="w-8 h-8 text-blue-600" />
+              <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                <DollarSign className="w-6 h-6 text-[#159A9C]" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+          <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Pendentes</p>
-                <p className="text-3xl font-bold text-yellow-600 mt-2">{formatCurrency(resumo.totalPendente)}</p>
-                <p className="text-xs text-yellow-500 mt-1">⏳ {resumo.contasPendentes} contas</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Pendentes</p>
+                <p className="text-3xl font-bold text-[#002333] mt-2">{formatCurrency(resumo.totalPendente)}</p>
+                <p className="text-sm text-[#002333]/70 mt-1">{resumo.contasPendentes} contas</p>
               </div>
-              <div className="p-4 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-xl">
-                <Clock className="w-8 h-8 text-yellow-600" />
+              <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
+                <Clock className="w-6 h-6 text-yellow-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+          <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Vencidas</p>
-                <p className="text-3xl font-bold text-red-600 mt-2">{formatCurrency(resumo.totalVencidas)}</p>
-                <p className="text-xs text-red-500 mt-1">🚨 {resumo.contasVencidas} contas</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Vencidas</p>
+                <p className="text-3xl font-bold text-[#002333] mt-2">{formatCurrency(resumo.totalVencidas)}</p>
+                <p className="text-sm text-[#002333]/70 mt-1">{resumo.contasVencidas} contas</p>
               </div>
-              <div className="p-4 bg-gradient-to-br from-red-100 to-red-200 rounded-xl">
-                <AlertTriangle className="w-8 h-8 text-red-600" />
+              <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center shadow-sm">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+          <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Recebido</p>
-                <p className="text-3xl font-bold text-green-600 mt-2">{formatCurrency(resumo.totalRecebido)}</p>
-                <p className="text-xs text-green-500 mt-1">✅ Este mês</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Recebido</p>
+                <p className="text-3xl font-bold text-[#002333] mt-2">{formatCurrency(resumo.totalRecebido)}</p>
+                <p className="text-sm text-[#002333]/70 mt-1">Este mês</p>
               </div>
-              <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-xl">
-                <CheckCircle className="w-8 h-8 text-green-600" />
+              <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
+                <CheckCircle className="w-6 h-6 text-green-600" />
               </div>
             </div>
           </div>
@@ -398,7 +398,7 @@ const ContasReceberPage: React.FC = () => {
           {/* Tabela */}
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     <div className="flex items-center gap-2">
@@ -511,18 +511,18 @@ const ContasReceberPage: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleViewConta(conta)}
-                          className="text-gray-600 hover:text-gray-800 p-1 rounded"
+                          className="text-gray-600 hover:text-gray-800 p-1 rounded hover:bg-gray-100 transition-colors"
                           title="Visualizar"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button className="text-blue-600 hover:text-blue-800 p-1 rounded" title="Editar">
+                        <button className="text-[#159A9C] hover:text-[#0F7B7D] p-1 rounded hover:bg-[#159A9C]/10 transition-colors" title="Editar">
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button className="text-green-600 hover:text-green-800 p-1 rounded" title="Enviar Cobrança">
+                        <button className="text-[#159A9C] hover:text-[#0F7B7D] p-1 rounded hover:bg-[#159A9C]/10 transition-colors" title="Enviar Cobrança">
                           <Mail className="w-4 h-4" />
                         </button>
-                        <button className="text-red-600 hover:text-red-800 p-1 rounded" title="Excluir">
+                        <button className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors" title="Excluir">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -540,7 +540,7 @@ const ContasReceberPage: React.FC = () => {
               <p className="text-gray-600 mb-4">
                 Tente ajustar os filtros ou criar uma nova conta a receber.
               </p>
-              <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg inline-flex items-center gap-2">
+              <button className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg inline-flex items-center gap-2 text-sm font-medium">
                 <Plus className="w-4 h-4" />
                 Nova Conta
               </button>
@@ -674,11 +674,11 @@ const ContasReceberPage: React.FC = () => {
                   Fechar
                 </button>
                 {selectedConta.status !== 'paga' && (
-                  <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                  <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
                     Registrar Pagamento
                   </button>
                 )}
-                <button className="px-4 py-2 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg transition-all">
+                <button className="px-4 py-2 bg-[#159A9C] hover:bg-[#0F7B7D] text-white rounded-lg transition-colors shadow-sm text-sm font-medium">
                   Editar Conta
                 </button>
               </div>

@@ -1,167 +1,88 @@
-# GitHub Copilot Instructions - ConectCRM
+<!-- Atualização: versão concisa e prática das instruções para agentes AI -->
+# GitHub Copilot Instructions — ConectCRM (resumo prático)
 
-## 🎨 Design System - Leia ANTES de criar qualquer tela
+Objetivo: orientar rapidamente agentes AI a serem produtivos no repositório ConectCRM com regras específicas do projeto, comandos essenciais e exemplos práticos.
 
-**OBRIGATÓRIO**: Sempre consulte `frontend-web/DESIGN_GUIDELINES.md` antes de criar ou modificar páginas React.
+## 🚨 REGRA CRÍTICA: NUNCA PULAR ETAPAS
 
-## 🎨 Tema Padrão: Crevasse Professional
+**SEMPRE obter consentimento explícito do usuário antes de:**
+- ❌ Pular etapas de um plano/checklist
+- ❌ Implementar múltiplas features de uma vez sem aprovação
+- ❌ Avançar para próxima fase antes de validar a atual
+- ❌ Fazer suposições sobre requisitos não especificados
+- ❌ Executar comandos que modificam o sistema sem permissão
 
-**TEMA OFICIAL DO SISTEMA**: O ConectCRM usa a paleta **Crevasse Professional** como tema padrão.
+**Fluxo Obrigatório:**
+1. ✅ Apresentar plano detalhado com TODAS as etapas
+2. ✅ Aguardar aprovação explícita do usuário
+3. ✅ Executar SOMENTE a etapa aprovada
+4. ✅ Validar resultado da etapa com o usuário
+5. ✅ Perguntar se deve prosseguir para próxima etapa
+6. ✅ Repetir ciclo até conclusão completa
 
-### Paleta Crevasse (5 cores principais)
-```typescript
-// PALETA OFICIAL - NÃO ALTERAR
-const CREVASSE_PALETTE = {
-  crevasse1: '#B4BEC9',  // Cinza azulado (secundário, bordas, texto secundário)
-  crevasse2: '#159A9C',  // Teal (primary, ações principais, destaques)
-  crevasse3: '#002333',  // Azul escuro profundo (texto principal, títulos)
-  crevasse4: '#DEEFE7',  // Verde claro suave (fundos secundários, bordas claras)
-  crevasse5: '#FFFFFF',  // Branco puro (background principal)
-};
+**Exemplo Correto:**
+```
+Copilot: "Vou implementar a Semana 1 do plano (OpenTelemetry). 
+         Posso prosseguir?"
+Usuário: "Sim"
+Copilot: [executa Semana 1]
+Copilot: "Semana 1 concluída. Quer que eu valide o resultado 
+         ou já posso prosseguir para Semana 2?"
 ```
 
-### Aplicação da Paleta
-```typescript
-// Configuração em ThemeContext.tsx (PADRÃO)
-const [currentPaletteId, setCurrentPaletteId] = useState<string>('crevasse');
-
-// Cores do sistema derivadas da paleta Crevasse:
-colors: {
-  primary: '#159A9C',        // Crevasse-2
-  primaryHover: '#0F7B7D',   // Variação escura do teal
-  primaryLight: '#DEEFE7',   // Crevasse-4
-  secondary: '#B4BEC9',      // Crevasse-1
-  text: '#002333',           // Crevasse-3
-  textSecondary: '#B4BEC9',  // Crevasse-1
-  background: '#FFFFFF',     // Crevasse-5
-  backgroundSecondary: '#DEEFE7', // Crevasse-4
-  border: '#B4BEC9',         // Crevasse-1
-  borderLight: '#DEEFE7',    // Crevasse-4
-}
+**Exemplo ERRADO:**
+```
+❌ Copilot: "Vou implementar as Semanas 1, 2 e 3 de uma vez..."
+❌ Copilot: "Pulando essa etapa porque presumo que..."
+❌ Copilot: "Já implementei tudo do plano..."
 ```
 
-### ⚠️ REGRAS CRÍTICAS DO TEMA
+### Comunicação
+- Responda sempre em português brasileiro (pt-BR), mantendo termos técnicos em inglês apenas quando não houver tradução adequada.
+- Ao reportar logs, comandos ou mensagens de erro, contextualize em português para manter a conversa padronizada.
+- **SEMPRE pergunte antes de executar ações que modificam código, banco de dados ou infraestrutura.**
 
-1. **NUNCA** altere as cores da paleta Crevasse
-2. **SEMPRE** use as cores definidas no ThemeContext
-3. **NUNCA** use cores hardcoded que não sejam da paleta
-4. **SEMPRE** mantenha `currentPaletteId = 'crevasse'` como padrão
-5. Use `#159A9C` (Crevasse-2 teal) para ações principais e destaques
-6. Use `#002333` (Crevasse-3) para texto principal e títulos
-7. Use `#B4BEC9` (Crevasse-1) para elementos secundários
-8. Use `#DEEFE7` (Crevasse-4) para fundos suaves e bordas claras
+1) Onde olhar primeiro
+- Frontend: `frontend-web/` (páginas em `frontend-web/src/pages` e features em `frontend-web/src/features`).
+- Backend: `backend/src/modules/` (entidades, controllers, services).
+- Design: `frontend-web/DESIGN_GUIDELINES.md` — **TEMA ÚNICO: Crevasse** (NÃO alterar cores em nenhuma tela).
 
-### Verificação de Cores
+2) **REGRA FUNDAMENTAL DE DESIGN**
+- ✅ **Tema Crevasse**: ÚNICO para TODO o sistema (todas as telas, todos os módulos)
+- ✅ **Layout/Template**: VARIA conforme contexto (dashboard, formulário, lista, etc)
+- ❌ **NÃO existe**: "tema por módulo" ou "cores diferentes por núcleo"
+- ❌ **NÃO mudar**: Cores da paleta Crevasse (#159A9C, #002333, #DEEFE7, #B4BEC9, #FFFFFF)
 
-```bash
-# ❌ ERRADO - cores não Crevasse
-className="bg-blue-500"      # Não é da paleta!
-className="text-gray-900"    # Deve ser #002333!
-className="border-gray-300"  # Deve ser #B4BEC9!
+3) Comandos rápidos (dev)
+- Iniciar backend em modo dev: `cd backend && npm run start:dev` (porta padrão 3001).
+- Iniciar frontend: `cd frontend-web && npm start` (proxy para `http://localhost:3001`).
+- Testes backend: `cd backend && npm test`. Frontend: `cd frontend-web && npm run test`.
 
-# ✅ CORRETO - cores Crevasse
-className="bg-[#159A9C]"           # Crevasse-2 primary
-className="text-[#002333]"         # Crevasse-3 text
-className="border-[#B4BEC9]"       # Crevasse-1 border
-className="bg-[#DEEFE7]"           # Crevasse-4 background soft
-```
+4) Edição segura (regra forte do projeto)
+- Sempre ler o arquivo completo antes de editar (use `read_file()` analogamente).
+- Antes de adicionar rota/import/função, procurar com `grep_search("texto-chave")` para evitar duplicação.
+- Ao usar operações de substituição, inclua 3–5 linhas de contexto únicas para evitar matches múltiplos.
 
----
+Exemplo prático: antes de adicionar rota `/nuclei/configuracoes/xyz` - `grep_search("/nuclei/configuracoes/")` e editar o bloco de rotas com contexto.
 
-## 🚫 PREVENÇÃO DE DUPLICAÇÕES (CRÍTICO)
+5) Padrões e templates úteis
+- Copiar página a partir de `frontend-web/src/pages/_TemplatePage.tsx` ou `_TemplateSimplePage.tsx` — NUNCA criar tela do zero.
+- Services frontend ficam em `frontend-web/src/services` e devem espelhar rotas do backend (ver controllers em `backend/src/modules/*/controllers`).
 
-### ⚠️ REGRAS ANTI-DUPLICAÇÃO
+6) Integrações e pontos sensíveis
+- Websockets / realtime: socket.io usado no backend e `socket.io-client` no frontend — checar `backend/src/gateways` e `frontend-web/src/services/socket`.
+- Integrações externas: OpenAI/Anthropic, WhatsApp (whatsapp-web.js), SendGrid, Stripe, Twilio — confira `backend/package.json` dependências e variáveis em `.env`.
 
-**NUNCA** duplique código ao editar arquivos! Siga estas regras **RIGOROSAMENTE**:
+7) Migrations & DB
+- Comandos TypeORM no backend: `npm run migration:generate`, `npm run migration:run`, `npm run migration:revert` (ver `ormconfig.js`).
 
-#### 1. **SEMPRE Ler Arquivo Completo ANTES de Editar**
+8) Convenções de naming (breve)
+- Backend: entities `*.entity.ts`, controllers `*.controller.ts`, services `*.service.ts`, modules `*.module.ts`.
+- Frontend: pages `*Page.tsx`, services `*Service.ts`, componentes em `src/components`.
 
-```typescript
-// ❌ ERRADO - Editar sem ler
-replace_string_in_file() // Sem contexto completo = risco de duplicar!
-
-// ✅ CORRETO - Ler primeiro
-read_file() // Ver conteúdo completo
-// Analisar o que JÁ existe
-// SÓ ENTÃO editar
-```
-
-#### 2. **Usar grep_search Para Verificar Existência**
-
-```bash
-# ✅ ANTES de adicionar rota nova:
-grep_search("path=\"/nuclei/configuracoes/empresas\"")
-
-# ✅ ANTES de adicionar import:
-grep_search("import.*EmpresasListPage")
-
-# ✅ ANTES de adicionar função:
-grep_search("function handleSave|const handleSave")
-```
-
-#### 3. **Incluir Contexto Suficiente no replace_string_in_file**
-
-```typescript
-// ❌ ERRADO - Contexto insuficiente (pode duplicar!)
-oldString: "<Route path=\"/nuclei/configuracoes/empresas\" />"
-// Problema: Pode haver múltiplas rotas similares!
-
-// ✅ CORRETO - Contexto de 3-5 linhas
-oldString: `
-          <Route path="/gestao/nucleos" element={...} />
-          <Route path="/nuclei/configuracoes/empresas" element={...} />
-          <Route path="/gestao/fluxos" element={...} />
-`
-// Contexto único: IMPOSSÍVEL duplicar!
-```
-
-#### 4. **Verificar Após Edição (Smoke Test)**
-
-```typescript
-// ✅ Após replace_string_in_file, SEMPRE:
-grep_search("nuclei/configuracoes/empresas") // Deve retornar APENAS 1 ocorrência!
-
-// Se retornar 2+ ocorrências = DUPLICAÇÃO ACIDENTAL
-// Reverter e editar novamente com mais contexto
-```
-
-#### 5. **Checklist Obrigatório ANTES de replace_string_in_file**
-
-- [ ] Li o arquivo completo com `read_file()`?
-- [ ] Verifiquei se linha/bloco já existe com `grep_search()`?
-- [ ] Inclui **3-5 linhas** de contexto antes E depois?
-- [ ] Garanti que `oldString` é **ÚNICO** no arquivo?
-- [ ] Testei mentalmente se outro bloco similar poderia dar match?
-
-### 🎯 Exemplos Práticos de Duplicação e Como Evitar
-
-#### Exemplo 1: Rotas Duplicadas (App.tsx)
-
-```typescript
-// ❌ PROBLEMA COMUM:
-// Ao adicionar rota nova, acabou duplicando uma existente
-
-// ANTES (arquivo original):
-<Route path="/nuclei/configuracoes/empresas" element={<EmpresasListPage />} />
-
-// TENTATIVA DE ADICIONAR USUÁRIOS:
-<Route path="/nuclei/configuracoes/empresas" element={<EmpresasListPage />} /> // DUPLICOU!
-<Route path="/nuclei/configuracoes/usuarios" element={<GestaoUsuariosPage />} />
-
-// ✅ SOLUÇÃO - Usar contexto único:
-oldString: `
-          <Route path="/gestao/nucleos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoNucleosPage />)} />
-          <Route path="/gestao/fluxos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoFluxosPage />)} />
-`
-
-newString: `
-          <Route path="/gestao/nucleos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoNucleosPage />)} />
-          <Route path="/nuclei/configuracoes/usuarios" element={<GestaoUsuariosPage />} />
-          <Route path="/gestao/fluxos" element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoFluxosPage />)} />
-`
-```
-
-#### Exemplo 2: Menu Items Duplicados (menuConfig.ts)
+9) Quando não souber: pesquise
+- Use `grep_search()` para localizar strings, imports e rotas antes de editar.
+- Ler `README.md` raiz e `frontend-web/README.md` ou `backend/README.md` se existirem.
 
 ```typescript
 // ❌ PROBLEMA:
@@ -280,17 +201,38 @@ cp frontend-web/src/pages/_TemplateWithKPIsPage.tsx frontend-web/src/pages/NomeD
 
 ## 📋 Padrões Obrigatórios
 
-### Cores por Módulo
+### Tema e Cores do Sistema
 ```typescript
-// SEMPRE usar essas cores exatas:
-const CORES_MODULOS = {
-  comercial: '#159A9C',    // Teal
-  atendimento: '#9333EA',  // Purple
-  financeiro: '#16A34A',   // Green
-  gestao: '#2563EB',       // Blue
-  texto: '#002333',        // Primary dark
-  secundario: '#B4BEC9'    // Secondary gray
+// TEMA ÚNICO: Crevasse Professional (TODO O SISTEMA)
+const CREVASSE_THEME = {
+  primary: '#159A9C',      // Teal - Cor principal de TODAS as telas
+  primaryHover: '#0F7B7D', // Hover do primary
+  text: '#002333',         // Texto principal (títulos, conteúdo)
+  textSecondary: '#B4BEC9',// Texto secundário
+  background: '#FFFFFF',   // Fundo principal
+  backgroundSecondary: '#DEEFE7', // Fundos secundários
+  border: '#B4BEC9',       // Bordas padrão
+  borderLight: '#DEEFE7'   // Bordas claras
 };
+
+// ❌ NÃO EXISTE: "cor do módulo Comercial", "cor do módulo Atendimento"
+// ✅ EXISTE: Tema único Crevasse para TODO o sistema
+// ✅ O que varia: Layout, estrutura, componentes (não cores do tema)
+```
+
+### Cores Contextuais (Apenas para Ícones/Status Específicos)
+```typescript
+// Usar APENAS para ícones contextuais e badges de status
+const CONTEXTUAL_COLORS = {
+  success: '#16A34A',   // Verde - sucesso/confirmação
+  warning: '#FBBF24',   // Amarelo - alerta/atenção
+  error: '#DC2626',     // Vermelho - erro/crítico
+  info: '#3B82F6'       // Azul - informativo
+};
+
+// Exemplo correto:
+// ✅ Ícone de status: bg-green-500/10 text-green-600 (sucesso)
+// ✅ Botão principal: bg-[#159A9C] text-white (tema Crevasse)
 ```
 
 ### Estrutura de Página (OBRIGATÓRIA)
@@ -311,19 +253,19 @@ const CORES_MODULOS = {
       // 4. Header da página
       <div className="bg-white rounded-lg shadow-sm border mb-6">
         <h1 className="text-3xl font-bold text-[#002333] flex items-center">
-          <IconeDoModulo className="h-8 w-8 mr-3 text-[COR_DO_MODULO]" />
+          <IconeDoModulo className="h-8 w-8 mr-3 text-[#159A9C]" />
           Título
         </h1>
       </div>
 
-      // 5. Dashboard Cards (4 cards com gradientes)
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        {/* Cards com gradientes blue/green/gray/purple */}
+      // 5. Dashboard Cards (KPI cards limpos, sem gradientes)
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Cards com padrão Funil de Vendas (ver seção KPI Cards) */}
       </div>
 
       // 6. Barra de busca/filtros
       <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-        <input className="focus:ring-2 focus:ring-[COR_DO_MODULO]" />
+        <input className="focus:ring-2 focus:ring-[#159A9C]" />
       </div>
 
       // 7. Grid de cards ou lista
@@ -338,25 +280,29 @@ const CORES_MODULOS = {
 ## 🚫 O Que NUNCA Fazer
 
 - ❌ Criar página sem BackToNucleus
-- ❌ Usar cores diferentes da paleta
+- ❌ Usar cores diferentes da paleta Crevasse
 - ❌ Usar componentes shadcn/ui (Button, Card, etc.) - usar Tailwind puro
+- ❌ Usar botões com cores diferentes de Crevasse para ações principais
 - ❌ Esquecer estado vazio com call-to-action
 - ❌ Esquecer loading states
 - ❌ Grid sem responsividade (mobile-first)
 - ❌ Modal sem botão de fechar (X)
-- ❌ Input sem `focus:ring-2 focus:ring-[COR]`
+- ❌ Input sem `focus:ring-2 focus:ring-[#159A9C]`
+- ❌ Botões sem estados disabled e loading
 
 ## ✅ O Que SEMPRE Fazer
 
-- ✅ Copiar `_TemplatePage.tsx` como base
+- ✅ Copiar `_TemplatePage.tsx` ou `_TemplateWithKPIsPage.tsx` como base
 - ✅ Consultar `DESIGN_GUIDELINES.md`
-- ✅ Usar cores da paleta exata
+- ✅ Usar cores da paleta Crevasse exata
+- ✅ Botões primários sempre `bg-[#159A9C]` e `hover:bg-[#0F7B7D]`
 - ✅ Implementar todos os estados (loading, error, empty, success)
 - ✅ Adicionar hover effects nos cards (`hover:shadow-lg`)
 - ✅ Usar grid responsivo (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3`)
 - ✅ Incluir BackToNucleus no header
-- ✅ Dashboard cards com gradientes
+- ✅ KPI cards limpos (sem gradientes coloridos - padrão Funil de Vendas)
 - ✅ Badges de status padronizados
+- ✅ Botões com transições suaves (`transition-colors`)
 
 ## 📦 Componentes Permitidos
 
@@ -381,6 +327,50 @@ import { Button } from '../components/ui/button';        // ❌
 import { Card } from '../components/ui/card';            // ❌
 import { Dialog } from '../components/ui/dialog';        // ❌
 ```
+
+## 🎯 Botões - Padrão do Sistema
+
+**REGRA CRÍTICA**: Tema Crevasse (#159A9C) para TODOS os botões primários do sistema!
+
+**TAMANHO PADRÃO**: `px-4 py-2` (compacto e profissional - seguir padrão da tela de Produtos)
+
+```tsx
+// ✅ Botão Primário - Ações principais (criar, salvar, confirmar)
+<button className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium">
+  <Plus className="h-4 w-4" />
+  Novo Item
+</button>
+
+// ✅ Botão Secundário - Ações secundárias (cancelar, voltar)
+<button className="px-4 py-2 bg-white text-[#002333] border border-[#B4BEC9] rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
+  Cancelar
+</button>
+
+// ✅ Botão de Perigo - Ações destrutivas (deletar, remover)
+<button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
+  <Trash2 className="h-4 w-4" />
+  Deletar
+</button>
+
+// ✅ Botão Ícone - Ações rápidas (editar, fechar)
+<button className="p-2 text-[#159A9C] hover:bg-[#159A9C]/10 rounded-lg transition-colors">
+  <Edit2 className="h-5 w-5" />
+</button>
+
+// ✅ Botão Minimal/Ghost - Ações terciárias
+<button className="px-4 py-2 text-[#159A9C] hover:bg-[#159A9C]/10 rounded-lg transition-colors text-sm font-medium">
+  Ver Detalhes
+</button>
+```
+
+**Regras de Uso**:
+- ❌ NUNCA use cores diferentes para botões primários (sempre #159A9C)
+- ❌ NUNCA use `px-6 py-3` (botões grandes demais - usar `px-4 py-2`)
+- ✅ Use `text-sm font-medium` para consistência visual
+- ✅ Ícones devem ser `h-4 w-4` em botões de texto
+- ✅ Use `disabled:opacity-50 disabled:cursor-not-allowed` em botões que podem desabilitar
+- ✅ Use `transition-colors` para animações suaves
+- ✅ Botões de loading devem mostrar spinner e desabilitar
 
 ## 🎯 Badges Padronizados
 
@@ -418,20 +408,23 @@ className="flex flex-col sm:flex-row gap-3"
 
 Sempre que precisar de exemplo, consulte ESTAS páginas (nesta ordem):
 
-1. **Template Base**: `frontend-web/src/pages/_TemplatePage.tsx`
-2. **Comercial**: `frontend-web/src/pages/CotacaoPage.tsx`
-3. **Atendimento**: `frontend-web/src/pages/GestaoEquipesPage.tsx`
-4. **Guidelines**: `frontend-web/DESIGN_GUIDELINES.md`
+1. **Templates Base**: 
+   - `frontend-web/src/pages/_TemplateWithKPIsPage.tsx` (com KPI cards)
+   - `frontend-web/src/pages/_TemplateSimplePage.tsx` (sem KPI cards)
+2. **Funil de Vendas**: `frontend-web/src/pages/FunilVendas.jsx` (padrão de KPI cards)
+3. **Comercial**: `frontend-web/src/pages/CotacaoPage.tsx`
+4. **Atendimento**: `frontend-web/src/pages/GestaoEquipesPage.tsx`
+5. **Guidelines**: `frontend-web/DESIGN_GUIDELINES.md`
 
 ## 📝 Checklist Automático
 
 Quando criar uma página, SEMPRE verifique:
 
-- [ ] Copiou `_TemplatePage.tsx`?
+- [ ] Copiou `_TemplatePage.tsx` ou `_TemplateWithKPIsPage.tsx`?
 - [ ] Substituiu todos os `[PERSONALIZAR]`?
 - [ ] Cor do módulo correta?
 - [ ] BackToNucleus implementado?
-- [ ] 4 Dashboard cards com gradientes?
+- [ ] KPI cards limpos (sem gradientes) se aplicável?
 - [ ] Barra de busca com `focus:ring-2`?
 - [ ] Grid responsivo?
 - [ ] Estado vazio com CTA?
@@ -444,21 +437,40 @@ Quando criar uma página, SEMPRE verifique:
 - [ ] Registrou rota em App.tsx?
 - [ ] Adicionou no menuConfig.ts?
 
-## 🎨 Dashboard Cards - Gradientes Padrão
+## 🎨 KPI Cards - Padrão Oficial (Funil de Vendas)
+
+**IMPORTANTE**: KPI cards devem ser LIMPOS, sem gradientes coloridos.
 
 ```tsx
-// Card 1 - Blue
-<div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl">
-  
-// Card 2 - Green  
-<div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-xl">
+// ✅ CORRETO - Padrão Funil de Vendas
+<div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
+  <div className="flex items-start justify-between">
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+        Label da Métrica
+      </p>
+      <p className="mt-2 text-3xl font-bold text-[#002333]">
+        {valor}
+      </p>
+      <p className="mt-3 text-sm text-[#002333]/70">
+        Descrição ou contexto da métrica.
+      </p>
+    </div>
+    <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+      <IconeMetrica className="h-6 w-6 text-[#159A9C]" />
+    </div>
+  </div>
+</div>
 
-// Card 3 - Gray
-<div className="p-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl">
-
-// Card 4 - Purple/Yellow/Red (depende do módulo)
-<div className="p-4 bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl">
+// ❌ ERRADO - NÃO usar gradientes coloridos
+<div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200">  // ❌ NÃO!
 ```
+
+**Variações de ícone (quando necessário):**
+- Padrão: `bg-[#159A9C]/10` + `text-[#159A9C]`
+- Sucesso: `bg-green-500/10` + `text-green-600`
+- Alerta: `bg-yellow-500/10` + `text-yellow-600`
+- Erro: `bg-red-500/10` + `text-red-600`
 
 ## 🚨 Error Handling Padrão
 

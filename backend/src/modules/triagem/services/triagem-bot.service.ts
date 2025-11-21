@@ -14,23 +14,22 @@ import { FluxoTriagem } from '../entities/fluxo-triagem.entity';
 import { NucleoAtendimento } from '../entities/nucleo-atendimento.entity';
 import { IniciarTriagemDto, ResponderTriagemDto } from '../dto';
 import { TicketService } from '../../atendimento/services/ticket.service';
-import { PrioridadeTicket, OrigemTicket, StatusTicket } from '../../atendimento/entities/ticket.entity';
+import {
+  PrioridadeTicket,
+  OrigemTicket,
+  StatusTicket,
+} from '../../atendimento/entities/ticket.entity';
 import { Contato } from '../../clientes/contato.entity';
 import { NucleoService } from './nucleo.service';
 import { AtribuicaoService } from './atribuicao.service';
 import { FlowEngine } from '../engine/flow-engine';
-import {
-  RespostaBot,
-  DadosMensagemWebhook,
-} from '../types/triagem-bot.types';
+import { RespostaBot, DadosMensagemWebhook } from '../types/triagem-bot.types';
 import type { ResultadoProcessamentoWebhook } from '../types/triagem-bot.types';
 export type { ResultadoProcessamentoWebhook } from '../types/triagem-bot.types';
 import { formatarOpcoes, normalizarTextoMenu } from '../utils/menu-format.util';
-import {
-  criarOpcoesDepartamentos,
-  criarOpcoesNucleos,
-} from '../utils/flow-options.util';
+import { criarOpcoesDepartamentos, criarOpcoesNucleos } from '../utils/flow-options.util';
 import { ValidationUtil } from '../utils/validation.util';
+import { KeywordShortcuts } from '../utils/keyword-shortcuts.util';
 import { TriagemLogService } from './triagem-log.service';
 import { WhatsAppSenderService } from '../../atendimento/services/whatsapp-sender.service';
 import { User } from '../../users/user.entity';
@@ -68,16 +67,22 @@ export class TriagemBotService {
     payload: any,
   ): Promise<ResultadoProcessamentoWebhook> {
     // 🔍 DEBUG: Log inicial do webhook
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('🤖 [BOT DEBUG] processarMensagemWhatsApp CHAMADO!');
+    console.log(`   empresaId: ${empresaId}`);
+    console.log(`   payload:`, JSON.stringify(payload, null, 2));
+    console.log('═══════════════════════════════════════════════════════════');
+
     this.logger.debug('🌐 WEBHOOK RECEBIDO:');
     this.logger.debug(`   - empresaId: ${empresaId}`);
     this.logger.debug(`   - payload type: ${payload?.object || 'unknown'}`);
 
     const dadosMensagem = this.extrairDadosWebhook(payload);
 
+    console.log('🔍 [BOT DEBUG] Dados extraídos:', JSON.stringify(dadosMensagem, null, 2));
+
     if (!dadosMensagem?.telefone || !dadosMensagem?.texto) {
-      this.logger.warn(
-        'Webhook WhatsApp ignorado: sem telefone ou texto processável',
-      );
+      this.logger.warn('Webhook WhatsApp ignorado: sem telefone ou texto processável');
       return {
         ignorado: true,
         motivo: 'Payload sem mensagem de texto ou telefone',
@@ -97,15 +102,10 @@ export class TriagemBotService {
     // Atualizar telefone normalizado para retorno
     dadosMensagem.telefone = telefoneNormalizado;
 
-    this.logger.log(
-      `Mensagem recebida de ${telefoneNormalizado}: "${dadosMensagem.texto}"`,
-    );
+    this.logger.log(`Mensagem recebida de ${telefoneNormalizado}: "${dadosMensagem.texto}"`);
 
     // Verificar se existe sessão ativa
-    const sessaoAtiva = await this.buscarSessaoAtiva(
-      empresaId,
-      telefoneNormalizado,
-    );
+    const sessaoAtiva = await this.buscarSessaoAtiva(empresaId, telefoneNormalizado);
 
     if (sessaoAtiva) {
       this.logger.log(`Sessão ativa encontrada: ${sessaoAtiva.id}`);
@@ -146,9 +146,7 @@ export class TriagemBotService {
       .getOne();
 
     if (!fluxoPadrao) {
-      throw new NotFoundException(
-        'Nenhum fluxo padrão publicado encontrado para o canal WhatsApp',
-      );
+      throw new NotFoundException('Nenhum fluxo padrão publicado encontrado para o canal WhatsApp');
     }
 
     this.logger.log(`Fluxo padrão encontrado: ${fluxoPadrao.id}`);
@@ -159,16 +157,24 @@ export class TriagemBotService {
     this.logger.debug(`📝 Nome: ${fluxoPadrao.nome}`);
     this.logger.debug(`✅ Publicado: ${fluxoPadrao.publicado} (em ${fluxoPadrao.publishedAt})`);
     this.logger.debug(`🔄 Atualizado: ${fluxoPadrao.updatedAt}`);
-    this.logger.debug(`📊 Total de etapas: ${Object.keys(fluxoPadrao.estrutura.etapas || {}).length}`);
-    this.logger.debug(`🗂️ Lista de etapas: ${Object.keys(fluxoPadrao.estrutura.etapas || {}).join(', ')}`);
+    this.logger.debug(
+      `📊 Total de etapas: ${Object.keys(fluxoPadrao.estrutura.etapas || {}).length}`,
+    );
+    this.logger.debug(
+      `🗂️ Lista de etapas: ${Object.keys(fluxoPadrao.estrutura.etapas || {}).join(', ')}`,
+    );
 
     const etapaBoasVindas = fluxoPadrao.estrutura.etapas['boas-vindas'];
     if (etapaBoasVindas) {
       this.logger.debug(`🎉 Etapa boas-vindas encontrada:`);
       this.logger.debug(`   - Tipo: ${etapaBoasVindas.tipo}`);
       this.logger.debug(`   - Próxima etapa: ${etapaBoasVindas.proximaEtapa || 'N/A'}`);
-      this.logger.debug(`   - Mensagem (primeiros 100 chars): ${(etapaBoasVindas.mensagem || '').substring(0, 100)}...`);
-      this.logger.debug(`   - Tem botões? ${etapaBoasVindas.opcoes ? 'SIM (' + etapaBoasVindas.opcoes.length + ')' : 'NÃO'}`);
+      this.logger.debug(
+        `   - Mensagem (primeiros 100 chars): ${(etapaBoasVindas.mensagem || '').substring(0, 100)}...`,
+      );
+      this.logger.debug(
+        `   - Tem botões? ${etapaBoasVindas.opcoes ? 'SIM (' + etapaBoasVindas.opcoes.length + ')' : 'NÃO'}`,
+      );
       if (etapaBoasVindas.opcoes && etapaBoasVindas.opcoes.length > 0) {
         etapaBoasVindas.opcoes.forEach((opcao, idx) => {
           this.logger.debug(`     Botão ${idx + 1}: "${opcao.texto}" → ${opcao.proximaEtapa}`);
@@ -243,9 +249,7 @@ export class TriagemBotService {
         return null;
       }
 
-      this.logger.debug(
-        `📞 Variantes para busca de contato: ${telefonesPossiveis.join(', ')}`,
-      );
+      this.logger.debug(`📞 Variantes para busca de contato: ${telefonesPossiveis.join(', ')}`);
 
       // Buscar contato ativo com telefone que bata com ou sem máscara/DDI
       const contato = await this.contatoRepository
@@ -253,10 +257,9 @@ export class TriagemBotService {
         .leftJoinAndSelect('contato.cliente', 'cliente')
         .where('contato.ativo = TRUE')
         .andWhere('cliente.empresa_id = :empresaId', { empresaId })
-        .andWhere(
-          "regexp_replace(contato.telefone, '\\D', '', 'g') IN (:...telefones)",
-          { telefones: telefonesPossiveis },
-        )
+        .andWhere("regexp_replace(contato.telefone, '\\D', '', 'g') IN (:...telefones)", {
+          telefones: telefonesPossiveis,
+        })
         .orderBy('contato.principal', 'DESC')
         .addOrderBy('contato.updatedAt', 'DESC')
         .getOne();
@@ -296,7 +299,9 @@ export class TriagemBotService {
 
     // ✅ NOVO: Verificar se deve finalizar automaticamente após enviar mensagem
     if (sessao.contexto?.__finalizarAposEnviar) {
-      this.logger.log('🎫 [AUTO-FINALIZAÇÃO] Flag detectada - finalizando triagem após enviar mensagem');
+      this.logger.log(
+        '🎫 [AUTO-FINALIZAÇÃO] Flag detectada - finalizando triagem após enviar mensagem',
+      );
 
       // Remover a flag para não reprocessar
       delete sessao.contexto.__finalizarAposEnviar;
@@ -355,13 +360,8 @@ export class TriagemBotService {
   /**
    * Inicia uma nova sessão de triagem
    */
-  async iniciarTriagem(
-    empresaId: string,
-    dto: IniciarTriagemDto,
-  ): Promise<RespostaBot> {
-    this.logger.log(
-      `Iniciando triagem para ${dto.contatoTelefone} no fluxo ${dto.fluxoId}`,
-    );
+  async iniciarTriagem(empresaId: string, dto: IniciarTriagemDto): Promise<RespostaBot> {
+    this.logger.log(`Iniciando triagem para ${dto.contatoTelefone} no fluxo ${dto.fluxoId}`);
 
     // Buscar fluxo
     const fluxo = await this.fluxoRepository.findOne({
@@ -414,7 +414,9 @@ export class TriagemBotService {
       ultimoTicket = await this.buscarUltimoTicketRecente(empresaId, contatoExistente.id);
 
       if (ultimoTicket) {
-        this.logger.log(`🔄 Último ticket encontrado: ${ultimoTicket.id} - Departamento: ${ultimoTicket.departamento?.nome || 'N/A'}`);
+        this.logger.log(
+          `🔄 Último ticket encontrado: ${ultimoTicket.id} - Departamento: ${ultimoTicket.departamento?.nome || 'N/A'}`,
+        );
         contextoInicial.__ultimoTicketId = ultimoTicket.id;
         contextoInicial.__ultimoDepartamentoId = ultimoTicket.departamentoId;
         contextoInicial.__ultimoDepartamentoNome = ultimoTicket.departamento?.nome || '';
@@ -477,18 +479,13 @@ export class TriagemBotService {
     await fluxo.incrementarExecucoes();
     await this.fluxoRepository.save(fluxo);
 
-    await this.registrarLogSistema(
-      sessaoSalva,
-      'Sessão de triagem iniciada',
-      'sessao_iniciada',
-      {
-        canal: dto.canal,
-        canalId: dto.canalId,
-        fluxoId: fluxo.id,
-        clienteReconhecido: Boolean(contextoInicial.__clienteCadastrado),
-        ultimoTicketEncontrado: Boolean(ultimoTicket),
-      },
-    );
+    await this.registrarLogSistema(sessaoSalva, 'Sessão de triagem iniciada', 'sessao_iniciada', {
+      canal: dto.canal,
+      canalId: dto.canalId,
+      fluxoId: fluxo.id,
+      clienteReconhecido: Boolean(contextoInicial.__clienteCadastrado),
+      ultimoTicketEncontrado: Boolean(ultimoTicket),
+    });
 
     if (dto.mensagemInicial) {
       await this.registrarLogEntradaTexto(sessaoSalva, dto.mensagemInicial, {
@@ -521,6 +518,104 @@ export class TriagemBotService {
 
     if (sessao.status !== 'em_andamento') {
       throw new BadRequestException('Sessão já foi finalizada');
+    }
+
+    // 🆕 QUICK WIN: Verificar se está em estado de timeout
+    if (sessao.metadados?.timeoutAvisoEnviado) {
+      this.logger.log('⏰ Processando resposta após aviso de timeout');
+
+      // Processar resposta de timeout (1, 2, 3, continuar, atendente, cancelar)
+      const respostaNormalizada = dto.resposta?.toLowerCase().trim();
+
+      if (['1', 'continuar', 'sim'].includes(respostaNormalizada)) {
+        // Resetar flag e continuar normalmente
+        sessao.metadados.timeoutAvisoEnviado = false;
+        sessao.metadados.timeoutContinuado = true;
+        await this.sessaoRepository.save(sessao);
+
+        await this.registrarLogSistema(
+          sessao,
+          'Usuário escolheu continuar após timeout',
+          'timeout_continuado',
+          {},
+        );
+
+        // Continuar fluxo normalmente (processar resposta abaixo)
+      } else if (['2', 'atendente', 'humano', 'pessoa'].includes(respostaNormalizada)) {
+        // Transferir imediatamente para atendente
+        sessao.metadados.timeoutAvisoEnviado = false;
+        sessao.metadados.timeoutTransferido = true;
+
+        await this.registrarLogSistema(
+          sessao,
+          'Usuário escolheu falar com atendente após timeout',
+          'timeout_transferir_atendente',
+          {},
+        );
+
+        // Buscar núcleo geral ou primeiro disponível
+        const nucleoGeral = await this.nucleoRepository.findOne({
+          where: {
+            codigo: 'NUC_GERAL',
+            empresaId: sessao.empresaId,
+            ativo: true
+          },
+        });
+
+        if (nucleoGeral) {
+          return await this.transferirParaNucleo(sessao, sessao.fluxo, {
+            nucleoId: nucleoGeral.id,
+            motivo: 'timeout_escolheu_atendente',
+          });
+        } else {
+          // Se não tem núcleo geral, buscar primeiro ativo
+          const primeiroNucleo = await this.nucleoRepository.findOne({
+            where: { empresaId: sessao.empresaId, ativo: true },
+          });
+
+          if (primeiroNucleo) {
+            return await this.transferirParaNucleo(sessao, sessao.fluxo, {
+              nucleoId: primeiroNucleo.id,
+              motivo: 'timeout_escolheu_atendente',
+            });
+          }
+        }
+      } else if (['3', 'cancelar', 'sair', 'não', 'nao'].includes(respostaNormalizada)) {
+        // Cancelar atendimento
+        sessao.status = 'cancelada';
+        sessao.finalizadaEm = new Date();
+        sessao.metadados.motivoCancelamento = 'timeout_usuario_cancelou';
+        await this.sessaoRepository.save(sessao);
+
+        await this.registrarLogSistema(
+          sessao,
+          'Usuário escolheu cancelar após timeout',
+          'timeout_cancelado',
+          {},
+        );
+
+        return {
+          mensagem: '✅ Atendimento cancelado.\n\nQuando precisar, é só chamar! 👋',
+          sessaoId: sessao.id,
+          etapaAtual: sessao.etapaAtual,
+          aguardaResposta: false,
+          finalizado: true,
+        };
+      } else {
+        // Qualquer outra resposta = assumir que quer continuar
+        sessao.metadados.timeoutAvisoEnviado = false;
+        sessao.metadados.timeoutContinuadoAutomatico = true;
+        await this.sessaoRepository.save(sessao);
+
+        await this.registrarLogSistema(
+          sessao,
+          'Resposta não reconhecida após timeout, continuando fluxo',
+          'timeout_continuado_automatico',
+          { resposta: dto.resposta },
+        );
+
+        // Continuar processamento normal abaixo
+      }
     }
 
     if (sessao.estaExpirada()) {
@@ -579,7 +674,9 @@ export class TriagemBotService {
     // 🎯 VERIFICAR SE ESTÁ AGUARDANDO TRANSFERÊNCIA
     // Se a sessão já tem flag de transferência, finalizar imediatamente e criar ticket
     if (sessao.contexto?.__aguardandoTransferencia) {
-      this.logger.log('🎫 [TRANSFERÊNCIA] Detectada flag __aguardandoTransferencia - finalizando triagem e criando ticket');
+      this.logger.log(
+        '🎫 [TRANSFERÊNCIA] Detectada flag __aguardandoTransferencia - finalizando triagem e criando ticket',
+      );
       return await this.finalizarTriagem(sessao, fluxo);
     }
 
@@ -614,7 +711,7 @@ export class TriagemBotService {
     if (
       sessao.etapaAtual === 'confirmar-dados-cliente' ||
       sessao.etapaAtual === 'confirmacao-dados' ||
-      sessao.etapaAtual === 'verificar-dados-atualizados'  // ✅ ADICIONAR NOVA ETAPA
+      sessao.etapaAtual === 'verificar-dados-atualizados' // ✅ ADICIONAR NOVA ETAPA
     ) {
       const { eConfirmacao, eNegacao } = await import('../utils/confirmation-format.util');
 
@@ -627,7 +724,13 @@ export class TriagemBotService {
           sessao,
           'Dados confirmados pelo usuário',
           'dados_confirmados',
-          { dados: { nome: sessao.contexto.nome, email: sessao.contexto.email, empresa: sessao.contexto.empresa } },
+          {
+            dados: {
+              nome: sessao.contexto.nome,
+              email: sessao.contexto.email,
+              empresa: sessao.contexto.empresa,
+            },
+          },
         );
       } else if (eNegacao(dto.resposta)) {
         this.logger.log('❌ Usuário solicitou correção de dados');
@@ -643,7 +746,8 @@ export class TriagemBotService {
       } else {
         // Resposta inválida - pedir confirmação novamente
         return await this.responderComLog(sessao, fluxo, {
-          mensagem: '❌ Resposta inválida.\n\n✅ Digite *SIM* para confirmar os dados\n❌ Digite *NÃO* para corrigir',
+          mensagem:
+            '❌ Resposta inválida.\n\n✅ Digite *SIM* para confirmar os dados\n❌ Digite *NÃO* para corrigir',
           sessaoId: sessao.id,
           etapaAtual: sessao.etapaAtual,
         });
@@ -656,9 +760,7 @@ export class TriagemBotService {
       return await this.gerarRespostaFluxo(sessaoAtualizada, fluxo);
     }
 
-    let opcoesDisponiveis = Array.isArray(etapaAtual.opcoes)
-      ? [...etapaAtual.opcoes]
-      : [];
+    let opcoesDisponiveis = Array.isArray(etapaAtual.opcoes) ? [...etapaAtual.opcoes] : [];
 
     if (sessao.etapaAtual === 'boas-vindas') {
       try {
@@ -673,9 +775,11 @@ export class TriagemBotService {
       const departamentosDisponiveis = sessao.contexto?.__departamentosDisponiveis;
       if (Array.isArray(departamentosDisponiveis) && departamentosDisponiveis.length > 0) {
         const proximaEtapaDepartamentosRaw = sessao.contexto?.__proximaEtapaDepartamento;
-        const proximaEtapaDepartamentos = typeof proximaEtapaDepartamentosRaw === 'string' && proximaEtapaDepartamentosRaw.trim().length > 0
-          ? proximaEtapaDepartamentosRaw.trim()
-          : 'transferir-atendimento';
+        const proximaEtapaDepartamentos =
+          typeof proximaEtapaDepartamentosRaw === 'string' &&
+            proximaEtapaDepartamentosRaw.trim().length > 0
+            ? proximaEtapaDepartamentosRaw.trim()
+            : 'transferir-atendimento';
 
         opcoesDisponiveis = criarOpcoesDepartamentos(
           sessao,
@@ -691,6 +795,86 @@ export class TriagemBotService {
       const respostaNormalizada = normalizarTextoMenu(respostaOriginal);
       const respostaNumerica = respostaOriginal.replace(/\D/g, '');
 
+      // 🆕 QUICK WIN: Detectar atalhos de palavras-chave
+      const atalho = KeywordShortcuts.detectar(respostaOriginal);
+
+      if (atalho && atalho.confianca > 0.8) {
+        this.logger.log(
+          `🎯 [ATALHO] Detectado: ${atalho.categoria} (${(atalho.confianca * 100).toFixed(0)}% confiança)`,
+        );
+
+        // Se detectou núcleo, ir para confirmação
+        if (atalho.nucleoCodigo) {
+          const nucleo = await this.nucleoRepository.findOne({
+            where: {
+              codigo: atalho.nucleoCodigo,
+              empresaId: sessao.empresaId,
+              ativo: true
+            },
+          });
+
+          if (nucleo) {
+            // Salvar destino no contexto
+            sessao.contexto.destinoNucleoId = nucleo.id;
+            sessao.contexto.areaTitulo = nucleo.nome.toLowerCase();
+            sessao.metadados.atalhoDetectado = {
+              categoria: atalho.categoria,
+              confianca: atalho.confianca,
+              palavras: atalho.palavrasEncontradas,
+            };
+
+            // Ir para confirmação rápida
+            sessao.etapaAtual = 'confirmar-atalho';
+            await this.sessaoRepository.save(sessao);
+
+            return await this.responderComLog(sessao, fluxo, {
+              mensagem: `✅ Entendi! Você precisa de ajuda com *${nucleo.nome}*.
+
+Posso te encaminhar agora para nossa equipe?
+
+1️⃣ Sim, pode encaminhar
+2️⃣ Não, quero escolher outra opção`,
+              sessaoId: sessao.id,
+              etapaAtual: sessao.etapaAtual,
+              aguardaResposta: true,
+            });
+          }
+        }
+
+        // Se detectou ação de transferir para humano
+        if (atalho.acao === 'transferir_geral') {
+          const nucleoGeral = await this.nucleoRepository.findOne({
+            where: {
+              codigo: 'NUC_GERAL',
+              empresaId: sessao.empresaId,
+              ativo: true
+            },
+          });
+
+          if (nucleoGeral) {
+            sessao.contexto.destinoNucleoId = nucleoGeral.id;
+            sessao.contexto.areaTitulo = 'atendimento humano';
+            sessao.etapaAtual = 'coleta-resumo'; // Coleta motivo rápido antes de transferir
+            await this.sessaoRepository.save(sessao);
+
+            return await this.responderComLog(sessao, fluxo, {
+              mensagem: '👤 Vou te conectar com um atendente humano!\n\nAntes, conta rapidamente: qual o motivo do seu contato?\n\n💡 Digite SAIR para cancelar',
+              sessaoId: sessao.id,
+              etapaAtual: sessao.etapaAtual,
+              aguardaResposta: true,
+            });
+          }
+        }
+
+        // Se detectou ação de sair/cancelar
+        if (atalho.acao === 'finalizar') {
+          this.logger.log('❌ Usuário solicitou cancelamento via atalho');
+          sessao.contexto.__mensagemFinal =
+            '👋 Atendimento cancelado. Caso precise de ajuda novamente, é só mandar uma mensagem! Até logo.';
+          return await this.finalizarTriagem(sessao, fluxo);
+        }
+      }
+
       if (['sair', 'cancelar'].includes(respostaNormalizada)) {
         if (fluxo?.permiteSair === false) {
           this.logger.log('🚫 Fluxo configurado para não permitir saída via comando "sair".');
@@ -704,12 +888,15 @@ export class TriagemBotService {
 
         this.logger.log('❌ Usuário solicitou cancelamento da triagem (menu).');
         sessao.contexto = sessao.contexto || {};
-        sessao.contexto.__mensagemFinal = '👋 Atendimento cancelado. Caso precise de ajuda novamente, é só mandar uma mensagem! Até logo.';
+        sessao.contexto.__mensagemFinal =
+          '👋 Atendimento cancelado. Caso precise de ajuda novamente, é só mandar uma mensagem! Até logo.';
         return await this.finalizarTriagem(sessao, fluxo);
       }
 
       this.logger.debug(`🔍 Procurando opção para resposta: "${respostaOriginal}"`);
-      this.logger.debug(`📋 Opções disponíveis: ${opcoesDisponiveis.map(op => `"${op.valor}"`).join(', ')}`);
+      this.logger.debug(
+        `📋 Opções disponíveis: ${opcoesDisponiveis.map((op) => `"${op.valor}"`).join(', ')}`,
+      );
 
       const opcaoEscolhida = opcoesDisponiveis.find((op, index) => {
         const valorOriginal = op.valor != null ? String(op.valor) : String(index + 1);
@@ -730,8 +917,9 @@ export class TriagemBotService {
         }
 
         if (Array.isArray((op as any).aliases)) {
-          const aliasesNormalizadas = ((op as any).aliases as string[])
-            .map(alias => normalizarTextoMenu(alias));
+          const aliasesNormalizadas = ((op as any).aliases as string[]).map((alias) =>
+            normalizarTextoMenu(alias),
+          );
           if (aliasesNormalizadas.includes(respostaNormalizada)) {
             return true;
           }
@@ -740,11 +928,15 @@ export class TriagemBotService {
         return false;
       });
 
-      this.logger.debug(`✅ Opção encontrada: ${opcaoEscolhida ? `"${opcaoEscolhida.valor}" (${opcaoEscolhida.acao})` : 'NENHUMA'}`);
+      this.logger.debug(
+        `✅ Opção encontrada: ${opcaoEscolhida ? `"${opcaoEscolhida.valor}" (${opcaoEscolhida.acao})` : 'NENHUMA'}`,
+      );
 
       if (!opcaoEscolhida) {
         // Resposta inválida
-        this.logger.warn(`❌ Opção inválida: "${dto.resposta}" não corresponde a nenhuma opção disponível`);
+        this.logger.warn(
+          `❌ Opção inválida: "${dto.resposta}" não corresponde a nenhuma opção disponível`,
+        );
         return await this.responderComLog(sessao, fluxo, {
           mensagem: `❌ Opção inválida. Por favor, escolha uma das opções:\n\n${formatarOpcoes(opcoesDisponiveis)}`,
           sessaoId: sessao.id,
@@ -766,7 +958,8 @@ export class TriagemBotService {
       if (['sair', 'cancelar'].includes(respostaNormalizada)) {
         this.logger.log('❌ Usuário solicitou cancelamento da triagem');
         sessao.contexto = sessao.contexto || {};
-        sessao.contexto.__mensagemFinal = '👋 Atendimento cancelado. Caso precise de ajuda novamente, é só mandar uma mensagem! Até logo.';
+        sessao.contexto.__mensagemFinal =
+          '👋 Atendimento cancelado. Caso precise de ajuda novamente, é só mandar uma mensagem! Até logo.';
         return await this.finalizarTriagem(sessao, fluxo);
       }
 
@@ -815,7 +1008,9 @@ export class TriagemBotService {
 
     if (!proximaEtapa) {
       // Finalizar triagem
-      this.logger.warn(`⚠️ [TRIAGEM] Etapa ${sessao.etapaAtual} sem proximaEtapa definida - finalizando`);
+      this.logger.warn(
+        `⚠️ [TRIAGEM] Etapa ${sessao.etapaAtual} sem proximaEtapa definida - finalizando`,
+      );
       return await this.finalizarTriagem(sessao, fluxo);
     }
 
@@ -874,8 +1069,12 @@ export class TriagemBotService {
       }
     }
 
-    const nucleoResolvido = opcao?.nucleoId || (opcao?.nucleoContextKey ? sessao.contexto?.[opcao.nucleoContextKey] : undefined);
-    const atendenteResolvido = opcao?.atendenteId || (opcao?.atendenteContextKey ? sessao.contexto?.[opcao.atendenteContextKey] : undefined);
+    const nucleoResolvido =
+      opcao?.nucleoId ||
+      (opcao?.nucleoContextKey ? sessao.contexto?.[opcao.nucleoContextKey] : undefined);
+    const atendenteResolvido =
+      opcao?.atendenteId ||
+      (opcao?.atendenteContextKey ? sessao.contexto?.[opcao.atendenteContextKey] : undefined);
 
     switch (opcao.acao) {
       case 'proximo_passo':
@@ -903,7 +1102,9 @@ export class TriagemBotService {
           for (const condicao of opcao.proximaEtapaCondicional) {
             if (this.avaliarCondicao(condicao.se, sessao.contexto)) {
               proximaEtapaDefinida = condicao.entao;
-              this.logger.log(`✅ Condição atendida: ${condicao.se} → Indo para: ${condicao.entao}`);
+              this.logger.log(
+                `✅ Condição atendida: ${condicao.se} → Indo para: ${condicao.entao}`,
+              );
               break;
             }
           }
@@ -989,22 +1190,15 @@ export class TriagemBotService {
     // 🎯 Buscar departamento selecionado (se houver)
     const departamentoId = sessao.contexto?.destinoDepartamentoId || null;
 
-    // 🎯 Buscar atendentes disponíveis com base em atribuições
-    const atendentesDisponiveis = await this.atribuicaoService.buscarAtendentesDisponiveis(
+    const atendenteEscolhido = await this.atribuicaoService.selecionarAtendenteParaRoteamento(
       sessao.empresaId,
       nucleoId,
       departamentoId,
     );
 
-    let atendenteEscolhido = null;
-    if (atendentesDisponiveis.length > 0) {
-      // Selecionar atendente com menor carga
-      atendenteEscolhido = await this.atribuicaoService.selecionarAtendentePorCarga(
-        atendentesDisponiveis,
-        sessao.empresaId,
-      );
+    if (atendenteEscolhido) {
       this.logger.log(
-        `✅ Atendente selecionado: ${atendenteEscolhido?.nome} (${atendenteEscolhido?.id})`,
+        `✅ Atendente selecionado: ${atendenteEscolhido.nome} (${atendenteEscolhido.id})`,
       );
     } else {
       this.logger.warn(
@@ -1044,8 +1238,8 @@ export class TriagemBotService {
     await fluxo.incrementarConclusoes();
     await this.fluxoRepository.save(fluxo);
 
-    let mensagem = nucleo.mensagemBoasVindas ||
-      `✅ Você foi direcionado para o núcleo de ${nucleo.nome}.`;
+    let mensagem =
+      nucleo.mensagemBoasVindas || `✅ Você foi direcionado para o núcleo de ${nucleo.nome}.`;
 
     if (atendenteEscolhido) {
       mensagem += ` O atendente ${atendenteEscolhido.nome} já foi notificado e entrará em contato em breve.`;
@@ -1117,7 +1311,9 @@ export class TriagemBotService {
       try {
         await this.ticketService.atribuir(ticket.id, atendenteId);
       } catch (error) {
-        this.logger.error(`Falha ao atribuir ticket ${ticket.id} ao atendente ${atendenteId}: ${error.message}`);
+        this.logger.error(
+          `Falha ao atribuir ticket ${ticket.id} ao atendente ${atendenteId}: ${error.message}`,
+        );
       }
     }
 
@@ -1138,7 +1334,8 @@ export class TriagemBotService {
     );
 
     return await this.responderComLog(sessao, fluxo, {
-      mensagem: '✅ Você foi direcionado para um atendente especializado. Em breve iniciaremos o atendimento.',
+      mensagem:
+        '✅ Você foi direcionado para um atendente especializado. Em breve iniciaremos o atendimento.',
       sessaoId: sessao.id,
       finalizado: true,
       atendenteId,
@@ -1150,10 +1347,7 @@ export class TriagemBotService {
   /**
    * Finaliza triagem sem transferência específica
    */
-  private async finalizarTriagem(
-    sessao: SessaoTriagem,
-    fluxo: FluxoTriagem,
-  ): Promise<RespostaBot> {
+  private async finalizarTriagem(sessao: SessaoTriagem, fluxo: FluxoTriagem): Promise<RespostaBot> {
     // 🆕 VERIFICAR SE ESTÁ AGUARDANDO TRANSFERÊNCIA
     if (sessao.contexto?.__aguardandoTransferencia) {
       this.logger.log(`🎫 [TRIAGEM FINALIZADA] Criando ticket para transferência`);
@@ -1187,7 +1381,8 @@ export class TriagemBotService {
 
           // 🎬 Enviar sequência de mensagens profissionais ao cliente
           const numeroTicket = ticket.numero || ticket.id.substring(0, 8).toUpperCase();
-          const primeiraMsg = `✅ *Atendimento Registrado*\n\n` +
+          const primeiraMsg =
+            `✅ *Atendimento Registrado*\n\n` +
             `Seu protocolo de atendimento é:\n` +
             `🎫 *#${numeroTicket}*\n\n` +
             `_Processando sua solicitação..._`;
@@ -1206,7 +1401,8 @@ export class TriagemBotService {
 
             // 🔄 Fallback: tentar enviar mensagem simples e encerrar sequência
             try {
-              const msgFallback = `✅ Atendimento registrado!\n\n` +
+              const msgFallback =
+                `✅ Atendimento registrado!\n\n` +
                 `Protocolo: #${ticket.numero || 'AGUARDE'}\n\n` +
                 `Você será atendido em breve. Aguarde na linha.`;
 
@@ -1226,56 +1422,79 @@ export class TriagemBotService {
           let nomeAtendente = ticket.atendenteNome || null;
           if (!nomeAtendente && ticket.atendenteId) {
             try {
-              const atendente = await this.userRepository.findOne({ where: { id: ticket.atendenteId } });
+              const atendente = await this.userRepository.findOne({
+                where: { id: ticket.atendenteId },
+              });
               nomeAtendente = atendente?.nome || null;
               if (nomeAtendente) {
-                this.logger.log(`👤 [TRIAGEM] Nome do atendente obtido via repositório: ${nomeAtendente}`);
+                this.logger.log(
+                  `👤 [TRIAGEM] Nome do atendente obtido via repositório: ${nomeAtendente}`,
+                );
               }
             } catch (error) {
-              this.logger.warn(`⚠️ [TRIAGEM] Não foi possível buscar nome do atendente (${ticket.atendenteId}): ${error instanceof Error ? error.message : String(error)}`);
+              this.logger.warn(
+                `⚠️ [TRIAGEM] Não foi possível buscar nome do atendente (${ticket.atendenteId}): ${error instanceof Error ? error.message : String(error)}`,
+              );
             }
           }
 
           if (continuarSequencia) {
             // Se ainda não temos nome do atendente, aguardar breve intervalo e consultar ticket novamente
             if (!nomeAtendente) {
-              await new Promise(resolve => setTimeout(resolve, 1200));
+              await new Promise((resolve) => setTimeout(resolve, 1200));
               try {
-                const ticketAtualizado = await this.ticketService.buscarPorId(ticket.id, sessao.empresaId);
-                if (ticketAtualizado?.atendenteId && ticketAtualizado.atendenteId !== ticket.atendenteId) {
-                  this.logger.log(`🔄 [TRIAGEM] Ticket atualizado com novo atendente: ${ticketAtualizado.atendenteId}`);
+                const ticketAtualizado = await this.ticketService.buscarPorId(
+                  ticket.id,
+                  sessao.empresaId,
+                );
+                if (
+                  ticketAtualizado?.atendenteId &&
+                  ticketAtualizado.atendenteId !== ticket.atendenteId
+                ) {
+                  this.logger.log(
+                    `🔄 [TRIAGEM] Ticket atualizado com novo atendente: ${ticketAtualizado.atendenteId}`,
+                  );
                 }
 
                 if (!ticketAtualizado?.atendenteNome && ticketAtualizado?.atendenteId) {
-                  const atendente = await this.userRepository.findOne({ where: { id: ticketAtualizado.atendenteId } });
+                  const atendente = await this.userRepository.findOne({
+                    where: { id: ticketAtualizado.atendenteId },
+                  });
                   nomeAtendente = atendente?.nome || null;
                 } else if (ticketAtualizado?.atendenteNome) {
                   nomeAtendente = ticketAtualizado.atendenteNome;
                 }
 
                 if (nomeAtendente) {
-                  this.logger.log(`✅ [TRIAGEM] Nome do atendente obtido após reconsulta: ${nomeAtendente}`);
+                  this.logger.log(
+                    `✅ [TRIAGEM] Nome do atendente obtido após reconsulta: ${nomeAtendente}`,
+                  );
                 }
               } catch (error) {
-                this.logger.warn(`⚠️ [TRIAGEM] Falha ao reconsultar ticket ${ticket.id}: ${error instanceof Error ? error.message : String(error)}`);
+                this.logger.warn(
+                  `⚠️ [TRIAGEM] Falha ao reconsultar ticket ${ticket.id}: ${error instanceof Error ? error.message : String(error)}`,
+                );
               }
             }
 
             // ⏱️ Delay + indicador de digitação (2 segundos)
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise((resolve) => setTimeout(resolve, 2000));
             try {
               await this.whatsAppSenderService.enviarIndicadorDigitacao(
                 sessao.empresaId,
                 sessao.contatoTelefone,
               );
             } catch (error) {
-              this.logger.warn(`⚠️ [WHATSAPP] Não foi possível enviar indicador de digitação (1ª etapa): ${error instanceof Error ? error.message : String(error)}`);
+              this.logger.warn(
+                `⚠️ [WHATSAPP] Não foi possível enviar indicador de digitação (1ª etapa): ${error instanceof Error ? error.message : String(error)}`,
+              );
             }
-            await new Promise(resolve => setTimeout(resolve, 800)); // Mostra "..." por 0.8s
+            await new Promise((resolve) => setTimeout(resolve, 800)); // Mostra "..." por 0.8s
 
             // 2️⃣ Informar sobre atendente atribuído
             if (nomeAtendente) {
-              const segundaMsg = `👤 *Atendente Designado*\n\n` +
+              const segundaMsg =
+                `👤 *Atendente Designado*\n\n` +
                 `Você será atendido por:\n` +
                 `*${nomeAtendente}*\n\n` +
                 `Departamento: _${departamentoNome}_`;
@@ -1286,42 +1505,16 @@ export class TriagemBotService {
                   segundaMsg,
                   sessao.empresaId,
                 );
-                this.logger.log(`📱 [WHATSAPP] 2/3 - Info do atendente enviada`);
+                this.logger.log(`📱 [WHATSAPP] 2/2 - Info do atendente enviada`);
               } catch (error) {
-                this.logger.error(`❌ [WHATSAPP] Erro ao enviar informação do atendente: ${error instanceof Error ? error.message : String(error)}`);
-              }
-
-              // ⏱️ Delay + indicador de digitação (1.5 segundos)
-              await new Promise(resolve => setTimeout(resolve, 1500));
-              try {
-                await this.whatsAppSenderService.enviarIndicadorDigitacao(
-                  sessao.empresaId,
-                  sessao.contatoTelefone,
+                this.logger.error(
+                  `❌ [WHATSAPP] Erro ao enviar informação do atendente: ${error instanceof Error ? error.message : String(error)}`,
                 );
-              } catch (error) {
-                this.logger.warn(`⚠️ [WHATSAPP] Não foi possível enviar indicador de digitação (2ª etapa): ${error instanceof Error ? error.message : String(error)}`);
-              }
-              await new Promise(resolve => setTimeout(resolve, 800));
-
-              // 3️⃣ Mensagem final com expectativa de tempo
-              const terceiraMsg = `⏰ *Tempo de Espera*\n\n` +
-                `Você está em fila prioritária!\n\n` +
-                `_Em breve ${nomeAtendente} iniciará o atendimento._\n\n` +
-                `💬 Aguarde na linha, por favor.`;
-
-              try {
-                await this.enviarMensagemWhatsApp(
-                  sessao.contatoTelefone,
-                  terceiraMsg,
-                  sessao.empresaId,
-                );
-                this.logger.log(`📱 [WHATSAPP] 3/3 - Tempo de espera informado`);
-              } catch (error) {
-                this.logger.error(`❌ [WHATSAPP] Erro ao enviar tempo de espera: ${error instanceof Error ? error.message : String(error)}`);
               }
             } else {
               // 2️⃣ Alternativa: Nenhum atendente disponível no momento
-              const segundaMsg = `⏳ *Buscando Atendente...*\n\n` +
+              const segundaMsg =
+                `⏳ *Buscando Atendente...*\n\n` +
                 `Estamos localizando um especialista disponível.\n\n` +
                 `Departamento: _${departamentoNome}_\n\n` +
                 `_Você receberá uma notificação assim que o atendimento iniciar._`;
@@ -1332,9 +1525,13 @@ export class TriagemBotService {
                   segundaMsg,
                   sessao.empresaId,
                 );
-                this.logger.warn(`⚠️ [TICKET] 2/2 - Nenhum atendente atribuído - cliente informado`);
+                this.logger.warn(
+                  `⚠️ [TICKET] 2/2 - Nenhum atendente atribuído - cliente informado`,
+                );
               } catch (error) {
-                this.logger.error(`❌ [WHATSAPP] Erro ao informar ausência de atendente: ${error instanceof Error ? error.message : String(error)}`);
+                this.logger.error(
+                  `❌ [WHATSAPP] Erro ao informar ausência de atendente: ${error instanceof Error ? error.message : String(error)}`,
+                );
               }
             }
           }
@@ -1354,15 +1551,10 @@ export class TriagemBotService {
       (sessao.contexto?.__mensagemFinal && String(sessao.contexto.__mensagemFinal)) ||
       '✅ Triagem concluída! Obrigado pelas informações.';
 
-    await this.registrarLogSistema(
-      sessao,
-      'Sessão de triagem finalizada',
-      'sessao_finalizada',
-      {
-        ticketId: sessao.ticketId,
-        mensagemFinal: mensagemFinal,
-      },
-    );
+    await this.registrarLogSistema(sessao, 'Sessão de triagem finalizada', 'sessao_finalizada', {
+      ticketId: sessao.ticketId,
+      mensagemFinal: mensagemFinal,
+    });
 
     return await this.responderComLog(sessao, fluxo, {
       mensagem: mensagemFinal,
@@ -1393,7 +1585,9 @@ export class TriagemBotService {
 
     const ticketAtivo = ticketsExistentes?.find((ticket) => {
       const statusNormalizado = (ticket.status || '').toUpperCase() as StatusTicket;
-      return [StatusTicket.ABERTO, StatusTicket.EM_ATENDIMENTO, StatusTicket.AGUARDANDO].includes(statusNormalizado);
+      return [StatusTicket.ABERTO, StatusTicket.EM_ATENDIMENTO, StatusTicket.AGUARDANDO].includes(
+        statusNormalizado,
+      );
     });
 
     if (ticketAtivo) {
@@ -1485,22 +1679,26 @@ export class TriagemBotService {
   private gerarDescricaoTicket(sessao: SessaoTriagem, fluxo: FluxoTriagem): string {
     const historico = Array.isArray(sessao.historico) ? sessao.historico : [];
 
-    const respostas = historico.length > 0
-      ? historico
-        .map((item, index) => {
-          const etapa = fluxo?.estrutura?.etapas?.[item.etapa];
-          const pergunta = etapa?.mensagem
-            ? etapa.mensagem.replace(/\s+/g, ' ').trim()
-            : item.etapa;
-          return `${index + 1}. ${pergunta}: ${item.resposta}`;
-        })
-        .join('\n')
-      : 'Nenhuma resposta registrada durante a triagem.';
+    const respostas =
+      historico.length > 0
+        ? historico
+          .map((item, index) => {
+            const etapa = fluxo?.estrutura?.etapas?.[item.etapa];
+            const pergunta = etapa?.mensagem
+              ? etapa.mensagem.replace(/\s+/g, ' ').trim()
+              : item.etapa;
+            return `${index + 1}. ${pergunta}: ${item.resposta}`;
+          })
+          .join('\n')
+        : 'Nenhuma resposta registrada durante a triagem.';
 
     const contexto = sessao.contexto || {};
     const variaveis = Object.entries(contexto)
       .filter(([chave]) => !chave.startsWith('__'))
-      .map(([chave, valor]) => `${chave}: ${typeof valor === 'object' ? JSON.stringify(valor) : valor}`)
+      .map(
+        ([chave, valor]) =>
+          `${chave}: ${typeof valor === 'object' ? JSON.stringify(valor) : valor}`,
+      )
       .join('\n');
 
     const contextoTexto = variaveis ? `\n\nContexto coletado:\n${variaveis}` : '';
@@ -1700,14 +1898,10 @@ export class TriagemBotService {
     }
   }
 
-
   /**
    * Avalia condições para etapa condicional
    */
-  private avaliarCondicoes(
-    condicoes: any[],
-    contexto: Record<string, any>,
-  ): string | null {
+  private avaliarCondicoes(condicoes: any[], contexto: Record<string, any>): string | null {
     for (const condicao of condicoes) {
       const valor = contexto[condicao.variavel];
       let resultado = false;
@@ -1747,16 +1941,16 @@ export class TriagemBotService {
       // Permitir combinações com && e || dividindo em grupos
       const gruposOu = expressao
         .split('||')
-        .map(grupo => grupo.trim())
+        .map((grupo) => grupo.trim())
         .filter(Boolean);
 
       for (const grupo of gruposOu) {
         const condicoesE = grupo
           .split('&&')
-          .map(condicao => condicao.trim())
+          .map((condicao) => condicao.trim())
           .filter(Boolean);
 
-        const todasCondicoesAtendidas = condicoesE.every(condicao =>
+        const todasCondicoesAtendidas = condicoesE.every((condicao) =>
           this.avaliarExpressaoSimples(condicao, contexto),
         );
 
@@ -1780,16 +1974,16 @@ export class TriagemBotService {
 
     if (expr.includes('===')) {
       operador = '===';
-      partes = expr.split('===').map(p => p.trim());
+      partes = expr.split('===').map((p) => p.trim());
     } else if (expr.includes('!==')) {
       operador = '!==';
-      partes = expr.split('!==').map(p => p.trim());
+      partes = expr.split('!==').map((p) => p.trim());
     } else if (expr.includes('==')) {
       operador = '==';
-      partes = expr.split('==').map(p => p.trim());
+      partes = expr.split('==').map((p) => p.trim());
     } else if (expr.includes('!=')) {
       operador = '!=';
-      partes = expr.split('!=').map(p => p.trim());
+      partes = expr.split('!=').map((p) => p.trim());
     } else {
       this.logger.warn(`⚠️ Operador não suportado na expressão: ${expressao}`);
       return false;
@@ -2017,15 +2211,7 @@ export class TriagemBotService {
 
     // Validação genérica baseada em config da etapa
     if (etapa?.validacao) {
-      const {
-        tipo,
-        minimo,
-        minLength,
-        maximo,
-        maxLength,
-        regex,
-        mensagemErro,
-      } = etapa.validacao;
+      const { tipo, minimo, minLength, maximo, maxLength, regex, mensagemErro } = etapa.validacao;
 
       const minimoAjustado = minimo ?? minLength;
       const maximoAjustado = maximo ?? maxLength;
@@ -2102,4 +2288,3 @@ export class TriagemBotService {
     }
   }
 }
-

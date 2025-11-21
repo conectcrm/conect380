@@ -1,4 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
+} from 'typeorm';
 import { Empresa } from '../../empresas/entities/empresa.entity';
 // import { Contato } from './contato.entity';
 
@@ -95,7 +104,7 @@ export class Cliente {
   /**
    * Relacionamento OneToMany: Um Cliente pode ter vários Contatos
    * Contatos são os funcionários/pessoas vinculadas à empresa (cliente)
-   * 
+   *
    * NOTA: Comentado temporariamente para resolver referência circular
    */
   // @OneToMany(() => Contato, (contato) => contato.cliente, {

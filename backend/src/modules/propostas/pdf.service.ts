@@ -19,7 +19,7 @@ export class PdfService {
       if (typeof value !== 'number') return 'R$ 0,00';
       return new Intl.NumberFormat('pt-BR', {
         style: 'currency',
-        currency: 'BRL'
+        currency: 'BRL',
       }).format(value);
     });
 
@@ -28,7 +28,7 @@ export class PdfService {
       if (typeof value !== 'number') return 'R$ 0,00';
       return new Intl.NumberFormat('pt-BR', {
         style: 'currency',
-        currency: 'BRL'
+        currency: 'BRL',
       }).format(value);
     });
 
@@ -57,8 +57,8 @@ export class PdfService {
     });
 
     // Helper para conditional
-    handlebars.registerHelper('ifEquals', function(arg1, arg2, options) {
-      return (arg1 == arg2) ? options.fn(this) : options.inverse(this);
+    handlebars.registerHelper('ifEquals', function (arg1, arg2, options) {
+      return arg1 == arg2 ? options.fn(this) : options.inverse(this);
     });
   }
 
@@ -69,7 +69,7 @@ export class PdfService {
 
   async gerarHtml(tipo: string, dados: any): Promise<string> {
     const templatePath = path.join(this.templatesPath, `proposta-${tipo}.html`);
-    
+
     if (!fs.existsSync(templatePath)) {
       throw new Error(`Template ${tipo} não encontrado em ${templatePath}`);
     }
@@ -79,20 +79,20 @@ export class PdfService {
 
     // Processar dados para o template
     const dadosProcessados = await this.processarDados(dados);
-    
+
     return template(dadosProcessados);
   }
 
   private async htmlParaPdf(html: string): Promise<Buffer> {
     const browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
 
     try {
       const page = await browser.newPage();
       await page.setContent(html, { waitUntil: 'networkidle0' });
-      
+
       const pdfBuffer = await page.pdf({
         format: 'a4',
         printBackground: true,
@@ -100,8 +100,8 @@ export class PdfService {
           top: '20px',
           right: '20px',
           bottom: '20px',
-          left: '20px'
-        }
+          left: '20px',
+        },
       });
 
       return Buffer.from(pdfBuffer);
@@ -112,7 +112,7 @@ export class PdfService {
 
   private async processarDados(dados: any) {
     const agora = new Date();
-    
+
     // Dados padrão
     const dadosProcessados = {
       ...dados,
@@ -122,13 +122,17 @@ export class PdfService {
 
     // Processar datas
     if (dadosProcessados.dataEmissao) {
-      dadosProcessados.dataEmissao = new Date(dadosProcessados.dataEmissao).toLocaleDateString('pt-BR');
+      dadosProcessados.dataEmissao = new Date(dadosProcessados.dataEmissao).toLocaleDateString(
+        'pt-BR',
+      );
     } else {
       dadosProcessados.dataEmissao = agora.toLocaleDateString('pt-BR');
     }
 
     if (dadosProcessados.dataValidade) {
-      dadosProcessados.dataValidade = new Date(dadosProcessados.dataValidade).toLocaleDateString('pt-BR');
+      dadosProcessados.dataValidade = new Date(dadosProcessados.dataValidade).toLocaleDateString(
+        'pt-BR',
+      );
     }
 
     // Processar valores monetários - removendo formatação pois será feita no template
@@ -180,7 +184,7 @@ export class PdfService {
         cep: '01234-567',
         telefone: '(11) 99999-9999',
         email: 'contato@conectcrm.com',
-        cnpj: '12.345.678/0001-90'
+        cnpj: '12.345.678/0001-90',
       };
     }
 
@@ -191,16 +195,16 @@ export class PdfService {
     if (typeof valor !== 'number') return 'R$ 0,00';
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(valor);
   }
 
   private getStatusText(status: string): string {
     const statusMap = {
-      'draft': 'Rascunho',
-      'sent': 'Enviada',
-      'approved': 'Aprovada',
-      'rejected': 'Rejeitada'
+      draft: 'Rascunho',
+      sent: 'Enviada',
+      approved: 'Aprovada',
+      rejected: 'Rejeitada',
     };
     return statusMap[status] || 'Desconhecido';
   }

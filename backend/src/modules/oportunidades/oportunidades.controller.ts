@@ -8,158 +8,109 @@ import {
   Delete,
   Query,
   UseGuards,
-  ParseIntPipe
+  ParseIntPipe,
+  Request,
 } from '@nestjs/common';
 import { OportunidadesService } from './oportunidades.service';
-import { CreateOportunidadeDto, UpdateOportunidadeDto, UpdateEstagioDto, MetricasQueryDto } from './dto/oportunidade.dto';
+import {
+  CreateOportunidadeDto,
+  UpdateOportunidadeDto,
+  UpdateEstagioDto,
+  MetricasQueryDto,
+} from './dto/oportunidade.dto';
 import { CreateAtividadeDto } from './dto/atividade.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CurrentUser } from '../auth/current-user.decorator';
-import { User } from '../users/user.entity';
+import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { EmpresaId } from '../../common/decorators/empresa.decorator';
 import { EstagioOportunidade } from './oportunidade.entity';
 
 @Controller('oportunidades')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class OportunidadesController {
   constructor(private readonly oportunidadesService: OportunidadesService) { }
 
   @Post()
-  create(@Body() createOportunidadeDto: CreateOportunidadeDto, @CurrentUser() user?: User) {
-    // Mock user para teste com UUID válido
-    const mockUser = user || {
-      id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479', // UUID fixo para teste
-      role: 'admin',
-      empresa_id: 'f47ac10b-58cc-4372-a567-0e02b2c3d480',
-      nome: 'Admin Teste'
-    } as User;
-    return this.oportunidadesService.create(createOportunidadeDto, mockUser);
+  create(@Body() createOportunidadeDto: CreateOportunidadeDto, @EmpresaId() empresaId: string) {
+    return this.oportunidadesService.create(createOportunidadeDto, empresaId);
   }
 
   @Get()
   findAll(
-    @CurrentUser() user?: User,
+    @EmpresaId() empresaId: string,
     @Query('estagio') estagio?: EstagioOportunidade,
     @Query('responsavel_id') responsavel_id?: string,
     @Query('cliente_id') cliente_id?: string,
     @Query('dataInicio') dataInicio?: string,
     @Query('dataFim') dataFim?: string,
   ) {
-    // Mock user para teste
-    const mockUser = user || {
-      id: 'mock-user',
-      role: 'admin',
-      empresa_id: '1',
-      nome: 'Admin Teste'
-    } as User;
-
     const filters = {
       estagio,
-      responsavel_id: responsavel_id ? parseInt(responsavel_id) : undefined,
-      cliente_id: cliente_id ? parseInt(cliente_id) : undefined,
+      responsavel_id: responsavel_id || undefined,
+      cliente_id: cliente_id || undefined,
       dataInicio,
-      dataFim
+      dataFim,
     };
 
-    return this.oportunidadesService.findAll(mockUser, filters);
+    return this.oportunidadesService.findAll(empresaId, filters);
   }
 
   @Get('pipeline')
-  getPipelineData(@CurrentUser() user?: User) {
-    // Mock user para teste
-    const mockUser = user || {
-      id: 'mock-user',
-      role: 'admin',
-      empresa_id: '1',
-      nome: 'Admin Teste'
-    } as User;
-    return this.oportunidadesService.getPipelineData(mockUser);
+  getPipelineData(@EmpresaId() empresaId: string) {
+    return this.oportunidadesService.getPipelineData(empresaId);
   }
 
   @Get('metricas')
-  getMetricas(
-    @CurrentUser() user?: User,
-    @Query() queryDto?: MetricasQueryDto,
-  ) {
-    // Mock user para teste
-    const mockUser = user || {
-      id: 'mock-user',
-      role: 'admin',
-      empresa_id: '1',
-      nome: 'Admin Teste'
-    } as User;
-    return this.oportunidadesService.getMetricas(mockUser, queryDto);
+  getMetricas(@EmpresaId() empresaId: string, @Query() queryDto?: MetricasQueryDto) {
+    return this.oportunidadesService.getMetricas(empresaId, queryDto);
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user?: User) {
-    // Mock user para teste
-    const mockUser = user || {
-      id: 'mock-user',
-      role: 'admin',
-      empresa_id: '1',
-      nome: 'Admin Teste'
-    } as User;
-    return this.oportunidadesService.findOne(id, mockUser);
+  findOne(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
+    return this.oportunidadesService.findOne(id, empresaId);
   }
 
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateOportunidadeDto: UpdateOportunidadeDto,
-    @CurrentUser() user?: User
+    @EmpresaId() empresaId: string,
   ) {
-    // Mock user para teste
-    const mockUser = user || {
-      id: 'mock-user',
-      role: 'admin',
-      empresa_id: '1',
-      nome: 'Admin Teste'
-    } as User;
-    return this.oportunidadesService.update(id, updateOportunidadeDto, mockUser);
+    return this.oportunidadesService.update(id, updateOportunidadeDto, empresaId);
   }
 
   @Patch(':id/estagio')
   updateEstagio(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateEstagioDto: UpdateEstagioDto,
-    @CurrentUser() user?: User
+    @EmpresaId() empresaId: string,
   ) {
-    // Mock user para teste
-    const mockUser = user || {
-      id: 'mock-user',
-      role: 'admin',
-      empresa_id: '1',
-      nome: 'Admin Teste'
-    } as User;
-    return this.oportunidadesService.updateEstagio(id, updateEstagioDto, mockUser);
+    return this.oportunidadesService.updateEstagio(id, updateEstagioDto, empresaId);
   }
 
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user?: User) {
-    // Mock user para teste
-    const mockUser = user || {
-      id: 'mock-user',
-      role: 'admin',
-      empresa_id: '1',
-      nome: 'Admin Teste'
-    } as User;
-    return this.oportunidadesService.remove(id, mockUser);
+  remove(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
+    return this.oportunidadesService.remove(id, empresaId);
+  }
+
+  @Get(':id/atividades')
+  listarAtividades(
+    @Param('id', ParseIntPipe) id: number,
+    @EmpresaId() empresaId: string,
+  ) {
+    return this.oportunidadesService.listarAtividades(id, empresaId);
   }
 
   @Post(':id/atividades')
   createAtividade(
     @Param('id', ParseIntPipe) id: number,
     @Body() createAtividadeDto: CreateAtividadeDto,
-    @CurrentUser() user?: User
+    @EmpresaId() empresaId: string,
+    @Request() req,
   ) {
-    // Mock user para teste
-    const mockUser = user || {
-      id: 'mock-user',
-      role: 'admin',
-      empresa_id: '1',
-      nome: 'Admin Teste'
-    } as User;
     createAtividadeDto.oportunidade_id = id;
-    return this.oportunidadesService.createAtividade(createAtividadeDto, mockUser);
+    return this.oportunidadesService.createAtividade(createAtividadeDto, {
+      userId: req.user?.id,
+      empresaId,
+    });
   }
 }

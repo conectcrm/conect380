@@ -13,25 +13,12 @@ import { PropostasModule } from '../propostas/propostas.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      Fatura,
-      ItemFatura,
-      Pagamento,
-      PlanoCobranca,
-    ]),
+    TypeOrmModule.forFeature([Fatura, ItemFatura, Pagamento, PlanoCobranca]),
     forwardRef(() => ContratosModule), // Para evitar dependência circular
     PropostasModule, // Para acessar o EmailIntegradoService
   ],
   controllers: [FaturamentoController],
-  providers: [
-    FaturamentoService,
-    PagamentoService,
-    CobrancaService,
-  ],
-  exports: [
-    FaturamentoService,
-    PagamentoService,
-    CobrancaService,
-  ],
+  providers: [FaturamentoService, PagamentoService, CobrancaService],
+  exports: [FaturamentoService, PagamentoService, CobrancaService],
 })
-export class FaturamentoModule { }
+export class FaturamentoModule {}

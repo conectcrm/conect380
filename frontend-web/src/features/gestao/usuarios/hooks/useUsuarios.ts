@@ -19,7 +19,9 @@ export const useUsuarios = () => {
     role: '',
     ativo: '',
     ordenacao: 'nome',
-    direcao: 'asc'
+    direcao: 'asc',
+    limite: 100,
+    pagina: 1,
   });
 
   const carregarUsuarios = useCallback(async (mostrarLoading = true) => {
@@ -27,8 +29,8 @@ export const useUsuarios = () => {
       if (mostrarLoading) setLoading(true);
       setError(null);
 
-      const usuariosData = await usuariosService.listarUsuarios(filtros);
-      setUsuarios(usuariosData);
+      const resposta = await usuariosService.listarUsuarios(filtros);
+      setUsuarios(resposta.usuarios);
     } catch (error: any) {
       console.error('Erro ao carregar usuários:', error);
       setError(error.message || 'Erro ao carregar usuários');
@@ -122,7 +124,9 @@ export const useUsuarios = () => {
       role: '',
       ativo: '',
       ordenacao: 'nome',
-      direcao: 'asc'
+      direcao: 'asc',
+      limite: 100,
+      pagina: 1,
     });
   }, []);
 

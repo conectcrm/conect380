@@ -15,7 +15,11 @@ export interface BaseChannelAdapter {
   /**
    * Envia mensagem de texto
    */
-  enviarMensagem(destinatario: string, mensagem: string, opcoes?: EnviarMensagemOpcoes): Promise<MensagemEnviada>;
+  enviarMensagem(
+    destinatario: string,
+    mensagem: string,
+    opcoes?: EnviarMensagemOpcoes,
+  ): Promise<MensagemEnviada>;
 
   /**
    * Envia mídia (imagem, áudio, vídeo, documento)

@@ -383,54 +383,54 @@ export default function FornecedoresPage() {
 
         {/* Cards de Dashboard */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+          <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total de Fornecedores</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{dashboardCards.totalFornecedores}</p>
-                <p className="text-xs text-gray-400 mt-1">📊 Visão geral</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Total de Fornecedores</p>
+                <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.totalFornecedores}</p>
+                <p className="text-sm text-[#002333]/70 mt-3">📊 Visão geral</p>
               </div>
-              <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl">
-                <Building2 className="w-8 h-8 text-blue-600" />
+              <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                <Building2 className="w-6 h-6 text-[#159A9C]" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+          <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Fornecedores Ativos</p>
-                <p className="text-3xl font-bold text-green-600 mt-2">{dashboardCards.fornecedoresAtivos}</p>
-                <p className="text-xs text-green-500 mt-1">✅ Operacionais</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Fornecedores Ativos</p>
+                <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.fornecedoresAtivos}</p>
+                <p className="text-sm text-[#002333]/70 mt-3">✅ Operacionais</p>
               </div>
-              <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-xl">
-                <CheckCircle className="w-8 h-8 text-green-600" />
+              <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
+                <CheckCircle className="w-6 h-6 text-green-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+          <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Fornecedores Inativos</p>
-                <p className="text-3xl font-bold text-red-600 mt-2">{dashboardCards.fornecedoresInativos}</p>
-                <p className="text-xs text-red-500 mt-1">❌ Suspensos</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Fornecedores Inativos</p>
+                <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.fornecedoresInativos}</p>
+                <p className="text-sm text-[#002333]/70 mt-3">❌ Suspensos</p>
               </div>
-              <div className="p-4 bg-gradient-to-br from-red-100 to-red-200 rounded-xl">
-                <X className="w-8 h-8 text-red-600" />
+              <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center shadow-sm">
+                <X className="w-6 h-6 text-red-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+          <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Cadastrados Hoje</p>
-                <p className="text-3xl font-bold text-purple-600 mt-2">{dashboardCards.fornecedoresCadastradosHoje}</p>
-                <p className="text-xs text-purple-500 mt-1">🆕 Novos</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Cadastrados Hoje</p>
+                <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.fornecedoresCadastradosHoje}</p>
+                <p className="text-sm text-[#002333]/70 mt-3">🆕 Novos</p>
               </div>
-              <div className="p-4 bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl">
-                <Calendar className="w-8 h-8 text-purple-600" />
+              <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                <Calendar className="w-6 h-6 text-[#159A9C]" />
               </div>
             </div>
           </div>

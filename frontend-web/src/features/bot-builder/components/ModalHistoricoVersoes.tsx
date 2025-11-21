@@ -134,7 +134,7 @@ export const ModalHistoricoVersoes: React.FC<ModalHistoricoVersoesProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="w-[calc(100%-2rem)] sm:w-[600px] md:w-[750px] lg:w-[850px] xl:w-[900px] max-w-[1000px] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
           <div>
@@ -197,8 +197,8 @@ export const ModalHistoricoVersoes: React.FC<ModalHistoricoVersoesProps> = ({
                 <div
                   key={`${versao.numero}-${index}`}
                   className={`border rounded-xl p-4 transition-all ${versao.publicada
-                      ? 'border-green-300 bg-green-50/50 hover:border-green-400 hover:shadow-md'
-                      : 'border-gray-200 bg-white hover:border-purple-300 hover:shadow-md'
+                    ? 'border-green-300 bg-green-50/50 hover:border-green-400 hover:shadow-md'
+                    : 'border-gray-200 bg-white hover:border-purple-300 hover:shadow-md'
                     }`}
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -232,8 +232,8 @@ export const ModalHistoricoVersoes: React.FC<ModalHistoricoVersoesProps> = ({
                         onClick={() => handleRestore(versao.numero)}
                         disabled={loading || restoring !== null}
                         className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all ${restoring === versao.numero
-                            ? 'bg-purple-200 text-purple-900 cursor-wait'
-                            : 'text-purple-600 bg-purple-50 hover:bg-purple-100 active:bg-purple-200'
+                          ? 'bg-purple-200 text-purple-900 cursor-wait'
+                          : 'text-purple-600 bg-purple-50 hover:bg-purple-100 active:bg-purple-200'
                           } disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
                         {restoring === versao.numero ? (

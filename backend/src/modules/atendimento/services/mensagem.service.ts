@@ -9,21 +9,27 @@ import axios from 'axios';
 import { parseBuffer } from 'music-metadata';
 import ffmpeg = require('fluent-ffmpeg');
 import ffmpegStatic = require('ffmpeg-static');
-import { Mensagem, TipoMensagem, RemetenteMensagem, StatusMensagem } from '../entities/mensagem.entity';
+import {
+  Mensagem,
+  TipoMensagem,
+  RemetenteMensagem,
+  StatusMensagem,
+} from '../entities/mensagem.entity';
 import { Ticket } from '../entities/ticket.entity';
 import { Canal, TipoCanal } from '../entities/canal.entity';
 import { WhatsAppSenderService } from './whatsapp-sender.service';
+import { EmailSenderService } from './email-sender.service';
 import { AtendimentoGateway } from '../gateways/atendimento.gateway';
 
-const resolvedFfmpegPath = typeof ffmpegStatic === 'string'
-  ? ffmpegStatic
-  : (ffmpegStatic as { path?: string })?.path;
+const resolvedFfmpegPath =
+  typeof ffmpegStatic === 'string' ? ffmpegStatic : (ffmpegStatic as { path?: string })?.path;
 
 if (resolvedFfmpegPath) {
   ffmpeg.setFfmpegPath(resolvedFfmpegPath);
 } else {
-  // eslint-disable-next-line no-console
-  console.warn('⚠️ ffmpeg-static não forneceu caminho válido. Certifique-se de ter o binário do FFmpeg disponível.');
+  console.warn(
+    '⚠️ ffmpeg-static não forneceu caminho válido. Certifique-se de ter o binário do FFmpeg disponível.',
+  );
 }
 
 export interface CriarMensagemDto {
@@ -70,6 +76,7 @@ export class MensagemService {
     @InjectRepository(Canal)
     private canalRepository: Repository<Canal>,
     private whatsappSenderService: WhatsAppSenderService,
+    private emailSenderService: EmailSenderService,
     private atendimentoGateway: AtendimentoGateway,
   ) { }
 
@@ -77,7 +84,9 @@ export class MensagemService {
     try {
       await fsPromises.mkdir(this.uploadsDir, { recursive: true });
     } catch (error) {
-      this.logger.warn(`⚠️ Não foi possível garantir diretório de uploads: ${error instanceof Error ? error.message : error}`);
+      this.logger.warn(
+        `⚠️ Não foi possível garantir diretório de uploads: ${error instanceof Error ? error.message : error}`,
+      );
     }
   }
 
@@ -145,7 +154,9 @@ export class MensagemService {
         tamanho: stats.size,
       };
     } catch (error) {
-      this.logger.error(`❌ Falha ao converter áudio para formato compatível: ${error instanceof Error ? error.message : error}`);
+      this.logger.error(
+        `❌ Falha ao converter áudio para formato compatível: ${error instanceof Error ? error.message : error}`,
+      );
       return null;
     }
   }
@@ -176,7 +187,9 @@ export class MensagemService {
       await fsPromises.writeFile(caminhoCompleto, arquivo.buffer);
       return caminhoCompleto;
     } catch (error) {
-      this.logger.error(`❌ Erro ao salvar arquivo localmente: ${error instanceof Error ? error.message : error}`);
+      this.logger.error(
+        `❌ Erro ao salvar arquivo localmente: ${error instanceof Error ? error.message : error}`,
+      );
       return null;
     }
   }
@@ -334,7 +347,9 @@ export class MensagemService {
 
     // 🎵 Se for URL do WhatsApp, tentar baixar AGORA (caso não tenha sido baixada antes)
     if (urlRemota.includes('lookaside.fbsbx.com')) {
-      this.logger.warn(`⚠️ Tentando baixar áudio do WhatsApp sob demanda (URL pode estar expirada)`);
+      this.logger.warn(
+        `⚠️ Tentando baixar áudio do WhatsApp sob demanda (URL pode estar expirada)`,
+      );
 
       try {
         const mensagemCompleta = await this.mensagemRepository.findOne({
@@ -356,9 +371,7 @@ export class MensagemService {
 
             if (canalEncontrado?.configuracao) {
               const config = canalEncontrado.configuracao as any;
-              authToken = config.credenciais?.whatsapp_api_token
-                || config.accessToken
-                || authToken;
+              authToken = config.credenciais?.whatsapp_api_token || config.accessToken || authToken;
             }
           }
         }
@@ -376,18 +389,13 @@ export class MensagemService {
               ...midiaParaDownload,
               id: midiaAtualizada.id || midiaParaDownload.id,
               url: midiaAtualizada.url,
-              mime_type: midiaAtualizada.mime_type
-                || midiaParaDownload.mime_type
-                || midiaParaDownload.tipo,
-              tipo: midiaAtualizada.mime_type
-                || midiaParaDownload.tipo
-                || tipo,
+              mime_type:
+                midiaAtualizada.mime_type || midiaParaDownload.mime_type || midiaParaDownload.tipo,
+              tipo: midiaAtualizada.mime_type || midiaParaDownload.tipo || tipo,
               sha256: midiaAtualizada.sha256 || midiaParaDownload.sha256,
-              tamanho: midiaAtualizada.file_size
-                ?? midiaParaDownload.tamanho
-                ?? midiaParaDownload.size,
-              size: midiaAtualizada.file_size
-                ?? midiaParaDownload.size,
+              tamanho:
+                midiaAtualizada.file_size ?? midiaParaDownload.tamanho ?? midiaParaDownload.size,
+              size: midiaAtualizada.file_size ?? midiaParaDownload.size,
             };
 
             if (midiaAtualizada.token) {
@@ -436,7 +444,9 @@ export class MensagemService {
           };
         }
       } catch (erro) {
-        this.logger.error(`❌ Falha ao baixar mídia sob demanda: ${erro instanceof Error ? erro.message : erro}`);
+        this.logger.error(
+          `❌ Falha ao baixar mídia sob demanda: ${erro instanceof Error ? erro.message : erro}`,
+        );
       }
     }
 
@@ -509,9 +519,7 @@ export class MensagemService {
 
       if (midiaLocal) {
         // Substituir URL temporária por caminho local
-        const duracaoBruta = midiaLocal.duracao
-          ?? midiaFinal?.duracao
-          ?? midiaFinal?.duration;
+        const duracaoBruta = midiaLocal.duracao ?? midiaFinal?.duracao ?? midiaFinal?.duration;
         let duracaoNormalizada: number | undefined;
         if (typeof duracaoBruta === 'number' && Number.isFinite(duracaoBruta) && duracaoBruta > 0) {
           duracaoNormalizada = Math.max(1, Math.round(duracaoBruta));
@@ -522,10 +530,11 @@ export class MensagemService {
           }
         }
 
-        const tamanhoBruto = midiaLocal.tamanho
-          ?? midiaFinal?.tamanho
-          ?? midiaFinal?.size
-          ?? (midiaFinal as any)?.file_size;
+        const tamanhoBruto =
+          midiaLocal.tamanho ??
+          midiaFinal?.tamanho ??
+          midiaFinal?.size ??
+          (midiaFinal as any)?.file_size;
         let tamanhoNormalizado: number | undefined;
         if (typeof tamanhoBruto === 'number' && Number.isFinite(tamanhoBruto)) {
           tamanhoNormalizado = tamanhoBruto;
@@ -638,30 +647,39 @@ export class MensagemService {
       originalUrl?: string | null;
       [chave: string]: unknown;
     }> = [];
-    let audio: {
-      url: string;
-      downloadUrl: string;
-      duracao?: number;
-      nome: string;
-      tipo: string;
-    } | undefined;
+    let audio:
+      | {
+        url: string;
+        downloadUrl: string;
+        duracao?: number;
+        nome: string;
+        tipo: string;
+      }
+      | undefined;
 
     for (const midiaOriginal of midias) {
       if (!midiaOriginal) {
         continue;
       }
 
-      const tipoMime = midiaOriginal.tipo || midiaOriginal.mime_type || midiaOriginal.mimetype || 'application/octet-stream';
-      const nomeArquivo = midiaOriginal.nome || midiaOriginal.filename || midiaOriginal.originalname || 'anexo';
+      const tipoMime =
+        midiaOriginal.tipo ||
+        midiaOriginal.mime_type ||
+        midiaOriginal.mimetype ||
+        'application/octet-stream';
+      const nomeArquivo =
+        midiaOriginal.nome || midiaOriginal.filename || midiaOriginal.originalname || 'anexo';
       const tamanhoArquivo = midiaOriginal.tamanho ?? midiaOriginal.size ?? null;
       const duracaoBruta = midiaOriginal.duracao ?? midiaOriginal.duration;
-      const duracaoNormalizada = typeof duracaoBruta === 'number'
-        ? duracaoBruta
-        : duracaoBruta
-          ? Number(duracaoBruta)
-          : undefined;
+      const duracaoNormalizada =
+        typeof duracaoBruta === 'number'
+          ? duracaoBruta
+          : duracaoBruta
+            ? Number(duracaoBruta)
+            : undefined;
 
-      const caminhoBruto: string | undefined = midiaOriginal.caminhoAnexo || midiaOriginal.url || midiaOriginal.path;
+      const caminhoBruto: string | undefined =
+        midiaOriginal.caminhoAnexo || midiaOriginal.url || midiaOriginal.path;
       if (!caminhoBruto) {
         continue;
       }
@@ -709,14 +727,18 @@ export class MensagemService {
     opcoes?: {
       fotoContato?: string | null;
       status?: string;
+      atendenteId?: string | null;
     },
   ) {
     const ehCliente = mensagem.remetente === RemetenteMensagem.CLIENTE;
     const { anexos, audio } = this.formatarMidiaParaFrontend(mensagem);
+    const mensagemComAtendente = mensagem as Mensagem & { atendenteId?: string | null };
+    const atendenteResponsavel = opcoes?.atendenteId ?? mensagemComAtendente?.atendenteId ?? null;
 
     return {
       id: mensagem.id,
       ticketId: mensagem.ticketId,
+      atendenteId: atendenteResponsavel,
       remetente: {
         id: mensagem.id,
         nome: ehCliente ? 'Cliente' : 'Atendente',
@@ -760,7 +782,9 @@ export class MensagemService {
   async marcarComoLidaPorIdExterno(idExterno: string): Promise<void> {
     await this.mensagemRepository.update(
       { idExterno },
-      { /* status: StatusMensagem.LIDA */ }, // Coluna não existe no banco
+      {
+        /* status: StatusMensagem.LIDA */
+      }, // Coluna não existe no banco
     );
 
     this.logger.log(`✓✓ Mensagem externa ${idExterno} marcada como lida`);
@@ -1044,8 +1068,12 @@ export class MensagemService {
         tamanho: arquivoPrincipal.size,
         size: arquivoPrincipal.size,
         // ✨ Nome do arquivo: apenas para não-áudio (áudio usa player visual)
-        nome: arquivoPrincipal.mimetype?.startsWith('audio/') ? undefined : arquivoPrincipal.originalname,
-        originalname: arquivoPrincipal.mimetype?.startsWith('audio/') ? undefined : arquivoPrincipal.originalname,
+        nome: arquivoPrincipal.mimetype?.startsWith('audio/')
+          ? undefined
+          : arquivoPrincipal.originalname,
+        originalname: arquivoPrincipal.mimetype?.startsWith('audio/')
+          ? undefined
+          : arquivoPrincipal.originalname,
         storage: caminhoMidiaLocal ? 'local' : undefined,
       };
 
@@ -1070,12 +1098,16 @@ export class MensagemService {
 
       if (mensagemData.tipo === TipoMensagem.AUDIO) {
         const tipoMidiaAtual = mensagemData.midia?.tipo || mimeTipoArquivo;
-        const precisaConverter = typeof tipoMidiaAtual === 'string' && tipoMidiaAtual.includes('webm');
+        const precisaConverter =
+          typeof tipoMidiaAtual === 'string' && tipoMidiaAtual.includes('webm');
 
         if (precisaConverter) {
           const caminhoReferencia = caminhoMidiaLocal || arquivoPrincipal.path || null;
           const resultadoConversao = caminhoReferencia
-            ? await this.converterAudioParaFormatoWhatsApp(caminhoReferencia, mensagemData.midia?.nome || arquivoPrincipal.originalname)
+            ? await this.converterAudioParaFormatoWhatsApp(
+              caminhoReferencia,
+              mensagemData.midia?.nome || arquivoPrincipal.originalname,
+            )
             : null;
 
           if (!resultadoConversao) {
@@ -1083,7 +1115,8 @@ export class MensagemService {
           }
 
           const caminhoRelativoConvertido = relative(process.cwd(), resultadoConversao.caminho)
-            .replace(/\\/g, '/').replace(/^\/+/, '');
+            .replace(/\\/g, '/')
+            .replace(/^\/+/, '');
 
           mensagemData.midia = {
             ...mensagemData.midia,
@@ -1125,21 +1158,21 @@ export class MensagemService {
     }
 
     const mensagem = this.mensagemRepository.create(mensagemData);
-    const mensagemSalva = await this.mensagemRepository.save(mensagem) as any as Mensagem;
+    const mensagemSalva = (await this.mensagemRepository.save(mensagem)) as any as Mensagem;
 
     this.logger.log(`✅ Mensagem salva no banco de dados`);
 
     // 🔥 ENVIAR VIA WHATSAPP SE FOR CANAL WHATSAPP
     try {
       const ticket = await this.ticketRepository.findOne({
-        where: { id: dados.ticketId }
+        where: { id: dados.ticketId },
       });
 
       if (!ticket) {
         this.logger.warn(`⚠️ Ticket ${dados.ticketId} não encontrado para envio via canal`);
       } else if (ticket.canalId) {
         const canal = await this.canalRepository.findOne({
-          where: { id: ticket.canalId }
+          where: { id: ticket.canalId },
         });
 
         if (canal && canal.tipo === TipoCanal.WHATSAPP) {
@@ -1165,13 +1198,16 @@ export class MensagemService {
                 arquivo: arquivoParaEnvioWhatsApp,
                 tipoMensagem: mensagemData.tipo,
                 legenda: mensagemData.tipo !== TipoMensagem.AUDIO ? legendaMidia : undefined,
-                duracaoAudio: mensagemData.tipo === TipoMensagem.AUDIO
-                  ? mensagemData.midia?.duracao ?? duracaoAudioInformada
-                  : undefined,
+                duracaoAudio:
+                  mensagemData.tipo === TipoMensagem.AUDIO
+                    ? (mensagemData.midia?.duracao ?? duracaoAudioInformada)
+                    : undefined,
               });
 
               if (envioMidia.sucesso) {
-                this.logger.log(`✅ Mídia enviada via WhatsApp: ${envioMidia.messageId || 'sem id'}`);
+                this.logger.log(
+                  `✅ Mídia enviada via WhatsApp: ${envioMidia.messageId || 'sem id'}`,
+                );
               } else {
                 this.logger.error(`❌ Erro ao enviar mídia via WhatsApp: ${envioMidia.erro}`);
               }
@@ -1181,20 +1217,24 @@ export class MensagemService {
                 const resultadoTexto = await this.whatsappSenderService.enviarMensagem(
                   ticket.empresaId,
                   ticket.contatoTelefone,
-                  conteudoDigitado
+                  conteudoDigitado,
                 );
 
                 if (resultadoTexto.sucesso) {
-                  this.logger.log(`✅ Texto complementar enviado via WhatsApp: ${resultadoTexto.messageId}`);
+                  this.logger.log(
+                    `✅ Texto complementar enviado via WhatsApp: ${resultadoTexto.messageId}`,
+                  );
                 } else {
-                  this.logger.error(`❌ Erro ao enviar texto complementar via WhatsApp: ${resultadoTexto.erro}`);
+                  this.logger.error(
+                    `❌ Erro ao enviar texto complementar via WhatsApp: ${resultadoTexto.erro}`,
+                  );
                 }
               }
             } else {
               const resultado = await this.whatsappSenderService.enviarMensagem(
                 ticket.empresaId,
                 ticket.contatoTelefone,
-                textoParaEnvio
+                textoParaEnvio,
               );
 
               if (resultado.sucesso) {
@@ -1204,10 +1244,59 @@ export class MensagemService {
               }
             }
           } else {
-            this.logger.warn(`⚠️ Ticket sem telefone de contato, mensagem não enviada via WhatsApp`);
+            this.logger.warn(
+              `⚠️ Ticket sem telefone de contato, mensagem não enviada via WhatsApp`,
+            );
+          }
+        } else if (canal.tipo === TipoCanal.EMAIL) {
+          // 📧 ENVIO VIA E-MAIL
+          this.logger.log(`📧 Enviando mensagem via E-mail...`);
+
+          if (ticket.contatoEmail) {
+            const assunto = `Resposta ao ticket #${ticket.numero || ticket.id.slice(0, 8)}`;
+            const textoParaEnvio = conteudoDigitado || mensagemData.conteudo;
+
+            if (arquivoPrincipal) {
+              // E-mail com anexo
+              const caminhoArquivo = typeof arquivoPrincipal === 'string'
+                ? arquivoPrincipal
+                : (arquivoPrincipal as any).path;
+
+              const anexos = [{
+                filename: basename(caminhoArquivo),
+                content: await fsPromises.readFile(caminhoArquivo),
+                type: mensagemData.midia?.tipo || 'application/octet-stream',
+              }];
+
+              const messageId = await this.emailSenderService.enviarComAnexos(
+                ticket.empresaId,
+                ticket.contatoEmail,
+                assunto,
+                textoParaEnvio,
+                anexos,
+              );
+
+              this.logger.log(`✅ E-mail com anexo enviado: ${messageId}`);
+            } else {
+              // E-mail de texto simples
+              const messageId = await this.emailSenderService.enviarTexto(
+                ticket.empresaId,
+                ticket.contatoEmail,
+                assunto,
+                textoParaEnvio,
+              );
+
+              this.logger.log(`✅ E-mail enviado: ${messageId}`);
+            }
+          } else {
+            this.logger.warn(
+              `⚠️ Ticket #${ticket.id.slice(0, 8)} sem e-mail de contato, mensagem não enviada via E-mail`,
+            );
           }
         } else {
-          this.logger.log(`ℹ️ Canal ${canal?.tipo || 'desconhecido'} - envio via gateway não implementado`);
+          this.logger.log(
+            `ℹ️ Canal ${canal?.tipo || 'desconhecido'} - envio via gateway não implementado`,
+          );
         }
       } else {
         this.logger.log(`ℹ️ Ticket sem canal associado, apenas salvo no banco`);
@@ -1219,15 +1308,27 @@ export class MensagemService {
 
     // 🔥 EMITIR EVENTO WEBSOCKET PARA ATUALIZAÇÃO EM TEMPO REAL
     try {
-      const ticketRelacionado = await this.ticketRepository.findOne({ where: { id: mensagemSalva.ticketId } });
+      const ticketRelacionado = await this.ticketRepository.findOne({
+        where: { id: mensagemSalva.ticketId },
+      });
+
+      const atendenteResponsavelId =
+        dados.remetenteId ||
+        dados.atendenteId ||
+        mensagemData.atendenteId ||
+        ticketRelacionado?.atendenteId ||
+        null;
 
       const mensagemFormatada = this.formatarMensagemParaFrontend(mensagemSalva, {
         fotoContato: ticketRelacionado?.contatoFoto || null,
         status: 'enviado',
+        atendenteId: atendenteResponsavelId,
       });
 
       this.atendimentoGateway.notificarNovaMensagem(mensagemFormatada);
-      this.logger.log(`📡 Evento WebSocket emitido: nova_mensagem (${mensagemFormatada.remetente.tipo})`);
+      this.logger.log(
+        `📡 Evento WebSocket emitido: nova_mensagem (${mensagemFormatada.remetente.tipo})`,
+      );
     } catch (error) {
       this.logger.error(`❌ Erro ao emitir evento WebSocket: ${error.message}`);
       // Não falha o fluxo

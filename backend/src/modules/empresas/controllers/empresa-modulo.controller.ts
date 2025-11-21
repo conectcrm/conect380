@@ -17,7 +17,7 @@ import { ModuloEnum, PlanoEnum } from '../entities/empresa-modulo.entity';
 
 @Controller('empresas/modulos')
 export class EmpresaModuloController {
-  constructor(private readonly empresaModuloService: EmpresaModuloService) { }
+  constructor(private readonly empresaModuloService: EmpresaModuloService) {}
 
   /**
    * POST /empresas/modulos/seed-all-public

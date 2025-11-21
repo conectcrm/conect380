@@ -14,6 +14,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { atendimentoService } from '../services/atendimentoService';
 import { Mensagem, StatusMensagem } from '../types';
+import {
+  useAtendimentoStore,
+  getMensagensDoTicket,
+  isTicketLoadingMensagens,
+  getMensagensError
+} from '../../../../stores/atendimentoStore';
 
 const DEBUG = false; // ✅ Desabilitado após resolução do problema de tempo real
 
@@ -50,10 +56,21 @@ export const useMensagens = (
 ): UseMensagensReturn => {
   const { ticketId, autoScroll = true, pageSize = 50 } = options;
 
-  // ===== ESTADO =====
-  const [mensagens, setMensagens] = useState<Mensagem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // ===== ESTADO (usando Zustand Store para mensagens) =====
+  const {
+    setMensagens: setMensagensStore,
+    setMensagensLoading,
+    setMensagensError,
+    adicionarMensagem: adicionarMensagemStore,
+    atualizarMensagem,
+  } = useAtendimentoStore();
+
+  // Buscar mensagens do ticket atual usando helpers
+  const mensagens = ticketId ? getMensagensDoTicket(ticketId) : [];
+  const loading = ticketId ? isTicketLoadingMensagens(ticketId) : false;
+  const error = ticketId ? getMensagensError(ticketId) : null;
+
+  // Estados locais (não precisam estar na store global)
   const [enviando, setEnviando] = useState(false);
   const [temMais, setTemMais] = useState(false);
   const [paginaAtual, setPaginaAtual] = useState(1);
@@ -64,12 +81,12 @@ export const useMensagens = (
   // ===== CARREGAR MENSAGENS =====
   const carregarMensagens = useCallback(async (pagina: number = 1, append: boolean = false) => {
     if (!ticketId) {
-      setMensagens([]);
+      setMensagensStore(ticketId || 'empty', []);
       return;
     }
 
-    setLoading(true);
-    setError(null);
+    setMensagensLoading(ticketId, true);
+    setMensagensError(ticketId, null);
 
     try {
       const response = await atendimentoService.listarMensagens({
@@ -80,10 +97,11 @@ export const useMensagens = (
 
       if (append) {
         // Adicionar mensagens antigas (paginação)
-        setMensagens(prev => [...response.data, ...prev]);
+        const mensagensAtuais = getMensagensDoTicket(ticketId);
+        setMensagensStore(ticketId, [...response.data, ...mensagensAtuais]);
       } else {
         // Substituir mensagens (refresh)
-        setMensagens(response.data);
+        setMensagensStore(ticketId, response.data);
       }
 
       setTemMais(response.data.length === pageSize);
@@ -92,12 +110,12 @@ export const useMensagens = (
       if (DEBUG) console.log(`✅ ${response.data.length} mensagens carregadas (página ${pagina})`);
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao carregar mensagens';
-      setError(mensagemErro);
+      setMensagensError(ticketId, mensagemErro);
       console.error('❌ Erro ao carregar mensagens:', err);
     } finally {
-      setLoading(false);
+      setMensagensLoading(ticketId, false);
     }
-  }, [ticketId, pageSize]);
+  }, [ticketId, pageSize, setMensagensStore, setMensagensLoading, setMensagensError]);
 
   // ===== CARREGAR MAIS (SCROLL INFINITO) =====
   const carregarMais = useCallback(async () => {
@@ -111,7 +129,6 @@ export const useMensagens = (
     if (!ticketId || !conteudo.trim()) return;
 
     setEnviando(true);
-    setError(null);
 
     try {
       const novaMensagem = await atendimentoService.enviarMensagem({
@@ -124,13 +141,13 @@ export const useMensagens = (
       if (DEBUG) console.log('✅ Mensagem enviada, aguardando WebSocket...');
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao enviar mensagem';
-      setError(mensagemErro);
+      if (ticketId) setMensagensError(ticketId, mensagemErro);
       console.error('❌ Erro ao enviar mensagem:', err);
       throw err;
     } finally {
       setEnviando(false);
     }
-  }, [ticketId]);
+  }, [ticketId, setMensagensError]);
 
   // ===== ENVIAR MENSAGEM COM ANEXOS =====
   const enviarMensagemComAnexos = useCallback(async (
@@ -140,7 +157,6 @@ export const useMensagens = (
     if (!ticketId || (!conteudo.trim() && arquivos.length === 0)) return;
 
     setEnviando(true);
-    setError(null);
 
     try {
       const novaMensagem = await atendimentoService.enviarMensagem({
@@ -153,20 +169,19 @@ export const useMensagens = (
       if (DEBUG) console.log('✅ Mensagem com anexos enviada, aguardando WebSocket...');
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao enviar mensagem';
-      setError(mensagemErro);
+      if (ticketId) setMensagensError(ticketId, mensagemErro);
       console.error('❌ Erro ao enviar mensagem com anexos:', err);
       throw err;
     } finally {
       setEnviando(false);
     }
-  }, [ticketId]);
+  }, [ticketId, setMensagensError]);
 
   // ===== ENVIAR ÁUDIO =====
   const enviarAudio = useCallback(async (audioBlob: Blob, duracao: number) => {
     if (!ticketId) return;
 
     setEnviando(true);
-    setError(null);
 
     try {
       const novaMensagem = await atendimentoService.enviarMensagem({
@@ -179,13 +194,13 @@ export const useMensagens = (
       if (DEBUG) console.log('✅ Áudio enviado, aguardando WebSocket...');
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao enviar áudio';
-      setError(mensagemErro);
+      if (ticketId) setMensagensError(ticketId, mensagemErro);
       console.error('❌ Erro ao enviar áudio:', err);
       throw err;
     } finally {
       setEnviando(false);
     }
-  }, [ticketId]);
+  }, [ticketId, setMensagensError]);
 
   // ===== MARCAR COMO LIDAS =====
   const marcarComoLidas = useCallback(async (mensagemIds: string[]) => {
@@ -194,18 +209,16 @@ export const useMensagens = (
     try {
       await atendimentoService.marcarComoLidas(ticketId, mensagemIds);
 
-      // Atualizar estado local
-      setMensagens(prev => prev.map(msg =>
-        mensagemIds.includes(msg.id)
-          ? { ...msg, status: 'lido' as StatusMensagem }
-          : msg
-      ));
+      // Atualizar mensagens na store
+      mensagemIds.forEach(mensagemId => {
+        atualizarMensagem(ticketId, mensagemId, { status: 'lido' as StatusMensagem });
+      });
 
       if (DEBUG) console.log(`✅ ${mensagemIds.length} mensagens marcadas como lidas`);
     } catch (err: any) {
       console.error('❌ Erro ao marcar mensagens como lidas:', err);
     }
-  }, [ticketId]);
+  }, [ticketId, atualizarMensagem]);
 
   // ===== RECARREGAR =====
   const recarregar = useCallback(async () => {
@@ -214,20 +227,13 @@ export const useMensagens = (
 
   // ===== ADICIONAR MENSAGEM RECEBIDA (WEBSOCKET) =====
   const adicionarMensagemRecebida = useCallback((mensagem: Mensagem) => {
+    if (!ticketId) return;
+
     if (DEBUG) console.log('📩 Adicionando mensagem recebida via WebSocket:', mensagem);
 
-    setMensagens(prev => {
-      // Verificar se mensagem já existe (evitar duplicatas)
-      const jaExiste = prev.some(m => m.id === mensagem.id);
-      if (jaExiste) {
-        if (DEBUG) console.log('⚠️ Mensagem já existe, ignorando duplicata');
-        return prev;
-      }
-
-      // Adicionar nova mensagem ao final
-      return [...prev, mensagem];
-    });
-  }, []);
+    // Usar a função da store que já tem deduplicação embutida
+    adicionarMensagemStore(ticketId, mensagem);
+  }, [ticketId, adicionarMensagemStore]);
 
   // ===== SCROLL AUTOMÁTICO =====
   const scrollParaFinal = useCallback(() => {
@@ -246,11 +252,8 @@ export const useMensagens = (
   // Carregar mensagens quando ticket mudar
   useEffect(() => {
     if (ticketId) {
-      setMensagens([]);
       setPaginaAtual(1);
       carregarMensagens(1, false);
-    } else {
-      setMensagens([]);
     }
   }, [ticketId, carregarMensagens]);
 

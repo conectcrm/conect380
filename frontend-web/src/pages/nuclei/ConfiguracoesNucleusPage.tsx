@@ -1,13 +1,12 @@
 import React from 'react';
 import {
   Settings,
-  MessageCircle,
   Mail,
   Database,
   Zap,
   Shield,
-  Palette,
-  Globe,
+  Building2,
+  UserCog,
   Target
 } from 'lucide-react';
 import ModulesScreen, { NucleusModulesData } from '../../components/navigation/ModulesScreen';
@@ -16,7 +15,7 @@ const ConfiguracoesNucleusPage: React.FC = () => {
   const configuracoesNucleusData: NucleusModulesData = {
     id: 'configuracoes',
     title: 'Configurações',
-    description: 'Configurações do sistema, integrações e preferências',
+    description: 'Central de configurações do sistema, integrações e preferências',
     icon: Settings,
     color: 'purple',
     modules: [
@@ -26,6 +25,24 @@ const ConfiguracoesNucleusPage: React.FC = () => {
         description: 'Configurações gerais do sistema, tema, idioma e preferências pessoais.',
         href: '/configuracoes/sistema',
         icon: Settings,
+        notifications: 0,
+        status: 'active'
+      },
+      {
+        id: 'configuracoes-empresa',
+        name: 'Empresa',
+        description: 'Dados cadastrais, CNPJ, endereço e informações fiscais.',
+        href: '/nuclei/configuracoes/empresa',
+        icon: Building2,
+        notifications: 0,
+        status: 'active'
+      },
+      {
+        id: 'configuracoes-usuarios',
+        name: 'Usuários',
+        description: 'Gestão de usuários, permissões e controle de acesso.',
+        href: '/nuclei/configuracoes/usuarios',
+        icon: UserCog,
         notifications: 0,
         status: 'active'
       },
@@ -41,30 +58,19 @@ const ConfiguracoesNucleusPage: React.FC = () => {
         status: 'active'
       },
       {
-        id: 'chatwoot-whatsapp',
-        name: 'Chatwoot (WhatsApp)',
-        description: 'Configuração completa do Chatwoot para atendimento via WhatsApp.',
-        href: '/configuracoes/chatwoot',
-        icon: MessageCircle,
-        notifications: 0,
-        badge: 'Ativo',
-        badgeColor: 'green',
-        status: 'active'
-      },
-      {
         id: 'email-configuracao',
         name: 'E-mail',
         description: 'Configuração de SMTP, templates de e-mail e notificações.',
         href: '/configuracoes/email',
         icon: Mail,
-        notifications: 1,
+        notifications: 0,
         status: 'active'
       },
       {
         id: 'integracoes',
         name: 'Integrações',
         description: 'APIs externas, webhooks e conectores com outros sistemas.',
-        href: '/configuracoes/integracoes',
+        href: '/nuclei/configuracoes/integracoes',
         icon: Zap,
         notifications: 0,
         badge: 'Novo',
@@ -75,28 +81,8 @@ const ConfiguracoesNucleusPage: React.FC = () => {
         id: 'backup-sync',
         name: 'Backup & Sincronização',
         description: 'Gestão de backups automáticos e sincronização entre empresas.',
-        href: '/configuracoes/backup',
+        href: '/sistema/backup',
         icon: Database,
-        notifications: 0,
-        status: 'active'
-      },
-      {
-        id: 'tema-interface',
-        name: 'Tema & Interface',
-        description: 'Personalização visual, cores, layout e modo escuro/claro.',
-        href: '/configuracoes/tema',
-        icon: Palette,
-        notifications: 0,
-        badge: 'Novo',
-        badgeColor: 'blue',
-        status: 'active'
-      },
-      {
-        id: 'idioma-localizacao',
-        name: 'Idioma & Localização',
-        description: 'Configurações de idioma, timezone e formatação regional.',
-        href: '/configuracoes/idioma',
-        icon: Globe,
         notifications: 0,
         status: 'active'
       },

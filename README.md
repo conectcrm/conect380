@@ -44,6 +44,18 @@ ConectSuite é um **sistema CRM completo** desenvolvido para gestão profissiona
 - **Status online/offline** dos atendentes
 - **Transferência de atendimentos** entre agentes
 - **Foto de perfil** dos contatos (sincronizada com WhatsApp)
+- **🆕 Sistema de Filas Inteligente**
+  - 3 estratégias de distribuição (Round-Robin, Menor Carga, Por Prioridade)
+  - Auto-distribuição configurável
+  - Gestão de capacidade por atendente
+  - Métricas em tempo real
+  - Integração visual no ChatOmnichannel
+- **🆕 Fechamento automático por inatividade** (configurável por empresa)
+  - Timeout personalizável (minutos/horas/dias)
+  - Aviso antes de fechar (opcional)
+  - Mensagens customizáveis
+  - Filtro por status (AGUARDANDO, EM_ATENDIMENTO)
+  - Monitoramento automático a cada 5 minutos
 
 ### 🤖 Triagem Inteligente com IA
 
@@ -329,6 +341,15 @@ npm run cypress:open
 - [GUIA_CRIAR_FLUXO_WHATSAPP.md](GUIA_CRIAR_FLUXO_WHATSAPP.md) - Criar fluxos
 - [MANUAL_CONSTRUTOR_VISUAL.md](MANUAL_CONSTRUTOR_VISUAL.md) - Editor visual
 - [GUIA_TOKEN_WHATSAPP.md](GUIA_TOKEN_WHATSAPP.md) - Configurar WhatsApp
+- [QUICKSTART_TESTE_INATIVIDADE.md](QUICKSTART_TESTE_INATIVIDADE.md) - 🆕 Teste de fechamento automático
+
+### Sistema de Fechamento Automático
+
+- [CONSOLIDACAO_FECHAMENTO_AUTOMATICO.md](CONSOLIDACAO_FECHAMENTO_AUTOMATICO.md) - Arquitetura completa
+- [TESTE_FECHAMENTO_AUTOMATICO.md](TESTE_FECHAMENTO_AUTOMATICO.md) - Guia detalhado de testes
+- [STATUS_FECHAMENTO_AUTOMATICO.md](STATUS_FECHAMENTO_AUTOMATICO.md) - Status da implementação
+- [scripts/test-inactivity-system.ps1](scripts/test-inactivity-system.ps1) - Script automatizado de teste
+- [scripts/test-inactivity-queries.sql](scripts/test-inactivity-queries.sql) - Queries SQL úteis
 
 ### Referências
 

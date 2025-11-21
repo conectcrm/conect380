@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { FieldPath, useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import toast from 'react-hot-toast';
-import { 
-  Building, 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
+import { empresaService, RegistrarEmpresaPayload } from '../../services/empresaService';
+import {
+  Building,
+  User,
+  Mail,
+  Phone,
+  MapPin,
   CreditCard,
   Check,
   ArrowRight,
@@ -135,6 +136,7 @@ export const RegistroEmpresaPage: React.FC = () => {
     handleSubmit,
     watch,
     setValue,
+    trigger,
     formState: { errors }
   } = useForm<RegistroFormData>({
     resolver: yupResolver(registroSchema),
@@ -151,7 +153,7 @@ export const RegistroEmpresaPage: React.FC = () => {
       try {
         const response = await fetch(`https://viacep.com.br/ws/${cep.replace(/\D/g, '')}/json/`);
         const data = await response.json();
-        
+
         if (!data.erro) {
           setValue('empresa.endereco', `${data.logradouro}, ${data.bairro}`);
           setValue('empresa.cidade', data.localidade);
@@ -195,26 +197,45 @@ export const RegistroEmpresaPage: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      // Simular API call para registro
-      console.log('Dados do registro:', data);
-      
-      // TODO: Implementar chamada real para API
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const payload: RegistrarEmpresaPayload = {
+        empresa: {
+          nome: data.empresa.nome,
+          cnpj: data.empresa.cnpj,
+          email: data.empresa.email,
+          telefone: data.empresa.telefone,
+          endereco: data.empresa.endereco,
+          cidade: data.empresa.cidade,
+          estado: data.empresa.estado,
+          cep: data.empresa.cep,
+        },
+        usuario: {
+          nome: data.usuario.nome,
+          email: data.usuario.email,
+          senha: data.usuario.senha,
+          telefone: data.usuario.telefone,
+        },
+        plano: data.plano,
+        aceitarTermos: data.aceitarTermos,
+      };
 
-      toast.success('Empresa registrada com sucesso! 🎉');
+      const response = await empresaService.registrarEmpresa(payload);
+
+      toast.success(response.message || 'Empresa registrada com sucesso! 🎉');
       toast.success('Verifique seu email para ativar a conta.');
-      
-      // Redirecionar para login ou dashboard
-      navigate('/login', { 
-        state: { 
+
+      navigate('/login', {
+        state: {
           message: 'Conta criada com sucesso! Faça login para continuar.',
-          email: data.usuario.email 
+          email: data.usuario.email,
         }
       });
 
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Erro no registro:', error);
-      toast.error('Erro ao registrar empresa. Tente novamente.');
+      const message = error instanceof Error
+        ? error.message
+        : 'Erro ao registrar empresa. Tente novamente.';
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -504,11 +525,10 @@ export const RegistroEmpresaPage: React.FC = () => {
         {PLANOS.map((plano) => (
           <div
             key={plano.id}
-            className={`relative rounded-lg border-2 p-6 cursor-pointer transition-all ${
-              watchedPlano === plano.id
+            className={`relative rounded-lg border-2 p-6 cursor-pointer transition-all ${watchedPlano === plano.id
                 ? 'border-[#159A9C] bg-[#DEEFE7]'
                 : 'border-gray-200 hover:border-gray-300'
-            } ${plano.popular ? 'ring-2 ring-[#159A9C] ring-opacity-50' : ''}`}
+              } ${plano.popular ? 'ring-2 ring-[#159A9C] ring-opacity-50' : ''}`}
             onClick={() => setValue('plano', plano.id)}
           >
             {plano.popular && (
@@ -583,19 +603,17 @@ export const RegistroEmpresaPage: React.FC = () => {
       {[1, 2, 3].map((step) => (
         <React.Fragment key={step}>
           <div
-            className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${
-              step <= currentStep
+            className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${step <= currentStep
                 ? 'bg-[#159A9C] text-white'
                 : 'bg-gray-200 text-gray-600'
-            }`}
+              }`}
           >
             {step < currentStep ? <Check className="w-5 h-5" /> : step}
           </div>
           {step < 3 && (
             <div
-              className={`w-12 h-1 mx-2 ${
-                step < currentStep ? 'bg-[#159A9C]' : 'bg-gray-200'
-              }`}
+              className={`w-12 h-1 mx-2 ${step < currentStep ? 'bg-[#159A9C]' : 'bg-gray-200'
+                }`}
             />
           )}
         </React.Fragment>
@@ -631,9 +649,8 @@ export const RegistroEmpresaPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
-                className={`px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 ${
-                  currentStep === 1 ? 'invisible' : ''
-                }`}
+                className={`px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 ${currentStep === 1 ? 'invisible' : ''
+                  }`}
               >
                 Voltar
               </button>
@@ -641,7 +658,43 @@ export const RegistroEmpresaPage: React.FC = () => {
               {currentStep < 3 ? (
                 <button
                   type="button"
-                  onClick={() => setCurrentStep(currentStep + 1)}
+                  onClick={async () => {
+                    let camposEtapa: FieldPath<RegistroFormData>[] | null = null;
+
+                    if (currentStep === 1) {
+                      camposEtapa = [
+                        'empresa.nome',
+                        'empresa.cnpj',
+                        'empresa.email',
+                        'empresa.telefone',
+                        'empresa.endereco',
+                        'empresa.cidade',
+                        'empresa.estado',
+                        'empresa.cep',
+                      ] as FieldPath<RegistroFormData>[];
+                    } else if (currentStep === 2) {
+                      camposEtapa = [
+                        'usuario.nome',
+                        'usuario.email',
+                        'usuario.senha',
+                        'usuario.confirmarSenha',
+                        'usuario.telefone',
+                      ] as FieldPath<RegistroFormData>[];
+                    }
+
+                    if (!camposEtapa) {
+                      setCurrentStep(currentStep + 1);
+                      return;
+                    }
+
+                    const valido = await trigger(camposEtapa, { shouldFocus: true });
+
+                    if (valido) {
+                      setCurrentStep(currentStep + 1);
+                    } else {
+                      toast.error('Preencha os campos obrigatórios antes de continuar.');
+                    }
+                  }}
                   className="px-6 py-3 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] flex items-center gap-2"
                 >
                   Próximo

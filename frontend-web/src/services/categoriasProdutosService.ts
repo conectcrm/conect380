@@ -1,7 +1,7 @@
 // services/categoriasProdutosService.ts
-import { 
-  CategoriaProduto, 
-  SubcategoriaProduto, 
+import {
+  CategoriaProduto,
+  SubcategoriaProduto,
   ConfiguracaoProduto,
   CriarCategoriaProdutoRequest,
   CriarSubcategoriaProdutoRequest,
@@ -16,7 +16,7 @@ import {
   EstatisticasCategorias
 } from '../types/produtos';
 
-const BASE_URL = 'http://localhost:3001/api';
+const BASE_URL = 'http://localhost:3001';
 const STORAGE_KEY = 'fenixcrm_categorias';
 
 class CategoriasProdutosService {
@@ -51,29 +51,29 @@ class CategoriasProdutosService {
       if (filtros?.direcao) params.append('direcao', filtros.direcao);
 
       const response = await fetch(`${BASE_URL}/categorias-produtos?${params}`);
-      
+
       if (response.ok) {
         const data: ApiResponse<CategoriaProduto[]> = await response.json();
-        
+
         if (data.success && data.data) {
           return data.data;
         }
       }
-      
+
       // Se falhar, usa localStorage como fallback
       const categoriasLocal = this.obterCategoriasDoStorage();
-      
+
       if (filtros?.busca) {
-        return categoriasLocal.filter(cat => 
+        return categoriasLocal.filter(cat =>
           cat.nome.toLowerCase().includes(filtros.busca!.toLowerCase()) ||
           cat.descricao.toLowerCase().includes(filtros.busca!.toLowerCase())
         );
       }
-      
+
       if (filtros?.ativo !== undefined) {
         return categoriasLocal.filter(cat => cat.ativo === filtros.ativo);
       }
-      
+
       return categoriasLocal;
     } catch (error) {
       console.error('Erro ao listar categorias, usando localStorage:', error);
@@ -85,23 +85,23 @@ class CategoriasProdutosService {
   async obterCategoria(id: string): Promise<CategoriaProduto> {
     try {
       const response = await fetch(`${BASE_URL}/categorias-produtos/${id}`);
-      
+
       if (response.ok) {
         const data: ApiResponse<CategoriaProduto> = await response.json();
-        
+
         if (data.success && data.data) {
           return data.data;
         }
       }
-      
+
       // Fallback para localStorage
       const categorias = this.obterCategoriasDoStorage();
       const categoria = categorias.find(cat => cat.id === id);
-      
+
       if (!categoria) {
         throw new Error('Categoria não encontrada');
       }
-      
+
       return categoria;
     } catch (error) {
       console.error('Erro ao obter categoria:', error);
@@ -119,15 +119,15 @@ class CategoriasProdutosService {
         },
         body: JSON.stringify(categoria),
       });
-      
+
       if (response.ok) {
         const data: ApiResponse<CategoriaProduto> = await response.json();
-        
+
         if (data.success && data.data) {
           return data.data;
         }
       }
-      
+
       // Fallback para localStorage
       const categorias = this.obterCategoriasDoStorage();
       const novaCategoria: CategoriaProduto = {
@@ -141,14 +141,14 @@ class CategoriasProdutosService {
         criadoEm: new Date().toISOString(),
         atualizadoEm: new Date().toISOString()
       };
-      
+
       categorias.push(novaCategoria);
       this.salvarCategoriasNoStorage(categorias);
-      
+
       return novaCategoria;
     } catch (error) {
       console.error('Erro ao criar categoria, usando localStorage:', error);
-      
+
       // Em caso de erro de rede, sempre usa localStorage
       const categorias = this.obterCategoriasDoStorage();
       const novaCategoria: CategoriaProduto = {
@@ -162,10 +162,10 @@ class CategoriasProdutosService {
         criadoEm: new Date().toISOString(),
         atualizadoEm: new Date().toISOString()
       };
-      
+
       categorias.push(novaCategoria);
       this.salvarCategoriasNoStorage(categorias);
-      
+
       return novaCategoria;
     }
   }
@@ -179,13 +179,13 @@ class CategoriasProdutosService {
         },
         body: JSON.stringify(categoria),
       });
-      
+
       const data: ApiResponse<CategoriaProduto> = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.message || 'Erro ao atualizar categoria');
       }
-      
+
       return data.data!;
     } catch (error) {
       console.error('Erro ao atualizar categoria:', error);
@@ -198,9 +198,9 @@ class CategoriasProdutosService {
       const response = await fetch(`${BASE_URL}/categorias-produtos/${id}`, {
         method: 'DELETE',
       });
-      
+
       const data: ApiResponse<void> = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.message || 'Erro ao excluir categoria');
       }
@@ -222,11 +222,11 @@ class CategoriasProdutosService {
 
       const response = await fetch(`${BASE_URL}/subcategorias-produtos?${params}`);
       const data: ApiResponse<SubcategoriaProduto[]> = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.message || 'Erro ao buscar subcategorias');
       }
-      
+
       return data.data || [];
     } catch (error) {
       console.error('Erro ao listar subcategorias:', error);
@@ -243,13 +243,13 @@ class CategoriasProdutosService {
         },
         body: JSON.stringify(subcategoria),
       });
-      
+
       const data: ApiResponse<SubcategoriaProduto> = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.message || 'Erro ao criar subcategoria');
       }
-      
+
       return data.data!;
     } catch (error) {
       console.error('Erro ao criar subcategoria:', error);
@@ -266,13 +266,13 @@ class CategoriasProdutosService {
         },
         body: JSON.stringify(subcategoria),
       });
-      
+
       const data: ApiResponse<SubcategoriaProduto> = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.message || 'Erro ao atualizar subcategoria');
       }
-      
+
       return data.data!;
     } catch (error) {
       console.error('Erro ao atualizar subcategoria:', error);
@@ -285,9 +285,9 @@ class CategoriasProdutosService {
       const response = await fetch(`${BASE_URL}/subcategorias-produtos/${id}`, {
         method: 'DELETE',
       });
-      
+
       const data: ApiResponse<void> = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.message || 'Erro ao excluir subcategoria');
       }
@@ -309,11 +309,11 @@ class CategoriasProdutosService {
 
       const response = await fetch(`${BASE_URL}/configuracoes-produtos?${params}`);
       const data: ApiResponse<ConfiguracaoProduto[]> = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.message || 'Erro ao buscar configurações');
       }
-      
+
       return data.data || [];
     } catch (error) {
       console.error('Erro ao listar configurações:', error);
@@ -330,13 +330,13 @@ class CategoriasProdutosService {
         },
         body: JSON.stringify(configuracao),
       });
-      
+
       const data: ApiResponse<ConfiguracaoProduto> = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.message || 'Erro ao criar configuração');
       }
-      
+
       return data.data!;
     } catch (error) {
       console.error('Erro ao criar configuração:', error);
@@ -353,13 +353,13 @@ class CategoriasProdutosService {
         },
         body: JSON.stringify(configuracao),
       });
-      
+
       const data: ApiResponse<ConfiguracaoProduto> = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.message || 'Erro ao atualizar configuração');
       }
-      
+
       return data.data!;
     } catch (error) {
       console.error('Erro ao atualizar configuração:', error);
@@ -372,9 +372,9 @@ class CategoriasProdutosService {
       const response = await fetch(`${BASE_URL}/configuracoes-produtos/${id}`, {
         method: 'DELETE',
       });
-      
+
       const data: ApiResponse<void> = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.message || 'Erro ao excluir configuração');
       }
@@ -389,11 +389,11 @@ class CategoriasProdutosService {
     try {
       const response = await fetch(`${BASE_URL}/categorias-produtos/estatisticas`);
       const data: ApiResponse<EstatisticasCategorias> = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.message || 'Erro ao buscar estatísticas');
       }
-      
+
       return data.data!;
     } catch (error) {
       console.error('Erro ao obter estatísticas:', error);
@@ -411,9 +411,9 @@ class CategoriasProdutosService {
         },
         body: JSON.stringify({ categorias }),
       });
-      
+
       const data: ApiResponse<void> = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.message || 'Erro ao reordenar categorias');
       }
@@ -433,13 +433,13 @@ class CategoriasProdutosService {
         },
         body: JSON.stringify({ novoNome }),
       });
-      
+
       const data: ApiResponse<CategoriaProduto> = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.message || 'Erro ao duplicar categoria');
       }
-      
+
       return data.data!;
     } catch (error) {
       console.error('Erro ao duplicar categoria:', error);
@@ -451,11 +451,11 @@ class CategoriasProdutosService {
   async exportarCategorias(): Promise<Blob> {
     try {
       const response = await fetch(`${BASE_URL}/categorias-produtos/exportar`);
-      
+
       if (!response.ok) {
         throw new Error('Erro ao exportar categorias');
       }
-      
+
       return response.blob();
     } catch (error) {
       console.error('Erro ao exportar categorias:', error);
@@ -472,13 +472,13 @@ class CategoriasProdutosService {
         method: 'POST',
         body: formData,
       });
-      
+
       const data: ApiResponse<{ importadas: number; erros: string[] }> = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.message || 'Erro ao importar categorias');
       }
-      
+
       return data.data!;
     } catch (error) {
       console.error('Erro ao importar categorias:', error);

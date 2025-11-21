@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  X, 
-  Save, 
-  Mail, 
-  Phone, 
-  Building, 
-  MapPin, 
+import {
+  X,
+  Save,
+  Mail,
+  Phone,
+  Building,
+  MapPin,
   User,
   Globe,
   Tag,
@@ -144,7 +144,7 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -157,7 +157,7 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
       ...prev,
       [field]: value
     }));
-    
+
     // Limpar erro quando o campo for preenchido
     if (errors[field] && value?.toString().trim()) {
       setErrors(prev => {
@@ -211,13 +211,13 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-lg shadow-xl w-[calc(100%-2rem)] sm:w-[600px] md:w-[700px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-[#159A9C] to-[#0d7a7d]">
           <h1 className="text-2xl font-bold text-white">
             {isEditing ? 'Editar Contato' : 'Novo Contato'}
           </h1>
-          
+
           <button
             onClick={onClose}
             className="p-2 text-white hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors"
@@ -230,17 +230,17 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
         <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-120px)]">
           <div className="p-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
+
               {/* Coluna Esquerda */}
               <div className="space-y-6">
-                
+
                 {/* Informações Básicas */}
                 <div className="bg-gray-50 rounded-lg p-6">
                   <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
                     <User className="w-5 h-5" />
                     Informações Básicas
                   </h3>
-                  
+
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -250,9 +250,8 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                         type="text"
                         value={formData.nome || ''}
                         onChange={(e) => handleInputChange('nome', e.target.value)}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
-                          errors.nome ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.nome ? 'border-red-300' : 'border-gray-300'
+                          }`}
                         placeholder="Nome completo"
                       />
                       {errors.nome && <p className="text-red-500 text-sm mt-1">{errors.nome}</p>}
@@ -267,9 +266,8 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                           type="email"
                           value={formData.email || ''}
                           onChange={(e) => handleInputChange('email', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
-                            errors.email ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.email ? 'border-red-300' : 'border-gray-300'
+                            }`}
                           placeholder="email@exemplo.com"
                         />
                         {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
@@ -283,9 +281,8 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                           type="tel"
                           value={formData.telefone || ''}
                           onChange={(e) => handleInputChange('telefone', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
-                            errors.telefone ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.telefone ? 'border-red-300' : 'border-gray-300'
+                            }`}
                           placeholder="(11) 99999-9999"
                         />
                         {errors.telefone && <p className="text-red-500 text-sm mt-1">{errors.telefone}</p>}
@@ -301,9 +298,8 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                           type="text"
                           value={formData.empresa || ''}
                           onChange={(e) => handleInputChange('empresa', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
-                            errors.empresa ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.empresa ? 'border-red-300' : 'border-gray-300'
+                            }`}
                           placeholder="Nome da empresa"
                         />
                         {errors.empresa && <p className="text-red-500 text-sm mt-1">{errors.empresa}</p>}
@@ -343,7 +339,7 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                     <Tag className="w-5 h-5" />
                     Classificação
                   </h3>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -469,14 +465,14 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
 
               {/* Coluna Direita */}
               <div className="space-y-6">
-                
+
                 {/* Endereço */}
                 <div className="bg-gray-50 rounded-lg p-6">
                   <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
                     <MapPin className="w-5 h-5" />
                     Endereço
                   </h3>
-                  
+
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -555,7 +551,7 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                     <Globe className="w-5 h-5" />
                     Redes Sociais
                   </h3>
-                  
+
                   <div className="space-y-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -617,7 +613,7 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                     <Tag className="w-5 h-5" />
                     Tags
                   </h3>
-                  
+
                   <div className="space-y-3">
                     <div className="flex gap-2">
                       <input
@@ -666,7 +662,7 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                     <FileText className="w-5 h-5" />
                     Notas
                   </h3>
-                  
+
                   <textarea
                     value={formData.notas || ''}
                     onChange={(e) => handleInputChange('notas', e.target.value)}
@@ -688,7 +684,7 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
             >
               Cancelar
             </button>
-            
+
             <button
               type="submit"
               className="flex items-center gap-2 px-6 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0d7a7d] transition-colors"

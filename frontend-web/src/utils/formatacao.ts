@@ -89,6 +89,28 @@ export const converterParaNumero = (valor: any): number => {
 };
 
 /**
+ * Formata um valor monetário usando a moeda BRL
+ * @param valor - Valor a ser formatado
+ * @param opcoes - Opções extras para Intl.NumberFormat
+ * @returns String formatada como "R$ 1.234,56"
+ */
+export const formatarMoeda = (valor: any, opcoes: Intl.NumberFormatOptions = {}): string => {
+  try {
+    const numero = converterParaNumero(valor);
+    return numero.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+      ...opcoes
+    });
+  } catch (error) {
+    console.warn('Erro ao formatar moeda:', valor, error);
+    return 'R$ 0,00';
+  }
+};
+
+/**
  * Valida se um valor é um número monetário válido
  * @param valor - Valor a ser validado
  * @returns true se for válido, false caso contrário
@@ -154,11 +176,11 @@ export const calcularDiasVencimento = (dataVencimento: Date | string, dataRefere
   try {
     const vencimento = new Date(dataVencimento);
     const referencia = dataReferencia || new Date();
-    
+
     // Remove a parte de hora para comparar apenas as datas
     vencimento.setHours(0, 0, 0, 0);
     referencia.setHours(0, 0, 0, 0);
-    
+
     const diffTime = vencimento.getTime() - referencia.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   } catch (error) {
@@ -175,11 +197,11 @@ export const calcularDiasVencimento = (dataVencimento: Date | string, dataRefere
  */
 export const formatarStatusFatura = (status: string, diasVencimento?: number) => {
   const statusMap: Record<string, { cor: string, texto: string, icone: string }> = {
-    'PENDENTE': { 
-      cor: diasVencimento !== undefined && diasVencimento < 0 ? 'text-red-600' : 
-           diasVencimento !== undefined && diasVencimento <= 7 ? 'text-yellow-600' : 'text-yellow-600',
-      texto: 'Pendente', 
-      icone: '⏳' 
+    'PENDENTE': {
+      cor: diasVencimento !== undefined && diasVencimento < 0 ? 'text-red-600' :
+        diasVencimento !== undefined && diasVencimento <= 7 ? 'text-yellow-600' : 'text-yellow-600',
+      texto: 'Pendente',
+      icone: '⏳'
     },
     'ENVIADA': { cor: 'text-blue-600', texto: 'Enviada', icone: '📤' },
     'PAGA': { cor: 'text-green-600', texto: 'Paga', icone: '✅' },
@@ -198,17 +220,17 @@ export const formatarStatusFatura = (status: string, diasVencimento?: number) =>
  */
 export const formatarNumeroFatura = (numero: string): string => {
   if (!numero) return '';
-  
+
   // Se já tem prefixo, retorna como está
   if (numero.startsWith('#') || numero.startsWith('FT')) {
     return numero;
   }
-  
+
   // Se é só número, adiciona prefixo FT
   if (/^\d+$/.test(numero)) {
     return `FT${numero.padStart(8, '0')}`;
   }
-  
+
   return numero;
 };
 
@@ -222,14 +244,14 @@ export const truncarTexto = (texto: string, limite: number = 50): string => {
   if (!texto || texto.length <= limite) {
     return texto || '';
   }
-  
+
   const truncado = texto.substring(0, limite);
   const ultimoEspaco = truncado.lastIndexOf(' ');
-  
+
   if (ultimoEspaco > 0) {
     return truncado.substring(0, ultimoEspaco) + '...';
   }
-  
+
   return truncado + '...';
 };
 
@@ -241,13 +263,13 @@ export const truncarTexto = (texto: string, limite: number = 50): string => {
  */
 export const formatarValorComDestaque = (valor: number, tipo: 'positivo' | 'negativo' | 'neutro' = 'neutro') => {
   const valorFormatado = formatarValorCompletoBRL(valor);
-  
+
   const classesMap = {
     positivo: 'text-green-600 font-semibold',
     negativo: 'text-red-600 font-semibold',
     neutro: 'text-gray-900 font-medium'
   };
-  
+
   return {
     valor: valorFormatado,
     classe: classesMap[tipo]
@@ -261,11 +283,11 @@ export const formatarValorComDestaque = (valor: number, tipo: 'positivo' | 'nega
  */
 export const formatarTamanhoArquivo = (bytes: number): string => {
   if (bytes === 0) return '0 Bytes';
-  
+
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
@@ -276,19 +298,19 @@ export const formatarTamanhoArquivo = (bytes: number): string => {
  */
 export const gerarCorPorTexto = (texto: string): string => {
   if (!texto) return '#6B7280';
-  
+
   let hash = 0;
   for (let i = 0; i < texto.length; i++) {
     hash = texto.charCodeAt(i) + ((hash << 5) - hash);
   }
-  
+
   const cores = [
     '#EF4444', '#F97316', '#F59E0B', '#EAB308',
     '#84CC16', '#22C55E', '#10B981', '#14B8A6',
     '#06B6D4', '#0EA5E9', '#3B82F6', '#6366F1',
     '#8B5CF6', '#A855F7', '#D946EF', '#EC4899'
   ];
-  
+
   return cores[Math.abs(hash) % cores.length];
 };
 
@@ -312,19 +334,19 @@ export const obterNomeCliente = (cliente: any, clienteId?: number | string): str
     console.log('✅ Cliente encontrado com nome:', cliente.nome);
     return cliente.nome;
   }
-  
+
   // Se cliente é uma string (nome direto)
   if (typeof cliente === 'string' && cliente.trim()) {
     console.log('✅ Cliente como string:', cliente.trim());
     return cliente.trim();
   }
-  
+
   // Fallback para ID do cliente
   if (clienteId) {
     console.log('⚠️ Usando fallback para Cliente ID:', clienteId);
     return `Cliente ID: ${clienteId}`;
   }
-  
+
   console.log('❌ Nenhum cliente encontrado');
   return 'Cliente não informado';
 };

@@ -1,4 +1,10 @@
-import { Injectable, CanActivate, ExecutionContext, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AssinaturasService } from '../planos/assinaturas.service';
 
@@ -20,12 +26,15 @@ export const VerificarLimites = (limite: LimiteVerificacao) => {
 export class LimitesGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly assinaturasService: AssinaturasService
-  ) { }
+    private readonly assinaturasService: AssinaturasService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    const limite = this.reflector.get<LimiteVerificacao>('limite-verificacao', context.getHandler());
+    const limite = this.reflector.get<LimiteVerificacao>(
+      'limite-verificacao',
+      context.getHandler(),
+    );
 
     if (!limite) {
       return true; // Sem limite definido, permite acesso
@@ -62,13 +71,16 @@ export class LimitesGuard implements CanActivate {
   private verificarLimiteUsuarios(limites: any, verificacao: LimiteVerificacao): boolean {
     if (verificacao.operacao === 'criar') {
       if (!limites.podeAdicionarUsuario) {
-        throw new HttpException({
-          message: `Limite de usuários atingido (${limites.usuariosAtivos}/${limites.limiteUsuarios})`,
-          code: 'USER_LIMIT_EXCEEDED',
-          current: limites.usuariosAtivos,
-          limit: limites.limiteUsuarios,
-          redirect: '/billing/upgrade'
-        }, HttpStatus.FORBIDDEN);
+        throw new HttpException(
+          {
+            message: `Limite de usuários atingido (${limites.usuariosAtivos}/${limites.limiteUsuarios})`,
+            code: 'USER_LIMIT_EXCEEDED',
+            current: limites.usuariosAtivos,
+            limit: limites.limiteUsuarios,
+            redirect: '/billing/upgrade',
+          },
+          HttpStatus.FORBIDDEN,
+        );
       }
     }
 
@@ -78,13 +90,16 @@ export class LimitesGuard implements CanActivate {
   private verificarLimiteClientes(limites: any, verificacao: LimiteVerificacao): boolean {
     if (verificacao.operacao === 'criar') {
       if (!limites.podeAdicionarCliente) {
-        throw new HttpException({
-          message: `Limite de clientes atingido (${limites.clientesCadastrados}/${limites.limiteClientes})`,
-          code: 'CLIENT_LIMIT_EXCEEDED',
-          current: limites.clientesCadastrados,
-          limit: limites.limiteClientes,
-          redirect: '/billing/upgrade'
-        }, HttpStatus.FORBIDDEN);
+        throw new HttpException(
+          {
+            message: `Limite de clientes atingido (${limites.clientesCadastrados}/${limites.limiteClientes})`,
+            code: 'CLIENT_LIMIT_EXCEEDED',
+            current: limites.clientesCadastrados,
+            limit: limites.limiteClientes,
+            redirect: '/billing/upgrade',
+          },
+          HttpStatus.FORBIDDEN,
+        );
       }
     }
 
@@ -100,14 +115,17 @@ export class LimitesGuard implements CanActivate {
         const mbLimite = Math.round(limites.limiteStorage / (1024 * 1024));
         const mbAdicional = Math.round(verificacao.quantidadeAdicional / (1024 * 1024));
 
-        throw new HttpException({
-          message: `Limite de armazenamento seria excedido (${mbUtilizado + mbAdicional}MB/${mbLimite}MB)`,
-          code: 'STORAGE_LIMIT_EXCEEDED',
-          currentMB: mbUtilizado,
-          limitMB: mbLimite,
-          additionalMB: mbAdicional,
-          redirect: '/billing/upgrade'
-        }, HttpStatus.FORBIDDEN);
+        throw new HttpException(
+          {
+            message: `Limite de armazenamento seria excedido (${mbUtilizado + mbAdicional}MB/${mbLimite}MB)`,
+            code: 'STORAGE_LIMIT_EXCEEDED',
+            currentMB: mbUtilizado,
+            limitMB: mbLimite,
+            additionalMB: mbAdicional,
+            redirect: '/billing/upgrade',
+          },
+          HttpStatus.FORBIDDEN,
+        );
       }
     }
 

@@ -11,12 +11,12 @@
  */
 
 import React, { useState, useRef, useCallback } from 'react';
-import { 
-  Upload, 
-  X, 
-  Image, 
-  File, 
-  CheckCircle, 
+import {
+  Upload,
+  X,
+  Image,
+  File,
+  CheckCircle,
   AlertCircle,
   Loader2,
   Plus
@@ -34,6 +34,7 @@ interface FileUploadProps {
   acceptedFileTypes?: string;
   className?: string;
   maxFiles?: number;
+  children?: React.ReactNode;
 }
 
 interface FileWithProgress {
@@ -53,7 +54,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   disabled = false,
   acceptedFileTypes,
   className = '',
-  maxFiles = 10
+  maxFiles = 10,
+  children,
 }) => {
   const [files, setFiles] = useState<FileWithProgress[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -72,7 +74,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   // Processar arquivos selecionados
   const processFiles = useCallback(async (selectedFiles: FileList | File[]) => {
     const fileArray = Array.from(selectedFiles);
-    
+
     // Validar número máximo de arquivos
     const totalFiles = files.length + fileArray.length;
     if (totalFiles > maxFiles) {
@@ -98,14 +100,14 @@ export const FileUpload: React.FC<FileUploadProps> = ({
       // Upload sequencial para melhor controle
       for (let i = 0; i < newFiles.length; i++) {
         const fileWithProgress = newFiles[i];
-        
+
         try {
           const result = await uploadService.uploadFile(
             fileWithProgress.file,
             category,
             (progress) => {
-              setFiles(prev => prev.map(f => 
-                f.file === fileWithProgress.file 
+              setFiles(prev => prev.map(f =>
+                f.file === fileWithProgress.file
                   ? { ...f, progress }
                   : f
               ));
@@ -113,23 +115,23 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           );
 
           // Atualizar com resultado
-          setFiles(prev => prev.map(f => 
-            f.file === fileWithProgress.file 
+          setFiles(prev => prev.map(f =>
+            f.file === fileWithProgress.file
               ? { ...f, result, progress: { ...f.progress, status: 'success' } }
               : f
           ));
 
         } catch (error) {
-          setFiles(prev => prev.map(f => 
-            f.file === fileWithProgress.file 
-              ? { 
-                  ...f, 
-                  progress: { 
-                    ...f.progress, 
-                    status: 'error',
-                    error: error instanceof Error ? error.message : 'Erro no upload'
-                  }
+          setFiles(prev => prev.map(f =>
+            f.file === fileWithProgress.file
+              ? {
+                ...f,
+                progress: {
+                  ...f.progress,
+                  status: 'error',
+                  error: error instanceof Error ? error.message : 'Erro no upload'
                 }
+              }
               : f
           ));
         }
@@ -164,7 +166,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     if (disabled) return;
 
     const droppedFiles = e.dataTransfer.files;
@@ -211,8 +213,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           disabled={disabled}
           className={`
             p-2 rounded-lg border-2 border-dashed transition-all duration-200
-            ${isDragging 
-              ? 'border-blue-400 bg-blue-50' 
+            ${isDragging
+              ? 'border-blue-400 bg-blue-50'
               : 'border-gray-300 hover:border-gray-400'
             }
             ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'}
@@ -223,13 +225,15 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          {isUploading ? (
+          {children ? (
+            children
+          ) : isUploading ? (
             <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
           ) : (
             <Plus className="w-5 h-5 text-gray-500" />
           )}
         </button>
-        
+
         <input
           ref={fileInputRef}
           type="file"
@@ -249,8 +253,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({
       <div
         className={`
           relative border-2 border-dashed rounded-lg p-6 transition-all duration-200
-          ${isDragging 
-            ? 'border-blue-400 bg-blue-50' 
+          ${isDragging
+            ? 'border-blue-400 bg-blue-50'
             : 'border-gray-300 hover:border-gray-400'
           }
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'}
@@ -270,7 +274,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           <p className="text-sm text-gray-500 mb-4">
             Arraste e solte {multiple ? 'arquivos' : 'um arquivo'} ou clique para selecionar
           </p>
-          
+
           {/* Informações sobre limites */}
           <div className="text-xs text-gray-400 space-y-1">
             <p>Tamanho máximo: {config.maxSize}MB</p>
@@ -298,7 +302,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           <h4 className="text-sm font-medium text-gray-900">
             Arquivos ({files.length})
           </h4>
-          
+
           <div className="space-y-2">
             {files.map((fileWithProgress, index) => (
               <FileItem
@@ -322,10 +326,10 @@ interface FileItemProps {
   onRemove: () => void;
 }
 
-const FileItem: React.FC<FileItemProps> = ({ 
-  fileWithProgress, 
-  showPreview, 
-  onRemove 
+const FileItem: React.FC<FileItemProps> = ({
+  fileWithProgress,
+  showPreview,
+  onRemove
 }) => {
   const { file, progress, previewUrl } = fileWithProgress;
   const fileIcon = uploadService.getFileIcon(file.type);
@@ -356,7 +360,7 @@ const FileItem: React.FC<FileItemProps> = ({
         <p className="text-xs text-gray-500">
           {formattedSize}
         </p>
-        
+
         {/* Barra de progresso */}
         {progress.status === 'uploading' && (
           <div className="mt-2">
@@ -386,11 +390,11 @@ const FileItem: React.FC<FileItemProps> = ({
         {progress.status === 'uploading' && (
           <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
         )}
-        
+
         {progress.status === 'success' && (
           <CheckCircle className="w-4 h-4 text-green-500" />
         )}
-        
+
         {progress.status === 'error' && (
           <AlertCircle className="w-4 h-4 text-red-500" />
         )}

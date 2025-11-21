@@ -1,0 +1,56 @@
+# ==========================================
+# Stage 1: Build
+# ==========================================
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Copiar package files
+COPY package*.json ./
+COPY tsconfig*.json ./
+COPY nest-cli.json ./
+
+# Install dependencies (incluindo devDependencies para build)
+RUN npm ci
+
+# Copiar código fonte
+COPY src ./src
+
+# Build da aplicação
+RUN npm run build
+
+# Limpar devDependencies
+RUN npm prune --production
+
+# ==========================================
+# Stage 2: Production
+# ==========================================
+FROM node:18-alpine
+
+# Adicionar usuário não-root para segurança
+RUN addgroup -g 1001 -S nodejs && \
+  adduser -S nestjs -u 1001
+
+WORKDIR /app
+
+# Copiar node_modules de produção
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
+
+# Copiar código compilado
+COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
+
+# Copiar package.json para ter acesso aos scripts
+COPY --chown=nestjs:nodejs package*.json ./
+
+# Expor porta
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3001/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
+
+# Trocar para usuário não-root
+USER nestjs
+
+# Comando de inicialização
+CMD ["node", "dist/src/main.js"]

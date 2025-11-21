@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  X, 
-  Save, 
-  Upload, 
-  Trash2, 
+import {
+  X,
+  Save,
+  Upload,
+  Trash2,
   Plus,
   Calendar,
   DollarSign,
@@ -19,10 +19,10 @@ import {
   Paperclip,
   Eye
 } from 'lucide-react';
-import { 
-  ContaPagar, 
-  NovaContaPagar, 
-  CategoriaContaPagar, 
+import {
+  ContaPagar,
+  NovaContaPagar,
+  CategoriaContaPagar,
   FormaPagamento,
   PrioridadePagamento,
   CATEGORIA_LABELS,
@@ -150,7 +150,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
     // Remove todos os caracteres não numéricos
     const numericValue = value.replace(/\D/g, '');
     if (!numericValue || numericValue === '0') return '';
-    
+
     // Converte para número e formata
     const formattedValue = (parseInt(numericValue) / 100).toFixed(2);
     return formattedValue.replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -162,9 +162,9 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
     const cleanValue = valorInput.replace(/^R\$\s*/, '');
     const formatted = formatCurrency(cleanValue);
     const formattedValue = formatted ? `R$ ${formatted}` : '';
-    
+
     setValorOriginalInput(formattedValue);
-    
+
     // Converte para valor numérico para cálculos
     const valorNumerico = formattedValue ? parseFloat(formattedValue.replace(/[^\d,]/g, '').replace(',', '.')) : 0;
     setFormData(prev => ({
@@ -187,9 +187,9 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
     const cleanValue = valorInput.replace(/^R\$\s*/, '');
     const formatted = formatCurrency(cleanValue);
     const formattedValue = formatted ? `R$ ${formatted}` : '';
-    
+
     setValorDescontoInput(formattedValue);
-    
+
     // Converte para valor numérico para cálculos
     const valorNumerico = formattedValue ? parseFloat(formattedValue.replace(/[^\d,]/g, '').replace(',', '.')) : 0;
     setFormData(prev => ({
@@ -301,7 +301,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
 
     const valorOriginalNum = Number(formData.valorOriginal) || 0;
     const valorDescontoNum = Number(formData.valorDesconto) || 0;
-    
+
     if (formData.valorDesconto && valorDescontoNum >= valorOriginalNum) {
       novosErros.valorDesconto = 'Desconto não pode ser maior ou igual ao valor original';
     }
@@ -363,27 +363,25 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
         const Icon = etapa.icon;
         const isActive = index === etapaAtual;
         const isCompleted = index < etapaAtual;
-        
+
         return (
           <div key={etapa.id} className="flex items-center">
-            <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
-              isActive 
-                ? 'border-blue-600 bg-blue-600 text-white' 
-                : isCompleted 
+            <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${isActive
+                ? 'border-blue-600 bg-blue-600 text-white'
+                : isCompleted
                   ? 'border-green-600 bg-green-600 text-white'
                   : 'border-gray-300 bg-white text-gray-400'
-            }`}>
+              }`}>
               {isCompleted ? (
                 <Check className="h-5 w-5" />
               ) : (
                 <Icon className="h-5 w-5" />
               )}
             </div>
-            
+
             {index < etapas.length - 1 && (
-              <div className={`w-16 h-1 mx-2 ${
-                index < etapaAtual ? 'bg-green-600' : 'bg-gray-300'
-              }`} />
+              <div className={`w-16 h-1 mx-2 ${index < etapaAtual ? 'bg-green-600' : 'bg-gray-300'
+                }`} />
             )}
           </div>
         );
@@ -411,14 +409,13 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                   <button
                     type="button"
                     onClick={() => setFornecedorDropdownAberto(!fornecedorDropdownAberto)}
-                    className={`w-full px-4 py-3 border rounded-lg text-left flex items-center justify-between bg-white ${
-                      errors.fornecedorId ? 'border-red-500' : 'border-gray-300'
-                    } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                    className={`w-full px-4 py-3 border rounded-lg text-left flex items-center justify-between bg-white ${errors.fornecedorId ? 'border-red-500' : 'border-gray-300'
+                      } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
                   >
                     <div className="flex items-center space-x-3">
                       <Building className="h-5 w-5 text-gray-400" />
                       <span className={formData.fornecedorId ? 'text-gray-900' : 'text-gray-500'}>
-                        {formData.fornecedorId 
+                        {formData.fornecedorId
                           ? fornecedoresMock.find(f => f.id === formData.fornecedorId)?.nome || 'Fornecedor não encontrado'
                           : 'Selecione um fornecedor'
                         }
@@ -426,7 +423,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                     </div>
                     <ChevronDown className="h-5 w-5 text-gray-400" />
                   </button>
-                  
+
                   {fornecedorDropdownAberto && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                       {fornecedoresMock.map((fornecedor) => (
@@ -465,9 +462,8 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                     type="text"
                     value={formData.descricao}
                     onChange={(e) => handleInputChange('descricao', e.target.value)}
-                    className={`w-full pl-10 pr-4 py-3 border rounded-lg ${
-                      errors.descricao ? 'border-red-500' : 'border-gray-300'
-                    } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                    className={`w-full pl-10 pr-4 py-3 border rounded-lg ${errors.descricao ? 'border-red-500' : 'border-gray-300'
+                      } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
                     placeholder="Ex: Licenças de software mensais"
                   />
                 </div>
@@ -532,9 +528,8 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                     type="date"
                     value={formData.dataVencimento}
                     onChange={(e) => handleInputChange('dataVencimento', e.target.value)}
-                    className={`w-full pl-10 pr-4 py-3 border rounded-lg ${
-                      errors.dataVencimento ? 'border-red-500' : 'border-gray-300'
-                    } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                    className={`w-full pl-10 pr-4 py-3 border rounded-lg ${errors.dataVencimento ? 'border-red-500' : 'border-gray-300'
+                      } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
                   />
                 </div>
                 {errors.dataVencimento && (
@@ -556,9 +551,8 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                     type="text"
                     value={valorOriginalInput}
                     onChange={(e) => handleValorOriginalChange(e.target.value)}
-                    className={`w-full pl-10 pr-4 py-3 border rounded-lg ${
-                      errors.valorOriginal ? 'border-red-500' : 'border-gray-300'
-                    } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                    className={`w-full pl-10 pr-4 py-3 border rounded-lg ${errors.valorOriginal ? 'border-red-500' : 'border-gray-300'
+                      } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
                     placeholder="0,00"
                   />
                 </div>
@@ -581,9 +575,8 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                     type="text"
                     value={valorDescontoInput}
                     onChange={(e) => handleValorDescontoChange(e.target.value)}
-                    className={`w-full pl-10 pr-4 py-3 border rounded-lg ${
-                      errors.valorDesconto ? 'border-red-500' : 'border-gray-300'
-                    } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                    className={`w-full pl-10 pr-4 py-3 border rounded-lg ${errors.valorDesconto ? 'border-red-500' : 'border-gray-300'
+                      } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
                     placeholder="0,00"
                   />
                 </div>
@@ -687,7 +680,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                       <option value="anual">Anual</option>
                     </select>
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Número de Parcelas
@@ -774,7 +767,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                       <span>Adicionar</span>
                     </button>
                   </div>
-                  
+
                   {formData.tags && formData.tags.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {formData.tags.map((tag, index) => (
@@ -883,7 +876,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl w-[calc(100%-2rem)] sm:w-[600px] md:w-[700px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] max-h-[95vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
           <div className="flex items-center space-x-3">
@@ -899,7 +892,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
               </p>
             </div>
           </div>
-          
+
           <button
             onClick={onClose}
             className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-100"
@@ -934,7 +927,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
           <div className="text-sm text-gray-500">
             Etapa {etapaAtual + 1} de {etapas.length}
           </div>
-          
+
           <div className="flex items-center space-x-3">
             <button
               onClick={onClose}
@@ -942,16 +935,15 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
             >
               Cancelar
             </button>
-            
+
             {etapaAtual < etapas.length - 1 ? (
               <button
                 onClick={proximaEtapa}
                 disabled={!podeAvancar()}
-                className={`px-6 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  podeAvancar()
+                className={`px-6 py-2 text-sm font-medium rounded-lg transition-colors ${podeAvancar()
                     ? 'bg-blue-600 text-white hover:bg-blue-700'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
+                  }`}
               >
                 Continuar
               </button>
@@ -959,11 +951,10 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
               <button
                 onClick={handleSalvar}
                 disabled={salvando || !podeAvancar()}
-                className={`px-6 py-2 text-sm font-medium rounded-lg transition-colors flex items-center space-x-2 ${
-                  salvando || !podeAvancar()
+                className={`px-6 py-2 text-sm font-medium rounded-lg transition-colors flex items-center space-x-2 ${salvando || !podeAvancar()
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : 'bg-green-600 text-white hover:bg-green-700'
-                }`}
+                  }`}
               >
                 {salvando ? (
                   <>

@@ -53,13 +53,11 @@ export class CobrancaService {
     }
   }
 
-  async buscarPlanosCobranca(
-    filtros?: {
-      status?: StatusPlanoCobranca;
-      clienteId?: number;
-      contratoId?: number;
-    }
-  ): Promise<PlanoCobranca[]> {
+  async buscarPlanosCobranca(filtros?: {
+    status?: StatusPlanoCobranca;
+    clienteId?: number;
+    contratoId?: number;
+  }): Promise<PlanoCobranca[]> {
     const query = this.planoCobrancaRepository
       .createQueryBuilder('plano')
       .leftJoinAndSelect('plano.contrato', 'contrato')
@@ -78,9 +76,7 @@ export class CobrancaService {
       query.andWhere('plano.contratoId = :contratoId', { contratoId: filtros.contratoId });
     }
 
-    return query
-      .orderBy('plano.createdAt', 'DESC')
-      .getMany();
+    return query.orderBy('plano.createdAt', 'DESC').getMany();
   }
 
   async buscarPlanoPorId(id: number): Promise<PlanoCobranca> {
@@ -109,7 +105,10 @@ export class CobrancaService {
     return plano;
   }
 
-  async atualizarPlanoCobranca(id: number, updatePlanoDto: UpdatePlanoCobrancaDto): Promise<PlanoCobranca> {
+  async atualizarPlanoCobranca(
+    id: number,
+    updatePlanoDto: UpdatePlanoCobrancaDto,
+  ): Promise<PlanoCobranca> {
     const plano = await this.buscarPlanoPorId(id);
 
     Object.assign(plano, updatePlanoDto);
@@ -214,7 +213,10 @@ export class CobrancaService {
       }
 
       // Calcular juros e multa se houver atraso
-      const diasAtraso = Math.max(0, Math.ceil((new Date().getTime() - plano.proximaCobranca.getTime()) / (1000 * 60 * 60 * 24)));
+      const diasAtraso = Math.max(
+        0,
+        Math.ceil((new Date().getTime() - plano.proximaCobranca.getTime()) / (1000 * 60 * 60 * 24)),
+      );
       const { juros, multa } = plano.calcularJurosMulta(plano.valorRecorrente, diasAtraso);
 
       // Criar fatura
@@ -226,16 +228,20 @@ export class CobrancaService {
         descricao: `${plano.nome} - Período: ${plano.proximaCobranca.toLocaleDateString('pt-BR')}`,
         dataVencimento: plano.proximaCobranca.toISOString().split('T')[0],
         valorDesconto: 0,
-        itens: [{
-          descricao: plano.nome,
-          quantidade: 1,
-          valorUnitario: plano.valorRecorrente,
-          unidade: 'mês',
-          codigoProduto: plano.codigo,
-        }],
+        itens: [
+          {
+            descricao: plano.nome,
+            quantidade: 1,
+            valorUnitario: plano.valorRecorrente,
+            unidade: 'mês',
+            codigoProduto: plano.codigo,
+          },
+        ],
       };
 
-      const fatura = await this.faturamentoService.criarFatura(createFaturaDto);
+      // Obter empresaId do contrato relacionado
+      const empresaId = plano.contrato.empresa_id;
+      const fatura = await this.faturamentoService.criarFatura(createFaturaDto, empresaId);
 
       // Adicionar juros e multa se houver
       if (juros > 0 || multa > 0) {

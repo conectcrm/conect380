@@ -19,6 +19,7 @@ import VerificacaoEmailPage from './features/auth/VerificacaoEmailPage';
 import ForgotPasswordPage from './features/auth/ForgotPasswordPage';
 import ResetPasswordPage from './features/auth/ResetPasswordPage';
 import TrocarSenhaPage from './pages/TrocarSenhaPage'; // ✅ Troca de senha (primeiro acesso)
+import CaptureLeadPage from './pages/CaptureLeadPage'; // ✅ Formulário público de captura
 import DashboardLayout from './components/layout/DashboardLayout';
 import DashboardRouter from './features/dashboard/DashboardRouter';
 import ClientesPage from './features/clientes/ClientesPage';
@@ -53,6 +54,8 @@ import { MinhasEmpresasPage } from './features/empresas/MinhasEmpresasPage';
 import ContatosPage from './features/contatos/ContatosPage';
 import { UsuariosPage } from './features/gestao/usuarios/UsuariosPage';
 import PerfilPage from './features/perfil/PerfilPage';
+import PipelinePage from './pages/PipelinePage';
+import LeadsPage from './pages/LeadsPage';
 import AtendimentoIntegradoPage from './features/atendimento/pages/AtendimentoIntegradoPage';
 import AtendimentoDashboard from './features/atendimento/pages/AtendimentoDashboard';
 import GestaoNucleosPage from './features/gestao/pages/GestaoNucleosPage';
@@ -75,6 +78,11 @@ import GestaoTemplatesPage from './pages/GestaoTemplatesPage';
 // Sistema de SLA Tracking - Núcleo Atendimento
 import ConfiguracaoSLAPage from './pages/ConfiguracaoSLAPage';
 import DashboardSLAPage from './pages/DashboardSLAPage';
+// Sistema de Fechamento Automático - Núcleo Atendimento
+import FechamentoAutomaticoPage from './pages/FechamentoAutomaticoPage';
+import DashboardAnalyticsPage from './pages/DashboardAnalyticsPage';
+// Notificações Real-Time
+import { NotificationsProvider } from './contexts/NotificationsContext';
 // Importar novas páginas do sistema de empresas
 import ConfiguracaoEmpresaPage from './pages/empresas/ConfiguracaoEmpresaPage';
 import { RelatoriosAnalyticsPage } from './pages/empresas/RelatoriosAnalyticsPage';
@@ -91,7 +99,9 @@ import ScrollToTop from './components/common/ScrollToTop';
 import { BillingPage } from './pages/billing';
 import FaturamentoPage from './pages/faturamento/FaturamentoPage';
 import CotacaoPage from './features/comercial/pages/CotacaoPage';
+import MinhasAprovacoesPage from './features/comercial/pages/MinhasAprovacoesPage';
 import DepartamentosPage from './features/gestao/pages/DepartamentosPage';
+import ConfigurarCanalEmail from './pages/ConfigurarCanalEmail';
 
 // Configuração do React Query
 const queryClient = new QueryClient({
@@ -165,10 +175,11 @@ const AppRoutes: React.FC = () => {
           <Route path="/gestao/atendentes" element={<Navigate to="/atendimento/configuracoes?tab=atendentes" replace />} />
           <Route path="/gestao/tags" element={<Navigate to="/atendimento/configuracoes?tab=tags" replace />} />
 
-          {/* ❌ REMOVIDO: Atribuições e Departamentos descontinuados */}
-          {/* Redirecionar para Tags (sistema flexível que substitui departamentos) */}
+          {/* ❌ REMOVIDO: Apenas Atribuições descontinuadas (absorvidas por Distribuição) */}
           <Route path="/gestao/atribuicoes" element={<Navigate to="/atendimento/distribuicao" replace />} />
-          <Route path="/gestao/departamentos" element={<Navigate to="/atendimento/configuracoes?tab=tags" replace />} />
+
+          {/* ⚠️ REDIRECT ANTIGO: Departamentos permanecem ativos em /nuclei/configuracoes/departamentos */}
+          <Route path="/gestao/departamentos" element={<Navigate to="/nuclei/configuracoes/departamentos" replace />} />
 
           {/* ✅ Fluxos mantém rotas separadas (tem sub-rotas para o builder) */}
           <Route path="/gestao/fluxos" element={<Navigate to="/atendimento/configuracoes?tab=fluxos" replace />} />
@@ -284,6 +295,7 @@ const AppRoutes: React.FC = () => {
           {/* ROTAS DO NÚCLEO ATENDIMENTO */}
           <Route path="/nuclei/atendimento/filas" element={<GestaoFilasPage />} />
           <Route path="/nuclei/atendimento/templates" element={<GestaoTemplatesPage />} />
+          <Route path="/nuclei/atendimento/canais/email" element={<ConfigurarCanalEmail />} />
           {/* SLA Tracking */}
           <Route path="/nuclei/atendimento/sla/configuracoes" element={<ConfiguracaoSLAPage />} />
           <Route path="/nuclei/atendimento/sla/dashboard" element={<DashboardSLAPage />} />
@@ -311,6 +323,8 @@ const AppRoutes: React.FC = () => {
           <Route path="/atendimento/chat" element={protegerRota(ModuloEnum.ATENDIMENTO, <AtendimentoIntegradoPage />)} />
           <Route path="/atendimento/distribuicao" element={protegerRota(ModuloEnum.ATENDIMENTO, <ConfiguracaoDistribuicaoPage />)} />
           <Route path="/atendimento/distribuicao/dashboard" element={protegerRota(ModuloEnum.ATENDIMENTO, <DashboardDistribuicaoPage />)} />
+          <Route path="/atendimento/fechamento-automatico" element={protegerRota(ModuloEnum.ATENDIMENTO, <FechamentoAutomaticoPage />)} />
+          <Route path="/atendimento/dashboard-analytics" element={protegerRota(ModuloEnum.ATENDIMENTO, <DashboardAnalyticsPage />)} />
 
           {/* Perfil do Usuário */}
           <Route path="/perfil" element={<PerfilPage />} />
@@ -326,12 +340,19 @@ const AppRoutes: React.FC = () => {
           <Route path="/exemplo-produto" element={<ExemploModalProduto />} />
 
           {/* Rotas dos módulos existentes - Protegidas */}
+          <Route path="/leads" element={protegerRota(ModuloEnum.CRM, <LeadsPage />)} />
           <Route path="/clientes" element={protegerRota(ModuloEnum.CRM, <ClientesPage />)} />
           <Route path="/contatos" element={protegerRota(ModuloEnum.CRM, <ContatosPage />)} />
+          <Route path="/pipeline" element={protegerRota(ModuloEnum.CRM, <PipelinePage />)} />
+
+          {/* Redirects - Consolidação de telas */}
+          <Route path="/funil-vendas" element={<Navigate to="/pipeline" replace />} />
+          <Route path="/oportunidades" element={<Navigate to="/pipeline" replace />} />
+
           <Route path="/propostas" element={protegerRota(ModuloEnum.VENDAS, <PropostasPage />)} />
           <Route path="/cotacoes" element={protegerRota(ModuloEnum.VENDAS, <CotacaoPage />)} />
           <Route path="/orcamentos" element={protegerRota(ModuloEnum.VENDAS, <CotacaoPage />)} />
-          <Route path="/funil-vendas" element={protegerRota(ModuloEnum.VENDAS, <FunilVendas />)} />
+          <Route path="/aprovacoes/pendentes" element={protegerRota(ModuloEnum.VENDAS, <MinhasAprovacoesPage />)} />
           <Route path="/produtos" element={protegerRota(ModuloEnum.VENDAS, <ProdutosPage />)} />
           <Route path="/produtos/categorias" element={protegerRota(ModuloEnum.VENDAS, <CategoriasProdutosPage />)} />
 
@@ -341,7 +362,6 @@ const AppRoutes: React.FC = () => {
           <Route path="/combos/:id/editar" element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)} />
 
           <Route path="/agenda" element={protegerRota(ModuloEnum.CRM, <AgendaPage />)} />
-          <Route path="/oportunidades" element={protegerRota(ModuloEnum.VENDAS, <OportunidadesPage />)} />
 
           {/* Upload Demo */}
           <Route path="/upload-demo" element={<UploadDemoPage />} />
@@ -436,6 +456,9 @@ const AppRoutes: React.FC = () => {
       {/* Página de configuração de e-mail - pública para facilitar configuração */}
       <Route path="/configuracao-email" element={<ConfiguracaoEmailPage />} />
 
+      {/* Formulário público de captura de leads */}
+      <Route path="/capturar-lead" element={<CaptureLeadPage />} />
+
       {/* Rotas de autenticação */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/registro" element={<RegistroEmpresaPage />} />
@@ -457,37 +480,39 @@ const App: React.FC = () => {
             <ProfileProvider>
               <NotificationProvider>
                 <EmpresaProvider>
-                  <SidebarProvider>
-                    <MenuProvider>
-                      <ToastProvider>
-                        {/* SocketProvider temporariamente desabilitado - usando useWebSocket do chat */}
-                        {/* <SocketProvider> */}
-                        <Router
-                          future={{
-                            v7_startTransition: true,
-                            v7_relativeSplatPath: true,
-                          }}
-                        >
-                          <ScrollToTop />
-                          <div className="App">
-                            <AppRoutes />
+                  <NotificationsProvider autoConnect={true} enableSound={true} enableToast={true}>
+                    <SidebarProvider>
+                      <MenuProvider>
+                        <ToastProvider>
+                          {/* SocketProvider temporariamente desabilitado - usando useWebSocket do chat */}
+                          {/* <SocketProvider> */}
+                          <Router
+                            future={{
+                              v7_startTransition: true,
+                              v7_relativeSplatPath: true,
+                            }}
+                          >
+                            <ScrollToTop />
+                            <div className="App">
+                              <AppRoutes />
 
-                            <Toaster
-                              position="top-right"
-                              toastOptions={{
-                                duration: 4000,
-                                style: {
-                                  background: '#363636',
-                                  color: '#fff',
-                                },
-                              }}
-                            />
-                          </div>
-                        </Router>
-                        {/* </SocketProvider> */}
-                      </ToastProvider>
-                    </MenuProvider>
-                  </SidebarProvider>
+                              <Toaster
+                                position="top-right"
+                                toastOptions={{
+                                  duration: 4000,
+                                  style: {
+                                    background: '#363636',
+                                    color: '#fff',
+                                  },
+                                }}
+                              />
+                            </div>
+                          </Router>
+                          {/* </SocketProvider> */}
+                        </ToastProvider>
+                      </MenuProvider>
+                    </SidebarProvider>
+                  </NotificationsProvider>
                 </EmpresaProvider>
               </NotificationProvider>
             </ProfileProvider>

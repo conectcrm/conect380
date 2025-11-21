@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import ConectCRMLogoFinal from '../components/ui/ConectCRMLogoFinal';
 import OpportunityModal from '../components/OpportunityModal';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { opportunitiesService } from '../services/opportunitiesService';
 import toast from 'react-hot-toast';
 
@@ -41,43 +41,45 @@ const FunilVendas = () => {
   });
 
   // Queries para dados da API
-  const { data: pipelineData, isLoading: loadingPipeline, error: pipelineError } = useQuery(
-    'pipeline',
-    opportunitiesService.getPipelineData,
-    {
-      refetchInterval: 30000,
-      retry: 3,
-      retryDelay: 1000
-    }
-  );
+  const {
+    data: pipelineData,
+    isLoading: loadingPipeline,
+    error: pipelineError
+  } = useQuery({
+    queryKey: ['pipeline'],
+    queryFn: opportunitiesService.getPipelineData,
+    refetchInterval: 30000,
+    retry: 3,
+    retryDelay: 1000
+  });
 
-  const { data: metrics, isLoading: loadingMetrics, error: metricsError } = useQuery(
-    'metrics',
-    opportunitiesService.getMetrics,
-    {
-      refetchInterval: 30000,
-      retry: 3,
-      retryDelay: 1000
-    }
-  );
+  const {
+    data: metrics,
+    isLoading: loadingMetrics,
+    error: metricsError
+  } = useQuery({
+    queryKey: ['metrics'],
+    queryFn: opportunitiesService.getMetrics,
+    refetchInterval: 30000,
+    retry: 3,
+    retryDelay: 1000
+  });
 
   // Mutation para atualizar estágio (drag and drop)
-  const updateStageMutation = useMutation(
-    ({ id, estagio }) => opportunitiesService.updateStage(id, estagio),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('pipeline');
-        queryClient.invalidateQueries('metrics');
-        toast.success('Oportunidade movida com sucesso!');
-      },
-      onError: (error) => {
-        console.error('Erro ao mover oportunidade:', error);
-        toast.error('Erro ao mover oportunidade. Tente novamente.');
-        // Recarregar dados em caso de erro
-        queryClient.invalidateQueries('pipeline');
-      }
+  const updateStageMutation = useMutation({
+    mutationFn: ({ id, estagio }) => opportunitiesService.updateStage(id, estagio),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pipeline'] });
+      queryClient.invalidateQueries({ queryKey: ['metrics'] });
+      toast.success('Oportunidade movida com sucesso!');
+    },
+    onError: (error) => {
+      console.error('Erro ao mover oportunidade:', error);
+      toast.error('Erro ao mover oportunidade. Tente novamente.');
+      // Recarregar dados em caso de erro
+      queryClient.invalidateQueries({ queryKey: ['pipeline'] });
     }
-  );
+  });
 
   // Loading states
   if (loadingPipeline || loadingMetrics) {
@@ -102,8 +104,8 @@ const FunilVendas = () => {
           </div>
           <button
             onClick={() => {
-              queryClient.invalidateQueries('pipeline');
-              queryClient.invalidateQueries('metrics');
+              queryClient.invalidateQueries({ queryKey: ['pipeline'] });
+              queryClient.invalidateQueries({ queryKey: ['metrics'] });
             }}
             className="bg-[#159A9C] text-white px-4 py-2 rounded-lg hover:bg-[#0F7B7D] transition-colors"
           >
@@ -320,8 +322,8 @@ const FunilVendas = () => {
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${showFilters
-                ? 'bg-[#159A9C] text-white border-[#159A9C]'
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              ? 'bg-[#159A9C] text-white border-[#159A9C]'
+              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
               }`}
           >
             <Filter className="w-4 h-4" />
@@ -494,8 +496,8 @@ const FunilVendas = () => {
           }}
           onUpdate={(updatedOpportunity) => {
             // Invalidar queries para recarregar dados
-            queryClient.invalidateQueries('pipeline');
-            queryClient.invalidateQueries('metrics');
+            queryClient.invalidateQueries({ queryKey: ['pipeline'] });
+            queryClient.invalidateQueries({ queryKey: ['metrics'] });
             setShowModal(false);
             setSelectedOpportunity(null);
             toast.success('Oportunidade atualizada com sucesso!');

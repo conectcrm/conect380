@@ -6,7 +6,14 @@ import {
   UpdateDateColumn,
   DeleteDateColumn,
   Index,
+  ManyToOne,
+  ManyToMany,
+  JoinTable,
+  JoinColumn,
 } from 'typeorm';
+
+import { Fila } from './fila.entity';
+import { Tag } from './tag.entity';
 
 export enum StatusTicket {
   ABERTO = 'ABERTO',
@@ -58,17 +65,27 @@ export class Ticket {
   @Column({ type: 'uuid', name: 'fila_id', nullable: true })
   filaId: string;
 
+  @ManyToOne(() => Fila, { nullable: true })
+  @JoinColumn({ name: 'fila_id' })
+  fila: Fila;
+
   @Column({ type: 'uuid', name: 'atendente_id', nullable: true })
   atendenteId: string;
 
   @Column({ type: 'uuid', name: 'empresa_id' })
   empresaId: string;
 
+  @Column({ type: 'uuid', name: 'departamento_id', nullable: true })
+  departamentoId: string | null;
+
   @Column({ type: 'varchar', length: 20, name: 'contato_telefone', nullable: true })
   contatoTelefone: string;
 
   @Column({ type: 'varchar', length: 255, name: 'contato_nome', nullable: true })
   contatoNome: string;
+
+  @Column({ type: 'varchar', length: 255, name: 'contato_email', nullable: true })
+  contatoEmail: string;
 
   @Column({ type: 'varchar', length: 512, name: 'contato_foto', nullable: true })
   contatoFoto: string;
@@ -93,6 +110,15 @@ export class Ticket {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  // Relação Many-to-Many com Tags
+  @ManyToMany(() => Tag, (tag) => tag.tickets)
+  @JoinTable({
+    name: 'ticket_tags',
+    joinColumn: { name: 'ticketId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'tagId', referencedColumnName: 'id' },
+  })
+  tags: Tag[];
 
   // @DeleteDateColumn({ name: 'deleted_at', nullable: true })
   // deletedAt: Date;

@@ -287,11 +287,11 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl w-[calc(100%-2rem)] sm:w-[700px] md:w-[900px] lg:w-[1100px] xl:w-[1200px] max-w-[1400px] max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <FileText className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 bg-[#159A9C]/10 rounded-lg flex items-center justify-center">
+              <FileText className="w-4 h-4 text-[#159A9C]" />
             </div>
             <h2 className="text-xl font-semibold text-gray-900">
               {fatura ? 'Editar Fatura' : 'Nova Fatura'}
@@ -634,7 +634,7 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
             <button
               type="submit"
               disabled={salvando || formData.itens.length === 0}
-              className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-md hover:from-blue-600 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 bg-[#159A9C] text-white rounded-md hover:bg-[#0F7B7D] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium"
             >
               {salvando ? (
                 <>

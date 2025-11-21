@@ -24,9 +24,7 @@ export function formatarOpcoes(opcoes: BotOption[]): string {
 
 export function obterEmojiPorNome(nome: string): string {
   const nomeLower = (nome || '').toLowerCase();
-  const normalized = nomeLower
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+  const normalized = nomeLower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
   if (normalized.includes('suporte') || normalized.includes('tecnico')) {
     return '1️⃣';

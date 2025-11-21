@@ -49,7 +49,7 @@ export class SessaoTriagem {
   @Column({ name: 'fluxo_id', type: 'uuid' })
   fluxoId: string;
 
-  @ManyToOne(() => FluxoTriagem, fluxo => fluxo.sessoes, { onDelete: 'CASCADE' })
+  @ManyToOne(() => FluxoTriagem, (fluxo) => fluxo.sessoes, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'fluxo_id' })
   fluxo: FluxoTriagem;
 
@@ -109,7 +109,7 @@ export class SessaoTriagem {
   @Column({
     type: 'varchar',
     length: 50,
-    default: 'em_andamento'
+    default: 'em_andamento',
   })
   status: StatusSessao;
 
@@ -179,7 +179,7 @@ export class SessaoTriagem {
       etapa,
       resposta,
       timestamp: new Date().toISOString(),
-      tempoRespostaSegundos: tempoResposta
+      tempoRespostaSegundos: tempoResposta,
     });
     this.totalMensagensRecebidas++;
   }
@@ -255,7 +255,7 @@ export class SessaoTriagem {
   private calcularTempoTotal(): void {
     if (this.concluidoEm && this.iniciadoEm) {
       this.tempoTotalSegundos = Math.floor(
-        (this.concluidoEm.getTime() - this.iniciadoEm.getTime()) / 1000
+        (this.concluidoEm.getTime() - this.iniciadoEm.getTime()) / 1000,
       );
     }
   }

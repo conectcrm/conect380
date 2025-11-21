@@ -3,7 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, FindManyOptions, Between } from 'typeorm';
 import { Oportunidade, EstagioOportunidade } from './oportunidade.entity';
 import { Atividade, TipoAtividade } from './atividade.entity';
-import { CreateOportunidadeDto, UpdateOportunidadeDto, UpdateEstagioDto } from './dto/oportunidade.dto';
+import {
+  CreateOportunidadeDto,
+  UpdateOportunidadeDto,
+  UpdateEstagioDto,
+} from './dto/oportunidade.dto';
 import { CreateAtividadeDto } from './dto/atividade.dto';
 import { User } from '../users/user.entity';
 
@@ -14,37 +18,45 @@ export class OportunidadesService {
     private oportunidadeRepository: Repository<Oportunidade>,
     @InjectRepository(Atividade)
     private atividadeRepository: Repository<Atividade>,
-  ) {}
+  ) { }
 
-  async create(createOportunidadeDto: CreateOportunidadeDto, user: User): Promise<Oportunidade> {
+  async create(createOportunidadeDto: CreateOportunidadeDto, empresaId: string): Promise<Oportunidade> {
     const oportunidade = this.oportunidadeRepository.create({
       ...createOportunidadeDto,
-      dataFechamentoEsperado: createOportunidadeDto.dataFechamentoEsperado 
-        ? new Date(createOportunidadeDto.dataFechamentoEsperado) 
+      empresa_id: empresaId,  // ✅ ADICIONADO - Associar à empresa do token JWT
+      dataFechamentoEsperado: createOportunidadeDto.dataFechamentoEsperado
+        ? new Date(createOportunidadeDto.dataFechamentoEsperado)
         : null,
     });
 
-    const savedOportunidade = await this.oportunidadeRepository.save(oportunidade);
+    const savedOportunidade =
+      await this.oportunidadeRepository.save(oportunidade);
 
-    // Criar atividade de criação (sem await para não bloquear)
-    this.createAtividade({
-      tipo: TipoAtividade.NOTA,
-      descricao: 'Oportunidade criada',
-      oportunidade_id: savedOportunidade.id
-    }, user).catch(err => console.log('Erro ao criar atividade:', err));
+    // Criar atividade de criação da oportunidade (não bloquear o fluxo)
+    this.createAtividade(
+      {
+        tipo: TipoAtividade.NOTA,
+        descricao: 'Oportunidade criada',
+        oportunidade_id: savedOportunidade.id,
+      },
+      {
+        userId: savedOportunidade.responsavel_id,
+        empresaId,
+      },
+    ).catch((err) => console.log('Erro ao criar atividade:', err));
 
     return savedOportunidade;
   }
 
   async findAll(
-    user: User,
+    empresaId: string,
     filters?: {
       estagio?: EstagioOportunidade;
-      responsavel_id?: number;
-      cliente_id?: number;
+      responsavel_id?: string;
+      cliente_id?: string;
       dataInicio?: string;
       dataFim?: string;
-    }
+    },
   ): Promise<Oportunidade[]> {
     const queryBuilder = this.oportunidadeRepository
       .createQueryBuilder('oportunidade')
@@ -52,6 +64,7 @@ export class OportunidadesService {
       .leftJoinAndSelect('oportunidade.cliente', 'cliente')
       .leftJoinAndSelect('oportunidade.atividades', 'atividades')
       .leftJoinAndSelect('atividades.criadoPor', 'atividadeCriadoPor')
+      .where('oportunidade.empresa_id = :empresaId', { empresaId })
       .orderBy('oportunidade.updatedAt', 'DESC');
 
     // Filtros
@@ -60,45 +73,41 @@ export class OportunidadesService {
     }
 
     if (filters?.responsavel_id) {
-      queryBuilder.andWhere('oportunidade.responsavel_id = :responsavel_id', { 
-        responsavel_id: filters.responsavel_id 
+      queryBuilder.andWhere('oportunidade.responsavel_id = :responsavel_id', {
+        responsavel_id: filters.responsavel_id,
       });
     }
 
     if (filters?.cliente_id) {
-      queryBuilder.andWhere('oportunidade.cliente_id = :cliente_id', { 
-        cliente_id: filters.cliente_id 
+      queryBuilder.andWhere('oportunidade.cliente_id = :cliente_id', {
+        cliente_id: filters.cliente_id,
       });
     }
 
     if (filters?.dataInicio && filters?.dataFim) {
       queryBuilder.andWhere('oportunidade.createdAt BETWEEN :dataInicio AND :dataFim', {
         dataInicio: filters.dataInicio,
-        dataFim: filters.dataFim
+        dataFim: filters.dataFim,
       });
-    }
-
-    // Verificar permissões - vendedores só veem suas oportunidades
-    if (user.role === 'vendedor') {
-      queryBuilder.andWhere('oportunidade.responsavel_id = :userId', { userId: user.id });
     }
 
     return queryBuilder.getMany();
   }
 
-  async findOne(id: number, user?: User): Promise<Oportunidade> {
+  async findOne(id: number, empresaId?: string): Promise<Oportunidade> {
     const queryBuilder = this.oportunidadeRepository
       .createQueryBuilder('oportunidade')
       .leftJoinAndSelect('oportunidade.responsavel', 'responsavel')
       .leftJoinAndSelect('oportunidade.cliente', 'cliente')
       .leftJoinAndSelect('oportunidade.atividades', 'atividades')
       .leftJoinAndSelect('atividades.criadoPor', 'atividadeCriadoPor')
-      .where('oportunidade.id = :id', { id })
-      .orderBy('atividades.dataAtividade', 'DESC');
+      .where('oportunidade.id = :id', { id });
 
-    if (user && user.role === 'vendedor') {
-      queryBuilder.andWhere('oportunidade.responsavel_id = :userId', { userId: user.id });
+    if (empresaId) {
+      queryBuilder.andWhere('oportunidade.empresa_id = :empresaId', { empresaId });
     }
+
+    queryBuilder.orderBy('atividades.dataAtividade', 'DESC');
 
     const oportunidade = await queryBuilder.getOne();
 
@@ -109,46 +118,57 @@ export class OportunidadesService {
     return oportunidade;
   }
 
-  async update(id: number, updateOportunidadeDto: UpdateOportunidadeDto, user: User): Promise<Oportunidade> {
-    const oportunidade = await this.findOne(id, user);
-
-    // Verificar se pode editar
-    if (user.role === 'vendedor' && oportunidade.responsavel_id !== user.id) {
-      throw new ForbiddenException('Você só pode editar suas próprias oportunidades');
-    }
+  async update(
+    id: number,
+    updateOportunidadeDto: UpdateOportunidadeDto,
+    empresaId: string,
+  ): Promise<Oportunidade> {
+    const oportunidade = await this.findOne(id, empresaId);
 
     const estadoAnterior = { ...oportunidade };
 
     await this.oportunidadeRepository.update(id, {
       ...updateOportunidadeDto,
-      dataFechamentoEsperado: updateOportunidadeDto.dataFechamentoEsperado 
-        ? new Date(updateOportunidadeDto.dataFechamentoEsperado) 
+      dataFechamentoEsperado: updateOportunidadeDto.dataFechamentoEsperado
+        ? new Date(updateOportunidadeDto.dataFechamentoEsperado)
         : undefined,
     });
 
     // Registrar mudanças importantes
     if (updateOportunidadeDto.estagio && updateOportunidadeDto.estagio !== estadoAnterior.estagio) {
-      await this.createAtividade({
-        tipo: TipoAtividade.NOTA,
-        descricao: `Estágio alterado de "${estadoAnterior.estagio}" para "${updateOportunidadeDto.estagio}"`,
-        oportunidade_id: id
-      }, user);
+      await this.createAtividade(
+        {
+          tipo: TipoAtividade.NOTA,
+          descricao: `Estágio alterado de "${estadoAnterior.estagio}" para "${updateOportunidadeDto.estagio}"`,
+          oportunidade_id: id,
+        },
+        {
+          userId: oportunidade.responsavel_id,
+          empresaId,
+        },
+      );
     }
 
     return this.findOne(id);
   }
 
-  async updateEstagio(id: number, updateEstagioDto: UpdateEstagioDto, user: User): Promise<Oportunidade> {
-    const oportunidade = await this.findOne(id, user);
+  async updateEstagio(
+    id: number,
+    updateEstagioDto: UpdateEstagioDto,
+    empresaId: string,
+  ): Promise<Oportunidade> {
+    const oportunidade = await this.findOne(id, empresaId);
 
     const updateData: Partial<Oportunidade> = {
-      estagio: updateEstagioDto.estagio
+      estagio: updateEstagioDto.estagio,
     };
 
     // Se for fechamento (ganho ou perdido), registrar data
-    if (updateEstagioDto.estagio === EstagioOportunidade.GANHO || 
-        updateEstagioDto.estagio === EstagioOportunidade.PERDIDO) {
-      updateData.dataFechamentoReal = updateEstagioDto.dataFechamentoReal 
+    if (
+      updateEstagioDto.estagio === EstagioOportunidade.GANHO ||
+      updateEstagioDto.estagio === EstagioOportunidade.PERDIDO
+    ) {
+      updateData.dataFechamentoReal = updateEstagioDto.dataFechamentoReal
         ? new Date(updateEstagioDto.dataFechamentoReal)
         : new Date();
     }
@@ -156,36 +176,54 @@ export class OportunidadesService {
     await this.oportunidadeRepository.update(id, updateData);
 
     // Registrar atividade de mudança de estágio
-    const descricao = updateEstagioDto.estagio === EstagioOportunidade.GANHO 
-      ? 'Oportunidade GANHA! 🎉'
-      : updateEstagioDto.estagio === EstagioOportunidade.PERDIDO
-      ? 'Oportunidade perdida'
-      : `Movido para estágio: ${updateEstagioDto.estagio}`;
+    const descricao =
+      updateEstagioDto.estagio === EstagioOportunidade.GANHO
+        ? 'Oportunidade GANHA! 🎉'
+        : updateEstagioDto.estagio === EstagioOportunidade.PERDIDO
+          ? 'Oportunidade perdida'
+          : `Movido para estágio: ${updateEstagioDto.estagio}`;
 
-    await this.createAtividade({
-      tipo: TipoAtividade.NOTA,
-      descricao,
-      oportunidade_id: id
-    }, user);
+    await this.createAtividade(
+      {
+        tipo: TipoAtividade.NOTA,
+        descricao,
+        oportunidade_id: id,
+      },
+      {
+        userId: oportunidade.responsavel_id,
+        empresaId,
+      },
+    );
 
     return this.findOne(id);
   }
 
-  async remove(id: number, user: User): Promise<void> {
-    const oportunidade = await this.findOne(id, user);
-
-    if (user.role === 'vendedor' && oportunidade.responsavel_id !== user.id) {
-      throw new ForbiddenException('Você só pode excluir suas próprias oportunidades');
-    }
+  async remove(id: number, empresaId: string): Promise<void> {
+    const oportunidade = await this.findOne(id, empresaId);
 
     await this.oportunidadeRepository.remove(oportunidade);
   }
 
-  async createAtividade(createAtividadeDto: CreateAtividadeDto, user: User): Promise<Atividade> {
+  async createAtividade(
+    createAtividadeDto: CreateAtividadeDto,
+    context: { userId?: string; empresaId: string },
+  ): Promise<Atividade> {
+    const oportunidade = await this.oportunidadeRepository.findOne({
+      where: {
+        id: createAtividadeDto.oportunidade_id,
+        empresa_id: context.empresaId,
+      },
+    });
+
+    if (!oportunidade) {
+      throw new NotFoundException('Oportunidade não encontrada para esta empresa');
+    }
+
     const atividade = this.atividadeRepository.create({
       ...createAtividadeDto,
-      criado_por_id: user.id,
-      dataAtividade: createAtividadeDto.dataAtividade 
+      empresa_id: context.empresaId,
+      criado_por_id: context.userId ?? oportunidade.responsavel_id,
+      dataAtividade: createAtividadeDto.dataAtividade
         ? new Date(createAtividadeDto.dataAtividade)
         : new Date(),
     });
@@ -193,43 +231,74 @@ export class OportunidadesService {
     return await this.atividadeRepository.save(atividade);
   }
 
-  async getMetricas(user: User, filtros?: { dataInicio?: string; dataFim?: string }) {
-    let queryBuilder = this.oportunidadeRepository.createQueryBuilder('oportunidade');
+  async listarAtividades(oportunidadeId: number, empresaId: string): Promise<Atividade[]> {
+    // Verificar se a oportunidade pertence à empresa
+    const oportunidade = await this.oportunidadeRepository.findOne({
+      where: {
+        id: oportunidadeId,
+        empresa_id: empresaId,
+      },
+    });
 
-    // Aplicar filtros de permissão
-    if (user.role === 'vendedor') {
-      queryBuilder = queryBuilder.where('oportunidade.responsavel_id = :userId', { userId: user.id });
+    if (!oportunidade) {
+      throw new NotFoundException('Oportunidade não encontrada para esta empresa');
     }
+
+    // Buscar atividades com informações do criador
+    const atividades = await this.atividadeRepository.find({
+      where: {
+        oportunidade_id: oportunidadeId,
+        empresa_id: empresaId,
+      },
+      relations: ['criadoPor'],
+      order: {
+        dataAtividade: 'DESC',
+      },
+    });
+
+    return atividades;
+  }
+
+  async getMetricas(empresaId: string, filtros?: { dataInicio?: string; dataFim?: string }) {
+    let queryBuilder = this.oportunidadeRepository
+      .createQueryBuilder('oportunidade')
+      .where('oportunidade.empresa_id = :empresaId', { empresaId });
 
     // Filtros de data
     if (filtros?.dataInicio && filtros?.dataFim) {
-      queryBuilder = queryBuilder.andWhere('oportunidade.createdAt BETWEEN :dataInicio AND :dataFim', {
-        dataInicio: filtros.dataInicio,
-        dataFim: filtros.dataFim
-      });
+      queryBuilder = queryBuilder.andWhere(
+        'oportunidade.createdAt BETWEEN :dataInicio AND :dataFim',
+        {
+          dataInicio: filtros.dataInicio,
+          dataFim: filtros.dataFim,
+        },
+      );
     }
 
     const todasOportunidades = await queryBuilder.getMany();
 
     const totalOportunidades = todasOportunidades.length;
     const valorTotalPipeline = todasOportunidades.reduce((sum, opp) => sum + Number(opp.valor), 0);
-    
-    const oportunidadesGanhas = todasOportunidades.filter(opp => opp.estagio === EstagioOportunidade.GANHO);
+
+    const oportunidadesGanhas = todasOportunidades.filter(
+      (opp) => opp.estagio === EstagioOportunidade.GANHO,
+    );
     const valorGanho = oportunidadesGanhas.reduce((sum, opp) => sum + Number(opp.valor), 0);
-    
-    const taxaConversao = totalOportunidades > 0 
-      ? ((oportunidadesGanhas.length / totalOportunidades) * 100).toFixed(1)
-      : 0;
+
+    const taxaConversao =
+      totalOportunidades > 0
+        ? ((oportunidadesGanhas.length / totalOportunidades) * 100).toFixed(1)
+        : 0;
 
     const valorMedio = totalOportunidades > 0 ? valorTotalPipeline / totalOportunidades : 0;
 
     // Distribuição por estágio
     const distribuicaoPorEstagio = {};
-    Object.values(EstagioOportunidade).forEach(estagio => {
-      const oportunidadesEstagio = todasOportunidades.filter(opp => opp.estagio === estagio);
+    Object.values(EstagioOportunidade).forEach((estagio) => {
+      const oportunidadesEstagio = todasOportunidades.filter((opp) => opp.estagio === estagio);
       distribuicaoPorEstagio[estagio] = {
         quantidade: oportunidadesEstagio.length,
-        valor: oportunidadesEstagio.reduce((sum, opp) => sum + Number(opp.valor), 0)
+        valor: oportunidadesEstagio.reduce((sum, opp) => sum + Number(opp.valor), 0),
       };
     });
 
@@ -239,26 +308,26 @@ export class OportunidadesService {
       valorGanho,
       taxaConversao: Number(taxaConversao),
       valorMedio,
-      distribuicaoPorEstagio
+      distribuicaoPorEstagio,
     };
   }
 
-  async getPipelineData(user: User) {
-    const oportunidades = await this.findAll(user);
-    
+  async getPipelineData(empresaId: string) {
+    const oportunidades = await this.findAll(empresaId);
+
     const pipeline = {};
-    Object.values(EstagioOportunidade).forEach(estagio => {
+    Object.values(EstagioOportunidade).forEach((estagio) => {
       pipeline[estagio] = {
         id: estagio,
         title: this.getEstagioLabel(estagio),
         color: this.getEstagioColor(estagio),
-        opportunities: oportunidades.filter(opp => opp.estagio === estagio)
+        opportunities: oportunidades.filter((opp) => opp.estagio === estagio),
       };
     });
 
     return {
       stages: pipeline,
-      stageOrder: Object.values(EstagioOportunidade)
+      stageOrder: Object.values(EstagioOportunidade),
     };
   }
 
@@ -270,7 +339,7 @@ export class OportunidadesService {
       [EstagioOportunidade.NEGOCIACAO]: 'Negociação',
       [EstagioOportunidade.FECHAMENTO]: 'Fechamento',
       [EstagioOportunidade.GANHO]: 'Ganho',
-      [EstagioOportunidade.PERDIDO]: 'Perdido'
+      [EstagioOportunidade.PERDIDO]: 'Perdido',
     };
     return labels[estagio];
   }
@@ -283,7 +352,7 @@ export class OportunidadesService {
       [EstagioOportunidade.NEGOCIACAO]: '#8B5CF6',
       [EstagioOportunidade.FECHAMENTO]: '#06B6D4',
       [EstagioOportunidade.GANHO]: '#10B981',
-      [EstagioOportunidade.PERDIDO]: '#EF4444'
+      [EstagioOportunidade.PERDIDO]: '#EF4444',
     };
     return colors[estagio];
   }

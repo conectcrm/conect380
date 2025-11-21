@@ -19,7 +19,7 @@ export class ContextoClienteService {
 
     @InjectRepository(Ticket)
     private ticketRepository: Repository<Ticket>,
-  ) { }
+  ) {}
 
   /**
    * Obter contexto completo do cliente
@@ -65,7 +65,6 @@ export class ContextoClienteService {
 
       this.logger.log(`✅ Contexto do cliente ${clienteId} obtido com sucesso`);
       return contexto;
-
     } catch (error) {
       this.logger.error(`❌ Erro ao obter contexto do cliente ${clienteId}:`, error.message);
       throw error;
@@ -87,7 +86,9 @@ export class ContextoClienteService {
 
       if (!cliente) {
         // Se não encontrar cliente, retornar contexto vazio com telefone
-        this.logger.warn(`⚠️ Cliente com telefone ${telefone} não encontrado. Retornando contexto vazio.`);
+        this.logger.warn(
+          `⚠️ Cliente com telefone ${telefone} não encontrado. Retornando contexto vazio.`,
+        );
 
         return {
           cliente: {
@@ -121,7 +122,6 @@ export class ContextoClienteService {
 
       // 2. Se encontrou cliente, usar método padrão com UUID
       return this.obterContextoCompleto(cliente.id, empresaId);
-
     } catch (error) {
       this.logger.error(`❌ Erro ao obter contexto por telefone ${telefone}:`, error.message);
       throw error;
@@ -131,10 +131,7 @@ export class ContextoClienteService {
   /**
    * Buscar dados básicos do cliente
    */
-  private async buscarCliente(
-    clienteId: string,
-    empresaId?: string,
-  ): Promise<Cliente> {
+  private async buscarCliente(clienteId: string, empresaId?: string): Promise<Cliente> {
     const where: any = { id: clienteId };
 
     if (empresaId) {
@@ -171,8 +168,16 @@ export class ContextoClienteService {
     this.logger.log(`📈 Calculando estatísticas do cliente ${clienteId}`);
 
     try {
-      const telefonesRelacionados = await this.coletarTelefonesRelacionados(clienteId, empresaId, clienteCache);
-      const tickets = await this.buscarTicketsDoCliente(clienteId, empresaId, telefonesRelacionados);
+      const telefonesRelacionados = await this.coletarTelefonesRelacionados(
+        clienteId,
+        empresaId,
+        clienteCache,
+      );
+      const tickets = await this.buscarTicketsDoCliente(
+        clienteId,
+        empresaId,
+        telefonesRelacionados,
+      );
 
       const totalTickets = tickets.length;
       const ticketsResolvidos = tickets.filter((t) => {
@@ -202,7 +207,6 @@ export class ContextoClienteService {
         avaliacaoMedia,
         tempoMedioResposta,
       };
-
     } catch (error) {
       this.logger.error('❌ Erro ao calcular estatísticas:', error.message);
 
@@ -229,8 +233,16 @@ export class ContextoClienteService {
     this.logger.log(`📜 Obtendo histórico do cliente ${clienteId}`);
 
     try {
-      const telefonesRelacionados = await this.coletarTelefonesRelacionados(clienteId, empresaId, clienteCache);
-      const tickets = await this.buscarTicketsDoCliente(clienteId, empresaId, telefonesRelacionados);
+      const telefonesRelacionados = await this.coletarTelefonesRelacionados(
+        clienteId,
+        empresaId,
+        clienteCache,
+      );
+      const tickets = await this.buscarTicketsDoCliente(
+        clienteId,
+        empresaId,
+        telefonesRelacionados,
+      );
 
       const ticketsRecentes = tickets
         .sort((a, b) => {
@@ -249,7 +261,7 @@ export class ContextoClienteService {
       return {
         propostas,
         faturas,
-        tickets: ticketsRecentes.map(t => ({
+        tickets: ticketsRecentes.map((t) => ({
           id: t.id,
           numero: t.numero,
           status: t.status,
@@ -258,7 +270,6 @@ export class ContextoClienteService {
           canalId: t.canalId,
         })),
       };
-
     } catch (error) {
       this.logger.error('❌ Erro ao obter histórico:', error.message);
 
@@ -286,7 +297,7 @@ export class ContextoClienteService {
 
     // Se cliente novo (menos de 30 dias)
     const diasDesdeContato = Math.floor(
-      (Date.now() - new Date(cliente.created_at).getTime()) / (1000 * 60 * 60 * 24)
+      (Date.now() - new Date(cliente.created_at).getTime()) / (1000 * 60 * 60 * 24),
     );
 
     if (diasDesdeContato <= 30) {
@@ -367,7 +378,9 @@ export class ContextoClienteService {
     const possuiColunaClienteId = Boolean(colunaClienteId);
 
     if (!possuiColunaClienteId && telefones.length === 0) {
-      this.logger.warn(`⚠️ Nenhuma forma de correlacionar tickets para cliente ${clienteId} (sem telefone e sem coluna clienteId).`);
+      this.logger.warn(
+        `⚠️ Nenhuma forma de correlacionar tickets para cliente ${clienteId} (sem telefone e sem coluna clienteId).`,
+      );
       return [];
     }
 
@@ -380,10 +393,12 @@ export class ContextoClienteService {
     const campoTelefoneNormalizado = `REGEXP_REPLACE(COALESCE(ticket.contato_telefone, ''), '\\D', '', 'g')`;
 
     if (possuiColunaClienteId && telefones.length > 0) {
-      query.andWhere(new Brackets((qb) => {
-        qb.where(`ticket.${colunaClienteId!.databaseName} = :clienteId`, { clienteId });
-        qb.orWhere(`${campoTelefoneNormalizado} IN (:...telefones)`, { telefones });
-      }));
+      query.andWhere(
+        new Brackets((qb) => {
+          qb.where(`ticket.${colunaClienteId!.databaseName} = :clienteId`, { clienteId });
+          qb.orWhere(`${campoTelefoneNormalizado} IN (:...telefones)`, { telefones });
+        }),
+      );
     } else if (possuiColunaClienteId) {
       query.andWhere(`ticket.${colunaClienteId.databaseName} = :clienteId`, { clienteId });
     } else if (telefones.length > 0) {

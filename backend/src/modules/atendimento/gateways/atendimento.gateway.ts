@@ -19,8 +19,7 @@ import { OnlineStatusService } from '../services/online-status.service';
   },
   namespace: '/atendimento',
 })
-export class AtendimentoGateway
-  implements OnGatewayConnection, OnGatewayDisconnect {
+export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
@@ -41,7 +40,7 @@ export class AtendimentoGateway
   constructor(
     private jwtService: JwtService,
     private onlineStatusService: OnlineStatusService,
-  ) { }
+  ) {}
 
   private normalizarRole(role: unknown): string {
     return (role ?? '').toString().trim().toLowerCase();
@@ -51,11 +50,7 @@ export class AtendimentoGateway
     return this.atendenteRoles.has(this.normalizarRole(role));
   }
 
-  private construirPayloadTicketAtualizado(
-    ticketId: string,
-    status: string,
-    dados?: any,
-  ) {
+  private construirPayloadTicketAtualizado(ticketId: string, status: string, dados?: any) {
     const basePayload = {
       id: ticketId,
       ticketId,
@@ -102,7 +97,8 @@ export class AtendimentoGateway
       if (this.DEBUG) this.logger.log(`🔌 Cliente ${client.id} tentando conectar...`);
 
       // Extrair token do handshake
-      const token = client.handshake.auth.token || client.handshake.headers.authorization?.split(' ')[1];
+      const token =
+        client.handshake.auth.token || client.handshake.headers.authorization?.split(' ')[1];
 
       if (!token) {
         this.logger.warn(`❌ Cliente ${client.id} tentou conectar SEM TOKEN`);
@@ -113,7 +109,8 @@ export class AtendimentoGateway
       // Validar token JWT
       const payload = await this.jwtService.verifyAsync(token);
       const roleNormalizado = this.normalizarRole(payload.role);
-      if (this.DEBUG) this.logger.log(`✅ Token válido! User: ${payload.sub}, Role: ${payload.role}`);
+      if (this.DEBUG)
+        this.logger.log(`✅ Token válido! User: ${payload.sub}, Role: ${payload.role}`);
 
       // Armazenar informações do cliente
       this.connectedClients.set(client.id, {
@@ -129,7 +126,9 @@ export class AtendimentoGateway
         client.join('atendentes');
       }
 
-      this.logger.log(`✅ Cliente conectado: ${client.id} (User: ${payload.sub}, Role: ${payload.role})`);
+      this.logger.log(
+        `✅ Cliente conectado: ${client.id} (User: ${payload.sub}, Role: ${payload.role})`,
+      );
 
       // Notificar outros atendentes sobre novo atendente online
       if (this.ehAtendenteRole(roleNormalizado)) {
@@ -144,7 +143,6 @@ export class AtendimentoGateway
         message: 'Conectado ao servidor de atendimento',
         clientId: client.id,
       });
-
     } catch (error) {
       this.logger.error(`❌ Erro ao conectar cliente ${client.id}: ${error.message}`);
       if (this.DEBUG) this.logger.error(error.stack);
@@ -198,51 +196,46 @@ export class AtendimentoGateway
    * Nova mensagem enviada
    */
   notificarNovaMensagem(mensagem: any) {
-    this.logger.log(`📤 Notificando nova mensagem: ticket=${mensagem.ticketId}, remetente=${mensagem.remetente?.tipo}`);
-
-    // 🔍 DEBUG: Verificar estado do server
-    this.logger.debug(`[DEBUG] this.server exists: ${!!this.server}`);
-    this.logger.debug(`[DEBUG] this.server.sockets exists: ${!!this.server?.sockets}`);
-    this.logger.debug(`[DEBUG] this.server.sockets.adapter exists: ${!!this.server?.sockets?.adapter}`);
-
-    // 🧪 TESTE: REMOVER SAFETY CHECK TEMPORARIAMENTE
-    // if (!this.server || !this.server.sockets || !this.server.sockets.adapter) {
-    //   this.logger.warn('⚠️ WebSocket server não inicializado completamente - pulando notificação');
-    //   return;
-    // }
+    this.logger.log(
+      `📤 Notificando nova mensagem: ticket=${mensagem.ticketId}, remetente=${mensagem.remetente?.tipo}`,
+    );
 
     try {
-      // 🔍 DEBUG: Listar todas as salas disponíveis
-      if (this.server?.sockets?.adapter) {
-        const allRooms = Array.from(this.server.sockets.adapter.rooms.keys());
-        this.logger.debug(`[DEBUG] Salas disponíveis: ${allRooms.join(', ')}`);
-      }
-
-      // Notificar sala do ticket
+      // 1️⃣ SEMPRE emitir para sala do ticket (atendente que está atendendo)
       const ticketRoom = `ticket:${mensagem.ticketId}`;
       this.logger.log(`   🎯 Emitindo 'nova_mensagem' para sala '${ticketRoom}'...`);
       this.server.to(ticketRoom).emit('nova_mensagem', mensagem);
 
       if (this.server?.sockets?.adapter) {
-        this.logger.log(`   → Sala '${ticketRoom}': ${this.server.sockets.adapter.rooms.get(ticketRoom)?.size || 0} clientes`);
+        this.logger.log(
+          `   → Sala '${ticketRoom}': ${this.server.sockets.adapter.rooms.get(ticketRoom)?.size || 0} clientes`,
+        );
       }
 
-      // Notificar atendentes disponíveis se ticket não tiver atendente
+      // 2️⃣ Se ticket NÃO tem atendente, emitir para fila de atendentes disponíveis
       if (!mensagem.atendenteId) {
-        this.logger.log(`   🎯 Emitindo 'mensagem:nao-atribuida' para sala 'atendentes'...`);
+        this.logger.log(`   🎯 Ticket SEM atendente - emitindo para fila 'atendentes'...`);
         this.server.to('atendentes').emit('mensagem:nao-atribuida', mensagem);
 
         if (this.server?.sockets?.adapter) {
-          this.logger.log(`   → Sala 'atendentes' (não atribuída): ${this.server.sockets.adapter.rooms.get('atendentes')?.size || 0} clientes`);
+          this.logger.log(
+            `   → Sala 'atendentes' (fila): ${this.server.sockets.adapter.rooms.get('atendentes')?.size || 0} clientes`,
+          );
         }
-      }
+      } else {
+        // 3️⃣ Ticket COM atendente - emitir apenas para o atendente específico
+        this.logger.log(
+          `   ✅ Ticket COM atendente (${mensagem.atendenteId}) - notificando apenas atendente designado`,
+        );
 
-      // 🔥 TAMBÉM emitir globalmente para todos os atendentes
-      this.logger.log(`   🎯 Emitindo 'nova_mensagem' para sala 'atendentes' (global)...`);
-      this.server.to('atendentes').emit('nova_mensagem', mensagem);
+        // Emitir para sala pessoal do atendente (caso não esteja na sala do ticket)
+        this.server.to(`user:${mensagem.atendenteId}`).emit('nova_mensagem', mensagem);
 
-      if (this.server?.sockets?.adapter) {
-        this.logger.log(`   → Sala 'atendentes' (global): ${this.server.sockets.adapter.rooms.get('atendentes')?.size || 0} clientes`);
+        if (this.server?.sockets?.adapter) {
+          this.logger.log(
+            `   → Sala 'user:${mensagem.atendenteId}': ${this.server.sockets.adapter.rooms.get(`user:${mensagem.atendenteId}`)?.size || 0} clientes`,
+          );
+        }
       }
 
       this.logger.log(`✅ Evento 'nova_mensagem' emitido com sucesso!`);
@@ -260,10 +253,7 @@ export class AtendimentoGateway
    * Entrar na sala de um ticket específico
    */
   @SubscribeMessage('ticket:entrar')
-  handleEntrarTicket(
-    @MessageBody() data: { ticketId: string },
-    @ConnectedSocket() client: Socket,
-  ) {
+  handleEntrarTicket(@MessageBody() data: { ticketId: string }, @ConnectedSocket() client: Socket) {
     try {
       const roomName = `ticket:${data.ticketId}`;
       client.join(roomName);
@@ -294,10 +284,7 @@ export class AtendimentoGateway
    * Sair da sala de um ticket
    */
   @SubscribeMessage('ticket:sair')
-  handleSairTicket(
-    @MessageBody() data: { ticketId: string },
-    @ConnectedSocket() client: Socket,
-  ) {
+  handleSairTicket(@MessageBody() data: { ticketId: string }, @ConnectedSocket() client: Socket) {
     try {
       client.leave(`ticket:${data.ticketId}`);
       this.logger.log(`🚪 Cliente ${client.id} SAIU do ticket ${data.ticketId}`);
@@ -480,7 +467,9 @@ export class AtendimentoGateway
     this.server.to('atendentes').emit('contato:status:atualizado', statusData);
 
     if (this.DEBUG) {
-      this.logger.log(`📱 Status do contato ${contatoId} atualizado: ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
+      this.logger.log(
+        `📱 Status do contato ${contatoId} atualizado: ${isOnline ? 'ONLINE' : 'OFFLINE'}`,
+      );
     }
   }
 
@@ -501,7 +490,9 @@ export class AtendimentoGateway
 
       // Buscar dados do contato para obter última atividade
       const contato = await this.onlineStatusService.getContactActivityData(data.contatoId);
-      const isOnline = this.onlineStatusService.calculateOnlineStatus(contato?.last_activity || null);
+      const isOnline = this.onlineStatusService.calculateOnlineStatus(
+        contato?.last_activity || null,
+      );
 
       // Responder apenas para o cliente que solicitou
       client.emit('contato:status:resposta', {
@@ -521,20 +512,32 @@ export class AtendimentoGateway
   /**
    * Atualizar atividade de um contato (chamado quando contato interage)
    */
-  async atualizarAtividadeContato(contatoId: number, empresaId: string, tipoInteracao: string = 'mensagem') {
+  async atualizarAtividadeContato(
+    contatoId: number,
+    empresaId: string,
+    tipoInteracao: string = 'mensagem',
+  ) {
     try {
       // Atualizar atividade no banco
       await this.onlineStatusService.updateContactActivity(contatoId.toString(), empresaId);
 
       // Buscar dados atualizados e verificar status
       const contato = await this.onlineStatusService.getContactActivityData(contatoId);
-      const isOnline = this.onlineStatusService.calculateOnlineStatus(contato?.last_activity || null);
+      const isOnline = this.onlineStatusService.calculateOnlineStatus(
+        contato?.last_activity || null,
+      );
 
       // Notificar mudança de status
-      await this.notificarMudancaStatusContato(contatoId, isOnline, contato?.last_activity || undefined);
+      await this.notificarMudancaStatusContato(
+        contatoId,
+        isOnline,
+        contato?.last_activity || undefined,
+      );
 
       if (this.DEBUG) {
-        this.logger.log(`🔄 Atividade atualizada para contato ${contatoId} (${tipoInteracao}): ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
+        this.logger.log(
+          `🔄 Atividade atualizada para contato ${contatoId} (${tipoInteracao}): ${isOnline ? 'ONLINE' : 'OFFLINE'}`,
+        );
       }
     } catch (error) {
       this.logger.error(`Erro ao atualizar atividade do contato ${contatoId}:`, error);

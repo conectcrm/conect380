@@ -205,10 +205,10 @@ const SuaPaginaPage: React.FC = () => {
                   </button>
                   <button
                     onClick={() => handleOpenDialog()}
-                    className="bg-[#9333EA] hover:bg-[#7E22CE] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                    className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium"
                   >
-                    {/* [PERSONALIZAR] Cor do botão (#9333EA = purple) */}
-                    <Plus className="w-5 h-5" />
+                    {/* [PERSONALIZAR] Sempre usar tema Crevasse #159A9C */}
+                    <Plus className="w-4 h-4" />
                     Novo Item {/* [PERSONALIZAR] */}
                   </button>
                 </div>
@@ -216,69 +216,78 @@ const SuaPaginaPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Dashboard Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          {/* Dashboard Cards (KPI Cards) */}
+          {/* PADRÃO: Sem gradientes coloridos, fundo branco limpo com ícone sutil */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {/* Card 1 - Total */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
-              <div className="flex items-center justify-between">
+            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
+              <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
                     Total de Items {/* [PERSONALIZAR] */}
                   </p>
-                  <p className="text-3xl font-bold text-gray-900 mt-2">{totalItems}</p>
-                  <p className="text-xs text-gray-400 mt-1">📊 Visão geral</p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">{totalItems}</p>
+                  <p className="mt-3 text-sm text-[#002333]/70">
+                    Descrição ou contexto adicional da métrica. {/* [PERSONALIZAR] */}
+                  </p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl">
-                  <Users className="w-8 h-8 text-blue-600" /> {/* [PERSONALIZAR] */}
+                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                  <Users className="h-6 w-6 text-[#159A9C]" /> {/* [PERSONALIZAR] */}
                 </div>
               </div>
             </div>
 
             {/* Card 2 - Ativos */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
-              <div className="flex items-center justify-between">
+            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
+              <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
                     Ativos {/* [PERSONALIZAR] */}
                   </p>
-                  <p className="text-3xl font-bold text-green-600 mt-2">{itensAtivos}</p>
-                  <p className="text-xs text-green-500 mt-1">✅ Operacionais</p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">{itensAtivos}</p>
+                  <p className="mt-3 text-sm text-[#002333]/70">
+                    Items ativos e operacionais no sistema. {/* [PERSONALIZAR] */}
+                  </p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-xl">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
+                <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
+                  <CheckCircle className="h-6 w-6 text-green-600" />
                 </div>
               </div>
             </div>
 
             {/* Card 3 - Inativos */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
-              <div className="flex items-center justify-between">
+            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
+              <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
                     Inativos {/* [PERSONALIZAR] */}
                   </p>
-                  <p className="text-3xl font-bold text-gray-600 mt-2">{itensInativos}</p>
-                  <p className="text-xs text-gray-500 mt-1">⏸️ Pausados</p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">{itensInativos}</p>
+                  <p className="mt-3 text-sm text-[#002333]/70">
+                    Items inativos ou pausados no momento. {/* [PERSONALIZAR] */}
+                  </p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl">
-                  <AlertCircle className="w-8 h-8 text-gray-600" />
+                <div className="h-12 w-12 rounded-2xl bg-gray-500/10 flex items-center justify-center shadow-sm">
+                  <AlertCircle className="h-6 w-6 text-gray-600" />
                 </div>
               </div>
             </div>
 
             {/* Card 4 - Personalizado */}
             {/* [PERSONALIZAR] Adicione sua própria métrica */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
-              <div className="flex items-center justify-between">
+            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
+              <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
                     Sua Métrica
                   </p>
-                  <p className="text-3xl font-bold text-purple-600 mt-2">0</p>
-                  <p className="text-xs text-purple-500 mt-1">🎯 Descrição</p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">0</p>
+                  <p className="mt-3 text-sm text-[#002333]/70">
+                    Descrição ou contexto da sua métrica personalizada. {/* [PERSONALIZAR] */}
+                  </p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl">
-                  <Users className="w-8 h-8 text-purple-600" />
+                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                  <Users className="h-6 w-6 text-[#159A9C]" /> {/* [PERSONALIZAR] */}
                 </div>
               </div>
             </div>
@@ -330,9 +339,9 @@ const SuaPaginaPage: React.FC = () => {
                 {!busca && (
                   <button
                     onClick={() => handleOpenDialog()}
-                    className="bg-[#9333EA] hover:bg-[#7E22CE] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm mx-auto"
+                    className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm mx-auto text-sm font-medium"
                   >
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-4 h-4" />
                     Criar Primeiro Item {/* [PERSONALIZAR] */}
                   </button>
                 )}

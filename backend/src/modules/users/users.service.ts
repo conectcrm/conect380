@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User, UserRole } from './user.entity';
 import { Empresa } from '../../empresas/entities/empresa.entity';
@@ -35,11 +35,41 @@ export class UsersService {
   async findOne(id: string): Promise<User | undefined> {
     return this.userRepository.findOne({
       where: { id },
-      select: ['id', 'nome', 'email', 'senha', 'role', 'empresa_id', 'ativo', 'ultimo_login', 'created_at', 'updated_at'],
+      select: [
+        'id',
+        'nome',
+        'email',
+        'senha',
+        'role',
+        'empresa_id',
+        'ativo',
+        'deve_trocar_senha',
+        'ultimo_login',
+        'created_at',
+        'updated_at',
+      ],
     });
   }
 
   async create(userData: Partial<User>): Promise<User> {
+    const user = this.userRepository.create(userData);
+    return this.userRepository.save(user);
+  }
+
+  async createWithHash(userData: Partial<User>): Promise<User> {
+    // Buscar primeira empresa ativa se não fornecida
+    if (!userData.empresa_id) {
+      const empresa = await this.empresaRepository.findOne({
+        where: { ativo: true },
+      });
+
+      if (!empresa) {
+        throw new Error('Nenhuma empresa ativa encontrada');
+      }
+
+      userData.empresa_id = empresa.id;
+    }
+
     const user = this.userRepository.create(userData);
     return this.userRepository.save(user);
   }
@@ -70,16 +100,19 @@ export class UsersService {
     await this.userRepository.update(id, {
       senha: hashedPassword,
       ativo: ativar,
+      deve_trocar_senha: false,
     });
   }
 
-  async listarComFiltros(filtros: any): Promise<{ usuarios: User[], total: number }> {
+  async listarComFiltros(filtros: any): Promise<{ usuarios: User[]; total: number }> {
     try {
-      console.log('Service - Filtros recebidos:', filtros);
-      const query = this.userRepository.createQueryBuilder('user')
+      const query = this.userRepository
+        .createQueryBuilder('user')
         .where('user.empresa_id = :empresa_id', { empresa_id: filtros.empresa_id });
       if (filtros.busca) {
-        query.andWhere('(user.nome LIKE :busca OR user.email LIKE :busca)', { busca: `%${filtros.busca}%` });
+        query.andWhere('(user.nome LIKE :busca OR user.email LIKE :busca)', {
+          busca: `%${filtros.busca}%`,
+        });
       }
       if (filtros.role) {
         query.andWhere('user.role = :role', { role: filtros.role });
@@ -94,7 +127,6 @@ export class UsersService {
       query.orderBy(`user.${filtros.ordenacao || 'nome'}`, direcaoUpper);
       query.skip((filtros.pagina - 1) * filtros.limite).take(filtros.limite);
       const usuarios = await query.getMany();
-      console.log('Service - Usuários encontrados:', usuarios.length);
       return { usuarios: usuarios || [], total: total || 0 };
     } catch (err) {
       console.error('Erro ao listar usuários:', err);
@@ -109,16 +141,16 @@ export class UsersService {
 
     // Calcular distribuição por perfil
     const adminCount = await this.userRepository.count({
-      where: { empresa_id, role: UserRole.ADMIN }
+      where: { empresa_id, role: UserRole.ADMIN },
     });
     const managerCount = await this.userRepository.count({
-      where: { empresa_id, role: UserRole.MANAGER }
+      where: { empresa_id, role: UserRole.MANAGER },
     });
     const vendedorCount = await this.userRepository.count({
-      where: { empresa_id, role: UserRole.VENDEDOR }
+      where: { empresa_id, role: UserRole.VENDEDOR },
     });
     const userCount = await this.userRepository.count({
-      where: { empresa_id, role: UserRole.USER }
+      where: { empresa_id, role: UserRole.USER },
     });
 
     return {
@@ -129,35 +161,33 @@ export class UsersService {
         admin: adminCount,
         manager: managerCount,
         vendedor: vendedorCount,
-        user: userCount
-      }
+        user: userCount,
+      },
     };
   }
 
   async listarAtendentes(empresa_id: string): Promise<User[]> {
-    return await this.userRepository.find({
-      where: { 
-        empresa_id,
-        ativo: true
-      },
-      order: { nome: 'ASC' }
-    }).then(users => 
-      users.filter(user => 
-        user.permissoes && 
-        (
-          user.permissoes.includes('ATENDIMENTO') ||
-          user.permissoes.some(p => p === 'ATENDIMENTO')
-        )
-      )
-    );
+    return await this.userRepository
+      .find({
+        where: {
+          empresa_id,
+          ativo: true,
+        },
+        order: { nome: 'ASC' },
+      })
+      .then((users) =>
+        users.filter(
+          (user) =>
+            user.permissoes &&
+            (user.permissoes.includes('ATENDIMENTO') ||
+              user.permissoes.some((p) => p === 'ATENDIMENTO')),
+        ),
+      );
   }
 
   async criar(userData: Partial<User>): Promise<User> {
-    console.log('🚀 UsersService.criar - Recebendo dados:', userData);
-
     // Validação de campos obrigatórios
     if (!userData.nome || !userData.email || !userData.senha || !userData.empresa_id) {
-      console.error('❌ Campos obrigatórios ausentes:', { nome: !!userData.nome, email: !!userData.email, senha: !!userData.senha, empresa_id: !!userData.empresa_id });
       throw new Error('Campos obrigatórios ausentes: nome, email, senha, empresa_id');
     }
 
@@ -165,18 +195,16 @@ export class UsersService {
     const hashedPassword = await bcrypt.hash(userData.senha, 10);
     const userDataWithHashedPassword = {
       ...userData,
-      senha: hashedPassword
+      senha: hashedPassword,
     };
 
     const user = this.userRepository.create(userDataWithHashedPassword);
-    console.log('📝 Usuário criado em memória:', user);
 
     try {
       const savedUser = await this.userRepository.save(user);
-      console.log('✅ Usuário salvo no banco:', savedUser);
       return savedUser;
     } catch (err: any) {
-      console.error('❌ Erro ao salvar usuário:', err);
+      console.error('Erro ao salvar usuário:', err);
       if (err.code === '23505' && String(err.detail).includes('email')) {
         throw new Error('Já existe um usuário cadastrado com este e-mail.');
       }
@@ -190,22 +218,85 @@ export class UsersService {
   }
 
   async excluir(id: string, empresa_id: string): Promise<void> {
-    await this.userRepository.delete({ id, empresa_id });
+    try {
+      const resultado = await this.userRepository.delete({ id, empresa_id });
+
+      if (!resultado.affected) {
+        throw new NotFoundException('Usuário não encontrado');
+      }
+    } catch (error) {
+      if (
+        error instanceof QueryFailedError &&
+        (error.driverError?.code === '23503' ||
+          error.driverError?.code === 'ER_ROW_IS_REFERENCED_2')
+      ) {
+        throw new ConflictException(
+          'Não é possível excluir este usuário porque existem registros relacionados em outros módulos. Reatribua ou conclua os vínculos antes de excluir.',
+        );
+      }
+
+      throw error;
+    }
   }
 
   async resetarSenha(id: string, empresa_id: string): Promise<string> {
-    const novaSenha = Math.random().toString(36).slice(-8);
-    await this.userRepository.update({ id, empresa_id }, { senha: novaSenha });
+    const usuario = await this.userRepository.findOne({ where: { id, empresa_id } });
+
+    if (!usuario) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    const novaSenha = this.gerarSenhaTemporaria();
+    const senhaHasheada = await bcrypt.hash(novaSenha, 10);
+
+    await this.userRepository.update(
+      { id, empresa_id },
+      {
+        senha: senhaHasheada,
+        deve_trocar_senha: true,
+      },
+    );
+
     return novaSenha;
   }
 
+  private gerarSenhaTemporaria(): string {
+    const letrasMaiusculas = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const letrasMinusculas = 'abcdefghijkmnpqrstuvwxyz';
+    const numeros = '23456789';
+    const simbolos = '@#$%&*?!';
+    const conjuntoCompleto = `${letrasMaiusculas}${letrasMinusculas}${numeros}${simbolos}`;
+
+    const gerarCaractere = (fonte: string) => fonte[Math.floor(Math.random() * fonte.length)];
+
+    const base = [
+      gerarCaractere(letrasMaiusculas),
+      gerarCaractere(letrasMinusculas),
+      gerarCaractere(numeros),
+      gerarCaractere(simbolos),
+    ];
+
+    while (base.length < 12) {
+      base.push(gerarCaractere(conjuntoCompleto));
+    }
+
+    for (let i = base.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [base[i], base[j]] = [base[j], base[i]];
+    }
+
+    return base.join('');
+  }
+
   async alterarStatus(id: string, ativo: boolean, empresa_id: string): Promise<User> {
-    console.log(`🔧 UsersService.alterarStatus - ID: ${id}, Ativo: ${ativo}, Empresa: ${empresa_id}`);
+    console.log(
+      `🔧 UsersService.alterarStatus - ID: ${id}, Ativo: ${ativo}, Empresa: ${empresa_id}`,
+    );
 
     // Verificar se o usuário existe e pertence à empresa
     const usuario = await this.userRepository.findOne({
       where: { id, empresa_id },
-      relations: ['empresa']
+      relations: ['empresa'],
     });
 
     if (!usuario) {
@@ -218,7 +309,7 @@ export class UsersService {
     // Buscar o usuário atualizado
     const usuarioAtualizado = await this.userRepository.findOne({
       where: { id, empresa_id },
-      relations: ['empresa']
+      relations: ['empresa'],
     });
 
     console.log(`✅ Status do usuário ${id} alterado para: ${ativo ? 'ATIVO' : 'INATIVO'}`);

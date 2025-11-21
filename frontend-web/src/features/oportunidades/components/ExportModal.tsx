@@ -104,11 +104,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
   const handleExport = async () => {
     setIsExporting(true);
-    
+
     try {
       // Simular processamento
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       // Aqui seria implementada a lógica real de exportação
       console.log('Exportando dados:', {
         formato,
@@ -117,11 +117,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         periodoCustomizado,
         filtros
       });
-      
+
       // Simular download
       const filename = `oportunidades_${new Date().toISOString().split('T')[0]}.${formato}`;
       alert(`Arquivo ${filename} seria baixado aqui!`);
-      
+
       onClose();
     } catch (error) {
       console.error('Erro na exportação:', error);
@@ -143,8 +143,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose} />
-        
-        <div className="inline-block w-full max-w-2xl px-6 py-4 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
+
+        <div className="inline-block w-[calc(100%-2rem)] sm:w-[500px] md:w-[600px] lg:w-[700px] xl:w-[700px] max-w-[800px] px-6 py-4 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center">
               <Download className="w-6 h-6 text-blue-600 mr-2" />
@@ -172,9 +172,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   return (
                     <label
                       key={fmt.value}
-                      className={`relative flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 ${
-                        formato === fmt.value ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
-                      }`}
+                      className={`relative flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 ${formato === fmt.value ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                        }`}
                     >
                       <input
                         type="radio"
@@ -212,9 +211,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 {tiposExport.map((t) => (
                   <label
                     key={t.value}
-                    className={`relative flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 ${
-                      tipo === t.value ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
-                    } ${t.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`relative flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 ${tipo === t.value ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                      } ${t.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <input
                       type="radio"
@@ -249,9 +247,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   type="checkbox"
                   id="periodo-customizado"
                   checked={periodoCustomizado.ativo}
-                  onChange={(e) => setPeriodoCustomizado(prev => ({ 
-                    ...prev, 
-                    ativo: e.target.checked 
+                  onChange={(e) => setPeriodoCustomizado(prev => ({
+                    ...prev,
+                    ativo: e.target.checked
                   }))}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
@@ -259,7 +257,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   Filtrar por período customizado
                 </label>
               </div>
-              
+
               {periodoCustomizado.ativo && (
                 <div className="grid grid-cols-2 gap-4 pl-6">
                   <div>

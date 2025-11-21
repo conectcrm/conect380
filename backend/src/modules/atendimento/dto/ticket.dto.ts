@@ -6,14 +6,14 @@ export enum StatusTicket {
   EM_ATENDIMENTO = 'em_atendimento',
   AGUARDANDO_CLIENTE = 'aguardando_cliente',
   RESOLVIDO = 'resolvido',
-  FECHADO = 'fechado'
+  FECHADO = 'fechado',
 }
 
 export enum PrioridadeTicket {
   BAIXA = 'baixa',
   MEDIA = 'media',
   ALTA = 'alta',
-  URGENTE = 'urgente'
+  URGENTE = 'urgente',
 }
 
 export class CriarTicketDto {
@@ -36,6 +36,11 @@ export class CriarTicketDto {
   @IsOptional()
   @IsEnum(PrioridadeTicket)
   prioridade?: PrioridadeTicket;
+
+  @ApiPropertyOptional({ description: 'ID da fila para atribuição automática' })
+  @IsOptional()
+  @IsUUID()
+  filaId?: string;
 
   @ApiPropertyOptional({ description: 'Tags do ticket' })
   @IsOptional()
@@ -64,6 +69,11 @@ export class AtualizarTicketDto {
   @IsOptional()
   @IsUUID()
   atendenteId?: string;
+
+  @ApiPropertyOptional({ description: 'ID da fila' })
+  @IsOptional()
+  @IsUUID()
+  filaId?: string;
 
   @ApiPropertyOptional({ description: 'Tags do ticket' })
   @IsOptional()
@@ -140,7 +150,7 @@ export class TransferirTicketDto {
 export class EncerrarTicketDto {
   @ApiProperty({
     description: 'Motivo do encerramento',
-    enum: ['resolvido', 'cancelado', 'sem_resposta', 'duplicado', 'spam', 'outro']
+    enum: ['resolvido', 'cancelado', 'sem_resposta', 'duplicado', 'spam', 'outro'],
   })
   @IsNotEmpty()
   @IsString()

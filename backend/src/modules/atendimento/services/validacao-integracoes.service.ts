@@ -114,8 +114,7 @@ export class ValidacaoIntegracoesService {
       if (response.status === 200 && response.data?.data) {
         // Verificar se o modelo solicitado existe
         const models = response.data.data.map((m: any) => m.id);
-        const modeloExiste =
-          !openai_model || models.includes(openai_model);
+        const modeloExiste = !openai_model || models.includes(openai_model);
 
         this.logger.log('✅ Credenciais OpenAI válidas');
         return {
@@ -124,9 +123,7 @@ export class ValidacaoIntegracoesService {
             ? 'Credenciais válidas'
             : 'API Key válida, mas modelo não encontrado',
           detalhes: {
-            modelosDisponiveis: models.filter((m: string) =>
-              m.startsWith('gpt-'),
-            ),
+            modelosDisponiveis: models.filter((m: string) => m.startsWith('gpt-')),
             modeloSolicitado: openai_model,
             modeloValido: modeloExiste,
           },
@@ -276,12 +273,9 @@ export class ValidacaoIntegracoesService {
       }
 
       // Testar API do Telegram
-      const response = await axios.get(
-        `https://api.telegram.org/bot${telegram_bot_token}/getMe`,
-        {
-          timeout: 10000,
-        },
-      );
+      const response = await axios.get(`https://api.telegram.org/bot${telegram_bot_token}/getMe`, {
+        timeout: 10000,
+      });
 
       if (response.data?.ok && response.data?.result) {
         const bot = response.data.result;
@@ -346,9 +340,7 @@ export class ValidacaoIntegracoesService {
       }
 
       // Testar API do Twilio
-      const auth = Buffer.from(
-        `${twilio_account_sid}:${twilio_auth_token}`,
-      ).toString('base64');
+      const auth = Buffer.from(`${twilio_account_sid}:${twilio_auth_token}`).toString('base64');
 
       const response = await axios.get(
         `https://api.twilio.com/2010-04-01/Accounts/${twilio_account_sid}.json`,
@@ -487,11 +479,12 @@ export class ValidacaoIntegracoesService {
       }
 
       if (error.response?.status === 403) {
-        throw new Error('Permissão negada. Verifique se o número tem permissão para receber mensagens');
+        throw new Error(
+          'Permissão negada. Verifique se o número tem permissão para receber mensagens',
+        );
       }
 
       throw new Error(`Erro ao enviar mensagem: ${error.message}`);
     }
   }
 }
-

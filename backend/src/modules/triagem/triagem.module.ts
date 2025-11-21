@@ -76,6 +76,7 @@ import { AtendimentoModule } from '../atendimento/atendimento.module';
     AtribuicaoService,
     TriagemLogService,
     TriagemMessageSenderService,
+    TypeOrmModule, // ✅ Exportar repositories para testes
   ],
 })
 export class TriagemModule { }

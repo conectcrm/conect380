@@ -11,6 +11,10 @@ export interface User {
     id: string;
     nome: string;
     slug: string;
+    cnpj?: string;
+    plano?: string;
+    ativo?: boolean;
+    subdominio?: string;
   };
 }
 

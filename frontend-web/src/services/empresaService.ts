@@ -1,6 +1,6 @@
 import { api } from './api';
 
-export interface EmpresaRegistro {
+export interface RegistrarEmpresaPayload {
   empresa: {
     nome: string;
     cnpj: string;
@@ -18,6 +18,7 @@ export interface EmpresaRegistro {
     telefone: string;
   };
   plano: string;
+  aceitarTermos: boolean;
 }
 
 export interface EmpresaResponse {
@@ -31,15 +32,33 @@ export interface EmpresaResponse {
   estado: string;
   cep: string;
   plano: string;
-  status: 'ativa' | 'inativa' | 'trial' | 'suspensa';
-  data_criacao: string;
-  data_expiracao: string;
-  usuario_admin: {
+  subdominio?: string;
+  ativo?: boolean;
+  status?: 'ativa' | 'inativa' | 'trial' | 'suspensa';
+  data_criacao?: string;
+  data_expiracao?: string;
+  email_verificado?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  configuracoes?: Record<string, unknown> | null;
+  limites?: {
+    usuarios?: number;
+    clientes?: number;
+    armazenamento?: string;
+  } | null;
+  usuario_admin?: {
     id: string;
     nome: string;
     email: string;
     telefone: string;
   };
+  usuarios?: Array<{
+    id: string;
+    nome: string;
+    email: string;
+    role: string;
+    ativo: boolean;
+  }>;
 }
 
 export interface VerificacaoEmailResponse {
@@ -47,16 +66,22 @@ export interface VerificacaoEmailResponse {
   success: boolean;
 }
 
+export interface RegistrarEmpresaResponse {
+  success: boolean;
+  message: string;
+  data: EmpresaResponse;
+}
+
 class EmpresaService {
   // Registrar nova empresa
-  async registrarEmpresa(dados: EmpresaRegistro): Promise<EmpresaResponse> {
+  async registrarEmpresa(dados: RegistrarEmpresaPayload): Promise<RegistrarEmpresaResponse> {
     try {
-      const response = await api.post('/empresas/registro', dados);
+      const response = await api.post<RegistrarEmpresaResponse>('/empresas/registro', dados);
       return response.data;
     } catch (error: any) {
       console.error('Erro ao registrar empresa:', error);
       throw new Error(
-        error.response?.data?.message || 
+        error.response?.data?.message ||
         'Erro ao registrar empresa. Tente novamente.'
       );
     }
@@ -98,7 +123,7 @@ class EmpresaService {
     } catch (error: any) {
       console.error('Erro ao verificar email de ativação:', error);
       throw new Error(
-        error.response?.data?.message || 
+        error.response?.data?.message ||
         'Token inválido ou expirado'
       );
     }
@@ -112,7 +137,7 @@ class EmpresaService {
     } catch (error: any) {
       console.error('Erro ao reenviar email:', error);
       throw new Error(
-        error.response?.data?.message || 
+        error.response?.data?.message ||
         'Erro ao reenviar email de ativação'
       );
     }
@@ -126,7 +151,7 @@ class EmpresaService {
     } catch (error: any) {
       console.error('Erro ao obter empresa:', error);
       throw new Error(
-        error.response?.data?.message || 
+        error.response?.data?.message ||
         'Empresa não encontrada'
       );
     }
@@ -227,7 +252,7 @@ class EmpresaService {
       // Esta seria uma integração com API da Receita Federal
       // Por enquanto, retornar validação básica
       const cnpjLimpo = cnpj.replace(/\D/g, '');
-      
+
       // Validação básica de CNPJ
       if (cnpjLimpo.length !== 14) {
         return {
@@ -271,7 +296,7 @@ class EmpresaService {
 
       const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
       const data = await response.json();
-      
+
       if (data.erro) {
         throw new Error('CEP não encontrado');
       }
@@ -280,6 +305,43 @@ class EmpresaService {
     } catch (error) {
       console.error('Erro ao buscar CEP:', error);
       throw new Error('CEP inválido ou não encontrado');
+    }
+  }
+
+  // Obter empresa por ID
+  async obterEmpresaPorId(id: string): Promise<EmpresaResponse> {
+    try {
+      const response = await api.get(`/empresas/${id}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Erro ao obter empresa:', error);
+      throw new Error(
+        error.response?.data?.message ||
+        'Erro ao buscar dados da empresa'
+      );
+    }
+  }
+
+  // Atualizar dados da empresa
+  async atualizarEmpresa(id: string, dados: Partial<{
+    nome: string;
+    cnpj: string;
+    email: string;
+    telefone: string;
+    endereco: string;
+    cidade: string;
+    estado: string;
+    cep: string;
+  }>): Promise<EmpresaResponse> {
+    try {
+      const response = await api.put(`/empresas/${id}`, dados);
+      return response.data;
+    } catch (error: any) {
+      console.error('Erro ao atualizar empresa:', error);
+      throw new Error(
+        error.response?.data?.message ||
+        'Erro ao atualizar dados da empresa'
+      );
     }
   }
 }

@@ -7,7 +7,7 @@ import { UpdateNotaClienteDto } from '../dto/update-nota-cliente.dto';
 
 /**
  * Service para gerenciar notas dos clientes
- * 
+ *
  * Funcionalidades:
  * - CRUD completo de notas
  * - Buscar notas por cliente
@@ -22,16 +22,12 @@ export class NotaClienteService {
   constructor(
     @InjectRepository(NotaCliente)
     private readonly notaRepository: Repository<NotaCliente>,
-  ) { }
+  ) {}
 
   /**
    * Criar nova nota
    */
-  async criar(
-    dto: CreateNotaClienteDto,
-    autorId: string,
-    empresaId: string,
-  ): Promise<NotaCliente> {
+  async criar(dto: CreateNotaClienteDto, autorId: string, empresaId: string): Promise<NotaCliente> {
     this.logger.log(`📝 Criando nota para ${dto.clienteId || dto.contatoTelefone || dto.ticketId}`);
 
     // Validar que pelo menos um identificador foi fornecido
@@ -73,10 +69,7 @@ export class NotaClienteService {
    * Buscar todas as notas de um cliente
    * Ordena por: importantes primeiro, depois por data (mais recente primeiro)
    */
-  async buscarPorCliente(
-    clienteId: string,
-    empresaId?: string,
-  ): Promise<NotaCliente[]> {
+  async buscarPorCliente(clienteId: string, empresaId?: string): Promise<NotaCliente[]> {
     this.logger.log(`📋 Buscando notas do cliente ${clienteId}`);
 
     const where: any = { clienteId };
@@ -89,7 +82,7 @@ export class NotaClienteService {
       relations: ['autor'],
       order: {
         importante: 'DESC', // Importantes primeiro
-        createdAt: 'DESC',  // Mais recentes primeiro
+        createdAt: 'DESC', // Mais recentes primeiro
       },
     });
 
@@ -101,10 +94,7 @@ export class NotaClienteService {
    * Buscar notas por telefone do contato
    * Útil quando não há clienteId cadastrado
    */
-  async buscarPorTelefone(
-    contatoTelefone: string,
-    empresaId?: string,
-  ): Promise<NotaCliente[]> {
+  async buscarPorTelefone(contatoTelefone: string, empresaId?: string): Promise<NotaCliente[]> {
     this.logger.log(`📋 Buscando notas do telefone ${contatoTelefone}`);
 
     const where: any = { contatoTelefone };
@@ -128,10 +118,7 @@ export class NotaClienteService {
   /**
    * Buscar notas de um ticket específico
    */
-  async buscarPorTicket(
-    ticketId: string,
-    empresaId?: string,
-  ): Promise<NotaCliente[]> {
+  async buscarPorTicket(ticketId: string, empresaId?: string): Promise<NotaCliente[]> {
     this.logger.log(`📋 Buscando notas do ticket ${ticketId}`);
 
     const where: any = { ticketId };
@@ -155,10 +142,7 @@ export class NotaClienteService {
   /**
    * Atualizar nota
    */
-  async atualizar(
-    id: string,
-    dto: UpdateNotaClienteDto,
-  ): Promise<NotaCliente> {
+  async atualizar(id: string, dto: UpdateNotaClienteDto): Promise<NotaCliente> {
     const nota = await this.buscarPorId(id);
 
     // Atualizar campos permitidos
@@ -214,10 +198,7 @@ export class NotaClienteService {
   /**
    * Contar notas importantes de um cliente
    */
-  async contarImportantesPorCliente(
-    clienteId: string,
-    empresaId?: string,
-  ): Promise<number> {
+  async contarImportantesPorCliente(clienteId: string, empresaId?: string): Promise<number> {
     const where: any = { clienteId, importante: true };
     if (empresaId) {
       where.empresaId = empresaId;

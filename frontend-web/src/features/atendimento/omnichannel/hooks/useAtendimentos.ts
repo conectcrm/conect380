@@ -11,29 +11,42 @@
  * - Auto-refresh
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   atendimentoService,
   ListarTicketsParams
 } from '../services/atendimentoService';
-import { Ticket, CanalTipo, StatusAtendimento } from '../types';
+import { Ticket, CanalTipo, StatusAtendimentoType } from '../types';
 import { NovoAtendimentoData } from '../modals/NovoAtendimentoModal';
 import { TransferenciaData } from '../modals/TransferirAtendimentoModal';
 import { EncerramentoData } from '../modals/EncerrarAtendimentoModal';
 import { resolveAvatarUrl } from '../../../../utils/avatar';
+import { useAtendimentoStore } from '../../../../stores/atendimentoStore';
 
-const normalizarStatusAtendimento = (status?: string | null): StatusAtendimento => {
+// ✅ MELHORADO: Normalizar status do backend (MAIÚSCULO) para frontend (minúsculo)
+// Suporta todos os 5 estados do sistema: aberto, em_atendimento, aguardando, resolvido, fechado
+const normalizarStatusAtendimento = (status?: string | null): StatusAtendimentoType => {
   const valor = (status ?? '').toString().trim().toLowerCase();
 
-  if (['resolvido', 'fechado', 'finalizado'].includes(valor)) {
-    return 'resolvido';
-  }
+  // Mapeamento explícito para todos os estados
+  const mapa: Record<string, StatusAtendimentoType> = {
+    // Estados principais
+    'aberto': 'aberto',
+    'em_atendimento': 'em_atendimento',
+    'em atendimento': 'em_atendimento',
+    'aguardando': 'aguardando',
+    'aguardando_cliente': 'aguardando',
+    'aguardando_cliente_bot': 'aguardando',
+    'resolvido': 'resolvido',
+    'fechado': 'fechado',
+    'finalizado': 'fechado',
+    // Compatibilidade com nomes antigos
+    'retorno': 'aguardando',
+    'pendente': 'aguardando',
+    'follow_up': 'aguardando',
+  };
 
-  if (['aguardando', 'aguardando_cliente', 'aguardando_cliente_bot', 'pendente', 'follow_up', 'retorno'].includes(valor)) {
-    return 'retorno';
-  }
-
-  return 'aberto';
+  return mapa[valor] || 'aberto';
 };
 
 const normalizarCanal = (valor: unknown): CanalTipo => {
@@ -107,21 +120,6 @@ const mapearTicketParaFrontend = (ticket: any): Ticket => {
   const contatoOnline = typeof contatoFonte.online === 'boolean'
     ? contatoFonte.online
     : Boolean(ticket.contatoOnline ?? ticket.contato_online ?? false);
-
-  // 🔍 DEBUG temporário - verificar clienteVinculado
-  if (contatoFonte.clienteVinculado) {
-    console.log('🔗 [useAtendimentos] Cliente vinculado encontrado:', {
-      ticketId: ticket.id,
-      contatoNome: contatoNome,
-      clienteVinculado: contatoFonte.clienteVinculado
-    });
-  } else {
-    console.log('⚠️ [useAtendimentos] Contato SEM cliente vinculado:', {
-      ticketId: ticket.id,
-      contatoNome: contatoNome,
-      contatoFonte: contatoFonte
-    });
-  }
 
   const canalFonte =
     typeof ticket.canal === 'string'
@@ -220,6 +218,7 @@ interface UseAtendimentosOptions {
   autoRefresh?: boolean;
   refreshInterval?: number; // em segundos
   filtroInicial?: ListarTicketsParams;
+  atendenteAtualId?: string | null;
 }
 
 interface UseAtendimentosReturn {
@@ -231,7 +230,7 @@ interface UseAtendimentosReturn {
   totalTickets: number;
   paginaAtual: number;
   totalPaginas: number;
-  totaisPorStatus: Record<StatusAtendimento, number>;
+  totaisPorStatus: Record<StatusAtendimentoType, number>;
 
   // Filtros
   filtros: ListarTicketsParams;
@@ -261,28 +260,58 @@ export const useAtendimentos = (
   const {
     autoRefresh = false,
     refreshInterval = 30, // 30 segundos padrão
-    filtroInicial = { status: 'aberto', page: 1, limit: 50 }
+    filtroInicial: filtroInicialProp,
+    atendenteAtualId = null,
   } = options;
 
-  // ===== ESTADO =====
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [ticketSelecionado, setTicketSelecionado] = useState<Ticket | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // ⚡ FIX: Estabilizar filtroInicial com useMemo para evitar recriação em cada render
+  const filtroInicial = useMemo(
+    () => filtroInicialProp || { page: 1, limit: 50 },
+    [filtroInicialProp]
+  );
+
+  // ===== ESTADO (usando Zustand Store para tickets e seleção) =====
+  // ===== ZUSTAND STORE (acesso direto - mais seguro) =====
+  const tickets = useAtendimentoStore((state) => state.tickets);
+  const ticketSelecionado = useAtendimentoStore((state) => state.ticketSelecionado);
+  const ticketsLoading = useAtendimentoStore((state) => state.ticketsLoading);
+  const ticketsError = useAtendimentoStore((state) => state.ticketsError);
+  const selecionarTicketStore = useAtendimentoStore((state) => state.selecionarTicket);
+  const setTickets = useAtendimentoStore((state) => state.setTickets);
+  const setTicketsLoading = useAtendimentoStore((state) => state.setTicketsLoading);
+  const setTicketsError = useAtendimentoStore((state) => state.setTicketsError);
+
+  // Estado local para paginação e filtros (não precisam estar na store global)
   const [totalTickets, setTotalTickets] = useState(0);
   const [paginaAtual, setPaginaAtual] = useState(filtroInicial.page || 1);
   const [totalPaginas, setTotalPaginas] = useState(0);
-  const [filtros, setFiltros] = useState<ListarTicketsParams>(filtroInicial);
-  const [totaisPorStatus, setTotaisPorStatus] = useState<Record<StatusAtendimento, number>>({
+  const [filtros, setFiltrosLocal] = useState<ListarTicketsParams>(filtroInicial);
+  const [totaisPorStatus, setTotaisPorStatus] = useState<Record<StatusAtendimentoType, number>>({
     aberto: 0,
+    em_atendimento: 0,
+    aguardando: 0,
     resolvido: 0,
-    retorno: 0,
+    fechado: 0,
   });
 
-  // ===== CARREGAR TICKETS =====
-  const carregarTickets = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const podeVisualizarTicket = useCallback((ticket: Ticket): boolean => {
+    if (!atendenteAtualId) {
+      return true;
+    }
+
+    const responsavelId = ticket.atendente?.id || null;
+    if (!responsavelId) {
+      return true;
+    }
+
+    return responsavelId === atendenteAtualId;
+  }, [atendenteAtualId]);
+
+  // ⚡ FIX DEFINITIVO: Usar função normal (não useCallback) para evitar loop
+  // O useEffect vai controlar quando chamar esta função
+  const carregarTickets = async () => {
+    setTicketsLoading(true);
+    setTicketsError(null);
 
     try {
       const response = await atendimentoService.listarTickets({
@@ -292,34 +321,41 @@ export const useAtendimentos = (
 
       const dados = Array.isArray(response.data) ? response.data : [];
       const ticketsTransformados = dados.map(mapearTicketParaFrontend);
-
-      const totalResposta = typeof response.total === 'number'
-        ? response.total
-        : ticketsTransformados.length;
+      const ticketsVisiveis = ticketsTransformados.filter(podeVisualizarTicket);
 
       const limiteAtual = Number(filtros.limit ?? filtroInicial.limit ?? 50) || 50;
-      const totalPaginasCalculado = typeof response.totalPages === 'number'
-        ? response.totalPages
-        : Math.ceil(totalResposta / limiteAtual) || 0;
+      const totalVisiveis = ticketsVisiveis.length;
+      const totalPaginasCalculado = Math.ceil(totalVisiveis / limiteAtual) || 0;
 
-      setTickets(ticketsTransformados);
-      setTotalTickets(totalResposta);
+      setTickets(ticketsVisiveis);
+
+      // Verificar se ticket selecionado ainda existe
+      if (ticketSelecionado) {
+        const aindaExiste = ticketsVisiveis.some(ticket => ticket.id === ticketSelecionado.id);
+        if (!aindaExiste) {
+          selecionarTicketStore(null);
+        }
+      }
+
+      setTotalTickets(totalVisiveis);
       setTotalPaginas(totalPaginasCalculado);
 
-      const statusParaContagem = (filtros.status || filtroInicial.status) as StatusAtendimento | undefined;
+      const statusParaContagem = (filtros.status || filtroInicial.status) as StatusAtendimentoType | undefined;
       if (statusParaContagem) {
         setTotaisPorStatus(prev => ({
           ...prev,
-          [statusParaContagem]: totalResposta,
+          [statusParaContagem]: totalVisiveis,
         }));
       } else {
-        const contagensCalculadas: Record<StatusAtendimento, number> = {
+        const contagensCalculadas: Record<StatusAtendimentoType, number> = {
           aberto: 0,
+          em_atendimento: 0,
+          aguardando: 0,
           resolvido: 0,
-          retorno: 0,
+          fechado: 0,
         };
 
-        ticketsTransformados.forEach(ticketAtual => {
+        ticketsVisiveis.forEach(ticketAtual => {
           contagensCalculadas[ticketAtual.status] += 1;
         });
 
@@ -332,12 +368,12 @@ export const useAtendimentos = (
       if (DEBUG) console.log(`✅ ${dados.length} tickets carregados`);
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao carregar tickets';
-      setError(mensagemErro);
+      setTicketsError(mensagemErro);
       console.error('❌ Erro ao carregar tickets:', err);
     } finally {
-      setLoading(false);
+      setTicketsLoading(false);
     }
-  }, [filtros, paginaAtual]); // ✅ Removido ticketSelecionado para evitar loop infinito
+  };  // ⚡ Fim da função carregarTickets (não é mais useCallback)
 
   // ===== SELECIONAR TICKET =====
   const selecionarTicket = useCallback(async (ticketId: string) => {
@@ -347,7 +383,7 @@ export const useAtendimentos = (
 
       if (!ticket || typeof ticket !== 'object') {
         console.error('❌ SelecionarTicket: resposta inválida do backend para id=', ticketId, ticket);
-        setError('Ticket inválido recebido do servidor');
+        setTicketsError('Ticket inválido recebido do servidor');
         return;
       }
 
@@ -356,22 +392,22 @@ export const useAtendimentos = (
         ticketNormalizado = mapearTicketParaFrontend(ticket);
       } catch (mapErr) {
         console.error('❌ Erro ao normalizar ticket recebido:', mapErr, ticket);
-        setError('Erro ao processar dados do ticket');
+        setTicketsError('Erro ao processar dados do ticket');
         return;
       }
 
-      setTicketSelecionado(ticketNormalizado);
+      selecionarTicketStore(ticketNormalizado);
       if (DEBUG) console.log('✅ Ticket selecionado:', ticket.numero);
     } catch (err: any) {
       console.error('❌ Erro ao selecionar ticket:', err);
-      setError('Erro ao carregar detalhes do ticket');
+      setTicketsError('Erro ao carregar detalhes do ticket');
     }
-  }, []);
+  }, [selecionarTicketStore, setTicketsError]);
 
   // ===== CRIAR TICKET =====
   const criarTicket = useCallback(async (dados: NovoAtendimentoData): Promise<Ticket> => {
     try {
-      setLoading(true);
+      setTicketsLoading(true);
       const ticketCriado = await atendimentoService.criarTicket(dados);
 
       // Recarregar lista
@@ -379,19 +415,19 @@ export const useAtendimentos = (
 
       // Selecionar o novo ticket
       const ticketNormalizado = mapearTicketParaFrontend(ticketCriado);
-      setTicketSelecionado(ticketNormalizado);
+      selecionarTicketStore(ticketNormalizado);
 
       if (DEBUG) console.log('✅ Ticket criado com sucesso:', ticketCriado.numero);
       return ticketNormalizado;
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao criar ticket';
-      setError(mensagemErro);
+      setTicketsError(mensagemErro);
       console.error('❌ Erro ao criar ticket:', err);
       throw err;
     } finally {
-      setLoading(false);
+      setTicketsLoading(false);
     }
-  }, [carregarTickets]);
+  }, [carregarTickets, selecionarTicketStore, setTicketsLoading, setTicketsError]);
 
   // ===== TRANSFERIR TICKET =====
   const transferirTicket = useCallback(async (
@@ -399,7 +435,7 @@ export const useAtendimentos = (
     dados: TransferenciaData
   ): Promise<void> => {
     try {
-      setLoading(true);
+      setTicketsLoading(true);
       await atendimentoService.transferirTicket(ticketId, dados);
 
       // Recarregar lista e ticket atual
@@ -412,13 +448,13 @@ export const useAtendimentos = (
       if (DEBUG) console.log('✅ Ticket transferido com sucesso');
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao transferir ticket';
-      setError(mensagemErro);
+      setTicketsError(mensagemErro);
       console.error('❌ Erro ao transferir ticket:', err);
       throw err;
     } finally {
-      setLoading(false);
+      setTicketsLoading(false);
     }
-  }, [carregarTickets, ticketSelecionado, selecionarTicket]);
+  }, [carregarTickets, ticketSelecionado, selecionarTicket, setTicketsLoading, setTicketsError]);
 
   // ===== ENCERRAR TICKET =====
   const encerrarTicket = useCallback(async (
@@ -426,7 +462,7 @@ export const useAtendimentos = (
     dados: EncerramentoData
   ): Promise<void> => {
     try {
-      setLoading(true);
+      setTicketsLoading(true);
       await atendimentoService.encerrarTicket(ticketId, dados);
 
       // Recarregar lista
@@ -434,24 +470,24 @@ export const useAtendimentos = (
 
       // Limpar seleção se era o ticket atual
       if (ticketSelecionado?.id === ticketId) {
-        setTicketSelecionado(null);
+        selecionarTicketStore(null);
       }
 
       if (DEBUG) console.log('✅ Ticket encerrado com sucesso');
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao encerrar ticket';
-      setError(mensagemErro);
+      setTicketsError(mensagemErro);
       console.error('❌ Erro ao encerrar ticket:', err);
       throw err;
     } finally {
-      setLoading(false);
+      setTicketsLoading(false);
     }
-  }, [carregarTickets, ticketSelecionado]);
+  }, [carregarTickets, ticketSelecionado, selecionarTicketStore, setTicketsLoading, setTicketsError]);
 
   // ===== REABRIR TICKET =====
   const reabrirTicket = useCallback(async (ticketId: string): Promise<void> => {
     try {
-      setLoading(true);
+      setTicketsLoading(true);
       const ticketReaberto = await atendimentoService.reabrirTicket(ticketId);
       const ticketNormalizado = mapearTicketParaFrontend(ticketReaberto);
 
@@ -459,18 +495,18 @@ export const useAtendimentos = (
       await carregarTickets();
 
       // Selecionar ticket reaberto
-      setTicketSelecionado(ticketNormalizado);
+      selecionarTicketStore(ticketNormalizado);
 
       if (DEBUG) console.log('✅ Ticket reaberto com sucesso');
     } catch (err: any) {
       const mensagemErro = err.response?.data?.message || 'Erro ao reabrir ticket';
-      setError(mensagemErro);
+      setTicketsError(mensagemErro);
       console.error('❌ Erro ao reabrir ticket:', err);
       throw err;
     } finally {
-      setLoading(false);
+      setTicketsLoading(false);
     }
-  }, [carregarTickets]);
+  }, [carregarTickets, selecionarTicketStore, setTicketsLoading, setTicketsError]);
 
   // ===== RECARREGAR =====
   const recarregar = useCallback(async () => {
@@ -492,45 +528,47 @@ export const useAtendimentos = (
     }
 
     const statusFiltroAtivo = filtros.status ?? null;
-    const deveExibirTicket = !statusFiltroAtivo || statusFiltroAtivo === ticketNormalizado.status;
+    const deveExibirTicket = podeVisualizarTicket(ticketNormalizado)
+      && (!statusFiltroAtivo || statusFiltroAtivo === ticketNormalizado.status);
 
     let adicionou = false;
     let removidoPorFiltro = false;
-    let statusAnterior: StatusAtendimento | null = null;
+    let statusAnterior: StatusAtendimentoType | null = null;
 
-    setTickets(prev => {
-      const index = prev.findIndex(ticket => ticket.id === ticketNormalizado.id);
+    // Atualizar tickets na store
+    const ticketsAtuais = tickets;
+    const index = ticketsAtuais.findIndex(ticket => ticket.id === ticketNormalizado.id);
 
-      if (index === -1) {
-        if (!deveExibirTicket) {
-          return prev;
-        }
-
+    if (index === -1) {
+      if (deveExibirTicket) {
         adicionou = true;
-        const atualizada = [ticketNormalizado, ...prev];
-
-        return atualizada.sort((a, b) => b.tempoUltimaMensagem.getTime() - a.tempoUltimaMensagem.getTime());
+        const atualizada = [ticketNormalizado, ...ticketsAtuais];
+        const ordenada = atualizada.sort((a, b) => b.tempoUltimaMensagem.getTime() - a.tempoUltimaMensagem.getTime());
+        setTickets(ordenada);
       }
-
-      statusAnterior = prev[index].status;
+    } else {
+      statusAnterior = ticketsAtuais[index].status;
 
       if (!deveExibirTicket) {
         removidoPorFiltro = true;
-        const atualizada = prev.filter((_, idx) => idx !== index);
-        return atualizada;
+        const atualizada = ticketsAtuais.filter((_, idx) => idx !== index);
+        setTickets(atualizada);
+      } else {
+        const atualizada = ticketsAtuais.map((ticket, idx) =>
+          idx === index ? { ...ticket, ...ticketNormalizado } : ticket
+        );
+        const ordenada = atualizada.sort((a, b) => b.tempoUltimaMensagem.getTime() - a.tempoUltimaMensagem.getTime());
+        setTickets(ordenada);
       }
+    }
 
-      const atualizada = prev.map((ticket, idx) =>
-        idx === index ? { ...ticket, ...ticketNormalizado } : ticket
-      );
-
-      return atualizada.sort((a, b) => b.tempoUltimaMensagem.getTime() - a.tempoUltimaMensagem.getTime());
-    });
-
-    if (deveExibirTicket) {
-      setTicketSelecionado(prev =>
-        prev?.id === ticketNormalizado.id ? { ...prev, ...ticketNormalizado } : prev
-      );
+    // Atualizar ticket selecionado se necessário
+    if (ticketSelecionado?.id === ticketNormalizado.id) {
+      if (deveExibirTicket) {
+        selecionarTicketStore({ ...ticketSelecionado, ...ticketNormalizado });
+      } else {
+        selecionarTicketStore(null);
+      }
     }
 
     if (adicionou) {
@@ -540,7 +578,7 @@ export const useAtendimentos = (
     }
 
     setTotaisPorStatus(prev => {
-      const atualizado = { ...prev } as Record<StatusAtendimento, number>;
+      const atualizado = { ...prev } as Record<StatusAtendimentoType, number>;
 
       if (adicionou) {
         atualizado[ticketNormalizado.status] = (atualizado[ticketNormalizado.status] ?? 0) + 1;
@@ -559,27 +597,27 @@ export const useAtendimentos = (
     }
 
     return ticketNormalizado;
-  }, [filtros.status]);
+  }, [filtros.status, podeVisualizarTicket, tickets, ticketSelecionado, setTickets, selecionarTicketStore]);
 
   // ===== ATUALIZAR TICKET LOCAL (SEM RELOAD) =====
   const atualizarTicketLocal = useCallback((ticketId: string, updates: Partial<Ticket>) => {
     const updatesNormalizados = normalizarAtualizacoesTicket(updates);
 
-    setTickets(prev => prev.map(ticket =>
+    // Atualizar na lista
+    const ticketsAtualizados = tickets.map(ticket =>
       ticket.id === ticketId
         ? { ...ticket, ...updatesNormalizados }
         : ticket
-    ));
+    );
+    setTickets(ticketsAtualizados);
 
     // Se for o ticket selecionado, atualizar também
-    setTicketSelecionado(prev =>
-      prev?.id === ticketId
-        ? { ...prev, ...updatesNormalizados }
-        : prev
-    );
+    if (ticketSelecionado?.id === ticketId) {
+      selecionarTicketStore({ ...ticketSelecionado, ...updatesNormalizados });
+    }
 
     if (DEBUG) console.log(`🔄 Ticket ${ticketId} atualizado localmente (sem reload)`);
-  }, []);
+  }, [tickets, ticketSelecionado, setTickets, selecionarTicketStore]);
 
   // ===== NAVEGAÇÃO =====
   const irParaPagina = useCallback((pagina: number) => {
@@ -589,9 +627,9 @@ export const useAtendimentos = (
   // ===== ATUALIZAR FILTROS =====
   const atualizarFiltros = useCallback((novosFiltros: ListarTicketsParams | ((prev: ListarTicketsParams) => ListarTicketsParams)) => {
     if (typeof novosFiltros === 'function') {
-      setFiltros(prev => (novosFiltros as (prev: ListarTicketsParams) => ListarTicketsParams)(prev));
+      setFiltrosLocal(prev => (novosFiltros as (prev: ListarTicketsParams) => ListarTicketsParams)(prev));
     } else {
-      setFiltros(prev => ({
+      setFiltrosLocal(prev => ({
         ...prev,
         ...novosFiltros,
       }));
@@ -602,10 +640,11 @@ export const useAtendimentos = (
 
   // ===== EFEITOS =====
 
-  // Carregar tickets ao montar ou quando filtros/página mudarem
+  // ⚡ FIX: Carregar tickets quando filtros ou página mudarem (não depende de carregarTickets)
   useEffect(() => {
     carregarTickets();
-  }, [carregarTickets]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtros, paginaAtual]);  // Apenas dependências primitivas/objetos de estado
 
   // Auto-refresh
   useEffect(() => {
@@ -621,11 +660,11 @@ export const useAtendimentos = (
 
   // ===== RETORNO =====
   return {
-    // Estado
+    // Estado (da Zustand Store)
     tickets,
     ticketSelecionado,
-    loading,
-    error,
+    loading: ticketsLoading,
+    error: ticketsError,
     totalTickets,
     paginaAtual,
     totalPaginas,
@@ -643,7 +682,7 @@ export const useAtendimentos = (
     reabrirTicket,
     recarregar,
     sincronizarTicketRealtime,
-    atualizarTicketLocal, // 🆕 NOVA
+    atualizarTicketLocal,
 
     // Navegação
     irParaPagina,

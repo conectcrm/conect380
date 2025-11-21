@@ -30,7 +30,8 @@ import {
   Workflow,
   Mail,
   Shuffle,
-  Clock
+  Clock,
+  CheckCircle
 } from 'lucide-react';
 
 export interface MenuConfig {
@@ -66,13 +67,6 @@ export const menuConfig: MenuConfig[] = [
     section: 'Operações',
     children: [
       {
-        id: 'atendimento-dashboard',
-        title: 'Dashboard',
-        icon: Activity,
-        href: '/atendimento',
-        color: 'purple'
-      },
-      {
         id: 'atendimento-central',
         title: 'Central de Atendimentos',
         icon: Headphones,
@@ -102,191 +96,149 @@ export const menuConfig: MenuConfig[] = [
       },
       {
         id: 'atendimento-sla',
-        title: 'SLA Tracking',
+        title: 'SLA Dashboard',
         icon: Clock,
         href: '/nuclei/atendimento/sla/dashboard',
-        color: 'purple',
-        children: [
-          {
-            id: 'atendimento-sla-dashboard',
-            title: 'Dashboard SLA',
-            icon: BarChart3,
-            href: '/nuclei/atendimento/sla/dashboard',
-            color: 'purple'
-          },
-          {
-            id: 'atendimento-sla-configuracoes',
-            title: 'Configurações',
-            icon: Settings,
-            href: '/nuclei/atendimento/sla/configuracoes',
-            color: 'purple'
-          }
-        ]
+        color: 'purple'
       },
       {
         id: 'atendimento-distribuicao',
-        title: 'Distribuição Automática',
+        title: 'Distribuição Dashboard',
         icon: Shuffle,
         href: '/nuclei/atendimento/distribuicao/dashboard',
-        color: 'purple',
-        children: [
-          {
-            id: 'atendimento-distribuicao-dashboard',
-            title: 'Dashboard',
-            icon: BarChart3,
-            href: '/nuclei/atendimento/distribuicao/dashboard',
-            color: 'purple'
-          },
-          {
-            id: 'atendimento-distribuicao-config',
-            title: 'Configurações',
-            icon: Settings,
-            href: '/nuclei/atendimento/distribuicao/configuracao',
-            color: 'purple'
-          },
-          {
-            id: 'atendimento-distribuicao-skills',
-            title: 'Gestão de Skills',
-            icon: Target,
-            href: '/nuclei/atendimento/distribuicao/skills',
-            color: 'purple'
-          }
-        ]
+        color: 'purple'
+      },
+      {
+        id: 'atendimento-fechamento-automatico',
+        title: 'Fechamento Automático',
+        icon: Clock,
+        href: '/atendimento/fechamento-automatico',
+        color: 'purple'
+      },
+      {
+        id: 'atendimento-dashboard-analytics',
+        title: 'Dashboard Analytics',
+        icon: BarChart3,
+        href: '/atendimento/dashboard-analytics',
+        color: 'purple'
       },
       {
         id: 'atendimento-configuracoes',
         title: 'Configurações',
         icon: Settings,
         href: '/atendimento/configuracoes',
-        color: 'purple'
-      },
-      {
-        id: 'atendimento-relatorios',
-        title: 'Relatórios',
-        icon: BarChart3,
-        href: '/relatorios/atendimento',
-        color: 'purple'
-      },
-      {
-        id: 'atendimento-supervisao',
-        title: 'Supervisão',
-        icon: Monitor,
-        href: '/atendimento/supervisao',
         color: 'purple',
-        adminOnly: true
+        children: [
+          {
+            id: 'atendimento-configuracoes-geral',
+            title: 'Geral',
+            icon: Settings,
+            href: '/atendimento/configuracoes',
+            color: 'purple'
+          },
+          {
+            id: 'atendimento-configuracoes-sla',
+            title: 'SLA',
+            icon: Clock,
+            href: '/nuclei/atendimento/sla/configuracoes',
+            color: 'purple'
+          },
+          {
+            id: 'atendimento-configuracoes-distribuicao',
+            title: 'Distribuição',
+            icon: Shuffle,
+            href: '/nuclei/atendimento/distribuicao/configuracao',
+            color: 'purple'
+          },
+          {
+            id: 'atendimento-configuracoes-skills',
+            title: 'Skills',
+            icon: Target,
+            href: '/nuclei/atendimento/distribuicao/skills',
+            color: 'purple'
+          }
+        ]
       }
     ]
   },
   {
-    id: 'crm',
-    title: 'CRM',
-    icon: Users,
-    href: '/nuclei/crm',
+    id: 'comercial',
+    title: 'Comercial',
+    icon: TrendingUp,
+    href: '/nuclei/comercial',
     color: 'blue',
-    requiredModule: 'CRM', // ⚡ Requer licença de CRM
+    requiredModule: 'CRM', // ⚡ Requer licença CRM (base para comercial)
     section: 'Operações',
     children: [
       {
-        id: 'crm-dashboard',
-        title: 'Dashboard CRM',
-        icon: TrendingUp,
-        href: '/nuclei/crm',
-        color: 'blue'
-      },
-      {
-        id: 'crm-clientes',
+        id: 'comercial-clientes',
         title: 'Clientes',
         icon: Users,
         href: '/clientes',
         color: 'blue'
       },
       {
-        id: 'crm-contatos',
+        id: 'comercial-contatos',
         title: 'Contatos',
         icon: Phone,
         href: '/contatos',
         color: 'blue'
       },
       {
-        id: 'crm-leads',
+        id: 'comercial-leads',
         title: 'Leads',
         icon: Target,
         href: '/leads',
         color: 'blue'
       },
       {
-        id: 'crm-pipeline',
-        title: 'Pipeline',
+        id: 'comercial-pipeline',
+        title: 'Pipeline de Vendas',
         icon: TrendingUp,
         href: '/pipeline',
-        color: 'blue'
+        color: 'blue',
+        badge: 'Completo'
       },
       {
-        id: 'crm-relatorios',
-        title: 'Relatórios',
-        icon: BarChart3,
-        href: '/relatorios/crm',
-        color: 'blue'
-      }
-    ]
-  },
-  {
-    id: 'vendas',
-    title: 'Vendas',
-    icon: ShoppingBag,
-    href: '/nuclei/vendas',
-    color: 'green',
-    requiredModule: 'VENDAS', // ⚡ Requer licença de Vendas
-    section: 'Operações',
-    children: [
-      {
-        id: 'vendas-dashboard',
-        title: 'Dashboard Vendas',
-        icon: TrendingUp,
-        href: '/nuclei/vendas',
-        color: 'green'
-      },
-      {
-        id: 'vendas-propostas',
+        id: 'comercial-propostas',
         title: 'Propostas',
         icon: FileText,
         href: '/propostas',
-        color: 'green'
+        color: 'blue',
+        requiredModule: 'VENDAS'
       },
       {
-        id: 'vendas-funil',
-        title: 'Funil de Vendas',
-        icon: Target,
-        href: '/funil-vendas',
-        color: 'green'
+        id: 'comercial-cotacoes',
+        title: 'Cotações',
+        icon: Calculator,
+        href: '/cotacoes',
+        color: 'blue',
+        requiredModule: 'VENDAS'
       },
       {
-        id: 'vendas-produtos',
+        id: 'comercial-aprovacoes',
+        title: 'Minhas Aprovações',
+        icon: CheckCircle,
+        href: '/aprovacoes/pendentes',
+        color: 'blue',
+        requiredModule: 'VENDAS',
+        badge: 'dynamic' // Badge será atualizado dinamicamente
+      },
+      {
+        id: 'comercial-produtos',
         title: 'Produtos',
         icon: ShoppingBag,
         href: '/produtos',
-        color: 'green'
+        color: 'blue',
+        requiredModule: 'VENDAS'
       },
       {
-        id: 'vendas-combos',
+        id: 'comercial-combos',
         title: 'Combos',
         icon: Archive,
         href: '/combos',
-        color: 'green'
-      },
-      {
-        id: 'vendas-metas',
-        title: 'Metas',
-        icon: Target,
-        href: '/configuracoes/metas',
-        color: 'green'
-      },
-      {
-        id: 'vendas-relatorios',
-        title: 'Relatórios',
-        icon: BarChart3,
-        href: '/relatorios/vendas',
-        color: 'green'
+        color: 'blue',
+        requiredModule: 'VENDAS'
       }
     ]
   },
@@ -299,13 +251,6 @@ export const menuConfig: MenuConfig[] = [
     requiredModule: 'FINANCEIRO', // ⚡ Requer licença de Financeiro
     section: 'Operações',
     children: [
-      {
-        id: 'financeiro-dashboard',
-        title: 'Dashboard Financeiro',
-        icon: PieChart,
-        href: '/nuclei/financeiro',
-        color: 'orange'
-      },
       {
         id: 'financeiro-faturamento',
         title: 'Faturamento',
@@ -335,10 +280,10 @@ export const menuConfig: MenuConfig[] = [
         color: 'orange'
       },
       {
-        id: 'financeiro-relatorios',
-        title: 'Relatórios',
-        icon: BarChart3,
-        href: '/relatorios/financeiro',
+        id: 'financeiro-fornecedores',
+        title: 'Fornecedores',
+        icon: Building2,
+        href: '/financeiro/fornecedores',
         color: 'orange'
       }
     ]
@@ -352,13 +297,6 @@ export const menuConfig: MenuConfig[] = [
     requiredModule: 'BILLING', // ⚡ Requer licença de Billing
     section: 'Operações',
     children: [
-      {
-        id: 'billing-dashboard',
-        title: 'Dashboard Billing',
-        icon: CreditCardIcon,
-        href: '/billing',
-        color: 'green'
-      },
       {
         id: 'billing-assinaturas',
         title: 'Assinaturas',
@@ -390,6 +328,97 @@ export const menuConfig: MenuConfig[] = [
     ]
   },
   {
+    id: 'relatorios',
+    title: 'Relatórios',
+    icon: BarChart3,
+    href: '/relatorios',
+    color: 'blue',
+    section: 'Visão Geral',
+    children: [
+      {
+        id: 'relatorios-atendimento',
+        title: 'Atendimento',
+        icon: Headphones,
+        href: '/relatorios/atendimento',
+        color: 'purple',
+        requiredModule: 'ATENDIMENTO'
+      },
+      {
+        id: 'relatorios-crm',
+        title: 'CRM',
+        icon: Users,
+        href: '/relatorios/crm',
+        color: 'blue',
+        requiredModule: 'CRM'
+      },
+      {
+        id: 'relatorios-vendas',
+        title: 'Vendas',
+        icon: ShoppingBag,
+        href: '/relatorios/vendas',
+        color: 'green',
+        requiredModule: 'VENDAS'
+      },
+      {
+        id: 'relatorios-financeiro',
+        title: 'Financeiro',
+        icon: DollarSign,
+        href: '/relatorios/financeiro',
+        color: 'orange',
+        requiredModule: 'FINANCEIRO'
+      },
+      {
+        id: 'relatorios-analytics',
+        title: 'Analytics Gerais',
+        icon: PieChart,
+        href: '/relatorios/analytics',
+        color: 'blue',
+        adminOnly: true,
+        requiredModule: 'ADMINISTRACAO'
+      }
+    ]
+  },
+  {
+    id: 'supervisao',
+    title: 'Supervisão',
+    icon: Monitor,
+    href: '/supervisao',
+    color: 'purple',
+    adminOnly: true,
+    section: 'Visão Geral',
+    children: [
+      {
+        id: 'supervisao-atendimento',
+        title: 'Atendimento',
+        icon: Headphones,
+        href: '/atendimento/supervisao',
+        color: 'purple',
+        requiredModule: 'ATENDIMENTO'
+      },
+      {
+        id: 'supervisao-equipes',
+        title: 'Equipes',
+        icon: Users,
+        href: '/supervisao/equipes',
+        color: 'purple'
+      },
+      {
+        id: 'supervisao-performance',
+        title: 'Performance',
+        icon: TrendingUp,
+        href: '/supervisao/performance',
+        color: 'purple'
+      },
+      {
+        id: 'supervisao-auditoria',
+        title: 'Auditoria',
+        icon: Shield,
+        href: '/supervisao/auditoria',
+        color: 'purple'
+      }
+    ]
+  },
+  {
     id: 'configuracoes',
     title: 'Configurações',
     icon: Settings,
@@ -397,13 +426,6 @@ export const menuConfig: MenuConfig[] = [
     color: 'purple',
     section: 'Administração',
     children: [
-      {
-        id: 'configuracoes-home',
-        title: 'Início',
-        icon: Home,
-        href: '/nuclei/configuracoes',
-        color: 'purple'
-      },
       {
         id: 'configuracoes-sistema',
         title: 'Sistema & Preferências',
@@ -473,13 +495,6 @@ export const menuConfig: MenuConfig[] = [
     section: 'Administração',
     children: [
       {
-        id: 'admin-dashboard',
-        title: 'Dashboard Admin',
-        icon: Building2,
-        href: '/nuclei/administracao',
-        color: 'blue'
-      },
-      {
         id: 'admin-empresas',
         title: 'Gestão de Empresas',
         icon: Building2,
@@ -491,13 +506,6 @@ export const menuConfig: MenuConfig[] = [
         title: 'Usuários do Sistema',
         icon: Users,
         href: '/admin/usuarios',
-        color: 'blue'
-      },
-      {
-        id: 'admin-relatorios',
-        title: 'Relatórios Gerais',
-        icon: BarChart3,
-        href: '/relatorios/analytics',
         color: 'blue'
       },
       {

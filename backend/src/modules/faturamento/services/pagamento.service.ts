@@ -3,7 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Pagamento, StatusPagamento, TipoPagamento } from '../entities/pagamento.entity';
 import { Fatura, StatusFatura } from '../entities/fatura.entity';
-import { CreatePagamentoDto, UpdatePagamentoDto, ProcessarPagamentoDto } from '../dto/pagamento.dto';
+import {
+  CreatePagamentoDto,
+  UpdatePagamentoDto,
+  ProcessarPagamentoDto,
+} from '../dto/pagamento.dto';
 import { FaturamentoService } from './faturamento.service';
 
 @Injectable()
@@ -18,11 +22,14 @@ export class PagamentoService {
     private faturamentoService: FaturamentoService,
   ) { }
 
-  async criarPagamento(createPagamentoDto: CreatePagamentoDto): Promise<Pagamento> {
+  async criarPagamento(
+    createPagamentoDto: CreatePagamentoDto,
+    empresaId: string,
+  ): Promise<Pagamento> {
     try {
       // Verificar se a fatura existe
       const fatura = await this.faturaRepository.findOne({
-        where: { id: createPagamentoDto.faturaId },
+        where: { id: createPagamentoDto.faturaId, empresa_id: empresaId },
       });
 
       if (!fatura) {
@@ -36,7 +43,10 @@ export class PagamentoService {
 
       // Verificar se já existe pagamento com o mesmo transacaoId
       const pagamentoExistente = await this.pagamentoRepository.findOne({
-        where: { transacaoId: createPagamentoDto.transacaoId },
+        where: {
+          transacaoId: createPagamentoDto.transacaoId,
+          empresa_id: empresaId,
+        },
       });
 
       if (pagamentoExistente) {
@@ -51,11 +61,14 @@ export class PagamentoService {
         ...createPagamentoDto,
         valorLiquido,
         status: StatusPagamento.PENDENTE,
+        empresa_id: empresaId,
       });
 
       const pagamentoSalvo = await this.pagamentoRepository.save(pagamento);
 
-      this.logger.log(`Pagamento criado: ${pagamentoSalvo.transacaoId} para fatura ${fatura.numero}`);
+      this.logger.log(
+        `Pagamento criado: ${pagamentoSalvo.transacaoId} para fatura ${fatura.numero}`,
+      );
 
       return pagamentoSalvo;
     } catch (error) {
@@ -64,11 +77,17 @@ export class PagamentoService {
     }
   }
 
-  async processarPagamento(processarPagamentoDto: ProcessarPagamentoDto): Promise<Pagamento> {
+  async processarPagamento(
+    processarPagamentoDto: ProcessarPagamentoDto,
+    empresaId: string,
+  ): Promise<Pagamento> {
     try {
       // Buscar pagamento pelo ID da transação do gateway
       const pagamento = await this.pagamentoRepository.findOne({
-        where: { gatewayTransacaoId: processarPagamentoDto.gatewayTransacaoId },
+        where: {
+          gatewayTransacaoId: processarPagamentoDto.gatewayTransacaoId,
+          empresa_id: empresaId,
+        },
         relations: ['fatura'],
       });
 
@@ -96,12 +115,14 @@ export class PagamentoService {
         pagamento.dataAprovacao = new Date();
 
         // Atualizar status da fatura
-        await this.atualizarStatusFatura(pagamento.faturaId, pagamento.valor);
+        await this.atualizarStatusFatura(pagamento.faturaId, pagamento.valor, empresaId);
       }
 
       const pagamentoAtualizado = await this.pagamentoRepository.save(pagamento);
 
-      this.logger.log(`Pagamento processado: ${pagamentoAtualizado.transacaoId} - Status: ${processarPagamentoDto.novoStatus}`);
+      this.logger.log(
+        `Pagamento processado: ${pagamentoAtualizado.transacaoId} - Status: ${processarPagamentoDto.novoStatus}`,
+      );
 
       return pagamentoAtualizado;
     } catch (error) {
@@ -111,18 +132,20 @@ export class PagamentoService {
   }
 
   async buscarPagamentos(
-    filtros?: {
+    filtros: {
       faturaId?: number;
       status?: StatusPagamento;
       metodoPagamento?: string;
       gateway?: string;
       dataInicio?: Date;
       dataFim?: Date;
-    }
+    } = {},
+    empresaId: string,
   ): Promise<Pagamento[]> {
     const query = this.pagamentoRepository
       .createQueryBuilder('pagamento')
       .leftJoinAndSelect('pagamento.fatura', 'fatura')
+      .where('pagamento.empresa_id = :empresaId', { empresaId })
       .orderBy('pagamento.createdAt', 'DESC');
 
     if (filtros?.faturaId) {
@@ -134,7 +157,9 @@ export class PagamentoService {
     }
 
     if (filtros?.metodoPagamento) {
-      query.andWhere('pagamento.metodoPagamento = :metodoPagamento', { metodoPagamento: filtros.metodoPagamento });
+      query.andWhere('pagamento.metodoPagamento = :metodoPagamento', {
+        metodoPagamento: filtros.metodoPagamento,
+      });
     }
 
     if (filtros?.gateway) {
@@ -152,9 +177,9 @@ export class PagamentoService {
     return query.getMany();
   }
 
-  async buscarPagamentoPorId(id: number): Promise<Pagamento> {
+  async buscarPagamentoPorId(id: number, empresaId: string): Promise<Pagamento> {
     const pagamento = await this.pagamentoRepository.findOne({
-      where: { id },
+      where: { id, empresa_id: empresaId },
       relations: ['fatura', 'fatura.contrato'],
     });
 
@@ -165,9 +190,12 @@ export class PagamentoService {
     return pagamento;
   }
 
-  async buscarPagamentoPorTransacao(transacaoId: string): Promise<Pagamento> {
+  async buscarPagamentoPorTransacao(
+    transacaoId: string,
+    empresaId: string,
+  ): Promise<Pagamento> {
     const pagamento = await this.pagamentoRepository.findOne({
-      where: { transacaoId },
+      where: { transacaoId, empresa_id: empresaId },
       relations: ['fatura', 'fatura.contrato'],
     });
 
@@ -178,9 +206,12 @@ export class PagamentoService {
     return pagamento;
   }
 
-  async buscarPagamentoPorGatewayTransacao(gatewayTransacaoId: string): Promise<Pagamento> {
+  async buscarPagamentoPorGatewayTransacao(
+    gatewayTransacaoId: string,
+    empresaId: string,
+  ): Promise<Pagamento> {
     const pagamento = await this.pagamentoRepository.findOne({
-      where: { gatewayTransacaoId },
+      where: { gatewayTransacaoId, empresa_id: empresaId },
       relations: ['fatura', 'fatura.contrato'],
     });
 
@@ -191,8 +222,12 @@ export class PagamentoService {
     return pagamento;
   }
 
-  async atualizarPagamento(id: number, updatePagamentoDto: UpdatePagamentoDto): Promise<Pagamento> {
-    const pagamento = await this.buscarPagamentoPorId(id);
+  async atualizarPagamento(
+    id: number,
+    updatePagamentoDto: UpdatePagamentoDto,
+    empresaId: string,
+  ): Promise<Pagamento> {
+    const pagamento = await this.buscarPagamentoPorId(id, empresaId);
 
     if (pagamento.isAprovado()) {
       throw new BadRequestException('Não é possível alterar pagamento já aprovado');
@@ -206,8 +241,8 @@ export class PagamentoService {
     return pagamentoAtualizado;
   }
 
-  async estornarPagamento(id: number, motivo: string): Promise<Pagamento> {
-    const pagamento = await this.buscarPagamentoPorId(id);
+  async estornarPagamento(id: number, motivo: string, empresaId: string): Promise<Pagamento> {
+    const pagamento = await this.buscarPagamentoPorId(id, empresaId);
 
     if (!pagamento.isAprovado()) {
       throw new BadRequestException('Só é possível estornar pagamentos aprovados');
@@ -227,24 +262,28 @@ export class PagamentoService {
       observacoes: `Estorno do pagamento ${pagamento.transacaoId}: ${motivo}`,
       dataProcessamento: new Date(),
       dataAprovacao: new Date(),
+      empresa_id: empresaId,
     });
 
     const estornoSalvo = await this.pagamentoRepository.save(estorno);
 
     // Atualizar status da fatura
-    await this.atualizarStatusFatura(pagamento.faturaId, -pagamento.valor);
+    await this.atualizarStatusFatura(pagamento.faturaId, -pagamento.valor, empresaId);
 
-    this.logger.log(`Estorno criado: ${estornoSalvo.transacaoId} para pagamento ${pagamento.transacaoId}`);
+    this.logger.log(
+      `Estorno criado: ${estornoSalvo.transacaoId} para pagamento ${pagamento.transacaoId}`,
+    );
 
     return estornoSalvo;
   }
 
   async obterEstatisticasPagamentos(
-    filtros?: {
+    filtros: {
       dataInicio?: Date;
       dataFim?: Date;
       gateway?: string;
-    }
+    } = {},
+    empresaId: string,
   ): Promise<{
     totalPagamentos: number;
     valorTotal: number;
@@ -255,7 +294,8 @@ export class PagamentoService {
   }> {
     const query = this.pagamentoRepository
       .createQueryBuilder('pagamento')
-      .where('pagamento.tipo = :tipo', { tipo: TipoPagamento.PAGAMENTO });
+      .where('pagamento.tipo = :tipo', { tipo: TipoPagamento.PAGAMENTO })
+      .andWhere('pagamento.empresa_id = :empresaId', { empresaId });
 
     if (filtros?.dataInicio) {
       query.andWhere('pagamento.createdAt >= :dataInicio', { dataInicio: filtros.dataInicio });
@@ -280,7 +320,7 @@ export class PagamentoService {
       porStatus: {} as Record<string, { quantidade: number; valor: number }>,
     };
 
-    pagamentos.forEach(pagamento => {
+    pagamentos.forEach((pagamento) => {
       estatisticas.valorTotal += pagamento.valor;
       estatisticas.valorLiquido += pagamento.valorLiquido;
       estatisticas.taxasTotal += pagamento.taxa;
@@ -303,16 +343,20 @@ export class PagamentoService {
     return estatisticas;
   }
 
-  private async atualizarStatusFatura(faturaId: number, valorPagamento: number): Promise<void> {
+  private async atualizarStatusFatura(
+    faturaId: number,
+    valorPagamento: number,
+    empresaId: string,
+  ): Promise<void> {
     const fatura = await this.faturaRepository.findOne({
-      where: { id: faturaId },
+      where: { id: faturaId, empresa_id: empresaId },
       relations: ['pagamentos'],
     });
 
     if (!fatura) return;
 
     // Calcular total pago (somando apenas pagamentos aprovados)
-    const pagamentosAprovados = fatura.pagamentos.filter(p => p.isAprovado());
+    const pagamentosAprovados = fatura.pagamentos.filter((p) => p.isAprovado());
     const totalPago = pagamentosAprovados.reduce((total, p) => total + p.valor, 0);
 
     fatura.valorPago = totalPago;

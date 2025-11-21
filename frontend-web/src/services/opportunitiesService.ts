@@ -1,20 +1,5 @@
 // Service para integração com API de oportunidades
-import axios from 'axios';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-
-// Configurar axios com interceptor para token
-const api = axios.create({
-  baseURL: API_BASE_URL,
-});
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+import { api } from './api';
 
 export interface Opportunity {
   id: number;
@@ -34,7 +19,7 @@ export interface Opportunity {
     email: string;
   };
   cliente?: {
-    id: number;
+    id: string;
     nome: string;
     email: string;
   };
@@ -70,7 +55,7 @@ export interface CreateOpportunityDto {
   tags?: string[];
   dataFechamentoEsperado?: string;
   responsavel_id: string; // Corrigido: deve ser string, não number
-  cliente_id?: number;
+  cliente_id?: string;
   nomeContato?: string;
   emailContato?: string;
   telefoneContato?: string;
@@ -113,8 +98,8 @@ export const opportunitiesService = {
   // CRUD de oportunidades
   async getAll(filters?: {
     estagio?: string;
-    responsavel_id?: number;
-    cliente_id?: number;
+    responsavel_id?: string;
+    cliente_id?: string;
     dataInicio?: string;
     dataFim?: string;
   }): Promise<Opportunity[]> {
@@ -126,7 +111,7 @@ export const opportunitiesService = {
         }
       });
     }
-    
+
     const response = await api.get(`/oportunidades?${params.toString()}`);
     return response.data;
   },
@@ -168,13 +153,13 @@ export const opportunitiesService = {
     try {
       // Se params for uma object com queryKey ou signal, ignorar (metadados do React Query)
       let filters: { dataInicio?: string; dataFim?: string } | undefined;
-      
+
       if (params && typeof params === 'object' && !params.queryKey && !params.signal) {
         filters = params;
       }
-      
+
       let url = '/oportunidades/metricas';
-      
+
       if (filters && Object.keys(filters).length > 0) {
         const urlParams = new URLSearchParams();
         Object.entries(filters).forEach(([key, value]) => {
@@ -182,14 +167,13 @@ export const opportunitiesService = {
             urlParams.append(key, String(value));
           }
         });
-        
+
         const queryString = urlParams.toString();
         if (queryString) {
           url += `?${queryString}`;
         }
       }
-      
-      console.log('Fazendo requisição para:', url); // Debug
+
       const response = await api.get(url);
       return response.data;
     } catch (error) {
@@ -235,15 +219,15 @@ export const useOpportunities = () => {
     },
 
     update: {
-      mutationFn: ({ id, data }: { id: number; data: any }) => 
+      mutationFn: ({ id, data }: { id: number; data: any }) =>
         opportunitiesService.update(id, data),
     },
 
     updateStage: {
-      mutationFn: ({ id, estagio, dataFechamentoReal }: { 
-        id: number; 
-        estagio: string; 
-        dataFechamentoReal?: string 
+      mutationFn: ({ id, estagio, dataFechamentoReal }: {
+        id: number;
+        estagio: string;
+        dataFechamentoReal?: string
       }) => opportunitiesService.updateStage(id, estagio, dataFechamentoReal),
     },
 
@@ -252,9 +236,9 @@ export const useOpportunities = () => {
     },
 
     createActivity: {
-      mutationFn: ({ opportunityId, data }: { 
-        opportunityId: number; 
-        data: CreateActivityDto 
+      mutationFn: ({ opportunityId, data }: {
+        opportunityId: number;
+        data: CreateActivityDto
       }) => opportunitiesService.createActivity(opportunityId, data),
     },
   };

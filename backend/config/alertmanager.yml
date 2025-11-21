@@ -1,0 +1,145 @@
+# Alertmanager Configuration - ConectCRM
+# Gerenciamento de alertas com roteamento inteligente
+
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'alertas@conectcrm.com'
+  smtp_auth_username: '${SMTP_USERNAME}'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+
+# Templates para mensagens de alerta
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Roteamento de alertas por severidade
+route:
+  # Configurações padrão
+  receiver: 'default'
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s        # Aguardar antes de enviar primeiro alerta
+  group_interval: 10s    # Intervalo entre alertas do mesmo grupo
+  repeat_interval: 12h   # Repetir alerta não resolvido
+
+  # Rotas específicas por severidade
+  routes:
+    # CRÍTICO: Notificação imediata em múltiplos canais
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 0s
+      repeat_interval: 5m
+      continue: true  # Continuar para outras rotas
+
+    # AVISO: Email + Slack
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 30s
+      repeat_interval: 3h
+
+    # INFO: Apenas Slack
+    - match:
+        severity: info
+      receiver: 'info-alerts'
+      group_wait: 5m
+      repeat_interval: 24h
+
+    # Alertas de SLO (Service Level Objectives)
+    - match:
+        type: slo
+      receiver: 'slo-alerts'
+      group_by: ['slo_name', 'window']
+      repeat_interval: 1h
+
+# Inibição de alertas (evitar spam)
+inhibit_rules:
+  # Inibir warning se critical está ativo
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
+
+  # Inibir alertas de componentes se sistema inteiro está down
+  - source_match:
+      alertname: 'SystemDown'
+    target_match_re:
+      alertname: '.*'
+    equal: ['instance']
+
+# Receivers (destinos de notificação)
+receivers:
+  # Default: Email básico
+  - name: 'default'
+    email_configs:
+      - to: 'ops-team@conectcrm.com'
+        send_resolved: true
+        headers:
+          Subject: '[ConectCRM] {{ .GroupLabels.alertname }}'
+
+  # Crítico: Email + Slack + PagerDuty
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'oncall@conectcrm.com,cto@conectcrm.com'
+        send_resolved: true
+        headers:
+          Subject: '🚨 CRÍTICO: {{ .GroupLabels.alertname }}'
+    
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts-critical'
+        title: '🚨 Alerta Crítico'
+        text: |
+          *{{ .GroupLabels.alertname }}*
+          {{ range .Alerts }}
+          - {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+    
+    # PagerDuty para on-call
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY}'
+        severity: 'critical'
+        details:
+          firing: '{{ .Alerts.Firing | len }}'
+          resolved: '{{ .Alerts.Resolved | len }}'
+
+  # Warning: Email + Slack
+  - name: 'warning-alerts'
+    email_configs:
+      - to: 'ops-team@conectcrm.com'
+        send_resolved: true
+        headers:
+          Subject: '⚠️ AVISO: {{ .GroupLabels.alertname }}'
+    
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts-warning'
+        title: '⚠️ Alerta de Aviso'
+        text: |
+          *{{ .GroupLabels.alertname }}*
+          {{ range .Alerts }}
+          - {{ .Annotations.summary }}
+          {{ end }}
+
+  # Info: Apenas Slack
+  - name: 'info-alerts'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts-info'
+        title: 'ℹ️ Informação'
+        text: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.description }}'
+
+  # SLO: Canal específico para SLOs
+  - name: 'slo-alerts'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#slo-violations'
+        title: '📊 Violação de SLO'
+        text: |
+          *SLO*: {{ .GroupLabels.slo_name }}
+          *Window*: {{ .GroupLabels.window }}
+          *Status*: {{ .CommonAnnotations.description }}
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'

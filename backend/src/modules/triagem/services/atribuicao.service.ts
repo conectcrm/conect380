@@ -26,7 +26,7 @@ export interface CreateEquipeDto {
   ativo?: boolean;
 }
 
-export interface UpdateEquipeDto extends Partial<CreateEquipeDto> { }
+export interface UpdateEquipeDto extends Partial<CreateEquipeDto> {}
 
 export interface AtribuirAtendenteDto {
   atendenteId: string;
@@ -66,7 +66,7 @@ export class AtribuicaoService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Ticket)
     private readonly ticketRepository: Repository<Ticket>,
-  ) { }
+  ) {}
 
   // ========================================================================
   // GESTÃO DE EQUIPES
@@ -151,10 +151,7 @@ export class AtribuicaoService {
   /**
    * Atualiza uma equipe
    */
-  async atualizarEquipe(
-    equipeId: string,
-    dto: UpdateEquipeDto,
-  ): Promise<Equipe> {
+  async atualizarEquipe(equipeId: string, dto: UpdateEquipeDto): Promise<Equipe> {
     const equipe = await this.buscarEquipe(equipeId);
 
     Object.assign(equipe, dto);
@@ -220,10 +217,7 @@ export class AtribuicaoService {
   /**
    * Remove um atendente de uma equipe
    */
-  async removerAtendenteDaEquipe(
-    equipeId: string,
-    atendenteId: string,
-  ): Promise<void> {
+  async removerAtendenteDaEquipe(equipeId: string, atendenteId: string): Promise<void> {
     const atendenteEquipe = await this.atendenteEquipeRepository.findOne({
       where: { equipeId, atendenteId },
     });
@@ -258,9 +252,7 @@ export class AtribuicaoService {
     dto: AtribuirAtendenteDto,
   ): Promise<AtendenteAtribuicao> {
     if (!dto.nucleoId && !dto.departamentoId) {
-      throw new BadRequestException(
-        'É necessário informar nucleoId ou departamentoId',
-      );
+      throw new BadRequestException('É necessário informar nucleoId ou departamentoId');
     }
 
     // Verificar se o atendente existe
@@ -268,9 +260,7 @@ export class AtribuicaoService {
       where: { id: dto.atendenteId },
     });
     if (!atendente) {
-      throw new NotFoundException(
-        `Atendente ${dto.atendenteId} não encontrado`,
-      );
+      throw new NotFoundException(`Atendente ${dto.atendenteId} não encontrado`);
     }
 
     // Verificar se o núcleo existe (se informado)
@@ -289,9 +279,7 @@ export class AtribuicaoService {
         where: { id: dto.departamentoId },
       });
       if (!departamento) {
-        throw new NotFoundException(
-          `Departamento ${dto.departamentoId} não encontrado`,
-        );
+        throw new NotFoundException(`Departamento ${dto.departamentoId} não encontrado`);
       }
     }
 
@@ -337,9 +325,7 @@ export class AtribuicaoService {
   /**
    * Lista atribuições de um atendente
    */
-  async listarAtribuicoesAtendente(
-    atendenteId: string,
-  ): Promise<AtendenteAtribuicao[]> {
+  async listarAtribuicoesAtendente(atendenteId: string): Promise<AtendenteAtribuicao[]> {
     return await this.atendenteAtribuicaoRepository.find({
       where: { atendenteId, ativo: true },
       relations: ['nucleo', 'departamento'],
@@ -354,13 +340,9 @@ export class AtribuicaoService {
   /**
    * Atribui uma equipe a um núcleo ou departamento
    */
-  async atribuirEquipeANucleoDepartamento(
-    dto: AtribuirEquipeDto,
-  ): Promise<EquipeAtribuicao> {
+  async atribuirEquipeANucleoDepartamento(dto: AtribuirEquipeDto): Promise<EquipeAtribuicao> {
     if (!dto.nucleoId && !dto.departamentoId) {
-      throw new BadRequestException(
-        'É necessário informar nucleoId ou departamentoId',
-      );
+      throw new BadRequestException('É necessário informar nucleoId ou departamentoId');
     }
 
     // Verificar se a equipe existe
@@ -387,9 +369,7 @@ export class AtribuicaoService {
         where: { id: dto.departamentoId },
       });
       if (!departamento) {
-        throw new NotFoundException(
-          `Departamento ${dto.departamentoId} não encontrado`,
-        );
+        throw new NotFoundException(`Departamento ${dto.departamentoId} não encontrado`);
       }
     }
 
@@ -466,37 +446,48 @@ export class AtribuicaoService {
     const query = this.userRepository
       .createQueryBuilder('user')
       .select('user.id', 'id')
-      .leftJoin('atendente_atribuicoes', 'atrib', 'atrib.atendente_id = user.id')
+      .leftJoin(
+        'atendente_atribuicoes',
+        'atrib',
+        'atrib.atendente_id = user.id AND atrib.ativo = true',
+      )
       .leftJoin('atendente_equipes', 'ae', 'ae.atendente_id = user.id')
-      .leftJoin('equipe_atribuicoes', 'equipeAtrib', 'equipeAtrib.equipe_id = ae.equipe_id')
+      .leftJoin(
+        'equipe_atribuicoes',
+        'equipeAtrib',
+        'equipeAtrib.equipe_id = ae.equipe_id AND equipeAtrib.ativo = true',
+      )
       .where('user.empresa_id = :empresaId', { empresaId })
       .andWhere('user.ativo = true')
       .andWhere(
         new Brackets((qb) => {
-          // Atribuição direta ao núcleo
-          qb.where('atrib.nucleo_id = :nucleoId AND atrib.ativo = true', {
-            nucleoId,
+          const conditions: { cond: string; params?: Record<string, unknown> }[] = [
+            { cond: 'atrib.nucleo_id = :nucleoId', params: { nucleoId } },
+            { cond: 'equipeAtrib.nucleo_id = :nucleoId', params: { nucleoId } },
+          ];
+
+          if (departamentoId) {
+            conditions.push({
+              cond: 'atrib.departamento_id = :departamentoId',
+              params: { departamentoId },
+            });
+            conditions.push({
+              cond: 'equipeAtrib.departamento_id = :departamentoId',
+              params: { departamentoId },
+            });
+          }
+
+          const [primeira, ...resto] = conditions;
+
+          if (!primeira) {
+            qb.where('1=0');
+            return;
+          }
+
+          qb.where(primeira.cond, primeira.params || {});
+          resto.forEach(({ cond, params }) => {
+            qb.orWhere(cond, params || {});
           });
-
-          // Atribuição direta ao departamento (se fornecido)
-          if (departamentoId) {
-            qb.orWhere(
-              'atrib.departamento_id = :departamentoId AND atrib.ativo = true',
-              { departamentoId },
-            );
-          }
-
-          // Atribuição via equipe → núcleo
-          qb.orWhere(
-            'equipeAtrib.nucleo_id = :nucleoId AND equipeAtrib.ativo = true',
-          );
-
-          // Atribuição via equipe → departamento
-          if (departamentoId) {
-            qb.orWhere(
-              'equipeAtrib.departamento_id = :departamentoId AND equipeAtrib.ativo = true',
-            );
-          }
         }),
       )
       .distinct(true);
@@ -516,6 +507,85 @@ export class AtribuicaoService {
     return atendentes;
   }
 
+  private async mapearPrioridadeDisponibilidade(
+    ids: string[],
+    nucleoId?: string,
+    departamentoId?: string,
+  ): Promise<Record<string, number>> {
+    const prioridades: Record<string, number> = {};
+
+    ids.forEach((id) => {
+      if (id) {
+        prioridades[id] = 99;
+      }
+    });
+
+    const atualizar = (atendenteId: string | null | undefined, valor: number) => {
+      if (!atendenteId) {
+        return;
+      }
+
+      const atual = prioridades[atendenteId];
+      if (atual === undefined || valor < atual) {
+        prioridades[atendenteId] = valor;
+      }
+    };
+
+    if (ids.length === 0) {
+      return prioridades;
+    }
+
+    if (departamentoId) {
+      const diretasDepartamento = await this.atendenteAtribuicaoRepository.find({
+        where: {
+          atendenteId: In(ids),
+          departamentoId,
+          ativo: true,
+        },
+      });
+
+      diretasDepartamento.forEach((atribuicao) => atualizar(atribuicao.atendenteId, 0));
+    }
+
+    if (nucleoId) {
+      const diretasNucleo = await this.atendenteAtribuicaoRepository.find({
+        where: {
+          atendenteId: In(ids),
+          nucleoId,
+          ativo: true,
+        },
+      });
+
+      diretasNucleo.forEach((atribuicao) => atualizar(atribuicao.atendenteId, 1));
+    }
+
+    if (departamentoId) {
+      const equipeDepartamento = await this.atendenteEquipeRepository
+        .createQueryBuilder('ae')
+        .select('ae.atendenteId', 'atendenteId')
+        .innerJoin('equipe_atribuicoes', 'ea', 'ea.equipe_id = ae.equipe_id AND ea.ativo = true')
+        .where('ae.atendenteId IN (:...ids)', { ids })
+        .andWhere('ea.departamento_id = :departamentoId', { departamentoId })
+        .getRawMany();
+
+      equipeDepartamento.forEach((row) => atualizar(row.atendenteId, 2));
+    }
+
+    if (nucleoId) {
+      const equipeNucleo = await this.atendenteEquipeRepository
+        .createQueryBuilder('ae')
+        .select('ae.atendenteId', 'atendenteId')
+        .innerJoin('equipe_atribuicoes', 'ea', 'ea.equipe_id = ae.equipe_id AND ea.ativo = true')
+        .where('ae.atendenteId IN (:...ids)', { ids })
+        .andWhere('ea.nucleo_id = :nucleoId', { nucleoId })
+        .getRawMany();
+
+      equipeNucleo.forEach((row) => atualizar(row.atendenteId, 3));
+    }
+
+    return prioridades;
+  }
+
   /**
    * Seleciona o atendente com menor carga de trabalho
    * TODO: Implementar lógica de contagem de tickets ativos por atendente
@@ -523,6 +593,7 @@ export class AtribuicaoService {
   async selecionarAtendentePorCarga(
     atendentes: User[],
     empresaId?: string,
+    prioridadePorAtendente?: Record<string, number>,
   ): Promise<User | null> {
     if (atendentes.length === 0) {
       return null;
@@ -564,6 +635,13 @@ export class AtribuicaoService {
       }, {});
 
       const ordenados = [...atendentes].sort((a, b) => {
+        const prioridadeA = prioridadePorAtendente?.[a.id] ?? 99;
+        const prioridadeB = prioridadePorAtendente?.[b.id] ?? 99;
+
+        if (prioridadeA !== prioridadeB) {
+          return prioridadeA - prioridadeB;
+        }
+
         const cargaA = cargas[a.id] ?? 0;
         const cargaB = cargas[b.id] ?? 0;
 
@@ -584,8 +662,9 @@ export class AtribuicaoService {
 
       if (selecionado) {
         const cargaSelecionado = cargas[selecionado.id] ?? 0;
+        const prioridadeSelecionado = prioridadePorAtendente?.[selecionado.id] ?? 99;
         this.logger.log(
-          `Atendente ${selecionado.id} selecionado com ${cargaSelecionado} tickets ativos`,
+          `Atendente ${selecionado.id} selecionado com ${cargaSelecionado} tickets ativos (prioridade ${prioridadeSelecionado})`,
         );
       }
 
@@ -596,5 +675,25 @@ export class AtribuicaoService {
       );
       return atendentes[0];
     }
+  }
+
+  async selecionarAtendenteParaRoteamento(
+    empresaId: string,
+    nucleoId: string,
+    departamentoId?: string,
+  ): Promise<User | null> {
+    const candidatos = await this.buscarAtendentesDisponiveis(empresaId, nucleoId, departamentoId);
+
+    if (candidatos.length === 0) {
+      this.logger.warn(
+        `⚠️ Nenhum atendente disponível para roteamento automático (empresa ${empresaId}, núcleo ${nucleoId}, departamento ${departamentoId || 'N/A'})`,
+      );
+      return null;
+    }
+
+    const ids = candidatos.map((c) => c.id).filter(Boolean);
+    const prioridades = await this.mapearPrioridadeDisponibilidade(ids, nucleoId, departamentoId);
+
+    return this.selecionarAtendentePorCarga(candidatos, empresaId, prioridades);
   }
 }

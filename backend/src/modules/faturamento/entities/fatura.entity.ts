@@ -1,7 +1,17 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+} from 'typeorm';
 import { Contrato } from '../../contratos/entities/contrato.entity';
 import { User } from '../../users/user.entity';
 import { Cliente } from '../../clientes/cliente.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 import { ItemFatura } from './item-fatura.entity';
 import { Pagamento } from './pagamento.entity';
 
@@ -11,14 +21,14 @@ export enum StatusFatura {
   PAGA = 'paga',
   VENCIDA = 'vencida',
   CANCELADA = 'cancelada',
-  PARCIALMENTE_PAGA = 'parcialmente_paga'
+  PARCIALMENTE_PAGA = 'parcialmente_paga',
 }
 
 export enum TipoFatura {
   UNICA = 'unica',
   RECORRENTE = 'recorrente',
   PARCELA = 'parcela',
-  ADICIONAL = 'adicional'
+  ADICIONAL = 'adicional',
 }
 
 export enum FormaPagamento {
@@ -27,7 +37,7 @@ export enum FormaPagamento {
   CARTAO_DEBITO = 'cartao_debito',
   BOLETO = 'boleto',
   TRANSFERENCIA = 'transferencia',
-  DINHEIRO = 'dinheiro'
+  DINHEIRO = 'dinheiro',
 }
 
 @Entity('faturas')
@@ -55,6 +65,13 @@ export class Fatura {
   cliente: Cliente;
 
   @Column('uuid')
+  empresa_id: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
+
+  @Column('uuid')
   usuarioResponsavelId: string;
 
   @ManyToOne(() => User)
@@ -64,21 +81,21 @@ export class Fatura {
   @Column({
     type: 'enum',
     enum: TipoFatura,
-    default: TipoFatura.UNICA
+    default: TipoFatura.UNICA,
   })
   tipo: TipoFatura;
 
   @Column({
     type: 'enum',
     enum: StatusFatura,
-    default: StatusFatura.PENDENTE
+    default: StatusFatura.PENDENTE,
   })
   status: StatusFatura;
 
   @Column({
     type: 'enum',
     enum: FormaPagamento,
-    nullable: true
+    nullable: true,
   })
   formaPagamentoPreferida: FormaPagamento;
 
@@ -130,10 +147,10 @@ export class Fatura {
   };
 
   // Removido cascade para garantir criação explícita dos itens (cálculo de valorTotal controlado)
-  @OneToMany(() => ItemFatura, item => item.fatura)
+  @OneToMany(() => ItemFatura, (item) => item.fatura)
   itens: ItemFatura[];
 
-  @OneToMany(() => Pagamento, pagamento => pagamento.fatura)
+  @OneToMany(() => Pagamento, (pagamento) => pagamento.fatura)
   pagamentos: Pagamento[];
 
   @Column({ type: 'boolean', default: true })
@@ -163,7 +180,12 @@ export class Fatura {
   }
 
   getValorComJurosMulta(): number {
-    return Number(this.valorTotal) + Number(this.valorJuros) + Number(this.valorMulta) - Number(this.valorDesconto);
+    return (
+      Number(this.valorTotal) +
+      Number(this.valorJuros) +
+      Number(this.valorMulta) -
+      Number(this.valorDesconto)
+    );
   }
 
   getDiasAtraso(): number {

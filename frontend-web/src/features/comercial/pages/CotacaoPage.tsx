@@ -19,6 +19,7 @@ import {
   Check,
   X,
   CheckCircle,
+  XCircle,
   Calendar,
   Activity,
   Settings,
@@ -27,7 +28,8 @@ import {
   AlertCircle,
   User,
   Mail,
-  Copy
+  Copy,
+  Send
 } from 'lucide-react';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 
@@ -36,6 +38,7 @@ interface DashboardCards {
   totalCotacoes: number;
   cotacoesPendentes: number;
   cotacoesAprovadas: number;
+  cotacoesReprovadas: number;
   cotacoesVencidas: number;
 }
 
@@ -67,6 +70,7 @@ function CotacaoPage() {
     totalCotacoes: 0,
     cotacoesPendentes: 0,
     cotacoesAprovadas: 0,
+    cotacoesReprovadas: 0,
     cotacoesVencidas: 0
   });
 
@@ -86,11 +90,22 @@ function CotacaoPage() {
     try {
       const filtros: FiltroCotacao = {
         busca: busca || undefined,
-        status: filtroStatus !== 'todos' ? [filtroStatus as any] : undefined
+        status: (filtroStatus !== 'todos' && filtroStatus !== 'vencida') ? [filtroStatus as any] : undefined
       };
       const dados = await cotacaoService.listar(filtros);
-      setCotacoes(dados);
-      calcularDashboard(dados);
+      let listaNormalizada = Array.isArray(dados.items) ? dados.items : [];
+
+      // Filtro especial para vencidas (client-side)
+      if (filtroStatus === 'vencida') {
+        const hoje = new Date();
+        listaNormalizada = listaNormalizada.filter(c => {
+          const vencimento = new Date(c.dataVencimento);
+          return vencimento < hoje && !['aprovada', 'convertida', 'cancelada', 'rejeitada'].includes(c.status);
+        });
+      }
+
+      setCotacoes(listaNormalizada);
+      calcularDashboard(listaNormalizada);
     } catch (error) {
       console.error('Erro ao carregar cotações:', error);
     } finally {
@@ -109,15 +124,20 @@ function CotacaoPage() {
       ['aprovada', 'convertida'].includes(c.status)
     ).length;
 
+    const reprovadas = cotacoes.filter(c =>
+      c.status === 'rejeitada'
+    ).length;
+
     const vencidas = cotacoes.filter(c => {
       const vencimento = new Date(c.dataVencimento);
-      return vencimento < hoje && !['aprovada', 'convertida', 'cancelada'].includes(c.status);
+      return vencimento < hoje && !['aprovada', 'convertida', 'cancelada', 'rejeitada'].includes(c.status);
     }).length;
 
     setDashboardCards({
       totalCotacoes: cotacoes.length,
       cotacoesPendentes: pendentes,
       cotacoesAprovadas: aprovadas,
+      cotacoesReprovadas: reprovadas,
       cotacoesVencidas: vencidas
     });
   };
@@ -169,6 +189,20 @@ function CotacaoPage() {
         fecharModalDetalhes();
       } catch (error) {
         console.error('Erro ao excluir cotação:', error);
+      }
+    }
+  };
+
+  const enviarParaAprovacao = async (cotacao: Cotacao) => {
+    if (window.confirm(`Deseja enviar a cotação #${cotacao.numero} para aprovação?\n\nApós enviar, o aprovador será notificado.`)) {
+      try {
+        await cotacaoService.enviarParaAprovacao(cotacao.id);
+        alert(`✅ Cotação #${cotacao.numero} enviada para aprovação com sucesso!\n\nO aprovador foi notificado.`);
+        carregarCotacoes(); // Recarregar lista
+      } catch (error: any) {
+        console.error('Erro ao enviar cotação para aprovação:', error);
+        const errorMessage = error.response?.data?.message || error.message || 'Erro ao enviar cotação para aprovação';
+        alert(`Erro ao enviar para aprovação:\n\n${errorMessage}`);
       }
     }
   };
@@ -303,6 +337,7 @@ function CotacaoPage() {
     const configs = {
       rascunho: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Rascunho' },
       enviada: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Enviada' },
+      pendente: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pendente' },
       em_analise: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Em Análise' },
       aprovada: { bg: 'bg-green-100', text: 'text-green-800', label: 'Aprovada' },
       rejeitada: { bg: 'bg-red-100', text: 'text-red-800', label: 'Rejeitada' },
@@ -335,8 +370,10 @@ function CotacaoPage() {
     );
   };
 
-  const isVencida = (dataVencimento: string, status: StatusCotacao) => {
+  const isVencida = (dataVencimento: string | undefined, status: StatusCotacao) => {
+    if (!dataVencimento) return false;
     const vencimento = new Date(dataVencimento);
+    if (isNaN(vencimento.getTime())) return false;
     const hoje = new Date();
     return vencimento < hoje && !['aprovada', 'convertida', 'cancelada'].includes(status);
   };
@@ -383,8 +420,12 @@ function CotacaoPage() {
           </div>
 
           {/* Dashboard Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
+            <div
+              onClick={() => setFiltroStatus('todos')}
+              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${filtroStatus === 'todos' ? 'border-[#159A9C] ring-2 ring-[#159A9C]/20' : 'border-[#DEEFE7]'
+                }`}
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Total de Cotações</p>
@@ -397,7 +438,11 @@ function CotacaoPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
+            <div
+              onClick={() => setFiltroStatus('em_analise')}
+              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${filtroStatus === 'em_analise' ? 'border-yellow-500 ring-2 ring-yellow-500/20' : 'border-[#DEEFE7]'
+                }`}
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Pendentes</p>
@@ -410,7 +455,11 @@ function CotacaoPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
+            <div
+              onClick={() => setFiltroStatus('aprovada')}
+              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${filtroStatus === 'aprovada' ? 'border-green-500 ring-2 ring-green-500/20' : 'border-[#DEEFE7]'
+                }`}
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Aprovadas</p>
@@ -423,15 +472,36 @@ function CotacaoPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
+            <div
+              onClick={() => setFiltroStatus('rejeitada')}
+              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${filtroStatus === 'rejeitada' ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DEEFE7]'
+                }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Reprovadas</p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.cotacoesReprovadas}</p>
+                  <p className="text-sm text-[#002333]/70 mt-3">❌ Rejeitadas</p>
+                </div>
+                <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center shadow-sm">
+                  <XCircle className="w-6 h-6 text-red-600" />
+                </div>
+              </div>
+            </div>
+
+            <div
+              onClick={() => setFiltroStatus('vencida')}
+              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${filtroStatus === 'vencida' ? 'border-orange-500 ring-2 ring-orange-500/20' : 'border-[#DEEFE7]'
+                }`}
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Vencidas</p>
                   <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.cotacoesVencidas}</p>
-                  <p className="text-sm text-[#002333]/70 mt-3">❌ Atrasadas</p>
+                  <p className="text-sm text-[#002333]/70 mt-3">⚠️ Atrasadas</p>
                 </div>
-                <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center shadow-sm">
-                  <AlertCircle className="w-6 h-6 text-red-600" />
+                <div className="h-12 w-12 rounded-2xl bg-orange-500/10 flex items-center justify-center shadow-sm">
+                  <AlertCircle className="w-6 h-6 text-orange-600" />
                 </div>
               </div>
             </div>
@@ -685,15 +755,31 @@ function CotacaoPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className={`text-sm ${isVencida(cotacao.dataVencimento, cotacao.status) ? 'text-red-600 font-medium' : 'text-gray-900'}`}>
-                            {new Date(cotacao.dataVencimento).toLocaleDateString('pt-BR')}
-                          </div>
-                          {isVencida(cotacao.dataVencimento, cotacao.status) && (
-                            <div className="text-xs text-red-500">Vencida</div>
+                          {cotacao.dataVencimento ? (
+                            <>
+                              <div className={`text-sm ${isVencida(cotacao.dataVencimento, cotacao.status) ? 'text-red-600 font-medium' : 'text-gray-900'}`}>
+                                {new Date(cotacao.dataVencimento).toLocaleDateString('pt-BR')}
+                              </div>
+                              {isVencida(cotacao.dataVencimento, cotacao.status) && (
+                                <div className="text-xs text-red-500">Vencida</div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="text-sm text-gray-400">Sem vencimento</div>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center justify-end gap-2">
+                            {/* Botão "Enviar para Aprovação" - Apenas para RASCUNHO */}
+                            {cotacao.status === StatusCotacao.RASCUNHO && (
+                              <button
+                                onClick={() => enviarParaAprovacao(cotacao)}
+                                className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
+                                title="Enviar para aprovação"
+                              >
+                                <Send className="w-4 h-4" />
+                              </button>
+                            )}
                             <button
                               onClick={() => abrirModalDetalhes(cotacao)}
                               className="text-blue-600 hover:text-blue-900 p-1 rounded"

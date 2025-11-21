@@ -389,7 +389,7 @@ export const DropdownContatos: React.FC<DropdownContatosProps> = ({
               </button>
               <button
                 type="submit"
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[#159A9C] text-white rounded-md hover:bg-[#0F7B7D] transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={salvandoContato}
               >
                 {salvandoContato ? (

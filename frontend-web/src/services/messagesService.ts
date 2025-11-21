@@ -114,7 +114,7 @@ export interface MarcarComoLidaDto {
  */
 class MessagesService {
   private getAuthHeaders() {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('authToken');
     return {
       headers: {
         Authorization: token ? `Bearer ${token}` : '',
@@ -215,7 +215,7 @@ class MessagesService {
       }
       formData.append('tipo', tipo);
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       const response = await axios.post<CriarMensagemResposta>(
         `${API_URL}/atendimento/mensagens/upload`,
         formData,

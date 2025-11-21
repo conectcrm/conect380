@@ -135,9 +135,7 @@ export class ResponseContatoDto {
     }
 
     // Campos calculados
-    this.nomeCompleto = contato.cargo
-      ? `${contato.nome} (${contato.cargo})`
-      : contato.nome;
+    this.nomeCompleto = contato.cargo ? `${contato.nome} (${contato.cargo})` : contato.nome;
 
     this.telefoneFormatado = this.formatarTelefone(contato.telefone);
   }

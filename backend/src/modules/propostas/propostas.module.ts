@@ -13,26 +13,9 @@ import { User } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Proposta, User, Cliente])
-  ],
-  providers: [
-    PdfService,
-    PropostasService,
-    PortalService,
-    EmailIntegradoService
-  ],
-  controllers: [
-    PdfController,
-    PropostasController,
-    PortalController,
-    EmailController
-  ],
-  exports: [
-    PdfService,
-    PropostasService,
-    PortalService,
-    EmailIntegradoService
-  ],
+  imports: [TypeOrmModule.forFeature([Proposta, User, Cliente])],
+  providers: [PdfService, PropostasService, PortalService, EmailIntegradoService],
+  controllers: [PdfController, PropostasController, PortalController, EmailController],
+  exports: [PdfService, PropostasService, PortalService, EmailIntegradoService],
 })
-export class PropostasModule { }
+export class PropostasModule {}

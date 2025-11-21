@@ -1,138 +1,106 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ResponsiveDashboardLayout } from '../components/layout/ResponsiveDashboardLayout';
+
+jest.mock('../hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: {
+      nome: 'Usuário Teste',
+      empresa: {
+        nome: 'Empresa Teste',
+      },
+    },
+    logout: jest.fn(),
+  }),
+}));
+
+jest.mock('../contexts/ThemeContext', () => ({
+  useTheme: () => ({
+    currentPalette: {
+      colors: {
+        primary: '#159A9C',
+        primaryHover: '#0F7B7D',
+        primaryLight: '#DEEFE7',
+        primaryDark: '#0A5F61',
+        secondary: '#B4BEC9',
+        secondaryLight: '#E5EAF0',
+        accent: '#159A9C',
+        accentLight: '#DEEFE7',
+        success: '#10b981',
+        warning: '#f59e0b',
+        error: '#ef4444',
+        neutral: '#B4BEC9',
+        neutralLight: '#f8fafc',
+        neutralDark: '#002333',
+        background: '#ffffff',
+        backgroundSecondary: '#DEEFE7',
+        text: '#002333',
+        textSecondary: '#B4BEC9',
+        border: '#B4BEC9',
+        borderLight: '#DEEFE7',
+      },
+    },
+  }),
+}));
 
 describe('ResponsiveDashboardLayout', () => {
   const defaultProps = {
     title: 'Dashboard',
+    subtitle: 'Visão geral do seu negócio',
     children: <div data-testid="content">Conteúdo do dashboard</div>,
   };
 
-  it('deve renderizar título corretamente', () => {
+  it('exibe branding principal e informações do usuário', () => {
     render(<ResponsiveDashboardLayout {...defaultProps} />);
-    
-    expect(screen.getAllByText('Dashboard')).toHaveLength(2); // Mobile e Desktop
+
+    expect(screen.getByText('Fênix CRM')).toBeInTheDocument();
+    expect(screen.getByTitle('Usuário Teste - Empresa Teste')).toBeInTheDocument();
   });
 
-  it('deve renderizar conteúdo filho', () => {
+  it('renderiza título e subtítulo na área principal', () => {
     render(<ResponsiveDashboardLayout {...defaultProps} />);
-    
-    expect(screen.getByTestId('content')).toBeInTheDocument();
-    expect(screen.getByText('Conteúdo do dashboard')).toBeInTheDocument();
-  });
 
-  it('deve renderizar subtítulo quando fornecido', () => {
-    const propsWithSubtitle = {
-      ...defaultProps,
-      subtitle: 'Visão geral do seu negócio',
-    };
-
-    render(<ResponsiveDashboardLayout {...propsWithSubtitle} />);
-    
-    expect(screen.getAllByText('Visão geral do seu negócio')).toHaveLength(2);
-  });
-
-  it('deve renderizar ações quando fornecidas', () => {
-    const actions = (
-      <button data-testid="action-button">Ação</button>
-    );
-    
-    const propsWithActions = {
-      ...defaultProps,
-      actions,
-    };
-
-    render(<ResponsiveDashboardLayout {...propsWithActions} />);
-    
-    expect(screen.getAllByTestId('action-button')).toHaveLength(2); // Mobile e Desktop
-  });
-
-  it('deve ter estrutura semântica correta', () => {
-    render(<ResponsiveDashboardLayout {...defaultProps} />);
-    
-    // Verifica se tem headers com role="banner"
-    const headers = screen.getAllByRole('banner');
-    expect(headers).toHaveLength(2); // Mobile e Desktop
-    expect(headers[0].tagName).toBe('HEADER');
-    expect(headers[1].tagName).toBe('HEADER');
-
-    // Verifica se tem main com role="main"
     const main = screen.getByRole('main');
-    expect(main).toBeInTheDocument();
-    expect(main.tagName).toBe('MAIN');
+    const heading = within(main).getByRole('heading', { name: defaultProps.title });
+
+    expect(heading).toBeInTheDocument();
+    if (defaultProps.subtitle) {
+      expect(within(main).getByText(defaultProps.subtitle)).toBeInTheDocument();
+    }
   });
 
-  it('deve ter títulos focáveis', () => {
-    render(<ResponsiveDashboardLayout {...defaultProps} />);
-    
-    const titles = screen.getAllByText('Dashboard');
-    titles.forEach(title => {
-      expect(title).toHaveAttribute('tabIndex', '0');
-    });
+  it('renderiza ações quando fornecidas', () => {
+    const actions = <button data-testid="action-button">Ação</button>;
+
+    render(<ResponsiveDashboardLayout {...defaultProps} actions={actions} />);
+
+    const actionsGroup = screen.getByLabelText('Ações do dashboard');
+    expect(within(actionsGroup).getByTestId('action-button')).toBeInTheDocument();
   });
 
-  it('deve ter IDs únicos para acessibilidade', () => {
+  it('posiciona o conteúdo filho dentro da região principal', () => {
     render(<ResponsiveDashboardLayout {...defaultProps} />);
-    
+
     const main = screen.getByRole('main');
-    expect(main).toHaveAttribute('id');
-    expect(main).toHaveAttribute('aria-labelledby');
+    expect(within(main).getByTestId('content')).toBeInTheDocument();
   });
 
-  it('deve ter grupos de ações com labels apropriados', () => {
-    const actions = (
-      <button>Ação 1</button>
-    );
-    
-    const propsWithActions = {
-      ...defaultProps,
-      actions,
-    };
-
-    render(<ResponsiveDashboardLayout {...propsWithActions} />);
-    
-    const actionGroups = screen.getAllByRole('group', { name: 'Ações do dashboard' });
-    expect(actionGroups).toHaveLength(2); // Mobile e Desktop
-  });
-
-  it('deve ter classes CSS corretas para responsividade', () => {
+  it('configura atributos de acessibilidade corretamente', () => {
     render(<ResponsiveDashboardLayout {...defaultProps} />);
-    
-    const headers = screen.getAllByRole('banner');
-    
-    // Header mobile deve ter classe lg:hidden
-    expect(headers[0]).toHaveClass('lg:hidden');
-    
-    // Header desktop deve ter classe hidden lg:block
-    expect(headers[1]).toHaveClass('hidden', 'lg:block');
-  });
 
-  it('deve ter padding responsivo no conteúdo', () => {
-    render(<ResponsiveDashboardLayout {...defaultProps} />);
-    
     const main = screen.getByRole('main');
-    expect(main).toHaveClass(
-      'px-4', 'sm:px-6', 'lg:px-8',
-      'py-4', 'sm:py-6', 'lg:py-8'
-    );
+    const labelledBy = main.getAttribute('aria-labelledby');
+    expect(labelledBy).toBeTruthy();
+
+    const referencedHeading = labelledBy ? document.getElementById(labelledBy) : null;
+    expect(referencedHeading?.textContent).toBe(defaultProps.title);
   });
 
-  it('deve aplicar classes de posicionamento corretas', () => {
+  it('mantém elementos interativos principais visíveis', () => {
     render(<ResponsiveDashboardLayout {...defaultProps} />);
-    
-    const mobileHeader = screen.getAllByRole('banner')[0];
-    expect(mobileHeader).toHaveClass('sticky', 'top-0', 'z-10');
-  });
 
-  it('deve ter cores e estilos de design consistentes', () => {
-    render(<ResponsiveDashboardLayout {...defaultProps} />);
-    
-    const headers = screen.getAllByRole('banner');
-    headers.forEach(header => {
-      expect(header.querySelector('div')).toHaveClass('bg-white');
-    });
-
-    const containerDiv = screen.getByRole('main').parentElement;
-    expect(containerDiv).toHaveClass('min-h-screen', 'bg-gray-50');
+    expect(screen.getByPlaceholderText('Buscar clientes, propostas, contratos...')).toBeInTheDocument();
+    expect(screen.getByText('Online')).toBeInTheDocument();
+    expect(screen.getByTitle('Notificações')).toBeInTheDocument();
   });
 });

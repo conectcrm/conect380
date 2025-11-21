@@ -25,6 +25,113 @@ import { contratoService } from '../../../services/contratoService';
 import { faturamentoAPI } from '../../../services/faturamentoAPI';
 import { api } from '../../../services/api';
 
+type ClienteContatoData = {
+  nome: string;
+  email: string;
+  telefone: string;
+};
+
+const CLIENTE_DETAILS_TTL = 5 * 60 * 1000; // 5 minutos
+const CLIENTE_DETAILS_COOLDOWN_TTL = 30 * 1000; // Evita loop de erros
+const clienteDetailsCache = new Map<string, { data: ClienteContatoData | null; expiresAt: number }>();
+const clienteDetailsPending = new Map<string, Promise<ClienteContatoData | null>>();
+
+const normalizarNomeCliente = (nome: string) => nome.trim().toLowerCase();
+
+const armazenarNoCache = (nome: string, data: ClienteContatoData | null, ttl: number) => {
+  const normalizado = normalizarNomeCliente(nome);
+  clienteDetailsCache.set(normalizado, {
+    data,
+    expiresAt: Date.now() + ttl
+  });
+};
+
+const obterClienteNoCache = (nome: string): ClienteContatoData | null | undefined => {
+  const normalizado = normalizarNomeCliente(nome);
+  const cache = clienteDetailsCache.get(normalizado);
+
+  if (!cache) {
+    return undefined;
+  }
+
+  if (cache.expiresAt < Date.now()) {
+    clienteDetailsCache.delete(normalizado);
+    return undefined;
+  }
+
+  return cache.data;
+};
+
+const buscarClienteComCache = async (nome: string): Promise<ClienteContatoData | null> => {
+  if (!nome) {
+    return null;
+  }
+
+  const normalizado = normalizarNomeCliente(nome);
+
+  const cache = obterClienteNoCache(normalizado);
+  if (cache !== undefined) {
+    return cache;
+  }
+
+  const promessaExistente = clienteDetailsPending.get(normalizado);
+  if (promessaExistente) {
+    return promessaExistente;
+  }
+
+  const promessa = (async () => {
+    try {
+      let clientes = await clientesService.searchClientes(nome);
+
+      if ((!clientes || clientes.length === 0) && nome.includes(' ')) {
+        const partes = nome
+          .split(' ')
+          .map(parte => parte.trim())
+          .filter(parte => parte.length >= 3);
+
+        for (const parte of partes) {
+          clientes = await clientesService.searchClientes(parte);
+          if (clientes && clientes.length > 0) {
+            break;
+          }
+        }
+      }
+
+      if (clientes && clientes.length > 0) {
+        const clienteExato = clientes.find(c =>
+          c.nome?.toLowerCase().trim() === nome.toLowerCase().trim()
+        );
+
+        const clienteEncontrado = clienteExato || clientes[0];
+
+        const data: ClienteContatoData = {
+          nome: clienteEncontrado.nome || nome,
+          email: clienteEncontrado.email || '',
+          telefone: clienteEncontrado.telefone || ''
+        };
+
+        armazenarNoCache(nome, data, CLIENTE_DETAILS_TTL);
+        return data;
+      }
+
+      armazenarNoCache(nome, null, CLIENTE_DETAILS_COOLDOWN_TTL);
+      return null;
+    } catch (error) {
+      const status = (error as any)?.response?.status;
+      if (status === 429) {
+        console.warn(`⚠️ Limite de requisições atingido ao buscar cliente "${nome}". Aplicando cooldown curto.`);
+        armazenarNoCache(nome, null, CLIENTE_DETAILS_COOLDOWN_TTL);
+      }
+      return null;
+    } finally {
+      clienteDetailsPending.delete(normalizado);
+    }
+  })();
+
+  clienteDetailsPending.set(normalizado, promessa);
+  return promessa;
+};
+
 // Tipo união para aceitar tanto PropostaCompleta quanto o formato da UI
 type PropostaUI = {
   id: string;
@@ -67,19 +174,40 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const [criandoFatura, setCriandoFatura] = useState(false);
   const [avancandoFluxo, setAvancandoFluxo] = useState(false);
 
-  // Carregar dados do cliente quando o componente for montado
-  React.useEffect(() => {
-    const loadClienteData = async () => {
-      const data = await getClienteData();
-      setClienteData(data);
-    };
-    loadClienteData();
-  }, [proposta]);
-
   // Função para detectar se é PropostaCompleta ou PropostaUI
   const isPropostaCompleta = (prop: PropostaCompleta | PropostaUI): prop is PropostaCompleta => {
     return 'cliente' in prop && typeof prop.cliente === 'object';
   };
+
+  // Carregar dados do cliente quando o componente for montado
+  const propostaIdentificador = React.useMemo(() => {
+    if (!proposta) {
+      return 'proposta_desconhecida';
+    }
+
+    if (isPropostaCompleta(proposta)) {
+      return proposta.id || proposta.numero || proposta.cliente?.id || proposta.cliente?.nome || 'proposta_completa';
+    }
+
+    return proposta.id || proposta.numero || proposta.cliente;
+  }, [proposta]);
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const loadClienteData = async () => {
+      const data = await getClienteData();
+      if (isMounted) {
+        setClienteData(data);
+      }
+    };
+
+    loadClienteData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [propostaIdentificador]);
 
   // Função para extrair dados do cliente independente do formato
   const getClienteData = async () => {
@@ -94,76 +222,15 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         email.includes('@cliente.temp') ||
         email.includes('@email.com');
 
-      if (isEmailFicticio && nome && nome !== 'Cliente') {
-        console.log(`⚠️ Email fictício detectado: ${email}`);
-        console.log(`🔍 Buscando dados REAIS do cliente: "${nome}"`);
+      if (nome && nome !== 'Cliente' && (isEmailFicticio || !telefone)) {
+        const dadosReais = await buscarClienteComCache(nome);
 
-        try {
-          // Buscar cliente real no backend
-          let clientesEncontrados = [];
-
-          // Método 1: Busca por nome
-          try {
-            const response = await clientesService.getClientes({
-              search: nome,
-              limit: 100
-            });
-            if (response?.data) {
-              clientesEncontrados = response.data.filter(c =>
-                c.nome?.toLowerCase().includes(nome.toLowerCase()) ||
-                nome.toLowerCase().includes(c.nome?.toLowerCase())
-              );
-            }
-          } catch (error) {
-            console.log('Erro na busca 1:', error);
-          }
-
-          // Método 2: Se não encontrou, buscar por partes do nome
-          if (clientesEncontrados.length === 0) {
-            try {
-              const partes = nome.split(' ');
-              for (const parte of partes) {
-                if (parte.length > 3) {
-                  const response = await clientesService.getClientes({
-                    search: parte,
-                    limit: 100
-                  });
-                  if (response?.data) {
-                    const found = response.data.find(c =>
-                      c.nome?.toLowerCase().includes(nome.toLowerCase()) ||
-                      nome.toLowerCase().includes(c.nome?.toLowerCase())
-                    );
-                    if (found) {
-                      clientesEncontrados = [found];
-                      break;
-                    }
-                  }
-                }
-              }
-            } catch (error) {
-              console.log('Erro na busca 2:', error);
-            }
-          }
-
-          if (clientesEncontrados.length > 0) {
-            const clienteReal = clientesEncontrados[0];
-            console.log(`✅ DADOS REAIS ENCONTRADOS:`, {
-              id: clienteReal.id,
-              nome: clienteReal.nome,
-              email: clienteReal.email,
-              telefone: clienteReal.telefone
-            });
-
-            return {
-              nome: clienteReal.nome,
-              email: clienteReal.email || '',
-              telefone: clienteReal.telefone || ''
-            };
-          } else {
-            console.log(`⚠️ Cliente real não encontrado para: "${nome}"`);
-          }
-        } catch (error) {
-          console.error('❌ Erro ao buscar dados reais:', error);
+        if (dadosReais) {
+          return {
+            nome: dadosReais.nome,
+            email: dadosReais.email || email,
+            telefone: dadosReais.telefone || telefone
+          };
         }
       }
 
@@ -186,108 +253,19 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         telefone = proposta.cliente_contato;
       }
 
-      // 2️⃣ TENTATIVA: Buscar cliente real por nome no backend (SEMPRE para garantir telefone)
+      // 2️⃣ TENTATIVA: Buscar cliente real por nome no backend (com cache para evitar 429)
       if (nome && nome !== 'Cliente') {
-        try {
-          console.log(`🔍 Buscando cliente real por nome: "${nome}" (para garantir email e telefone)`);
+        const dadosReais = await buscarClienteComCache(nome);
 
-          // Tentar múltiplas formas de busca
-          let clientesEncontrados = [];
-
-          // Busca 1: Nome completo
-          try {
-            clientesEncontrados = await clientesService.searchClientes(nome);
-            console.log(`   📝 Busca por nome completo: ${clientesEncontrados?.length || 0} resultados`);
-          } catch (error) {
-            console.log(`   ❌ Erro na busca por nome completo:`, error);
-          }
-
-          // Busca 2: Apenas primeiro nome se busca completa falhou
-          if (!clientesEncontrados || clientesEncontrados.length === 0) {
-            const primeiroNome = nome.split(' ')[0];
-            try {
-              clientesEncontrados = await clientesService.searchClientes(primeiroNome);
-              console.log(`   📝 Busca por primeiro nome "${primeiroNome}": ${clientesEncontrados?.length || 0} resultados`);
-            } catch (error) {
-              console.log(`   ❌ Erro na busca por primeiro nome:`, error);
-            }
-          }
-
-          // Busca 3: Listar todos e filtrar localmente
-          if (!clientesEncontrados || clientesEncontrados.length === 0) {
-            try {
-              const todosClientes = await clientesService.getClientes({ limit: 1000 });
-              if (todosClientes?.data) {
-                clientesEncontrados = todosClientes.data.filter(c =>
-                  c.nome?.toLowerCase().includes(nome.toLowerCase()) ||
-                  nome.toLowerCase().includes(c.nome?.toLowerCase())
-                );
-                console.log(`   📝 Busca local em ${todosClientes.data.length} clientes: ${clientesEncontrados.length} resultados`);
-              }
-            } catch (error) {
-              console.log(`   ❌ Erro na busca local:`, error);
-            }
-          }
-
-          if (clientesEncontrados && clientesEncontrados.length > 0) {
-            // Buscar correspondência exata ou mais próxima
-            const clienteExato = clientesEncontrados.find(c =>
-              c.nome?.toLowerCase().trim() === nome.toLowerCase().trim()
-            );
-
-            const clienteReal = clienteExato || clientesEncontrados[0];
-
-            console.log(`✅ Cliente real encontrado:`, {
-              id: clienteReal.id,
-              nome: clienteReal.nome,
-              email: clienteReal.email,
-              telefone: clienteReal.telefone,
-              metodo: clienteExato ? 'correspondência exata' : 'mais próximo'
-            });
-
-            return {
-              nome: clienteReal.nome,
-              email: clienteReal.email || email, // Usar email real ou da proposta como fallback
-              telefone: clienteReal.telefone || telefone // Usar telefone real ou da proposta como fallback
-            };
-          } else {
-            console.log(`⚠️ Nenhum cliente encontrado com nome: "${nome}"`);
-          }
-        } catch (error) {
-          console.error('❌ Erro ao buscar cliente no backend:', error);
+        if (dadosReais) {
+          return {
+            nome: dadosReais.nome,
+            email: dadosReais.email || email,
+            telefone: dadosReais.telefone || telefone
+          };
         }
       }
 
-      // 3️⃣ RETORNO: Usar dados extraídos ou buscar no backend se necessário
-      console.log('🔍 [getClienteData] Dados extraídos inicialmente:', { nome, email, telefone });
-
-      // Se não tem telefone, mas tem nome, tentar buscar no backend como fallback
-      if (!telefone && nome && nome !== 'Cliente') {
-        console.log('⚠️ Telefone vazio - tentando buscar no backend como fallback...');
-        try {
-          const response = await clientesService.getClientes({
-            search: nome,
-            limit: 100
-          });
-          if (response?.data) {
-            const clienteEncontrado = response.data.find(c =>
-              c.nome?.toLowerCase().includes(nome.toLowerCase()) ||
-              nome.toLowerCase().includes(c.nome?.toLowerCase())
-            );
-            if (clienteEncontrado && clienteEncontrado.telefone) {
-              console.log('✅ Telefone encontrado no backend:', clienteEncontrado.telefone);
-              telefone = clienteEncontrado.telefone;
-              if (!email && clienteEncontrado.email) {
-                email = clienteEncontrado.email;
-              }
-            }
-          }
-        } catch (error) {
-          console.log('❌ Erro ao buscar telefone no backend:', error);
-        }
-      }
-
-      console.log('🔍 [getClienteData] Dados finais:', { nome, email, telefone });
       return { nome, email, telefone };
     }
   };
@@ -345,8 +323,6 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       const propostaData = getPropostaData();
       const clienteData = await getClienteData();
 
-      console.log('🚀 Gerando contrato para proposta:', propostaData.numero);
-
       // Preparar dados no formato esperado pelo backend
       const contratoData = {
         propostaId: parseInt(propostaData.numero) || 1, // Converter para number
@@ -366,8 +342,6 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           valorParcela: propostaData.total
         }
       };
-
-      console.log('📄 Dados do contrato preparados:', contratoData);
 
       // Usar o serviço de contratos
       const contrato = await contratoService.criarContrato(contratoData);
@@ -411,8 +385,6 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     try {
       const propostaData = getPropostaData();
       const clienteData = await getClienteData();
-
-      console.log('💰 Criando fatura para proposta:', propostaData.numero);
 
       const faturaData = {
         contratoId: propostaData.numero, // Temporário até ter contrato real
@@ -468,8 +440,6 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     try {
       const propostaData = getPropostaData();
       const status = propostaData.status;
-
-      console.log('⚡ Avançando fluxo da proposta:', propostaData.numero, 'Status atual:', status);
 
       let proximaAcao = '';
       let novoStatus = '';
@@ -536,7 +506,6 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const handleSendEmail = async () => {
     const clienteData = await getClienteData();
 
-    console.log('🔍 Dados do cliente extraídos:', clienteData);
 
     if (!clienteData.email) {
       toast.error('Cliente não possui email cadastrado');
@@ -562,7 +531,6 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     let emailFinal = clienteData.email;
 
     if (isEmailFicticio) {
-      console.warn('⚠️ Email fictício detectado:', clienteData.email);
 
       // Solicitar email real do usuário
       const emailReal = prompt(`O email cadastrado "${clienteData.email}" é fictício.\n\nPor favor, digite o email REAL do cliente "${clienteData.nome}":\n\n(Ex: dhonlenofreitas@hotmail.com)`);
@@ -577,12 +545,9 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         return;
       }
 
-      console.log('✅ Email real informado pelo usuário:', emailReal);
       emailFinal = emailReal; // Usar o email real
       toast.success(`Email corrigido de "${clienteData.email}" para "${emailReal}"`);
     }
-
-    console.log('📧 Enviando email para:', emailFinal);
 
     setSendingEmail(true);
     try {
@@ -618,11 +583,6 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
       if (resultado.success) {
         toast.success(`✅ Proposta enviada por email para ${clienteData.nome}`);
-        console.log('📧 Token de acesso gerado:', token);
-
-        // 🔄 NOTIFICAR PÁGINA PAI PARA ATUALIZAÇÃO EM TEMPO REAL (OTIMIZADO)
-        console.log('🔄 Disparando evento de atualização de proposta...');
-
         // Criar evento personalizado para notificar a PropostasPage
         const eventoAtualizacao = new CustomEvent('propostaAtualizada', {
           detail: {
@@ -690,7 +650,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       const uint8Array = new Uint8Array(arrayBuffer);
       setPropostaPdfBuffer(uint8Array);
     } catch (error) {
-      console.warn('⚠️ Erro ao gerar PDF, enviando sem anexo:', error);
+      console.error('Erro ao gerar PDF, enviando sem anexo:', error);
       setPropostaPdfBuffer(null);
     }
 
@@ -754,8 +714,6 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       navigator.clipboard.writeText(shareUrl);
       toast.success('🔗 Link da proposta copiado');
     }
-
-    console.log('🔗 Token de acesso gerado para compartilhamento:', token);
   };
 
   const buttonClass = showLabels

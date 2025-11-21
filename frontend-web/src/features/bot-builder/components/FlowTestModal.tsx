@@ -554,7 +554,7 @@ export const FlowTestModal: React.FC<FlowTestModalProps> = ({ open, estrutura, o
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+      <div className="w-[calc(100%-2rem)] sm:w-[700px] md:w-[800px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
           <div>
@@ -617,10 +617,10 @@ export const FlowTestModal: React.FC<FlowTestModalProps> = ({ open, estrutura, o
                 >
                   <div
                     className={`max-w-xl rounded-2xl px-4 py-3 text-sm shadow-sm whitespace-pre-wrap ${entry.from === 'user'
-                        ? 'bg-blue-600 text-white'
-                        : entry.from === 'system'
-                          ? 'bg-amber-100 text-amber-900'
-                          : 'bg-white text-gray-800'
+                      ? 'bg-blue-600 text-white'
+                      : entry.from === 'system'
+                        ? 'bg-amber-100 text-amber-900'
+                        : 'bg-white text-gray-800'
                       }`}
                   >
                     {entry.stepId && entry.from !== 'user' && (

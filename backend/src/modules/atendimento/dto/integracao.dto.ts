@@ -1,7 +1,16 @@
 import { IsString, IsOptional, IsEnum, IsBoolean, IsObject } from 'class-validator';
 
 export class ConfigurarIntegracaoDto {
-  @IsEnum(['whatsapp_business', 'telegram', 'twilio', 'sendgrid', 'ses', 'smtp', 'openai', 'anthropic'])
+  @IsEnum([
+    'whatsapp_business',
+    'telegram',
+    'twilio',
+    'sendgrid',
+    'ses',
+    'smtp',
+    'openai',
+    'anthropic',
+  ])
   provider: string;
 
   @IsObject()

@@ -14,7 +14,7 @@ export class AtendenteService {
 
     @InjectRepository(User)
     private userRepo: Repository<User>,
-  ) { }
+  ) {}
 
   /**
    * Gera senha temporária aleatória
@@ -59,7 +59,7 @@ export class AtendenteService {
         telefone: dto.telefone || null,
         empresa_id: empresaId,
         role: UserRole.USER,
-        ativo: false,  // ⚡ Força troca de senha no primeiro login
+        ativo: false, // ⚡ Força troca de senha no primeiro login
       });
 
       await this.userRepo.save(user);

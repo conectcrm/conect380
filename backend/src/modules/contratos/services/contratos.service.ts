@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Contrato, StatusContrato } from '../entities/contrato.entity';
 import { AssinaturaContrato, StatusAssinatura } from '../entities/assinatura-contrato.entity';
+import { Proposta } from '../../propostas/proposta.entity';
 import { CreateContratoDto, UpdateContratoDto } from '../dto/contrato.dto';
 import { PdfContratoService } from './pdf-contrato.service';
 import { AssinaturaDigitalService } from './assinatura-digital.service';
@@ -16,17 +17,43 @@ export class ContratosService {
     private contratoRepository: Repository<Contrato>,
     @InjectRepository(AssinaturaContrato)
     private assinaturaRepository: Repository<AssinaturaContrato>,
+    @InjectRepository(Proposta)
+    private propostaRepository: Repository<Proposta>,
     private pdfContratoService: PdfContratoService,
     private assinaturaDigitalService: AssinaturaDigitalService,
   ) { }
 
-  async criarContrato(createContratoDto: CreateContratoDto): Promise<Contrato> {
+  async criarContrato(createContratoDto: CreateContratoDto, empresaId: string): Promise<Contrato> {
     try {
+      let proposta: Proposta | null = null;
+
+      if (createContratoDto.propostaId) {
+        // 🔒 VALIDAÇÃO MULTI-TENANCY: Verificar se a proposta pertence à empresa
+        proposta = await this.propostaRepository.findOne({
+          where: { id: createContratoDto.propostaId },
+        });
+
+        if (!proposta) {
+          throw new NotFoundException('Proposta não encontrada');
+        }
+
+        if (proposta.empresa_id !== empresaId) {
+          this.logger.warn(
+            `Tentativa de criar contrato com proposta de outra empresa. ` +
+            `Empresa do token: ${empresaId}, Empresa da proposta: ${proposta.empresa_id}`
+          );
+          throw new ForbiddenException(
+            'Você não tem permissão para criar contrato com esta proposta'
+          );
+        }
+      }
+
       // Gerar número único do contrato
       const numero = await this.gerarNumeroContrato();
 
       const contrato = this.contratoRepository.create({
         ...createContratoDto,
+        empresa_id: empresaId,
         numero,
         status: StatusContrato.AGUARDANDO_ASSINATURA,
       });
@@ -44,28 +71,37 @@ export class ContratosService {
 
       const contratoAtualizado = await this.contratoRepository.save(contratoSalvo);
 
-      this.logger.log(`Contrato criado: ${contratoAtualizado.numero}`);
+      this.logger.log(
+        `Contrato criado: ${contratoAtualizado.numero}` +
+        (proposta ? ` (vinculado à proposta ${proposta.id})` : ' (sem proposta vinculada)')
+      );
 
       return contratoAtualizado;
     } catch (error) {
       this.logger.error(`Erro ao criar contrato: ${error.message}`);
+
+      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+        throw error;
+      }
+
       throw new BadRequestException('Erro ao criar contrato');
     }
   }
 
   async buscarContratos(
-    empresaId: number,
+    empresaId: string,
     filtros?: {
       status?: StatusContrato;
       clienteId?: number;
       dataInicio?: Date;
       dataFim?: Date;
-    }
+    },
   ): Promise<Contrato[]> {
-    // Consulta simplificada para teste - sem joins por enquanto
+    // 🔒 MULTI-TENANCY: Filtrar por empresa_id
     const query = this.contratoRepository
       .createQueryBuilder('contrato')
-      .where('contrato.ativo = :ativo', { ativo: true });
+      .where('contrato.ativo = :ativo', { ativo: true })
+      .andWhere('contrato.empresa_id = :empresaId', { empresaId });
 
     if (filtros?.status) {
       query.andWhere('contrato.status = :status', { status: filtros.status });
@@ -83,14 +119,13 @@ export class ContratosService {
       query.andWhere('contrato.dataFim <= :dataFim', { dataFim: filtros.dataFim });
     }
 
-    return query
-      .orderBy('contrato.createdAt', 'DESC')
-      .getMany();
+    return query.orderBy('contrato.createdAt', 'DESC').getMany();
   }
 
-  async buscarContratoPorId(id: number): Promise<Contrato> {
+  async buscarContratoPorId(id: number, empresaId: string): Promise<Contrato> {
+    // 🔒 MULTI-TENANCY: Filtrar por empresa_id
     const contrato = await this.contratoRepository.findOne({
-      where: { id, ativo: true },
+      where: { id, empresa_id: empresaId, ativo: true },
       relations: ['proposta', 'usuarioResponsavel', 'assinaturas', 'assinaturas.usuario'],
     });
 
@@ -101,9 +136,10 @@ export class ContratosService {
     return contrato;
   }
 
-  async buscarContratoPorNumero(numero: string): Promise<Contrato> {
+  async buscarContratoPorNumero(numero: string, empresaId: string): Promise<Contrato> {
+    // 🔒 MULTI-TENANCY: Filtrar por empresa_id
     const contrato = await this.contratoRepository.findOne({
-      where: { numero, ativo: true },
+      where: { numero, empresa_id: empresaId, ativo: true },
       relations: ['proposta', 'usuarioResponsavel', 'assinaturas', 'assinaturas.usuario'],
     });
 
@@ -114,8 +150,9 @@ export class ContratosService {
     return contrato;
   }
 
-  async atualizarContrato(id: number, updateContratoDto: UpdateContratoDto): Promise<Contrato> {
-    const contrato = await this.buscarContratoPorId(id);
+  async atualizarContrato(id: number, updateContratoDto: UpdateContratoDto, empresaId: string): Promise<Contrato> {
+    // 🔒 MULTI-TENANCY: Validar empresa_id
+    const contrato = await this.buscarContratoPorId(id, empresaId);
 
     if (contrato.status === StatusContrato.ASSINADO) {
       throw new BadRequestException('Não é possível alterar contrato já assinado');
@@ -124,14 +161,21 @@ export class ContratosService {
     Object.assign(contrato, updateContratoDto);
 
     // Se alterou dados importantes, regenerar PDF
-    const camposImportantes = ['objeto', 'valorTotal', 'dataInicio', 'dataFim', 'condicoesPagamento'];
-    const houveAlteracaoImportante = camposImportantes.some(campo =>
-      updateContratoDto.hasOwnProperty(campo)
+    const camposImportantes = [
+      'objeto',
+      'valorTotal',
+      'dataInicio',
+      'dataFim',
+      'condicoesPagamento',
+    ];
+    const houveAlteracaoImportante = camposImportantes.some((campo) =>
+      updateContratoDto.hasOwnProperty(campo),
     );
 
     if (houveAlteracaoImportante) {
       const novoCaminhoArquivoPDF = await this.pdfContratoService.gerarPDFContrato(contrato);
-      const novoHashDocumento = await this.pdfContratoService.calcularHashDocumento(novoCaminhoArquivoPDF);
+      const novoHashDocumento =
+        await this.pdfContratoService.calcularHashDocumento(novoCaminhoArquivoPDF);
 
       contrato.caminhoArquivoPDF = novoCaminhoArquivoPDF;
       contrato.hashDocumento = novoHashDocumento;
@@ -146,15 +190,16 @@ export class ContratosService {
     return contratoAtualizado;
   }
 
-  async marcarComoAssinado(id: number): Promise<Contrato> {
-    const contrato = await this.buscarContratoPorId(id);
+  async marcarComoAssinado(id: number, empresaId: string): Promise<Contrato> {
+    // 🔒 MULTI-TENANCY: Validar empresa_id
+    const contrato = await this.buscarContratoPorId(id, empresaId);
 
     if (contrato.status === StatusContrato.ASSINADO) {
       throw new BadRequestException('Contrato já está assinado');
     }
 
     // Verificar se todas as assinaturas obrigatórias foram realizadas
-    const assinaturasAssinadas = contrato.assinaturas.filter(a => a.isAssinado());
+    const assinaturasAssinadas = contrato.assinaturas.filter((a) => a.isAssinado());
 
     if (assinaturasAssinadas.length === 0) {
       throw new BadRequestException('Nenhuma assinatura válida encontrada');
@@ -169,8 +214,9 @@ export class ContratosService {
     return contratoAtualizado;
   }
 
-  async cancelarContrato(id: number, motivo?: string): Promise<Contrato> {
-    const contrato = await this.buscarContratoPorId(id);
+  async cancelarContrato(id: number, empresaId: string, motivo?: string): Promise<Contrato> {
+    // 🔒 MULTI-TENANCY: Validar empresa_id
+    const contrato = await this.buscarContratoPorId(id, empresaId);
 
     if (contrato.status === StatusContrato.ASSINADO) {
       throw new BadRequestException('Não é possível cancelar contrato já assinado');

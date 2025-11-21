@@ -11,8 +11,12 @@ import {
   HttpStatus,
   ParseIntPipe,
   BadRequestException,
+  HttpCode,
+  HttpException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { EmpresaId } from '../../common/decorators/empresa.decorator';
 import { FaturamentoService } from './services/faturamento.service';
 import { PagamentoService } from './services/pagamento.service';
 import { CobrancaService } from './services/cobranca.service';
@@ -24,7 +28,7 @@ import { StatusPagamento } from './entities/pagamento.entity';
 import { StatusPlanoCobranca } from './entities/plano-cobranca.entity';
 
 @Controller('faturamento')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class FaturamentoController {
   constructor(
     private readonly faturamentoService: FaturamentoService,
@@ -35,9 +39,12 @@ export class FaturamentoController {
   // ==================== FATURAS ====================
 
   @Post('faturas')
-  async criarFatura(@Body() createFaturaDto: CreateFaturaDto) {
+  async criarFatura(
+    @Body() createFaturaDto: CreateFaturaDto,
+    @EmpresaId() empresaId: string,
+  ) {
     try {
-      const fatura = await this.faturamentoService.criarFatura(createFaturaDto);
+      const fatura = await this.faturamentoService.criarFatura(createFaturaDto, empresaId);
       return {
         status: HttpStatus.CREATED,
         message: 'Fatura criada com sucesso',
@@ -49,9 +56,12 @@ export class FaturamentoController {
   }
 
   @Post('faturas/automatica')
-  async gerarFaturaAutomatica(@Body() gerarFaturaDto: GerarFaturaAutomaticaDto) {
+  async gerarFaturaAutomatica(
+    @Body() gerarFaturaDto: GerarFaturaAutomaticaDto,
+    @EmpresaId() empresaId: string,
+  ) {
     try {
-      const fatura = await this.faturamentoService.gerarFaturaAutomatica(gerarFaturaDto);
+      const fatura = await this.faturamentoService.gerarFaturaAutomatica(gerarFaturaDto, empresaId);
       return {
         status: HttpStatus.CREATED,
         message: 'Fatura automática gerada com sucesso',
@@ -64,6 +74,7 @@ export class FaturamentoController {
 
   @Get('faturas')
   async buscarFaturas(
+    @EmpresaId() empresaId: string,
     @Query('status') status?: StatusFatura,
     @Query('clienteId') clienteId?: number,
     @Query('contratoId') contratoId?: number,
@@ -84,8 +95,9 @@ export class FaturamentoController {
       q,
     };
 
-    // Se page e pageSize chegaram, usar paginação; mantém compatibilidade sem quebrar callers antigos
+    // Mantém compatibilidade com implementações que esperam paginação flat
     const paginated = await this.faturamentoService.buscarFaturasPaginadas(
+      empresaId,
       Number(page) || 1,
       Number(pageSize) || 10,
       sortBy,
@@ -100,12 +112,13 @@ export class FaturamentoController {
       page: Number(page) || 1,
       pageSize: Number(pageSize) || 10,
       aggregates: paginated.resumo,
+      filtros,
     };
   }
 
-  // Versão que embala paginação e agregados dentro de data para garantir compatibilidade com wrappers externos
   @Get('faturas/paginadas')
   async buscarFaturasPaginadas(
+    @EmpresaId() empresaId: string,
     @Query('status') status?: StatusFatura,
     @Query('clienteId') clienteId?: number,
     @Query('contratoId') contratoId?: number,
@@ -127,6 +140,7 @@ export class FaturamentoController {
     };
 
     const paginated = await this.faturamentoService.buscarFaturasPaginadas(
+      empresaId,
       Number(page) || 1,
       Number(pageSize) || 10,
       sortBy,
@@ -142,13 +156,17 @@ export class FaturamentoController {
         page: Number(page) || 1,
         pageSize: Number(pageSize) || 10,
         aggregates: paginated.resumo,
+        filtros,
       },
     };
   }
 
   @Get('faturas/:id')
-  async buscarFaturaPorId(@Param('id', ParseIntPipe) id: number) {
-    const fatura = await this.faturamentoService.buscarFaturaPorId(id);
+  async buscarFaturaPorId(
+    @Param('id', ParseIntPipe) id: number,
+    @EmpresaId() empresaId: string,
+  ) {
+    const fatura = await this.faturamentoService.buscarFaturaPorId(id, empresaId);
 
     return {
       status: HttpStatus.OK,
@@ -158,8 +176,11 @@ export class FaturamentoController {
   }
 
   @Get('faturas/numero/:numero')
-  async buscarFaturaPorNumero(@Param('numero') numero: string) {
-    const fatura = await this.faturamentoService.buscarFaturaPorNumero(numero);
+  async buscarFaturaPorNumero(
+    @Param('numero') numero: string,
+    @EmpresaId() empresaId: string,
+  ) {
+    const fatura = await this.faturamentoService.buscarFaturaPorNumero(numero, empresaId);
 
     return {
       status: HttpStatus.OK,
@@ -172,8 +193,9 @@ export class FaturamentoController {
   async atualizarFatura(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateFaturaDto: UpdateFaturaDto,
+    @EmpresaId() empresaId: string,
   ) {
-    const fatura = await this.faturamentoService.atualizarFatura(id, updateFaturaDto);
+    const fatura = await this.faturamentoService.atualizarFatura(id, updateFaturaDto, empresaId);
 
     return {
       status: HttpStatus.OK,
@@ -186,8 +208,9 @@ export class FaturamentoController {
   async marcarComoPaga(
     @Param('id', ParseIntPipe) id: number,
     @Body('valorPago') valorPago: number,
+    @EmpresaId() empresaId: string,
   ) {
-    const fatura = await this.faturamentoService.marcarComoPaga(id, valorPago);
+    const fatura = await this.faturamentoService.marcarComoPaga(id, valorPago, empresaId);
 
     return {
       status: HttpStatus.OK,
@@ -199,9 +222,10 @@ export class FaturamentoController {
   @Put('faturas/:id/cancelar')
   async cancelarFatura(
     @Param('id', ParseIntPipe) id: number,
+    @EmpresaId() empresaId: string,
     @Body('motivo') motivo?: string,
   ) {
-    const fatura = await this.faturamentoService.cancelarFatura(id, motivo);
+    const fatura = await this.faturamentoService.cancelarFatura(id, empresaId, motivo);
 
     return {
       status: HttpStatus.OK,
@@ -211,8 +235,11 @@ export class FaturamentoController {
   }
 
   @Post('faturas/:id/enviar-email')
-  async enviarFaturaPorEmail(@Param('id', ParseIntPipe) id: number) {
-    const sucesso = await this.faturamentoService.enviarFaturaPorEmail(id);
+  async enviarFaturaPorEmail(
+    @Param('id', ParseIntPipe) id: number,
+    @EmpresaId() empresaId: string,
+  ) {
+    const sucesso = await this.faturamentoService.enviarFaturaPorEmail(id, empresaId);
 
     return {
       status: HttpStatus.OK,
@@ -222,12 +249,15 @@ export class FaturamentoController {
   }
 
   @Delete('faturas/:id')
-  async excluirFatura(@Param('id', ParseIntPipe) id: number) {
+  async excluirFatura(
+    @Param('id', ParseIntPipe) id: number,
+    @EmpresaId() empresaId: string,
+  ) {
     console.log(`🔍 [CONTROLLER] DELETE /faturamento/faturas/${id} - Iniciando exclusão`);
 
     try {
       console.log(`🔍 [CONTROLLER] Chamando excluirFatura para ID: ${id}`);
-      const faturaAtualizada = await this.faturamentoService.excluirFatura(id);
+      await this.faturamentoService.excluirFatura(id, empresaId);
 
       console.log(`🔍 [CONTROLLER] Fatura ${id} excluída com sucesso`);
       return {
@@ -245,35 +275,52 @@ export class FaturamentoController {
   // ==================== PAGAMENTOS ====================
 
   @Post('pagamentos')
-  async criarPagamento(@Body() createPagamentoDto: CreatePagamentoDto) {
+  async criarPagamento(
+    @Body() createPagamentoDto: CreatePagamentoDto,
+    @EmpresaId() empresaId: string,
+  ) {
     try {
-      const pagamento = await this.pagamentoService.criarPagamento(createPagamentoDto);
+      const pagamento = await this.pagamentoService.criarPagamento(createPagamentoDto, empresaId);
       return {
         status: HttpStatus.CREATED,
         message: 'Pagamento criado com sucesso',
         data: pagamento,
       };
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new BadRequestException(error.message);
     }
   }
 
   @Post('pagamentos/processar')
-  async processarPagamento(@Body() processarPagamentoDto: ProcessarPagamentoDto) {
+  @HttpCode(HttpStatus.OK)
+  async processarPagamento(
+    @Body() processarPagamentoDto: ProcessarPagamentoDto,
+    @EmpresaId() empresaId: string,
+  ) {
     try {
-      const pagamento = await this.pagamentoService.processarPagamento(processarPagamentoDto);
+      const pagamento = await this.pagamentoService.processarPagamento(
+        processarPagamentoDto,
+        empresaId,
+      );
       return {
         status: HttpStatus.OK,
         message: 'Pagamento processado com sucesso',
         data: pagamento,
       };
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new BadRequestException(error.message);
     }
   }
 
   @Get('pagamentos')
   async buscarPagamentos(
+    @EmpresaId() empresaId: string,
     @Query('faturaId') faturaId?: number,
     @Query('status') status?: StatusPagamento,
     @Query('metodoPagamento') metodoPagamento?: string,
@@ -282,7 +329,7 @@ export class FaturamentoController {
     @Query('dataFim') dataFim?: string,
   ) {
     const filtros = {
-      faturaId,
+      faturaId: faturaId ? Number(faturaId) : undefined,
       status,
       metodoPagamento,
       gateway,
@@ -290,7 +337,7 @@ export class FaturamentoController {
       dataFim: dataFim ? new Date(dataFim) : undefined,
     };
 
-    const pagamentos = await this.pagamentoService.buscarPagamentos(filtros);
+    const pagamentos = await this.pagamentoService.buscarPagamentos(filtros, empresaId);
 
     return {
       status: HttpStatus.OK,
@@ -301,8 +348,11 @@ export class FaturamentoController {
   }
 
   @Get('pagamentos/:id')
-  async buscarPagamentoPorId(@Param('id', ParseIntPipe) id: number) {
-    const pagamento = await this.pagamentoService.buscarPagamentoPorId(id);
+  async buscarPagamentoPorId(
+    @Param('id', ParseIntPipe) id: number,
+    @EmpresaId() empresaId: string,
+  ) {
+    const pagamento = await this.pagamentoService.buscarPagamentoPorId(id, empresaId);
 
     return {
       status: HttpStatus.OK,
@@ -312,8 +362,14 @@ export class FaturamentoController {
   }
 
   @Get('pagamentos/transacao/:transacaoId')
-  async buscarPagamentoPorTransacao(@Param('transacaoId') transacaoId: string) {
-    const pagamento = await this.pagamentoService.buscarPagamentoPorTransacao(transacaoId);
+  async buscarPagamentoPorTransacao(
+    @Param('transacaoId') transacaoId: string,
+    @EmpresaId() empresaId: string,
+  ) {
+    const pagamento = await this.pagamentoService.buscarPagamentoPorTransacao(
+      transacaoId,
+      empresaId,
+    );
 
     return {
       status: HttpStatus.OK,
@@ -326,22 +382,35 @@ export class FaturamentoController {
   async atualizarPagamento(
     @Param('id', ParseIntPipe) id: number,
     @Body() updatePagamentoDto: UpdatePagamentoDto,
+    @EmpresaId() empresaId: string,
   ) {
-    const pagamento = await this.pagamentoService.atualizarPagamento(id, updatePagamentoDto);
+    try {
+      const pagamento = await this.pagamentoService.atualizarPagamento(
+        id,
+        updatePagamentoDto,
+        empresaId,
+      );
 
-    return {
-      status: HttpStatus.OK,
-      message: 'Pagamento atualizado com sucesso',
-      data: pagamento,
-    };
+      return {
+        status: HttpStatus.OK,
+        message: 'Pagamento atualizado com sucesso',
+        data: pagamento,
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new BadRequestException(error.message);
+    }
   }
 
   @Post('pagamentos/:id/estornar')
   async estornarPagamento(
     @Param('id', ParseIntPipe) id: number,
     @Body('motivo') motivo: string,
+    @EmpresaId() empresaId: string,
   ) {
-    const estorno = await this.pagamentoService.estornarPagamento(id, motivo);
+    const estorno = await this.pagamentoService.estornarPagamento(id, motivo, empresaId);
 
     return {
       status: HttpStatus.OK,
@@ -352,6 +421,7 @@ export class FaturamentoController {
 
   @Get('pagamentos/estatisticas')
   async obterEstatisticasPagamentos(
+    @EmpresaId() empresaId: string,
     @Query('dataInicio') dataInicio?: string,
     @Query('dataFim') dataFim?: string,
     @Query('gateway') gateway?: string,
@@ -362,7 +432,10 @@ export class FaturamentoController {
       gateway,
     };
 
-    const estatisticas = await this.pagamentoService.obterEstatisticasPagamentos(filtros);
+    const estatisticas = await this.pagamentoService.obterEstatisticasPagamentos(
+      filtros,
+      empresaId,
+    );
 
     return {
       status: HttpStatus.OK,

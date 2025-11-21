@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, MessageSquare, UserCheck, Calendar } from 'lucide-react';
+import { Users, MessageSquare, UserCheck, Calendar, Target, UserPlus } from 'lucide-react';
 import ModulesScreen, { NucleusModulesData } from '../../components/navigation/ModulesScreen';
 
 const CrmNucleusPage: React.FC = () => {
@@ -30,6 +30,28 @@ const CrmNucleusPage: React.FC = () => {
         notifications: 0,
         badge: 'Ativo',
         badgeColor: 'green',
+        status: 'active'
+      },
+      {
+        id: 'leads',
+        name: 'Leads',
+        description: 'Captura, qualificação e conversão de leads em oportunidades de negócio.',
+        href: '/leads',
+        icon: UserPlus,
+        notifications: 0,
+        badge: 'Novo',
+        badgeColor: 'blue',
+        status: 'active'
+      },
+      {
+        id: 'pipeline',
+        name: 'Pipeline de Vendas',
+        description: 'Visualização Kanban do funil de oportunidades com drag-and-drop entre etapas.',
+        href: '/pipeline',
+        icon: Target,
+        notifications: 0,
+        badge: 'Novo',
+        badgeColor: 'blue',
         status: 'active'
       },
       {

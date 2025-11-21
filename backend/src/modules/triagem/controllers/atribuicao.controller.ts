@@ -13,16 +13,12 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../modules/auth/jwt-auth.guard';
 import { AtribuicaoService } from '../services/atribuicao.service';
-import {
-  AtribuirAtendenteDto,
-  AtribuirEquipeDto,
-  BuscarAtendentesDisponiveisDto,
-} from '../dto';
+import { AtribuirAtendenteDto, AtribuirEquipeDto, BuscarAtendentesDisponiveisDto } from '../dto';
 
 @Controller('atribuicoes')
 @UseGuards(JwtAuthGuard)
 export class AtribuicaoController {
-  constructor(private readonly atribuicaoService: AtribuicaoService) { }
+  constructor(private readonly atribuicaoService: AtribuicaoService) {}
 
   // ========================================================================
   // ATRIBUIÇÕES DIRETAS DE ATENDENTE

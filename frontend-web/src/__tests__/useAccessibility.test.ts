@@ -1,53 +1,47 @@
 import { renderHook, act } from '@testing-library/react';
 import { useAccessibility, useKeyboardNavigation, useLiveRegion } from '../hooks/useAccessibility';
 
+afterEach(() => {
+  jest.useRealTimers();
+  jest.clearAllTimers();
+  jest.restoreAllMocks();
+  jest.clearAllMocks();
+});
+
 describe('useAccessibility', () => {
   it('deve criar refs corretamente', () => {
     const { result } = renderHook(() => useAccessibility());
-    
+
     expect(result.current.elementRef).toBeDefined();
     expect(result.current.elementRef.current).toBeNull();
   });
 
   it('deve anunciar mudanças para leitores de tela', () => {
-    // Mock do DOM
-    const mockAppendChild = jest.fn();
-    const mockRemoveChild = jest.fn();
-    const mockCreateElement = jest.fn(() => ({
-      setAttribute: jest.fn(),
-      classList: { add: jest.fn() },
-      textContent: '',
-    }));
-    
-    Object.defineProperty(document, 'createElement', {
-      value: mockCreateElement,
-    });
-    Object.defineProperty(document.body, 'appendChild', {
-      value: mockAppendChild,
-    });
-    Object.defineProperty(document.body, 'removeChild', {
-      value: mockRemoveChild,
-    });
-    Object.defineProperty(document.body, 'contains', {
-      value: () => true,
-    });
+    jest.useFakeTimers();
+
+    const appendSpy = jest.spyOn(document.body, 'appendChild');
+    const removeSpy = jest.spyOn(document.body, 'removeChild');
+    jest.spyOn(document.body, 'contains').mockReturnValue(true);
+    const createSpy = jest.spyOn(document, 'createElement');
 
     const { result } = renderHook(() => useAccessibility({ announceChanges: true }));
-    
+
     act(() => {
       result.current.announceToScreenReader('Teste de anúncio');
+      jest.runOnlyPendingTimers();
     });
 
-    expect(mockCreateElement).toHaveBeenCalledWith('div');
-    expect(mockAppendChild).toHaveBeenCalled();
+    expect(createSpy).toHaveBeenCalledWith('div');
+    expect(appendSpy).toHaveBeenCalled();
+    expect(removeSpy).toHaveBeenCalled();
   });
 
   it('deve verificar contraste de cores', () => {
     const { result } = renderHook(() => useAccessibility());
-    
+
     const isGoodContrast = result.current.checkColorContrast('#000000', '#ffffff');
     const isBadContrast = result.current.checkColorContrast('#888888', '#999999');
-    
+
     expect(isGoodContrast).toBe(true);
     expect(isBadContrast).toBe(false);
   });
@@ -55,15 +49,11 @@ describe('useAccessibility', () => {
   it('deve gerenciar foco quando focusOnMount é true', () => {
     const mockFocus = jest.fn();
     const mockElement = { focus: mockFocus };
-    
+
     const { result } = renderHook(() => useAccessibility({ focusOnMount: true }));
-    
+
     act(() => {
-      // Mock da propriedade current do ref
-      Object.defineProperty(result.current.elementRef, 'current', {
-        value: mockElement,
-        writable: true,
-      });
+      result.current.elementRef.current = mockElement as unknown as HTMLElement;
       result.current.manageFocus();
     });
 
@@ -139,24 +129,9 @@ describe('useKeyboardNavigation', () => {
 
 describe('useLiveRegion', () => {
   it('deve criar região ao vivo para anúncios', () => {
-    const mockGetElementById = jest.fn(() => null);
-    const mockCreateElement = jest.fn(() => ({
-      id: '',
-      setAttribute: jest.fn(),
-      classList: { add: jest.fn() },
-      textContent: '',
-    }));
-    const mockAppendChild = jest.fn();
-
-    Object.defineProperty(document, 'getElementById', {
-      value: mockGetElementById,
-    });
-    Object.defineProperty(document, 'createElement', {
-      value: mockCreateElement,
-    });
-    Object.defineProperty(document.body, 'appendChild', {
-      value: mockAppendChild,
-    });
+    jest.spyOn(document, 'getElementById').mockReturnValue(null);
+    const createSpy = jest.spyOn(document, 'createElement');
+    const appendSpy = jest.spyOn(document.body, 'appendChild');
 
     const { result } = renderHook(() => useLiveRegion());
 
@@ -164,19 +139,14 @@ describe('useLiveRegion', () => {
       result.current.announceChange('Teste de região ao vivo');
     });
 
-    expect(mockCreateElement).toHaveBeenCalledWith('div');
-    expect(mockAppendChild).toHaveBeenCalled();
+    expect(createSpy).toHaveBeenCalledWith('div');
+    expect(appendSpy).toHaveBeenCalled();
   });
 
   it('deve reutilizar região existente', () => {
-    const mockLiveRegion = {
-      textContent: '',
-    };
-    const mockGetElementById = jest.fn(() => mockLiveRegion);
-
-    Object.defineProperty(document, 'getElementById', {
-      value: mockGetElementById,
-    });
+    const liveRegion = document.createElement('div');
+    liveRegion.id = 'live-region';
+    document.body.appendChild(liveRegion);
 
     const { result } = renderHook(() => useLiveRegion());
 
@@ -184,6 +154,9 @@ describe('useLiveRegion', () => {
       result.current.announceChange('Reutilizar região');
     });
 
-    expect(mockLiveRegion.textContent).toBe('Reutilizar região');
+    const region = document.getElementById('live-region');
+    expect(region?.textContent).toBe('Reutilizar região');
+
+    region?.parentNode?.removeChild(region);
   });
 });

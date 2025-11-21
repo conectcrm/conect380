@@ -198,14 +198,14 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       {/* Backdrop */}
-      <div 
+      <div
         className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
         onClick={handleClose}
       />
-      
+
       {/* Modal - Formato Paisagem */}
       <div className="flex min-h-full items-center justify-center p-2 sm:p-4">
-        <div className="relative w-full max-w-7xl bg-white rounded-xl shadow-2xl transform transition-all">
+        <div className="relative w-[calc(100%-2rem)] sm:w-[700px] md:w-[900px] lg:w-[1100px] xl:w-[1300px] max-w-[1600px] bg-white rounded-xl shadow-2xl transform transition-all">
           {/* Header */}
           <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
             <div className="flex items-center space-x-3">
@@ -234,7 +234,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
             <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
               {/* Grid Principal - 3 Colunas para maximizar uso do espaço */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
+
                 {/* COLUNA 1 - Informações Básicas */}
                 <div className="space-y-4">
                   <div className="border-b border-gray-100 pb-2">
@@ -252,9 +252,8 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                       {...register('nome')}
                       type="text"
                       placeholder="Digite o nome do produto"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                        errors.nome ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${errors.nome ? 'border-red-300' : 'border-gray-300'
+                        }`}
                     />
                     {errors.nome && (
                       <p className="mt-1 text-sm text-red-600">{errors.nome.message}</p>
@@ -268,9 +267,8 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                     </label>
                     <select
                       {...register('tipoItem')}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                        errors.tipoItem ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${errors.tipoItem ? 'border-red-300' : 'border-gray-300'
+                        }`}
                     >
                       {tiposItem.map(tipo => (
                         <option key={tipo.value} value={tipo.value}>
@@ -293,9 +291,8 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                       type="text"
                       list="categorias"
                       placeholder="Digite ou selecione uma categoria"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                        errors.categoria ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${errors.categoria ? 'border-red-300' : 'border-gray-300'
+                        }`}
                     />
                     <datalist id="categorias">
                       {categoriasSugeridas.map(categoria => (
@@ -330,9 +327,8 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                           value={field.value}
                           onChange={(value) => field.onChange(value)}
                           placeholder="R$ 0,00"
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                            errors.precoUnitario ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${errors.precoUnitario ? 'border-red-300' : 'border-gray-300'
+                            }`}
                         />
                       )}
                     />
@@ -348,9 +344,8 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                     </label>
                     <select
                       {...register('frequencia')}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                        errors.frequencia ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${errors.frequencia ? 'border-red-300' : 'border-gray-300'
+                        }`}
                     >
                       {frequencias.map(freq => (
                         <option key={freq.value} value={freq.value}>
@@ -370,9 +365,8 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                     </label>
                     <select
                       {...register('unidadeMedida')}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                        errors.unidadeMedida ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${errors.unidadeMedida ? 'border-red-300' : 'border-gray-300'
+                        }`}
                     >
                       {unidadesMedida.map(unidade => (
                         <option key={unidade.value} value={unidade.value}>
@@ -482,192 +476,189 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                 </div>
               </div>
 
-                {/* COLUNA 2 - Configurações */}
-                <div className="space-y-6">
-                  <div className="border-b border-gray-100 pb-4">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">
-                      Configurações
-                    </h3>
-                  </div>
+              {/* COLUNA 2 - Configurações */}
+              <div className="space-y-6">
+                <div className="border-b border-gray-100 pb-4">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">
+                    Configurações
+                  </h3>
+                </div>
 
-                  {/* Frequência */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Frequência *
-                    </label>
-                    <select
-                      {...register('frequencia')}
-                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                        errors.frequencia ? 'border-red-300' : 'border-gray-300'
+                {/* Frequência */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Frequência *
+                  </label>
+                  <select
+                    {...register('frequencia')}
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${errors.frequencia ? 'border-red-300' : 'border-gray-300'
                       }`}
-                    >
-                      {frequencias.map(freq => (
-                        <option key={freq.value} value={freq.value}>
-                          {freq.label}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.frequencia && (
-                      <p className="mt-1 text-sm text-red-600">{errors.frequencia.message}</p>
-                    )}
-                  </div>
+                  >
+                    {frequencias.map(freq => (
+                      <option key={freq.value} value={freq.value}>
+                        {freq.label}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.frequencia && (
+                    <p className="mt-1 text-sm text-red-600">{errors.frequencia.message}</p>
+                  )}
+                </div>
 
-                  {/* Unidade de Medida */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Unidade de Medida *
-                    </label>
-                    <select
-                      {...register('unidadeMedida')}
-                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                        errors.unidadeMedida ? 'border-red-300' : 'border-gray-300'
+                {/* Unidade de Medida */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Unidade de Medida *
+                  </label>
+                  <select
+                    {...register('unidadeMedida')}
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${errors.unidadeMedida ? 'border-red-300' : 'border-gray-300'
                       }`}
-                    >
-                      {unidadesMedida.map(unidade => (
-                        <option key={unidade.value} value={unidade.value}>
-                          {unidade.label}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.unidadeMedida && (
-                      <p className="mt-1 text-sm text-red-600">{errors.unidadeMedida.message}</p>
-                    )}
-                  </div>
+                  >
+                    {unidadesMedida.map(unidade => (
+                      <option key={unidade.value} value={unidade.value}>
+                        {unidade.label}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.unidadeMedida && (
+                    <p className="mt-1 text-sm text-red-600">{errors.unidadeMedida.message}</p>
+                  )}
+                </div>
 
-                  {/* Status */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Status *
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status *
+                  </label>
+                  <div className="flex items-center space-x-4">
+                    <label className="flex items-center">
+                      <input
+                        {...register('status')}
+                        type="radio"
+                        value="true"
+                        className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">Ativo</span>
                     </label>
-                    <div className="flex items-center space-x-4">
-                      <label className="flex items-center">
-                        <input
-                          {...register('status')}
-                          type="radio"
-                          value="true"
-                          className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                        />
-                        <span className="ml-2 text-sm text-gray-700">Ativo</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          {...register('status')}
-                          type="radio"
-                          value="false"
-                          className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                        />
-                        <span className="ml-2 text-sm text-gray-700">Inativo</span>
-                      </label>
+                    <label className="flex items-center">
+                      <input
+                        {...register('status')}
+                        type="radio"
+                        value="false"
+                        className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">Inativo</span>
+                    </label>
+                  </div>
+                  {errors.status && (
+                    <p className="mt-1 text-sm text-red-600">{errors.status.message}</p>
+                  )}
+                </div>
+
+                {/* Tags */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Tag className="w-4 h-4 inline mr-1" />
+                    Tags
+                  </label>
+                  <div className="space-y-3">
+                    <div className="flex space-x-2">
+                      <input
+                        type="text"
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), adicionarTag())}
+                        placeholder="Digite uma tag e pressione Enter"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      />
+                      <button
+                        type="button"
+                        onClick={adicionarTag}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Adicionar
+                      </button>
                     </div>
-                    {errors.status && (
-                      <p className="mt-1 text-sm text-red-600">{errors.status.message}</p>
-                    )}
-                  </div>
 
-                  {/* Tags */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <Tag className="w-4 h-4 inline mr-1" />
-                      Tags
-                    </label>
-                    <div className="space-y-3">
-                      <div className="flex space-x-2">
-                        <input
-                          type="text"
-                          value={tagInput}
-                          onChange={(e) => setTagInput(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), adicionarTag())}
-                          placeholder="Digite uma tag e pressione Enter"
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                        />
-                        <button
-                          type="button"
-                          onClick={adicionarTag}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                          Adicionar
-                        </button>
-                      </div>
-                      
-                      {watchedFields.tags && watchedFields.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {watchedFields.tags.map((tag, index) => (
-                            <span
-                              key={index}
-                              className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
+                    {watchedFields.tags && watchedFields.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {watchedFields.tags.map((tag, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
+                          >
+                            {tag}
+                            <button
+                              type="button"
+                              onClick={() => removerTag(tag)}
+                              className="ml-2 text-blue-600 hover:text-blue-800"
                             >
-                              {tag}
-                              <button
-                                type="button"
-                                onClick={() => removerTag(tag)}
-                                className="ml-2 text-blue-600 hover:text-blue-800"
-                              >
-                                ×
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Variações (Oculto inicialmente) */}
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => setShowVariacoes(!showVariacoes)}
-                      className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
-                    >
-                      {showVariacoes ? '− Ocultar' : '+ Adicionar'} Variações do Produto
-                    </button>
-                    
-                    {showVariacoes && (
-                      <div className="mt-3">
-                        <textarea
-                          {...register('variacoes')}
-                          rows={3}
-                          placeholder="Digite as variações do produto (uma por linha)..."
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
-                        />
+                              ×
+                            </button>
+                          </span>
+                        ))}
                       </div>
                     )}
                   </div>
                 </div>
-              </div>
-            </form>
-          </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
-            <div className="text-sm text-gray-500">
-              {hasUnsavedChanges && '• Alterações não salvas'}
-            </div>
-            
-            <div className="flex space-x-3">
-              <button
-                type="button"
-                onClick={handleClose}
-                className="px-6 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Cancelar
-              </button>
-              
-              <button
-                type="submit"
-                onClick={handleSubmit(onFormSubmit)}
-                disabled={!isValid || loading}
-                className={`px-6 py-2 rounded-lg transition-colors ${
-                  isValid && !loading
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                {loading ? 'Salvando...' : 'Salvar Produto'}
-              </button>
-            </div>
+                {/* Variações (Oculto inicialmente) */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowVariacoes(!showVariacoes)}
+                    className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                  >
+                    {showVariacoes ? '− Ocultar' : '+ Adicionar'} Variações do Produto
+                  </button>
+
+                  {showVariacoes && (
+                    <div className="mt-3">
+                      <textarea
+                        {...register('variacoes')}
+                        rows={3}
+                        placeholder="Digite as variações do produto (uma por linha)..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
           </div>
+        </form>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+        <div className="text-sm text-gray-500">
+          {hasUnsavedChanges && '• Alterações não salvas'}
+        </div>
+
+        <div className="flex space-x-3">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="px-6 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Cancelar
+          </button>
+
+          <button
+            type="submit"
+            onClick={handleSubmit(onFormSubmit)}
+            disabled={!isValid || loading}
+            className={`px-6 py-2 rounded-lg transition-colors ${isValid && !loading
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+          >
+            {loading ? 'Salvando...' : 'Salvar Produto'}
+          </button>
         </div>
       </div>
     </div>
+      </div >
+    </div >
   );
 };

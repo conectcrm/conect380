@@ -1,12 +1,12 @@
-import { 
-  Entity, 
-  PrimaryGeneratedColumn, 
-  Column, 
-  CreateDateColumn, 
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
-  Index
+  Index,
 } from 'typeorm';
 import { Cotacao } from './cotacao.entity';
 
@@ -20,7 +20,7 @@ export class ItemCotacao {
   @Column({ name: 'cotacao_id' })
   cotacaoId: string;
 
-  @ManyToOne(() => Cotacao, cotacao => cotacao.itens, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Cotacao, (cotacao) => cotacao.itens, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'cotacao_id' })
   cotacao: Cotacao;
 
@@ -39,7 +39,7 @@ export class ItemCotacao {
   @Column({ type: 'decimal', precision: 15, scale: 2 })
   valorUnitario: number;
 
-  @Column({ type: 'decimal', precision: 15, scale: 2 })
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
   valorTotal: number;
 
   @Column({ type: 'text', nullable: true })
@@ -109,8 +109,10 @@ export class ItemCotacao {
 
   // Método para atualizar valores calculados
   atualizarValores(): void {
-    this.valorDesconto = this.valorUnitario * this.quantidade * (this.desconto || 0) / 100;
-    this.valorImposto = (this.valorUnitario * this.quantidade - this.valorDesconto) * (this.aliquotaImposto || 0) / 100;
+    this.valorDesconto = (this.valorUnitario * this.quantidade * (this.desconto || 0)) / 100;
+    this.valorImposto =
+      ((this.valorUnitario * this.quantidade - this.valorDesconto) * (this.aliquotaImposto || 0)) /
+      100;
     this.valorTotal = this.calcularValorTotal();
     this.valorLiquido = this.valorTotal - this.valorImposto;
   }

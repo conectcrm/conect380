@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import toast from 'react-hot-toast';
@@ -20,6 +20,9 @@ import {
 } from 'lucide-react';
 import { cotacaoService } from '../../services/cotacaoService';
 import { fornecedorService } from '../../services/fornecedorService';
+import { usuariosService } from '../../services/usuariosService';
+import { useAuth } from '../../hooks/useAuth';
+import MoneyInput from '../common/MoneyInput';
 import {
   Cotacao,
   CriarCotacaoRequest,
@@ -44,6 +47,7 @@ interface CotacaoFormData {
   validadeOrcamento?: number;
   origem: OrigemCotacao;
   tags: string[];
+  aprovadorId?: string;
   itens: Omit<ItemCotacao, 'id' | 'valorTotal'>[];
 }
 
@@ -60,6 +64,7 @@ const schemaValidacao = yup.object({
   validadeOrcamento: yup.number().positive('Validade deve ser um número positivo'),
   origem: yup.string().oneOf(['manual', 'website', 'email', 'telefone', 'whatsapp', 'indicacao']).required('Origem é obrigatória'),
   tags: yup.array().of(yup.string()),
+  aprovadorId: yup.string().optional(),
   itens: yup.array().of(
     yup.object({
       descricao: yup.string().required('Descrição do item é obrigatória'),
@@ -84,9 +89,12 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
   cotacao,
   onSave
 }) => {
+  const { user: usuarioLogado } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fornecedores, setFornecedores] = useState<any[]>([]);
   const [loadingFornecedores, setLoadingFornecedores] = useState(false);
+  const [usuarios, setUsuarios] = useState<any[]>([]);
+  const [loadingUsuarios, setLoadingUsuarios] = useState(false);
   const [novaTag, setNovaTag] = useState('');
   const [activeTab, setActiveTab] = useState<'dados' | 'itens' | 'configuracoes'>('dados');
 
@@ -99,12 +107,13 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
     setValue,
     watch,
     reset,
-    getValues
+    getValues,
+    control
   } = useForm<CotacaoFormData>({
     resolver: yupResolver(schemaValidacao),
     defaultValues: {
-      prioridade: 'media',
-      origem: 'manual',
+      prioridade: PrioridadeCotacao.MEDIA,
+      origem: OrigemCotacao.MANUAL,
       tags: [],
       itens: [{ descricao: '', quantidade: 1, unidade: 'un', valorUnitario: 0, observacoes: '', ordem: 1 }],
       validadeOrcamento: 30
@@ -117,6 +126,11 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
   // Carregar fornecedores
   useEffect(() => {
     carregarFornecedores();
+  }, []);
+
+  // Carregar usuários (potenciais aprovadores)
+  useEffect(() => {
+    carregarUsuarios();
   }, []);
 
   // Preencher dados para edição
@@ -134,6 +148,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
         validadeOrcamento: cotacao.validadeOrcamento || 30,
         origem: cotacao.origem,
         tags: cotacao.tags || [],
+        aprovadorId: cotacao.aprovadorId || '',
         itens: cotacao.itens.map(item => ({
           produtoId: item.produtoId,
           descricao: item.descricao,
@@ -148,8 +163,8 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
       reset(dadosFormulario);
     } else {
       reset({
-        prioridade: 'media',
-        origem: 'manual',
+        prioridade: PrioridadeCotacao.MEDIA,
+        origem: OrigemCotacao.MANUAL,
         tags: [],
         itens: [{ descricao: '', quantidade: 1, unidade: 'un', valorUnitario: 0, observacoes: '', ordem: 1 }],
         validadeOrcamento: 30
@@ -167,6 +182,19 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
       toast.error('Erro ao carregar fornecedores');
     } finally {
       setLoadingFornecedores(false);
+    }
+  };
+
+  const carregarUsuarios = async () => {
+    try {
+      setLoadingUsuarios(true);
+      const response = await usuariosService.listarUsuarios({ ativo: true });
+      setUsuarios(response.usuarios || []);
+    } catch (error) {
+      console.error('Erro ao carregar usuários:', error);
+      toast.error('Erro ao carregar usuários');
+    } finally {
+      setLoadingUsuarios(false);
     }
   };
 
@@ -225,6 +253,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
           prazoEntrega: data.prazoEntrega,
           localEntrega: data.localEntrega,
           validadeOrcamento: data.validadeOrcamento,
+          aprovadorId: data.aprovadorId || undefined, // Enviar apenas se selecionado
           tags: data.tags,
           itens: data.itens
         };
@@ -245,6 +274,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
           validadeOrcamento: data.validadeOrcamento,
           origem: data.origem,
           tags: data.tags,
+          aprovadorId: data.aprovadorId || undefined, // Enviar apenas se selecionado
           itens: data.itens
         };
 
@@ -276,7 +306,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-lg sm:rounded-xl shadow-2xl w-[calc(100%-2rem)] sm:w-[600px] md:w-[700px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-[#159A9C]">
           <div className="flex items-center space-x-3">
@@ -348,6 +378,29 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                     )}
                   </div>
 
+                  {/* Aprovador (opcional) */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Aprovador
+                      <span className="text-gray-400 text-xs ml-2">(opcional)</span>
+                    </label>
+                    <select
+                      {...register('aprovadorId')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                      disabled={loadingUsuarios}
+                    >
+                      <option value="">Nenhum (sem aprovação)</option>
+                      {usuarios.map(usuario => (
+                        <option key={usuario.id} value={usuario.id}>
+                          {usuario.nome} ({usuario.email})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Se selecionado, esta cotação precisará ser aprovada antes de prosseguir.
+                    </p>
+                  </div>
+
                   {/* Prioridade */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -358,10 +411,10 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.prioridade ? 'border-red-300' : 'border-gray-300'
                         }`}
                     >
-                      <option value="baixa">Baixa</option>
-                      <option value="media">Média</option>
-                      <option value="alta">Alta</option>
-                      <option value="urgente">Urgente</option>
+                      <option value={PrioridadeCotacao.BAIXA}>Baixa</option>
+                      <option value={PrioridadeCotacao.MEDIA}>Média</option>
+                      <option value={PrioridadeCotacao.ALTA}>Alta</option>
+                      <option value={PrioridadeCotacao.URGENTE}>Urgente</option>
                     </select>
                     {errors.prioridade && (
                       <p className="text-red-500 text-sm mt-1">{errors.prioridade.message}</p>
@@ -425,12 +478,12 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                         }`}
                       disabled={isEditing}
                     >
-                      <option value="manual">Manual</option>
-                      <option value="website">Website</option>
-                      <option value="email">Email</option>
-                      <option value="telefone">Telefone</option>
-                      <option value="whatsapp">WhatsApp</option>
-                      <option value="indicacao">Indicação</option>
+                      <option value={OrigemCotacao.MANUAL}>Manual</option>
+                      <option value={OrigemCotacao.WEBSITE}>Website</option>
+                      <option value={OrigemCotacao.EMAIL}>Email</option>
+                      <option value={OrigemCotacao.TELEFONE}>Telefone</option>
+                      <option value={OrigemCotacao.WHATSAPP}>WhatsApp</option>
+                      <option value={OrigemCotacao.INDICACAO}>Indicação</option>
                     </select>
                     {errors.origem && (
                       <p className="text-red-500 text-sm mt-1">{errors.origem.message}</p>
@@ -471,9 +524,9 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         {/* Descrição */}
-                        <div className="lg:col-span-2">
+                        <div className="lg:col-span-4">
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Descrição *
                           </label>
@@ -519,21 +572,26 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                         </div>
 
                         {/* Valor Unitário */}
-                        <div>
+                        <div className="lg:col-span-2">
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Valor Unit. *
+                            Valor Unitário *
                           </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            {...register(`itens.${index}.valorUnitario`)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
-                            min="0"
+                          <Controller
+                            name={`itens.${index}.valorUnitario`}
+                            control={control}
+                            render={({ field }) => (
+                              <MoneyInput
+                                value={field.value || 0}
+                                onChange={(value) => field.onChange(value)}
+                                placeholder="R$ 0,00"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
+                              />
+                            )}
                           />
                         </div>
 
                         {/* Observações */}
-                        <div className="lg:col-span-5">
+                        <div className="lg:col-span-4">
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Observações
                           </label>
@@ -546,7 +604,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                         </div>
 
                         {/* Valor Total do Item */}
-                        <div className="lg:col-span-5 flex justify-end">
+                        <div className="lg:col-span-4 flex justify-end">
                           <div className="text-right">
                             <span className="text-sm text-gray-500">Valor Total: </span>
                             <span className="font-medium text-lg text-[#159A9C]">

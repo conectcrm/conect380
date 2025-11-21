@@ -1,4 +1,16 @@
-import { IsUUID, IsEnum, IsOptional, IsObject, IsInt, IsString, IsBoolean, IsDateString, ValidateNested, Min, Max } from 'class-validator';
+import {
+  IsUUID,
+  IsEnum,
+  IsOptional,
+  IsObject,
+  IsInt,
+  IsString,
+  IsBoolean,
+  IsDateString,
+  ValidateNested,
+  Min,
+  Max,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { StatusFluxo } from '../entities/fluxo-automatizado.entity';
 

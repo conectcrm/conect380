@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { DropdownContatos } from '../../features/atendimento/chat/DropdownContatos';
+import { useAuth } from '../../hooks/useAuth';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -73,6 +74,7 @@ export function PainelContextoCliente({
   onToggle,
   onClose,
 }: PainelContextoClienteProps) {
+  const { user } = useAuth();
   const [contexto, setContexto] = useState<ContextoCliente | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -92,7 +94,7 @@ export function PainelContextoCliente({
 
     try {
       const token = localStorage.getItem('authToken');
-      const empresaId = localStorage.getItem('empresaId');
+      const empresaId = user?.empresa?.id;
 
       // Determinar se clienteId é um UUID ou telefone
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clienteId);
@@ -207,8 +209,8 @@ export function PainelContextoCliente({
       <div className="flex border-b bg-gray-50">
         <button
           className={`flex-1 py-3 text-sm font-medium transition ${abaAtiva === 'info'
-              ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
-              : 'text-gray-600 hover:text-gray-800'
+            ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+            : 'text-gray-600 hover:text-gray-800'
             }`}
           onClick={() => setAbaAtiva('info')}
         >
@@ -216,8 +218,8 @@ export function PainelContextoCliente({
         </button>
         <button
           className={`flex-1 py-3 text-sm font-medium transition ${abaAtiva === 'historico'
-              ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
-              : 'text-gray-600 hover:text-gray-800'
+            ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+            : 'text-gray-600 hover:text-gray-800'
             }`}
           onClick={() => setAbaAtiva('historico')}
         >
@@ -225,8 +227,8 @@ export function PainelContextoCliente({
         </button>
         <button
           className={`flex-1 py-3 text-sm font-medium transition ${abaAtiva === 'acoes'
-              ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
-              : 'text-gray-600 hover:text-gray-800'
+            ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+            : 'text-gray-600 hover:text-gray-800'
             }`}
           onClick={() => setAbaAtiva('acoes')}
         >
@@ -283,10 +285,10 @@ function AbaInfo({ contexto }: { contexto: ContextoCliente }) {
         <h3 className="text-sm font-semibold text-gray-700 mb-2">Segmento</h3>
         <span
           className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${cliente.segmento === 'VIP'
-              ? 'bg-yellow-100 text-yellow-800'
-              : cliente.segmento === 'Novo'
-                ? 'bg-green-100 text-green-800'
-                : 'bg-gray-100 text-gray-800'
+            ? 'bg-yellow-100 text-yellow-800'
+            : cliente.segmento === 'Novo'
+              ? 'bg-green-100 text-green-800'
+              : 'bg-gray-100 text-gray-800'
             }`}
         >
           {cliente.segmento === 'VIP' && '⭐ '}
@@ -444,8 +446,8 @@ function AbaHistorico({ contexto }: { contexto: ContextoCliente }) {
                   <span className="font-medium">Ticket #{ticket.numero}</span>
                   <span
                     className={`px-2 py-0.5 rounded text-xs ${ticket.status === 'RESOLVIDO'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-800'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-gray-100 text-gray-800'
                       }`}
                   >
                     {ticket.status}

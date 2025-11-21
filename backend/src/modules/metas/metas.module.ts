@@ -11,4 +11,4 @@ import { MetasController } from './metas.controller';
   providers: [MetasService],
   exports: [MetasService], // Exporta o service para uso em outros módulos
 })
-export class MetasModule { }
+export class MetasModule {}

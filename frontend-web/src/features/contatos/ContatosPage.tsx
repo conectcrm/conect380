@@ -172,9 +172,9 @@ const ContatosPage: React.FC = () => {
                 <div className="mt-4 sm:mt-0 flex items-center gap-3">
                   <button
                     onClick={handleNovo}
-                    className="bg-[#159A9C] hover:bg-[#0d7a7c] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                    className="bg-[#159A9C] hover:bg-[#0d7a7c] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium"
                   >
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-4 h-4" />
                     Novo Contato
                   </button>
                 </div>
@@ -182,57 +182,57 @@ const ContatosPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Dashboard Cards */}
+          {/* Dashboard Cards (KPI Cards) */}
           {!loading && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
-                <div className="flex items-center justify-between">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
+                <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total de Contatos</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{totalContatos}</p>
-                    <p className="text-xs text-gray-400 mt-1">📊 Cadastrados</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Total de Contatos</p>
+                    <p className="mt-2 text-3xl font-bold text-[#002333]">{totalContatos}</p>
+                    <p className="mt-3 text-sm text-[#002333]/70">Base completa de contatos cadastrados no sistema.</p>
                   </div>
-                  <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl">
-                    <Users className="w-8 h-8 text-blue-600" />
+                  <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                    <Users className="h-6 w-6 text-[#159A9C]" />
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
-                <div className="flex items-center justify-between">
+              <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
+                <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Principais</p>
-                    <p className="text-3xl font-bold text-yellow-600 mt-2">{contatosPrincipais}</p>
-                    <p className="text-xs text-yellow-500 mt-1">⭐ Contato principal</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Principais</p>
+                    <p className="mt-2 text-3xl font-bold text-[#002333]">{contatosPrincipais}</p>
+                    <p className="mt-3 text-sm text-[#002333]/70">Contatos definidos como principais dos clientes.</p>
                   </div>
-                  <div className="p-4 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-xl">
-                    <Star className="w-8 h-8 text-yellow-600" />
+                  <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
+                    <Star className="h-6 w-6 text-yellow-600" />
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
-                <div className="flex items-center justify-between">
+              <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
+                <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Ativos</p>
-                    <p className="text-3xl font-bold text-green-600 mt-2">{contatosAtivos}</p>
-                    <p className="text-xs text-green-500 mt-1">✅ Em uso</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Ativos</p>
+                    <p className="mt-2 text-3xl font-bold text-[#002333]">{contatosAtivos}</p>
+                    <p className="mt-3 text-sm text-[#002333]/70">Contatos ativos e disponíveis para comunicação.</p>
                   </div>
-                  <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-xl">
-                    <User className="w-8 h-8 text-green-600" />
+                  <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
+                    <User className="h-6 w-6 text-green-600" />
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
-                <div className="flex items-center justify-between">
+              <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
+                <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Com E-mail</p>
-                    <p className="text-3xl font-bold text-purple-600 mt-2">{contatosComEmail}</p>
-                    <p className="text-xs text-purple-500 mt-1">📧 Cadastrado</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Com E-mail</p>
+                    <p className="mt-2 text-3xl font-bold text-[#002333]">{contatosComEmail}</p>
+                    <p className="mt-3 text-sm text-[#002333]/70">Contatos com e-mail cadastrado para comunicação.</p>
                   </div>
-                  <div className="p-4 bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl">
-                    <Mail className="w-8 h-8 text-purple-600" />
+                  <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                    <Mail className="h-6 w-6 text-[#159A9C]" />
                   </div>
                 </div>
               </div>
@@ -330,9 +330,9 @@ const ContatosPage: React.FC = () => {
                 {!searchTerm && !clienteFiltro && (
                   <button
                     onClick={handleNovo}
-                    className="px-6 py-3 bg-gradient-to-r from-[#159A9C] to-[#0d7a7d] text-white rounded-lg hover:shadow-lg transition-all inline-flex items-center gap-2"
+                    className="px-4 py-2 bg-[#159A9C] hover:bg-[#0F7B7D] text-white rounded-lg transition-colors inline-flex items-center gap-2 text-sm font-medium shadow-sm"
                   >
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-4 h-4" />
                     Novo Contato
                   </button>
                 )}

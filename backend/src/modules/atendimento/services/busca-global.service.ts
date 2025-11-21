@@ -20,7 +20,7 @@ export class BuscaGlobalService {
 
     @InjectRepository(Ticket)
     private ticketRepository: Repository<Ticket>,
-  ) { }
+  ) {}
 
   /**
    * Realizar busca global em múltiplas entidades
@@ -58,7 +58,7 @@ export class BuscaGlobalService {
       const resultadosArrays = await Promise.all(promises);
 
       // Unificar resultados
-      resultadosArrays.forEach(arr => resultados.push(...arr));
+      resultadosArrays.forEach((arr) => resultados.push(...arr));
 
       // Ordenar por relevância
       resultados.sort((a, b) => b.relevancia - a.relevancia);
@@ -68,11 +68,11 @@ export class BuscaGlobalService {
 
       // Calcular contadores
       const contadores = {
-        propostas: resultados.filter(r => r.tipo === TipoRecursoBusca.PROPOSTA).length,
-        faturas: resultados.filter(r => r.tipo === TipoRecursoBusca.FATURA).length,
-        clientes: resultados.filter(r => r.tipo === TipoRecursoBusca.CLIENTE).length,
-        pedidos: resultados.filter(r => r.tipo === TipoRecursoBusca.PEDIDO).length,
-        tickets: resultados.filter(r => r.tipo === TipoRecursoBusca.TICKET).length,
+        propostas: resultados.filter((r) => r.tipo === TipoRecursoBusca.PROPOSTA).length,
+        faturas: resultados.filter((r) => r.tipo === TipoRecursoBusca.FATURA).length,
+        clientes: resultados.filter((r) => r.tipo === TipoRecursoBusca.CLIENTE).length,
+        pedidos: resultados.filter((r) => r.tipo === TipoRecursoBusca.PEDIDO).length,
+        tickets: resultados.filter((r) => r.tipo === TipoRecursoBusca.TICKET).length,
       };
 
       const tempoMs = Date.now() - startTime;
@@ -84,7 +84,6 @@ export class BuscaGlobalService {
         tempoMs,
         contadores,
       };
-
     } catch (error) {
       this.logger.error('❌ Erro na busca global:', error.message);
       throw error;
@@ -94,10 +93,7 @@ export class BuscaGlobalService {
   /**
    * Buscar clientes
    */
-  private async buscarClientes(
-    query: string,
-    empresaId: string,
-  ): Promise<ResultadoBuscaDto[]> {
+  private async buscarClientes(query: string, empresaId: string): Promise<ResultadoBuscaDto[]> {
     try {
       const queryLower = `%${query.toLowerCase()}%`;
 
@@ -106,13 +102,13 @@ export class BuscaGlobalService {
         .where('cliente.empresa_id = :empresaId', { empresaId })
         .andWhere(
           '(LOWER(cliente.nome) LIKE :query OR LOWER(cliente.email) LIKE :query OR LOWER(cliente.telefone) LIKE :query OR LOWER(cliente.documento) LIKE :query)',
-          { query: queryLower }
+          { query: queryLower },
         )
         .orderBy('cliente.created_at', 'DESC')
         .take(10)
         .getMany();
 
-      return clientes.map(cliente => ({
+      return clientes.map((cliente) => ({
         tipo: TipoRecursoBusca.CLIENTE,
         id: cliente.id,
         titulo: cliente.nome,
@@ -121,12 +117,11 @@ export class BuscaGlobalService {
         data: cliente.created_at,
         relevancia: this.calcularRelevancia(
           query,
-          `${cliente.nome} ${cliente.email} ${cliente.telefone} ${cliente.documento}`
+          `${cliente.nome} ${cliente.email} ${cliente.telefone} ${cliente.documento}`,
         ),
         highlight: this.encontrarHighlight(query, cliente.nome, cliente.email, cliente.telefone),
         dados: cliente,
       }));
-
     } catch (error) {
       this.logger.error('❌ Erro ao buscar clientes:', error.message);
       return [];
@@ -136,10 +131,7 @@ export class BuscaGlobalService {
   /**
    * Buscar tickets
    */
-  private async buscarTickets(
-    query: string,
-    empresaId: string,
-  ): Promise<ResultadoBuscaDto[]> {
+  private async buscarTickets(query: string, empresaId: string): Promise<ResultadoBuscaDto[]> {
     try {
       const queryLower = `%${query.toLowerCase()}%`;
 
@@ -148,13 +140,13 @@ export class BuscaGlobalService {
         .where('ticket.empresaId = :empresaId', { empresaId })
         .andWhere(
           '(LOWER(ticket.assunto) LIKE :query OR LOWER(ticket.contatoNome) LIKE :query OR CAST(ticket.numero AS VARCHAR) LIKE :query)',
-          { query: queryLower }
+          { query: queryLower },
         )
         .orderBy('ticket.createdAt', 'DESC')
         .take(10)
         .getMany();
 
-      return tickets.map(ticket => ({
+      return tickets.map((ticket) => ({
         tipo: TipoRecursoBusca.TICKET,
         id: ticket.id,
         titulo: `Ticket #${ticket.numero}`,
@@ -163,12 +155,16 @@ export class BuscaGlobalService {
         data: ticket.createdAt,
         relevancia: this.calcularRelevancia(
           query,
-          `${ticket.numero} ${ticket.assunto} ${ticket.contatoNome}`
+          `${ticket.numero} ${ticket.assunto} ${ticket.contatoNome}`,
         ),
-        highlight: this.encontrarHighlight(query, ticket.assunto, ticket.contatoNome, String(ticket.numero)),
+        highlight: this.encontrarHighlight(
+          query,
+          ticket.assunto,
+          ticket.contatoNome,
+          String(ticket.numero),
+        ),
         dados: ticket,
       }));
-
     } catch (error) {
       this.logger.error('❌ Erro ao buscar tickets:', error.message);
       return [];
@@ -227,8 +223,8 @@ export class BuscaGlobalService {
 
     // Contém palavras similares = 0.4
     const queryWords = queryLower.split(/\s+/);
-    const matches = queryWords.filter(qw =>
-      words.some(w => w.includes(qw) || qw.includes(w))
+    const matches = queryWords.filter((qw) =>
+      words.some((w) => w.includes(qw) || qw.includes(w)),
     ).length;
 
     if (matches > 0) {

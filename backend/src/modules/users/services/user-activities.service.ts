@@ -18,7 +18,7 @@ export class UserActivitiesService {
   async listarAtividades(empresaId: string, limit: number = 20): Promise<any[]> {
     try {
       this.logger.log(`Listando atividades recentes para empresa ${empresaId}`);
-      
+
       // Buscar atividades mais recentes para a empresa
       const atividades = await this.userActivityRepository.find({
         where: { empresaId },
@@ -28,7 +28,7 @@ export class UserActivitiesService {
       });
 
       // Transformar para o formato esperado pelo frontend
-      return atividades.map(atividade => ({
+      return atividades.map((atividade) => ({
         id: atividade.id,
         tipo: this.mapTipoAtividade(atividade.tipo),
         usuario: {
@@ -44,7 +44,7 @@ export class UserActivitiesService {
       return [];
     }
   }
-  
+
   private mapTipoAtividade(tipo: AtividadeTipo): string {
     // Map do enum do backend para as strings do frontend
     const mapeamento = {
@@ -56,16 +56,16 @@ export class UserActivitiesService {
       [AtividadeTipo.ALTERACAO_STATUS]: 'alteracao_status',
       [AtividadeTipo.RESET_SENHA]: 'reset_senha',
     };
-    
+
     return mapeamento[tipo] || 'login';
   }
 
   async registrarAtividade(
     usuarioId: string,
-    empresaId: string, 
-    tipo: AtividadeTipo, 
+    empresaId: string,
+    tipo: AtividadeTipo,
     descricao: string,
-    detalhes?: string
+    detalhes?: string,
   ): Promise<UserActivity> {
     try {
       const novaAtividade = this.userActivityRepository.create({
@@ -75,7 +75,7 @@ export class UserActivitiesService {
         descricao,
         detalhes,
       });
-      
+
       return await this.userActivityRepository.save(novaAtividade);
     } catch (error) {
       this.logger.error(`Erro ao registrar atividade: ${error.message}`);

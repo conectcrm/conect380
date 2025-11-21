@@ -1,4 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  Index,
+} from 'typeorm';
 import { FluxoAutomatizado } from './fluxo-automatizado.entity';
 
 export enum TipoEvento {
@@ -11,7 +20,7 @@ export enum TipoEvento {
   ERRO_OCORRIDO = 'erro_ocorrido',
   WORKFLOW_PAUSADO = 'workflow_pausado',
   WORKFLOW_RETOMADO = 'workflow_retomado',
-  WORKFLOW_CANCELADO = 'workflow_cancelado'
+  WORKFLOW_CANCELADO = 'workflow_cancelado',
 }
 
 export enum StatusEvento {
@@ -19,7 +28,7 @@ export enum StatusEvento {
   PROCESSANDO = 'processando',
   CONCLUIDO = 'concluido',
   ERRO = 'erro',
-  CANCELADO = 'cancelado'
+  CANCELADO = 'cancelado',
 }
 
 @Entity('eventos_fluxo')
@@ -41,14 +50,14 @@ export class EventoFluxo {
 
   @Column({
     type: 'enum',
-    enum: TipoEvento
+    enum: TipoEvento,
   })
   tipoEvento: TipoEvento;
 
   @Column({
     type: 'enum',
     enum: StatusEvento,
-    default: StatusEvento.PENDENTE
+    default: StatusEvento.PENDENTE,
   })
   status: StatusEvento;
 
@@ -119,7 +128,7 @@ export class EventoFluxo {
       this.resultadoProcessamento = {
         sucesso: true,
         dadosRetorno: resultado,
-        mensagem: 'Evento processado com sucesso'
+        mensagem: 'Evento processado com sucesso',
       };
     }
   }
@@ -134,7 +143,7 @@ export class EventoFluxo {
       sucesso: false,
       mensagem: erro,
       codigoErro: detalhes?.codigo || 'ERRO_GENERICO',
-      detalhesErro: detalhes
+      detalhesErro: detalhes,
     };
   }
 
@@ -144,19 +153,20 @@ export class EventoFluxo {
     this.resultadoProcessamento = {
       sucesso: false,
       mensagem: motivo || 'Evento cancelado',
-      codigoErro: 'CANCELADO'
+      codigoErro: 'CANCELADO',
     };
   }
 
   podeProcessar(): boolean {
-    return (this.status === StatusEvento.PENDENTE || this.status === StatusEvento.ERRO) &&
+    return (
+      (this.status === StatusEvento.PENDENTE || this.status === StatusEvento.ERRO) &&
       this.tentativas < this.maxTentativas &&
-      (!this.dataAgendamento || this.dataAgendamento <= new Date());
+      (!this.dataAgendamento || this.dataAgendamento <= new Date())
+    );
   }
 
   deveReprocessar(): boolean {
-    return this.status === StatusEvento.ERRO &&
-      this.tentativas < this.maxTentativas;
+    return this.status === StatusEvento.ERRO && this.tentativas < this.maxTentativas;
   }
 
   calcularProximaTentativa(): Date {
@@ -197,7 +207,7 @@ export class EventoFluxo {
       [StatusEvento.PROCESSANDO]: 'Processando...',
       [StatusEvento.CONCLUIDO]: 'Concluído com sucesso',
       [StatusEvento.ERRO]: `Erro (tentativa ${this.tentativas}/${this.maxTentativas})`,
-      [StatusEvento.CANCELADO]: 'Cancelado'
+      [StatusEvento.CANCELADO]: 'Cancelado',
     };
 
     return statusMap[this.status] || this.status;

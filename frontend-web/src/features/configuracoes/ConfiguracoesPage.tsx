@@ -20,11 +20,8 @@ import {
   TestTube,
   CheckCircle,
   AlertCircle,
-  Send,
-  MessageCircle
+  Send
 } from 'lucide-react';
-
-const ChatwootConfiguracao = React.lazy(() => import('../../pages/configuracoes/ChatwootConfiguracao'));
 
 const ConfiguracoesPage: React.FC = () => {
   // Estados
@@ -142,7 +139,6 @@ const ConfiguracoesPage: React.FC = () => {
     { id: 'perfil', label: 'Perfil', icon: User },
     { id: 'seguranca', label: 'Segurança', icon: Shield },
     { id: 'email', label: 'E-mail', icon: Mail },
-    { id: 'chatwoot', label: 'Chatwoot', icon: MessageCircle },
     { id: 'notificacoes', label: 'Notificações', icon: Bell },
     { id: 'aparencia', label: 'Aparência', icon: Palette },
     { id: 'empresa', label: 'Empresa', icon: Building },
@@ -666,14 +662,6 @@ const ConfiguracoesPage: React.FC = () => {
             </div>
           </div>
         );
-
-      case 'chatwoot':
-        return (
-          <React.Suspense fallback={<div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div></div>}>
-            <ChatwootConfiguracao />
-          </React.Suspense>
-        );
-
       case 'notificacoes':
         return (
           <div className="space-y-6">

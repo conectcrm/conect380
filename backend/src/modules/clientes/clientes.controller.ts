@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, UseInterceptors, NotFoundException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { ClientesService } from './clientes.service';
 import { Cliente, StatusCliente } from './cliente.entity';
@@ -6,15 +6,18 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
 import { EmpresaId } from '../../common/decorators/empresa.decorator';
 import { PaginationParams } from '../../common/interfaces/common.interface';
+import { CacheInterceptor, CacheTTL } from '../../common/interceptors/cache.interceptor';
 
 @ApiTags('clientes')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseInterceptors(CacheInterceptor) // 🚀 Cache ativado para clientes
 @Controller('clientes')
 export class ClientesController {
   constructor(private readonly clientesService: ClientesService) { }
 
   @Get()
+  @CacheTTL(2 * 60 * 1000) // 🚀 Cache: 2 minutos (listagem com paginação)
   @ApiOperation({ summary: 'Listar clientes' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
@@ -51,6 +54,7 @@ export class ClientesController {
   }
 
   @Get('estatisticas')
+  @CacheTTL(3 * 60 * 1000) // 🚀 Cache: 3 minutos (estatísticas mudam menos frequentemente)
   @ApiOperation({ summary: 'Obter estatísticas dos clientes' })
   @ApiResponse({ status: 200, description: 'Estatísticas retornadas com sucesso' })
   async getEstatisticas(@EmpresaId() empresaId: string) {

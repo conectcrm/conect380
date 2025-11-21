@@ -1,23 +1,9 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Body,
-  Param,
-  UseGuards,
-  Req,
-} from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { Fila } from '../entities/fila.entity';
-import {
-  CriarFilaDto,
-  AtualizarFilaDto,
-  AtribuirAtendenteFilaDto,
-} from '../dto';
+import { CriarFilaDto, AtualizarFilaDto, AtribuirAtendenteFilaDto } from '../dto';
 
 @Controller('atendimento/filas')
 @UseGuards(JwtAuthGuard)
@@ -87,11 +73,7 @@ export class FilasController {
   }
 
   @Put(':id')
-  async atualizar(
-    @Req() req,
-    @Param('id') id: string,
-    @Body() dto: AtualizarFilaDto,
-  ) {
+  async atualizar(@Req() req, @Param('id') id: string, @Body() dto: AtualizarFilaDto) {
     const empresaId = req.user.empresa_id || req.user.empresaId;
 
     const fila = await this.filaRepo.findOne({

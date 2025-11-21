@@ -1,20 +1,30 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+} from 'typeorm';
 import { Proposta } from '../../propostas/proposta.entity';
 import { User } from '../../users/user.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 import { AssinaturaContrato } from './assinatura-contrato.entity';
 
 export enum StatusContrato {
   AGUARDANDO_ASSINATURA = 'aguardando_assinatura',
   ASSINADO = 'assinado',
   CANCELADO = 'cancelado',
-  EXPIRADO = 'expirado'
+  EXPIRADO = 'expirado',
 }
 
 export enum TipoContrato {
   SERVICO = 'servico',
   PRODUTO = 'produto',
   MISTO = 'misto',
-  MANUTENCAO = 'manutencao'
+  MANUTENCAO = 'manutencao',
 }
 
 @Entity('contratos')
@@ -37,6 +47,13 @@ export class Contrato {
   clienteId: string;
 
   @Column('uuid')
+  empresa_id: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
+
+  @Column('uuid')
   usuarioResponsavelId: string;
 
   @ManyToOne(() => User)
@@ -46,14 +63,14 @@ export class Contrato {
   @Column({
     type: 'enum',
     enum: TipoContrato,
-    default: TipoContrato.SERVICO
+    default: TipoContrato.SERVICO,
   })
   tipo: TipoContrato;
 
   @Column({
     type: 'enum',
     enum: StatusContrato,
-    default: StatusContrato.AGUARDANDO_ASSINATURA
+    default: StatusContrato.AGUARDANDO_ASSINATURA,
   })
   status: StatusContrato;
 
@@ -95,7 +112,7 @@ export class Contrato {
   @Column({ type: 'text', nullable: true })
   hashDocumento: string;
 
-  @OneToMany(() => AssinaturaContrato, assinatura => assinatura.contrato)
+  @OneToMany(() => AssinaturaContrato, (assinatura) => assinatura.contrato)
   assinaturas: AssinaturaContrato[];
 
   @Column({ type: 'boolean', default: true })

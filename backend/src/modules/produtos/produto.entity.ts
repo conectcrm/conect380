@@ -4,7 +4,10 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Empresa } from '../../empresas/entities/empresa.entity';
 
 @Entity('produtos')
 export class Produto {
@@ -68,6 +71,13 @@ export class Produto {
   // Variações como JSON
   @Column({ type: 'json', nullable: true })
   variacoes?: string[];
+
+  @Column({ type: 'uuid' })
+  empresa_id: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @CreateDateColumn()
   criadoEm: Date;

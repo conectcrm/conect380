@@ -3,15 +3,15 @@
  */
 
 import React, { useState } from 'react';
-import { 
-  User, 
-  Phone, 
-  Mail, 
-  Building, 
-  MapPin, 
-  Tag, 
-  Edit, 
-  Trash2, 
+import {
+  User,
+  Phone,
+  Mail,
+  Building,
+  MapPin,
+  Tag,
+  Edit,
+  Trash2,
   Eye,
   MoreVertical,
   Camera,
@@ -72,35 +72,33 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
   };
 
   return (
-    <div 
+    <div
       className="bg-white rounded-lg border border-gray-200 hover:border-[#159A9C] hover:shadow-lg transition-all duration-200 overflow-hidden group cursor-pointer"
       onClick={() => onView?.(cliente)}
     >
       {/* Status Bar */}
-      <div className={`h-1 ${
-        cliente.status === 'cliente' ? 'bg-green-500' : 
-        cliente.status === 'prospect' ? 'bg-blue-500' : 
-        cliente.status === 'lead' ? 'bg-yellow-500' : 'bg-gray-400'
-      }`}></div>
-      
+      <div className={`h-1 ${cliente.status === 'cliente' ? 'bg-green-500' :
+          cliente.status === 'prospect' ? 'bg-blue-500' :
+            cliente.status === 'lead' ? 'bg-yellow-500' : 'bg-gray-400'
+        }`}></div>
+
       <div className="p-4">
         {/* Header: Avatar e Nome */}
         <div className="flex items-start space-x-3 mb-3">
           <div className="relative flex-shrink-0">
             <AvatarUpload
-              currentAvatar={cliente.avatar}
+              currentAvatar={cliente.avatar ?? cliente.avatarUrl}
               onAvatarChange={handleAvatarChange}
               size="sm"
               className="border-2 border-gray-100 group-hover:border-[#159A9C] transition-colors"
             />
             {/* Status Indicator */}
-            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${
-              cliente.status === 'cliente' ? 'bg-green-500' : 
-              cliente.status === 'prospect' ? 'bg-blue-500' : 
-              cliente.status === 'lead' ? 'bg-yellow-500' : 'bg-gray-400'
-            }`}></div>
+            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${cliente.status === 'cliente' ? 'bg-green-500' :
+                cliente.status === 'prospect' ? 'bg-blue-500' :
+                  cliente.status === 'lead' ? 'bg-yellow-500' : 'bg-gray-400'
+              }`}></div>
           </div>
-          
+
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-gray-900 truncate group-hover:text-[#159A9C] transition-colors">
               {cliente.nome}
@@ -177,7 +175,7 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(cliente.status)}`}>
             {getStatusLabel(cliente.status)}
           </span>
-          
+
           <div className="flex items-center space-x-2 text-xs text-gray-500">
             {/* Indicador de anexos se existirem */}
             <button
@@ -190,11 +188,11 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
             >
               <Paperclip className="w-3 h-3" />
             </button>
-            
+
             <span>
-              {new Date(cliente.created_at).toLocaleDateString('pt-BR', { 
-                day: '2-digit', 
-                month: '2-digit' 
+              {new Date(cliente.created_at).toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit'
               })}
             </span>
           </div>
@@ -215,7 +213,7 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
                 ✕
               </button>
             </div>
-            
+
             <FileUpload
               category="client-attachment"
               onUploadSuccess={handleAttachmentAdd}
@@ -223,7 +221,7 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
               compact={true}
               className="mb-2"
             />
-            
+
             {/* Lista simplificada de anexos */}
             <div className="flex flex-wrap gap-1">
               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-700">

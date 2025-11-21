@@ -10,4 +10,4 @@ import { IAAutoRespostaService } from './ia-auto-resposta.service';
   providers: [IAService, IAAutoRespostaService],
   exports: [IAService, IAAutoRespostaService],
 })
-export class IAModule { }
+export class IAModule {}

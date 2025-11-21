@@ -50,6 +50,13 @@ import { TriagemLog } from '../modules/triagem/entities/triagem-log.entity';
 import { EmpresaModulo } from '../modules/empresas/entities/empresa-modulo.entity'; // ✅ Sistema de licenciamento modular
 import { EmpresaConfig } from '../modules/empresas/entities/empresa-config.entity'; // ✅ Configurações de empresa
 import { PasswordResetToken } from '../modules/auth/entities/password-reset-token.entity'; // ✅ Tokens de recuperação de senha
+import { Lead } from '../modules/leads/lead.entity'; // ✅ Módulo de Leads CRM
+import { ConfiguracaoGateway } from '../modules/pagamentos/entities/configuracao-gateway.entity';
+import { TransacaoGateway } from '../modules/pagamentos/entities/transacao-gateway.entity';
+import { Cotacao } from '../cotacao/entities/cotacao.entity';
+import { ItemCotacao } from '../cotacao/entities/item-cotacao.entity';
+import { AnexoCotacao } from '../cotacao/entities/anexo-cotacao.entity';
+import { Notification } from '../notifications/entities/notification.entity';
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
@@ -101,6 +108,12 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         MessageTemplate, // ✅ Templates de Mensagens (respostas rápidas)
         SlaConfig, // ✅ SLA Tracking - Configurações de SLA
         SlaEventLog, // ✅ SLA Tracking - Logs de eventos SLA
+        ConfiguracaoGateway,
+        TransacaoGateway,
+        Cotacao,
+        ItemCotacao,
+        AnexoCotacao,
+        Notification, // ✅ Sistema de notificações
         NucleoAtendimento, // Módulo triagem
         Departamento, // Módulo triagem
         FluxoTriagem, // Módulo triagem
@@ -113,8 +126,9 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         EmpresaModulo, // ✅ Sistema de licenciamento modular
         EmpresaConfig, // ✅ Configurações de empresa
         PasswordResetToken, // ✅ Tokens de recuperação de senha
+        Lead, // ✅ Módulo de Leads CRM
       ],
-      synchronize: false, // Desabilitado - apenas tabelas base criadas manualmente
+      synchronize: false, // ✅ DESABILITADO - usar migrations para segurança
       logging: this.configService.get('APP_ENV') === 'development',
       cache: false, // ⚡ CRITICAL: Desabilita cache do TypeORM para evitar dados obsoletos
       // SSL apenas se DATABASE_SSL=true (para RDS externo)
@@ -133,6 +147,8 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       username: config.username,
       password: config.password?.substr(0, 3) + '***',
       database: config.database,
+      entitiesCount: config.entities.length, // ✅ Quantas entities carregadas
+      synchronize: config.synchronize, // ✅ Confirmar se está true
     });
 
     return config as TypeOrmModuleOptions;

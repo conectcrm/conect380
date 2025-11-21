@@ -1,3 +1,5 @@
+import { propostasService as sharedPropostasService, Proposta as PropostaBasica } from '../../../services/propostasService';
+
 interface Cliente {
   id: string;
   nome: string;
@@ -98,13 +100,11 @@ class PropostasService {
         (now - this.produtosCacheTimestamp) < this.CACHE_DURATION;
 
       if (isCacheValid) {
-        console.log('📦 Usando produtos do cache');
         return this.produtosCache!;
       }
 
       // Se já está carregando, aguardar um pouco para evitar múltiplas requisições simultâneas
       if (this.isLoadingProdutos) {
-        console.log('⏳ Aguardando carregamento de produtos em andamento...');
         await new Promise(resolve => setTimeout(resolve, 500));
 
         // Verificar se o cache foi atualizado enquanto esperava
@@ -114,15 +114,12 @@ class PropostasService {
       }
 
       this.isLoadingProdutos = true;
-      console.log('📦 Carregando produtos do servidor...');
 
       // Carregar produtos do backend
       const { produtosService } = await import('../../../services/produtosService');
       const produtosAPI = await produtosService.findAll();
 
       if (produtosAPI && produtosAPI.length > 0) {
-        console.log('📦 Produtos carregados do backend:', produtosAPI.length);
-
         // Converter produtos da API para o formato de propostas
         const produtosFormatados: Produto[] = produtosAPI.map((produto: any) => ({
           id: produto.id || `prod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -138,7 +135,6 @@ class PropostasService {
         this.produtosCache = produtosFormatados;
         this.produtosCacheTimestamp = Date.now();
 
-        console.log(`✅ ${produtosFormatados.length} produtos disponíveis para propostas (cache atualizado)`);
         return produtosFormatados;
       }
     } catch (error) {
@@ -148,7 +144,6 @@ class PropostasService {
     }
 
     // Fallback com produtos básicos se não conseguir carregar do backend
-    console.log('📦 Usando produtos básicos como fallback');
     const fallbackProdutos = [
       {
         id: 'prod1',
@@ -177,8 +172,6 @@ class PropostasService {
       const clientesData = await clientesService.getClientes({ page: 1, limit: 1000 });
 
       if (clientesData?.data && clientesData.data.length > 0) {
-        console.log('👥 Clientes carregados do backend:', clientesData.data.length);
-
         const clientesFormatados: Cliente[] = clientesData.data.map((cliente: any) => ({
           id: cliente.id || `cli_${Date.now()}`,
           nome: cliente.nome || 'Cliente sem nome',
@@ -210,13 +203,11 @@ class PropostasService {
         (now - this.vendedoresCacheTimestamp) < this.CACHE_DURATION;
 
       if (isCacheValid) {
-        console.log('� Usando vendedores do cache');
         return this.vendedoresCache!;
       }
 
       // Se já está carregando, aguardar um pouco para evitar múltiplas requisições simultâneas
       if (this.isLoadingVendedores) {
-        console.log('⏳ Aguardando carregamento de vendedores em andamento...');
         await new Promise(resolve => setTimeout(resolve, 500));
 
         // Verificar se o cache foi atualizado enquanto esperava
@@ -225,8 +216,7 @@ class PropostasService {
         }
       }
 
-      this.isLoadingVendedores = true;
-      console.log('�🔍 Carregando vendedores do servidor...');
+  this.isLoadingVendedores = true;
 
       // Como não temos vendedoresService, vamos usar usuários como vendedores
       const { usuariosService } = await import('../../../services/usuariosService');
@@ -237,14 +227,16 @@ class PropostasService {
       });
 
       // Filtrar apenas usuários ativos com timeout
-      const usuariosData = await Promise.race([
-        usuariosService.listarUsuarios({ ativo: true }),
+      const usuariosResult = await Promise.race([
+        usuariosService.listarUsuarios({ ativo: true, limite: 1000 }),
         timeoutPromise
       ]);
 
-      if (usuariosData && usuariosData.length > 0) {
-        console.log('👨‍💼 Usuários ativos carregados como vendedores:', usuariosData.length);
+      const usuariosData = Array.isArray(usuariosResult)
+        ? usuariosResult
+        : usuariosResult?.usuarios ?? [];
 
+      if (usuariosData && usuariosData.length > 0) {
         const vendedoresFormatados: Vendedor[] = usuariosData
           .filter((usuario: any) => usuario.ativo === true) // Dupla verificação
           .map((usuario: any) => ({
@@ -260,10 +252,9 @@ class PropostasService {
         this.vendedoresCache = vendedoresFormatados;
         this.vendedoresCacheTimestamp = Date.now();
 
-        console.log(`✅ ${vendedoresFormatados.length} vendedores ativos disponíveis para propostas (cache atualizado)`);
         return vendedoresFormatados;
       } else {
-        console.warn('⚠️ Nenhum usuário ativo encontrado, usando fallback');
+        // Nenhum usuário ativo encontrado, utilizar fallback padrão
       }
     } catch (error) {
       console.error('❌ Erro ao carregar vendedores do backend:', error);
@@ -272,7 +263,6 @@ class PropostasService {
     }
 
     // Fallback: retornar pelo menos um vendedor padrão
-    console.log('🔄 Usando vendedor padrão (fallback)');
     const fallbackVendedores = [
       {
         id: 'vend_default',
@@ -304,8 +294,6 @@ class PropostasService {
   // Criar nova proposta usando API real
   async criarProposta(dados: PropostaCompleta): Promise<PropostaCompleta> {
     try {
-      console.log('📝 Criando nova proposta via API:', dados);
-
       // Preparar dados para o backend
       const dadosParaBackend = {
         titulo: dados.titulo || this.gerarTituloAutomatico(dados.cliente),
@@ -330,7 +318,6 @@ class PropostasService {
       }
 
       const result = await response.json();
-      console.log('✅ Proposta criada no backend:', result);
 
       // Converter resposta do backend para formato do frontend
       const propostaCriada: PropostaCompleta = {
@@ -341,6 +328,8 @@ class PropostasService {
         criadaEm: new Date(result.proposta?.createdAt || Date.now()),
         atualizadaEm: new Date(result.proposta?.updatedAt || Date.now())
       };
+
+      sharedPropostasService.clearCache();
 
       return propostaCriada;
 
@@ -353,45 +342,90 @@ class PropostasService {
   // Listar propostas usando API real
   async listarPropostas(): Promise<PropostaCompleta[]> {
     try {
-      console.log('📋 Buscando propostas da API...');
+      const propostas = await sharedPropostasService.findAll();
 
-      const response = await fetch(this.baseUrl);
-
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log('✅ Propostas recebidas da API:', result);
-
-      if (!result.propostas || !Array.isArray(result.propostas)) {
-        console.warn('⚠️ Formato inesperado da resposta da API');
+      if (!Array.isArray(propostas) || propostas.length === 0) {
         return [];
       }
 
-      // Converter propostas do backend para formato do frontend
-      const propostasFormatadas: PropostaCompleta[] = result.propostas.map((prop: any) => ({
-        id: prop.id,
-        numero: prop.numero,
-        titulo: prop.titulo,
-        status: prop.status,
-        cliente: { nome: prop.cliente } as Cliente,
-        vendedor: { nome: prop.vendedor || 'N/A' } as Vendedor,
-        produtos: [],
-        descontoGlobal: 0,
-        impostos: 0,
-        formaPagamento: (prop.formaPagamento as any) || 'avista',
-        validadeDias: prop.validadeDias || 30,
-        observacoes: prop.observacoes || '',
-        incluirImpostosPDF: false,
-        subtotal: prop.valor || 0,
-        total: prop.valor || 0,
-        dataValidade: new Date(Date.now() + (prop.validadeDias || 30) * 24 * 60 * 60 * 1000),
-        criadaEm: new Date(prop.createdAt),
-        atualizadaEm: new Date(prop.updatedAt)
-      }));
+      const propostasFormatadas: PropostaCompleta[] = propostas.map((prop: PropostaBasica) => {
+        const cliente: Cliente = prop.cliente ? {
+          id: prop.cliente.id,
+          nome: prop.cliente.nome,
+          documento: prop.cliente.documento || '',
+          email: prop.cliente.email || '',
+          telefone: prop.cliente.telefone || '',
+          endereco: prop.cliente.endereco || '',
+          cidade: prop.cliente.cidade || '',
+          estado: prop.cliente.estado || '',
+          cep: (prop.cliente as any)?.cep || '',
+          tipoPessoa: (prop.cliente as any)?.tipoPessoa || 'fisica'
+        } : {
+          id: 'cliente_desconhecido',
+          nome: 'Cliente não informado',
+          documento: '',
+          email: '',
+          telefone: '',
+          endereco: '',
+          cidade: '',
+          estado: '',
+          cep: '',
+          tipoPessoa: 'fisica'
+        };
 
-      console.log(`📋 ${propostasFormatadas.length} propostas formatadas para o frontend`);
+        const produtos: ProdutoProposta[] = Array.isArray(prop.produtos)
+          ? prop.produtos.map((produto: any) => ({
+              produto: {
+                id: produto.id || produto.produtoId || `prod_${Date.now()}`,
+                nome: produto.nome || produto.produtoNome || 'Produto',
+                preco: produto.precoUnitario || produto.preco || 0,
+                categoria: produto.categoria || 'Geral',
+                unidade: produto.unidade || 'unidade',
+                descricao: produto.descricao || '',
+                tipo: 'produto'
+              },
+              quantidade: produto.quantidade || 1,
+              desconto: produto.desconto || 0,
+              subtotal: produto.subtotal || (produto.precoUnitario || produto.preco || 0) * (produto.quantidade || 1)
+            }))
+          : [];
+
+        return {
+          id: prop.id,
+          numero: prop.numero,
+          titulo: prop.numero || prop.observacoes || cliente.nome || 'Proposta Comercial',
+          status: (prop.status as any) || 'rascunho',
+          cliente,
+          vendedor: prop.vendedor ? {
+            id: prop.vendedor.id,
+            nome: prop.vendedor.nome,
+            email: prop.vendedor.email,
+            telefone: prop.vendedor.telefone,
+            tipo: (prop.vendedor.tipo as any) || 'vendedor',
+            ativo: prop.vendedor.ativo ?? true
+          } : {
+            id: 'vendedor_desconhecido',
+            nome: prop.vendedor?.nome || 'Vendedor não informado',
+            email: prop.vendedor?.email || '',
+            telefone: prop.vendedor?.telefone || '',
+            tipo: 'vendedor',
+            ativo: true
+          },
+          produtos,
+          descontoGlobal: prop.descontoGlobal ?? 0,
+          impostos: prop.impostos ?? 0,
+          formaPagamento: (prop.formaPagamento as any) || 'avista',
+          validadeDias: prop.validadeDias ?? 30,
+          observacoes: prop.observacoes || '',
+          incluirImpostosPDF: Boolean(prop.incluirImpostosPDF),
+          subtotal: prop.subtotal ?? prop.total ?? prop.valor ?? 0,
+          total: prop.total ?? prop.valor ?? 0,
+          dataValidade: prop.dataVencimento ? new Date(prop.dataVencimento) : new Date(Date.now() + (prop.validadeDias ?? 30) * 24 * 60 * 60 * 1000),
+          criadaEm: prop.criadaEm ? new Date(prop.criadaEm) : (prop.atualizadaEm ? new Date(prop.atualizadaEm) : new Date()),
+          atualizadaEm: prop.atualizadaEm ? new Date(prop.atualizadaEm) : new Date()
+        };
+      });
+
       return propostasFormatadas;
 
     } catch (error) {
@@ -403,23 +437,19 @@ class PropostasService {
   // Obter proposta específica usando API real
   async obterProposta(id: string): Promise<PropostaCompleta | null> {
     try {
-      console.log(`🔍 Buscando proposta ${id} na API...`);
 
       const response = await fetch(`${this.baseUrl}/${id}`);
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.log(`⚠️ Proposta ${id} não encontrada`);
           return null;
         }
         throw new Error(`Erro HTTP: ${response.status}`);
       }
 
       const result = await response.json();
-      console.log('✅ Proposta recebida da API:', result);
 
       if (!result.proposta) {
-        console.warn('⚠️ Proposta não encontrada na resposta da API');
         return null;
       }
 
@@ -447,7 +477,6 @@ class PropostasService {
         atualizadaEm: new Date(prop.updatedAt)
       };
 
-      console.log(`✅ Proposta ${id} formatada para o frontend`);
       return propostaFormatada;
 
     } catch (error) {
@@ -459,7 +488,6 @@ class PropostasService {
   // Remover proposta usando API real
   async removerProposta(id: string): Promise<boolean> {
     try {
-      console.log(`🗑️ Removendo proposta ${id} via API...`);
 
       const response = await fetch(`${this.baseUrl}/${id}`, {
         method: 'DELETE'
@@ -470,7 +498,8 @@ class PropostasService {
       }
 
       const result = await response.json();
-      console.log('✅ Proposta removida:', result);
+
+      sharedPropostasService.clearCache();
 
       return true;
 
@@ -483,7 +512,6 @@ class PropostasService {
   // Atualizar status de proposta
   async atualizarStatus(id: string, novoStatus: string): Promise<PropostaCompleta | null> {
     try {
-      console.log(`🔄 Atualizando status da proposta ${id} para ${novoStatus}...`);
 
       const response = await fetch(`${this.baseUrl}/${id}/status`, {
         method: 'PUT',
@@ -498,7 +526,8 @@ class PropostasService {
       }
 
       const result = await response.json();
-      console.log('✅ Status atualizado:', result);
+
+      sharedPropostasService.clearCache();
 
       // Retornar proposta atualizada
       return await this.obterProposta(id);
@@ -610,7 +639,8 @@ class PropostasService {
       }
 
       const result = await response.json();
-      console.log('✅ Proposta clonada no backend:', result);
+
+      sharedPropostasService.clearCache();
 
       return {
         ...propostaClone,
@@ -635,11 +665,8 @@ class PropostasService {
         (now - this.vendedorAtualCacheTimestamp) < this.CACHE_DURATION;
 
       if (isCacheValid) {
-        console.log('👤 Usando vendedor atual do cache');
         return this.vendedorAtualCache;
       }
-
-      console.log('👤 Obtendo vendedor atual...');
 
       // Timeout para evitar loading infinito
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -657,14 +684,11 @@ class PropostasService {
       this.vendedorAtualCache = vendedorAtual;
       this.vendedorAtualCacheTimestamp = Date.now();
 
-      console.log('✅ Vendedor atual definido:', vendedorAtual?.nome || 'Nenhum');
-
       return vendedorAtual;
     } catch (error) {
       console.error('❌ Erro ao obter vendedor atual:', error);
 
       // Fallback: retornar vendedor padrão
-      console.log('🔄 Usando vendedor padrão como atual');
       const fallbackVendedor = {
         id: 'vend_atual_default',
         nome: 'Vendedor Atual',
@@ -692,7 +716,6 @@ class PropostasService {
     this.produtosCacheTimestamp = 0;
     this.isLoadingVendedores = false;
     this.isLoadingProdutos = false;
-    console.log('🗑️ Cache completo limpo (vendedores e produtos)');
   }
 
   // Método para limpar cache de vendedores apenas (compatibilidade)
@@ -702,7 +725,6 @@ class PropostasService {
     this.vendedorAtualCache = null;
     this.vendedorAtualCacheTimestamp = 0;
     this.isLoadingVendedores = false;
-    console.log('🗑️ Cache de vendedores limpo');
   }
 
   // Preview de proposta (mock para compatibilidade)
@@ -727,21 +749,18 @@ class PropostasService {
 
   // Métodos para ações em lote (mock para compatibilidade)
   async atualizarStatusEmLote(ids: string[], novoStatus: string): Promise<void> {
-    console.log(`📋 Atualizando status em lote para ${ids.length} propostas`);
     for (const id of ids) {
       await this.atualizarStatus(id, novoStatus);
     }
   }
 
   async excluirEmLote(ids: string[]): Promise<void> {
-    console.log(`🗑️ Removendo ${ids.length} propostas em lote`);
     for (const id of ids) {
       await this.removerProposta(id);
     }
   }
 
   async enviarEmailEmLote(ids: string[]): Promise<void> {
-    console.log(`📧 Enviando email para ${ids.length} propostas`);
     // Mock implementation - em produção, integraria com EmailService
     await new Promise(resolve => setTimeout(resolve, 1000));
   }

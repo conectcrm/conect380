@@ -1,4 +1,17 @@
-import { IsString, IsNumber, IsEnum, IsOptional, IsDateString, IsObject, IsArray, ValidateNested, IsBoolean, Min, Max, IsUUID } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsEnum,
+  IsOptional,
+  IsDateString,
+  IsObject,
+  IsArray,
+  ValidateNested,
+  IsBoolean,
+  Min,
+  Max,
+  IsUUID,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { TipoContrato } from '../entities/contrato.entity';
 
@@ -22,13 +35,14 @@ export class CondicoesPagamentoDto {
 }
 
 export class CreateContratoDto {
+  @IsOptional()
   @IsUUID()
-  propostaId: string;
+  propostaId?: string;
 
   @IsUUID(4)
   clienteId: string;
 
-  @IsString()
+  @IsUUID(4)
   usuarioResponsavelId: string;
 
   @IsEnum(TipoContrato)

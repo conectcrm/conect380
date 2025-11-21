@@ -1,18 +1,15 @@
 import React, { useState } from 'react';
 import { Usuario } from '../../../../types/usuarios/index';
-import { 
-  X, 
-  User, 
-  Mail, 
-  Phone, 
-  Globe, 
-  Bell, 
-  Shield, 
-  Eye, 
+import {
+  X,
+  User,
+  Mail,
+  Phone,
+  Globe,
+  Shield,
+  Eye,
   EyeOff,
   Save,
-  Upload,
-  Camera,
   Calendar,
   Clock,
   Info
@@ -32,6 +29,12 @@ export const ModalPerfilUsuario: React.FC<ModalPerfilUsuarioProps> = ({
   usuario,
   onSave
 }) => {
+  const idiomaLabels: Record<string, string> = {
+    'pt-BR': 'Português (Brasil)',
+    'en-US': 'English (US)',
+    'es-ES': 'Español (ES)'
+  };
+
   const [loading, setSaving] = useState(false);
   const [dadosUsuario, setDadosUsuario] = useState<Partial<Usuario>>({
     nome: usuario.nome,
@@ -103,29 +106,12 @@ export const ModalPerfilUsuario: React.FC<ModalPerfilUsuarioProps> = ({
         ...(novaSenha && { senha: novaSenha })
       };
 
-      await onSave(dadosParaSalvar);
-      toast.success('Perfil atualizado com sucesso!');
+  await onSave(dadosParaSalvar);
       onClose();
     } catch (error) {
       toast.error('Erro ao atualizar perfil');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Simular upload de avatar
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setDadosUsuario(prev => ({
-          ...prev,
-          avatar_url: event.target?.result as string
-        }));
-      };
-      reader.readAsDataURL(file);
-      toast.success('Avatar carregado com sucesso!');
     }
   };
 
@@ -165,19 +151,11 @@ export const ModalPerfilUsuario: React.FC<ModalPerfilUsuarioProps> = ({
                   </span>
                 </div>
               )}
-              <label className="absolute bottom-0 right-0 bg-[#159A9C] text-white p-2 rounded-full cursor-pointer hover:bg-[#138A8C] transition-colors">
-                <Camera className="w-4 h-4" />
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarUpload}
-                  className="hidden"
-                />
-              </label>
             </div>
             <div>
               <h3 className="text-lg font-medium text-gray-900">{dadosUsuario.nome}</h3>
               <p className="text-sm text-gray-500">{usuario.role}</p>
+              <p className="text-xs text-gray-400 mt-1">Atualização da foto disponível em breve.</p>
             </div>
           </div>
 
@@ -239,16 +217,14 @@ export const ModalPerfilUsuario: React.FC<ModalPerfilUsuarioProps> = ({
                 </label>
                 <div className="relative">
                   <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <select
-                    value={dadosUsuario.idioma_preferido || 'pt-BR'}
-                    onChange={(e) => setDadosUsuario(prev => ({ ...prev, idioma_preferido: e.target.value }))}
-                    className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C]"
-                  >
-                    <option value="pt-BR">Português (Brasil)</option>
-                    <option value="en-US">English (US)</option>
-                    <option value="es-ES">Español</option>
-                  </select>
+                  <input
+                    type="text"
+                    value={idiomaLabels[dadosUsuario.idioma_preferido || 'pt-BR'] || dadosUsuario.idioma_preferido || 'Português (Brasil)'}
+                    readOnly
+                    className="pl-10 w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-600 focus:outline-none cursor-not-allowed"
+                  />
                 </div>
+                <p className="text-xs text-gray-400 mt-1">Alteração de idioma será disponibilizada em Configurações.</p>
               </div>
             </div>
           </div>
@@ -361,92 +337,13 @@ export const ModalPerfilUsuario: React.FC<ModalPerfilUsuarioProps> = ({
             </div>
           </div>
 
-          {/* Configurações */}
+          {/* Personalização futura */}
           <div className="space-y-4">
-            <h4 className="text-md font-medium text-gray-900 border-b pb-2">Configurações</h4>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tema
-                </label>
-                <div className="flex space-x-4">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="tema"
-                      value="light"
-                      checked={dadosUsuario.configuracoes?.tema === 'light'}
-                      onChange={(e) => setDadosUsuario(prev => ({
-                        ...prev,
-                        configuracoes: { ...prev.configuracoes, tema: e.target.value }
-                      }))}
-                      className="mr-2"
-                    />
-                    Claro
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="tema"
-                      value="dark"
-                      checked={dadosUsuario.configuracoes?.tema === 'dark'}
-                      onChange={(e) => setDadosUsuario(prev => ({
-                        ...prev,
-                        configuracoes: { ...prev.configuracoes, tema: e.target.value }
-                      }))}
-                      className="mr-2"
-                    />
-                    Escuro
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Notificações
-                </label>
-                <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={dadosUsuario.configuracoes?.notificacoes?.email ?? true}
-                      onChange={(e) => setDadosUsuario(prev => ({
-                        ...prev,
-                        configuracoes: {
-                          ...prev.configuracoes,
-                          notificacoes: {
-                            ...prev.configuracoes?.notificacoes,
-                            email: e.target.checked
-                          }
-                        }
-                      }))}
-                      className="mr-2"
-                    />
-                    <Bell className="w-4 h-4 mr-2 text-gray-400" />
-                    Notificações por email
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={dadosUsuario.configuracoes?.notificacoes?.push ?? true}
-                      onChange={(e) => setDadosUsuario(prev => ({
-                        ...prev,
-                        configuracoes: {
-                          ...prev.configuracoes,
-                          notificacoes: {
-                            ...prev.configuracoes?.notificacoes,
-                            push: e.target.checked
-                          }
-                        }
-                      }))}
-                      className="mr-2"
-                    />
-                    <Bell className="w-4 h-4 mr-2 text-gray-400" />
-                    Notificações push
-                  </label>
-                </div>
-              </div>
+            <h4 className="text-md font-medium text-gray-900 border-b pb-2">Personalização</h4>
+            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4">
+              <p className="text-sm text-gray-600">
+                Ajustes de tema e notificações serão centralizados na área de Configurações em uma próxima atualização.
+              </p>
             </div>
           </div>
 

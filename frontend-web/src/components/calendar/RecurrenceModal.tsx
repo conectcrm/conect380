@@ -196,7 +196,7 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl w-[calc(100%-2rem)] sm:w-[600px] md:w-[700px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div>
@@ -237,8 +237,8 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
                     type="button"
                     onClick={() => setPattern(prev => ({ ...prev, type: option.value as any }))}
                     className={`p-3 text-sm font-medium rounded-lg border transition-colors ${pattern.type === option.value
-                        ? 'bg-[#159A9C] text-white border-[#159A9C]'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      ? 'bg-[#159A9C] text-white border-[#159A9C]'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                       }`}
                   >
                     {option.label}
@@ -287,8 +287,8 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
                       type="button"
                       onClick={() => toggleDayOfWeek(index)}
                       className={`w-10 h-10 text-sm font-medium rounded-lg border transition-colors ${pattern.daysOfWeek?.includes(index)
-                          ? 'bg-[#159A9C] text-white border-[#159A9C]'
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        ? 'bg-[#159A9C] text-white border-[#159A9C]'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                         }`}
                     >
                       {day}

@@ -33,8 +33,11 @@ interface Departamento {
 }
 
 interface Atendente {
-  id: string;
+  id: string; // Sempre representar o usuário (users.id) para integração com backend
   nome: string;
+  usuarioId?: string | null;
+  atendenteId?: string;
+  email?: string | null;
 }
 
 interface Equipe {
@@ -150,8 +153,31 @@ const GestaoAtribuicoesPage: React.FC<GestaoAtribuicoesPageProps> = ({ hideBackB
 
       const atendentesNormalizados: Atendente[] = Array.isArray(atendentesResponse)
         ? atendentesResponse
-          .filter((atendente: any) => atendente && atendente.id && atendente.nome)
-          .map((atendente: any) => ({ id: atendente.id, nome: atendente.nome }))
+          .map((atendente: any) => {
+            if (!atendente) {
+              return null;
+            }
+
+            const usuarioId = atendente?.usuarioId
+              || atendente?.usuario_id
+              || atendente?.userId
+              || atendente?.user_id
+              || null;
+
+            if (!usuarioId) {
+              console.warn('Atendente sem usuário vinculado. Ignorando na atribuição direta.', atendente);
+              return null;
+            }
+
+            return {
+              id: usuarioId,
+              nome: atendente?.nome || atendente?.user?.nome || 'Atendente sem nome',
+              usuarioId,
+              atendenteId: atendente?.id,
+              email: atendente?.email || atendente?.user?.email || null,
+            } as Atendente;
+          })
+          .filter((atendente): atendente is Atendente => Boolean(atendente && atendente.id && atendente.nome))
         : [];
 
       const nucleosVisiveis = Array.isArray(nucleosResponse)
@@ -232,7 +258,7 @@ const GestaoAtribuicoesPage: React.FC<GestaoAtribuicoesPageProps> = ({ hideBackB
         return registros.map((registro: any) => ({
           id: registro.id,
           tipo: 'atendente' as const,
-          atendenteId: atendente.id,
+          atendenteId: registro.atendenteId || atendente.id,
           atendenteNome: atendente.nome,
           nucleoId: registro.nucleoId || registro.nucleo?.id || null,
           nucleoNome: registro.nucleo?.nome || null,

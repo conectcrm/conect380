@@ -1,18 +1,9 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  Query,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { MetasService, CreateMetaDto, UpdateMetaDto } from './metas.service';
 
 @Controller('metas')
 export class MetasController {
-  constructor(private readonly metasService: MetasService) { }
+  constructor(private readonly metasService: MetasService) {}
 
   @Post()
   create(@Body() createMetaDto: CreateMetaDto) {
@@ -40,10 +31,7 @@ export class MetasController {
   }
 
   @Get('atual')
-  getMetaAtual(
-    @Query('vendedorId') vendedorId?: string,
-    @Query('regiao') regiao?: string,
-  ) {
+  getMetaAtual(@Query('vendedorId') vendedorId?: string, @Query('regiao') regiao?: string) {
     const vendedorIdNumber = vendedorId ? parseInt(vendedorId) : undefined;
     return this.metasService.getMetaAtual(vendedorIdNumber, regiao);
   }
@@ -54,10 +42,7 @@ export class MetasController {
   }
 
   @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @Body() updateMetaDto: UpdateMetaDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateMetaDto: UpdateMetaDto) {
     return this.metasService.update(id, updateMetaDto);
   }
 

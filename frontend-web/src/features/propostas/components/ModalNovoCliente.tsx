@@ -3,12 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { X, Building, User, Mail, Phone, MapPin, FileText } from 'lucide-react';
-
-// Toast simples para demonstração
-const toast = {
-  success: (message: string) => console.log('✅', message),
-  error: (message: string) => console.error('❌', message)
-};
+import { toast } from 'react-hot-toast';
 
 interface Cliente {
   id: string;
@@ -57,7 +52,7 @@ const clienteSchema = yup.object({
 });
 
 const estados = [
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG',
   'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
 ];
 
@@ -103,7 +98,7 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
       onClienteCriado(novoCliente);
       reset();
       onClose();
-      
+
     } catch (error) {
       console.error('Erro ao criar cliente:', error);
       toast.error('Erro ao criar cliente. Tente novamente.');
@@ -114,7 +109,7 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl w-[calc(100%-2rem)] sm:w-[500px] md:w-[600px] lg:w-[700px] max-w-[800px] max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center space-x-3">
@@ -177,7 +172,7 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
 
           {/* Grid de campos */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
+
             {/* Nome */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">

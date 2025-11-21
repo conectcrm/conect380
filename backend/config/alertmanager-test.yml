@@ -1,0 +1,137 @@
+# Alertmanager Configuration - ConectCRM (Modo de Teste)
+# ATENÇÃO: Configuração simplificada para testes locais sem integrações externas
+
+global:
+  resolve_timeout: 5m
+
+# Roteamento de alertas por severidade
+route:
+  # Configurações padrão
+  receiver: 'default'
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s        # Aguardar antes de enviar primeiro alerta
+  group_interval: 10s    # Intervalo entre alertas do mesmo grupo
+  repeat_interval: 12h   # Repetir alerta não resolvido
+
+  # Rotas específicas por severidade
+  routes:
+    # CRÍTICO: Notificação imediata
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 0s
+      repeat_interval: 5m
+
+    # AVISO
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 30s
+      repeat_interval: 3h
+
+    # INFO
+    - match:
+        severity: info
+      receiver: 'info-alerts'
+      group_wait: 5m
+      repeat_interval: 24h
+
+    # Alertas de SLO
+    - match:
+        type: slo
+      receiver: 'slo-alerts'
+      group_by: ['slo_name', 'window']
+      repeat_interval: 1h
+
+# Inibição de alertas (evitar spam)
+inhibit_rules:
+  # Inibir warning se critical está ativo
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
+
+  # Inibir alertas de componentes se sistema inteiro está down
+  - source_match:
+      alertname: 'SystemDown'
+    target_match_re:
+      alertname: '.*'
+    equal: ['instance']
+
+# Receivers (com notificações reais)
+receivers:
+  # Default: Webhook genérico para testes
+  - name: 'default'
+    webhook_configs:
+      - url: 'http://host.docker.internal:8080/alerts/default'
+        send_resolved: true
+    
+  # Crítico: Slack + Webhook
+  - name: 'critical-alerts'
+    # Slack para alertas críticos (substituir WEBHOOK_URL)
+    slack_configs:
+      - api_url: '{{ if .ExternalURL }}{{ .ExternalURL }}{{ else }}https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK{{ end }}'
+        channel: '#alerts-critical'
+        title: '🚨 [CRITICAL] {{ .GroupLabels.alertname }}'
+        text: |
+          *Alert:* {{ .GroupLabels.alertname }}
+          *Severity:* {{ .CommonLabels.severity }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          {{ if .CommonAnnotations.runbook }}*Runbook:* {{ .CommonAnnotations.runbook }}{{ end }}
+          *Status:* {{ .Status }}
+        send_resolved: true
+    # Webhook backup
+    webhook_configs:
+      - url: 'http://host.docker.internal:8080/alerts/critical'
+        send_resolved: true
+    
+  # Warning: Slack (canal diferente)
+  - name: 'warning-alerts'
+    slack_configs:
+      - api_url: '{{ if .ExternalURL }}{{ .ExternalURL }}{{ else }}https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK{{ end }}'
+        channel: '#alerts-warning'
+        title: '⚠️ [WARNING] {{ .GroupLabels.alertname }}'
+        text: |
+          *Alert:* {{ .GroupLabels.alertname }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          *Status:* {{ .Status }}
+        send_resolved: true
+    webhook_configs:
+      - url: 'http://host.docker.internal:8080/alerts/warning'
+        send_resolved: true
+    
+  # Info: Apenas webhook (sem Slack para não fazer spam)
+  - name: 'info-alerts'
+    webhook_configs:
+      - url: 'http://host.docker.internal:8080/alerts/info'
+        send_resolved: true
+
+  # SLO: Slack + Email
+  - name: 'slo-alerts'
+    slack_configs:
+      - api_url: '{{ if .ExternalURL }}{{ .ExternalURL }}{{ else }}https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK{{ end }}'
+        channel: '#alerts-slo'
+        title: '📊 [SLO] {{ .GroupLabels.alertname }}'
+        text: |
+          *SLO Alert:* {{ .GroupLabels.alertname }}
+          *SLO Name:* {{ .GroupLabels.slo_name }}
+          *Window:* {{ .GroupLabels.window }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Current Value:* {{ .CommonAnnotations.description }}
+          *Status:* {{ .Status }}
+        send_resolved: true
+    # Email para SLO (configurar SMTP se necessário)
+    # email_configs:
+    #   - to: 'sre-team@conectcrm.com'
+    #     from: 'alertmanager@conectcrm.com'
+    #     smarthost: 'smtp.gmail.com:587'
+    #     auth_username: 'alertmanager@conectcrm.com'
+    #     auth_password: 'YOUR_APP_PASSWORD'
+    #     headers:
+    #       Subject: '[SLO Alert] {{ .GroupLabels.alertname }}'
+    webhook_configs:
+      - url: 'http://host.docker.internal:8080/alerts/slo'
+        send_resolved: true

@@ -56,7 +56,7 @@ export const VincularClienteModal: React.FC<VincularClienteModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg shadow-2xl w-[calc(100%-2rem)] sm:w-[500px] md:w-[600px] lg:w-[700px] xl:w-[700px] max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col">
         <div
           className="flex items-center justify-between px-6 py-4 border-b"
           style={{ backgroundColor: `${currentPalette.colors.primary}10` }}
@@ -100,8 +100,8 @@ export const VincularClienteModal: React.FC<VincularClienteModalProps> = ({
                   key={cliente.id}
                   onClick={() => setClienteSelecionado(cliente)}
                   className={`w-full px-4 py-3 rounded-lg transition-all text-left ${clienteSelecionado?.id === cliente.id
-                      ? 'border-2 shadow-md'
-                      : 'border border-gray-200 hover:border-gray-300'
+                    ? 'border-2 shadow-md'
+                    : 'border border-gray-200 hover:border-gray-300'
                     }`}
                   style={{
                     borderColor: clienteSelecionado?.id === cliente.id ? currentPalette.colors.primary : undefined,

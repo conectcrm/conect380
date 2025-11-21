@@ -28,7 +28,9 @@ export class PdfContratoService {
       // Escrever arquivo
       fs.writeFileSync(caminhoCompleto, htmlContent, 'utf8');
 
-      this.logger.log(`Contrato HTML gerado para ${contrato.numero || contrato.id}: ${caminhoCompleto}`);
+      this.logger.log(
+        `Contrato HTML gerado para ${contrato.numero || contrato.id}: ${caminhoCompleto}`,
+      );
 
       return caminhoCompleto;
     } catch (error) {
@@ -150,12 +152,16 @@ export class PdfContratoService {
     <div class="section">
         <div class="section-title">2. VALOR E CONDIÇÕES DE PAGAMENTO</div>
         <p><span class="value">Valor Total: R$ ${contrato.valorTotal?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}</span></p>
-        ${contrato.condicoesPagamento ? `
+        ${
+          contrato.condicoesPagamento
+            ? `
         <p>Forma de Pagamento: ${contrato.condicoesPagamento.formaPagamento}<br>
         Número de Parcelas: ${contrato.condicoesPagamento.parcelas}<br>
         Valor da Parcela: R$ ${contrato.condicoesPagamento.valorParcela?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}<br>
         Dia de Vencimento: ${contrato.condicoesPagamento.diaVencimento}</p>
-        ` : ''}
+        `
+            : ''
+        }
     </div>
 
     <div class="section">
@@ -164,19 +170,27 @@ export class PdfContratoService {
         Data de Término: ${contrato.dataFim ? new Date(contrato.dataFim).toLocaleDateString('pt-BR') : 'N/A'}</p>
     </div>
 
-    ${contrato.clausulasEspeciais ? `
+    ${
+      contrato.clausulasEspeciais
+        ? `
     <div class="section">
         <div class="section-title">4. CLÁUSULAS ESPECIAIS</div>
         <p>${contrato.clausulasEspeciais}</p>
     </div>
-    ` : ''}
+    `
+        : ''
+    }
 
-    ${contrato.observacoes ? `
+    ${
+      contrato.observacoes
+        ? `
     <div class="section">
         <div class="section-title">5. OBSERVAÇÕES</div>
         <p>${contrato.observacoes}</p>
     </div>
-    ` : ''}
+    `
+        : ''
+    }
 
     <div class="section">
         <div class="section-title">6. CLÁUSULAS GERAIS</div>

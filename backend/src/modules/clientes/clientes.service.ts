@@ -16,12 +16,17 @@ export class ClientesService {
     return this.clienteRepository.save(cliente);
   }
 
-  async findAll(
-    empresaId: string,
-    params: PaginationParams,
-  ): Promise<PaginatedResponse<Cliente>> {
-    const { page = 1, limit = 10, search, status, tipo, sortBy = 'created_at', sortOrder = 'DESC' } = params;
-    
+  async findAll(empresaId: string, params: PaginationParams): Promise<PaginatedResponse<Cliente>> {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      status,
+      tipo,
+      sortBy = 'created_at',
+      sortOrder = 'DESC',
+    } = params;
+
     const queryBuilder = this.clienteRepository
       .createQueryBuilder('cliente')
       .where('cliente.empresa_id = :empresaId', { empresaId })
@@ -30,7 +35,7 @@ export class ClientesService {
     if (search) {
       queryBuilder.andWhere(
         '(cliente.nome ILIKE :search OR cliente.email ILIKE :search OR cliente.empresa ILIKE :search)',
-        { search: `%${search}%` }
+        { search: `%${search}%` },
       );
     }
 
@@ -70,18 +75,12 @@ export class ClientesService {
   }
 
   async update(id: string, empresaId: string, updateData: Partial<Cliente>): Promise<Cliente> {
-    await this.clienteRepository.update(
-      { id, empresa_id: empresaId },
-      updateData
-    );
+    await this.clienteRepository.update({ id, empresa_id: empresaId }, updateData);
     return this.findById(id, empresaId);
   }
 
   async delete(id: string, empresaId: string): Promise<void> {
-    await this.clienteRepository.update(
-      { id, empresa_id: empresaId },
-      { ativo: false }
-    );
+    await this.clienteRepository.update({ id, empresa_id: empresaId }, { ativo: false });
   }
 
   async getByStatus(empresaId: string, status: StatusCliente): Promise<Cliente[]> {
@@ -94,7 +93,7 @@ export class ClientesService {
   async updateStatus(id: string, empresaId: string, status: StatusCliente): Promise<Cliente> {
     await this.clienteRepository.update(
       { id, empresa_id: empresaId },
-      { status, ultimo_contato: new Date() }
+      { status, ultimo_contato: new Date() },
     );
     return this.findById(id, empresaId);
   }
@@ -105,8 +104,8 @@ export class ClientesService {
     amanha.setDate(hoje.getDate() + 1);
 
     return this.clienteRepository.find({
-      where: { 
-        empresa_id: empresaId, 
+      where: {
+        empresa_id: empresaId,
         ativo: true,
       },
       order: { proximo_contato: 'ASC' },
@@ -115,23 +114,23 @@ export class ClientesService {
 
   async getEstatisticas(empresaId: string) {
     const totalClientes = await this.clienteRepository.count({
-      where: { empresa_id: empresaId, ativo: true }
+      where: { empresa_id: empresaId, ativo: true },
     });
 
     const clientesAtivos = await this.clienteRepository.count({
-      where: { empresa_id: empresaId, ativo: true, status: StatusCliente.CLIENTE }
+      where: { empresa_id: empresaId, ativo: true, status: StatusCliente.CLIENTE },
     });
 
     const leads = await this.clienteRepository.count({
-      where: { empresa_id: empresaId, ativo: true, status: StatusCliente.LEAD }
+      where: { empresa_id: empresaId, ativo: true, status: StatusCliente.LEAD },
     });
 
     const prospects = await this.clienteRepository.count({
-      where: { empresa_id: empresaId, ativo: true, status: StatusCliente.PROSPECT }
+      where: { empresa_id: empresaId, ativo: true, status: StatusCliente.PROSPECT },
     });
 
     const inativos = await this.clienteRepository.count({
-      where: { empresa_id: empresaId, ativo: true, status: StatusCliente.INATIVO }
+      where: { empresa_id: empresaId, ativo: true, status: StatusCliente.INATIVO },
     });
 
     // Novos clientes no mês atual
@@ -152,7 +151,7 @@ export class ClientesService {
       leads,
       prospects,
       inativos,
-      novosClientesMes
+      novosClientesMes,
     };
   }
 }

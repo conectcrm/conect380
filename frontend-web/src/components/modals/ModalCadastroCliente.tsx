@@ -458,7 +458,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen p-4 bg-black bg-opacity-50">
-        <div className="relative w-full max-w-7xl bg-white rounded-xl shadow-2xl">
+        <div className="relative w-[calc(100%-2rem)] sm:w-[700px] md:w-[900px] lg:w-[1100px] xl:w-[1300px] max-w-[1600px] bg-white rounded-xl shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div className="flex items-center space-x-3">
@@ -956,8 +956,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                       type="submit"
                       disabled={!isValid || isLoading}
                       className={`px-6 py-2 rounded-lg font-medium transition-all flex items-center space-x-2 ${isValid && !isLoading
-                          ? 'bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white hover:shadow-lg'
-                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        ? 'bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white hover:shadow-lg'
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         }`}
                     >
                       {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}

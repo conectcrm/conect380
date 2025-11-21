@@ -19,6 +19,7 @@ cp src/pages/_TemplatePage.tsx src/pages/MinhaNovaPage.tsx
 Antes de criar qualquer tela, **LEIA**:
 
 - **Design Guidelines**: [`DESIGN_GUIDELINES.md`](./DESIGN_GUIDELINES.md)
+- **Padrão de Criação (Funil & Produtos)**: [`SCREEN_CREATION_PATTERN.md`](./SCREEN_CREATION_PATTERN.md)
 - **Template Base**: [`src/pages/_TemplatePage.tsx`](./src/pages/_TemplatePage.tsx)
 - **Instruções Copilot**: [`../.github/copilot-instructions.md`](../.github/copilot-instructions.md)
 
@@ -62,7 +63,7 @@ Ao criar uma tela, certifique-se de:
 - [ ] Substituiu TODOS os `[PERSONALIZAR]`
 - [ ] Usou cor correta do módulo
 - [ ] Incluiu `BackToNucleus` no header
-- [ ] Implementou 4 dashboard cards com gradientes
+- [ ] Avaliou e implementou dashboard cards **quando fizer sentido** (consulte `SCREEN_CREATION_PATTERN.md`)
 - [ ] Adicionou barra de busca/filtros
 - [ ] Grid responsivo (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3`)
 - [ ] Estado vazio com call-to-action
@@ -110,6 +111,15 @@ import { Dialog } from '../components/ui/dialog';
 <div className="bg-white border-b px-6 py-4">
   <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
 </div>
+```
+
+#### ❌ NÃO criar cards sólidos coloridos
+```tsx
+// ERRADO ❌ - fundo sólido ignorando paleta
+<div className="bg-red-500 text-white p-6 rounded-lg">...</div>
+
+// CORRETO ✅ - siga os gradientes suaves usados em Produtos/Oportunidades
+<div className="p-6 rounded-xl border border-[#DEEFE7] bg-gradient-to-br from-blue-100 to-blue-200">...</div>
 ```
 
 ### 🎯 Estrutura Padrão de Página

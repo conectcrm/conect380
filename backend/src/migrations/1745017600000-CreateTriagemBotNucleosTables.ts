@@ -4,7 +4,6 @@ export class CreateTriagemBotNucleosTables1745017600000 implements MigrationInte
   name = 'CreateTriagemBotNucleosTables1745017600000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-
     // ===================================================================
     // 1. TABELA: nucleos_atendimento
     // ===================================================================

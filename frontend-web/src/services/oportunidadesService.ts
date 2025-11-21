@@ -22,9 +22,9 @@ class OportunidadesService {
   });
 
   constructor() {
-    // Interceptor para adicionar token de autenticação - TEMPORARIAMENTE DESABILITADO
+    // Interceptor para adicionar token de autenticação
     this.api.interceptors.request.use((config) => {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem('authToken'); // ✅ Mesmo nome usado em api.ts
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -46,10 +46,10 @@ class OportunidadesService {
   async criarOportunidade(oportunidade: NovaOportunidade): Promise<Oportunidade> {
     console.log('Service - Dados recebidos:', oportunidade);
 
-    const cliente_id = oportunidade.clienteId ?? null;
+    const cliente_id = oportunidade.cliente_id ?? null;
     const dataFechamento = this.serializeDate(oportunidade.dataFechamentoEsperado);
 
-    // Transformar campos para o formato esperado pelo backend
+    // ✅ Interface já usa snake_case - enviar direto (com limpeza de tags vazias)
     const dadosBackend = {
       titulo: oportunidade.titulo,
       descricao: oportunidade.descricao,
@@ -58,9 +58,9 @@ class OportunidadesService {
       estagio: oportunidade.estagio,
       prioridade: oportunidade.prioridade,
       origem: oportunidade.origem,
-      tags: oportunidade.tags,
+      tags: oportunidade.tags && oportunidade.tags.length > 0 ? oportunidade.tags : undefined, // ✅ Não enviar array vazio
       dataFechamentoEsperado: dataFechamento,
-      responsavel_id: oportunidade.responsavelId,
+      responsavel_id: oportunidade.responsavel_id, // ✅ Já está correto
       cliente_id,
       nomeContato: oportunidade.nomeContato,
       emailContato: oportunidade.emailContato,
@@ -85,7 +85,7 @@ class OportunidadesService {
     const { id, ...dados } = oportunidade;
     const dataFechamento = this.serializeDate(dados.dataFechamentoEsperado);
 
-    // Transformar campos para o formato esperado pelo backend
+    // ✅ Interface já usa snake_case - enviar direto (com limpeza de tags vazias)
     const dadosBackend = {
       titulo: dados.titulo,
       descricao: dados.descricao,
@@ -94,10 +94,10 @@ class OportunidadesService {
       estagio: dados.estagio,
       prioridade: dados.prioridade,
       origem: dados.origem,
-      tags: dados.tags,
+      tags: dados.tags && dados.tags.length > 0 ? dados.tags : undefined, // ✅ Não enviar array vazio
       dataFechamentoEsperado: dataFechamento,
-      responsavel_id: dados.responsavelId,
-      cliente_id: dados.clienteId,
+      responsavel_id: dados.responsavel_id, // ✅ Já está correto
+      cliente_id: dados.cliente_id, // ✅ Já está correto
       nomeContato: dados.nomeContato,
       emailContato: dados.emailContato,
       telefoneContato: dados.telefoneContato,
@@ -105,7 +105,7 @@ class OportunidadesService {
       observacoes: dados.observacoes
     };
 
-    const response = await this.api.put(`/${id}`, dadosBackend);
+    const response = await this.api.patch(`/${id}`, dadosBackend);
     return this.formatarOportunidade(response.data);
   }
 

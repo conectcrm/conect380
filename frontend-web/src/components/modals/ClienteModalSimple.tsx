@@ -57,7 +57,7 @@ const ClienteModalSimple: React.FC<ClienteModalProps> = ({
     const validTelefone = Boolean(telefone && telefone.trim().length > 0);
     const validTipo = tipo === 'pessoa_fisica' || tipo === 'pessoa_juridica';
     const validStatus = ['lead', 'prospect', 'cliente', 'inativo'].includes(status || '');
-    
+
     return validNome && validEmail && validTelefone && validTipo && validStatus;
   }, [nome, email, telefone, tipo, status]);
 
@@ -65,10 +65,10 @@ const ClienteModalSimple: React.FC<ClienteModalProps> = ({
   React.useEffect(() => {
     if (isOpen) {
       console.log('=== DEBUG MODAL SIMPLES ===');
-      console.log('Estado do formulário:', { 
-        isValid, 
+      console.log('Estado do formulário:', {
+        isValid,
         isValidating,
-        errors: Object.keys(errors).length > 0 ? errors : 'Nenhum erro', 
+        errors: Object.keys(errors).length > 0 ? errors : 'Nenhum erro',
         isSubmitting,
         isFormValidManual
       });
@@ -158,7 +158,7 @@ const ClienteModalSimple: React.FC<ClienteModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl w-[calc(100%-2rem)] sm:w-[700px] md:w-[800px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] max-h-[90vh] overflow-hidden">
         <form onSubmit={handleSubmit(onSubmit)} className="h-full flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white">
@@ -186,9 +186,8 @@ const ClienteModalSimple: React.FC<ClienteModalProps> = ({
                 <input
                   {...register('nome')}
                   type="text"
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
-                    errors.nome ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.nome ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   placeholder="Digite o nome completo"
                 />
                 {errors.nome && (
@@ -204,9 +203,8 @@ const ClienteModalSimple: React.FC<ClienteModalProps> = ({
                 <input
                   {...register('email')}
                   type="email"
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
-                    errors.email ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.email ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   placeholder="email@exemplo.com"
                 />
                 {errors.email && (
@@ -222,9 +220,8 @@ const ClienteModalSimple: React.FC<ClienteModalProps> = ({
                 <input
                   {...register('telefone')}
                   type="tel"
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
-                    errors.telefone ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.telefone ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   placeholder="(11) 99999-9999"
                 />
                 {errors.telefone && (
@@ -239,9 +236,8 @@ const ClienteModalSimple: React.FC<ClienteModalProps> = ({
                 </label>
                 <select
                   {...register('tipo')}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
-                    errors.tipo ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.tipo ? 'border-red-500' : 'border-gray-300'
+                    }`}
                 >
                   <option value="pessoa_fisica">Pessoa Física</option>
                   <option value="pessoa_juridica">Pessoa Jurídica</option>
@@ -258,9 +254,8 @@ const ClienteModalSimple: React.FC<ClienteModalProps> = ({
                 </label>
                 <select
                   {...register('status')}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
-                    errors.status ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.status ? 'border-red-500' : 'border-gray-300'
+                    }`}
                 >
                   <option value="lead">Lead</option>
                   <option value="prospect">Prospect</option>
@@ -292,7 +287,7 @@ const ClienteModalSimple: React.FC<ClienteModalProps> = ({
                 </span>
               )}
             </div>
-            
+
             <div className="flex space-x-3">
               <button
                 type="button"

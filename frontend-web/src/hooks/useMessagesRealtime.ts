@@ -37,7 +37,9 @@ export function useMessagesRealtime(ticketId: string | null) {
   const [digitando, setDigitando] = useState<{ userId: string; timestamp: Date } | null>(null);
 
   // Token do usuário
-  const token = localStorage.getItem('token');
+  const socketRef = useRef<Socket | null>(null);
+  const token = localStorage.getItem('authToken');
+  const empresaId = localStorage.getItem('empresaAtiva');
 
   // WebSocket hook
   const {

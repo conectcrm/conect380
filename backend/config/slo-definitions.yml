@@ -1,0 +1,308 @@
+# SLO (Service Level Objectives) - ConectCRM
+# Definição dos objetivos de nível de serviço e error budgets
+
+# ========================================
+# CONCEITOS:
+# - SLI (Service Level Indicator): Métrica que mede o serviço
+# - SLO (Service Level Objective): Target/meta da SLI
+# - SLA (Service Level Agreement): Contrato com cliente (SLO + consequências)
+# - Error Budget: Margem de erro aceitável (1 - SLO)
+# ========================================
+
+slos:
+  # ========================================
+  # SLO 1: DISPONIBILIDADE
+  # ========================================
+  availability:
+    name: "Disponibilidade da API"
+    description: "Percentual de requisições bem-sucedidas (status 2xx/3xx)"
+    
+    # SLI: Taxa de sucesso
+    sli:
+      metric: http_requests_total
+      success_criteria: status !~ "5.."
+      
+    # Targets por janela de tempo
+    targets:
+      - window: 30d
+        target: 99.9%    # "Three nines"
+        error_budget: 0.1%
+        downtime_allowed: 43m  # Por mês
+      
+      - window: 7d
+        target: 99.95%
+        error_budget: 0.05%
+        downtime_allowed: 5m   # Por semana
+    
+    # Prometheus query
+    promql: |
+      (
+        sum(rate(http_requests_total{status!~"5.."}[30d]))
+        /
+        sum(rate(http_requests_total[30d]))
+      ) * 100
+    
+    # Alertas
+    alerts:
+      - name: SLOAvailabilityViolation
+        severity: critical
+        threshold: 99.9%
+        action: "Investigar falhas 5xx imediatamente"
+
+  # ========================================
+  # SLO 2: LATÊNCIA
+  # ========================================
+  latency:
+    name: "Latência de Requisições"
+    description: "95% das requisições devem responder em < 2s"
+    
+    sli:
+      metric: http_request_duration_seconds
+      percentile: 95
+      
+    targets:
+      - window: 7d
+        target: 2s       # P95 < 2s
+        error_budget: 5%  # 5% podem exceder 2s
+      
+      - window: 1d
+        target: 1.5s     # Target mais agressivo para dia
+        error_budget: 3%
+    
+    promql: |
+      histogram_quantile(0.95,
+        sum(rate(http_request_duration_seconds_bucket[7d])) by (le)
+      )
+    
+    alerts:
+      - name: SLOLatencyViolation
+        severity: warning
+        threshold: 2s
+        action: "Investigar queries lentas e otimizar"
+
+  # ========================================
+  # SLO 3: TAXA DE ERROS
+  # ========================================
+  error_rate:
+    name: "Taxa de Erros"
+    description: "< 0.1% de erros 5xx"
+    
+    sli:
+      metric: http_requests_total
+      error_criteria: status =~ "5.."
+      
+    targets:
+      - window: 30d
+        target: 99.9%    # 0.1% de erro
+        error_budget: 0.1%
+      
+      - window: 1h
+        target: 99.5%    # Alerta mais rápido
+        error_budget: 0.5%
+    
+    promql: |
+      (
+        sum(rate(http_requests_total{status=~"5.."}[1h]))
+        /
+        sum(rate(http_requests_total[1h]))
+      ) * 100
+    
+    alerts:
+      - name: HighErrorRate
+        severity: critical
+        threshold: 0.5%
+        action: "Rollback do último deploy se necessário"
+
+  # ========================================
+  # SLO 4: ATENDIMENTO - PRIMEIRA RESPOSTA
+  # ========================================
+  first_response_time:
+    name: "Tempo de Primeira Resposta"
+    description: "90% dos tickets respondem em < 30min"
+    
+    sli:
+      metric: ticket_tempo_primeira_resposta_seconds
+      percentile: 90
+      
+    targets:
+      - window: 7d
+        target: 1800s    # 30 minutos
+        error_budget: 10%  # 10% podem exceder
+      
+      - window: 1d
+        target: 1200s    # 20 min (target agressivo)
+        error_budget: 5%
+    
+    promql: |
+      histogram_quantile(0.90,
+        sum(rate(ticket_tempo_primeira_resposta_seconds_bucket[7d])) by (le)
+      )
+    
+    alerts:
+      - name: SlowFirstResponse
+        severity: warning
+        threshold: 1800s
+        action: "Avaliar staffing e distribuição de carga"
+
+  # ========================================
+  # SLO 5: ATENDIMENTO - RESOLUÇÃO
+  # ========================================
+  resolution_time:
+    name: "Tempo de Resolução"
+    description: "80% dos tickets resolvidos em < 4h"
+    
+    sli:
+      metric: ticket_tempo_resolucao_seconds
+      percentile: 80
+      
+    targets:
+      - window: 30d
+        target: 14400s   # 4 horas
+        error_budget: 20%
+      
+      - window: 7d
+        target: 10800s   # 3 horas
+        error_budget: 15%
+    
+    promql: |
+      histogram_quantile(0.80,
+        sum(rate(ticket_tempo_resolucao_seconds_bucket[30d])) by (le)
+      )
+    
+    alerts:
+      - name: SlowResolutionTime
+        severity: info
+        threshold: 14400s
+        action: "Revisar processos de atendimento"
+
+  # ========================================
+  # SLO 6: DATABASE PERFORMANCE
+  # ========================================
+  database_latency:
+    name: "Latência de Queries"
+    description: "95% das queries em < 500ms"
+    
+    sli:
+      metric: typeorm_query_duration_seconds
+      percentile: 95
+      
+    targets:
+      - window: 1d
+        target: 0.5s
+        error_budget: 5%
+      
+      - window: 1h
+        target: 0.3s     # Alerta precoce
+        error_budget: 3%
+    
+    promql: |
+      histogram_quantile(0.95,
+        sum(rate(typeorm_query_duration_seconds_bucket[1d])) by (le, entity)
+      )
+    
+    alerts:
+      - name: SlowDatabaseQueries
+        severity: warning
+        threshold: 0.5s
+        action: "Otimizar queries ou adicionar índices"
+
+  # ========================================
+  # SLO 7: TAXA DE CONVERSÃO (BUSINESS)
+  # ========================================
+  conversion_rate:
+    name: "Taxa de Conversão"
+    description: "> 60% dos tickets devem ser resolvidos"
+    
+    sli:
+      metric: tickets_resolvidos_total / tickets_criados_total
+      
+    targets:
+      - window: 7d
+        target: 60%
+        error_budget: 10%  # Pode cair até 54%
+      
+      - window: 1d
+        target: 65%
+        error_budget: 5%
+    
+    promql: |
+      (
+        sum(rate(tickets_resolvidos_total[7d]))
+        /
+        sum(rate(tickets_criados_total[7d]))
+      ) * 100
+    
+    alerts:
+      - name: LowConversionRate
+        severity: info
+        threshold: 60%
+        action: "Revisar qualidade do atendimento"
+
+# ========================================
+# ERROR BUDGET POLICY
+# ========================================
+error_budget_policy:
+  description: "Política de consumo do error budget"
+  
+  # Ações baseadas no consumo do budget
+  actions:
+    - budget_remaining: "> 80%"
+      action: "Normal operations - Can deploy freely"
+      frequency: "Multiple deploys per day"
+      
+    - budget_remaining: "50% - 80%"
+      action: "Caution - Review changes carefully"
+      frequency: "1-2 deploys per day"
+      
+    - budget_remaining: "20% - 50%"
+      action: "Warning - Focus on reliability"
+      frequency: "Emergency fixes only"
+      
+    - budget_remaining: "< 20%"
+      action: "FREEZE - No deploys except critical fixes"
+      frequency: "Deploy freeze"
+      impact: "All hands on stability"
+
+# ========================================
+# DASHBOARD RECOMENDADO
+# ========================================
+dashboard:
+  panels:
+    - title: "SLO Overview"
+      metrics:
+        - Availability (30d): 99.9%
+        - Latency P95 (7d): < 2s
+        - Error Rate (1h): < 0.1%
+        - First Response (7d): < 30min
+    
+    - title: "Error Budget Burn Rate"
+      description: "Taxa de consumo do error budget"
+      alert_if: "Burning > 10x normal rate"
+    
+    - title: "SLO Compliance History"
+      description: "Histórico de compliance por SLO"
+      timeframe: "Last 90 days"
+
+# ========================================
+# ALERTAS DE ERROR BUDGET
+# ========================================
+error_budget_alerts:
+  # Alerta de consumo rápido (fast burn)
+  - name: ErrorBudgetFastBurn
+    condition: "Budget consumindo > 10x taxa normal"
+    window: 1h
+    action: "Investigação imediata"
+    severity: critical
+  
+  # Alerta de consumo moderado (slow burn)
+  - name: ErrorBudgetSlowBurn
+    condition: "Budget consumindo > 5x taxa normal"
+    window: 6h
+    action: "Monitorar de perto"
+    severity: warning
+  
+  # Alerta de budget quase esgotado
+  - name: ErrorBudgetNearlyExhausted
+    condition: "> 90% do budget consumido"
+    action: "Freeze deploys"
+    severity: critical

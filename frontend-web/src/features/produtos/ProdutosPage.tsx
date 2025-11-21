@@ -1,14 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Search,
-  Filter,
   Download,
   Package,
-  BarChart3,
   TrendingUp,
-  TrendingDown,
   Eye,
   Edit,
   Trash2,
@@ -16,7 +13,6 @@ import {
   Check,
   X,
   DollarSign,
-  ShoppingCart,
   Settings
 } from 'lucide-react';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
@@ -65,17 +61,17 @@ interface ProdutoLegacy {
 const statusConfig = {
   ativo: {
     label: 'Ativo',
-    color: 'bg-green-100 text-green-800 border-green-200',
+    color: 'bg-[#DEEFE7] text-[#0F7B7D] border-[#159A9C]/40',
     icon: Check
   },
   inativo: {
     label: 'Inativo',
-    color: 'bg-gray-100 text-gray-800 border-gray-200',
+    color: 'bg-white text-[#B4BEC9] border-[#B4BEC9]',
     icon: X
   },
   descontinuado: {
     label: 'Descontinuado',
-    color: 'bg-red-100 text-red-800 border-red-200',
+    color: 'bg-[#B4BEC9]/40 text-[#002333] border-[#B4BEC9]',
     icon: AlertTriangle
   }
 };
@@ -103,6 +99,7 @@ const ProdutosPage: React.FC = () => {
   const [showModalAvancado, setShowModalAvancado] = useState(false);
   const [produtoParaEditar, setProdutoParaEditar] = useState<ProdutoFormData & { produtoId?: string } | null>(null);
   const [isLoadingSave, setIsLoadingSave] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Estados para confirmação de exclusão
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
@@ -146,7 +143,90 @@ const ProdutosPage: React.FC = () => {
     });
   }, [produtos, searchTerm, statusFilter, categoriaFilter]);
 
-  const categorias = Array.from(new Set(produtos.map(produto => produto.categoria)));
+  const categorias = useMemo(() => Array.from(new Set(produtos.map(produto => produto.categoria))), [produtos]);
+
+  const handleExport = useCallback(async () => {
+    if (produtosFiltrados.length === 0) {
+      toast.error('Nenhum produto disponível para exportação.');
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+
+      const headers = [
+        'Nome',
+        'SKU',
+        'Categoria',
+        'Status',
+        'Preço',
+        'Custo',
+        'Estoque Atual',
+        'Estoque Mínimo',
+        'Estoque Máximo',
+        'Fornecedor',
+        'Vendas (Mês)',
+        'Vendas (Total)',
+        'Criado em',
+        'Atualizado em'
+      ];
+
+      const sanitize = (value: unknown) => {
+        if (value === null || value === undefined) {
+          return '';
+        }
+
+        if (value instanceof Date) {
+          return value.toISOString();
+        }
+
+        const text = String(value);
+        return text.includes('"') ? text.split('"').join('""') : text;
+      };
+
+      const formatNumber = (value: number | null | undefined) => (
+        typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : ''
+      );
+
+      const rows = produtosFiltrados.map((produto) => ([
+        produto.nome,
+        produto.sku,
+        produto.categoria,
+        statusConfig[produto.status]?.label ?? produto.status,
+        formatNumber(produto.preco),
+        formatNumber(produto.custoUnitario),
+        produto.estoque.atual,
+        produto.estoque.minimo,
+        produto.estoque.maximo,
+        produto.fornecedor,
+        produto.vendas.mes,
+        produto.vendas.total,
+        produto.criadoEm,
+        produto.atualizadoEm
+      ].map(sanitize)));
+
+      const csvContent = [headers, ...rows]
+        .map((row) => row.map((cell) => `"${cell}"`).join(';'))
+        .join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `produtos_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success('Exportação concluída com sucesso!');
+    } catch (error) {
+      console.error('Erro ao exportar produtos:', error);
+      toast.error('Não foi possível exportar os produtos.');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [produtosFiltrados]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -163,11 +243,11 @@ const ProdutosPage: React.FC = () => {
     if (produto.categoria === 'Serviços') return null;
 
     if (produto.estoque.atual <= produto.estoque.minimo) {
-      return { label: 'Baixo', color: 'text-red-600', icon: AlertTriangle };
+      return { label: 'Baixo', color: 'text-[#002333]', icon: AlertTriangle };
     } else if (produto.estoque.atual >= produto.estoque.maximo * 0.8) {
-      return { label: 'Alto', color: 'text-green-600', icon: Check };
+      return { label: 'Alto', color: 'text-[#0F7B7D]', icon: Check };
     } else {
-      return { label: 'Normal', color: 'text-yellow-600', icon: Check };
+      return { label: 'Normal', color: 'text-[#159A9C]', icon: Check };
     }
   };
 
@@ -262,12 +342,51 @@ const ProdutosPage: React.FC = () => {
     }
   };
 
+  const statCards = useMemo(() => ([
+    {
+      key: 'total-produtos',
+      label: 'Total de Produtos',
+      value: estatisticas.totalProdutos,
+      description: 'Itens cadastrados no catálogo',
+      iconWrapper: 'bg-[#159A9C]',
+      iconColor: 'text-white',
+      Icon: Package
+    },
+    {
+      key: 'produtos-ativos',
+      label: 'Produtos Ativos',
+      value: estatisticas.produtosAtivos,
+      description: 'Disponíveis para venda',
+      iconWrapper: 'bg-[#0F7B7D]',
+      iconColor: 'text-white',
+      Icon: Check
+    },
+    {
+      key: 'faturamento',
+      label: 'Faturamento Total',
+      value: formatCurrency(estatisticas.valorTotal),
+      description: 'Receita acumulada',
+      iconWrapper: 'bg-[#002333]',
+      iconColor: 'text-white',
+      Icon: DollarSign
+    },
+    {
+      key: 'estoques-baixos',
+      label: 'Estoques Baixos',
+      value: estatisticas.estoquesBaixos,
+      description: 'Itens exigindo reposição',
+      iconWrapper: 'bg-white border border-[#B4BEC9]',
+      iconColor: 'text-[#002333]',
+      Icon: AlertTriangle
+    }
+  ]), [estatisticas]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Carregando produtos...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#159A9C] mx-auto"></div>
+          <p className="mt-4 text-[#002333]/70">Carregando produtos...</p>
         </div>
       </div>
     );
@@ -284,280 +403,246 @@ const ProdutosPage: React.FC = () => {
       </div>
 
       <div className="p-6">
-        {/* Header da Página */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-                <Package className="h-8 w-8 mr-3 text-blue-600" />
-                Produtos
-              </h1>
-              <p className="mt-2 text-gray-600">
-                Gestão completa do catálogo de produtos e serviços
-              </p>
-            </div>
-            <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={() => navigate('/produtos/categorias')}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-              >
-                <Settings className="w-4 h-4 mr-2" />
-                Categorias
-              </button>
-
-              <button className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
-                <Download className="w-4 h-4 mr-2" />
-                Exportar
-              </button>
-
-              <button
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                onClick={handleNovoProduto}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Novo Produto
-              </button>
-            </div>
-          </div>
-        </div>
-        {/* Cards de Estatísticas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 shadow-sm border border-blue-200 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header da Página */}
+          <div className="bg-white rounded-lg shadow-sm border border-[#DEEFE7] p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-medium text-blue-700">Total Produtos</p>
-                <p className="text-2xl font-bold text-blue-900">{estatisticas.totalProdutos}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center shadow-sm">
-                <Package className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 shadow-sm border border-green-200 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-700">Produtos Ativos</p>
-                <p className="text-2xl font-bold text-green-900">{estatisticas.produtosAtivos}</p>
-              </div>
-              <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center shadow-sm">
-                <Check className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 shadow-sm border border-purple-200 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-purple-700">Vendas Mês</p>
-                <p className="text-2xl font-bold text-purple-900">{estatisticas.vendasMes}</p>
-              </div>
-              <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center shadow-sm">
-                <ShoppingCart className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-6 shadow-sm border border-yellow-200 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-yellow-700">Faturamento</p>
-                <p className="text-2xl font-bold text-yellow-900">{formatCurrency(estatisticas.valorTotal)}</p>
-              </div>
-              <div className="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center shadow-sm">
-                <DollarSign className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 shadow-sm border border-red-200 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-red-700">Estoques Baixos</p>
-                <p className="text-2xl font-bold text-red-900">{estatisticas.estoquesBaixos}</p>
-              </div>
-              <div className="w-12 h-12 bg-red-500 rounded-lg flex items-center justify-center shadow-sm">
-                <AlertTriangle className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Filtros */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Buscar por nome, SKU ou fornecedor..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="todos">Todos os Status</option>
-                <option value="ativo">Ativo</option>
-                <option value="inativo">Inativo</option>
-                <option value="descontinuado">Descontinuado</option>
-              </select>
-
-              <select
-                value={categoriaFilter}
-                onChange={(e) => setCategoriaFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="todas">Todas as Categorias</option>
-                {categorias.map(categoria => (
-                  <option key={categoria} value={categoria}>{categoria}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Lista de Produtos */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">
-              Lista de Produtos ({produtosFiltrados.length})
-            </h3>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Produto
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Categoria
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Preço
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estoque
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Vendas (Mês)
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {produtosFiltrados.map((produto) => {
-                  const statusInfo = statusConfig[produto.status];
-                  const estoqueStatus = getEstoqueStatus(produto);
-                  const StatusIcon = statusInfo.icon;
-
-                  return (
-                    <tr key={produto.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {produto.nome}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            SKU: {produto.sku}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-900">{produto.categoria}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {formatCurrency(produto.preco)}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          Custo: {formatCurrency(produto.custoUnitario)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {produto.categoria === 'Serviços' ? (
-                          <span className="text-sm text-gray-500">N/A</span>
-                        ) : (
-                          <div className="text-sm">
-                            <div className={`font-medium ${estoqueStatus?.color}`}>
-                              {produto.estoque.atual} un.
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              Min: {produto.estoque.minimo} | Max: {produto.estoque.maximo}
-                            </div>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusInfo.color}`}>
-                          <StatusIcon className="w-3 h-3 mr-1" />
-                          {statusInfo.label}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <div className="flex items-center">
-                          <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                          {produto.vendas.mes}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end space-x-2">
-                          <button
-                            onClick={() => openModal(produto)}
-                            className="text-blue-600 hover:text-blue-700 p-1 rounded hover:bg-blue-50"
-                            title="Visualizar"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleEditarProduto(produto)}
-                            className="text-indigo-600 hover:text-indigo-700 p-1 rounded hover:bg-indigo-50"
-                            title="Editar"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleExcluirProduto(produto)}
-                            className="text-red-600 hover:text-red-700 p-1 rounded hover:bg-red-50"
-                            title="Excluir"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-
-            {produtosFiltrados.length === 0 && (
-              <div className="text-center py-12">
-                <Package className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum produto encontrado</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  {produtos.length === 0
-                    ? 'Comece criando seu primeiro produto.'
-                    : 'Tente ajustar os filtros ou termos de busca.'
-                  }
+                <h1 className="text-3xl font-bold text-[#002333] flex items-center">
+                  <Package className="h-8 w-8 mr-3 text-[#159A9C]" />
+                  Produtos
+                </h1>
+                <p className="mt-2 text-[#002333]/70">
+                  Gestão completa do catálogo de produtos e serviços
                 </p>
               </div>
-            )}
+              <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => navigate('/produtos/categorias')}
+                  className="inline-flex items-center px-4 py-2 border border-[#B4BEC9] text-sm font-medium rounded-lg text-[#002333] bg-white hover:bg-[#DEEFE7] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C]/40 transition-colors"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Categorias
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExport}
+                  disabled={isExporting || produtosFiltrados.length === 0}
+                  className="inline-flex items-center px-4 py-2 border border-[#B4BEC9] text-sm font-medium rounded-lg text-[#002333] bg-white hover:bg-[#DEEFE7] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C]/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  {isExporting ? 'Exportando...' : 'Exportar'}
+                </button>
+
+                <button
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-semibold rounded-lg text-white bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] hover:from-[#0F7B7D] hover:to-[#0C6062] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C]/40 transition-all shadow-sm hover:shadow-md"
+                  onClick={handleNovoProduto}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Novo Produto
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Cards de Estatísticas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {statCards.map(({ key, label, value, description, iconWrapper, iconColor, Icon }) => (
+              <div
+                key={key}
+                className="rounded-xl p-6 shadow-sm border border-[#DEEFE7] bg-white hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-[#002333]/70 uppercase tracking-wide">{label}</p>
+                    <p className="mt-2 text-3xl font-bold text-[#002333]">{value}</p>
+                    <p className="mt-3 text-xs text-[#002333]/70">{description}</p>
+                  </div>
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-inner ${iconWrapper}`}>
+                    <Icon className={`w-6 h-6 ${iconColor}`} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Filtros */}
+          <div className="bg-white rounded-lg shadow-sm border border-[#DEEFE7] p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="lg:col-span-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#B4BEC9] w-5 h-5" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por nome, SKU ou fornecedor..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C]/40 focus:border-[#159A9C] text-[#002333] placeholder-[#B4BEC9]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row gap-3">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C]/40 focus:border-[#159A9C] text-[#002333]"
+                >
+                  <option value="todos">Todos os Status</option>
+                  <option value="ativo">Ativo</option>
+                  <option value="inativo">Inativo</option>
+                  <option value="descontinuado">Descontinuado</option>
+                </select>
+
+                <select
+                  value={categoriaFilter}
+                  onChange={(e) => setCategoriaFilter(e.target.value)}
+                  className="px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C]/40 focus:border-[#159A9C] text-[#002333]"
+                >
+                  <option value="todas">Todas as Categorias</option>
+                  {categorias.map(categoria => (
+                    <option key={categoria} value={categoria}>{categoria}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Lista de Produtos */}
+          <div className="bg-white rounded-lg shadow-sm border border-[#DEEFE7]">
+            <div className="px-6 py-4 border-b border-[#DEEFE7]">
+              <h3 className="text-lg font-semibold text-[#002333]">
+                Lista de Produtos ({produtosFiltrados.length})
+              </h3>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-[#DEEFE7]">
+                <thead className="bg-[#DEEFE7]">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#002333] uppercase tracking-wider">
+                      Produto
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#002333] uppercase tracking-wider">
+                      Categoria
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#002333] uppercase tracking-wider">
+                      Preço
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#002333] uppercase tracking-wider">
+                      Estoque
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#002333] uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#002333] uppercase tracking-wider">
+                      Vendas (Mês)
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-semibold text-[#002333] uppercase tracking-wider">
+                      Ações
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-[#DEEFE7]">
+                  {produtosFiltrados.map((produto) => {
+                    const statusInfo = statusConfig[produto.status];
+                    const estoqueStatus = getEstoqueStatus(produto);
+                    const StatusIcon = statusInfo.icon;
+
+                    return (
+                      <tr key={produto.id} className="hover:bg-[#DEEFE7]/40 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-semibold text-[#002333]">
+                              {produto.nome}
+                            </div>
+                            <div className="text-xs text-[#002333]/70">
+                              SKU: {produto.sku}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-sm text-[#002333] font-medium">{produto.categoria}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-[#002333] font-semibold">
+                            {formatCurrency(produto.preco)}
+                          </div>
+                          <div className="text-xs text-[#002333]/70">
+                            Custo: {formatCurrency(produto.custoUnitario)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {produto.categoria === 'Serviços' ? (
+                            <span className="text-sm text-[#002333]/70">N/A</span>
+                          ) : (
+                            <div className="text-sm">
+                              <div className={`font-medium ${estoqueStatus?.color}`}>
+                                {produto.estoque.atual} un.
+                              </div>
+                              <div className="text-xs text-[#002333]/70">
+                                Min: {produto.estoque.minimo} | Max: {produto.estoque.maximo}
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusInfo.color}`}>
+                            <StatusIcon className="w-3 h-3 mr-1" />
+                            {statusInfo.label}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[#002333]">
+                          <div className="flex items-center">
+                            <TrendingUp className="w-4 h-4 text-[#159A9C] mr-1" />
+                            {produto.vendas.mes}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex items-center justify-end space-x-2">
+                            <button
+                              onClick={() => openModal(produto)}
+                              className="text-[#159A9C] hover:text-[#0F7B7D] p-1 rounded hover:bg-[#DEEFE7] transition-colors"
+                              title="Visualizar"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleEditarProduto(produto)}
+                              className="text-[#0F7B7D] hover:text-[#159A9C] p-1 rounded hover:bg-[#DEEFE7] transition-colors"
+                              title="Editar"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleExcluirProduto(produto)}
+                              className="text-[#002333] hover:text-[#0F7B7D] p-1 rounded hover:bg-[#B4BEC9]/30 transition-colors"
+                              title="Excluir"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {produtosFiltrados.length === 0 && (
+                <div className="text-center py-12">
+                  <Package className="mx-auto h-12 w-12 text-[#B4BEC9]" />
+                  <h3 className="mt-2 text-sm font-semibold text-[#002333]">Nenhum produto encontrado</h3>
+                  <p className="mt-1 text-sm text-[#002333]/70">
+                    {produtos.length === 0
+                      ? 'Comece criando seu primeiro produto.'
+                      : 'Tente ajustar os filtros ou termos de busca.'
+                    }
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -568,12 +653,12 @@ const ProdutosPage: React.FC = () => {
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-96 overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
-                <h3 className="text-lg font-medium text-gray-900">
+                <h3 className="text-lg font-semibold text-[#002333]">
                   Detalhes do Produto
                 </h3>
                 <button
                   onClick={closeModal}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-[#B4BEC9] hover:text-[#002333] transition-colors"
                 >
                   <X className="w-6 h-6" />
                 </button>
@@ -581,36 +666,36 @@ const ProdutosPage: React.FC = () => {
 
               <div className="space-y-4">
                 <div>
-                  <h4 className="text-sm font-medium text-gray-700">Nome</h4>
-                  <p className="text-sm text-gray-900">{selectedProduto.nome}</p>
+                  <h4 className="text-sm font-semibold text-[#002333]">Nome</h4>
+                  <p className="text-sm text-[#002333]/70">{selectedProduto.nome}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h4 className="text-sm font-medium text-gray-700">SKU</h4>
-                    <p className="text-sm text-gray-900">{selectedProduto.sku}</p>
+                    <h4 className="text-sm font-semibold text-[#002333]">SKU</h4>
+                    <p className="text-sm text-[#002333]/70">{selectedProduto.sku}</p>
                   </div>
                   <div>
-                    <h4 className="text-sm font-medium text-gray-700">Categoria</h4>
-                    <p className="text-sm text-gray-900">{selectedProduto.categoria}</p>
+                    <h4 className="text-sm font-semibold text-[#002333]">Categoria</h4>
+                    <p className="text-sm text-[#002333]/70">{selectedProduto.categoria}</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h4 className="text-sm font-medium text-gray-700">Preço</h4>
-                    <p className="text-sm text-gray-900">{formatCurrency(selectedProduto.preco)}</p>
+                    <h4 className="text-sm font-semibold text-[#002333]">Preço</h4>
+                    <p className="text-sm text-[#002333]/70">{formatCurrency(selectedProduto.preco)}</p>
                   </div>
                   <div>
-                    <h4 className="text-sm font-medium text-gray-700">Custo</h4>
-                    <p className="text-sm text-gray-900">{formatCurrency(selectedProduto.custoUnitario)}</p>
+                    <h4 className="text-sm font-semibold text-[#002333]">Custo</h4>
+                    <p className="text-sm text-[#002333]/70">{formatCurrency(selectedProduto.custoUnitario)}</p>
                   </div>
                 </div>
 
                 {selectedProduto.categoria !== 'Serviços' && (
                   <div>
-                    <h4 className="text-sm font-medium text-gray-700">Estoque</h4>
-                    <p className="text-sm text-gray-900">
+                    <h4 className="text-sm font-semibold text-[#002333]">Estoque</h4>
+                    <p className="text-sm text-[#002333]/70">
                       Atual: {selectedProduto.estoque.atual} |
                       Mínimo: {selectedProduto.estoque.minimo} |
                       Máximo: {selectedProduto.estoque.maximo}
@@ -619,18 +704,18 @@ const ProdutosPage: React.FC = () => {
                 )}
 
                 <div>
-                  <h4 className="text-sm font-medium text-gray-700">Descrição</h4>
-                  <p className="text-sm text-gray-900">{selectedProduto.descricao || 'Sem descrição'}</p>
+                  <h4 className="text-sm font-semibold text-[#002333]">Descrição</h4>
+                  <p className="text-sm text-[#002333]/70">{selectedProduto.descricao || 'Sem descrição'}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h4 className="text-sm font-medium text-gray-700">Criado em</h4>
-                    <p className="text-sm text-gray-900">{formatDate(selectedProduto.criadoEm)}</p>
+                    <h4 className="text-sm font-semibold text-[#002333]">Criado em</h4>
+                    <p className="text-sm text-[#002333]/70">{formatDate(selectedProduto.criadoEm)}</p>
                   </div>
                   <div>
-                    <h4 className="text-sm font-medium text-gray-700">Atualizado em</h4>
-                    <p className="text-sm text-gray-900">{formatDate(selectedProduto.atualizadoEm)}</p>
+                    <h4 className="text-sm font-semibold text-[#002333]">Atualizado em</h4>
+                    <p className="text-sm text-[#002333]/70">{formatDate(selectedProduto.atualizadoEm)}</p>
                   </div>
                 </div>
               </div>
@@ -657,29 +742,29 @@ const ProdutosPage: React.FC = () => {
           <div className="bg-white rounded-lg max-w-md w-full">
             <div className="p-6">
               <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-4">
-                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                <div className="w-12 h-12 bg-[#DEEFE7] rounded-full flex items-center justify-center mr-4">
+                  <AlertTriangle className="w-6 h-6 text-[#002333]" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900">Confirmar Exclusão</h3>
-                  <p className="text-sm text-gray-500">Esta ação não pode ser desfeita.</p>
+                  <h3 className="text-lg font-semibold text-[#002333]">Confirmar Exclusão</h3>
+                  <p className="text-sm text-[#002333]/70">Esta ação não pode ser desfeita.</p>
                 </div>
               </div>
 
-              <p className="text-sm text-gray-700 mb-6">
+              <p className="text-sm text-[#002333] mb-6">
                 Tem certeza que deseja excluir o produto <strong>"{produtoParaExcluir.nome}"</strong>?
               </p>
 
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={cancelarExclusao}
-                  className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                  className="px-4 py-2 border border-[#B4BEC9] text-sm font-medium rounded-lg text-[#002333] bg-white hover:bg-[#DEEFE7] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C]/40"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={confirmarExclusao}
-                  className="px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  className="px-4 py-2 border border-transparent text-sm font-semibold rounded-lg text-white bg-[#002333] hover:bg-[#0F7B7D] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C]/40"
                 >
                   Excluir
                 </button>

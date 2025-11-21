@@ -11,12 +11,12 @@ import { User } from '../../users/user.entity';
 
 /**
  * Entity para demandas/tarefas relacionadas a clientes
- * 
+ *
  * Uma demanda pode estar vinculada a:
  * - Um cliente específico (clienteId)
  * - Um ticket de atendimento (ticketId)
  * - Um contato por telefone (fallback quando não há cliente cadastrado)
- * 
+ *
  * Campos:
  * - id: UUID único da demanda
  * - clienteId: ID do cliente (opcional, pode não ter cliente cadastrado)
@@ -64,9 +64,17 @@ export class Demanda {
     type: 'varchar',
     length: 50,
     default: 'outros',
-    comment: 'Tipo da demanda: tecnica, comercial, financeira, suporte, reclamacao, solicitacao, outros',
+    comment:
+      'Tipo da demanda: tecnica, comercial, financeira, suporte, reclamacao, solicitacao, outros',
   })
-  tipo: 'tecnica' | 'comercial' | 'financeira' | 'suporte' | 'reclamacao' | 'solicitacao' | 'outros';
+  tipo:
+    | 'tecnica'
+    | 'comercial'
+    | 'financeira'
+    | 'suporte'
+    | 'reclamacao'
+    | 'solicitacao'
+    | 'outros';
 
   @Column({
     type: 'varchar',

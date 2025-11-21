@@ -29,16 +29,16 @@ export class EventosController {
   @Get()
   async findAll(@Request() req, @Query() query) {
     const { startDate, endDate, tipo } = query;
-    
+
     // Debug: verificar se req.user existe
     if (!req.user) {
       throw new BadRequestException('Usuário não autenticado');
     }
-    
+
     const userId = req.user.id;
     // Verificar se a estrutura tem empresa.id ou empresaId
     const empresaId = req.user.empresa?.id || req.user.empresaId;
-    
+
     if (!empresaId) {
       throw new BadRequestException('ID da empresa não encontrado');
     }
@@ -47,7 +47,7 @@ export class EventosController {
     if (startDate && endDate) {
       const start = new Date(startDate);
       const end = new Date(endDate);
-      
+
       if (isNaN(start.getTime()) || isNaN(end.getTime())) {
         throw new BadRequestException('Datas inválidas fornecidas');
       }
@@ -69,7 +69,7 @@ export class EventosController {
     if (!req.user) {
       throw new BadRequestException('Usuário não autenticado');
     }
-    
+
     const empresaId = req.user.empresa?.id || req.user.empresaId;
     return await this.eventosService.findOne(id, req.user.id, empresaId);
   }
@@ -83,7 +83,7 @@ export class EventosController {
     if (!req.user) {
       throw new BadRequestException('Usuário não autenticado');
     }
-    
+
     const empresaId = req.user.empresa?.id || req.user.empresaId;
     return await this.eventosService.update(id, updateEventoDto, req.user.id, empresaId);
   }
@@ -93,7 +93,7 @@ export class EventosController {
     if (!req.user) {
       throw new BadRequestException('Usuário não autenticado');
     }
-    
+
     const empresaId = req.user.empresa?.id || req.user.empresaId;
     await this.eventosService.remove(id, req.user.id, empresaId);
     return { message: 'Evento excluído com sucesso' };
@@ -109,7 +109,7 @@ export class EventosController {
     if (!req.user) {
       throw new BadRequestException('Usuário não autenticado');
     }
-    
+
     if (!start || !end) {
       throw new BadRequestException('Parâmetros start e end são obrigatórios');
     }
@@ -133,7 +133,7 @@ export class EventosController {
     if (!req.user) {
       throw new BadRequestException('Usuário não autenticado');
     }
-    
+
     const { dataInicio, dataFim } = body;
 
     if (!dataInicio || !dataFim) {

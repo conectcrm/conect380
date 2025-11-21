@@ -13,25 +13,27 @@ export class AssinaturasService {
 
     @InjectRepository(Plano)
     private planoRepository: Repository<Plano>,
-  ) { }
+  ) {}
 
   async buscarPorEmpresa(empresaId: string): Promise<AssinaturaEmpresa | null> {
     return this.assinaturaRepository.findOne({
       where: {
         empresaId,
-        status: 'ativa'
+        status: 'ativa',
       },
-      relations: ['plano', 'plano.modulosInclusos', 'plano.modulosInclusos.modulo']
+      relations: ['plano', 'plano.modulosInclusos', 'plano.modulosInclusos.modulo'],
     });
   }
 
-  async listarTodas(status?: 'ativa' | 'cancelada' | 'suspensa' | 'pendente'): Promise<AssinaturaEmpresa[]> {
+  async listarTodas(
+    status?: 'ativa' | 'cancelada' | 'suspensa' | 'pendente',
+  ): Promise<AssinaturaEmpresa[]> {
     const where = status ? { status } : {};
 
     return this.assinaturaRepository.find({
       where,
       relations: ['plano'],
-      order: { criadoEm: 'DESC' }
+      order: { criadoEm: 'DESC' },
     });
   }
 
@@ -40,8 +42,8 @@ export class AssinaturasService {
     const assinaturaExistente = await this.assinaturaRepository.findOne({
       where: {
         empresaId: dados.empresaId,
-        status: 'ativa'
-      }
+        status: 'ativa',
+      },
     });
 
     if (assinaturaExistente) {
@@ -50,7 +52,7 @@ export class AssinaturasService {
 
     // Verificar se plano existe
     const plano = await this.planoRepository.findOne({
-      where: { id: dados.planoId }
+      where: { id: dados.planoId },
     });
 
     if (!plano) {
@@ -66,7 +68,7 @@ export class AssinaturasService {
       proximoVencimento: new Date(dados.proximoVencimento),
       valorMensal: dados.valorMensal,
       renovacaoAutomatica: dados.renovacaoAutomatica !== false,
-      observacoes: dados.observacoes
+      observacoes: dados.observacoes,
     });
 
     return this.assinaturaRepository.save(assinatura);
@@ -80,7 +82,7 @@ export class AssinaturasService {
     }
 
     const novoPlano = await this.planoRepository.findOne({
-      where: { id: novoPlanoId }
+      where: { id: novoPlanoId },
     });
 
     if (!novoPlano) {
@@ -123,9 +125,9 @@ export class AssinaturasService {
     const assinatura = await this.assinaturaRepository.findOne({
       where: {
         empresaId,
-        status: 'suspensa'
+        status: 'suspensa',
       },
-      relations: ['plano']
+      relations: ['plano'],
     });
 
     if (!assinatura) {
@@ -165,15 +167,18 @@ export class AssinaturasService {
       limiteStorage: assinatura.plano.limiteStorage,
       podeAdicionarUsuario: assinatura.usuariosAtivos < assinatura.plano.limiteUsuarios,
       podeAdicionarCliente: assinatura.clientesCadastrados < assinatura.plano.limiteClientes,
-      storageDisponivel: Math.max(0, storageDisponivel)
+      storageDisponivel: Math.max(0, storageDisponivel),
     };
   }
 
-  async atualizarContadores(empresaId: string, dados: {
-    usuariosAtivos?: number;
-    clientesCadastrados?: number;
-    storageUtilizado?: number;
-  }): Promise<AssinaturaEmpresa> {
+  async atualizarContadores(
+    empresaId: string,
+    dados: {
+      usuariosAtivos?: number;
+      clientesCadastrados?: number;
+      storageUtilizado?: number;
+    },
+  ): Promise<AssinaturaEmpresa> {
     const assinatura = await this.buscarPorEmpresa(empresaId);
 
     if (!assinatura) {

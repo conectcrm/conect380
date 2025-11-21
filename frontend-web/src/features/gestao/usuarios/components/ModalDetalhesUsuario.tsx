@@ -3,12 +3,12 @@ import { toast } from 'react-hot-toast';
 import { Usuario, ROLE_LABELS, ROLE_COLORS } from '../../../../types/usuarios/index';
 import { useConfirmation } from '../../../../hooks/useConfirmation';
 import { ConfirmationModal } from '../../../../components/common/ConfirmationModal';
-import { 
-  X, 
-  User, 
-  Mail, 
-  Phone, 
-  Shield, 
+import {
+  X,
+  User,
+  Mail,
+  Phone,
+  Shield,
   Calendar,
   MapPin,
   Briefcase,
@@ -107,7 +107,7 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
   // Função para salvar alterações
   const handleSalvar = async () => {
     if (!onSalvarUsuario) return;
-    
+
     setIsLoading(true);
     try {
       await onSalvarUsuario(dadosUsuario);
@@ -124,17 +124,17 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
   // Função para alterar status
   const handleAlterarStatus = async () => {
     if (!onAlterarStatus) return;
-    
+
     const novoStatus = !usuario.ativo;
     const acao = novoStatus ? 'ativar' : 'inativar';
-    
+
     showConfirmation({
       title: `${acao.charAt(0).toUpperCase() + acao.slice(1)} usuário`,
       message: `Tem certeza que deseja ${acao} o usuário "${usuario.nome}"?`,
       confirmText: acao.charAt(0).toUpperCase() + acao.slice(1),
       cancelText: 'Cancelar',
       icon: novoStatus ? 'success' : 'warning',
-      confirmButtonClass: novoStatus 
+      confirmButtonClass: novoStatus
         ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500'
         : 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
       onConfirm: async () => {
@@ -155,7 +155,7 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
   // Função para excluir usuário
   const handleExcluir = async () => {
     if (!onExcluirUsuario) return;
-    
+
     showConfirmation({
       title: 'Excluir usuário permanentemente',
       message: `⚠️ ATENÇÃO: Esta ação não pode ser desfeita!\n\nTem certeza que deseja excluir permanentemente o usuário "${usuario.nome}"? Todos os dados relacionados serão perdidos.`,
@@ -297,7 +297,7 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
       {/* Status e Datas */}
       <div className="bg-gray-50 rounded-lg p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Status e Informações</h3>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Status */}
           <div>
@@ -344,7 +344,7 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
       {/* Ações Rápidas */}
       <div className="bg-gray-50 rounded-lg p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Ações Rápidas</h3>
-        
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <button
             onClick={abrirWhatsApp}
@@ -373,11 +373,10 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
           <button
             onClick={handleAlterarStatus}
             disabled={isLoading}
-            className={`flex items-center justify-center px-4 py-3 text-white rounded-lg transition-colors disabled:opacity-50 ${
-              usuario.ativo 
-                ? 'bg-yellow-600 hover:bg-yellow-700' 
+            className={`flex items-center justify-center px-4 py-3 text-white rounded-lg transition-colors disabled:opacity-50 ${usuario.ativo
+                ? 'bg-yellow-600 hover:bg-yellow-700'
                 : 'bg-green-600 hover:bg-green-700'
-            }`}
+              }`}
           >
             {usuario.ativo ? <UserX className="w-4 h-4 mr-2" /> : <UserCheck className="w-4 h-4 mr-2" />}
             {isLoading ? 'Processando...' : (usuario.ativo ? 'Inativar' : 'Ativar')}
@@ -391,7 +390,7 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
     <div className="space-y-4">
       <div className="bg-gray-50 rounded-lg p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Histórico de Atividades</h3>
-        
+
         <div className="space-y-4">
           {/* Exemplo de atividades */}
           <div className="flex items-start space-x-3 p-3 bg-white rounded-lg border">
@@ -428,7 +427,7 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
     <div className="space-y-6">
       <div className="bg-gray-50 rounded-lg p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Configurações de Segurança</h3>
-        
+
         <div className="space-y-4">
           <button className="w-full flex items-center justify-between p-4 bg-white rounded-lg border hover:bg-gray-50 transition-colors">
             <div className="flex items-center">
@@ -455,7 +454,7 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
       {/* Zona de Perigo */}
       <div className="bg-red-50 rounded-lg p-6 border border-red-200">
         <h3 className="text-lg font-semibold text-red-900 mb-4">Zona de Perigo</h3>
-        
+
         <button
           onClick={handleExcluir}
           disabled={isLoading}
@@ -464,7 +463,7 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
           <AlertCircle className="w-4 h-4 mr-2" />
           {isLoading ? 'Excluindo...' : 'Excluir Usuário Permanentemente'}
         </button>
-        
+
         <p className="text-sm text-red-700 mt-2">
           ⚠️ Esta ação não pode ser desfeita. O usuário será permanentemente removido do sistema.
         </p>
@@ -476,13 +475,13 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Overlay */}
-        <div 
+        <div
           className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
           onClick={onClose}
         />
 
         {/* Modal */}
-        <div className="inline-block w-full max-w-4xl my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
+        <div className="inline-block w-[calc(100%-2rem)] sm:w-[700px] md:w-[800px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-[#159A9C] to-[#159A9C]/90">
             <div className="flex items-center space-x-3">
@@ -494,7 +493,7 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
                 <p className="text-sm text-white/80">{usuario.email}</p>
               </div>
             </div>
-            
+
             <button
               onClick={onClose}
               className="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
@@ -510,11 +509,10 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
                 <button
                   key={tab.id}
                   onClick={() => setTabAtiva(tab.id)}
-                  className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                    tabAtiva === tab.id
+                  className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${tabAtiva === tab.id
                       ? 'border-[#159A9C] text-[#159A9C]'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   {tab.icone}
                   <span className="ml-2">{tab.nome}</span>
@@ -541,7 +539,7 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
           </div>
         </div>
       </div>
-      
+
       {/* Modal de Confirmação */}
       <ConfirmationModal confirmationState={confirmationState} />
     </div>

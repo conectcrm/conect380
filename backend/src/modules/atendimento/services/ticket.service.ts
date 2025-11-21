@@ -1,13 +1,41 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Logger,
+  Inject,
+  forwardRef,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, Brackets } from 'typeorm';
+import { Repository, In, Brackets, Not } from 'typeorm';
 import { Ticket, StatusTicket, PrioridadeTicket, OrigemTicket } from '../entities/ticket.entity';
 import { Mensagem, RemetenteMensagem } from '../entities/mensagem.entity';
 import { SessaoTriagem, ResultadoSessao } from '../../triagem/entities/sessao-triagem.entity';
 import { Evento, TipoEvento } from '../../eventos/evento.entity';
 import { Contato } from '../../clientes/contato.entity';
+import { User } from '../../users/user.entity';
 import { WhatsAppSenderService } from './whatsapp-sender.service';
 import { AtendimentoGateway } from '../gateways/atendimento.gateway';
+import { AtribuicaoService } from '../../triagem/services/atribuicao.service';
+import { MensagemService } from './mensagem.service';
+import {
+  validarTransicaoStatus,
+  gerarMensagemErroTransicao,
+  obterDescricaoTransicao,
+} from '../utils/status-validator';
+// 🔍 OpenTelemetry imports
+import { trace, context, SpanStatusCode } from '@opentelemetry/api';
+import { withSpan, addAttributes, recordException } from '../../../common/tracing/tracing.helpers';
+// 📊 Prometheus metrics imports
+import {
+  ticketsCriadosTotal,
+  ticketsEncerradosTotal,
+  ticketsTransferidosTotal,
+  ticketTempoVidaHistogram,
+  MetricTimer,
+  incrementCounter,
+  observeHistogram,
+} from '../../../config/metrics';
 
 export interface CriarTicketDto {
   empresaId: string;
@@ -59,8 +87,13 @@ export class TicketService {
     private eventoRepository: Repository<Evento>,
     @InjectRepository(Contato)
     private contatoRepository: Repository<Contato>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     private readonly atendimentoGateway: AtendimentoGateway,
     private readonly whatsAppSenderService: WhatsAppSenderService,
+    private readonly mensagemService: MensagemService,
+    @Inject(forwardRef(() => AtribuicaoService))
+    private readonly atribuicaoService: AtribuicaoService,
   ) { }
 
   /**
@@ -90,7 +123,7 @@ export class TicketService {
         .where('contato.ativo = :ativo', { ativo: true })
         .andWhere(
           `REPLACE(REPLACE(REPLACE(REPLACE(contato.telefone, '+', ''), '-', ''), ' ', ''), '(', '') LIKE :telefone`,
-          { telefone: `%${ultimosDigitos}` }
+          { telefone: `%${ultimosDigitos}` },
         )
         .getOne();
 
@@ -99,7 +132,9 @@ export class TicketService {
           `✅ Contato encontrado: ${contato.nome} (ID: ${contato.id}, Cliente: ${contato.cliente?.nome || 'SEM CLIENTE'})`,
         );
       } else {
-        this.logger.debug(`❌ NENHUM contato encontrado para telefone: ${telefoneNormalizado} (últimos 8: ${ultimosDigitos})`);
+        this.logger.debug(
+          `❌ NENHUM contato encontrado para telefone: ${telefoneNormalizado} (últimos 8: ${ultimosDigitos})`,
+        );
       }
 
       return contato;
@@ -119,13 +154,11 @@ export class TicketService {
       return 0;
     }
 
-    const statusNormalizado = typeof ticket.status === 'string'
-      ? ticket.status.toUpperCase()
-      : undefined;
+    const statusNormalizado =
+      typeof ticket.status === 'string' ? ticket.status.toUpperCase() : undefined;
 
     const status = (statusNormalizado as StatusTicket) || StatusTicket.ABERTO;
-    const encerrado =
-      status === StatusTicket.RESOLVIDO || status === StatusTicket.FECHADO;
+    const encerrado = status === StatusTicket.RESOLVIDO || status === StatusTicket.FECHADO;
 
     let fimMs: number | undefined;
 
@@ -162,88 +195,148 @@ export class TicketService {
    * Usado pelo webhook para garantir que cada cliente tenha um ticket ativo
    */
   async buscarOuCriarTicket(dados: BuscarOuCriarTicketDto): Promise<Ticket> {
-    this.logger.log(`🔍 Buscando ticket para cliente: ${dados.clienteNumero}`);
-
-    // 1. Buscar ticket aberto/em atendimento do cliente neste canal
-    let ticket = await this.ticketRepository.findOne({
-      where: {
-        empresaId: dados.empresaId,
-        canalId: dados.canalId,
-        contatoTelefone: dados.clienteNumero,
-        status: In([StatusTicket.ABERTO, StatusTicket.EM_ATENDIMENTO, StatusTicket.AGUARDANDO]),
-      },
-      order: { createdAt: 'DESC' },
-    });
-
-    // 2. Se não existir, criar novo ticket
-    if (!ticket) {
-      this.logger.log(`✨ Criando novo ticket para ${dados.clienteNumero}`);
-
-      ticket = this.ticketRepository.create({
-        empresaId: dados.empresaId,
-        canalId: dados.canalId,
-        contatoTelefone: dados.clienteNumero,
-        contatoNome: dados.clienteNome || dados.clienteNumero,
-        contatoFoto: dados.clienteFoto || null,
-        assunto: dados.assunto || 'Novo atendimento via WhatsApp',
-        status: StatusTicket.ABERTO,
-        prioridade: PrioridadeTicket.MEDIA,
-        data_abertura: new Date(),
-        ultima_mensagem_em: new Date(),
+    return withSpan('ticket.buscarOuCriar', async (span) => {
+      // 📊 Adicionar atributos para rastreamento
+      addAttributes(span, {
+        'ticket.empresaId': dados.empresaId,
+        'ticket.canalId': dados.canalId,
+        'ticket.clienteNumero': dados.clienteNumero,
+        'ticket.clienteNome': dados.clienteNome || 'unknown',
       });
 
-      ticket = await this.ticketRepository.save(ticket);
+      this.logger.log(`🔍 Buscando ticket para cliente: ${dados.clienteNumero}`);
 
-      // 🔧 FALLBACK: Se trigger não gerou número, gerar manualmente
-      if (!ticket.numero) {
-        this.logger.warn(`⚠️ Trigger não gerou número - gerando manualmente`);
-        const ultimoTicket = await this.ticketRepository
-          .createQueryBuilder('ticket')
-          .where('ticket.empresaId = :empresaId', { empresaId: dados.empresaId })
-          .andWhere('ticket.numero IS NOT NULL')
-          .orderBy('ticket.numero', 'DESC')
-          .getOne();
+      // 1. Buscar ticket aberto/em atendimento/aguardando do cliente neste canal
+      // 🔧 FIX: Incluir TODOS os status ativos, não apenas ABERTO/EM_ATENDIMENTO/AGUARDANDO
+      // Um ticket com atendente designado NÃO deve criar novo ticket!
+      let ticket = await this.ticketRepository.findOne({
+        where: {
+          empresaId: dados.empresaId,
+          canalId: dados.canalId,
+          contatoTelefone: dados.clienteNumero,
+          status: In([StatusTicket.ABERTO, StatusTicket.EM_ATENDIMENTO, StatusTicket.AGUARDANDO]),
+        },
+        order: { createdAt: 'DESC' },
+      });
 
-        ticket.numero = (ultimoTicket?.numero || 0) + 1;
+      // 🔧 Se não encontrou com status padrão, buscar qualquer ticket NÃO FECHADO/RESOLVIDO
+      // Isso garante que tickets com atendente designado sejam encontrados
+      if (!ticket) {
+        this.logger.log(`🔍 Ticket não encontrado com status padrão, buscando tickets ativos...`);
+
+        ticket = await this.ticketRepository.findOne({
+          where: {
+            empresaId: dados.empresaId,
+            canalId: dados.canalId,
+            contatoTelefone: dados.clienteNumero,
+            status: Not(In([StatusTicket.FECHADO, StatusTicket.RESOLVIDO])),
+          },
+          order: { createdAt: 'DESC' },
+        });
+
+        if (ticket) {
+          this.logger.log(
+            `✅ Encontrado ticket ativo com status ${ticket.status} (ID: ${ticket.id})`,
+          );
+          addAttributes(span, {
+            'ticket.found': true,
+            'ticket.id': ticket.id,
+            'ticket.status': ticket.status,
+            'ticket.searchType': 'fallback-active',
+          });
+        }
+      } else {
+        addAttributes(span, {
+          'ticket.found': true,
+          'ticket.id': ticket.id,
+          'ticket.status': ticket.status,
+          'ticket.searchType': 'standard',
+        });
+      }
+
+      // 2. Se não existir, criar novo ticket
+      if (!ticket) {
+        addAttributes(span, { 'ticket.found': false, 'ticket.action': 'create' });
+        this.logger.log(`✨ Criando novo ticket para ${dados.clienteNumero}`); ticket = this.ticketRepository.create({
+          empresaId: dados.empresaId,
+          canalId: dados.canalId,
+          contatoTelefone: dados.clienteNumero,
+          contatoNome: dados.clienteNome || dados.clienteNumero,
+          contatoFoto: dados.clienteFoto || null,
+          assunto: dados.assunto || 'Novo atendimento via WhatsApp',
+          status: StatusTicket.ABERTO,
+          prioridade: PrioridadeTicket.MEDIA,
+          data_abertura: new Date(),
+          ultima_mensagem_em: new Date(),
+        });
+
         ticket = await this.ticketRepository.save(ticket);
-        this.logger.log(`🔢 Número gerado manualmente: ${ticket.numero}`);
-      }
 
-      this.logger.log(`✅ Ticket criado: ${ticket.id} (Número: ${ticket.numero})`);
+        // 🔧 FALLBACK: Se trigger não gerou número, gerar manualmente
+        if (!ticket.numero) {
+          this.logger.warn(`⚠️ Trigger não gerou número - gerando manualmente`);
+          const ultimoTicket = await this.ticketRepository
+            .createQueryBuilder('ticket')
+            .where('ticket.empresaId = :empresaId', { empresaId: dados.empresaId })
+            .andWhere('ticket.numero IS NOT NULL')
+            .orderBy('ticket.numero', 'DESC')
+            .getOne();
 
-      // 🔔 Notificar sidebar em tempo real sobre novo ticket
-      this.atendimentoGateway.notificarNovoTicket(ticket);
-      this.atendimentoGateway.notificarStatusTicket(ticket.id, ticket.status, ticket);
-    } else {
-      // 3. Se já existe, atualizar última interação
-      ticket.ultima_mensagem_em = new Date();
-      if (dados.clienteFoto && dados.clienteFoto !== ticket.contatoFoto) {
-        ticket.contatoFoto = dados.clienteFoto;
-      }
-      ticket = await this.ticketRepository.save(ticket);
+          ticket.numero = (ultimoTicket?.numero || 0) + 1;
+          ticket = await this.ticketRepository.save(ticket);
+          this.logger.log(`🔢 Número gerado manualmente: ${ticket.numero}`);
+        }
 
-      // 🔧 FALLBACK: Se ticket existente não tem número, gerar agora
-      if (!ticket.numero) {
-        this.logger.warn(`⚠️ Ticket existente sem número - gerando agora`);
-        const ultimoTicket = await this.ticketRepository
-          .createQueryBuilder('ticket')
-          .where('ticket.empresaId = :empresaId', { empresaId: dados.empresaId })
-          .andWhere('ticket.numero IS NOT NULL')
-          .orderBy('ticket.numero', 'DESC')
-          .getOne();
+        this.logger.log(`✅ Ticket criado: ${ticket.id} (Número: ${ticket.numero})`);
+        addAttributes(span, { 'ticket.numero': ticket.numero, 'ticket.created': true });
 
-        ticket.numero = (ultimoTicket?.numero || 0) + 1;
+        // 📊 Incrementar métrica de tickets criados
+        incrementCounter(ticketsCriadosTotal, {
+          empresaId: dados.empresaId,
+          canalId: dados.canalId || 'unknown',
+          departamentoId: 'none',
+          origem: 'webhook',
+        });
+
+        // 🔔 Notificar sidebar em tempo real sobre novo ticket
+        this.atendimentoGateway.notificarNovoTicket(ticket);
+        this.atendimentoGateway.notificarStatusTicket(ticket.id, ticket.status, ticket);
+      } else {
+        // 3. Se já existe, atualizar última interação
+        addAttributes(span, { 'ticket.action': 'update' });
+        ticket.ultima_mensagem_em = new Date();
+        if (dados.clienteFoto && dados.clienteFoto !== ticket.contatoFoto) {
+          ticket.contatoFoto = dados.clienteFoto;
+        }
         ticket = await this.ticketRepository.save(ticket);
-        this.logger.log(`🔢 Número gerado: ${ticket.numero}`);
+
+        // 🔧 FALLBACK: Se ticket existente não tem número, gerar agora
+        if (!ticket.numero) {
+          this.logger.warn(`⚠️ Ticket existente sem número - gerando agora`);
+          const ultimoTicket = await this.ticketRepository
+            .createQueryBuilder('ticket')
+            .where('ticket.empresaId = :empresaId', { empresaId: dados.empresaId })
+            .andWhere('ticket.numero IS NOT NULL')
+            .orderBy('ticket.numero', 'DESC')
+            .getOne();
+
+          ticket.numero = (ultimoTicket?.numero || 0) + 1;
+          ticket = await this.ticketRepository.save(ticket);
+          this.logger.log(`🔢 Número gerado: ${ticket.numero}`);
+        }
+
+        this.logger.log(`♻️ Ticket existente atualizado: ${ticket.id} (Número: ${ticket.numero})`);
+
+        // 🔄 Atualizar card na sidebar em tempo real
+        this.atendimentoGateway.notificarStatusTicket(ticket.id, ticket.status, ticket);
       }
 
-      this.logger.log(`♻️ Ticket existente atualizado: ${ticket.id} (Número: ${ticket.numero})`);
+      // ✅ Marcar span como bem-sucedido
+      span.setStatus({ code: SpanStatusCode.OK });
+      addAttributes(span, { 'ticket.finalId': ticket.id, 'ticket.finalStatus': ticket.status });
 
-      // 🔄 Atualizar card na sidebar em tempo real
-      this.atendimentoGateway.notificarStatusTicket(ticket.id, ticket.status, ticket);
-    }
-
-    return ticket;
+      return ticket;
+    });
   }
 
   /**
@@ -262,92 +355,127 @@ export class TicketService {
     assunto: string;
     descricao?: string;
   }): Promise<any> {
-    this.logger.log(`➕ Criando ticket para: ${dados.contatoId || dados.contatoTelefone || 'contato não especificado'}`);
-
-    // Buscar contato se fornecido
-    let contato: Contato | null = null;
-    if (dados.contatoId) {
-      contato = await this.contatoRepository.findOne({
-        where: { id: dados.contatoId },
-        relations: ['cliente'],
+    return withSpan('ticket.criarParaTriagem', async (span) => {
+      addAttributes(span, {
+        'ticket.empresaId': dados.empresaId,
+        'ticket.departamentoId': dados.departamentoId || 'none',
+        'ticket.nucleoId': dados.nucleoId || 'none',
+        'ticket.contatoId': dados.contatoId || 'none',
+        'ticket.prioridade': dados.prioridade,
       });
 
-      if (contato) {
-        this.logger.log(`✅ Contato encontrado no banco: ${contato.nome} (${contato.telefone})`);
-      }
-    }
+      this.logger.log(
+        `➕ Criando ticket para: ${dados.contatoId || dados.contatoTelefone || 'contato não especificado'}`,
+      );
 
-    // 🆕 Se não tem contato mas tem telefone/nome, usar os dados fornecidos
-    const telefone = contato?.telefone || dados.contatoTelefone || null;
-    const nome = contato?.nome || dados.contatoNome || null;
+      // Buscar contato se fornecido
+      let contato: Contato | null = null;
+      if (dados.contatoId) {
+        contato = await this.contatoRepository.findOne({
+          where: { id: dados.contatoId },
+          relations: ['cliente'],
+        });
 
-    if (!contato && (dados.contatoTelefone || dados.contatoNome)) {
-      this.logger.log(`⚠️ Ticket sem vínculo de contato - usando: ${nome} (${telefone})`);
-    }
-
-    // Criar ticket
-    const ticket = this.ticketRepository.create({
-      empresaId: dados.empresaId,
-      contatoTelefone: telefone,
-      contatoNome: nome,
-      contatoFoto: null, // Contato não tem campo foto
-      assunto: dados.assunto,
-      status: 'ABERTO' as any,
-      prioridade: dados.prioridade as any,
-      data_abertura: new Date(),
-      ultima_mensagem_em: new Date(),
-    });
-
-    let ticketSalvo = await this.ticketRepository.save(ticket);
-
-    // Gerar número se não foi gerado automaticamente
-    if (!ticketSalvo.numero) {
-      this.logger.warn(`⚠️ Trigger não gerou número - gerando manualmente`);
-      const ultimoTicket = await this.ticketRepository
-        .createQueryBuilder('ticket')
-        .where('ticket.empresaId = :empresaId', { empresaId: dados.empresaId })
-        .andWhere('ticket.numero IS NOT NULL')
-        .orderBy('ticket.numero', 'DESC')
-        .getOne();
-
-      ticketSalvo.numero = (ultimoTicket?.numero || 0) + 1;
-      ticketSalvo = await this.ticketRepository.save(ticketSalvo);
-      this.logger.log(`🔢 Número gerado manualmente: ${ticketSalvo.numero}`);
-    }
-
-    this.logger.log(`✅ Ticket criado: ${ticketSalvo.id} (Número: ${ticketSalvo.numero})`);
-
-    // 🤖 ATRIBUIÇÃO AUTOMÁTICA DE ATENDENTE
-    let atendenteInfo: { id: string; nome: string } | null = null;
-    if (dados.departamentoId || dados.nucleoId) {
-      try {
-        atendenteInfo = await this.atribuirAutomaticamente(
-          ticketSalvo.id,
-          dados.empresaId,
-          dados.departamentoId,
-          dados.nucleoId,
-        );
-
-        if (atendenteInfo) {
-          ticketSalvo.atendenteId = atendenteInfo.id;
-          this.logger.log(`👤 Atendente atribuído automaticamente: ${atendenteInfo.nome} (${atendenteInfo.id})`);
-        } else {
-          this.logger.warn(`⚠️ Nenhum atendente disponível para departamento ${dados.departamentoId} / núcleo ${dados.nucleoId}`);
+        if (contato) {
+          this.logger.log(`✅ Contato encontrado no banco: ${contato.nome} (${contato.telefone})`);
         }
-      } catch (error) {
-        this.logger.error(`❌ Erro ao atribuir atendente automaticamente: ${error.message}`, error.stack);
       }
-    }
 
-    // 🔔 Notificar sidebar em tempo real sobre novo ticket
-    this.atendimentoGateway.notificarNovoTicket(ticketSalvo);
-    this.atendimentoGateway.notificarStatusTicket(ticketSalvo.id, ticketSalvo.status, ticketSalvo);
+      // 🆕 Se não tem contato mas tem telefone/nome, usar os dados fornecidos
+      const telefone = contato?.telefone || dados.contatoTelefone || null;
+      const nome = contato?.nome || dados.contatoNome || null;
 
-    // Adicionar informações do atendente ao retorno
-    return {
-      ...ticketSalvo,
-      atendenteNome: atendenteInfo?.nome || null,
-    };
+      if (!contato && (dados.contatoTelefone || dados.contatoNome)) {
+        this.logger.log(`⚠️ Ticket sem vínculo de contato - usando: ${nome} (${telefone})`);
+      }
+
+      // Criar ticket
+      const ticket = this.ticketRepository.create({
+        empresaId: dados.empresaId,
+        contatoTelefone: telefone,
+        contatoNome: nome,
+        contatoFoto: null, // Contato não tem campo foto
+        assunto: dados.assunto,
+        status: 'ABERTO' as any,
+        prioridade: dados.prioridade as any,
+        data_abertura: new Date(),
+        ultima_mensagem_em: new Date(),
+      });
+
+      let ticketSalvo = await this.ticketRepository.save(ticket);
+
+      // Gerar número se não foi gerado automaticamente
+      if (!ticketSalvo.numero) {
+        this.logger.warn(`⚠️ Trigger não gerou número - gerando manualmente`);
+        const ultimoTicket = await this.ticketRepository
+          .createQueryBuilder('ticket')
+          .where('ticket.empresaId = :empresaId', { empresaId: dados.empresaId })
+          .andWhere('ticket.numero IS NOT NULL')
+          .orderBy('ticket.numero', 'DESC')
+          .getOne();
+
+        ticketSalvo.numero = (ultimoTicket?.numero || 0) + 1;
+        ticketSalvo = await this.ticketRepository.save(ticketSalvo);
+        this.logger.log(`🔢 Número gerado manualmente: ${ticketSalvo.numero}`);
+      }
+
+      this.logger.log(`✅ Ticket criado: ${ticketSalvo.id} (Número: ${ticketSalvo.numero})`);
+      addAttributes(span, { 'ticket.id': ticketSalvo.id, 'ticket.numero': ticketSalvo.numero });
+
+      // 📊 Incrementar métrica de tickets criados
+      incrementCounter(ticketsCriadosTotal, {
+        empresaId: dados.empresaId,
+        canalId: dados.canalOrigem || 'unknown',
+        departamentoId: dados.departamentoId || 'none',
+        origem: 'triagem-bot',
+      });
+
+      // 🤖 ATRIBUIÇÃO AUTOMÁTICA DE ATENDENTE
+      let atendenteInfo: { id: string; nome: string } | null = null;
+      if (dados.departamentoId || dados.nucleoId) {
+        try {
+          atendenteInfo = await this.atribuirAutomaticamente(
+            ticketSalvo.id,
+            dados.empresaId,
+            dados.departamentoId,
+            dados.nucleoId,
+          );
+
+          if (atendenteInfo) {
+            ticketSalvo.atendenteId = atendenteInfo.id;
+            this.logger.log(
+              `👤 Atendente atribuído automaticamente: ${atendenteInfo.nome} (${atendenteInfo.id})`,
+            );
+            addAttributes(span, {
+              'ticket.atendenteId': atendenteInfo.id,
+              'ticket.atendenteNome': atendenteInfo.nome,
+            });
+          } else {
+            this.logger.warn(
+              `⚠️ Nenhum atendente disponível para departamento ${dados.departamentoId} / núcleo ${dados.nucleoId}`,
+            );
+          }
+        } catch (error) {
+          this.logger.error(
+            `❌ Erro ao atribuir atendente automaticamente: ${error.message}`,
+            error.stack,
+          );
+        }
+      }
+
+      // 🔔 Notificar sidebar em tempo real sobre novo ticket
+      this.atendimentoGateway.notificarNovoTicket(ticketSalvo);
+      this.atendimentoGateway.notificarStatusTicket(ticketSalvo.id, ticketSalvo.status, ticketSalvo);
+
+      // ✅ Marcar span como bem-sucedido
+      span.setStatus({ code: SpanStatusCode.OK });
+
+      // Adicionar informações do atendente ao retorno
+      return {
+        ...ticketSalvo,
+        atendenteNome: atendenteInfo?.nome || null,
+      };
+    });
   }
 
   /**
@@ -370,16 +498,17 @@ export class TicketService {
     }
 
     // Adicionar campos calculados + contato completo
-    const [mensagensNaoLidas, totalMensagens, ultimaMensagemObj, contatoCompleto] = await Promise.all([
-      this.contarMensagensNaoLidas(ticket.id),
-      this.contarMensagens(ticket.id),
-      this.mensagemRepository.findOne({
-        where: { ticketId: ticket.id },
-        order: { createdAt: 'DESC' },
-      }),
-      // 🔍 BUSCAR CONTATO COMPLETO COM CLIENTE VINCULADO
-      this.buscarContatoPorTelefone(ticket.contatoTelefone),
-    ]);
+    const [mensagensNaoLidas, totalMensagens, ultimaMensagemObj, contatoCompleto] =
+      await Promise.all([
+        this.contarMensagensNaoLidas(ticket.id),
+        this.contarMensagens(ticket.id),
+        this.mensagemRepository.findOne({
+          where: { ticketId: ticket.id },
+          order: { createdAt: 'DESC' },
+        }),
+        // 🔍 BUSCAR CONTATO COMPLETO COM CLIENTE VINCULADO
+        this.buscarContatoPorTelefone(ticket.contatoTelefone),
+      ]);
 
     // Calcular tempo de atendimento em segundos
     const tempoAtendimento = this.calcularTempoAtendimento(ticket);
@@ -421,9 +550,16 @@ export class TicketService {
       // .leftJoinAndSelect('ticket.fila', 'fila')
       .where('ticket.empresaId = :empresaId', { empresaId: filtros.empresaId });
 
-    // Filtros opcionais
+    // ✅ CORREÇÃO: Filtros opcionais de status com fallback inteligente
     if (filtros.status && filtros.status.length > 0) {
+      // Se status foi especificado, usar filtro exato
       queryBuilder.andWhere('ticket.status IN (:...status)', { status: filtros.status });
+    } else {
+      // ✅ Se status NÃO foi especificado, excluir apenas tickets FECHADOS
+      // Isso garante que tickets novos (ABERTO, EM_ATENDIMENTO, AGUARDANDO, etc) apareçam
+      queryBuilder.andWhere('ticket.status != :statusFechado', {
+        statusFechado: StatusTicket.FECHADO,
+      });
     }
 
     if (filtros.canalId) {
@@ -454,10 +590,7 @@ export class TicketService {
     const pagina = filtros.pagina || 1;
     const skip = (pagina - 1) * limite;
 
-    const [tickets, total] = await queryBuilder
-      .take(limite)
-      .skip(skip)
-      .getManyAndCount();
+    const [tickets, total] = await queryBuilder.take(limite).skip(skip).getManyAndCount();
 
     // 🔍 DEBUG: Log dos tickets retornados
     this.logger.debug(
@@ -467,16 +600,17 @@ export class TicketService {
     // ✨ ADICIONAR CAMPOS CALCULADOS + CONTATO COMPLETO
     const ticketsComCampos = await Promise.all(
       tickets.map(async (ticket) => {
-        const [mensagensNaoLidas, totalMensagens, ultimaMensagemObj, contatoCompleto] = await Promise.all([
-          this.contarMensagensNaoLidas(ticket.id),
-          this.contarMensagens(ticket.id),
-          this.mensagemRepository.findOne({
-            where: { ticketId: ticket.id },
-            order: { createdAt: 'DESC' },
-          }),
-          // 🔍 BUSCAR CONTATO COMPLETO COM CLIENTE VINCULADO
-          this.buscarContatoPorTelefone(ticket.contatoTelefone),
-        ]);
+        const [mensagensNaoLidas, totalMensagens, ultimaMensagemObj, contatoCompleto] =
+          await Promise.all([
+            this.contarMensagensNaoLidas(ticket.id),
+            this.contarMensagens(ticket.id),
+            this.mensagemRepository.findOne({
+              where: { ticketId: ticket.id },
+              order: { createdAt: 'DESC' },
+            }),
+            // 🔍 BUSCAR CONTATO COMPLETO COM CLIENTE VINCULADO
+            this.buscarContatoPorTelefone(ticket.contatoTelefone),
+          ]);
 
         // Calcular tempo de atendimento em segundos
         const tempoAtendimento = this.calcularTempoAtendimento(ticket);
@@ -521,7 +655,7 @@ export class TicketService {
           ultimaMensagem: ultimaMensagemObj?.conteudo || 'Sem mensagens',
           tempoAtendimento,
         };
-      })
+      }),
     );
 
     this.logger.log(`📋 Listando ${tickets.length} de ${total} tickets (com campos calculados)`);
@@ -580,75 +714,41 @@ export class TicketService {
     departamentoId?: string,
     nucleoId?: string,
   ): Promise<{ id: string; nome: string } | null> {
-    this.logger.log(`🔍 Buscando atendente disponível para departamento ${departamentoId} / núcleo ${nucleoId}`);
+    this.logger.log(
+      `🔍 Buscando atendente disponível para departamento ${departamentoId} / núcleo ${nucleoId}`,
+    );
 
     try {
-      const params: any[] = [];
-      const filtros: string[] = ['aa.ativo = true'];
-      const condicoesMatch: string[] = [];
-      let departamentoPlaceholder: string | null = null;
-
-      if (departamentoId) {
-        departamentoPlaceholder = `$${params.length + 1}`;
-        condicoesMatch.push(`aa.departamento_id = ${departamentoPlaceholder}`);
-        params.push(departamentoId);
-      }
-
-      if (nucleoId) {
-        const placeholder = `$${params.length + 1}`;
-        condicoesMatch.push(`aa.nucleo_id = ${placeholder}`);
-        params.push(nucleoId);
-      }
-
-      if (condicoesMatch.length > 0) {
-        filtros.push(`(${condicoesMatch.join(' OR ')})`);
-      }
-
-      const whereClause = filtros
-        .map((clause, index) => (index === 0 ? clause : `AND ${clause}`))
-        .join('\n        ');
-
-      const prioridadeDireta = departamentoPlaceholder
-        ? `CASE WHEN aa.departamento_id = ${departamentoPlaceholder} THEN 0 ELSE 1 END ASC,`
-        : '';
-
-      const query = `
-        SELECT 
-          aa.atendente_id,
-          u.nome as atendente_nome,
-          COALESCE(
-            (SELECT COUNT(*) 
-             FROM atendimento_tickets t 
-             WHERE t.atendente_id = aa.atendente_id 
-             AND t.status IN ('ABERTO', 'EM_ATENDIMENTO', 'AGUARDANDO_CLIENTE')
-            ), 0
-          ) as tickets_ativos
-        FROM atendente_atribuicoes aa
-        INNER JOIN users u ON u.id = aa.atendente_id
-        WHERE ${whereClause}
-        ORDER BY ${prioridadeDireta} tickets_ativos ASC, aa.prioridade ASC, aa.updated_at ASC
-        LIMIT 1
-      `;
-
-      const result = await this.ticketRepository.query(query, params);
-
-      if (!result || result.length === 0) {
-        this.logger.warn(`⚠️ Nenhum atendente encontrado para departamento ${departamentoId} / núcleo ${nucleoId}`);
+      if (!nucleoId) {
+        this.logger.warn(
+          `⚠️ Núcleo não informado para atribuição automática do ticket ${ticketId}`,
+        );
         return null;
       }
 
-      const atendenteSelecionado = result[0];
-      this.logger.log(`✅ Atendente selecionado: ${atendenteSelecionado.atendente_nome} (tickets ativos: ${atendenteSelecionado.tickets_ativos})`);
+      const candidato = await this.atribuicaoService.selecionarAtendenteParaRoteamento(
+        empresaId,
+        nucleoId,
+        departamentoId,
+      );
 
-      // Atribuir ticket ao atendente
+      if (!candidato) {
+        this.logger.warn(
+          `⚠️ Nenhum atendente encontrado para departamento ${departamentoId} / núcleo ${nucleoId}`,
+        );
+        return null;
+      }
+
       await this.ticketRepository.update(ticketId, {
-        atendenteId: atendenteSelecionado.atendente_id,
-        status: 'EM_ATENDIMENTO' as any,
+        atendenteId: candidato.id,
+        status: StatusTicket.EM_ATENDIMENTO,
       });
 
+      this.logger.log(`✅ Atendente selecionado: ${candidato.nome} (${candidato.id})`);
+
       return {
-        id: atendenteSelecionado.atendente_id,
-        nome: atendenteSelecionado.atendente_nome,
+        id: candidato.id,
+        nome: candidato.nome,
       };
     } catch (error) {
       this.logger.error(`❌ Erro ao atribuir automaticamente: ${error.message}`, error.stack);
@@ -659,8 +759,15 @@ export class TicketService {
   /**
    * Atribui ticket a um atendente
    */
-  async atribuir(ticketId: string, atendenteId: string, enviarBoasVindas: boolean = false): Promise<Ticket> {
+  async atribuir(
+    ticketId: string,
+    atendenteId: string,
+    enviarBoasVindas: boolean = false,
+  ): Promise<Ticket> {
     const ticket = await this.buscarPorId(ticketId);
+    this.logger.debug(
+      `[ATRIBUIR] Ticket ${ticketId} antes da atribuição -> status=${ticket.status} atendenteAtual=${ticket.atendenteId || 'nenhum'}`,
+    );
 
     // Verificar se estava ABERTO e vai para EM_ATENDIMENTO
     const primeiraAtribuicao = ticket.status === StatusTicket.ABERTO && !ticket.atendenteId;
@@ -669,35 +776,62 @@ export class TicketService {
     ticket.status = StatusTicket.EM_ATENDIMENTO;
 
     const ticketAtualizado = await this.ticketRepository.save(ticket);
+    const telefoneCliente = ticket.contatoTelefone || ticketAtualizado.contatoTelefone;
     this.logger.log(`👤 Ticket ${ticketId} atribuído para atendente ${atendenteId}`);
 
     // 🆕 Enviar mensagem de boas-vindas se for primeira atribuição ou solicitado
-    if ((primeiraAtribuicao || enviarBoasVindas) && ticket.contatoTelefone) {
+    this.logger.debug(
+      `[SAUDACAO] Avaliando envio automático: primeira=${primeiraAtribuicao} enviarBoasVindas=${enviarBoasVindas} telefone=${telefoneCliente || 'N/A'}`,
+    );
+
+    if ((primeiraAtribuicao || enviarBoasVindas) && telefoneCliente) {
+      // Buscar melhor nome possível para apresentar ao cliente
+      let nomeAtendente = (ticket as any).atendenteNome || null;
+
+      if ((!nomeAtendente || nomeAtendente.trim().length === 0) && atendenteId) {
+        try {
+          const atendente = await this.userRepository.findOne({ where: { id: atendenteId } });
+          nomeAtendente = atendente?.nome || nomeAtendente;
+        } catch (buscaErro) {
+          this.logger.warn(
+            `⚠️ Não foi possível obter nome do atendente ${atendenteId}: ${buscaErro instanceof Error ? buscaErro.message : buscaErro}`,
+          );
+        }
+      }
+
+      nomeAtendente = nomeAtendente || 'nosso atendente';
+
+      const mensagemBoasVindas = `Olá, em que posso ajuda-lo?`;
+
       try {
-        // Buscar nome do atendente (se disponível no ticket ou contexto)
-        const nomeAtendente = (ticket as any).atendenteNome || 'nosso atendente';
-
-        const mensagemBoasVindas = `👋 *Olá!*\n\n` +
-          `Sou *${nomeAtendente}* e vou te ajudar agora! 😊\n\n` +
-          `📱 Estou online e à disposição.\n\n` +
-          `💬 _Como posso ajudar você?_`;
-
-        // ⏳ Indicador de digitação antes de enviar (mais natural)
         await this.whatsAppSenderService.enviarIndicadorDigitacao(
-          ticket.empresaId,
-          ticket.contatoTelefone,
+          ticketAtualizado.empresaId,
+          telefoneCliente,
         );
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Aguarda 1s
-
-        await this.whatsAppSenderService.enviarMensagem(
-          ticket.empresaId,
-          ticket.contatoTelefone,
-          mensagemBoasVindas,
+      } catch (indicadorErro) {
+        this.logger.warn(
+          `⚠️ [WHATSAPP] Não foi possível enviar indicador de digitação: ${indicadorErro instanceof Error ? indicadorErro.message : indicadorErro}`,
         );
+      }
 
-        this.logger.log(`📱 [WHATSAPP] Mensagem de boas-vindas enviada ao cliente`);
-      } catch (error) {
-        this.logger.error(`❌ [WHATSAPP] Erro ao enviar boas-vindas: ${error.message}`);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      try {
+        const mensagemSalva = await this.mensagemService.enviar({
+          ticketId: ticketAtualizado.id,
+          conteudo: mensagemBoasVindas,
+          tipoRemetente: RemetenteMensagem.ATENDENTE,
+          remetenteId: atendenteId,
+        });
+
+        this.logger.log(
+          `📱 [WHATSAPP] Mensagem de boas-vindas automática enviada (${mensagemSalva.id})`,
+        );
+        await this.atualizarUltimaMensagem(ticketAtualizado.id);
+      } catch (erroSaudacao) {
+        this.logger.error(
+          `❌ Falha ao registrar/enviar mensagem de boas-vindas automática: ${erroSaudacao instanceof Error ? erroSaudacao.message : erroSaudacao}`,
+        );
       }
     }
 
@@ -705,13 +839,24 @@ export class TicketService {
   }
 
   /**
-   * Atualiza status do ticket
+   * Atualiza status do ticket com validação de transições
    */
-  async atualizarStatus(
-    ticketId: string,
-    status: StatusTicket,
-  ): Promise<Ticket> {
+  async atualizarStatus(ticketId: string, status: StatusTicket): Promise<Ticket> {
     const ticket = await this.buscarPorId(ticketId);
+
+    // ✅ VALIDAR TRANSIÇÃO
+    const statusAtual = ticket.status as StatusTicket;
+    const transicaoValida = validarTransicaoStatus(statusAtual, status);
+
+    if (!transicaoValida) {
+      const mensagemErro = gerarMensagemErroTransicao(statusAtual, status);
+      this.logger.warn(`⚠️ Transição inválida: ${ticketId} (${statusAtual} → ${status})`);
+      throw new BadRequestException(mensagemErro);
+    }
+
+    // Log da transição
+    const descricao = obterDescricaoTransicao(statusAtual, status);
+    this.logger.log(`🔄 Transição: ${ticketId} (${statusAtual} → ${status}): ${descricao}`);
 
     ticket.status = status;
 
@@ -725,8 +870,30 @@ export class TicketService {
       ticket.data_fechamento = new Date();
     }
 
+    // Se reabrindo, limpar datas
+    if (status === StatusTicket.ABERTO && statusAtual === StatusTicket.FECHADO) {
+      ticket.data_resolucao = null;
+      ticket.data_fechamento = null;
+      this.logger.log(`♻️ Ticket ${ticketId} reaberto - datas zeradas`);
+    }
+
     const ticketAtualizado = await this.ticketRepository.save(ticket);
-    this.logger.log(`📝 Status do ticket ${ticketId} atualizado para ${status}`);
+    this.logger.log(`✅ Status do ticket ${ticketId} atualizado para ${status}`);
+
+    // 🔔 Notificar via WebSocket
+    try {
+      await Promise.resolve(
+        this.atendimentoGateway.notificarStatusTicket(
+          ticketAtualizado.id,
+          ticketAtualizado.status,
+          ticketAtualizado,
+        ),
+      );
+    } catch (error) {
+      this.logger.error(
+        `⚠️ Erro ao notificar atualização de status via WebSocket: ${error.message}`,
+      );
+    }
 
     return ticketAtualizado;
   }
@@ -734,10 +901,7 @@ export class TicketService {
   /**
    * Atualiza prioridade do ticket
    */
-  async atualizarPrioridade(
-    ticketId: string,
-    prioridade: PrioridadeTicket,
-  ): Promise<Ticket> {
+  async atualizarPrioridade(ticketId: string, prioridade: PrioridadeTicket): Promise<Ticket> {
     const ticket = await this.buscarPorId(ticketId);
 
     ticket.prioridade = prioridade;
@@ -773,10 +937,7 @@ export class TicketService {
   /**
    * Busca tickets por número de telefone do cliente
    */
-  async buscarPorTelefone(
-    empresaId: string,
-    telefone: string,
-  ): Promise<Ticket[]> {
+  async buscarPorTelefone(empresaId: string, telefone: string): Promise<Ticket[]> {
     return await this.ticketRepository.find({
       where: {
         empresaId,
@@ -803,55 +964,134 @@ export class TicketService {
    * Transfere ticket para outro atendente
    */
   async transferir(ticketId: string, dados: any): Promise<Ticket> {
-    const ticket = await this.buscarPorId(ticketId);
+    return withSpan('ticket.transferir', async (span) => {
+      try {
+        addAttributes(span, {
+          'ticket.id': ticketId,
+          'ticket.novoAtendenteId': dados.atendenteId,
+          'ticket.motivo': dados.motivo || 'not-specified',
+        });
 
-    // Armazenar atendente anterior
-    const atendenteAnterior = ticket.atendenteId;
+        const ticket = await this.buscarPorId(ticketId);
 
-    // Atualizar ticket
-    ticket.atendenteId = dados.atendenteId;
-    ticket.status = StatusTicket.EM_ATENDIMENTO;
+        // Armazenar atendente anterior
+        const atendenteAnterior = ticket.atendenteId;
+        addAttributes(span, {
+          'ticket.atendenteAnterior': atendenteAnterior || 'none',
+          'ticket.statusAnterior': ticket.status,
+        });
 
-    const ticketAtualizado = await this.ticketRepository.save(ticket);
+        // Atualizar ticket
+        ticket.atendenteId = dados.atendenteId;
+        ticket.status = StatusTicket.EM_ATENDIMENTO;
 
-    this.logger.log(
-      `🔄 Ticket ${ticketId} transferido de ${atendenteAnterior || 'fila'} para ${dados.atendenteId}. ` +
-      `Motivo: ${dados.motivo}`
-    );
+        const ticketAtualizado = await this.ticketRepository.save(ticket);
 
-    // TODO: Criar nota interna com motivo e notaInterna
-    // TODO: Se notificarAgente, enviar notificação
+        this.logger.log(
+          `🔄 Ticket ${ticketId} transferido de ${atendenteAnterior || 'fila'} para ${dados.atendenteId}. ` +
+          `Motivo: ${dados.motivo}`,
+        );
 
-    return ticketAtualizado;
+        // 📊 Incrementar métrica de transferências
+        incrementCounter(ticketsTransferidosTotal, {
+          empresaId: ticket.empresaId,
+          departamentoOrigem: 'unknown', // TODO: buscar do ticket
+          departamentoDestino: 'unknown', // TODO: buscar do atendente
+        });
+
+        // TODO: Criar nota interna com motivo e notaInterna
+        // TODO: Se notificarAgente, enviar notificação
+
+        span.setStatus({ code: SpanStatusCode.OK });
+        return ticketAtualizado;
+      } catch (error) {
+        recordException(span, error as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+        throw error;
+      }
+    });
   }
 
   /**
    * Encerra um ticket
    */
   async encerrar(ticketId: string, dados: any): Promise<any> {
-    const ticket = await this.buscarPorId(ticketId);
+    return withSpan('ticket.encerrar', async (span) => {
+      try {
+        addAttributes(span, {
+          'ticket.id': ticketId,
+          'ticket.motivo': dados?.motivo || 'not-specified',
+          'ticket.solicitarAvaliacao': dados?.solicitarAvaliacao || false,
+        });
 
-    const statusFinal = this.definirStatusEncerramento(dados?.motivo);
-    const agora = new Date();
+        const ticket = await this.buscarPorId(ticketId);
+        addAttributes(span, { 'ticket.statusAnterior': ticket.status });
 
-    ticket.status = statusFinal;
-    ticket.data_resolucao = agora;
-    ticket.data_fechamento = agora;
+        const statusFinal = this.definirStatusEncerramento(dados?.motivo);
+        const agora = new Date();
 
-    const ticketAtualizado = await this.ticketRepository.save(ticket);
+        ticket.status = statusFinal;
+        ticket.data_resolucao = agora;
+        ticket.data_fechamento = agora;
 
-    this.logger.log(`🏁 Ticket ${ticketId} encerrado. Motivo: ${dados?.motivo || 'não informado'}`);
+        const ticketAtualizado = await this.ticketRepository.save(ticket);
 
-    const followUp = await this.criarFollowUpCasoNecessario(ticketAtualizado, dados);
-    const csatEnviado = await this.enviarCsatSeSolicitado(ticketAtualizado, dados?.solicitarAvaliacao);
+        this.logger.log(
+          `🏁 Ticket ${ticketId} encerrado. Motivo: ${dados?.motivo || 'não informado'}`,
+        );
 
-    await this.finalizarSessoesTriagem(ticketAtualizado, dados?.motivo, dados?.solicitarAvaliacao);
+        const followUp = await this.criarFollowUpCasoNecessario(ticketAtualizado, dados);
+        const csatEnviado = await this.enviarCsatSeSolicitado(
+          ticketAtualizado,
+          dados?.solicitarAvaliacao,
+        );
 
-    return {
-      ticket: ticketAtualizado,
-      followUp: followUp ?? undefined,
-      csatEnviado,
-    };
+        await this.finalizarSessoesTriagem(
+          ticketAtualizado,
+          dados?.motivo,
+          dados?.solicitarAvaliacao,
+        );
+
+        addAttributes(span, {
+          'ticket.statusFinal': statusFinal,
+          'ticket.followUpCriado': !!followUp,
+          'ticket.csatEnviado': csatEnviado,
+        });
+
+        // 📊 Incrementar métrica de tickets encerrados
+        incrementCounter(ticketsEncerradosTotal, {
+          empresaId: ticket.empresaId,
+          departamentoId: 'unknown', // TODO: buscar do ticket
+          motivo: dados?.motivo || 'not-specified',
+        });
+
+        // 📊 Registrar tempo de vida do ticket (criação → fechamento)
+        if (ticket.data_abertura) {
+          const tempoVidaSegundos =
+            (ticketAtualizado.data_fechamento.getTime() - ticket.data_abertura.getTime()) / 1000;
+          observeHistogram(
+            ticketTempoVidaHistogram,
+            tempoVidaSegundos,
+            {
+              empresaId: ticket.empresaId,
+              departamentoId: 'unknown', // TODO: buscar do ticket
+            },
+          );
+        }
+
+        span.setStatus({ code: SpanStatusCode.OK });
+
+        return {
+          ticket: ticketAtualizado,
+          followUp: followUp ?? undefined,
+          csatEnviado,
+        };
+      } catch (error) {
+        recordException(span, error as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+        throw error;
+      }
+    });
   }
 
   /**
@@ -943,7 +1183,9 @@ export class TicketService {
     }
 
     if (!ticket.atendenteId) {
-      this.logger.warn(`⚠️ Não foi possível criar follow-up: ticket ${ticket.id} sem atendente associado`);
+      this.logger.warn(
+        `⚠️ Não foi possível criar follow-up: ticket ${ticket.id} sem atendente associado`,
+      );
       return null;
     }
 
@@ -958,7 +1200,9 @@ export class TicketService {
         titulo: ticket.numero
           ? `Follow-up atendimento #${ticket.numero}`
           : 'Follow-up de atendimento',
-        descricao: dados.observacoes || `Revisar atendimento do cliente ${ticket.contatoNome || ticket.contatoTelefone}`,
+        descricao:
+          dados.observacoes ||
+          `Revisar atendimento do cliente ${ticket.contatoNome || ticket.contatoTelefone}`,
         dataInicio: dataFollowUp,
         dataFim: new Date(dataFollowUp.getTime() + 30 * 60 * 1000),
         diaInteiro: true,
@@ -970,7 +1214,9 @@ export class TicketService {
       });
 
       const eventoSalvo = await this.eventoRepository.save(evento);
-      this.logger.log(`📅 Follow-up agendado: evento ${eventoSalvo.id} em ${eventoSalvo.dataInicio.toISOString()}`);
+      this.logger.log(
+        `📅 Follow-up agendado: evento ${eventoSalvo.id} em ${eventoSalvo.dataInicio.toISOString()}`,
+      );
 
       return {
         id: eventoSalvo.id,
@@ -1025,7 +1271,11 @@ export class TicketService {
     ].join('\n');
   }
 
-  private async finalizarSessoesTriagem(ticket: Ticket, motivo?: string, solicitouCsat?: boolean): Promise<void> {
+  private async finalizarSessoesTriagem(
+    ticket: Ticket,
+    motivo?: string,
+    solicitouCsat?: boolean,
+  ): Promise<void> {
     if (!ticket?.id) {
       return;
     }
@@ -1036,11 +1286,15 @@ export class TicketService {
         .where('sessao.ticketId = :ticketId', { ticketId: ticket.id });
 
       if (ticket.contatoTelefone) {
-        query.orWhere(new Brackets((qb) => {
-          qb.where('sessao.empresaId = :empresaId', { empresaId: ticket.empresaId })
-            .andWhere('sessao.contatoTelefone = :telefone', { telefone: ticket.contatoTelefone })
-            .andWhere('sessao.status IN (:...statusAtivos)', { statusAtivos: ['em_andamento', 'transferido'] });
-        }));
+        query.orWhere(
+          new Brackets((qb) => {
+            qb.where('sessao.empresaId = :empresaId', { empresaId: ticket.empresaId })
+              .andWhere('sessao.contatoTelefone = :telefone', { telefone: ticket.contatoTelefone })
+              .andWhere('sessao.status IN (:...statusAtivos)', {
+                statusAtivos: ['em_andamento', 'transferido'],
+              });
+          }),
+        );
       }
 
       const sessoes = await query.getMany();
@@ -1079,7 +1333,9 @@ export class TicketService {
 
       if (atualizadas.length) {
         await this.sessaoTriagemRepository.save(atualizadas);
-        this.logger.log(`🔚 ${atualizadas.length} sessão(ões) de triagem finalizadas para o ticket ${ticket.id}`);
+        this.logger.log(
+          `🔚 ${atualizadas.length} sessão(ões) de triagem finalizadas para o ticket ${ticket.id}`,
+        );
       }
     } catch (error) {
       this.logger.warn(`⚠️ Erro ao finalizar sessões de triagem: ${error.message}`);
@@ -1108,7 +1364,9 @@ export class TicketService {
         .createQueryBuilder('sessao')
         .where('sessao.empresaId = :empresaId', { empresaId: dados.empresaId })
         .andWhere('sessao.contatoTelefone = :telefone', { telefone: dados.telefone })
-        .andWhere('sessao.status IN (:...statusValidos)', { statusValidos: ['concluido', 'transferido'] })
+        .andWhere('sessao.status IN (:...statusValidos)', {
+          statusValidos: ['concluido', 'transferido'],
+        })
         .orderBy('sessao.updatedAt', 'DESC')
         .take(10)
         .getMany();

@@ -8,7 +8,7 @@ export class PlanoModulo {
   id: string;
 
   // Relacionamentos
-  @ManyToOne(() => Plano, plano => plano.modulosInclusos, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Plano, (plano) => plano.modulosInclusos, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'plano_id' })
   plano: Plano;
 

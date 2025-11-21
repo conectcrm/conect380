@@ -62,7 +62,11 @@ export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({
 
   // Sem assinatura
   if (!temAssinatura) {
-    return fallback || (
+    if (fallback) {
+      return <>{fallback}</>;
+    }
+
+    return (
       <Card className="border-yellow-200 bg-yellow-50">
         <CardContent className="pt-6">
           <div className="text-center">
@@ -90,7 +94,11 @@ export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({
   if (!assinaturaAtiva) {
     const statusInfo = getStatusInfo();
 
-    return fallback || (
+    if (fallback) {
+      return <>{fallback}</>;
+    }
+
+    return (
       <Card className="border-red-200 bg-red-50">
         <CardContent className="pt-6">
           <div className="text-center">
@@ -117,7 +125,11 @@ export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({
   if (requiredModule && !temAcessoModulo(requiredModule)) {
     const moduleName = requiredModule.charAt(0).toUpperCase() + requiredModule.slice(1);
 
-    return fallback || (
+    if (fallback) {
+      return <>{fallback}</>;
+    }
+
+    return (
       <Card className="border-blue-200 bg-blue-50">
         <CardContent className="pt-6">
           <div className="text-center">

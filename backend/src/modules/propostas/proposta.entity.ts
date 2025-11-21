@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { User } from '../users/user.entity';
 
 export interface ProdutoProposta {
@@ -54,7 +62,7 @@ export class Proposta {
   @Column({
     type: 'enum',
     enum: ['avista', 'boleto', 'cartao', 'pix', 'recorrente'],
-    default: 'avista'
+    default: 'avista',
   })
   formaPagamento: string;
 
@@ -70,7 +78,7 @@ export class Proposta {
   @Column({
     type: 'enum',
     enum: ['rascunho', 'enviada', 'visualizada', 'aprovada', 'rejeitada', 'expirada'],
-    default: 'rascunho'
+    default: 'rascunho',
   })
   status: string;
 

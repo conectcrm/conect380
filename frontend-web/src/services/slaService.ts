@@ -133,10 +133,10 @@ export const slaService = {
    */
   async listarConfigs(apenasAtivas?: boolean): Promise<SlaConfig[]> {
     try {
-      const url = apenasAtivas 
+      const url = apenasAtivas
         ? '/atendimento/sla/configs?apenasAtivas=true'
         : '/atendimento/sla/configs';
-      
+
       const response = await api.get(url);
       return response.data;
     } catch (err: unknown) {

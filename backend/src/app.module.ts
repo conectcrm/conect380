@@ -3,8 +3,12 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { WinstonModule } from 'nest-winston';
+import { winstonConfig } from './config/logger.config';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { RateLimitInterceptor } from './common/interceptors/rate-limit.interceptor';
 import { HttpsRedirectMiddleware } from './common/middleware/https-redirect.middleware';
+import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { ClientesModule } from './modules/clientes/clientes.module';
@@ -23,11 +27,16 @@ import { EventosModule } from './modules/eventos/eventos.module';
 import { AtendimentoModule } from './modules/atendimento/atendimento.module';
 import { IAModule } from './modules/ia/ia.module';
 import { TriagemModule } from './modules/triagem/triagem.module';
+import { LeadsModule } from './modules/leads/leads.module';
 import { AssinaturaMiddleware } from './modules/common/assinatura.middleware';
 import { TenantContextMiddleware } from './common/middleware/tenant-context.middleware';
 import { HealthController } from './health/health.controller';
+import { RateLimitController } from './common/controllers/rate-limit.controller';
 import { DatabaseConfig } from './config/database.config';
 import { BullModule } from '@nestjs/bull';
+import { PagamentosModule } from './modules/pagamentos/pagamentos.module';
+import { NotificationModule } from './notifications/notification.module';
+import { MetricsModule } from './modules/metrics/metrics.module';
 
 @Module({
   imports: [
@@ -35,6 +44,8 @@ import { BullModule } from '@nestjs/bull';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    // 📊 Winston Logger: Logs estruturados e rotação automática
+    WinstonModule.forRoot(winstonConfig),
     TypeOrmModule.forRootAsync({
       useClass: DatabaseConfig,
     }),
@@ -48,18 +59,18 @@ import { BullModule } from '@nestjs/bull';
     ThrottlerModule.forRoot([
       {
         name: 'short',
-        ttl: 1000,      // 1 segundo
-        limit: 10,       // 10 requisições por segundo
+        ttl: 1000, // 1 segundo
+        limit: 10, // 10 requisições por segundo
       },
       {
         name: 'medium',
-        ttl: 60000,     // 1 minuto
-        limit: 100,      // 100 requisições por minuto
+        ttl: 60000, // 1 minuto
+        limit: 100, // 100 requisições por minuto
       },
       {
         name: 'long',
-        ttl: 900000,    // 15 minutos
-        limit: 1000,     // 1000 requisições por 15 minutos
+        ttl: 900000, // 15 minutos
+        limit: 1000, // 1000 requisições por 15 minutos
       },
     ]),
     AuthModule,
@@ -80,8 +91,12 @@ import { BullModule } from '@nestjs/bull';
     AtendimentoModule,
     IAModule,
     TriagemModule,
+    LeadsModule,
+    PagamentosModule,
+    NotificationModule,
+    MetricsModule, // 📊 Prometheus metrics endpoint
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, RateLimitController], // 📊 Health + Rate Limit monitoring
   providers: [
     {
       provide: APP_GUARD,
@@ -91,31 +106,28 @@ import { BullModule } from '@nestjs/bull';
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
     },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: RateLimitInterceptor, // 🛡️ Rate limiting anti-DDoS (100 req/min IP, 1000 empresa)
+    },
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
+    // 🔗 Correlation ID (primeiro middleware - gera ID para toda requisição)
+    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+
     // 🔒 HTTPS Redirect (Força HTTPS em produção)
-    consumer
-      .apply(HttpsRedirectMiddleware)
-      .forRoutes('*');
+    consumer.apply(HttpsRedirectMiddleware).forRoutes('*');
 
     // 🔒 CRÍTICO: Middleware de Tenant Context (Multi-Tenancy)
     // Define automaticamente o empresaId no PostgreSQL para RLS funcionar
-    consumer
-      .apply(TenantContextMiddleware)
-      .forRoutes('*'); // Aplicar em TODAS as rotas
+    consumer.apply(TenantContextMiddleware).forRoutes('*'); // Aplicar em TODAS as rotas
 
     // Middleware de verificação de assinatura
     consumer
       .apply(AssinaturaMiddleware)
-      .exclude(
-        '/auth/(.*)',
-        '/planos/(.*)',
-        '/assinaturas/(.*)',
-        '/health',
-        '/docs'
-      )
+      .exclude('/auth/(.*)', '/planos/(.*)', '/assinaturas/(.*)', '/health', '/docs')
       .forRoutes('*');
   }
 }

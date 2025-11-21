@@ -4,9 +4,9 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import toast from 'react-hot-toast';
 import { SelectField } from '../common/SelectField';
-import { 
-  X, 
-  Package, 
+import {
+  X,
+  Package,
   Tag,
   FileText,
   CheckCircle,
@@ -25,17 +25,17 @@ interface ProdutoFormData {
   custoUnitario?: number;
   unidadeMedida: string;
   status: 'ativo' | 'inativo' | 'descontinuado';
-  
+
   // Estoque
   controlarEstoque: boolean;
   estoqueMinimo?: number;
   estoqueAtual?: number;
-  
+
   // Detalhes
   descricao?: string;
   observacoes?: string;
   tags: string[];
-  
+
   // Configurações específicas
   tipoPlano?: 'basico' | 'premium' | 'enterprise';
   modulos?: string[];
@@ -50,39 +50,39 @@ const produtoSchema = yup.object({
     .required('Nome é obrigatório')
     .min(3, 'Nome deve ter pelo menos 3 caracteres')
     .max(100, 'Nome deve ter no máximo 100 caracteres'),
-  
+
   codigo: yup
     .string()
     .required('Código é obrigatório')
     .matches(/^[A-Z0-9-_]+$/, 'Código deve conter apenas letras maiúsculas, números, hífen e underscore')
     .max(20, 'Código deve ter no máximo 20 caracteres'),
-  
+
   categoria: yup
     .string()
     .required('Categoria é obrigatória'),
-  
+
   preco: yup
     .number()
     .required('Preço é obrigatório')
     .min(0, 'Preço deve ser maior ou igual a zero'),
-  
+
   custoUnitario: yup
     .number()
     .min(0, 'Custo unitário deve ser maior ou igual a zero'),
-  
+
   unidadeMedida: yup
     .string()
     .required('Unidade de medida é obrigatória'),
-  
+
   status: yup
     .string()
     .required('Status é obrigatório')
     .oneOf(['ativo', 'inativo', 'descontinuado'], 'Status inválido'),
-  
+
   // Estoque - Opcionais
   controlarEstoque: yup
     .boolean(),
-  
+
   estoqueMinimo: yup
     .number()
     .when('controlarEstoque', {
@@ -90,7 +90,7 @@ const produtoSchema = yup.object({
       then: (schema) => schema.min(0, 'Estoque mínimo deve ser maior ou igual a zero'),
       otherwise: (schema) => schema.notRequired()
     }),
-  
+
   estoqueAtual: yup
     .number()
     .when('controlarEstoque', {
@@ -98,30 +98,30 @@ const produtoSchema = yup.object({
       then: (schema) => schema.min(0, 'Estoque atual deve ser maior ou igual a zero'),
       otherwise: (schema) => schema.notRequired()
     }),
-  
+
   // Detalhes - Opcionais
   descricao: yup
     .string()
     .max(500, 'Descrição deve ter no máximo 500 caracteres'),
-  
+
   observacoes: yup
     .string()
     .max(1000, 'Observações deve ter no máximo 1000 caracteres'),
-  
+
   tags: yup
     .array()
     .of(yup.string())
     .max(10, 'Máximo de 10 tags permitidas'),
-  
+
   // Configurações específicas - Opcionais
   tipoPlano: yup
     .string()
     .oneOf(['basico', 'premium', 'enterprise'], 'Tipo de plano inválido'),
-  
+
   modulos: yup
     .array()
     .of(yup.string()),
-  
+
   licencas: yup
     .array()
     .of(yup.string())
@@ -174,7 +174,7 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
   ];
 
   const modulosDisponiveis = [
-    'Confinamento', 'Reprodutivo', 'Agrícola', 'Financeiro', 
+    'Confinamento', 'Reprodutivo', 'Agrícola', 'Financeiro',
     'Contratos', 'Relatórios', 'Dashboard', 'API'
   ];
 
@@ -279,16 +279,16 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
 
     try {
       await onSave(data);
-      
+
       toast.success(
         produto ? 'Produto atualizado com sucesso!' : 'Produto cadastrado com sucesso!',
         { id: loadingToastId }
       );
-      
+
       setTimeout(() => {
         handleClose();
       }, 1000);
-      
+
     } catch (error) {
       console.error('Erro ao salvar produto:', error);
       toast.error(
@@ -376,9 +376,9 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
       <div className="flex min-h-screen items-center justify-center p-4">
         {/* Overlay */}
         <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={handleClose}></div>
-        
+
         {/* Modal */}
-        <div className="relative bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+        <div className="relative bg-white rounded-lg shadow-xl w-[calc(100%-2rem)] sm:w-[600px] md:w-[700px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] max-h-[90vh] overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div className="flex items-center gap-3">
@@ -414,11 +414,10 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                 <button
                   key={key}
                   onClick={() => setCurrentTab(key as any)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                    currentTab === key
+                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${currentTab === key
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-2">
                     <Icon className="w-4 h-4" />
@@ -444,9 +443,8 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                       <input
                         {...register('nome')}
                         type="text"
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                          errors.nome ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.nome ? 'border-red-300' : 'border-gray-300'
+                          }`}
                         placeholder="Ex: Sistema Completo Agronegócio"
                       />
                       {errors.nome && (
@@ -463,9 +461,8 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                         <input
                           {...register('codigo')}
                           type="text"
-                          className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                            errors.codigo ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                          className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.codigo ? 'border-red-300' : 'border-gray-300'
+                            }`}
                           placeholder="Ex: SCA_PREMIUM"
                           style={{ textTransform: 'uppercase' }}
                         />
@@ -530,9 +527,8 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                           type="number"
                           step="0.01"
                           min="0"
-                          className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                            errors.preco ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                          className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.preco ? 'border-red-300' : 'border-gray-300'
+                            }`}
                           placeholder="0,00"
                         />
                       </div>
@@ -553,9 +549,8 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                           type="number"
                           step="0.01"
                           min="0"
-                          className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                            errors.custoUnitario ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                          className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.custoUnitario ? 'border-red-300' : 'border-gray-300'
+                            }`}
                           placeholder="0,00"
                         />
                       </div>
@@ -621,9 +616,8 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                           {...register('estoqueMinimo', { valueAsNumber: true })}
                           type="number"
                           min="0"
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                            errors.estoqueMinimo ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.estoqueMinimo ? 'border-red-300' : 'border-gray-300'
+                            }`}
                           placeholder="0"
                         />
                         {errors.estoqueMinimo && (
@@ -643,9 +637,8 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                           {...register('estoqueAtual', { valueAsNumber: true })}
                           type="number"
                           min="0"
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                            errors.estoqueAtual ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.estoqueAtual ? 'border-red-300' : 'border-gray-300'
+                            }`}
                           placeholder="0"
                         />
                         {errors.estoqueAtual && (
@@ -682,9 +675,8 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                     <textarea
                       {...register('descricao')}
                       rows={4}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none ${
-                        errors.descricao ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none ${errors.descricao ? 'border-red-300' : 'border-gray-300'
+                        }`}
                       placeholder="Descreva as características e funcionalidades do produto..."
                     />
                     {errors.descricao && (
@@ -721,7 +713,7 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                         <Plus className="w-4 h-4" />
                       </button>
                     </div>
-                    
+
                     {/* Lista de Tags */}
                     {watchedTags.length > 0 && (
                       <div className="flex flex-wrap gap-2">
@@ -758,9 +750,8 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                     <textarea
                       {...register('observacoes')}
                       rows={3}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none ${
-                        errors.observacoes ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none ${errors.observacoes ? 'border-red-300' : 'border-gray-300'
+                        }`}
                       placeholder="Informações internas sobre o produto..."
                     />
                     {errors.observacoes && (
@@ -814,7 +805,7 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                             <Plus className="w-4 h-4" />
                           </button>
                         </div>
-                        
+
                         {/* Lista de Módulos */}
                         {watchedModulos.length > 0 && (
                           <div className="space-y-2">
@@ -861,7 +852,7 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                             <Plus className="w-4 h-4" />
                           </button>
                         </div>
-                        
+
                         {/* Lista de Licenças */}
                         {watchedLicencas.length > 0 && (
                           <div className="space-y-2">

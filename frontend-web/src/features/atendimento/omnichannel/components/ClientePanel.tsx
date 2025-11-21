@@ -44,13 +44,26 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
 }) => {
   const [expandido, setExpandido] = useState(true);
   const [abaAtiva, setAbaAtiva] = useState<'historico' | 'demandas' | 'notas'>('historico');
-  const [tipoDemanda, setTipoDemanda] = useState('');
+  const demandaTipoOptions: Array<{ value: Demanda['tipo']; label: string }> = [
+    { value: 'tecnica', label: 'Técnica' },
+    { value: 'suporte', label: 'Suporte Técnico' },
+    { value: 'comercial', label: 'Comercial' },
+    { value: 'financeira', label: 'Financeira' },
+    { value: 'reclamacao', label: 'Reclamação' },
+    { value: 'solicitacao', label: 'Solicitação' },
+    { value: 'outros', label: 'Outros' }
+  ];
+
+  const resolveDemandaTipoLabel = (tipo: Demanda['tipo']) =>
+    demandaTipoOptions.find(option => option.value === tipo)?.label ?? tipo;
+
+  const [tipoDemanda, setTipoDemanda] = useState<Demanda['tipo'] | ''>('');
   const [descricaoDemanda, setDescricaoDemanda] = useState('');
   const [novaNota, setNovaNota] = useState('');
   const [notaImportante, setNotaImportante] = useState(false);
 
   const handleAbrirDemanda = () => {
-    if (tipoDemanda.trim() && descricaoDemanda.trim()) {
+    if (tipoDemanda && descricaoDemanda.trim()) {
       onAbrirDemanda(tipoDemanda, descricaoDemanda);
       setTipoDemanda('');
       setDescricaoDemanda('');
@@ -73,6 +86,10 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
         return 'bg-blue-100 text-blue-700';
       case 'concluida':
         return 'bg-green-100 text-green-700';
+      case 'aguardando':
+        return 'bg-blue-50 text-blue-700';
+      case 'cancelada':
+        return 'bg-gray-200 text-gray-700';
       default:
         return 'bg-gray-100 text-gray-700';
     }
@@ -86,6 +103,10 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
         return <Clock className="w-3 h-3" />;
       case 'concluida':
         return <CheckCircle className="w-3 h-3" />;
+      case 'aguardando':
+        return <Clock className="w-3 h-3" />;
+      case 'cancelada':
+        return <Trash2 className="w-3 h-3" />;
       default:
         return null;
     }
@@ -319,7 +340,10 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                   </label>
                   <select
                     value={tipoDemanda}
-                    onChange={(e) => setTipoDemanda(e.target.value)}
+                    onChange={(e) => {
+                      const nextValue = e.target.value as Demanda['tipo'] | '';
+                      setTipoDemanda(nextValue);
+                    }}
                     style={{ borderColor: theme.colors.border }}
                     onFocus={(e) => {
                       e.currentTarget.style.outline = `2px solid ${theme.colors.primary}`;
@@ -332,11 +356,11 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                     className="w-full px-2.5 py-1.5 border rounded-lg text-xs transition-all"
                   >
                     <option value="">Selecione...</option>
-                    <option value="Suporte Técnico">Suporte Técnico</option>
-                    <option value="Financeiro">Financeiro</option>
-                    <option value="Comercial">Comercial</option>
-                    <option value="Reclamação">Reclamação</option>
-                    <option value="Outros">Outros</option>
+                    {demandaTipoOptions.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -399,7 +423,7 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                     >
                       <div className="flex items-start justify-between mb-1.5">
                         <span className="text-xs font-medium text-gray-900">
-                          {demanda.tipo}
+                          {resolveDemandaTipoLabel(demanda.tipo)}
                         </span>
                         <span className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium ${getStatusDemandaStyle(demanda.status)
                           }`}>

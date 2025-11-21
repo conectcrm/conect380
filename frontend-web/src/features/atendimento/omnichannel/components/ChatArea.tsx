@@ -15,11 +15,21 @@ import {
   X,
   Play,
   Pause,
-  Download
+  Download,
+  Users,
+  FileText,
+  Zap
 } from 'lucide-react';
-import { Ticket, Mensagem } from '../types';
+import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
+import { Ticket, Mensagem, StatusAtendimentoType } from '../types';
 import { getIconeCanal, formatarTempoAtendimento, formatarHorarioMensagem, copiarParaClipboard, resolverNomeExibicao } from '../utils';
 import { ThemePalette } from '../../../../contexts/ThemeContext';
+import { FilaIndicator } from '../../../../components/chat/FilaIndicator';
+import messageTemplateService, { MessageTemplate } from '../../../../services/messageTemplateService';
+import { FileUpload } from '../../../../components/chat/FileUpload';
+import { UploadArea } from '../../components/UploadArea'; // 🆕 Upload moderno com drag & drop
+import { RespostasRapidas } from '../../../../components/chat/RespostasRapidas';
+import { useAuth } from '../../../../hooks/useAuth';
 
 const DURACAO_AUDIO_DESCONHECIDA = '--:--';
 
@@ -316,6 +326,9 @@ interface ChatAreaProps {
   onTransferir: () => void;
   onEncerrar: () => void;
   onLigar: () => void;
+  onMudarStatus?: (novoStatus: StatusAtendimentoType) => Promise<void>; // 🆕 NOVO
+  onSelecionarFila?: () => void; // 🆕 Sistema de Filas
+  onRemoverFila?: () => void; // 🆕 Sistema de Filas
   theme: ThemePalette;
   estaDigitando?: boolean;
   loading?: boolean;
@@ -330,11 +343,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onTransferir,
   onEncerrar,
   onLigar,
+  onMudarStatus, // 🆕 NOVO
+  onSelecionarFila, // 🆕 Sistema de Filas
+  onRemoverFila, // 🆕 Sistema de Filas
   theme,
   estaDigitando = false,
   loading = false,
   enviandoMensagem = false
 }) => {
+  const { user } = useAuth();
   const [mensagemAtual, setMensagemAtual] = useState('');
   const [tempoAtendimento, setTempoAtendimento] = useState(ticket.tempoAtendimento);
   const [mostrarOpcoes, setMostrarOpcoes] = useState(false);
@@ -346,6 +363,19 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [erroAudio, setErroAudio] = useState<string | null>(null);
+
+  // Estados de Templates
+  const [templates, setTemplates] = useState<MessageTemplate[]>([]);
+  const [mostrarTemplates, setMostrarTemplates] = useState(false);
+  const [autocompleteTemplates, setAutocompleteTemplates] = useState<MessageTemplate[]>([]);
+  const [mostrarAutocomplete, setMostrarAutocomplete] = useState(false);
+
+  // ✅ NOVOS: Estados para Emoji, FileUpload e Respostas Rápidas
+  const [mostrarEmojiPicker, setMostrarEmojiPicker] = useState(false);
+  const [mostrarFileUploadModal, setMostrarFileUploadModal] = useState(false);
+  const [mostrarRespostasRapidasModal, setMostrarRespostasRapidasModal] = useState(false);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -401,6 +431,30 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       limparAudio(true);
     };
   }, []);
+
+  // Carregar templates ao montar o componente
+  useEffect(() => {
+    const empresaId = user?.empresa?.id || 'empresa-default';
+    messageTemplateService.listar(empresaId, true)
+      .then(data => setTemplates(Array.isArray(data) ? data : []))
+      .catch(err => console.error('Erro ao carregar templates:', err));
+  }, []);
+
+  // Detectar comando /atalho e mostrar autocomplete
+  useEffect(() => {
+    const texto = mensagemAtual.trim();
+
+    if (texto.startsWith('/') && texto.length > 1) {
+      const comando = texto.substring(1).toLowerCase();
+      const sugestoes = templates.filter(t =>
+        t.atalho && t.atalho.toLowerCase().startsWith(comando)
+      );
+      setAutocompleteTemplates(sugestoes);
+      setMostrarAutocomplete(sugestoes.length > 0);
+    } else {
+      setMostrarAutocomplete(false);
+    }
+  }, [mensagemAtual, templates]);
 
   const formatarTamanhoArquivo = (tamanho: number) => {
     if (tamanho >= 1024 * 1024) {
@@ -579,6 +633,50 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
+  // Funções de Templates
+  const handleSelecionarTemplate = async (template: MessageTemplate) => {
+    try {
+      const empresaId = user?.empresa?.id || 'empresa-default';
+
+      // Preparar dados para substituição de variáveis
+      const dados = {
+        nome: ticket.nomeCliente || ticket.contato?.nome || 'Cliente',
+        email: ticket.contato?.email || '',
+        telefone: ticket.telefone || ticket.contato?.telefone || '',
+        ticket: ticket.numero || '',
+        atendente: ticket.atendente || 'Atendente',
+        empresa: 'ConectCRM',
+        data: new Date().toLocaleDateString('pt-BR'),
+        hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        protocolo: ticket.numero || '',
+        assunto: ticket.assunto || '',
+        prioridade: ticket.prioridade || 'Normal',
+        status: ticket.status || '',
+        fila: ticket.fila || '',
+        departamento: ticket.departamento || '',
+      };
+
+      // Processar template (substituir variáveis)
+      const conteudoProcessado = messageTemplateService.substituirVariaveisLocal(
+        template.conteudo,
+        dados
+      );
+
+      setMensagemAtual(conteudoProcessado);
+      setMostrarTemplates(false);
+      setMostrarAutocomplete(false);
+
+      // Focar no textarea
+      textareaRef.current?.focus();
+    } catch (err) {
+      console.error('Erro ao processar template:', err);
+    }
+  };
+
+  const handleSelecionarTemplateAutocomplete = (template: MessageTemplate) => {
+    handleSelecionarTemplate(template);
+  };
+
   const handleClickAnexar = () => {
     if (!podeResponder || enviandoMensagem) {
       return;
@@ -623,6 +721,60 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const handleRemoverArquivo = (indice: number) => {
     setArquivosAnexados((prev) => prev.filter((_, idx) => idx !== indice));
   };
+
+  // ✅ NOVOS: Handlers para Emoji Picker
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    const emoji = emojiData.emoji;
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart || 0;
+    const end = textarea.selectionEnd || 0;
+    const textBefore = mensagemAtual.substring(0, start);
+    const textAfter = mensagemAtual.substring(end);
+    const newText = textBefore + emoji + textAfter;
+
+    setMensagemAtual(newText);
+    setMostrarEmojiPicker(false);
+
+    setTimeout(() => {
+      textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
+      textarea.focus();
+    }, 0);
+  };
+
+  // ✅ NOVOS: Handler para FileUpload
+  const handleUploadSucesso = (arquivos: any[]) => {
+    console.log('[ChatArea] Arquivos enviados com sucesso:', arquivos);
+    setMostrarFileUploadModal(false);
+    // Recarregar mensagens se necessário
+  };
+
+  // ✅ NOVOS: Handler para Respostas Rápidas
+  const handleSelecionarTemplateModal = (conteudo: string) => {
+    setMensagemAtual(conteudo);
+    setMostrarRespostasRapidasModal(false);
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 0);
+  };
+
+  // ✅ NOVOS: Click-outside para fechar emoji picker
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(event.target as Node)
+      ) {
+        setMostrarEmojiPicker(false);
+      }
+    };
+
+    if (mostrarEmojiPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [mostrarEmojiPicker]);
 
   const handleToggleGravador = () => {
     if (!podeResponder || enviandoMensagem) {
@@ -821,18 +973,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
           {/* Ações */}
           <div className="flex items-center gap-3">
-            {/* Botão Ligar */}
-            <button
-              onClick={onLigar}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Ligar para o cliente"
-            >
-              <Phone className="w-5 h-5 text-gray-600" />
-            </button>
+            {/* Tempo de Atendimento */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-[#DEEFE7] rounded-lg">
+              <Clock className="w-4 h-4 text-[#159A9C]" />
+              <span className="text-sm font-mono font-medium text-[#002333]">
+                {formatarTempoAtendimento(tempoAtendimento)}
+              </span>
+            </div>
 
-            {/* Número do Ticket + Copiar */}
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg">
-              <span className="text-sm font-medium text-gray-700">{ticket.numero}</span>
+            {/* Número do Ticket */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg">
+              <span className="text-sm font-medium text-gray-700">#{ticket.numero}</span>
               <button
                 onClick={handleCopiarTicket}
                 className="hover:bg-gray-200 p-1 rounded transition-colors"
@@ -842,73 +993,58 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               </button>
             </div>
 
-            {/* Tempo de Atendimento */}
-            <div
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
-              style={{ backgroundColor: theme.colors.primaryLight }}
-            >
-              <Clock className="w-4 h-4" style={{ color: theme.colors.primary }} />
-              <span className="text-sm font-mono font-medium" style={{ color: theme.colors.primary }}>
-                {formatarTempoAtendimento(tempoAtendimento)}
-              </span>
-            </div>
+            {/* Divisor */}
+            <div className="h-8 w-px bg-gray-200"></div>
 
-            {/* Transferir */}
+            {/* 🆕 Botão Selecionar Fila */}
+            {onSelecionarFila && !ticket.filaId && (
+              <button
+                onClick={onSelecionarFila}
+                className="p-2 hover:bg-[#159A9C]/10 rounded-lg transition-colors"
+                title="Selecionar Fila"
+              >
+                <Users className="w-5 h-5 text-[#159A9C]" />
+              </button>
+            )}
+
+            {/* 🆕 Indicador de Fila (quando ticket tem fila) */}
+            {ticket.filaId && onRemoverFila && (
+              <FilaIndicator filaId={ticket.filaId} onRemove={onRemoverFila} />
+            )}
+
+            {/* Botão Ligar - Apenas ícone */}
             <button
-              onClick={podeResponder ? onTransferir : undefined}
-              style={{
-                borderColor: podeResponder ? theme.colors.secondary : theme.colors.neutral,
-                color: theme.colors.text,
-                backgroundColor: 'transparent',
-                opacity: podeResponder ? 1 : 0.5,
-                cursor: podeResponder ? 'pointer' : 'not-allowed'
-              }}
-              onMouseEnter={(e) => {
-                if (!podeResponder) return;
-                e.currentTarget.style.backgroundColor = theme.colors.secondaryLight;
-                e.currentTarget.style.borderColor = theme.colors.neutral;
-              }}
-              onMouseLeave={(e) => {
-                if (!podeResponder) return;
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.borderColor = theme.colors.secondary;
-              }}
-              className="px-4 py-2 border-2 rounded-lg transition-colors font-medium text-sm"
-              disabled={!podeResponder}
+              onClick={onLigar}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Ligar para o cliente"
             >
-              <div className="flex items-center gap-2">
-                <RefreshCw className="w-4 h-4" />
-                Transferir
-              </div>
+              <Phone className="w-5 h-5 text-gray-600" />
             </button>
 
-            {/* Encerrar */}
+            {/* Botão Transferir - Apenas ícone */}
+            <button
+              onClick={podeResponder ? onTransferir : undefined}
+              disabled={!podeResponder}
+              className={`p-2 rounded-lg transition-colors ${podeResponder
+                ? 'hover:bg-blue-50 text-blue-600'
+                : 'text-gray-400 cursor-not-allowed'
+                }`}
+              title="Transferir atendimento"
+            >
+              <RefreshCw className="w-5 h-5" />
+            </button>
+
+            {/* Botão Encerrar - Apenas ícone */}
             <button
               onClick={podeResponder ? onEncerrar : undefined}
-              style={{
-                borderColor: podeResponder ? theme.colors.error : theme.colors.neutral,
-                color: podeResponder ? theme.colors.error : theme.colors.text,
-                backgroundColor: 'transparent',
-                opacity: podeResponder ? 1 : 0.6,
-                cursor: podeResponder ? 'pointer' : 'not-allowed'
-              }}
-              onMouseEnter={(e) => {
-                if (!podeResponder) return;
-                e.currentTarget.style.backgroundColor = theme.colors.error;
-                e.currentTarget.style.color = '#FFFFFF';
-              }}
-              onMouseLeave={(e) => {
-                if (!podeResponder) return;
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.color = theme.colors.error;
-              }}
-              className="px-4 py-2 border-2 rounded-lg transition-colors font-medium text-sm"
               disabled={!podeResponder}
+              className={`p-2 rounded-lg transition-colors ${podeResponder
+                ? 'hover:bg-red-50 text-red-600'
+                : 'text-gray-400 cursor-not-allowed'
+                }`}
+              title={podeResponder ? 'Encerrar atendimento' : 'Atendimento resolvido'}
             >
-              <div className="flex items-center gap-2">
-                <UserX className="w-4 h-4" />
-                {podeResponder ? 'Encerrar' : 'Resolvido'}
-              </div>
+              <UserX className="w-5 h-5" />
             </button>
 
             {/* Menu de Opções */}
@@ -916,6 +1052,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               <button
                 onClick={() => setMostrarOpcoes(!mostrarOpcoes)}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Mais opções"
               >
                 <MoreVertical className="w-5 h-5 text-gray-600" />
               </button>
@@ -1165,14 +1302,106 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         )}
 
         <div className="flex items-end gap-3">
-          {/* Botão Anexar */}
+          {/* ✅ NOVO: Botão Respostas Rápidas (Modal Completo) */}
           <button
             type="button"
-            onClick={handleClickAnexar}
-            className={`p-2 rounded-lg transition-colors flex-shrink-0 ${podeResponder ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed'}`}
+            onClick={() => setMostrarRespostasRapidasModal(true)}
+            className={`p-2 rounded-lg transition-colors flex-shrink-0 ${podeResponder ? 'hover:bg-[#159A9C]/10 text-[#159A9C]' : 'opacity-50 cursor-not-allowed'}`}
             disabled={!podeResponder || enviandoMensagem}
+            title="Respostas Rápidas (ou digite /)"
           >
-            <Paperclip className="w-5 h-5 text-gray-600" />
+            <Zap className="w-5 h-5" />
+          </button>
+
+          {/* Botão Template (mantido para compatibilidade) */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMostrarTemplates(!mostrarTemplates)}
+              className={`p-2 rounded-lg transition-colors flex-shrink-0 ${podeResponder ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed'}`}
+              disabled={!podeResponder || enviandoMensagem}
+              title="Templates de Mensagens"
+            >
+              <FileText className="w-5 h-5 text-[#9333EA]" />
+            </button>
+
+            {/* Dropdown de Templates */}
+            {mostrarTemplates && templates.length > 0 && (
+              <div className="absolute bottom-full left-0 mb-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto z-50">
+                <div className="p-3 border-b bg-gray-50">
+                  <p className="text-sm font-semibold text-[#002333]">Selecione um template</p>
+                </div>
+                <div className="p-2">
+                  {templates.map(template => (
+                    <button
+                      key={template.id}
+                      onClick={() => handleSelecionarTemplate(template)}
+                      className="w-full text-left p-3 hover:bg-gray-50 rounded-lg transition-colors border-b border-gray-100 last:border-0"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-[#002333]">{template.nome}</p>
+                          {template.atalho && (
+                            <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded mt-1 inline-block">
+                              /{template.atalho}
+                            </code>
+                          )}
+                          <p className="text-xs text-[#B4BEC9] mt-1 line-clamp-2">
+                            {template.conteudo}
+                          </p>
+                        </div>
+                        {template.categoria && (
+                          <span className="text-xs bg-[#9333EA]/10 text-[#9333EA] px-2 py-1 rounded ml-2 flex-shrink-0">
+                            {template.categoria}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Autocomplete ao digitar / */}
+            {mostrarAutocomplete && autocompleteTemplates.length > 0 && (
+              <div className="absolute bottom-full left-0 mb-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto z-50">
+                <div className="p-2 border-b bg-gray-50">
+                  <p className="text-xs text-[#B4BEC9]">
+                    Sugestões de atalhos
+                  </p>
+                </div>
+                <div className="p-1">
+                  {autocompleteTemplates.map(template => (
+                    <button
+                      key={template.id}
+                      onClick={() => handleSelecionarTemplateAutocomplete(template)}
+                      className="w-full text-left p-2 hover:bg-gray-50 rounded transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono">
+                          /{template.atalho}
+                        </code>
+                        <span className="text-sm text-[#002333]">{template.nome}</span>
+                      </div>
+                      <p className="text-xs text-[#B4BEC9] mt-1 line-clamp-1 pl-16">
+                        {template.conteudo}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ✅ MODIFICADO: Botão Anexar - Abre modal FileUpload */}
+          <button
+            type="button"
+            onClick={() => setMostrarFileUploadModal(true)}
+            className={`p-2 rounded-lg transition-colors flex-shrink-0 ${podeResponder ? 'hover:bg-[#159A9C]/10 text-[#159A9C]' : 'opacity-50 cursor-not-allowed'}`}
+            disabled={!podeResponder || enviandoMensagem}
+            title="Anexar arquivo"
+          >
+            <Paperclip className="w-5 h-5" />
           </button>
 
           {/* Campo de Texto */}
@@ -1196,12 +1425,33 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               className={`w-full px-4 py-2.5 pr-10 border rounded-lg resize-none max-h-32 transition-all ${podeResponder ? '' : 'bg-gray-100 text-gray-500 cursor-not-allowed'}`}
               disabled={!podeResponder || enviandoMensagem}
             />
-            <button
-              className={`absolute right-3 top-1/2 transform -translate-y-1/2 p-1.5 rounded-lg transition-colors ${podeResponder ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed'}`}
-              disabled={!podeResponder}
-            >
-              <Smile className="w-5 h-5 text-gray-400" />
-            </button>
+
+            {/* ✅ MODIFICADO: Botão Emoji com Picker */}
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2" ref={emojiPickerRef}>
+              <button
+                type="button"
+                onClick={() => setMostrarEmojiPicker(!mostrarEmojiPicker)}
+                className={`p-1.5 rounded-lg transition-colors ${podeResponder ? 'hover:bg-[#159A9C]/10' : 'opacity-50 cursor-not-allowed'}`}
+                disabled={!podeResponder}
+                title="Adicionar emoji"
+              >
+                <Smile className="w-5 h-5 text-gray-400" />
+              </button>
+
+              {/* Emoji Picker Popover */}
+              {mostrarEmojiPicker && (
+                <div className="absolute bottom-full right-0 mb-2 z-50">
+                  <EmojiPicker
+                    onEmojiClick={handleEmojiClick}
+                    theme={Theme.LIGHT}
+                    width={350}
+                    height={400}
+                    searchPlaceHolder="Buscar emoji..."
+                    previewConfig={{ showPreview: false }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Botão Microfone ou Enviar */}
@@ -1237,6 +1487,69 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </p>
         )}
       </div>
+
+      {/* ✅ NOVO: Modal de FileUpload (com opção moderna UploadArea) */}
+      {mostrarFileUploadModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Enviar Arquivos</h3>
+              <button
+                onClick={() => setMostrarFileUploadModal(false)}
+                className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Conteúdo - UploadArea moderno com drag & drop */}
+            <div className="p-6">
+              <UploadArea ticketId={ticket.id} onUploadSuccess={handleUploadSucesso} />
+            </div>
+
+            {/* Divisor */}
+            <div className="px-6 pb-2">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 border-t border-gray-200"></div>
+                <span className="text-xs text-gray-400 font-medium">OU USE O MÉTODO TRADICIONAL</span>
+                <div className="flex-1 border-t border-gray-200"></div>
+              </div>
+            </div>
+
+            {/* Fallback - FileUpload tradicional */}
+            <div className="p-6 pt-3">
+              <FileUpload ticketId={ticket.id} onUploadSuccess={handleUploadSucesso} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ NOVO: Modal de Respostas Rápidas */}
+      {mostrarRespostasRapidasModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b flex-shrink-0">
+              <h3 className="text-lg font-semibold text-gray-900">Respostas Rápidas</h3>
+              <button
+                onClick={() => setMostrarRespostasRapidasModal(false)}
+                className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Conteúdo */}
+            <div className="overflow-y-auto flex-1">
+              <RespostasRapidas
+                onSelecionarTemplate={handleSelecionarTemplateModal}
+                ticketAtual={{ id: ticket.id }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

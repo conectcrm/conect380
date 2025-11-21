@@ -202,4 +202,85 @@ export class MailService {
       throw error;
     }
   }
+
+  async enviarEmailRecuperacaoSenha(dados: {
+    to: string;
+    usuario: string;
+    empresa?: string;
+    resetLink: string;
+    expiracaoHoras: number;
+  }): Promise<void> {
+    const { to, usuario, empresa, resetLink, expiracaoHoras } = dados;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Recuperar Senha - Conect CRM</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #002333; background: #f4f7fb; }
+          .container { max-width: 600px; margin: 0 auto; padding: 24px; }
+          .card { background: #ffffff; border-radius: 12px; box-shadow: 0 12px 40px rgba(21, 154, 156, 0.12); overflow: hidden; }
+          .header { background: linear-gradient(135deg, #159A9C, #0F7B7D); color: white; padding: 32px; text-align: center; }
+          .header h1 { margin: 0; font-size: 24px; }
+          .content { padding: 32px; }
+          .content p { margin: 0 0 16px 0; }
+          .button {
+            display: inline-block;
+            background: #159A9C;
+            color: white;
+            padding: 14px 28px;
+            text-decoration: none;
+            border-radius: 8px;
+            margin: 16px 0;
+            font-weight: bold;
+          }
+          .link { word-break: break-all; color: #159A9C; }
+          .footer { padding: 24px 32px 32px 32px; background: #DEEFE7; color: #002333; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="card">
+            <div class="header">
+              <h1>Recupere sua senha</h1>
+            </div>
+            <div class="content">
+              <p>Olá <strong>${usuario}</strong>,</p>
+              <p>Recebemos um pedido para redefinir a senha da sua conta${empresa ? ` da empresa <strong>${empresa}</strong>` : ''} no <strong>Conect CRM</strong>.</p>
+              <p>Para criar uma nova senha, clique no botão abaixo:</p>
+              <p style="text-align: center;">
+                <a href="${resetLink}" class="button">Criar nova senha</a>
+              </p>
+              <p>Se preferir, copie e cole este link no seu navegador:</p>
+              <p class="link">${resetLink}</p>
+              <p><strong>Importante:</strong> este link expira em ${expiracaoHoras} hora${expiracaoHoras > 1 ? 's' : ''}. Depois desse prazo, você poderá solicitar um novo link.</p>
+              <p>Se você não solicitou a redefinição de senha, pode ignorar este e-mail com segurança. Sua senha atual continuará válida.</p>
+            </div>
+            <div class="footer">
+              <p>Ficou com dúvidas? Fale com nosso time pelo e-mail <a href="mailto:suporte@conectcrm.com">suporte@conectcrm.com</a>.</p>
+              <p>Conect CRM • Plataforma inteligente de relacionamento com clientes.</p>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const mailOptions = {
+      from: `"Conect CRM" <${process.env.SMTP_USER}>`,
+      to,
+      subject: '🔐 Redefinição de senha no Conect CRM',
+      html: htmlContent,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Email de recuperação de senha enviado para: ${to}`);
+    } catch (error) {
+      console.error('❌ Erro ao enviar email de recuperação de senha:', error);
+      throw error;
+    }
+  }
 }

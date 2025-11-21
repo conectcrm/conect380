@@ -200,7 +200,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
 
       // Usar confirmação inteligente baseada no status da conta
       const tipoConfirmacao = conta.status === StatusContaPagar.PAGO ? 'estornar-pagamento' : 'excluir-transacao';
-      
+
       // Obter dados contextuais
       const dadosContexto = {
         numero: conta.numero,
@@ -357,9 +357,9 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
               </button>
               <button
                 onClick={handleNovaConta}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium"
               >
-                <Plus className="w-5 h-5" />
+                <Plus className="w-4 h-4" />
                 Nova Conta
               </button>
             </div>
@@ -369,62 +369,62 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
         {/* Cards de Dashboard */}
         {resumoFinanceiro && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Vencendo Hoje</p>
-                  <p className="text-3xl font-bold text-orange-600 mt-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Vencendo Hoje</p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">
                     {formatarMoeda(resumoFinanceiro.totalVencendoHoje)}
                   </p>
-                  <p className="text-xs text-orange-500 mt-1">⏰ {resumoFinanceiro.quantidadeVencendoHoje} conta(s)</p>
+                  <p className="text-sm text-[#002333]/70 mt-3">⏰ {resumoFinanceiro.quantidadeVencendoHoje} conta(s)</p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-orange-100 to-orange-200 rounded-xl">
-                  <Clock className="w-8 h-8 text-orange-600" />
+                <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
+                  <Clock className="w-6 h-6 text-yellow-600" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total do Mês</p>
-                  <p className="text-3xl font-bold text-blue-600 mt-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Total do Mês</p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">
                     {formatarMoeda(resumoFinanceiro.totalMes)}
                   </p>
-                  <p className="text-xs text-blue-500 mt-1">📅 {resumoFinanceiro.quantidadeMes} conta(s)</p>
+                  <p className="text-sm text-[#002333]/70 mt-3">📅 {resumoFinanceiro.quantidadeMes} conta(s)</p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl">
-                  <Calendar className="w-8 h-8 text-blue-600" />
+                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                  <Calendar className="w-6 h-6 text-[#159A9C]" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Em Atraso</p>
-                  <p className="text-3xl font-bold text-red-600 mt-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Em Atraso</p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">
                     {formatarMoeda(resumoFinanceiro.totalAtrasado)}
                   </p>
-                  <p className="text-xs text-red-500 mt-1">🚨 {resumoFinanceiro.quantidadeAtrasado} conta(s)</p>
+                  <p className="text-sm text-[#002333]/70 mt-3">🚨 {resumoFinanceiro.quantidadeAtrasado} conta(s)</p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-red-100 to-red-200 rounded-xl">
-                  <AlertTriangle className="w-8 h-8 text-red-600" />
+                <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center shadow-sm">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Pago no Mês</p>
-                  <p className="text-3xl font-bold text-green-600 mt-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Pago no Mês</p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">
                     {formatarMoeda(resumoFinanceiro.totalPagoMes)}
                   </p>
-                  <p className="text-xs text-green-500 mt-1">✅ {resumoFinanceiro.quantidadePagoMes} conta(s)</p>
+                  <p className="text-sm text-[#002333]/70 mt-3">✅ {resumoFinanceiro.quantidadePagoMes} conta(s)</p>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-xl">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
+                <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
+                  <CheckCircle className="w-6 h-6 text-green-600" />
                 </div>
               </div>
             </div>
@@ -486,19 +486,19 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
               <>
                 <button
                   onClick={() => handleAcaoMassa('marcar_pago')}
-                  className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                  className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm font-medium"
                 >
                   Marcar como Pago
                 </button>
                 <button
                   onClick={() => handleAcaoMassa('excluir')}
-                  className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
                 >
                   Excluir Selecionadas
                 </button>
               </>
             )}
-            <button className="flex items-center gap-2 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm">
+            <button className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium">
               <Download size={16} />
               Exportar
             </button>
@@ -514,7 +514,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
 
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+            <thead className="bg-white border-b border-gray-200">
               <tr>
                 <th className="w-12 px-4 py-4 text-left">
                   <input
@@ -630,8 +630,8 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className={`text-sm ${isVencida ? 'text-red-600 font-medium' :
-                          isVencendoHoje ? 'text-orange-600 font-medium' :
-                            'text-gray-900'
+                        isVencendoHoje ? 'text-orange-600 font-medium' :
+                          'text-gray-900'
                         }`}>
                         {formatarData(conta.dataVencimento)}
                       </div>
@@ -740,7 +740,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
               </button>
               <button
                 onClick={() => handleSalvarPagamento({} as RegistrarPagamento)}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] text-sm font-medium"
               >
                 Registrar Pagamento
               </button>

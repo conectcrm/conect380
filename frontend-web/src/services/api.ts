@@ -30,13 +30,16 @@ api.interceptors.request.use(
       const empresaAtiva = localStorage.getItem('empresaAtiva');
       const metodo = config.method?.toLowerCase();
 
-      if (empresaAtiva && metodo === 'get') {
+      // ⚠️ NÃO adicionar empresaId se já está no path (ex: /configuracao-inatividade/:empresaId)
+      const empresaIdNoPath = config.url?.match(/\/[a-f0-9-]{36}\/?/i); // UUID no path
+
+      if (empresaAtiva && metodo === 'get' && !empresaIdNoPath) {
         // Adicionar empresaId nos query params para GET requests
         config.params = {
           ...config.params,
           empresaId: empresaAtiva,
         };
-      } else if (empresaAtiva && (metodo === 'post' || metodo === 'patch' || metodo === 'put')) {
+      } else if (empresaAtiva && (metodo === 'post' || metodo === 'patch' || metodo === 'put') && !empresaIdNoPath) {
         // Adicionar empresaId no body para POST/PATCH requests
         if (config.data instanceof FormData) {
           // FormData não pode ser espalhado, então apenas anexamos o campo
@@ -192,16 +195,16 @@ api.interceptors.response.use(
 
       if (!isLoginPage && !isAuthEndpoint) {
         console.warn('⚠️ [API] Token inválido - Limpando sessão e redirecionando...');
-        
+
         // Limpar localStorage
         localStorage.removeItem('authToken');
         localStorage.removeItem('user_data');
         localStorage.removeItem('empresaAtiva');
         localStorage.removeItem('selectedProfileId');
-        
+
         // Adicionar mensagem para o usuário
         localStorage.setItem('sessionExpired', 'true');
-        
+
         // Redirecionar após pequeno delay para permitir que a mensagem seja mostrada
         setTimeout(() => {
           window.location.href = '/login';

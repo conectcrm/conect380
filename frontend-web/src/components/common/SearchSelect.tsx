@@ -21,6 +21,7 @@ interface SearchSelectProps {
   icon?: 'user' | 'file' | React.ReactNode;
   emptyMessage?: string;
   className?: string;
+  error?: string;
 }
 
 export default function SearchSelect({
@@ -35,7 +36,8 @@ export default function SearchSelect({
   disabled = false,
   icon = 'user',
   emptyMessage = "Nenhum item encontrado",
-  className = ""
+  className = "",
+  error
 }: SearchSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -141,8 +143,7 @@ export default function SearchSelect({
           onFocus={handleInputFocus}
           placeholder={value ? value.label : placeholder}
           disabled={disabled}
-          className={`w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
-            }`}
+          className={`w-full pl-10 pr-10 py-2 border ${error ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-transparent'} rounded-md focus:outline-none focus:ring-2 ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
         />
 
         {/* Botões laterais */}
@@ -216,6 +217,10 @@ export default function SearchSelect({
             </div>
           )}
         </div>
+      )}
+
+      {error && (
+        <p className="mt-1 text-sm text-red-600">{error}</p>
       )}
     </div>
   );

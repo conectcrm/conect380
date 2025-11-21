@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity('atendimento_integracoes_config')
 export class IntegracoesConfig {
@@ -42,4 +48,3 @@ export class IntegracoesConfig {
   @UpdateDateColumn({ name: 'atualizado_em' })
   atualizadoEm: Date;
 }
-

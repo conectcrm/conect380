@@ -9,7 +9,7 @@ export class EventosService {
   constructor(
     @InjectRepository(Evento)
     private eventosRepository: Repository<Evento>,
-  ) { }
+  ) {}
 
   async create(createEventoDto: CreateEventoDto): Promise<Evento> {
     const evento = this.eventosRepository.create({
@@ -25,20 +25,25 @@ export class EventosService {
     return await this.eventosRepository.find({
       where: {
         usuarioId: userId,
-        empresaId: empresaId
+        empresaId: empresaId,
       },
-      order: { dataInicio: 'ASC' }
+      order: { dataInicio: 'ASC' },
     });
   }
 
-  async findByPeriod(userId: string, empresaId: string, startDate: Date, endDate: Date): Promise<Evento[]> {
+  async findByPeriod(
+    userId: string,
+    empresaId: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<Evento[]> {
     return await this.eventosRepository.find({
       where: {
         usuarioId: userId,
         empresaId: empresaId,
-        dataInicio: Between(startDate, endDate)
+        dataInicio: Between(startDate, endDate),
       },
-      order: { dataInicio: 'ASC' }
+      order: { dataInicio: 'ASC' },
     });
   }
   async findOne(id: string, userId: string, empresaId: string): Promise<Evento> {
@@ -46,7 +51,7 @@ export class EventosService {
       where: {
         id,
         usuarioId: userId,
-        empresaId: empresaId
+        empresaId: empresaId,
       },
     });
 
@@ -57,7 +62,12 @@ export class EventosService {
     return evento;
   }
 
-  async update(id: string, updateEventoDto: UpdateEventoDto, userId: string, empresaId: string): Promise<Evento> {
+  async update(
+    id: string,
+    updateEventoDto: UpdateEventoDto,
+    userId: string,
+    empresaId: string,
+  ): Promise<Evento> {
     const evento = await this.findOne(id, userId, empresaId);
 
     // Converter datas se fornecidas
@@ -78,8 +88,15 @@ export class EventosService {
     await this.eventosRepository.delete(id);
   }
 
-  async findConflicts(userId: string, empresaId: string, start: Date, end: Date, excludeEventId?: string): Promise<Evento[]> {
-    const query = this.eventosRepository.createQueryBuilder('evento')
+  async findConflicts(
+    userId: string,
+    empresaId: string,
+    start: Date,
+    end: Date,
+    excludeEventId?: string,
+  ): Promise<Evento[]> {
+    const query = this.eventosRepository
+      .createQueryBuilder('evento')
       .where('evento.usuarioId = :userId', { userId })
       .andWhere('evento.empresaId = :empresaId', { empresaId })
       .andWhere('evento.diaInteiro = false')
@@ -98,18 +115,23 @@ export class EventosService {
       where: {
         usuarioId: userId,
         empresaId: empresaId,
-        tipo: tipo as any
+        tipo: tipo as any,
       },
-      order: { dataInicio: 'ASC' }
+      order: { dataInicio: 'ASC' },
     });
   }
 
-  async getEventStatsByPeriod(dataInicio: string, dataFim: string, usuarioId?: string, empresaId?: string): Promise<any> {
+  async getEventStatsByPeriod(
+    dataInicio: string,
+    dataFim: string,
+    usuarioId?: string,
+    empresaId?: string,
+  ): Promise<any> {
     const startDate = new Date(dataInicio);
     const endDate = new Date(dataFim);
 
-    let whereCondition: any = {
-      dataInicio: Between(startDate, endDate)
+    const whereCondition: any = {
+      dataInicio: Between(startDate, endDate),
     };
 
     // Filtrar por usuário se fornecido
@@ -124,7 +146,7 @@ export class EventosService {
 
     const eventos = await this.eventosRepository.find({
       where: whereCondition,
-      order: { dataInicio: 'ASC' }
+      order: { dataInicio: 'ASC' },
     });
 
     // Estatísticas por tipo - mapear todos os tipos do enum
@@ -134,7 +156,7 @@ export class EventosService {
       apresentacao: 0,
       visita: 0,
       'follow-up': 0,
-      outro: 0
+      outro: 0,
     };
 
     // Estatísticas por status
@@ -142,16 +164,16 @@ export class EventosService {
       pendente: 0,
       confirmado: 0,
       cancelado: 0,
-      concluido: 0
+      concluido: 0,
     };
 
     // Estatísticas por local
     const estatisticasPorLocal = {
       presencial: 0,
-      virtual: 0
+      virtual: 0,
     };
 
-    let totalEventos = eventos.length;
+    const totalEventos = eventos.length;
     let eventosConcluidos = 0;
     let proximosEventos = 0;
     let eventosHoje = 0;
@@ -160,7 +182,7 @@ export class EventosService {
     const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
     const fimHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59);
 
-    eventos.forEach(evento => {
+    eventos.forEach((evento) => {
       // Contagem por tipo - incluir todos os tipos do enum
       if (estatisticasPorTipo.hasOwnProperty(evento.tipo)) {
         estatisticasPorTipo[evento.tipo]++;
@@ -209,7 +231,7 @@ export class EventosService {
       estatisticasPorTipo,
       estatisticasPorStatus,
       estatisticasPorLocal,
-      produtividade: totalEventos > 0 ? (eventosConcluidos / totalEventos) * 100 : 0
+      produtividade: totalEventos > 0 ? (eventosConcluidos / totalEventos) * 100 : 0,
     };
   }
 
@@ -222,7 +244,7 @@ export class EventosService {
       inicioMes.toISOString().split('T')[0],
       fimMes.toISOString().split('T')[0],
       userId,
-      empresaId
+      empresaId,
     );
   }
 
@@ -240,7 +262,7 @@ export class EventosService {
       inicioSemana.toISOString().split('T')[0],
       fimSemana.toISOString().split('T')[0],
       userId,
-      empresaId
+      empresaId,
     );
   }
 }

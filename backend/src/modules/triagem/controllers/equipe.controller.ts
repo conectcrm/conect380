@@ -23,7 +23,7 @@ import {
 @Controller('equipes')
 @UseGuards(JwtAuthGuard)
 export class EquipeController {
-  constructor(private readonly atribuicaoService: AtribuicaoService) { }
+  constructor(private readonly atribuicaoService: AtribuicaoService) {}
 
   // ========================================================================
   // GESTÃO DE EQUIPES
@@ -105,10 +105,7 @@ export class EquipeController {
    */
   @Delete(':id/atendentes/:atendenteId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async removerAtendente(
-    @Param('id') equipeId: string,
-    @Param('atendenteId') atendenteId: string,
-  ) {
+  async removerAtendente(@Param('id') equipeId: string, @Param('atendenteId') atendenteId: string) {
     await this.atribuicaoService.removerAtendenteDaEquipe(equipeId, atendenteId);
   }
 

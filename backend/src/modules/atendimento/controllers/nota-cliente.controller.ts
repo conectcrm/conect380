@@ -19,7 +19,7 @@ import { UpdateNotaClienteDto } from '../dto/update-nota-cliente.dto';
 
 /**
  * Controller para gerenciar notas dos clientes
- * 
+ *
  * Endpoints:
  * - POST /notas - Criar nota
  * - GET /notas/:id - Buscar nota por ID
@@ -37,17 +37,14 @@ import { UpdateNotaClienteDto } from '../dto/update-nota-cliente.dto';
 export class NotaClienteController {
   private readonly logger = new Logger(NotaClienteController.name);
 
-  constructor(private readonly notaService: NotaClienteService) { }
+  constructor(private readonly notaService: NotaClienteService) {}
 
   /**
    * Criar nova nota
    */
   @Post()
   @ApiOperation({ summary: 'Criar nova nota para cliente/ticket' })
-  async criar(
-    @Body() dto: CreateNotaClienteDto,
-    @Request() req,
-  ) {
+  async criar(@Body() dto: CreateNotaClienteDto, @Request() req) {
     this.logger.log(`📝 Criando nota - User: ${req.user.email}`);
 
     const autorId = req.user.id;
@@ -106,10 +103,7 @@ export class NotaClienteController {
    */
   @Patch(':id')
   @ApiOperation({ summary: 'Atualizar conteúdo ou flag importante' })
-  async atualizar(
-    @Param('id') id: string,
-    @Body() dto: UpdateNotaClienteDto,
-  ) {
+  async atualizar(@Param('id') id: string, @Body() dto: UpdateNotaClienteDto) {
     return await this.notaService.atualizar(id, dto);
   }
 
@@ -118,10 +112,7 @@ export class NotaClienteController {
    */
   @Patch(':id/importante')
   @ApiOperation({ summary: 'Marcar ou desmarcar nota como importante' })
-  async toggleImportante(
-    @Param('id') id: string,
-    @Body('importante') importante: boolean,
-  ) {
+  async toggleImportante(@Param('id') id: string, @Body('importante') importante: boolean) {
     if (importante) {
       return await this.notaService.marcarImportante(id);
     } else {
@@ -149,10 +140,7 @@ export class NotaClienteController {
     @Query('empresaId') empresaId?: string,
   ) {
     const total = await this.notaService.contarPorCliente(clienteId, empresaId);
-    const importantes = await this.notaService.contarImportantesPorCliente(
-      clienteId,
-      empresaId,
-    );
+    const importantes = await this.notaService.contarImportantesPorCliente(clienteId, empresaId);
 
     return { total, importantes };
   }

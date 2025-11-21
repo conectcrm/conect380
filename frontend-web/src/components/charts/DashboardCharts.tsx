@@ -3,13 +3,13 @@
  */
 
 import React from 'react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   LineChart,
   Line,
@@ -53,14 +53,14 @@ export const chartData = {
     { mes: 'Jun', valor: 205000, meta: 220000 },
     { mes: 'Jul', valor: 195000, meta: 210000 }
   ],
-  
+
   propostas: [
     { status: 'Em Análise', valor: 25, color: COLORS.warning },
     { status: 'Aprovadas', valor: 45, color: COLORS.success },
     { status: 'Rejeitadas', valor: 15, color: COLORS.error },
     { status: 'Aguardando', valor: 15, color: COLORS.info }
   ],
-  
+
   funnelVendas: [
     { etapa: 'Leads', quantidade: 1250, valor: 2500000 },
     { etapa: 'Qualificados', quantidade: 750, valor: 1875000 },
@@ -68,7 +68,7 @@ export const chartData = {
     { etapa: 'Negociação', quantidade: 180, valor: 900000 },
     { etapa: 'Fechamento', quantidade: 85, valor: 510000 }
   ],
-  
+
   vendasPorVendedor: [
     { nome: 'João Silva', vendas: 15, valor: 185000 },
     { nome: 'Maria Santos', vendas: 12, valor: 165000 },
@@ -76,7 +76,7 @@ export const chartData = {
     { nome: 'Ana Oliveira', vendas: 10, valor: 145000 },
     { nome: 'Carlos Lima', vendas: 6, valor: 95000 }
   ],
-  
+
   atividadesMensais: [
     { mes: 'Jan', reunioes: 45, ligacoes: 125, emails: 280 },
     { mes: 'Fev', reunioes: 52, ligacoes: 138, emails: 295 },
@@ -95,16 +95,16 @@ export const VendasChart: React.FC = () => {
       <h3 className="text-lg font-semibold text-gray-900 mb-4">
         📊 Vendas vs Meta Mensal
       </h3>
-      
+
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={chartData.vendas}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis 
-            dataKey="mes" 
+          <XAxis
+            dataKey="mes"
             stroke="#6b7280"
             fontSize={12}
           />
-          <YAxis 
+          <YAxis
             stroke="#6b7280"
             fontSize={12}
             tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
@@ -121,13 +121,13 @@ export const VendasChart: React.FC = () => {
               borderRadius: '8px'
             }}
           />
-          <Bar 
-            dataKey="valor" 
+          <Bar
+            dataKey="valor"
             fill={COLORS.primary}
             radius={[4, 4, 0, 0]}
           />
-          <Bar 
-            dataKey="meta" 
+          <Bar
+            dataKey="meta"
             fill={COLORS.warning}
             radius={[4, 4, 0, 0]}
             opacity={0.7}
@@ -145,7 +145,7 @@ export const PropostasChart: React.FC = () => {
       <h3 className="text-lg font-semibold text-gray-900 mb-4">
         🎯 Status das Propostas
       </h3>
-      
+
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>
           <Pie
@@ -171,12 +171,12 @@ export const PropostasChart: React.FC = () => {
           />
         </PieChart>
       </ResponsiveContainer>
-      
+
       {/* Legenda personalizada */}
       <div className="flex flex-wrap justify-center gap-4 mt-4">
         {chartData.propostas.map((item, index) => (
           <div key={index} className="flex items-center gap-2">
-            <div 
+            <div
               className="w-3 h-3 rounded-full"
               style={{ backgroundColor: item.color }}
             />
@@ -197,12 +197,12 @@ export const FunnelChart: React.FC = () => {
       <h3 className="text-lg font-semibold text-gray-900 mb-4">
         📈 Funil de Vendas
       </h3>
-      
+
       <div className="space-y-3">
         {chartData.funnelVendas.map((etapa, index) => {
           const maxQuantidade = chartData.funnelVendas[0].quantidade;
           const porcentagem = (etapa.quantidade / maxQuantidade) * 100;
-          
+
           return (
             <div key={etapa.etapa} className="relative">
               <div className="flex justify-between items-center mb-1">
@@ -213,7 +213,7 @@ export const FunnelChart: React.FC = () => {
                   {etapa.quantidade} leads
                 </span>
               </div>
-              
+
               <div className="w-full bg-gray-200 rounded-full h-3">
                 <div
                   className="h-3 rounded-full transition-all duration-300"
@@ -223,7 +223,7 @@ export const FunnelChart: React.FC = () => {
                   }}
                 />
               </div>
-              
+
               <div className="text-xs text-gray-500 mt-1">
                 R$ {etapa.valor.toLocaleString('pt-BR')} em oportunidades
               </div>
@@ -242,21 +242,21 @@ export const VendedoresChart: React.FC = () => {
       <h3 className="text-lg font-semibold text-gray-900 mb-4">
         🏆 Performance dos Vendedores
       </h3>
-      
+
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart 
+        <BarChart
           data={chartData.vendasPorVendedor}
-          layout="verseChart"
+          layout="vertical"
           margin={{ left: 80 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis 
+          <XAxis
             type="number"
             stroke="#6b7280"
             fontSize={12}
             tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
           />
-          <YAxis 
+          <YAxis
             type="category"
             dataKey="nome"
             stroke="#6b7280"
@@ -271,7 +271,7 @@ export const VendedoresChart: React.FC = () => {
               borderRadius: '8px'
             }}
           />
-          <Bar 
+          <Bar
             dataKey="valor"
             fill={COLORS.success}
             radius={[0, 4, 4, 0]}
@@ -289,16 +289,16 @@ export const AtividadesChart: React.FC = () => {
       <h3 className="text-lg font-semibold text-gray-900 mb-4">
         📅 Atividades Mensais
       </h3>
-      
+
       <ResponsiveContainer width="100%" height={300}>
         <AreaChart data={chartData.atividadesMensais}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis 
-            dataKey="mes" 
+          <XAxis
+            dataKey="mes"
             stroke="#6b7280"
             fontSize={12}
           />
-          <YAxis 
+          <YAxis
             stroke="#6b7280"
             fontSize={12}
           />
@@ -335,7 +335,7 @@ export const AtividadesChart: React.FC = () => {
           />
         </AreaChart>
       </ResponsiveContainer>
-      
+
       {/* Legenda */}
       <div className="flex justify-center gap-6 mt-4">
         <div className="flex items-center gap-2">

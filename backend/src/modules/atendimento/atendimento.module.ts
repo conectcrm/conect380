@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
 import { JwtModule } from '@nestjs/jwt';
+import { MulterModule } from '@nestjs/platform-express';
 
 // Entities - Apenas as essenciais que estão sendo usadas
 import {
@@ -47,7 +48,9 @@ import { TicketController } from './controllers/ticket.controller'; // ✅ REST 
 import { MensagemController } from './controllers/mensagem.controller'; // ✅ REST API Mensagens
 import { NotaClienteController } from './controllers/nota-cliente.controller'; // ✅ SPRINT 1 - Notas
 import { DemandaController } from './controllers/demanda.controller'; // ✅ SPRINT 1 - Demandas
+import { SetupController } from './controllers/setup.controller'; // 🚀 Setup inicial (público)
 import { ConfiguracaoInactividadeController } from './controllers/configuracao-inatividade.controller'; // ✅ Fechamento automático
+import { AnalyticsController } from './controllers/analytics.controller'; // ✅ Dashboard Analytics
 import { DistribuicaoController } from './controllers/distribuicao.controller'; // ✅ AUTO-DISTRIBUIÇÃO - Distribuição de tickets
 import { DistribuicaoAvancadaController } from './controllers/distribuicao-avancada.controller'; // ✅ Distribuição Avançada (4 algoritmos)
 import { TagsController } from './controllers/tags.controller'; // ✅ Sistema de Tags (gestão de tags)
@@ -62,6 +65,7 @@ import { WhatsAppWebhookService } from './services/whatsapp-webhook.service'; //
 import { ValidacaoIntegracoesService } from './services/validacao-integracoes.service'; // ✅ Novo - Validação de credenciais
 import { AIResponseService } from './services/ai-response.service'; // ✅ Novo - IA para respostas
 import { WhatsAppSenderService } from './services/whatsapp-sender.service'; // ✅ Novo - Envio WhatsApp
+import { EmailSenderService } from './services/email-sender.service'; // ✅ NOVO - Envio E-mail
 import { WhatsAppInteractiveService } from './services/whatsapp-interactive.service'; // ✅ Novo - Botões interativos
 import { TicketService } from './services/ticket.service'; // ✅ Novo - Gestão de Tickets
 import { MensagemService } from './services/mensagem.service'; // ✅ Novo - Gestão de Mensagens
@@ -75,6 +79,7 @@ import { DistribuicaoAvancadaService } from './services/distribuicao-avancada.se
 import { TagsService } from './services/tags.service'; // ✅ Sistema de Tags (CRUD de tags)
 import { MessageTemplateService } from './services/message-template.service'; // ✅ Templates de Mensagens
 import { SlaService } from './services/sla.service'; // ✅ SLA Tracking
+import { AnalyticsService } from './services/analytics.service'; // ✅ Dashboard Analytics
 
 // Gateway
 import { AtendimentoGateway } from './gateways/atendimento.gateway';
@@ -82,6 +87,9 @@ import { TriagemModule } from '../triagem/triagem.module';
 
 @Module({
   imports: [
+    // Multer para upload de arquivos
+    MulterModule.register({}),
+
     // TypeORM Entities - Apenas essenciais para teste
     TypeOrmModule.forFeature([
       Canal, // Entidade original sem relações
@@ -133,6 +141,7 @@ import { TriagemModule } from '../triagem/triagem.module';
   ],
 
   controllers: [
+    SetupController, // 🚀 Setup inicial (endpoints públicos)
     TestCanaisController, // Controller de teste
     CanaisController, // ✅ Reabilitado
     FilasController, // ✅ Reabilitado
@@ -151,6 +160,7 @@ import { TriagemModule } from '../triagem/triagem.module';
     TagsController, // ✅ Sistema de Tags (REST API)
     MessageTemplateController, // ✅ Templates de Mensagens (REST API)
     SlaController, // ✅ SLA Tracking (REST API)
+    AnalyticsController, // ✅ Dashboard Analytics (REST API)
     ContextoClienteController, // ✅ SPRINT 1 - Contexto Cliente
     BuscaGlobalController, // ✅ SPRINT 1 - Busca Global
   ],
@@ -172,6 +182,8 @@ import { TriagemModule } from '../triagem/triagem.module';
     AIResponseService, // ✅ Novo
     // Service Envio de Mensagens WhatsApp
     WhatsAppSenderService, // ✅ Novo
+    // Service Envio de E-mails
+    EmailSenderService, // ✅ NOVO - SendGrid/SES/SMTP
     // Service Mensagens Interativas WhatsApp (botões e listas)
     WhatsAppInteractiveService, // ✅ Novo
     // Service Gestão de Tickets
@@ -194,6 +206,8 @@ import { TriagemModule } from '../triagem/triagem.module';
     MessageTemplateService, // ✅ CRUD de templates + substituição de variáveis
     // Sistema de SLA
     SlaService, // ✅ SLA Tracking - Cálculos, métricas, alertas
+    // Sistema de Analytics
+    AnalyticsService, // ✅ Dashboard Analytics - Métricas agregadas e tendências
   ],
 
   exports: [
@@ -206,6 +220,8 @@ import { TriagemModule } from '../triagem/triagem.module';
     DistribuicaoService, // ✅ AUTO-DISTRIBUIÇÃO - Exportado para uso externo
     DistribuicaoAvancadaService, // ✅ Distribuição Avançada - Exportado para uso externo
     WhatsAppSenderService, // ✅ Exportado para TriagemMessageSenderService
+    EmailSenderService, // ✅ NOVO - Exportado para uso em outros módulos
+    TypeOrmModule, // ✅ Exportar repositories para testes
   ],
 })
 export class AtendimentoModule { }

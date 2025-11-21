@@ -82,7 +82,7 @@ export const AbrirDemandaModal: React.FC<AbrirDemandaModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg shadow-2xl w-[calc(100%-2rem)] sm:w-[500px] md:w-[600px] lg:w-[700px] max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col">
         <div
           className="flex items-center justify-between px-6 py-4 border-b"
           style={{ backgroundColor: `${currentPalette.colors.primary}10` }}

@@ -19,7 +19,7 @@ import { UpdateDemandaDto } from '../dto/update-demanda.dto';
 
 /**
  * Controller para gerenciar demandas dos clientes
- * 
+ *
  * Endpoints:
  * - POST /demandas - Criar demanda
  * - GET /demandas/:id - Buscar demanda por ID
@@ -42,17 +42,14 @@ import { UpdateDemandaDto } from '../dto/update-demanda.dto';
 export class DemandaController {
   private readonly logger = new Logger(DemandaController.name);
 
-  constructor(private readonly demandaService: DemandaService) { }
+  constructor(private readonly demandaService: DemandaService) {}
 
   /**
    * Criar nova demanda
    */
   @Post()
   @ApiOperation({ summary: 'Criar nova demanda para cliente/ticket' })
-  async criar(
-    @Body() dto: CreateDemandaDto,
-    @Request() req,
-  ) {
+  async criar(@Body() dto: CreateDemandaDto, @Request() req) {
     this.logger.log(`📋 Criando demanda - User: ${req.user.email}`);
 
     const autorId = req.user.id;
@@ -123,10 +120,7 @@ export class DemandaController {
    */
   @Patch(':id')
   @ApiOperation({ summary: 'Atualizar demanda' })
-  async atualizar(
-    @Param('id') id: string,
-    @Body() dto: UpdateDemandaDto,
-  ) {
+  async atualizar(@Param('id') id: string, @Body() dto: UpdateDemandaDto) {
     return await this.demandaService.atualizar(id, dto);
   }
 
@@ -135,10 +129,7 @@ export class DemandaController {
    */
   @Patch(':id/responsavel')
   @ApiOperation({ summary: 'Atribuir responsável à demanda' })
-  async atribuirResponsavel(
-    @Param('id') id: string,
-    @Body('responsavelId') responsavelId: string,
-  ) {
+  async atribuirResponsavel(@Param('id') id: string, @Body('responsavelId') responsavelId: string) {
     return await this.demandaService.atribuirResponsavel(id, responsavelId);
   }
 

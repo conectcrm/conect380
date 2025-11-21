@@ -27,7 +27,7 @@ export function detectarLoops(estrutura: EstruturaFluxo): LoopDetectionResult {
 
       // Evitar duplicatas (mesmo loop com ordem diferente)
       const loopKey = [...loop].sort().join('→');
-      const jaAdicionado = loops.some(l => {
+      const jaAdicionado = loops.some((l) => {
         const existingKey = [...l].sort().join('→');
         return existingKey === loopKey;
       });
@@ -80,7 +80,10 @@ export function detectarLoops(estrutura: EstruturaFluxo): LoopDetectionResult {
     }
 
     // Checar proximaEtapaCondicional
-    if ((etapa as any).proximaEtapaCondicional && Array.isArray((etapa as any).proximaEtapaCondicional)) {
+    if (
+      (etapa as any).proximaEtapaCondicional &&
+      Array.isArray((etapa as any).proximaEtapaCondicional)
+    ) {
       for (const cond of (etapa as any).proximaEtapaCondicional) {
         if (cond.entao) {
           dfs(cond.entao, newPath);
@@ -95,7 +98,7 @@ export function detectarLoops(estrutura: EstruturaFluxo): LoopDetectionResult {
   }
 
   if (loops.length > 0) {
-    const loopDescriptions = loops.map(loop => loop.join(' → ')).join('\n');
+    const loopDescriptions = loops.map((loop) => loop.join(' → ')).join('\n');
     return {
       temLoop: true,
       loops,
@@ -120,7 +123,7 @@ export function validarFluxoParaPublicacao(estrutura: EstruturaFluxo): void {
   if (resultado.temLoop) {
     throw new Error(
       `❌ Não é possível publicar fluxo com loops infinitos.\n\n${resultado.mensagem}\n\n` +
-      `Por favor, corrija o fluxo removendo as referências circulares antes de publicar.`
+        `Por favor, corrija o fluxo removendo as referências circulares antes de publicar.`,
     );
   }
 }

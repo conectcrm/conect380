@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   RefreshCw,
@@ -12,6 +13,7 @@ import {
   Search,
   CheckCircle,
   AlertCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 import { KPICard } from '../../../components/common/KPICard';
@@ -24,7 +26,20 @@ interface GestaoEquipesPageProps {
   hideBackButton?: boolean;
 }
 
+/**
+ * @deprecated Esta página está DEPRECADA desde Janeiro 2025
+ * ⚠️ Equipes foram consolidadas em FILAS
+ * ✅ Nova página: /atendimento/filas (GestaoFilasPage)
+ * 
+ * Motivo: Unificação da arquitetura de atendimento
+ * - Equipes = conceito duplicado de Filas
+ * - Nova estrutura: Filas com Núcleo + Departamento
+ * - Load balancing inteligente implementado
+ */
 const GestaoEquipesPage: React.FC<GestaoEquipesPageProps> = ({ hideBackButton = false }) => {
+  const navigate = useNavigate();
+  const [showDeprecationWarning, setShowDeprecationWarning] = useState(true);
+
   const [equipes, setEquipes] = useState<Equipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -194,6 +209,51 @@ const GestaoEquipesPage: React.FC<GestaoEquipesPageProps> = ({ hideBackButton = 
             nucleusName="Atendimento"
             nucleusPath="/nuclei/atendimento"
           />
+        </div>
+      )}
+
+      {/* ⚠️ BANNER DE DEPRECAÇÃO (Jan 2025) */}
+      {showDeprecationWarning && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-6 mb-6 rounded-lg shadow-sm">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <AlertTriangle className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div className="ml-4 flex-1">
+              <h3 className="text-lg font-semibold text-yellow-800">
+                ⚠️ Esta página está DEPRECADA
+              </h3>
+              <p className="mt-2 text-sm text-yellow-700">
+                <strong>Equipes</strong> foram consolidadas em <strong>Filas</strong> (Janeiro 2025).
+                A nova estrutura oferece load balancing inteligente, integração com núcleos e departamentos,
+                e algoritmo de distribuição automática.
+              </p>
+              <div className="mt-4 flex gap-3">
+                <button
+                  onClick={() => navigate('/atendimento/filas')}
+                  className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors flex items-center gap-2 text-sm font-medium"
+                >
+                  <Users className="h-4 w-4" />
+                  Ir para Gestão de Filas (Nova)
+                </button>
+                <button
+                  onClick={() => setShowDeprecationWarning(false)}
+                  className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                >
+                  Continuar aqui (não recomendado)
+                </button>
+              </div>
+              <p className="mt-3 text-xs text-yellow-600">
+                💡 <strong>Migração automática:</strong> Seus dados de equipes serão migrados automaticamente para filas.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowDeprecationWarning(false)}
+              className="ml-4 text-yellow-600 hover:text-yellow-800"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
       )}
 

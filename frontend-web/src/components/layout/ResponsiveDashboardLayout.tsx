@@ -3,8 +3,8 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../hooks/useAuth';
 import { formatCompanyName, formatUserName } from '../../utils/textUtils';
 import LanguageSelector from '../common/LanguageSelector';
-import { 
-  Bell, Wifi, WifiOff, Search, 
+import {
+  Bell, Wifi, WifiOff, Search,
   Settings, HelpCircle, LogOut,
   User, ChevronDown
 } from 'lucide-react';
@@ -13,12 +13,14 @@ interface ResponsiveDashboardLayoutProps {
   children: React.ReactNode;
   title: string;
   subtitle?: string;
+  actions?: React.ReactNode;
 }
 
 export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps> = ({
   children,
   title,
   subtitle,
+  actions,
 }) => {
   const { currentPalette } = useTheme();
   const { user, logout } = useAuth();
@@ -34,7 +36,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
   ]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  
+
   // Estados para sistema de busca
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -48,10 +50,10 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
@@ -62,15 +64,15 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
-      
+
       if (showNotifications && !target.closest('[data-dropdown="notifications"]')) {
         setShowNotifications(false);
       }
-      
+
       if (showUserMenu && !target.closest('[data-dropdown="user-menu"]')) {
         setShowUserMenu(false);
       }
-      
+
       if (showSearchResults && !target.closest('[data-dropdown="search"]')) {
         setShowSearchResults(false);
       }
@@ -79,7 +81,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
     if (showNotifications || showUserMenu || showSearchResults) {
       document.addEventListener('mousedown', handleClickOutside);
     }
-    
+
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showNotifications, showUserMenu, showSearchResults]);
 
@@ -93,7 +95,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
           searchInput.focus();
         }
       }
-      
+
       if (event.key === 'Escape') {
         setShowSearchResults(false);
         setSearchQuery('');
@@ -110,11 +112,11 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
       <header className="bg-white shadow-lg border-b sticky top-0 z-20" role="banner">
         <div className="w-full max-w-[1440px] mx-auto px-6 py-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            
+
             {/* Seção Esquerda: Logo + Dashboard Title */}
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
-                <div 
+                <div
                   className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md"
                   style={{ backgroundColor: currentPalette.colors.primary }}
                 >
@@ -149,7 +151,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                     ⌘K
                   </kbd>
                 </div>
-                
+
                 {/* Dropdown de Resultados de Busca */}
                 {showSearchResults && (
                   <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl border shadow-xl z-50 overflow-hidden">
@@ -163,51 +165,50 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                         </span>
                       </div>
                     </div>
-                    
+
                     <div className="max-h-80 overflow-y-auto">
                       {searchResults
-                        .filter(result => 
+                        .filter(result =>
                           result.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           result.subtitle.toLowerCase().includes(searchQuery.toLowerCase())
                         )
                         .map((result) => (
-                        <div key={result.id} className="p-3 hover:bg-gray-50 cursor-pointer transition-colors border-b last:border-b-0">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-medium ${
-                              result.type === 'cliente' ? 'bg-blue-500' :
-                              result.type === 'proposta' ? 'bg-green-500' :
-                              'bg-purple-500'
-                            }`}>
-                              {result.type === 'cliente' ? 'C' :
-                               result.type === 'proposta' ? 'P' : 'CT'}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">
-                                {result.title}
-                              </p>
-                              <p className="text-xs text-gray-500 truncate">
-                                {result.subtitle}
-                              </p>
-                            </div>
-                            <div className="text-xs text-gray-400 capitalize">
-                              {result.type}
+                          <div key={result.id} className="p-3 hover:bg-gray-50 cursor-pointer transition-colors border-b last:border-b-0">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-medium ${result.type === 'cliente' ? 'bg-blue-500' :
+                                  result.type === 'proposta' ? 'bg-green-500' :
+                                    'bg-purple-500'
+                                }`}>
+                                {result.type === 'cliente' ? 'C' :
+                                  result.type === 'proposta' ? 'P' : 'CT'}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                  {result.title}
+                                </p>
+                                <p className="text-xs text-gray-500 truncate">
+                                  {result.subtitle}
+                                </p>
+                              </div>
+                              <div className="text-xs text-gray-400 capitalize">
+                                {result.type}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                      
-                      {searchResults.filter(result => 
+                        ))}
+
+                      {searchResults.filter(result =>
                         result.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                         result.subtitle.toLowerCase().includes(searchQuery.toLowerCase())
                       ).length === 0 && (
-                        <div className="p-6 text-center">
-                          <Search className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                          <p className="text-sm text-gray-500">Nenhum resultado encontrado</p>
-                          <p className="text-xs text-gray-400">Tente usar outros termos</p>
-                        </div>
-                      )}
+                          <div className="p-6 text-center">
+                            <Search className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                            <p className="text-sm text-gray-500">Nenhum resultado encontrado</p>
+                            <p className="text-xs text-gray-400">Tente usar outros termos</p>
+                          </div>
+                        )}
                     </div>
-                    
+
                     <div className="p-3 border-t bg-gray-50">
                       <button className="w-full text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors">
                         Ver todos os resultados
@@ -220,13 +221,12 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
 
             {/* Seção Direita: Status + Notificações + Idioma + Usuário */}
             <div className="flex items-center gap-3">
-              
+
               {/* Status Online */}
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-full transition-all duration-300 ${
-                isOnline 
-                  ? 'bg-green-50 border border-green-200 text-green-700' 
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-full transition-all duration-300 ${isOnline
+                  ? 'bg-green-50 border border-green-200 text-green-700'
                   : 'bg-red-50 border border-red-200 text-red-700'
-              }`}>
+                }`}>
                 {isOnline ? (
                   <Wifi className="w-4 h-4 animate-pulse" />
                 ) : (
@@ -239,7 +239,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
 
               {/* Notificações com Badge */}
               <div className="relative" data-dropdown="notifications">
-                <button 
+                <button
                   onClick={() => setShowNotifications(!showNotifications)}
                   className="relative p-3 rounded-full hover:bg-gray-100 transition-colors group"
                   title="Notificações"
@@ -265,7 +265,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                         )}
                       </div>
                     </div>
-                    
+
                     <div className="max-h-64 overflow-y-auto">
                       {notifications.length > 0 ? (
                         notifications.map((notification) => (
@@ -287,7 +287,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                         </div>
                       )}
                     </div>
-                    
+
                     {notifications.length > 0 && (
                       <div className="p-3 border-t bg-gray-50">
                         <button className="w-full text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors">
@@ -307,7 +307,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
 
               {/* Avatar/Menu do Usuário */}
               <div className="relative" data-dropdown="user-menu">
-                <button 
+                <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="flex items-center gap-3 px-3 py-2 rounded-full hover:bg-gray-100 transition-colors"
                   title={`${formatUserName(user?.nome || 'Admin Sistema')} - ${formatCompanyName(user?.empresa?.nome || 'Fênix CRM Demo')}`}
@@ -351,7 +351,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* Menu Options */}
                     <div className="p-2">
                       <button className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors group">
@@ -373,10 +373,10 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                         </div>
                       </button>
                     </div>
-                    
+
                     {/* Logout Section */}
                     <div className="p-2 border-t bg-gray-50">
-                      <button 
+                      <button
                         onClick={logout}
                         className="w-full flex items-center gap-3 p-3 text-left hover:bg-red-50 rounded-lg transition-colors group"
                       >
@@ -398,12 +398,32 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
       </header>
 
       {/* Content */}
-      <main 
+      <main
         id={mainId}
         className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-4 sm:py-6 lg:py-8"
         role="main"
         aria-labelledby={headingId}
       >
+        <div className="bg-white rounded-xl border border-[#DEEFE7] shadow-sm p-6 mb-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2
+                id={headingId}
+                className="text-2xl font-semibold text-[#002333] tracking-tight"
+              >
+                {title}
+              </h2>
+              {subtitle && (
+                <p className="text-sm text-gray-600 mt-1">{subtitle}</p>
+              )}
+            </div>
+            {actions && (
+              <div className="flex items-center gap-3 flex-wrap" aria-label="Ações do dashboard">
+                {actions}
+              </div>
+            )}
+          </div>
+        </div>
         {children}
       </main>
     </div>

@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, BeforeInsert, BeforeUpdate } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  BeforeInsert,
+  BeforeUpdate,
+} from 'typeorm';
 import { Fatura } from './fatura.entity';
 
 @Entity('itens_fatura')
@@ -9,7 +17,7 @@ export class ItemFatura {
   @Column()
   faturaId: number;
 
-  @ManyToOne(() => Fatura, fatura => fatura.itens)
+  @ManyToOne(() => Fatura, (fatura) => fatura.itens)
   @JoinColumn({ name: 'faturaId' })
   fatura: Fatura;
 
@@ -61,7 +69,7 @@ export class ItemFatura {
     const subtotal = quantidadeNum * valorUnitNum;
     const descontoValor = Number(this.valorDesconto) || 0;
     const descontoPerc = Number(this.percentualDesconto) || 0;
-    const descontoPercValor = descontoPerc > 0 ? (subtotal * descontoPerc / 100) : 0;
+    const descontoPercValor = descontoPerc > 0 ? (subtotal * descontoPerc) / 100 : 0;
     const total = subtotal - descontoValor - descontoPercValor;
     // Garantir duas casas decimais
     this.valorTotal = Number(total.toFixed(2));

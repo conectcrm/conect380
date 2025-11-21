@@ -12,6 +12,7 @@ export class CreateAtividadeDto {
   @IsDateString()
   dataAtividade?: string;
 
+  @IsOptional()
   @IsNumber()
   oportunidade_id: number;
 }

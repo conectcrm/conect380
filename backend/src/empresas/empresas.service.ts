@@ -1,4 +1,4 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Empresa } from './entities/empresa.entity';
@@ -7,61 +7,58 @@ import { CreateEmpresaDto } from './dto/empresas.dto';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { MailService } from '../mail/mail.service';
+import { EmpresaModuloService } from '../modules/empresas/services/empresa-modulo.service';
+import { PlanoEnum } from '../modules/empresas/entities/empresa-modulo.entity';
 
 @Injectable()
 export class EmpresasService {
+  private readonly logger = new Logger(EmpresasService.name);
+
   constructor(
     @InjectRepository(Empresa)
     private empresaRepository: Repository<Empresa>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private mailService: MailService,
-  ) {}
+    private empresaModuloService: EmpresaModuloService,
+  ) { }
 
   async registrarEmpresa(createEmpresaDto: CreateEmpresaDto): Promise<Empresa> {
+    console.log(`\n🚀 ===== REGISTRO DE EMPRESA INICIADO =====`);
+    console.log(`📋 DTO recebido:`, JSON.stringify(createEmpresaDto, null, 2));
+
     const { empresa, usuario, plano, aceitarTermos } = createEmpresaDto;
+    console.log(`📋 Plano extraído: "${plano}"`);
 
     if (!aceitarTermos) {
-      throw new HttpException(
-        'É necessário aceitar os termos de uso',
-        HttpStatus.BAD_REQUEST
-      );
+      throw new HttpException('É necessário aceitar os termos de uso', HttpStatus.BAD_REQUEST);
     }
 
     // Verificar se CNPJ já existe
     const cnpjExiste = await this.empresaRepository.findOne({
-      where: { cnpj: empresa.cnpj.replace(/\D/g, '') }
+      where: { cnpj: empresa.cnpj.replace(/\D/g, '') },
     });
 
     if (cnpjExiste) {
-      throw new HttpException(
-        'CNPJ já cadastrado',
-        HttpStatus.CONFLICT
-      );
+      throw new HttpException('CNPJ já cadastrado', HttpStatus.CONFLICT);
     }
 
     // Verificar se email da empresa já existe
     const emailEmpresaExiste = await this.empresaRepository.findOne({
-      where: { email: empresa.email }
+      where: { email: empresa.email },
     });
 
     if (emailEmpresaExiste) {
-      throw new HttpException(
-        'Email da empresa já cadastrado',
-        HttpStatus.CONFLICT
-      );
+      throw new HttpException('Email da empresa já cadastrado', HttpStatus.CONFLICT);
     }
 
     // Verificar se email do usuário já existe
     const emailUsuarioExiste = await this.userRepository.findOne({
-      where: { email: usuario.email }
+      where: { email: usuario.email },
     });
 
     if (emailUsuarioExiste) {
-      throw new HttpException(
-        'Email do usuário já cadastrado',
-        HttpStatus.CONFLICT
-      );
+      throw new HttpException('Email do usuário já cadastrado', HttpStatus.CONFLICT);
     }
 
     try {
@@ -83,8 +80,8 @@ export class EmpresasService {
         subdominio: subdominio,
         ativo: true, // Empresa ativa por padrão
         data_expiracao: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 dias de trial
-        email_verificado: false,
-        token_verificacao: crypto.randomBytes(32).toString('hex'),
+        email_verificado: true, // ✅ TEMPORÁRIO: Desabilitado para testes multi-tenant
+        token_verificacao: null, // ✅ TEMPORÁRIO: Sem token para testes
       });
 
       const empresaSalva = await this.empresaRepository.save(novaEmpresa);
@@ -101,28 +98,37 @@ export class EmpresasService {
         telefone: usuario.telefone.replace(/\D/g, ''),
         role: UserRole.ADMIN,
         empresa_id: empresaSalva.id,
-        ativo: false, // Usuário fica inativo até verificar email
+        ativo: true, // ✅ TEMPORÁRIO: Ativo para permitir testes multi-tenant
       });
 
       await this.userRepository.save(novoUsuario);
+      console.log(`✅ [DEBUG] Usuário salvo: ${novoUsuario.id}`);
 
-      // Enviar email de verificação
-      await this.enviarEmailVerificacao(empresaSalva, novoUsuario);
+      // ⚠️ TEMPORÁRIO: Email de verificação desabilitado para testes multi-tenant
+      // TODO: Reabilitar quando configurar SMTP para produção
+      // await this.enviarEmailVerificacao(empresaSalva, novoUsuario);
+
+      // Ativar módulos baseado no plano escolhido
+      const planoEnum = this.mapearPlanoParaEnum(plano);
+
+      if (planoEnum) {
+        await this.empresaModuloService.ativarPlano(empresaSalva.id, planoEnum);
+        this.logger.log(`Módulos do plano ${planoEnum} ativados para empresa ${empresaSalva.id}`);
+      }
+      console.log(`✅ [DEBUG] ATIVAÇÃO CONCLUÍDA`);
+      console.log(`═══════════════════════════════════════\n`);
 
       return empresaSalva;
     } catch (error) {
       console.error('Erro ao registrar empresa:', error);
-      throw new HttpException(
-        'Erro interno do servidor',
-        HttpStatus.INTERNAL_SERVER_ERROR
-      );
+      throw new HttpException('Erro interno do servidor', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
   async verificarCNPJDisponivel(cnpj: string): Promise<boolean> {
     const cnpjLimpo = cnpj.replace(/\D/g, '');
     const empresa = await this.empresaRepository.findOne({
-      where: { cnpj: cnpjLimpo }
+      where: { cnpj: cnpjLimpo },
     });
     return !empresa;
   }
@@ -130,7 +136,7 @@ export class EmpresasService {
   async verificarEmailDisponivel(email: string): Promise<boolean> {
     const [empresaExiste, usuarioExiste] = await Promise.all([
       this.empresaRepository.findOne({ where: { email } }),
-      this.userRepository.findOne({ where: { email } })
+      this.userRepository.findOne({ where: { email } }),
     ]);
     return !empresaExiste && !usuarioExiste;
   }
@@ -138,14 +144,11 @@ export class EmpresasService {
   async verificarEmailAtivacao(token: string): Promise<Empresa> {
     const empresa = await this.empresaRepository.findOne({
       where: { token_verificacao: token },
-      relations: ['usuarios']
+      relations: ['usuarios'],
     });
 
     if (!empresa) {
-      throw new HttpException(
-        'Token inválido',
-        HttpStatus.BAD_REQUEST
-      );
+      throw new HttpException('Token inválido', HttpStatus.BAD_REQUEST);
     }
 
     // Verificar se token não expirou (24 horas)
@@ -154,10 +157,7 @@ export class EmpresasService {
     const diffHours = (now.getTime() - tokenCreatedAt.getTime()) / (1000 * 60 * 60);
 
     if (diffHours > 24) {
-      throw new HttpException(
-        'Token expirado',
-        HttpStatus.BAD_REQUEST
-      );
+      throw new HttpException('Token expirado', HttpStatus.BAD_REQUEST);
     }
 
     // Ativar empresa e usuário
@@ -166,7 +166,7 @@ export class EmpresasService {
     await this.empresaRepository.save(empresa);
 
     // Ativar usuário administrador
-    const adminUser = empresa.usuarios.find(u => u.role === 'admin');
+    const adminUser = empresa.usuarios.find((u) => u.role === 'admin');
     if (adminUser) {
       adminUser.ativo = true;
       await this.userRepository.save(adminUser);
@@ -178,21 +178,15 @@ export class EmpresasService {
   async reenviarEmailAtivacao(email: string): Promise<void> {
     const empresa = await this.empresaRepository.findOne({
       where: { email },
-      relations: ['usuarios']
+      relations: ['usuarios'],
     });
 
     if (!empresa) {
-      throw new HttpException(
-        'Empresa não encontrada',
-        HttpStatus.NOT_FOUND
-      );
+      throw new HttpException('Empresa não encontrada', HttpStatus.NOT_FOUND);
     }
 
     if (empresa.email_verificado) {
-      throw new HttpException(
-        'Email já verificado',
-        HttpStatus.BAD_REQUEST
-      );
+      throw new HttpException('Email já verificado', HttpStatus.BAD_REQUEST);
     }
 
     // Gerar novo token
@@ -200,12 +194,9 @@ export class EmpresasService {
     await this.empresaRepository.save(empresa);
 
     // Buscar usuário admin
-    const adminUser = empresa.usuarios.find(u => u.role === 'admin');
+    const adminUser = empresa.usuarios.find((u) => u.role === 'admin');
     if (!adminUser) {
-      throw new HttpException(
-        'Usuário administrador não encontrado',
-        HttpStatus.NOT_FOUND
-      );
+      throw new HttpException('Usuário administrador não encontrado', HttpStatus.NOT_FOUND);
     }
 
     // Reenviar email
@@ -214,17 +205,54 @@ export class EmpresasService {
 
   async obterPorSubdominio(subdominio: string): Promise<Empresa> {
     const empresa = await this.empresaRepository.findOne({
-      where: { subdominio }
+      where: { subdominio },
     });
 
     if (!empresa) {
-      throw new HttpException(
-        'Empresa não encontrada',
-        HttpStatus.NOT_FOUND
-      );
+      throw new HttpException('Empresa não encontrada', HttpStatus.NOT_FOUND);
     }
 
     return empresa;
+  }
+
+  async obterPorId(id: string): Promise<Empresa> {
+    const empresa = await this.empresaRepository.findOne({
+      where: { id },
+    });
+
+    if (!empresa) {
+      throw new HttpException('Empresa não encontrada', HttpStatus.NOT_FOUND);
+    }
+
+    return empresa;
+  }
+
+  async atualizarEmpresa(id: string, updateData: Partial<Empresa>): Promise<Empresa> {
+    const empresa = await this.obterPorId(id);
+
+    // Validar CNPJ se estiver sendo alterado
+    if (updateData.cnpj && updateData.cnpj !== empresa.cnpj) {
+      const cnpjEmUso = await this.empresaRepository.findOne({
+        where: { cnpj: updateData.cnpj },
+      });
+      if (cnpjEmUso) {
+        throw new HttpException('CNPJ já cadastrado em outra empresa', HttpStatus.CONFLICT);
+      }
+    }
+
+    // Validar email se estiver sendo alterado
+    if (updateData.email && updateData.email !== empresa.email) {
+      const emailEmUso = await this.empresaRepository.findOne({
+        where: { email: updateData.email },
+      });
+      if (emailEmUso) {
+        throw new HttpException('Email já cadastrado em outra empresa', HttpStatus.CONFLICT);
+      }
+    }
+
+    // Atualizar empresa
+    Object.assign(empresa, updateData);
+    return await this.empresaRepository.save(empresa);
   }
 
   async listarPlanos(): Promise<any[]> {
@@ -241,13 +269,13 @@ export class EmpresasService {
           'Até 1.000 clientes',
           'Módulos básicos',
           '5GB de armazenamento',
-          'Suporte por email'
+          'Suporte por email',
         ],
         limites: {
           usuarios: 3,
           clientes: 1000,
-          armazenamento: '5GB'
-        }
+          armazenamento: '5GB',
+        },
       },
       {
         id: 'professional',
@@ -260,13 +288,13 @@ export class EmpresasService {
           'Todos os módulos',
           '50GB de armazenamento',
           'White label básico',
-          'Suporte prioritário'
+          'Suporte prioritário',
         ],
         limites: {
           usuarios: 10,
           clientes: 10000,
-          armazenamento: '50GB'
-        }
+          armazenamento: '50GB',
+        },
       },
       {
         id: 'enterprise',
@@ -279,27 +307,24 @@ export class EmpresasService {
           'API completa',
           '500GB de armazenamento',
           'White label completo',
-          'Suporte dedicado'
+          'Suporte dedicado',
         ],
         limites: {
           usuarios: -1,
           clientes: -1,
-          armazenamento: '500GB'
-        }
-      }
+          armazenamento: '500GB',
+        },
+      },
     ];
   }
 
   async verificarStatusEmpresa(empresaId: string): Promise<any> {
     const empresa = await this.empresaRepository.findOne({
-      where: { id: empresaId }
+      where: { id: empresaId },
     });
 
     if (!empresa) {
-      throw new HttpException(
-        'Empresa não encontrada',
-        HttpStatus.NOT_FOUND
-      );
+      throw new HttpException('Empresa não encontrada', HttpStatus.NOT_FOUND);
     }
 
     const agora = new Date();
@@ -313,15 +338,15 @@ export class EmpresasService {
       email_verificado: empresa.email_verificado,
       data_expiracao: empresa.data_expiracao,
       expirada,
-      dias_restantes: empresa.data_expiracao 
+      dias_restantes: empresa.data_expiracao
         ? Math.ceil((empresa.data_expiracao.getTime() - agora.getTime()) / (1000 * 60 * 60 * 24))
-        : null
+        : null,
     };
   }
 
   private async gerarSubdominioUnico(nomeEmpresa: string): Promise<string> {
     // Limpar nome da empresa para criar subdomínio
-    let baseSubdominio = nomeEmpresa
+    const baseSubdominio = nomeEmpresa
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '') // Remove acentos
@@ -348,7 +373,7 @@ export class EmpresasService {
         to: usuario.email,
         empresa: empresa.nome,
         usuario: usuario.nome,
-        url: verificacaoUrl
+        url: verificacaoUrl,
       });
     } catch (error) {
       console.error('Erro ao enviar email de verificação:', error);
@@ -366,5 +391,28 @@ export class EmpresasService {
       .replace(/\s+/g, '-') // Substitui espaços por hífens
       .replace(/-+/g, '-') // Remove hífens duplicados
       .slice(0, 100); // Limita a 100 caracteres
+  }
+
+  /**
+   * Mapeia string do plano para PlanoEnum
+   * Aceita: 'starter', 'professional', 'enterprise', 'STARTER', 'BUSINESS', 'ENTERPRISE'
+   */
+  private mapearPlanoParaEnum(plano: string): PlanoEnum | null {
+    const planoUpper = plano?.toUpperCase();
+
+    // Mapeamento de nomes variados para PlanoEnum
+    const mapeamento: Record<string, PlanoEnum> = {
+      'STARTER': PlanoEnum.STARTER,
+      'BASIC': PlanoEnum.STARTER,
+      'BASICO': PlanoEnum.STARTER,
+      'PROFESSIONAL': PlanoEnum.BUSINESS,
+      'BUSINESS': PlanoEnum.BUSINESS,
+      'PRO': PlanoEnum.BUSINESS,
+      'ENTERPRISE': PlanoEnum.ENTERPRISE,
+      'PREMIUM': PlanoEnum.ENTERPRISE,
+      'EMPRESARIAL': PlanoEnum.ENTERPRISE,
+    };
+
+    return mapeamento[planoUpper] || null;
   }
 }

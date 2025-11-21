@@ -121,7 +121,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             }
           }
         } catch (error) {
-          console.warn('Erro ao buscar dados reais do cliente:', error);
+          console.error('Erro ao buscar dados reais do cliente:', error);
         }
       }
 
@@ -208,7 +208,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       const uint8Array = new Uint8Array(arrayBuffer);
       setPropostaPdfBuffer(uint8Array);
     } catch (error) {
-      console.warn('⚠️ Erro ao gerar PDF, enviando sem anexo:', error);
+      console.error('Erro ao gerar PDF, enviando sem anexo:', error);
       setPropostaPdfBuffer(null);
     }
 

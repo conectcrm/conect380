@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { Plano } from './plano.entity';
 
 @Entity('assinaturas_empresas')
@@ -10,7 +18,7 @@ export class AssinaturaEmpresa {
   empresaId: string;
 
   // Relacionamento com Plano
-  @ManyToOne(() => Plano, plano => plano.assinaturas, { onDelete: 'RESTRICT' })
+  @ManyToOne(() => Plano, (plano) => plano.assinaturas, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'plano_id' })
   plano: Plano;
 

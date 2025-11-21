@@ -302,7 +302,9 @@ export const ReminderManager: React.FC<ReminderManagerProps> = ({ isOpen, onClos
                             {reminder.title}
                           </h3>
                           {reminder.recurring && (
-                            <Repeat className="w-4 h-4 text-purple-500" title="Recorrente" />
+                            <span className="flex items-center" aria-label="Recorrente">
+                              <Repeat className="w-4 h-4 text-purple-500" aria-hidden="true" />
+                            </span>
                           )}
                           {!reminder.active && (
                             <span className="px-2 py-1 text-xs bg-gray-200 text-gray-600 rounded-full">
@@ -350,8 +352,8 @@ export const ReminderManager: React.FC<ReminderManagerProps> = ({ isOpen, onClos
                         <button
                           onClick={() => updateReminder(reminder.id, { active: !reminder.active })}
                           className={`p-2 rounded-lg transition-colors ${reminder.active
-                              ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-                              : 'text-green-400 hover:text-green-600 hover:bg-green-50'
+                            ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                            : 'text-green-400 hover:text-green-600 hover:bg-green-50'
                             }`}
                           title={reminder.active ? 'Desativar' : 'Ativar'}
                         >

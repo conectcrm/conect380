@@ -1,4 +1,12 @@
-import { IsString, IsOptional, IsUUID, IsEnum, IsDateString, MinLength, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsUUID,
+  IsEnum,
+  IsDateString,
+  MinLength,
+  MaxLength,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateDemandaDto {
@@ -18,7 +26,9 @@ export class CreateDemandaDto {
   @MaxLength(20)
   contatoTelefone?: string;
 
-  @ApiPropertyOptional({ description: 'ID da empresa (UUID) - preenchido automaticamente se não fornecido' })
+  @ApiPropertyOptional({
+    description: 'ID da empresa (UUID) - preenchido automaticamente se não fornecido',
+  })
   @IsOptional()
   @IsUUID()
   empresaId?: string;
@@ -38,16 +48,23 @@ export class CreateDemandaDto {
   @ApiPropertyOptional({
     description: 'Tipo da demanda',
     enum: ['tecnica', 'comercial', 'financeira', 'suporte', 'reclamacao', 'solicitacao', 'outros'],
-    default: 'outros'
+    default: 'outros',
   })
   @IsOptional()
   @IsEnum(['tecnica', 'comercial', 'financeira', 'suporte', 'reclamacao', 'solicitacao', 'outros'])
-  tipo?: 'tecnica' | 'comercial' | 'financeira' | 'suporte' | 'reclamacao' | 'solicitacao' | 'outros';
+  tipo?:
+    | 'tecnica'
+    | 'comercial'
+    | 'financeira'
+    | 'suporte'
+    | 'reclamacao'
+    | 'solicitacao'
+    | 'outros';
 
   @ApiPropertyOptional({
     description: 'Prioridade da demanda',
     enum: ['baixa', 'media', 'alta', 'urgente'],
-    default: 'media'
+    default: 'media',
   })
   @IsOptional()
   @IsEnum(['baixa', 'media', 'alta', 'urgente'])
@@ -56,7 +73,7 @@ export class CreateDemandaDto {
   @ApiPropertyOptional({
     description: 'Status da demanda',
     enum: ['aberta', 'em_andamento', 'aguardando', 'concluida', 'cancelada'],
-    default: 'aberta'
+    default: 'aberta',
   })
   @IsOptional()
   @IsEnum(['aberta', 'em_andamento', 'aguardando', 'concluida', 'cancelada'])

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../../contexts/I18nContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -10,8 +10,11 @@ import HierarchicalNavGroup from '../navigation/HierarchicalNavGroup';
 import { menuConfig, getMenuParaEmpresa } from '../../config/menuConfig';
 import { useModulosAtivos } from '../../hooks/useModuloAtivo';
 import NotificationCenter from '../notifications/NotificationCenter';
+import NotificationIndicator from '../notifications/NotificationIndicator';
 import ConectCRMLogoFinal from '../ui/ConectCRMLogoFinal';
 import LanguageSelector from '../common/LanguageSelector';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import {
   Menu,
   X,
@@ -28,12 +31,33 @@ import {
   Calendar,
   Clock,
   CreditCard,
-  HelpCircle
+  HelpCircle,
+  Mail
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
+
+const formatCnpj = (cnpj?: string): string => {
+  if (!cnpj) {
+    return '';
+  }
+
+  const digits = cnpj.replace(/\D/g, '');
+  if (digits.length !== 14) {
+    return cnpj;
+  }
+
+  return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Administrador',
+  manager: 'Gestor',
+  vendedor: 'Vendedor',
+  user: 'Usuário'
+};
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -47,6 +71,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const { currentPalette } = useTheme();
   const { perfilSelecionado, setPerfilSelecionado } = useProfile();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // ⚡ LICENCIAMENTO: Buscar módulos ativos da empresa
   const [modulosAtivos, loadingModulos] = useModulosAtivos();
@@ -57,8 +82,40 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     return getMenuParaEmpresa(modulosAtivos);
   }, [modulosAtivos, loadingModulos]);
 
+  const roleKey = (user?.role || '').toLowerCase();
+  const displayRole = ROLE_LABELS[roleKey] || (user?.role ? formatUserName(user.role) : 'Administrador');
+
   // Verificação se é admin
-  const isAdmin = user?.role === 'admin' || user?.role === 'manager' || user?.email?.includes('admin');
+  const isAdmin = roleKey === 'admin' || roleKey === 'manager' || user?.email?.includes('admin');
+
+  const lastLoginRaw = (user as any)?.ultimo_login ?? (user as any)?.ultimoLogin ?? (user as any)?.lastLoginAt ?? (user as any)?.last_login;
+  const lastLoginDate = lastLoginRaw ? new Date(lastLoginRaw) : null;
+  const lastLoginText = lastLoginDate && !Number.isNaN(lastLoginDate.getTime())
+    ? formatDistanceToNow(lastLoginDate, { addSuffix: true, locale: ptBR })
+    : null;
+  const lastLoginLabel = lastLoginText
+    ? `Último acesso ${lastLoginText}`
+    : lastLoginRaw
+      ? 'Último acesso indisponível'
+      : 'Nunca acessou';
+
+  const rawAppVersion = (typeof window !== 'undefined' && (window as any)?.__APP_VERSION__) ?? process.env.REACT_APP_APP_VERSION ?? process.env.REACT_APP_VERSION;
+  const appVersion = rawAppVersion
+    ? rawAppVersion.toLowerCase().startsWith('v')
+      ? rawAppVersion
+      : `v${rawAppVersion}`
+    : null;
+
+  const companyCardName = user?.empresa?.nome ? formatCompanyName(user.empresa.nome) : null;
+  const companyPlanLabel = user?.empresa?.plano ? formatUserName(user.empresa.plano) : null;
+  const companyCardCnpj = user?.empresa?.cnpj ? formatCnpj(user.empresa.cnpj) : null;
+
+  const handleNavigate = (path: string) => {
+    setShowUserMenu(false);
+    setShowProfileSelector(false);
+    setShowLanguageSelector(false);
+    navigate(path);
+  };
 
   // Perfis disponíveis para o seletor
   const availableProfiles = [
@@ -226,10 +283,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         title: 'Configurações',
         subtitle: 'Configurações do sistema'
       },
-      '/configuracoes/chatwoot': {
-        title: 'Configurações do Chatwoot',
-        subtitle: 'Configurações da integração com Chatwoot'
-      },
       '/admin/empresas': {
         title: 'Gestão de Empresas',
         subtitle: 'Administração e monitoramento de empresas'
@@ -275,7 +328,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   // Estados para funcionalidades da barra superior
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showCalendar, setShowCalendar] = useState(false);
-  const [showCompanySelector, setShowCompanySelector] = useState(false);
 
   // Estados para sistema de busca
   const [searchQuery, setSearchQuery] = useState('');
@@ -286,45 +338,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     { id: 3, type: 'contrato', title: 'Contrato #123', subtitle: 'Ativo até 12/2025' }
   ]);
 
-  // Lista de empresas do usuário (mock - seria obtida via API)
-  const [userCompanies] = useState([
-    {
-      id: '1',
-      nome: 'Tech Solutions Ltda',
-      cnpj: '12.345.678/0001-90',
-      plano: 'Professional',
-      isActive: true
-    },
-    {
-      id: '2',
-      nome: 'Marketing Digital Corp',
-      cnpj: '98.765.432/0001-10',
-      plano: 'Enterprise',
-      isActive: true
-    },
-    {
-      id: '3',
-      nome: 'Consultoria Empresarial',
-      cnpj: '11.222.333/0001-44',
-      plano: 'Starter',
-      isActive: false
-    }
-  ]);
-
-  // Empresa atualmente selecionada
-  const [selectedCompany, setSelectedCompany] = useState(userCompanies[0]);
-
-  // Função para alternar empresa
-  const handleCompanySwitch = (company: typeof userCompanies[0]) => {
-    setSelectedCompany(company);
-    setShowCompanySelector(false);
-
-    // Aqui você faria a chamada para API para trocar o contexto da empresa
-    // updateUserContext(company.id);
-
-    // Opcional: recarregar dados específicos da empresa
-    // window.location.reload(); // ou refetch dos dados
-  };
+  const companyName = formatCompanyName(user?.empresa?.nome || 'Sua Empresa Ltda');
+  const companyCnpj = formatCnpj(user?.empresa?.cnpj);
+  const companyIdentifier = companyCnpj || user?.empresa?.slug?.toUpperCase();
+  const companyPlan = user?.empresa?.plano;
 
   // Estados e dados do calendário
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -444,18 +461,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       if (showCalendar && !target.closest('[data-dropdown="calendar"]')) {
         setShowCalendar(false);
       }
-
-      if (showCompanySelector && !target.closest('[data-dropdown="company"]')) {
-        setShowCompanySelector(false);
-      }
     };
 
-    if (showUserMenu || showSearchResults || showCalendar || showCompanySelector) {
+    if (showUserMenu || showSearchResults || showCalendar) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showUserMenu, showSearchResults, showCalendar, showCompanySelector]);
+  }, [showUserMenu, showSearchResults, showCalendar]);
 
   // Effect para atalho de teclado da busca
   useEffect(() => {
@@ -511,7 +524,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
       {/* Sidebar para desktop */}
       <div className="hidden md:flex md:flex-shrink-0">
-        <div className={`flex flex-col transition-all duration-300 bg-[#FFFFFF] border-r border-[#DEEFE7] relative overflow-hidden shadow-sm ${sidebarCollapsed ? 'w-16' : 'w-64'}`}>
+        <div className={`flex flex-col transition-all duration-300 bg-[#FFFFFF] border-r border-[#DEEFE7] relative overflow-hidden shadow-sm ${sidebarCollapsed ? 'w-16' : 'w-72'}`}>
           <div className="flex flex-col h-full">
             <div className={`flex-1 flex flex-col pt-5 pb-4 min-h-0 ${sidebarCollapsed ? 'overflow-hidden px-2' : 'overflow-y-auto'}`}>
               {/* Header da Sidebar */}
@@ -582,10 +595,73 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               </div>
 
               {/* Navegação Hierárquica */}
-              <HierarchicalNavGroup
-                menuItems={menuFiltrado}
-                sidebarCollapsed={sidebarCollapsed}
-              />
+              <div className={`${sidebarCollapsed ? 'mt-4' : 'mt-6'} flex-1 flex flex-col`}>
+                <HierarchicalNavGroup
+                  menuItems={menuFiltrado}
+                  sidebarCollapsed={sidebarCollapsed}
+                />
+              </div>
+
+              {/* Ações rápidas e suporte */}
+              {!sidebarCollapsed ? (
+                <div className="mt-6 px-4">
+                  <div className="relative overflow-hidden rounded-2xl border border-[#DEEFE7] bg-gradient-to-br from-white via-[#F5FBFA] to-[#DEEFE7] shadow-sm">
+                    <div className="absolute -right-10 -top-8 h-24 w-24 rounded-full bg-[#159A9C]/10 blur-2xl"></div>
+                    <div className="absolute -left-12 bottom-0 h-24 w-24 rounded-full bg-[#0F7B7D]/5 blur-2xl"></div>
+                    <div className="relative p-4 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#159A9C]/10 text-[#159A9C]">
+                          <HelpCircle className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-[#002333]">
+                            Precisa de ajuda?
+                          </p>
+                          <p className="text-xs text-[#4B5563]">
+                            Acesse a central ou fale com o nosso time.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <Link
+                          to="/suporte"
+                          className="flex items-center justify-between rounded-xl border border-[#B4BEC9]/40 bg-white px-3 py-2 text-sm font-medium text-[#159A9C] transition-all hover:border-[#159A9C]/60 hover:bg-[#DEEFE7]"
+                        >
+                          <span>Central de ajuda</span>
+                          <ChevronRight className="h-4 w-4" />
+                        </Link>
+                        <a
+                          href="mailto:suporte@conectcrm.com"
+                          className="flex items-center justify-between rounded-xl border border-transparent bg-[#159A9C] px-3 py-2 text-sm font-semibold text-white transition-all hover:bg-[#0F7B7D]"
+                        >
+                          Abrir chamado
+                          <Mail className="h-4 w-4" />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 px-1 pb-1">
+                  <div className="flex flex-col items-center gap-3 rounded-2xl border border-[#DEEFE7] bg-white/80 p-2 shadow-sm">
+                    <Link
+                      to="/suporte"
+                      className="flex h-10 w-10 items-center justify-center rounded-full bg-[#159A9C]/10 text-[#159A9C] hover:bg-[#0F7B7D]/10 hover:text-[#0F7B7D] transition-all"
+                      title="Central de ajuda"
+                    >
+                      <HelpCircle className="h-5 w-5" />
+                    </Link>
+                    <a
+                      href="mailto:suporte@conectcrm.com"
+                      className="flex h-10 w-10 items-center justify-center rounded-full bg-[#159A9C] text-white hover:bg-[#0F7B7D] transition-all"
+                      title="Abrir chamado"
+                    >
+                      <Mail className="h-4 w-4" />
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -612,152 +688,37 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
                 <div className="flex items-center gap-4">
                   {/* Seção da Empresa */}
-                  <div className="flex flex-col min-w-0">
-                    <div className="flex items-center gap-3">
-                      {/* Nome da Empresa com Seletor */}
-                      <div className="flex items-center gap-2 relative" data-dropdown="company">
-                        <Building2 className="w-5 h-5 text-[#159A9C]" />
-
-                        {/* Botão para trocar empresa */}
-                        {userCompanies.length > 1 ? (
-                          <button
-                            onClick={() => setShowCompanySelector(!showCompanySelector)}
-                            className="flex items-center gap-2 text-lg font-bold text-[#159A9C] truncate hover:text-[#0F7B7D] transition-colors group"
-                            title="Clique para alternar entre empresas"
-                          >
-                            <span className="truncate">
-                              {formatCompanyName(selectedCompany?.nome || user?.empresa?.nome || 'Sua Empresa Ltda')}
-                            </span>
-                            <ChevronDown className="w-4 h-4 group-hover:text-[#0F7B7D] transition-colors flex-shrink-0" />
-                          </button>
-                        ) : (
-                          <span className="text-lg font-bold text-[#159A9C] truncate">
-                            {formatCompanyName(selectedCompany?.nome || user?.empresa?.nome || 'Sua Empresa Ltda')}
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#159A9C]/10 text-[#159A9C] shadow-inner">
+                      <Building2 className="h-5 w-5" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-lg font-bold text-[#159A9C] truncate">
+                        {companyName}
+                      </span>
+                      <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-[#4B5563]">
+                        {companyIdentifier && (
+                          <span className="font-semibold tracking-wide text-[#002333]/70 uppercase">
+                            {companyIdentifier}
                           </span>
                         )}
-
-                        {/* Dropdown Seletor de Empresas */}
-                        {showCompanySelector && userCompanies.length > 1 && (
-                          <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-xl border shadow-xl z-50 overflow-hidden">
-                            {/* Header do Seletor */}
-                            <div className="p-4 bg-gradient-to-r from-[#159A9C]/5 to-[#0F7B7D]/5 border-b">
-                              <div className="flex items-center gap-2">
-                                <Building2 className="w-4 h-4 text-[#159A9C]" />
-                                <h3 className="text-sm font-semibold text-gray-900">
-                                  Alternar Empresa
-                                </h3>
-                              </div>
-                              <p className="text-xs text-gray-600 mt-1">
-                                Selecione a empresa para trabalhar
-                              </p>
-                            </div>
-
-                            {/* Lista de Empresas */}
-                            <div className="max-h-64 overflow-y-auto">
-                              {userCompanies.map((company) => (
-                                <button
-                                  key={company.id}
-                                  onClick={() => handleCompanySwitch(company)}
-                                  className={`w-full p-4 text-left hover:bg-gray-50 transition-colors border-b last:border-b-0 ${selectedCompany?.id === company.id ? 'bg-[#159A9C]/5 border-l-4 border-l-[#159A9C]' : ''
-                                    }`}
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white text-xs font-bold ${company.isActive ? 'bg-green-500' : 'bg-gray-400'
-                                      }`}>
-                                      {company.nome.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <p className={`text-sm font-medium truncate ${selectedCompany?.id === company.id ? 'text-[#159A9C]' : 'text-gray-900'
-                                        }`}>
-                                        {company.nome}
-                                      </p>
-                                      <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-xs text-gray-500">
-                                          {company.cnpj}
-                                        </span>
-                                        <div className="flex items-center gap-1">
-                                          <div className={`w-2 h-2 rounded-full ${company.isActive ? 'bg-green-500' : 'bg-gray-400'
-                                            }`}></div>
-                                          <span className={`text-xs font-medium ${company.isActive ? 'text-green-600' : 'text-gray-500'
-                                            }`}>
-                                            {company.isActive ? 'Ativa' : 'Inativa'}
-                                          </span>
-                                        </div>
-                                      </div>
-                                      <span className={`inline-block text-xs px-2 py-0.5 rounded-full mt-1 ${company.plano === 'Enterprise' ? 'bg-purple-100 text-purple-700' :
-                                        company.plano === 'Professional' ? 'bg-blue-100 text-blue-700' :
-                                          'bg-gray-100 text-gray-700'
-                                        }`}>
-                                        {company.plano}
-                                      </span>
-                                    </div>
-                                    {selectedCompany?.id === company.id && (
-                                      <div className="flex-shrink-0">
-                                        <div className="w-6 h-6 bg-[#159A9C] rounded-full flex items-center justify-center">
-                                          <div className="w-2 h-2 bg-white rounded-full"></div>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-
-                            {/* Footer com ações */}
-                            <div className="p-3 border-t bg-gray-50 space-y-1">
-                              <Link
-                                to="/empresas/minhas"
-                                className="w-full text-xs text-[#159A9C] hover:text-[#0F7B7D] font-medium transition-colors hover:bg-white rounded-lg py-2 block text-center"
-                                onClick={() => setShowCompanySelector(false)}
-                              >
-                                Gerenciar empresas
-                              </Link>
-
-                              <div className="grid grid-cols-2 gap-1 mt-2">
-                                <Link
-                                  to="/configuracoes/empresa"
-                                  className="text-xs text-gray-600 hover:text-[#159A9C] transition-colors hover:bg-white rounded-lg py-1.5 px-2 text-center"
-                                  onClick={() => setShowCompanySelector(false)}
-                                >
-                                  Configurações
-                                </Link>
-                                <Link
-                                  to="/configuracoes/chatwoot"
-                                  className="text-xs text-gray-600 hover:text-[#159A9C] transition-colors hover:bg-white rounded-lg py-1.5 px-2 text-center"
-                                  onClick={() => setShowCompanySelector(false)}
-                                >
-                                  Chatwoot
-                                </Link>
-                                <Link
-                                  to="/relatorios/analytics"
-                                  className="text-xs text-gray-600 hover:text-[#159A9C] transition-colors hover:bg-white rounded-lg py-1.5 px-2 text-center"
-                                  onClick={() => setShowCompanySelector(false)}
-                                >
-                                  Relatórios
-                                </Link>
-                                <Link
-                                  to="/gestao/usuarios"
-                                  className="text-xs text-gray-600 hover:text-[#159A9C] transition-colors hover:bg-white rounded-lg py-1.5 px-2 text-center"
-                                  onClick={() => setShowCompanySelector(false)}
-                                >
-                                  Usuários
-                                </Link>
-                                <Link
-                                  to="/sistema/backup"
-                                  className="text-xs text-gray-600 hover:text-[#159A9C] transition-colors hover:bg-white rounded-lg py-1.5 px-2 text-center"
-                                  onClick={() => setShowCompanySelector(false)}
-                                >
-                                  Backup
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
+                        {companyPlan && (
+                          <>
+                            {companyIdentifier && (
+                              <span className="text-[#B4BEC9]" aria-hidden="true">
+                                •
+                              </span>
+                            )}
+                            <span className="font-medium text-[#159A9C] uppercase">
+                              Plano {companyPlan.toUpperCase()}
+                            </span>
+                          </>
                         )}
                       </div>
+                      <span className="text-xs text-[#4B5563] mt-1">
+                        Sistema de Gestão Empresarial
+                      </span>
                     </div>
-                    <p className="text-sm text-gray-600 truncate hidden sm:block font-medium">
-                      Sistema de Gestão Empresarial
-                    </p>
                   </div>
 
                   {/* Separador */}
@@ -1068,6 +1029,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 {/* Notificações - Sistema Novo */}
                 <NotificationCenter className="relative" />
 
+                {/* Notificações Tempo Real - WebSocket */}
+                <NotificationIndicator />
+
                 {/* Avatar/Menu do Usuário Melhorado */}
                 <div className="relative" data-dropdown="user-menu">
                   <div className="flex items-center gap-1">
@@ -1089,7 +1053,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                           {formatUserName(user?.nome || 'Admin')}
                         </span>
                         <span className="text-xs text-gray-500 truncate max-w-24">
-                          {user?.role || 'Administrador'}
+                          {displayRole}
                         </span>
                       </div>
                       <ChevronDown className="w-3 h-3 text-gray-400 hidden sm:block group-hover:text-gray-600 transition-colors" />
@@ -1115,9 +1079,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                             <p className="text-xs text-gray-600 truncate">
                               {user?.email || 'admin@conectcrm.com'}
                             </p>
-                            <div className="flex items-center gap-1.5 mt-1">
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                               <span className="text-xs text-[#159A9C] font-medium bg-[#159A9C]/10 px-1.5 py-0.5 rounded-full">
-                                {user?.role || 'Admin'}
+                                {displayRole}
                               </span>
                               <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">
                                 Online
@@ -1128,9 +1092,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
                         {/* Informações adicionais compactas */}
                         <div className="mt-2 pt-2 border-t border-gray-200/50">
-                          <div className="flex items-center justify-between text-xs text-gray-500">
-                            <span>Último: Hoje, 08:30</span>
-                            <span className="text-[#159A9C] font-medium">v2.1.0</span>
+                          <div className="flex flex-col gap-1 text-xs text-gray-500 sm:flex-row sm:items-center sm:justify-between">
+                            <span>{lastLoginLabel}</span>
+                            {appVersion && (
+                              <span className="text-[#159A9C] font-medium">{appVersion}</span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1251,22 +1217,31 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Empresa</span>
                         </div>
 
-                        <Link
-                          to="/empresas/minhas"
+                        <button
+                          type="button"
+                          onClick={() => handleNavigate('/nuclei/configuracoes/empresa')}
                           className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gradient-to-r hover:from-emerald-50 hover:to-emerald-25 flex items-center gap-3 transition-all duration-200 group"
-                          onClick={() => setShowUserMenu(false)}
                         >
                           <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 group-hover:scale-105 transition-all duration-200">
                             <Building2 className="w-4 h-4 text-emerald-600" />
                           </div>
                           <div className="flex-1">
-                            <div className="font-medium text-gray-900 text-sm">Minhas Empresas</div>
-                            <div className="text-xs text-gray-500">Gerenciar empresas</div>
+                            <div className="font-medium text-gray-900 text-sm">Empresa atual</div>
+                            <div className="text-xs text-gray-500 truncate">
+                              {companyCardName || 'Nenhuma empresa vinculada'}
+                            </div>
+                            {companyCardCnpj && (
+                              <div className="text-[10px] text-gray-400 mt-1">CNPJ {companyCardCnpj}</div>
+                            )}
                           </div>
-                          <div className="w-5 h-5 bg-emerald-100 rounded-full flex items-center justify-center text-xs font-bold text-emerald-600">
-                            3
-                          </div>
-                        </Link>
+                          {companyPlanLabel ? (
+                            <div className="px-2 py-1 bg-emerald-100 rounded-full text-emerald-700 text-xs font-semibold">
+                              {companyPlanLabel}
+                            </div>
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-emerald-500" />
+                          )}
+                        </button>
                       </div>
 
                       {/* SEPARADOR */}
@@ -1278,7 +1253,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Sistema</span>
                         </div>
 
-                        <button className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-25 flex items-center gap-3 transition-all duration-200 group">
+                        <button
+                          type="button"
+                          onClick={() => handleNavigate('/nuclei/configuracoes/empresa')}
+                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-25 flex items-center gap-3 transition-all duration-200 group"
+                        >
                           <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 group-hover:scale-105 transition-all duration-200">
                             <Settings className="w-4 h-4 text-purple-600" />
                           </div>

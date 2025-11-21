@@ -83,7 +83,7 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg shadow-2xl w-[calc(100%-2rem)] sm:w-[500px] md:w-[600px] max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div
           className="flex items-center justify-between px-6 py-4 border-b"
@@ -129,8 +129,8 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
                     key={m.value}
                     onClick={() => setMotivo(m.value)}
                     className={`p-4 rounded-lg border-2 transition-all text-left ${motivo === m.value
-                        ? 'border-current shadow-md scale-105'
-                        : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-current shadow-md scale-105'
+                      : 'border-gray-200 hover:border-gray-300'
                       }`}
                     style={{
                       borderColor: motivo === m.value ? m.cor : undefined,

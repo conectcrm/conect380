@@ -12,10 +12,11 @@ import {
   Req,
   Res,
   HttpStatus,
-  HttpException
+  HttpException,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../modules/auth/jwt-auth.guard';
 import { CotacaoService } from './cotacao.service';
 import {
   CriarCotacaoDto,
@@ -24,12 +25,13 @@ import {
   AlterarStatusDto,
   DuplicarCotacaoDto,
   EnviarEmailDto,
-  CotacaoResponseDto
+  CotacaoResponseDto,
 } from './dto/cotacao.dto';
 import { StatusCotacao } from './entities/cotacao.entity';
 
 @ApiTags('Cotações')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('cotacao')
 export class CotacaoController {
   constructor(private readonly cotacaoService: CotacaoService) { }
@@ -39,13 +41,11 @@ export class CotacaoController {
   @ApiResponse({
     status: 201,
     description: 'Cotação criada com sucesso',
-    type: CotacaoResponseDto
+    type: CotacaoResponseDto,
   })
-
-
   async criar(
     @Body() criarCotacaoDto: CriarCotacaoDto,
-    @Req() req: any
+    @Req() req: any,
   ): Promise<CotacaoResponseDto> {
     try {
       const cotacao = await this.cotacaoService.criar(criarCotacaoDto, req.user.id);
@@ -53,7 +53,7 @@ export class CotacaoController {
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao criar cotação',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -63,20 +63,34 @@ export class CotacaoController {
   @ApiResponse({
     status: 200,
     description: 'Lista de cotações',
-    type: [CotacaoResponseDto]
+    type: [CotacaoResponseDto],
   })
-
-  async listar(
-    @Query() query: CotacaoQueryDto,
-    @Req() req: any
-  ) {
+  async listar(@Query() query: CotacaoQueryDto, @Req() req: any) {
     try {
       const result = await this.cotacaoService.listar(query, req.user.id);
       return result;
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao listar cotações',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('minhas-aprovacoes')
+  @ApiOperation({ summary: 'Listar cotações pendentes de aprovação do usuário' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de cotações pendentes de aprovação',
+    type: [CotacaoResponseDto],
+  })
+  async minhasAprovacoes(@Req() req: any): Promise<CotacaoResponseDto[]> {
+    try {
+      return await this.cotacaoService.minhasAprovacoes(req.user.id);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Erro ao listar aprovações pendentes',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -84,7 +98,6 @@ export class CotacaoController {
   @Get('estatisticas')
   @ApiOperation({ summary: 'Obter estatísticas das cotações' })
   @ApiResponse({ status: 200, description: 'Estatísticas das cotações' })
-
   async obterEstatisticas(@Req() req: any) {
     try {
       const estatisticas = await this.cotacaoService.obterEstatisticas(req.user.id);
@@ -92,7 +105,7 @@ export class CotacaoController {
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao obter estatísticas',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -100,7 +113,6 @@ export class CotacaoController {
   @Get('dashboard')
   @ApiOperation({ summary: 'Obter dados do dashboard de cotações' })
   @ApiResponse({ status: 200, description: 'Dados do dashboard' })
-
   async obterDashboard(@Req() req: any) {
     try {
       const dashboard = await this.cotacaoService.obterDashboard(req.user.id);
@@ -108,7 +120,7 @@ export class CotacaoController {
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao obter dados do dashboard',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -118,13 +130,12 @@ export class CotacaoController {
   @ApiResponse({
     status: 200,
     description: 'Cotação encontrada',
-    type: CotacaoResponseDto
+    type: CotacaoResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Cotação não encontrada' })
-
   async buscarPorId(
     @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: any
+    @Req() req: any,
   ): Promise<CotacaoResponseDto> {
     try {
       const cotacao = await this.cotacaoService.buscarPorId(id, req.user.id);
@@ -135,7 +146,7 @@ export class CotacaoController {
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao buscar cotação',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -145,15 +156,13 @@ export class CotacaoController {
   @ApiResponse({
     status: 200,
     description: 'Cotação atualizada com sucesso',
-    type: CotacaoResponseDto
+    type: CotacaoResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Cotação não encontrada' })
-
-
   async atualizar(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() atualizarCotacaoDto: AtualizarCotacaoDto,
-    @Req() req: any
+    @Req() req: any,
   ): Promise<CotacaoResponseDto> {
     try {
       const cotacao = await this.cotacaoService.atualizar(id, atualizarCotacaoDto, req.user.id);
@@ -161,7 +170,7 @@ export class CotacaoController {
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao atualizar cotação',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -170,22 +179,224 @@ export class CotacaoController {
   @ApiOperation({ summary: 'Deletar cotação' })
   @ApiResponse({ status: 200, description: 'Cotação deletada com sucesso' })
   @ApiResponse({ status: 404, description: 'Cotação não encontrada' })
-
-
-  async deletar(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: any
-  ) {
+  async deletar(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
     try {
       await this.cotacaoService.deletar(id, req.user.id);
       return {
         success: true,
-        message: 'Cotação deletada com sucesso'
+        message: 'Cotação deletada com sucesso',
       };
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao deletar cotação',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post(':id/enviar-para-aprovacao')
+  @ApiOperation({ summary: 'Enviar cotação em rascunho para aprovação' })
+  @ApiResponse({ status: 200, description: 'Cotação enviada para aprovação com sucesso' })
+  @ApiResponse({ status: 404, description: 'Cotação não encontrada' })
+  @ApiResponse({ status: 400, description: 'Cotação não está em rascunho ou faltam dados obrigatórios' })
+  @ApiResponse({ status: 403, description: 'Apenas o criador pode enviar para aprovação' })
+  async enviarParaAprovacao(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: any,
+  ) {
+    try {
+      console.log(`\n🎯 [CONTROLLER] Recebendo request para enviar cotação para aprovação`);
+      console.log(`   ID: ${id}`);
+      console.log(`   User: ${req.user?.id}`);
+
+      const cotacao = await this.cotacaoService.enviarParaAprovacao(id, req.user.id);
+
+      console.log(`✅ [CONTROLLER] Sucesso ao enviar para aprovação`);
+
+      return {
+        success: true,
+        message: 'Cotação enviada para aprovação com sucesso',
+        data: cotacao,
+      };
+    } catch (error) {
+      console.error(`\n❌ [CONTROLLER] Erro ao enviar cotação para aprovação:`);
+      console.error(`   Message: ${error.message}`);
+      console.error(`   Status: ${error.status}`);
+      console.error(`   Name: ${error.name}`);
+      console.error(`   Stack: ${error.stack}`);
+
+      throw new HttpException(
+        {
+          statusCode: error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+          message: error.message || 'Erro ao enviar cotação para aprovação',
+          error: error.name || 'InternalServerError',
+          details: error.stack?.split('\n').slice(0, 3).join('\n'), // Primeiras 3 linhas do stack
+        },
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post(':id/aprovar')
+  @ApiOperation({ summary: 'Aprovar cotação' })
+  @ApiResponse({ status: 200, description: 'Cotação aprovada com sucesso' })
+  @ApiResponse({ status: 404, description: 'Cotação não encontrada' })
+  @ApiResponse({ status: 403, description: 'Usuário não é o aprovador desta cotação' })
+  async aprovar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { justificativa?: string },
+    @Req() req: any,
+  ) {
+    try {
+      console.log(`🔍 DEBUG Controller aprovar() - Request:`, {
+        cotacaoId: id,
+        userId: req.user?.id,
+        userNome: req.user?.nome,
+        justificativa: body.justificativa,
+      });
+
+      const cotacao = await this.cotacaoService.aprovar(
+        id,
+        req.user.id,
+        body.justificativa,
+      );
+      return {
+        success: true,
+        message: 'Cotação aprovada com sucesso',
+        data: cotacao,
+      };
+    } catch (error) {
+      console.error(`❌ Erro no controller aprovar():`, {
+        message: error.message,
+        status: error.status,
+        stack: error.stack,
+      });
+      throw new HttpException(
+        error.message || 'Erro ao aprovar cotação',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post(':id/reprovar')
+  @ApiOperation({ summary: 'Reprovar cotação' })
+  @ApiResponse({ status: 200, description: 'Cotação reprovada com sucesso' })
+  @ApiResponse({ status: 404, description: 'Cotação não encontrada' })
+  @ApiResponse({ status: 403, description: 'Usuário não é o aprovador desta cotação' })
+  @ApiResponse({ status: 400, description: 'Justificativa é obrigatória para reprovação' })
+  async reprovar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { justificativa: string },
+    @Req() req: any,
+  ) {
+    try {
+      if (!body.justificativa || body.justificativa.trim() === '') {
+        throw new HttpException(
+          'Justificativa é obrigatória para reprovar uma cotação',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const cotacao = await this.cotacaoService.reprovar(
+        id,
+        req.user.id,
+        body.justificativa,
+      );
+      return {
+        success: true,
+        message: 'Cotação reprovada',
+        data: cotacao,
+      };
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Erro ao reprovar cotação',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('aprovar-lote')
+  @ApiOperation({ summary: 'Aprovar múltiplas cotações de uma vez' })
+  @ApiResponse({
+    status: 200,
+    description: 'Resultado da aprovação em lote',
+    schema: {
+      type: 'object',
+      properties: {
+        total: { type: 'number' },
+        sucessos: { type: 'number' },
+        falhas: { type: 'number' },
+        cotacoesProcessadas: { type: 'array', items: { type: 'string' } },
+        erros: { type: 'array', items: { type: 'object' } }
+      }
+    }
+  })
+  async aprovarLote(
+    @Body() body: { cotacaoIds: string[]; justificativa?: string },
+    @Req() req: any,
+  ) {
+    try {
+      const resultado = await this.cotacaoService.aprovarLote(
+        body.cotacaoIds,
+        req.user.id,
+        body.justificativa,
+      );
+      return {
+        success: true,
+        message: `${resultado.sucessos} cotação(ões) aprovada(s) com sucesso`,
+        data: resultado,
+      };
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Erro ao aprovar cotações em lote',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('reprovar-lote')
+  @ApiOperation({ summary: 'Reprovar múltiplas cotações de uma vez' })
+  @ApiResponse({
+    status: 200,
+    description: 'Resultado da reprovação em lote',
+    schema: {
+      type: 'object',
+      properties: {
+        total: { type: 'number' },
+        sucessos: { type: 'number' },
+        falhas: { type: 'number' },
+        cotacoesProcessadas: { type: 'array', items: { type: 'string' } },
+        erros: { type: 'array', items: { type: 'object' } }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Justificativa é obrigatória para reprovação' })
+  async reprovarLote(
+    @Body() body: { cotacaoIds: string[]; justificativa: string },
+    @Req() req: any,
+  ) {
+    try {
+      if (!body.justificativa || body.justificativa.trim() === '') {
+        throw new HttpException(
+          'Justificativa é obrigatória para reprovar cotações',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const resultado = await this.cotacaoService.reprovarLote(
+        body.cotacaoIds,
+        req.user.id,
+        body.justificativa,
+      );
+      return {
+        success: true,
+        message: `${resultado.sucessos} cotação(ões) reprovada(s)`,
+        data: resultado,
+      };
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Erro ao reprovar cotações em lote',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -195,27 +406,25 @@ export class CotacaoController {
   @ApiResponse({
     status: 200,
     description: 'Status alterado com sucesso',
-    type: CotacaoResponseDto
+    type: CotacaoResponseDto,
   })
-
-
   async alterarStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() alterarStatusDto: AlterarStatusDto,
-    @Req() req: any
+    @Req() req: any,
   ): Promise<CotacaoResponseDto> {
     try {
       const cotacao = await this.cotacaoService.alterarStatus(
         id,
         alterarStatusDto.status,
         alterarStatusDto.observacao,
-        req.user.id
+        req.user.id,
       );
       return cotacao;
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao alterar status',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -225,72 +434,20 @@ export class CotacaoController {
   @ApiResponse({
     status: 201,
     description: 'Cotação duplicada com sucesso',
-    type: CotacaoResponseDto
+    type: CotacaoResponseDto,
   })
-
-
   async duplicar(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() duplicarDto: DuplicarCotacaoDto,
-    @Req() req: any
-  ): Promise<CotacaoResponseDto> {
+    @Req() req: any,
+  ): Promise<DuplicarCotacaoDto> {
     try {
       const cotacao = await this.cotacaoService.duplicar(id, duplicarDto, req.user.id);
       return cotacao;
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao duplicar cotação',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
-      );
-    }
-  }
-
-  @Post(':id/aprovar')
-  @ApiOperation({ summary: 'Aprovar cotação' })
-  @ApiResponse({
-    status: 200,
-    description: 'Cotação aprovada com sucesso',
-    type: CotacaoResponseDto
-  })
-
-
-  async aprovar(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { observacao?: string },
-    @Req() req: any
-  ): Promise<CotacaoResponseDto> {
-    try {
-      const cotacao = await this.cotacaoService.aprovar(id, body.observacao, req.user.id);
-      return cotacao;
-    } catch (error) {
-      throw new HttpException(
-        error.message || 'Erro ao aprovar cotação',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
-      );
-    }
-  }
-
-  @Post(':id/rejeitar')
-  @ApiOperation({ summary: 'Rejeitar cotação' })
-  @ApiResponse({
-    status: 200,
-    description: 'Cotação rejeitada com sucesso',
-    type: CotacaoResponseDto
-  })
-
-
-  async rejeitar(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { motivo: string },
-    @Req() req: any
-  ): Promise<CotacaoResponseDto> {
-    try {
-      const cotacao = await this.cotacaoService.rejeitar(id, body.motivo, req.user.id);
-      return cotacao;
-    } catch (error) {
-      throw new HttpException(
-        error.message || 'Erro ao rejeitar cotação',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -300,29 +457,23 @@ export class CotacaoController {
   @ApiResponse({
     status: 200,
     description: 'PDF gerado com sucesso',
-    content: { 'application/pdf': {} }
+    content: { 'application/pdf': {} },
   })
-
-
-  async gerarPDF(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Res() res: Response,
-    @Req() req: any
-  ) {
+  async gerarPDF(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response, @Req() req: any) {
     try {
       const pdfBuffer = await this.cotacaoService.gerarPDF(id, req.user.id);
 
       res.set({
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="cotacao-${id}.pdf"`,
-        'Content-Length': pdfBuffer.length
+        'Content-Length': pdfBuffer.length,
       });
 
       res.send(pdfBuffer);
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao gerar PDF',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -330,23 +481,21 @@ export class CotacaoController {
   @Post(':id/enviar-email')
   @ApiOperation({ summary: 'Enviar cotação por email' })
   @ApiResponse({ status: 200, description: 'Email enviado com sucesso' })
-
-
   async enviarEmail(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() enviarEmailDto: EnviarEmailDto,
-    @Req() req: any
+    @Req() req: any,
   ) {
     try {
       await this.cotacaoService.enviarEmail(id, enviarEmailDto, req.user.id);
       return {
         success: true,
-        message: 'Email enviado com sucesso'
+        message: 'Email enviado com sucesso',
       };
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao enviar email',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -354,18 +503,14 @@ export class CotacaoController {
   @Get(':id/historico')
   @ApiOperation({ summary: 'Obter histórico da cotação' })
   @ApiResponse({ status: 200, description: 'Histórico da cotação' })
-
-  async obterHistorico(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: any
-  ) {
+  async obterHistorico(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
     try {
       const historico = await this.cotacaoService.obterHistorico(id, req.user.id);
       return historico;
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao obter histórico',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -373,12 +518,10 @@ export class CotacaoController {
   @Post(':id/converter-pedido')
   @ApiOperation({ summary: 'Converter cotação em pedido' })
   @ApiResponse({ status: 201, description: 'Pedido criado com sucesso' })
-
-
   async converterEmPedido(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: { observacoes?: string },
-    @Req() req: any
+    @Req() req: any,
   ) {
     try {
       const pedido = await this.cotacaoService.converterEmPedido(id, body.observacoes, req.user.id);
@@ -386,7 +529,7 @@ export class CotacaoController {
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao converter em pedido',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -401,7 +544,7 @@ export class CotacaoController {
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao buscar próximo número',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -416,7 +559,7 @@ export class CotacaoController {
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao buscar templates',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -426,7 +569,7 @@ export class CotacaoController {
   @ApiResponse({ status: 201, description: 'Template salvo com sucesso' })
   async salvarTemplate(
     @Body() body: { nome: string; descricao?: string; dados: any },
-    @Req() req: any
+    @Req() req: any,
   ) {
     try {
       const template = await this.cotacaoService.salvarTemplate(body, req.user.id);
@@ -434,7 +577,7 @@ export class CotacaoController {
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao salvar template',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -442,30 +585,26 @@ export class CotacaoController {
   @Get('exportar')
   @ApiOperation({ summary: 'Exportar cotações' })
   @ApiResponse({ status: 200, description: 'Arquivo exportado com sucesso' })
-  async exportar(
-    @Query() query: any,
-    @Res() res: Response,
-    @Req() req: any
-  ) {
+  async exportar(@Query() query: any, @Res() res: Response, @Req() req: any) {
     try {
       const formato = query.formato || 'csv';
       const { buffer, filename, mimeType } = await this.cotacaoService.exportar(
         formato,
         query,
-        req.user.id
+        req.user.id,
       );
 
       res.set({
         'Content-Type': mimeType,
         'Content-Disposition': `attachment; filename="${filename}"`,
-        'Content-Length': buffer.byteLength.toString()
+        'Content-Length': buffer.byteLength.toString(),
       });
 
       res.send(buffer);
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao exportar dados',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -473,23 +612,18 @@ export class CotacaoController {
   @Post('importar')
   @ApiOperation({ summary: 'Importar cotações' })
   @ApiResponse({ status: 201, description: 'Cotações importadas com sucesso' })
-
-
-  async importar(
-    @Body() body: { dados: any[]; validarApenas?: boolean },
-    @Req() req: any
-  ) {
+  async importar(@Body() body: { dados: any[]; validarApenas?: boolean }, @Req() req: any) {
     try {
       const resultado = await this.cotacaoService.importar(
         body.dados,
         body.validarApenas || false,
-        req.user.id
+        req.user.id,
       );
       return resultado;
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao importar cotações',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -497,18 +631,14 @@ export class CotacaoController {
   @Get(':id/anexos')
   @ApiOperation({ summary: 'Listar anexos da cotação' })
   @ApiResponse({ status: 200, description: 'Lista de anexos' })
-
-  async listarAnexos(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: any
-  ) {
+  async listarAnexos(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
     try {
       const anexos = await this.cotacaoService.listarAnexos(id, req.user.id);
       return anexos;
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao listar anexos',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -516,12 +646,10 @@ export class CotacaoController {
   @Post(':id/anexos')
   @ApiOperation({ summary: 'Adicionar anexo à cotação' })
   @ApiResponse({ status: 201, description: 'Anexo adicionado com sucesso' })
-
-
   async adicionarAnexo(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: { nome: string; tipo: string; url: string; tamanho: number },
-    @Req() req: any
+    @Req() req: any,
   ) {
     try {
       const anexo = await this.cotacaoService.adicionarAnexo(id, body, req.user.id);
@@ -529,7 +657,7 @@ export class CotacaoController {
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao adicionar anexo',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -537,23 +665,21 @@ export class CotacaoController {
   @Delete(':id/anexos/:anexoId')
   @ApiOperation({ summary: 'Remover anexo da cotação' })
   @ApiResponse({ status: 200, description: 'Anexo removido com sucesso' })
-
-
   async removerAnexo(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('anexoId', ParseUUIDPipe) anexoId: string,
-    @Req() req: any
+    @Req() req: any,
   ) {
     try {
       await this.cotacaoService.removerAnexo(id, anexoId, req.user.id);
       return {
         success: true,
-        message: 'Anexo removido com sucesso'
+        message: 'Anexo removido com sucesso',
       };
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao remover anexo',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }

@@ -94,6 +94,14 @@ export interface PropostaEstatisticas {
 
 class PropostasService {
   private baseURL = '/propostas';
+  private readonly CACHE_TTL = 30 * 1000; // 30 segundos
+  private readonly MIN_REQUEST_INTERVAL = 500; // 0.5s entre chamadas
+  private readonly MAX_RETRIES = 3;
+  private readonly RETRY_BASE_DELAY = 500;
+  private readonly MAX_BACKOFF_DELAY = 4_000;
+  private lastRequestTimestamp = 0;
+  private requestsCache = new Map<string, { timestamp: number; data: Proposta[] }>();
+  private pendingRequests = new Map<string, Promise<Proposta[]>>();
 
   // Produtos mock como fallback
   private produtosMock: ProdutoProposta[] = [
@@ -125,32 +133,133 @@ class PropostasService {
 
   // Listar propostas com filtros
   async findAll(filters?: PropostaFilters): Promise<Proposta[]> {
+    const cacheKey = this.buildCacheKey(filters);
+    const cached = this.requestsCache.get(cacheKey);
+
+    if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL) {
+      return cached.data.map(proposta => this.cloneProposta(proposta));
+    }
+
+    const pendingRequest = this.pendingRequests.get(cacheKey);
+    if (pendingRequest) {
+      return pendingRequest;
+    }
+
+    const requestPromise = this.performFindAllRequest(filters);
+    this.pendingRequests.set(cacheKey, requestPromise);
+
     try {
-      const params = new URLSearchParams();
-
-      if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== '') {
-            params.append(key, value.toString());
-          }
-        });
-      }
-
-      const response = await api.get(`${this.baseURL}?${params.toString()}`);
-
-      // ✅ CORREÇÃO: Backend retorna { success: true, propostas: [...] }
-      if (response.data && response.data.propostas) {
-        return response.data.propostas;
-      } else if (Array.isArray(response.data)) {
-        return response.data;
-      } else {
-        console.warn('Estrutura de dados inesperada:', response.data);
-        return [];
-      }
+      const propostas = await requestPromise;
+      const normalized = propostas.map(proposta => this.cloneProposta(proposta));
+      this.requestsCache.set(cacheKey, {
+        timestamp: Date.now(),
+        data: normalized,
+      });
+      return normalized.map(proposta => this.cloneProposta(proposta));
     } catch (error) {
-      console.error('Erro ao buscar propostas:', error);
+      if (!this.isRateLimitError(error)) {
+        console.error('Erro ao buscar propostas:', error);
+      }
+      throw error;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  private buildCacheKey(filters?: PropostaFilters): string {
+    if (!filters || Object.keys(filters).length === 0) {
+      return '__default__';
+    }
+
+    const normalizedEntries = Object.entries(filters)
+      .filter(([, value]) => value !== undefined && value !== null && value !== '')
+      .sort(([a], [b]) => a.localeCompare(b));
+
+    if (normalizedEntries.length === 0) {
+      return '__default__';
+    }
+
+    return JSON.stringify(normalizedEntries);
+  }
+
+  private buildQueryString(filters?: PropostaFilters): string {
+    if (!filters) {
+      return '';
+    }
+
+    const params = new URLSearchParams();
+
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, value.toString());
+      }
+    });
+
+    const query = params.toString();
+    return query ? `?${query}` : '';
+  }
+
+  private parseFindAllResponse(data: any): Proposta[] {
+    if (data && data.propostas) {
+      return data.propostas;
+    }
+
+    if (Array.isArray(data)) {
+      return data;
+    }
+
+    console.warn('Estrutura de dados inesperada:', data);
+    return [];
+  }
+
+  private cloneProposta(proposta: Proposta): Proposta {
+    return {
+      ...proposta,
+      cliente: proposta.cliente ? { ...proposta.cliente } : proposta.cliente,
+      vendedor: proposta.vendedor ? { ...proposta.vendedor } : undefined,
+      produtos: Array.isArray(proposta.produtos)
+        ? proposta.produtos.map(produto => ({ ...produto }))
+        : [],
+    };
+  }
+
+  private isRateLimitError(error: unknown): boolean {
+    const status = (error as any)?.response?.status;
+    return status === 429;
+  }
+
+  private async performFindAllRequest(filters?: PropostaFilters, attempt: number = 1): Promise<Proposta[]> {
+    const now = Date.now();
+    const elapsed = now - this.lastRequestTimestamp;
+
+    if (elapsed < this.MIN_REQUEST_INTERVAL) {
+      await this.delay(this.MIN_REQUEST_INTERVAL - elapsed);
+    }
+
+    try {
+      const queryString = this.buildQueryString(filters);
+      const response = await api.get(`${this.baseURL}${queryString}`);
+      this.lastRequestTimestamp = Date.now();
+  const parsed = this.parseFindAllResponse(response.data);
+  return parsed;
+    } catch (error) {
+      if (this.isRateLimitError(error) && attempt < this.MAX_RETRIES) {
+        const backoff = Math.min(this.RETRY_BASE_DELAY * Math.pow(2, attempt - 1), this.MAX_BACKOFF_DELAY);
+        await this.delay(backoff);
+        return this.performFindAllRequest(filters, attempt + 1);
+      }
+
       throw error;
     }
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+  
+  clearCache(): void {
+    this.requestsCache.clear();
+    this.pendingRequests.clear();
   }
 
   // Buscar proposta por ID
@@ -177,6 +286,7 @@ class PropostasService {
   async create(data: PropostaCreate): Promise<Proposta> {
     try {
       const response = await api.post(this.baseURL, data);
+      this.clearCache();
       return response.data;
     } catch (error) {
       console.error('Erro ao criar proposta:', error);
@@ -188,6 +298,7 @@ class PropostasService {
   async update(id: string, data: Partial<PropostaCreate>): Promise<Proposta> {
     try {
       const response = await api.put(`${this.baseURL}/${id}`, data);
+      this.clearCache();
       return response.data;
     } catch (error) {
       console.error('Erro ao atualizar proposta:', error);
@@ -199,6 +310,7 @@ class PropostasService {
   async delete(id: string): Promise<void> {
     try {
       await api.delete(`${this.baseURL}/${id}`);
+      this.clearCache();
     } catch (error) {
       console.error('Erro ao excluir proposta:', error);
       throw error;
@@ -209,6 +321,7 @@ class PropostasService {
   async updateStatus(id: string, status: Proposta['status']): Promise<Proposta> {
     try {
       const response = await api.put(`${this.baseURL}/${id}/status`, { status });
+      this.clearCache();
       return response.data;
     } catch (error) {
       console.error('Erro ao atualizar status da proposta:', error);
@@ -233,6 +346,7 @@ class PropostasService {
   async duplicate(id: string): Promise<Proposta> {
     try {
       const response = await api.post(`${this.baseURL}/${id}/duplicate`);
+      this.clearCache();
       return response.data;
     } catch (error) {
       console.error('Erro ao duplicar proposta:', error);
@@ -325,6 +439,7 @@ class PropostasService {
   async convertToOrder(id: string): Promise<{ orderId: string }> {
     try {
       const response = await api.post(`${this.baseURL}/${id}/convert-to-order`);
+      this.clearCache();
       return response.data;
     } catch (error) {
       console.error('Erro ao converter proposta em pedido:', error);

@@ -157,7 +157,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
     if (isOpen) {
       setHasUnsavedChanges(false);
       setIsFormInitialized(false);
-      
+
       if (produtoEditando) {
         reset({
           nome: produtoEditando.nome || '',
@@ -185,7 +185,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
           variacoes: []
         });
       }
-      
+
       // Marca como inicializado após um pequeno delay para evitar detecção de mudança
       setTimeout(() => setIsFormInitialized(true), 100);
     }
@@ -240,7 +240,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
       {/* Modal de Confirmação de Alterações Não Salvas */}
       {showUnsavedChangesModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-xl w-[calc(100%-2rem)] sm:w-[450px] max-w-[500px]">
             <div className="p-6">
               <div className="flex items-center mb-4">
                 <AlertTriangle className="w-6 h-6 text-amber-500 mr-3" />
@@ -273,14 +273,14 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
       {/* Modal Principal */}
       <div className="fixed inset-0 z-50 overflow-y-auto">
         {/* Backdrop */}
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
           onClick={handleClose}
         />
-        
+
         {/* Modal - Layout Paisagem */}
         <div className="flex min-h-full items-center justify-center p-2 sm:p-4">
-          <div className="relative w-full max-w-6xl bg-white rounded-xl shadow-2xl transform transition-all">
+          <div className="relative w-[calc(100%-2rem)] sm:w-[700px] md:w-[900px] lg:w-[1100px] xl:w-[1200px] max-w-[1400px] bg-white rounded-xl shadow-2xl transform transition-all">
             {/* Header */}
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
               <div className="flex items-center space-x-3">
@@ -308,14 +308,14 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
             {/* Formulário em Grid */}
             <form onSubmit={handleSubmit(onFormSubmit)} className="p-4 sm:p-6">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
+
                 {/* Coluna 1: Informações Básicas */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium text-gray-900 flex items-center">
                     <Package className="w-5 h-5 mr-2 text-blue-600" />
                     Informações Básicas
                   </h3>
-                  
+
                   {/* Nome */}
                   <div>
                     <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-1">
@@ -384,9 +384,8 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                           value={field.value}
                           onChange={field.onChange}
                           placeholder="R$ 0,00"
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                            errors.precoUnitario ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.precoUnitario ? 'border-red-300' : 'border-gray-300'
+                            }`}
                         />
                       )}
                     />

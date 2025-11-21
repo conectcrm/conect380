@@ -1,4 +1,12 @@
-import { IsString, IsEmail, IsNotEmpty, ValidateNested, IsBoolean, MinLength, Matches } from 'class-validator';
+import {
+  IsString,
+  IsEmail,
+  IsNotEmpty,
+  ValidateNested,
+  IsBoolean,
+  MinLength,
+  Matches,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -11,7 +19,9 @@ class EmpresaDataDto {
   @ApiProperty({ description: 'CNPJ da empresa' })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/, { message: 'CNPJ deve ter formato XX.XXX.XXX/XXXX-XX' })
+  @Matches(/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/, {
+    message: 'CNPJ deve ter formato XX.XXX.XXX/XXXX-XX',
+  })
   cnpj: string;
 
   @ApiProperty({ description: 'Email corporativo' })

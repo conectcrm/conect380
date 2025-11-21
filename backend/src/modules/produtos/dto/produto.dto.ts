@@ -20,7 +20,7 @@ export class CreateProdutoDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
-  @Transform(({ value }) => value ? parseFloat(value) : 0)
+  @Transform(({ value }) => (value ? parseFloat(value) : 0))
   custoUnitario?: number;
 
   @IsOptional()

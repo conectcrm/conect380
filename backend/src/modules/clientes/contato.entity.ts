@@ -12,14 +12,14 @@ import { Cliente } from './cliente.entity';
 /**
  * Entity Contato
  * Representa os contatos (funcionários) vinculados a um Cliente (empresa)
- * 
+ *
  * Exemplo de uso:
  * - Cliente: "Empresa XYZ Ltda"
  * - Contatos:
  *   • João Silva (Gerente Comercial)
  *   • Maria Santos (Compradora)
  *   • Pedro Costa (Financeiro)
- * 
+ *
  * Durante o atendimento, o agente pode identificar com qual contato
  * está falando e trocar via dropdown no painel de contexto.
  */

@@ -23,6 +23,9 @@ export interface Cliente {
   renda?: number;
   created_at?: string;
   updated_at?: string;
+  avatar?: string;
+  avatarUrl?: string;
+  foto?: string;
 }
 
 export interface NotaCliente {
@@ -38,9 +41,13 @@ export interface NotaCliente {
     id: string;
     username: string;
     nome?: string;
+    foto?: string;
+    avatarUrl?: string;
   };
   createdAt: string;
   updatedAt: string;
+  dataCriacao?: string;
+  dataEdicao?: string;
 }
 
 export interface CreateNotaDto {
@@ -84,6 +91,7 @@ export interface Demanda {
   };
   createdAt: string;
   updatedAt: string;
+  dataAbertura?: string;
 }
 
 export interface CreateDemandaDto {

@@ -1,14 +1,7 @@
 import { SessaoTriagem } from '../entities/sessao-triagem.entity';
-import {
-  BotOption,
-  DepartamentoBotOption,
-  NucleoBotOption,
-} from '../types/triagem-bot.types';
+import { BotOption, DepartamentoBotOption, NucleoBotOption } from '../types/triagem-bot.types';
 
-export function criarOpcoesNucleos(
-  sessao: SessaoTriagem,
-  nucleos: NucleoBotOption[],
-): BotOption[] {
+export function criarOpcoesNucleos(sessao: SessaoTriagem, nucleos: NucleoBotOption[]): BotOption[] {
   return nucleos.map((nucleo, index) => {
     const departamentosDisponiveis = Array.isArray(nucleo.departamentos)
       ? nucleo.departamentos
@@ -16,9 +9,7 @@ export function criarOpcoesNucleos(
     const temDepartamentos = departamentosDisponiveis.length > 0;
 
     // 🎯 Verificar se núcleo tem atendentes diretos (quando não tem departamentos)
-    const atendentesNucleo = Array.isArray(nucleo.atendentesIds)
-      ? nucleo.atendentesIds
-      : [];
+    const atendentesNucleo = Array.isArray(nucleo.atendentesIds) ? nucleo.atendentesIds : [];
     const nucleoTemAtendentes = atendentesNucleo.length > 0;
 
     return {
@@ -46,11 +37,13 @@ export function criarOpcoesDepartamentos(
   departamentos: DepartamentoBotOption[],
   proximaEtapa: string = 'transferir-atendimento',
 ): BotOption[] {
-  const destinoEtapa = typeof proximaEtapa === 'string' && proximaEtapa.trim().length > 0
-    ? proximaEtapa.trim()
-    : 'transferir-atendimento';
+  const destinoEtapa =
+    typeof proximaEtapa === 'string' && proximaEtapa.trim().length > 0
+      ? proximaEtapa.trim()
+      : 'transferir-atendimento';
 
-  const areaAtual = sessao.contexto?.areaTitulo || sessao.contexto?.areaTituloOriginal || 'atendimento';
+  const areaAtual =
+    sessao.contexto?.areaTitulo || sessao.contexto?.areaTituloOriginal || 'atendimento';
 
   return departamentos.map((dept, index) => ({
     valor: String(index + 1),

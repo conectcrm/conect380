@@ -20,7 +20,10 @@ export const AppDataSource = new DataSource({
   migrationsTableName: 'migrations',
   synchronize: false, // Desabilitar para usar migrações
   logging: configService.get('APP_ENV') === 'development',
-  ssl: configService.get('APP_ENV') === 'production' ? {
-    rejectUnauthorized: false,
-  } : false,
+  ssl:
+    configService.get('APP_ENV') === 'production'
+      ? {
+          rejectUnauthorized: false,
+        }
+      : false,
 });

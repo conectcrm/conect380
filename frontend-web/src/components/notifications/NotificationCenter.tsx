@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { 
-  Bell, 
-  BellOff, 
-  Check, 
-  X, 
-  Trash2, 
+import notificationService from '../../services/notificationService';
+import {
+  Bell,
+  BellOff,
+  Check,
+  X,
+  Trash2,
   Settings,
   Clock,
   AlertTriangle,
@@ -31,10 +32,16 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
     removeNotification,
     clearAll,
     settings,
+    addNotification,
   } = useNotifications();
 
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread' | 'success' | 'error' | 'warning' | 'info' | 'reminder'>('all');
+  const [realUnreadCount, setRealUnreadCount] = useState(0);
+
+  // ✅ Usar useRef para persistir o Set entre re-renders (evita duplicadas)
+  const processedApiNotificationsRef = useRef<Set<string>>(new Set());
+
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Fechar dropdown ao clicar fora
@@ -48,6 +55,53 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Polling: Buscar notificações da API a cada 30 segundos
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const apiNotifications = await notificationService.listar();
+        const count = await notificationService.contarNaoLidas();
+        setRealUnreadCount(count);
+
+        // Adicionar apenas notificações novas (não processadas antes)
+        apiNotifications.forEach((apiNotif) => {
+          // Se já processamos esta notificação da API, pular
+          if (processedApiNotificationsRef.current.has(apiNotif.id)) {
+            return;
+          }
+
+          // Marcar como processada
+          processedApiNotificationsRef.current.add(apiNotif.id);
+
+          // Mapear tipo da API para tipo do contexto
+          let type: 'success' | 'error' | 'warning' | 'info' | 'reminder' = 'info';
+          if (apiNotif.type === 'COTACAO_APROVADA') type = 'success';
+          else if (apiNotif.type === 'COTACAO_REPROVADA') type = 'error';
+          else if (apiNotif.type === 'COTACAO_PENDENTE') type = 'warning';
+
+          addNotification({
+            id: apiNotif.id, // ✅ Preservar ID do banco de dados
+            type,
+            title: apiNotif.title,
+            message: apiNotif.message,
+            autoClose: true, // Fechar automaticamente após 5 segundos
+            duration: 5000,
+          });
+        });
+      } catch (error) {
+        console.error('Erro ao buscar notificações:', error);
+      }
+    };
+
+    // Buscar imediatamente
+    fetchNotifications();
+
+    // Polling a cada 30 segundos
+    const interval = setInterval(fetchNotifications, 30000);
+
+    return () => clearInterval(interval);
+  }, [notifications, addNotification]);
 
   const filteredNotifications = notifications.filter(notification => {
     switch (filter) {
@@ -122,11 +176,11 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
         ) : (
           <BellOff className="w-6 h-6" />
         )}
-        
+
         {/* Badge de notificações não lidas */}
-        {unreadCount > 0 && (
+        {realUnreadCount > 0 && (
           <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
-            {unreadCount > 99 ? '99+' : unreadCount}
+            {realUnreadCount > 99 ? '99+' : realUnreadCount}
           </span>
         )}
       </button>
@@ -139,7 +193,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-semibold text-gray-900">Notificações</h3>
               <div className="flex items-center space-x-2">
-                {unreadCount > 0 && (
+                {realUnreadCount > 0 && (
                   <button
                     onClick={markAllAsRead}
                     className="text-sm text-blue-600 hover:text-blue-800"
@@ -163,18 +217,17 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
             <div className="flex flex-wrap gap-2">
               {[
                 { key: 'all', label: 'Todas', count: notifications.length },
-                { key: 'unread', label: 'Não Lidas', count: unreadCount },
+                { key: 'unread', label: 'Não Lidas', count: realUnreadCount },
                 { key: 'reminder', label: 'Lembretes', count: notifications.filter(n => n.type === 'reminder').length },
                 { key: 'error', label: 'Erros', count: notifications.filter(n => n.type === 'error').length },
               ].map(({ key, label, count }) => (
                 <button
                   key={key}
                   onClick={() => setFilter(key as any)}
-                  className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                    filter === key
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
+                  className={`px-3 py-1 text-xs rounded-full transition-colors ${filter === key
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
                 >
                   {label} {count > 0 && `(${count})`}
                 </button>
@@ -190,7 +243,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                 <p className="text-gray-500 mb-4">
                   {filter === 'all' ? 'Nenhuma notificação' : `Nenhuma notificação ${filter === 'unread' ? 'não lida' : `do tipo ${filter}`}`}
                 </p>
-                <button 
+                <button
                   onClick={() => {
                     setIsOpen(false);
                     navigate('/notifications');
@@ -205,9 +258,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                 {filteredNotifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-4 hover:bg-gray-50 transition-colors border-l-4 ${
-                      !notification.read ? 'bg-blue-50' : 'bg-white'
-                    } ${getPriorityColor(notification.priority)}`}
+                    className={`p-4 hover:bg-gray-50 transition-colors border-l-4 ${!notification.read ? 'bg-blue-50' : 'bg-white'
+                      } ${getPriorityColor(notification.priority)}`}
                   >
                     <div className="flex items-start space-x-3">
                       {/* Ícone */}
@@ -219,9 +271,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <p className={`text-sm font-medium ${
-                              !notification.read ? 'text-gray-900' : 'text-gray-700'
-                            }`}>
+                            <p className={`text-sm font-medium ${!notification.read ? 'text-gray-900' : 'text-gray-700'
+                              }`}>
                               {notification.title}
                             </p>
                             <p className="text-sm text-gray-600 mt-1">
@@ -276,7 +327,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
           {/* Footer */}
           {filteredNotifications.length > 0 && (
             <div className="p-3 border-t border-gray-200 text-center">
-              <button 
+              <button
                 onClick={() => {
                   setIsOpen(false);
                   navigate('/notifications');

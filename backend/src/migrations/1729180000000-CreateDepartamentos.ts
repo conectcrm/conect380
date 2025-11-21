@@ -144,15 +144,9 @@ export class CreateDepartamentos1729180000000 implements MigrationInterface {
     );
 
     // Criar índices
-    await queryRunner.query(
-      `CREATE INDEX idx_departamentos_empresa ON departamentos(empresa_id)`,
-    );
-    await queryRunner.query(
-      `CREATE INDEX idx_departamentos_nucleo ON departamentos(nucleo_id)`,
-    );
-    await queryRunner.query(
-      `CREATE INDEX idx_departamentos_ativo ON departamentos(ativo)`,
-    );
+    await queryRunner.query(`CREATE INDEX idx_departamentos_empresa ON departamentos(empresa_id)`);
+    await queryRunner.query(`CREATE INDEX idx_departamentos_nucleo ON departamentos(nucleo_id)`);
+    await queryRunner.query(`CREATE INDEX idx_departamentos_ativo ON departamentos(ativo)`);
 
     // Criar foreign keys
     await queryRunner.createForeignKey(

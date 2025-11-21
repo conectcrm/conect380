@@ -26,8 +26,8 @@ export function MessageList({ mensagens, ticketId }: MessageListProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [mensagens]);
 
-  const formatarHora = (data: Date) => {
-    const dataMsg = new Date(data);
+  const formatarHora = (data: Date | string) => {
+    const dataMsg = typeof data === 'string' ? new Date(data) : data;
     return dataMsg.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 

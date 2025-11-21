@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 
 export enum StatusFluxo {
   PROPOSTA_ACEITA = 'proposta_aceita',
@@ -10,7 +18,7 @@ export enum StatusFluxo {
   WORKFLOW_CONCLUIDO = 'workflow_concluido',
   ERRO_PROCESSAMENTO = 'erro_processamento',
   PAUSADO = 'pausado',
-  CANCELADO = 'cancelado'
+  CANCELADO = 'cancelado',
 }
 
 export enum TipoEvento {
@@ -23,7 +31,7 @@ export enum TipoEvento {
   ERRO_OCORRIDO = 'erro_ocorrido',
   WORKFLOW_PAUSADO = 'workflow_pausado',
   WORKFLOW_RETOMADO = 'workflow_retomado',
-  WORKFLOW_CANCELADO = 'workflow_cancelado'
+  WORKFLOW_CANCELADO = 'workflow_cancelado',
 }
 
 @Entity('fluxos_automatizados')
@@ -49,7 +57,7 @@ export class FluxoAutomatizado {
   @Column({
     type: 'enum',
     enum: StatusFluxo,
-    default: StatusFluxo.PROPOSTA_ACEITA
+    default: StatusFluxo.PROPOSTA_ACEITA,
   })
   status: StatusFluxo;
 
@@ -127,10 +135,12 @@ export class FluxoAutomatizado {
   }
 
   podeProcessar(): boolean {
-    return this.status !== StatusFluxo.WORKFLOW_CONCLUIDO &&
+    return (
+      this.status !== StatusFluxo.WORKFLOW_CONCLUIDO &&
       this.status !== StatusFluxo.CANCELADO &&
       this.status !== StatusFluxo.PAUSADO &&
-      this.tentativasProcessamento < this.maxTentativas;
+      this.tentativasProcessamento < this.maxTentativas
+    );
   }
 
   isWorkflowCompleto(): boolean {
@@ -175,7 +185,8 @@ export class FluxoAutomatizado {
   pausar(motivo?: string): void {
     this.status = StatusFluxo.PAUSADO;
     if (motivo) {
-      this.observacoes = (this.observacoes || '') + `\n[${new Date().toISOString()}] Pausado: ${motivo}`;
+      this.observacoes =
+        (this.observacoes || '') + `\n[${new Date().toISOString()}] Pausado: ${motivo}`;
     }
   }
 
@@ -191,20 +202,28 @@ export class FluxoAutomatizado {
     this.status = StatusFluxo.CANCELADO;
     this.dataConclusao = new Date();
     if (motivo) {
-      this.observacoes = (this.observacoes || '') + `\n[${new Date().toISOString()}] Cancelado: ${motivo}`;
+      this.observacoes =
+        (this.observacoes || '') + `\n[${new Date().toISOString()}] Cancelado: ${motivo}`;
     }
   }
 
   private obterStatusAnteriorAoPausar(): StatusFluxo {
     // Lógica para determinar o status baseado na etapa atual
     switch (this.etapaAtual) {
-      case 1: return StatusFluxo.PROPOSTA_ACEITA;
-      case 2: return StatusFluxo.CONTRATO_GERADO;
-      case 3: return StatusFluxo.CONTRATO_ENVIADO;
-      case 4: return StatusFluxo.CONTRATO_ASSINADO;
-      case 5: return StatusFluxo.FATURA_GERADA;
-      case 6: return StatusFluxo.PAGAMENTO_PROCESSADO;
-      default: return StatusFluxo.PROPOSTA_ACEITA;
+      case 1:
+        return StatusFluxo.PROPOSTA_ACEITA;
+      case 2:
+        return StatusFluxo.CONTRATO_GERADO;
+      case 3:
+        return StatusFluxo.CONTRATO_ENVIADO;
+      case 4:
+        return StatusFluxo.CONTRATO_ASSINADO;
+      case 5:
+        return StatusFluxo.FATURA_GERADA;
+      case 6:
+        return StatusFluxo.PAGAMENTO_PROCESSADO;
+      default:
+        return StatusFluxo.PROPOSTA_ACEITA;
     }
   }
 }

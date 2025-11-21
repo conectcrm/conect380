@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import toast from 'react-hot-toast';
+import { api } from '../services/api';
 
 export interface Notification {
   id: string;
@@ -53,10 +54,10 @@ interface NotificationContextData {
   notifications: Notification[];
   unreadCount: number;
   addNotification: (notification: AddNotificationInput) => void;
-  markAsRead: (id: string) => void;
-  markAllAsRead: () => void;
-  removeNotification: (id: string) => void;
-  clearAll: () => void;
+  markAsRead: (id: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  removeNotification: (id: string) => Promise<void>;
+  clearAll: () => Promise<void>;
 
   // Lembretes
   reminders: NotificationReminder[];
@@ -83,7 +84,8 @@ interface NotificationContextData {
 
 const NotificationContext = createContext<NotificationContextData | undefined>(undefined);
 
-type AddNotificationInput = Omit<Notification, 'id' | 'timestamp' | 'read' | 'priority'> & Partial<Pick<Notification, 'priority'>>;
+type AddNotificationInput = Omit<Notification, 'timestamp' | 'read' | 'priority'> &
+  Partial<Pick<Notification, 'id' | 'priority'>>;
 
 export const useNotifications = () => {
   const context = useContext(NotificationContext);
@@ -150,22 +152,15 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
   // Carregar dados do localStorage na inicialização
   useEffect(() => {
-    const savedNotifications = localStorage.getItem('conect-notifications');
+    // ❌ REMOVIDO: Não persistir notificações no localStorage
+    // Motivo: Notificações são específicas por usuário (via API + JWT)
+    // Persistir causava vazamento entre usuários no mesmo navegador
+
+    // Limpar notificações antigas do localStorage (se existirem)
+    localStorage.removeItem('conect-notifications');
+
     const savedReminders = localStorage.getItem('conect-reminders');
     const savedSettings = localStorage.getItem('conect-notification-settings');
-
-    if (savedNotifications) {
-      try {
-        const parsed = JSON.parse(savedNotifications);
-        const validNotifications = parsed.map((n: any) => ({
-          ...n,
-          timestamp: new Date(n.timestamp)
-        }));
-        setNotifications(validNotifications);
-      } catch (error) {
-        console.error('Erro ao carregar notificações:', error);
-      }
-    }
 
     if (savedReminders) {
       try {
@@ -212,10 +207,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     }
   }, []);
 
-  // Salvar notificações no localStorage
-  useEffect(() => {
-    localStorage.setItem('conect-notifications', JSON.stringify(notifications));
-  }, [notifications]);
+  // ❌ REMOVIDO: Não persistir notificações no localStorage
+  // Motivo: Causava vazamento de notificações entre usuários
+  // As notificações vêm da API com polling e são filtradas por userId no backend
 
   // Salvar lembretes no localStorage
   useEffect(() => {
@@ -275,13 +269,16 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
     // Se encontrou notificação similar recente, não criar nova
     if (recentSimilar) {
-      console.log('Notificação duplicada evitada:', notification.title);
+      // Log silencioso - apenas em debug mode
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('Notificação duplicada evitada:', notification.title);
+      }
       return;
     }
 
     const newNotification: Notification = {
       ...notification,
-      id: generateId(),
+      id: notification.id || generateId(), // Usar ID fornecido ou gerar novo
       timestamp: new Date(),
       read: false,
       priority: notification.priority ?? 'medium',
@@ -343,9 +340,30 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   };
 
   const playNotificationSound = (type: Notification['type']) => {
+    // Som desabilitado por padrão devido à política de autoplay dos navegadores
+    // O AudioContext precisa ser criado após interação do usuário
+    // Para habilitar: usuário deve clicar em algum lugar da página primeiro
+    return;
+
+    /* CÓDIGO DE SOM DESABILITADO - Remover comentário após implementar botão de ativação
     try {
+      // Verificar se Web Audio API está disponível
+      if (typeof window === 'undefined' || !('AudioContext' in window || 'webkitAudioContext' in (window as any))) {
+        return; // Navegador não suporta
+      }
+
       // Criar contexto de áudio
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      // Verificar se AudioContext foi suspenso pela política do navegador
+      if (audioContext.state === 'suspended') {
+        // Tentar resumir (só funciona após interação do usuário)
+        audioContext.resume().catch(() => {
+          // Silenciosamente ignorar - som não é crítico
+        });
+        return;
+      }
+
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
 
@@ -370,30 +388,68 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.3);
     } catch (error) {
-      console.log('Som de notificação não disponível:', error);
+      // Silenciosamente ignorar - som não é crítico
+    }
+    */
+  };
+
+  const markAsRead = async (id: string) => {
+    try {
+      // Atualizar estado local imediatamente (UX responsivo)
+      setNotifications(prev =>
+        prev.map(notification =>
+          notification.id === id ? { ...notification, read: true } : notification
+        )
+      );
+
+      // Persistir no backend
+      const notificationService = await import('../services/notificationService');
+      await notificationService.default.marcarComoLida(id);
+    } catch (error) {
+      console.error('Erro ao marcar notificação como lida:', error);
+      // Se falhar no backend, estado local já está atualizado para melhor UX
     }
   };
 
-  const markAsRead = (id: string) => {
-    setNotifications(prev =>
-      prev.map(notification =>
-        notification.id === id ? { ...notification, read: true } : notification
-      )
-    );
+  const markAllAsRead = async () => {
+    try {
+      // Atualizar estado local imediatamente (UX responsivo)
+      setNotifications(prev =>
+        prev.map(notification => ({ ...notification, read: true }))
+      );
+
+      // Persistir no backend
+      const notificationService = await import('../services/notificationService');
+      await notificationService.default.marcarTodasComoLidas();
+    } catch (error) {
+      console.error('Erro ao marcar todas como lidas:', error);
+      // Se falhar no backend, estado local já está atualizado para melhor UX
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(prev =>
-      prev.map(notification => ({ ...notification, read: true }))
-    );
+  const removeNotification = async (id: string) => {
+    try {
+      // Remover do estado local imediatamente (UX responsivo)
+      setNotifications(prev => prev.filter(notification => notification.id !== id));
+
+      // Remover do backend
+      await api.delete(`/notifications/${id}`);
+    } catch (error) {
+      console.error('Erro ao remover notificação:', error);
+      // Se falhar no backend, não recarregar - usuário já viu a remoção
+    }
   };
 
-  const removeNotification = (id: string) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== id));
-  };
+  const clearAll = async () => {
+    try {
+      // Limpar estado local imediatamente
+      setNotifications([]);
 
-  const clearAll = () => {
-    setNotifications([]);
+      // Limpar no backend
+      await api.delete('/notifications');
+    } catch (error) {
+      console.error('Erro ao limpar notificações:', error);
+    }
   };
 
   const addReminder = (reminder: NotificationReminderInput) => {

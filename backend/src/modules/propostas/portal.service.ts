@@ -30,13 +30,13 @@ export class PortalService {
     'TEST-002': '2',
     // ✨ ADICIONANDO PROPOSTAS REAIS PARA TESTE
     'PROP-2025-049': 'bff61bbe-b645-4581-a3d1-d8447b8c2b75',
-    'PROP-2025-051': 'e0003dcb-f81a-4ac5-9661-76233446bfa8'
+    'PROP-2025-051': 'e0003dcb-f81a-4ac5-9661-76233446bfa8',
   };
 
   constructor(
     private readonly propostasService: PropostasService,
-    private readonly emailService: EmailIntegradoService
-  ) { }
+    private readonly emailService: EmailIntegradoService,
+  ) {}
 
   /**
    * Atualiza status de proposta usando token do portal
@@ -44,9 +44,8 @@ export class PortalService {
   async atualizarStatusPorToken(
     token: string,
     novoStatus: string,
-    metadata?: ViewData
+    metadata?: ViewData,
   ): Promise<any> {
-
     console.log(`🔐 Portal: Processando token ${token}`);
 
     // 1. Validar token e obter proposta ID
@@ -57,12 +56,14 @@ export class PortalService {
     }
 
     console.log(`✅ Token válido para proposta: ${tokenData.propostaId}`);
-    console.log(`🔧 DEBUG: tokenData.propostaId = "${tokenData.propostaId}" (tipo: ${typeof tokenData.propostaId})`);
+    console.log(
+      `🔧 DEBUG: tokenData.propostaId = "${tokenData.propostaId}" (tipo: ${typeof tokenData.propostaId})`,
+    );
 
     // 2. Registrar ação no log do portal
     await this.registrarAcaoPortal(token, 'status_update', {
       novoStatus,
-      ...metadata
+      ...metadata,
     });
 
     // 3. Atualizar status da proposta via service principal com validação automática
@@ -70,12 +71,14 @@ export class PortalService {
 
     if (novoStatus === 'aprovada' || novoStatus === 'rejeitada') {
       console.log(`🔄 Portal: Aplicando transição automática para ${novoStatus}`);
-      console.log(`🔧 DEBUG: Chamando atualizarStatusComValidacao com ID: "${tokenData.propostaId}"`);
+      console.log(
+        `🔧 DEBUG: Chamando atualizarStatusComValidacao com ID: "${tokenData.propostaId}"`,
+      );
       resultado = await this.propostasService.atualizarStatusComValidacao(
         tokenData.propostaId,
         novoStatus,
         'portal-auto',
-        `Cliente ${novoStatus} a proposta via portal (token: ${token.substring(0, 8)}...)`
+        `Cliente ${novoStatus} a proposta via portal (token: ${token.substring(0, 8)}...)`,
       );
     } else {
       console.log(`🔧 DEBUG: Chamando atualizarStatus com ID: "${tokenData.propostaId}"`);
@@ -83,7 +86,7 @@ export class PortalService {
         tokenData.propostaId,
         novoStatus,
         'portal-cliente',
-        `Atualizado via portal do cliente (token: ${token.substring(0, 8)}...)`
+        `Atualizado via portal do cliente (token: ${token.substring(0, 8)}...)`,
       );
     }
 
@@ -96,7 +99,7 @@ export class PortalService {
           cliente: resultado.cliente || 'Cliente',
           valor: resultado.valor || 0,
           status: 'aprovada',
-          dataAceite: new Date().toISOString()
+          dataAceite: new Date().toISOString(),
         });
         console.log('📧 Email de notificação de aceitação enviado com sucesso');
       } catch (emailError) {
@@ -110,7 +113,7 @@ export class PortalService {
           cliente: resultado.cliente || 'Cliente',
           valor: resultado.valor || 0,
           status: 'rejeitada',
-          dataRejeicao: new Date().toISOString()
+          dataRejeicao: new Date().toISOString(),
         });
         console.log('📧 Email de notificação de rejeição enviado com sucesso');
       } catch (emailError) {
@@ -124,8 +127,8 @@ export class PortalService {
       ...resultado,
       tokenInfo: {
         token: token.substring(0, 8) + '...',
-        source: 'portal-cliente'
-      }
+        source: 'portal-cliente',
+      },
     };
   }
 
@@ -157,7 +160,7 @@ export class PortalService {
         await this.propostasService.marcarComoVisualizada(
           tokenData.propostaId,
           '127.0.0.1', // IP do cliente seria capturado em produção
-          'Portal-Client'
+          'Portal-Client',
         );
 
         // Atualizar objeto local
@@ -174,7 +177,7 @@ export class PortalService {
     await this.registrarAcaoPortal(token, 'view', {
       timestamp: new Date().toISOString(),
       statusAnterior: proposta.status === 'visualizada' ? 'enviada' : proposta.status,
-      statusAtual: proposta.status
+      statusAtual: proposta.status,
     });
 
     console.log(`✅ Portal: Proposta encontrada para token`);
@@ -183,8 +186,8 @@ export class PortalService {
       ...proposta,
       portalAccess: {
         token: token.substring(0, 8) + '...',
-        accessedAt: new Date().toISOString()
-      }
+        accessedAt: new Date().toISOString(),
+      },
     };
   }
 
@@ -213,18 +216,20 @@ export class PortalService {
         // Log das primeiras propostas para debug
         if (propostas.length > 0) {
           console.log(`📋 Primeiras propostas no banco:`);
-          propostas.slice(0, 3).forEach(p => {
+          propostas.slice(0, 3).forEach((p) => {
             console.log(`   - ${p.numero} (ID: ${p.id})`);
           });
         }
 
         // Tentar encontrar proposta pelo número (token)
-        const propostaEncontrada = propostas.find(p => p.numero === token);
+        const propostaEncontrada = propostas.find((p) => p.numero === token);
 
         if (propostaEncontrada) {
           propostaId = propostaEncontrada.id;
           console.log(`✅ Token ${token} mapeado para proposta existente ID: ${propostaId}`);
-          console.log(`🔧 DEBUG: propostaEncontrada.id = "${propostaEncontrada.id}" (tipo: ${typeof propostaEncontrada.id})`);
+          console.log(
+            `🔧 DEBUG: propostaEncontrada.id = "${propostaEncontrada.id}" (tipo: ${typeof propostaEncontrada.id})`,
+          );
           console.log(`🔧 DEBUG: propostaEncontrada.numero = "${propostaEncontrada.numero}"`);
         } else {
           console.log(`❌ Proposta com número ${token} não encontrada no banco`);
@@ -245,7 +250,7 @@ export class PortalService {
       propostaId, // AGORA USA O ID CORRETO DA PROPOSTA REAL
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 dias
-      isActive: true
+      isActive: true,
     };
 
     console.log(`✅ Token ${token} validado → Proposta ID real: ${propostaId}`);
@@ -255,18 +260,14 @@ export class PortalService {
   /**
    * Registra ação no portal
    */
-  async registrarAcaoPortal(
-    token: string,
-    acao: string,
-    metadata?: any
-  ): Promise<void> {
+  async registrarAcaoPortal(token: string, acao: string, metadata?: any): Promise<void> {
     console.log(`📝 Portal: Registrando ação "${acao}" para token ${token}`);
 
     const logEntry = {
       token: token.substring(0, 8) + '...',
       acao,
       timestamp: new Date().toISOString(),
-      metadata
+      metadata,
     };
 
     // Em um ambiente real, isso seria salvo no banco de dados
@@ -280,7 +281,7 @@ export class PortalService {
     await this.registrarAcaoPortal(token, 'view', {
       ip: viewData.ip,
       userAgent: viewData.userAgent,
-      timestamp: viewData.timestamp || new Date().toISOString()
+      timestamp: viewData.timestamp || new Date().toISOString(),
     });
   }
 
@@ -290,7 +291,7 @@ export class PortalService {
   async registrarAcaoCliente(
     token: string,
     acao: string,
-    metadata?: any
+    metadata?: any,
   ): Promise<{ sucesso: boolean; mensagem: string; status?: string }> {
     console.log(`🎯 Portal: Registrando ação "${acao}" do cliente`);
 
@@ -305,7 +306,7 @@ export class PortalService {
       await this.registrarAcaoPortal(token, acao, {
         ...metadata,
         timestamp: new Date().toISOString(),
-        source: 'cliente-portal'
+        source: 'cliente-portal',
       });
 
       // 3. Atualizar status baseado na ação
@@ -340,20 +341,19 @@ export class PortalService {
         return {
           sucesso: true,
           mensagem: `Ação "${acao}" registrada e status atualizado para "${novoStatus}"`,
-          status: novoStatus
+          status: novoStatus,
         };
       }
 
       return {
         sucesso: true,
-        mensagem: `Ação "${acao}" registrada com sucesso`
+        mensagem: `Ação "${acao}" registrada com sucesso`,
       };
-
     } catch (error) {
       console.error(`❌ Erro ao registrar ação do cliente:`, error);
       return {
         sucesso: false,
-        mensagem: `Erro ao registrar ação: ${error.message}`
+        mensagem: `Erro ao registrar ação: ${error.message}`,
       };
     }
   }
@@ -388,7 +388,7 @@ export class PortalService {
       propostaId,
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString(),
-      isActive: true
+      isActive: true,
     };
 
     // Em um ambiente real, salvar no banco de dados

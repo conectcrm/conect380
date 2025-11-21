@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Plus, Clock, MessageSquare } from 'lucide-react';
-import { Ticket, StatusAtendimento, CanalTipo } from '../types';
+import { Ticket, StatusAtendimentoType, CanalTipo } from '../types';
 import { getIconeCanal, resolverNomeExibicao } from '../utils';
+import { renderStatusBadge } from '../utils/statusUtils';
 import { resolveAvatarUrl } from '../../../../utils/avatar';
 import { ThemePalette } from '../../../../contexts/ThemeContext';
 import { TicketListSkeleton } from './SkeletonLoaders';
@@ -15,9 +16,9 @@ interface AtendimentosSidebarProps {
   onNovoAtendimento: () => void;
   theme: ThemePalette;
   loading?: boolean;
-  tabAtiva: StatusAtendimento;
-  onChangeTab: (status: StatusAtendimento) => void;
-  contagemPorStatus?: Partial<Record<StatusAtendimento, number>>;
+  tabAtiva: StatusAtendimentoType;
+  onChangeTab: (status: StatusAtendimentoType) => void;
+  contagemPorStatus?: Partial<Record<StatusAtendimentoType, number>>;
 }
 
 export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
@@ -127,14 +128,18 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
 
   const contagemFallback = useMemo(() => ({
     aberto: tickets.filter(t => (t.status || '').toLowerCase() === 'aberto').length,
+    em_atendimento: tickets.filter(t => (t.status || '').toLowerCase() === 'em_atendimento' || (t.status || '').toLowerCase() === 'em atendimento').length,
+    aguardando: tickets.filter(t => (t.status || '').toLowerCase() === 'aguardando').length,
     resolvido: tickets.filter(t => (t.status || '').toLowerCase() === 'resolvido').length,
-    retorno: tickets.filter(t => (t.status || '').toLowerCase() === 'retorno').length,
+    fechado: tickets.filter(t => (t.status || '').toLowerCase() === 'fechado').length,
   }), [tickets]);
 
-  const tabs: { value: StatusAtendimento; label: string; count: number }[] = [
+  const tabs: { value: StatusAtendimentoType; label: string; count: number }[] = [
     { value: 'aberto', label: 'Aberto', count: contagemPorStatus?.aberto ?? contagemFallback.aberto },
+    { value: 'em_atendimento', label: 'Em Atendimento', count: contagemPorStatus?.em_atendimento ?? contagemFallback.em_atendimento },
+    { value: 'aguardando', label: 'Aguardando', count: contagemPorStatus?.aguardando ?? contagemFallback.aguardando },
     { value: 'resolvido', label: 'Resolvido', count: contagemPorStatus?.resolvido ?? contagemFallback.resolvido },
-    { value: 'retorno', label: 'Retornos', count: contagemPorStatus?.retorno ?? contagemFallback.retorno }
+    { value: 'fechado', label: 'Fechado', count: contagemPorStatus?.fechado ?? contagemFallback.fechado }
   ];
 
   return (
@@ -193,7 +198,7 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
             const IconeCanal = getIconeCanal(ticket.canal);
             const tempoAtendimento = contadores[ticket.id] || ticket.tempoAtendimento;
             const isAtivo = ticketSelecionado === ticket.id;
-            const avatarUrl = resolveAvatarUrl(ticket.contato.foto || null);
+            const avatarUrl = resolveAvatarUrl(ticket.contato?.foto || null);
 
             return (
               <div
@@ -224,7 +229,7 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
                     <IconeCanal className="w-2.5 h-2.5 text-white" />
                   </div>
                   {/* Status Online */}
-                  {ticket.contato.online && (
+                  {ticket.contato?.online && (
                     <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white"></div>
                   )}
                 </div>
@@ -274,14 +279,26 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
                       )}
                     </div>
 
-                    {ticket.status === 'aberto' && (
-                      <div className="flex items-center gap-0.5 text-[10px] text-gray-500 flex-shrink-0">
-                        <Clock className="w-3 h-3" />
-                        <span className="font-mono">
-                          {formatarTempo(tempoAtendimento)}
-                        </span>
-                      </div>
-                    )}
+                    {/* Badge de Status + Tempo de Atendimento */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {(() => {
+                        const badge = renderStatusBadge(ticket.status, { size: 'sm', showIcon: true });
+                        return (
+                          <span className={badge.classes} title={badge.label}>
+                            {badge.icon}
+                          </span>
+                        );
+                      })()}
+
+                      {ticket.status === 'aberto' && (
+                        <div className="flex items-center gap-0.5 text-[10px] text-gray-500">
+                          <Clock className="w-3 h-3" />
+                          <span className="font-mono">
+                            {formatarTempo(tempoAtendimento)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

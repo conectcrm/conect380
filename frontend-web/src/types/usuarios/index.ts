@@ -30,6 +30,7 @@ export interface Usuario {
     };
   };
   ativo: boolean;
+  deve_trocar_senha?: boolean;
   ultimo_login?: Date;
   created_at: Date;
   updated_at: Date;
@@ -54,7 +55,7 @@ export interface NovoUsuario {
   empresa_id: string;
   avatar_url?: string;
   idioma_preferido?: string;
-  configuracoes?:  {
+  configuracoes?: {
     tema?: string;
     notificacoes?: {
       email?: boolean;
@@ -94,6 +95,8 @@ export interface FiltrosUsuarios {
   dataFim?: string;
   ultimoLoginInicio?: string;
   ultimoLoginFim?: string;
+  limite?: number;
+  pagina?: number;
 }
 
 export interface EstatisticasUsuarios {

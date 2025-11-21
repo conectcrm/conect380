@@ -61,7 +61,8 @@ export const useHistoricoCliente = (
     if (autoLoad && clienteId) {
       carregarHistorico();
     }
-  }, [autoLoad, clienteId, carregarHistorico]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLoad, clienteId]); // ✅ Removido carregarHistorico para evitar loop
 
   return {
     historico,

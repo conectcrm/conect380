@@ -1,28 +1,12 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Body,
-  Param,
-  UseGuards,
-  Req,
-} from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { AtendenteService } from '../services/atendente.service';
-import {
-  CriarAtendenteDto,
-  AtualizarAtendenteDto,
-  AtualizarStatusAtendenteDto,
-} from '../dto';
+import { CriarAtendenteDto, AtualizarAtendenteDto, AtualizarStatusAtendenteDto } from '../dto';
 
 @Controller('atendimento/atendentes')
 @UseGuards(JwtAuthGuard)
 export class AtendentesController {
-  constructor(
-    private atendenteService: AtendenteService,
-  ) {
+  constructor(private atendenteService: AtendenteService) {
     console.log('✅ AtendentesController inicializado');
   }
 
@@ -62,16 +46,12 @@ export class AtendentesController {
         ? 'Atendente criado! Usuário gerado automaticamente.'
         : 'Atendente criado e vinculado ao usuário existente',
       data: resultado.atendente,
-      senhaTemporaria: resultado.senhaTemporaria,  // ⚡ Frontend vai usar isso!
+      senhaTemporaria: resultado.senhaTemporaria, // ⚡ Frontend vai usar isso!
     };
   }
 
   @Put(':id')
-  async atualizar(
-    @Req() req,
-    @Param('id') id: string,
-    @Body() dto: AtualizarAtendenteDto,
-  ) {
+  async atualizar(@Req() req, @Param('id') id: string, @Body() dto: AtualizarAtendenteDto) {
     const empresaId = req.user.empresa_id || req.user.empresaId;
     const atendente = await this.atendenteService.atualizar(id, dto, empresaId);
 
@@ -109,4 +89,3 @@ export class AtendentesController {
     };
   }
 }
-

@@ -7,5 +7,10 @@ import { CreateNotaClienteDto } from './create-nota-cliente.dto';
  * Não permite alterar clienteId, ticketId ou empresaId após criação
  */
 export class UpdateNotaClienteDto extends PartialType(
-  OmitType(CreateNotaClienteDto, ['clienteId', 'ticketId', 'contatoTelefone', 'empresaId'] as const)
-) { }
+  OmitType(CreateNotaClienteDto, [
+    'clienteId',
+    'ticketId',
+    'contatoTelefone',
+    'empresaId',
+  ] as const),
+) {}

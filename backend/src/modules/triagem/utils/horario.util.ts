@@ -156,7 +156,9 @@ export class HorarioUtil {
   /**
    * Obtém dia da semana (segunda, terca, etc)
    */
-  private static obterDiaSemana(data: Date): keyof Omit<HorarioFuncionamento, 'timezone' | 'feriados'> {
+  private static obterDiaSemana(
+    data: Date,
+  ): keyof Omit<HorarioFuncionamento, 'timezone' | 'feriados'> {
     const dias = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'] as const;
     return dias[data.getDay()];
   }
@@ -278,12 +280,14 @@ export class HorarioUtil {
 
     const linhas: string[] = [];
 
-    (['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'] as const).forEach((dia) => {
-      const config = horario[dia];
-      if (config && config.inicio && config.fim) {
-        linhas.push(`${diasNomes[dia]}: ${config.inicio} às ${config.fim}`);
-      }
-    });
+    (['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'] as const).forEach(
+      (dia) => {
+        const config = horario[dia];
+        if (config && config.inicio && config.fim) {
+          linhas.push(`${diasNomes[dia]}: ${config.inicio} às ${config.fim}`);
+        }
+      },
+    );
 
     return linhas.join('\n');
   }

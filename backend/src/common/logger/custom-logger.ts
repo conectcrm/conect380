@@ -4,14 +4,14 @@ import * as path from 'path';
 
 /**
  * 📝 Custom Logger com Rotação de Arquivos
- * 
+ *
  * Logger que:
  * - Escreve logs em arquivos separados por nível (error, warn, info)
  * - Rotação automática quando arquivo atinge 10 MB
  * - Mantém últimos 10 arquivos de cada tipo
  * - Logs estruturados em JSON (fácil parsing)
  * - Console colorido em desenvolvimento
- * 
+ *
  * Estrutura de arquivos:
  * logs/
  *   error.log      (erros críticos)
@@ -45,7 +45,7 @@ export class CustomLogger implements LoggerService {
   private rotateLogFile(logFile: string) {
     try {
       const stats = fs.statSync(logFile);
-      
+
       if (stats.size >= this.maxFileSize) {
         // Remover arquivo mais antigo se necessário
         const oldestFile = `${logFile}.${this.maxFiles}`;
@@ -57,7 +57,7 @@ export class CustomLogger implements LoggerService {
         for (let i = this.maxFiles - 1; i >= 1; i--) {
           const currentFile = `${logFile}.${i}`;
           const nextFile = `${logFile}.${i + 1}`;
-          
+
           if (fs.existsSync(currentFile)) {
             fs.renameSync(currentFile, nextFile);
           }
@@ -76,7 +76,7 @@ export class CustomLogger implements LoggerService {
    */
   private writeToFile(level: string, message: string, context?: string) {
     const logFile = path.join(this.logsDir, `${level}.log`);
-    
+
     // Verificar e rotacionar se necessário
     this.rotateLogFile(logFile);
 
@@ -97,19 +97,15 @@ export class CustomLogger implements LoggerService {
   /**
    * Formata mensagem para console
    */
-  private formatConsoleMessage(
-    level: string,
-    message: string,
-    context?: string,
-  ): string {
+  private formatConsoleMessage(level: string, message: string, context?: string): string {
     const timestamp = new Date().toLocaleString('pt-BR');
     const contextStr = context ? `[${context}]` : '';
-    
+
     // Cores ANSI
     const colors = {
       error: '\x1b[31m', // Vermelho
-      warn: '\x1b[33m',  // Amarelo
-      log: '\x1b[32m',   // Verde
+      warn: '\x1b[33m', // Amarelo
+      log: '\x1b[32m', // Verde
       debug: '\x1b[36m', // Ciano
       verbose: '\x1b[35m', // Magenta
       reset: '\x1b[0m',
@@ -122,15 +118,8 @@ export class CustomLogger implements LoggerService {
   /**
    * Log genérico
    */
-  private logMessage(
-    level: string,
-    message: any,
-    context?: string,
-    trace?: string,
-  ) {
-    const messageStr = typeof message === 'object' 
-      ? JSON.stringify(message) 
-      : message;
+  private logMessage(level: string, message: any, context?: string, trace?: string) {
+    const messageStr = typeof message === 'object' ? JSON.stringify(message) : message;
 
     // Console (desenvolvimento)
     if (process.env.NODE_ENV !== 'production') {

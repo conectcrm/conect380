@@ -23,7 +23,7 @@ import {
 @Controller('departamentos')
 @UseGuards(JwtAuthGuard)
 export class DepartamentoController {
-  constructor(private readonly departamentoService: DepartamentoService) { }
+  constructor(private readonly departamentoService: DepartamentoService) {}
 
   /**
    * POST /departamentos
@@ -81,11 +81,7 @@ export class DepartamentoController {
    * Atualiza um departamento
    */
   @Put(':id')
-  async update(
-    @Request() req,
-    @Param('id') id: string,
-    @Body() updateDto: UpdateDepartamentoDto,
-  ) {
+  async update(@Request() req, @Param('id') id: string, @Body() updateDto: UpdateDepartamentoDto) {
     const empresaId = req.user.empresa_id;
     return this.departamentoService.update(empresaId, id, updateDto);
   }
@@ -112,11 +108,7 @@ export class DepartamentoController {
     @Param('atendenteId') atendenteId: string,
   ) {
     const empresaId = req.user.empresa_id;
-    return this.departamentoService.adicionarAtendente(
-      empresaId,
-      id,
-      atendenteId,
-    );
+    return this.departamentoService.adicionarAtendente(empresaId, id, atendenteId);
   }
 
   /**
@@ -130,11 +122,7 @@ export class DepartamentoController {
     @Param('atendenteId') atendenteId: string,
   ) {
     const empresaId = req.user.empresa_id;
-    return this.departamentoService.removerAtendente(
-      empresaId,
-      id,
-      atendenteId,
-    );
+    return this.departamentoService.removerAtendente(empresaId, id, atendenteId);
   }
 
   /**
@@ -148,11 +136,7 @@ export class DepartamentoController {
     @Body() body: { nucleoId: string; ordenacao: { id: string; ordem: number }[] },
   ) {
     const empresaId = req.user.empresa_id;
-    await this.departamentoService.reordenar(
-      empresaId,
-      body.nucleoId,
-      body.ordenacao,
-    );
+    await this.departamentoService.reordenar(empresaId, body.nucleoId, body.ordenacao);
     return { message: 'Departamentos reordenados com sucesso' };
   }
 }

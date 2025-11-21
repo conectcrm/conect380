@@ -53,13 +53,13 @@ describe('🎨 Validação do Tema Crevasse', () => {
         const hexColorRegex = /#[0-9A-Fa-f]{6}/g;
         const hexColorsFound = content.match(hexColorRegex) || [];
         const crevassePalette = Object.values(CREVASSE_COLORS);
-        
+
         hexColorsFound.forEach(hex => {
           const upperHex = hex.toUpperCase();
           const isCrevasseColor = crevassePalette.some(
             c => c.toUpperCase() === upperHex
           );
-          
+
           if (!isCrevasseColor) {
             console.warn(`⚠️ ${file}: Cor não-Crevasse encontrada: ${hex}`);
           }
@@ -76,9 +76,9 @@ describe('🎨 Validação do Tema Crevasse', () => {
         const filePath = path.join(pagesDir, file);
         const content = fs.readFileSync(filePath, 'utf-8');
 
-        const hasBackToNucleus = content.includes('BackToNucleus') || 
-                                 content.includes('import { BackToNucleus }');
-        
+        const hasBackToNucleus = content.includes('BackToNucleus') ||
+          content.includes('import { BackToNucleus }');
+
         expect(hasBackToNucleus).toBe(true);
       });
     });
@@ -92,27 +92,27 @@ describe('🎨 Validação do Tema Crevasse', () => {
       const content = fs.readFileSync(filePath, 'utf-8');
 
       it(`${file} deve ter estado de loading`, () => {
-        const hasLoadingState = 
-          content.includes('useState') && 
+        const hasLoadingState =
+          content.includes('useState') &&
           (content.includes('loading') || content.includes('isLoading'));
-        
+
         expect(hasLoadingState).toBe(true);
       });
 
       it(`${file} deve ter estado de erro`, () => {
-        const hasErrorState = 
-          content.includes('useState') && 
+        const hasErrorState =
+          content.includes('useState') &&
           content.includes('error');
-        
+
         expect(hasErrorState).toBe(true);
       });
 
       it(`${file} deve ter tratamento de lista vazia`, () => {
-        const hasEmptyState = 
-          content.includes('length === 0') || 
+        const hasEmptyState =
+          content.includes('length === 0') ||
           content.includes('.length === 0') ||
           content.includes('items.length');
-        
+
         expect(hasEmptyState).toBe(true);
       });
     });
@@ -124,11 +124,11 @@ describe('🎨 Validação do Tema Crevasse', () => {
         const filePath = path.join(pagesDir, file);
         const content = fs.readFileSync(filePath, 'utf-8');
 
-        const hasResponsiveClasses = 
-          content.includes('md:') || 
+        const hasResponsiveClasses =
+          content.includes('md:') ||
           content.includes('lg:') ||
           content.includes('sm:');
-        
+
         expect(hasResponsiveClasses).toBe(true);
       });
 
@@ -137,10 +137,10 @@ describe('🎨 Validação do Tema Crevasse', () => {
         const content = fs.readFileSync(filePath, 'utf-8');
 
         if (content.includes('grid')) {
-          const hasResponsiveGrid = 
-            content.includes('grid-cols-1') && 
+          const hasResponsiveGrid =
+            content.includes('grid-cols-1') &&
             (content.includes('md:grid-cols') || content.includes('lg:grid-cols'));
-          
+
           expect(hasResponsiveGrid).toBe(true);
         }
       });
@@ -177,7 +177,7 @@ describe('🎨 Validação do Tema Crevasse', () => {
         it(`${file} - inputs devem ter labels`, () => {
           const inputCount = (content.match(/<input/g) || []).length;
           const labelCount = (content.match(/<label/g) || []).length;
-          
+
           // Pelo menos 70% dos inputs devem ter labels
           const ratio = labelCount / inputCount;
           expect(ratio).toBeGreaterThanOrEqual(0.7);
@@ -186,10 +186,10 @@ describe('🎨 Validação do Tema Crevasse', () => {
 
       if (content.includes('focus:ring')) {
         it(`${file} - focus rings devem ser Crevasse primary`, () => {
-          const hasCrevasseFocus = 
+          const hasCrevasseFocus =
             content.includes('focus:ring-[#159A9C]') ||
             content.includes('focus:ring-2');
-          
+
           expect(hasCrevasseFocus).toBe(true);
         });
       }
@@ -205,7 +205,7 @@ describe('🎨 Validação do Tema Crevasse', () => {
         it(`${file} - useEffect deve ter array de dependências`, () => {
           const useEffectRegex = /useEffect\([^)]+\)/g;
           const effects = content.match(useEffectRegex) || [];
-          
+
           effects.forEach(effect => {
             // useEffect deve ter segundo argumento (dependências)
             const hasDeps = effect.includes(',');
@@ -219,16 +219,16 @@ describe('🎨 Validação do Tema Crevasse', () => {
 
 describe('🔧 Validação do ThemeContext', () => {
   const themeContextPath = path.join(__dirname, '../src/contexts/ThemeContext.tsx');
-  
+
   it('Deve ter Crevasse como tema padrão', () => {
     const content = fs.readFileSync(themeContextPath, 'utf-8');
-    
+
     expect(content).toContain("useState<string>('crevasse')");
   });
 
   it('Deve ter paleta Crevasse completa definida', () => {
     const content = fs.readFileSync(themeContextPath, 'utf-8');
-    
+
     Object.entries(CREVASSE_COLORS).forEach(([key, value]) => {
       expect(content).toContain(value);
     });
@@ -249,7 +249,7 @@ describe('📚 Validação de Documentação', () => {
   it('copilot-instructions.md deve mencionar Crevasse', () => {
     const copilotPath = path.join(__dirname, '../../.github/copilot-instructions.md');
     const content = fs.readFileSync(copilotPath, 'utf-8');
-    
+
     expect(content).toContain('Crevasse');
     expect(content).toContain('#159A9C');
   });
@@ -257,7 +257,7 @@ describe('📚 Validação de Documentação', () => {
 
 describe('🚀 Validação de Template', () => {
   const templatePath = path.join(__dirname, '../src/pages/_TemplatePage.tsx');
-  
+
   it('_TemplatePage.tsx deve existir', () => {
     expect(fs.existsSync(templatePath)).toBe(true);
   });
@@ -269,12 +269,12 @@ describe('🚀 Validação de Template', () => {
 
   it('Template deve usar cores Crevasse', () => {
     const content = fs.readFileSync(templatePath, 'utf-8');
-    
+
     // Deve ter pelo menos uma cor Crevasse
-    const hasCrevasseColor = Object.values(CREVASSE_COLORS).some(color => 
+    const hasCrevasseColor = Object.values(CREVASSE_COLORS).some(color =>
       content.includes(color)
     );
-    
+
     expect(hasCrevasseColor).toBe(true);
   });
 
@@ -285,7 +285,7 @@ describe('🚀 Validação de Template', () => {
 
   it('Template deve ter todos os estados', () => {
     const content = fs.readFileSync(templatePath, 'utf-8');
-    
+
     expect(content).toContain('loading');
     expect(content).toContain('error');
     expect(content).toContain('length === 0');
@@ -295,38 +295,38 @@ describe('🚀 Validação de Template', () => {
 describe('📊 Estatísticas do Projeto', () => {
   it('Deve ter pelo menos 5 páginas criadas', () => {
     const pagesDir = path.join(__dirname, '../src/pages');
-    const pages = fs.readdirSync(pagesDir).filter(f => 
+    const pages = fs.readdirSync(pagesDir).filter(f =>
       f.endsWith('.tsx') && f !== '_TemplatePage.tsx'
     );
-    
+
     expect(pages.length).toBeGreaterThanOrEqual(5);
   });
 
   it('Deve reportar páginas que NÃO seguem Crevasse', () => {
     const pagesDir = path.join(__dirname, '../src/pages');
     const pageFiles = fs.readdirSync(pagesDir).filter(f => f.endsWith('.tsx'));
-    
+
     const nonCompliantPages: string[] = [];
-    
+
     pageFiles.forEach(file => {
       const filePath = path.join(pagesDir, file);
       const content = fs.readFileSync(filePath, 'utf-8');
-      
+
       // Verificar se tem cores proibidas
-      const hasForbiddenColors = FORBIDDEN_COLORS.some(color => 
+      const hasForbiddenColors = FORBIDDEN_COLORS.some(color =>
         content.includes(color)
       );
-      
+
       if (hasForbiddenColors) {
         nonCompliantPages.push(file);
       }
     });
-    
+
     if (nonCompliantPages.length > 0) {
       console.warn('\n⚠️ Páginas que NÃO seguem 100% Crevasse:');
       nonCompliantPages.forEach(page => console.warn(`   - ${page}`));
     }
-    
+
     // Permitir até 20% de páginas não-compliant
     const complianceRate = 1 - (nonCompliantPages.length / pageFiles.length);
     expect(complianceRate).toBeGreaterThanOrEqual(0.8);

@@ -7,7 +7,7 @@ export class EmailIntegradoService {
 
   constructor(
     @Inject(forwardRef(() => require('./propostas.service').PropostasService))
-    private propostasService?: any
+    private propostasService?: any,
   ) {
     this.setupTransporter();
   }
@@ -18,8 +18,8 @@ export class EmailIntegradoService {
       service: 'gmail',
       auth: {
         user: process.env.GMAIL_USER || process.env.SMTP_USER,
-        pass: process.env.GMAIL_PASSWORD || process.env.SMTP_PASS
-      }
+        pass: process.env.GMAIL_PASSWORD || process.env.SMTP_PASS,
+      },
     });
 
     console.log('📧 Serviço de email integrado configurado');
@@ -35,17 +35,16 @@ export class EmailIntegradoService {
       const mailOptions = {
         from: {
           name: process.env.EMAIL_FROM_NAME || 'Conect CRM',
-          address: process.env.EMAIL_FROM || process.env.GMAIL_USER
+          address: process.env.EMAIL_FROM || process.env.GMAIL_USER,
         },
         to: 'vendas@conectcrm.com', // Email da equipe
         subject: `✅ Proposta ${dadosProposta.numero} foi ACEITA!`,
-        html: this.gerarTemplateAceitacao(dadosProposta)
+        html: this.gerarTemplateAceitacao(dadosProposta),
       };
 
       const result = await this.transporter.sendMail(mailOptions);
       console.log('✅ Email de aceitação enviado:', result.messageId);
       return true;
-
     } catch (error) {
       console.error('❌ Erro ao enviar email de aceitação:', error);
       return false;
@@ -62,17 +61,16 @@ export class EmailIntegradoService {
       const mailOptions = {
         from: {
           name: process.env.EMAIL_FROM_NAME || 'Conect CRM',
-          address: process.env.EMAIL_FROM || process.env.GMAIL_USER
+          address: process.env.EMAIL_FROM || process.env.GMAIL_USER,
         },
         to: 'vendas@conectcrm.com', // Email da equipe
         subject: `❌ Proposta ${dadosProposta.numero} foi REJEITADA`,
-        html: this.gerarTemplateRejeicao(dadosProposta)
+        html: this.gerarTemplateRejeicao(dadosProposta),
       };
 
       const result = await this.transporter.sendMail(mailOptions);
       console.log('✅ Email de rejeição enviado:', result.messageId);
       return true;
-
     } catch (error) {
       console.error('❌ Erro ao enviar email de rejeição:', error);
       return false;
@@ -86,7 +84,7 @@ export class EmailIntegradoService {
     dadosProposta: any,
     emailCliente: string,
     linkPortal: string,
-    propostaId?: string
+    propostaId?: string,
   ): Promise<boolean> {
     try {
       console.log(`📤 Enviando proposta para cliente: ${emailCliente}`);
@@ -94,11 +92,11 @@ export class EmailIntegradoService {
       const mailOptions = {
         from: {
           name: process.env.EMAIL_FROM_NAME || 'Conect CRM',
-          address: process.env.EMAIL_FROM || process.env.GMAIL_USER
+          address: process.env.EMAIL_FROM || process.env.GMAIL_USER,
         },
         to: emailCliente,
         subject: `📋 Proposta ${dadosProposta.numero} - ${dadosProposta.titulo}`,
-        html: this.gerarTemplateProposta(dadosProposta, linkPortal)
+        html: this.gerarTemplateProposta(dadosProposta, linkPortal),
       };
 
       const result = await this.transporter.sendMail(mailOptions);
@@ -107,11 +105,7 @@ export class EmailIntegradoService {
       // 🔄 SINCRONIZAÇÃO AUTOMÁTICA: Marcar como enviada após sucesso no envio
       if (propostaId && this.propostasService) {
         try {
-          await this.propostasService.marcarComoEnviada(
-            propostaId,
-            emailCliente,
-            linkPortal
-          );
+          await this.propostasService.marcarComoEnviada(propostaId, emailCliente, linkPortal);
           console.log(`✅ Status automaticamente atualizado para "enviada"`);
         } catch (statusError) {
           console.warn(`⚠️ Erro ao atualizar status automaticamente:`, statusError.message);
@@ -120,7 +114,6 @@ export class EmailIntegradoService {
       }
 
       return true;
-
     } catch (error) {
       console.error('❌ Erro ao enviar proposta:', error);
       return false;
@@ -156,7 +149,8 @@ export class EmailIntegradoService {
       console.log(`📤 [EMAIL GENÉRICO] Assunto: ${emailData.subject}`);
 
       // ✅ VALIDAÇÃO: Verificar se é email fictício
-      const isFakeEmail = emailData.to.includes('@cliente.temp') ||
+      const isFakeEmail =
+        emailData.to.includes('@cliente.temp') ||
         emailData.to.includes('@exemplo.') ||
         emailData.to.includes('@test.');
 
@@ -170,13 +164,13 @@ export class EmailIntegradoService {
       const mailOptions = {
         from: {
           name: process.env.EMAIL_FROM_NAME || 'ConectCRM',
-          address: process.env.EMAIL_FROM || process.env.GMAIL_USER || 'conectcrm@gmail.com'
+          address: process.env.EMAIL_FROM || process.env.GMAIL_USER || 'conectcrm@gmail.com',
         },
         to: emailData.to,
         cc: emailData.cc || undefined,
         subject: emailData.subject,
         html: emailData.html,
-        text: emailData.text || emailData.html.replace(/<[^>]*>/g, '') // Fallback para texto simples
+        text: emailData.text || emailData.html.replace(/<[^>]*>/g, ''), // Fallback para texto simples
       };
 
       console.log(`📤 [EMAIL REAL] Configurações do envio:`, {
@@ -185,7 +179,7 @@ export class EmailIntegradoService {
         subject: mailOptions.subject,
         hasHtml: !!mailOptions.html,
         hasText: !!mailOptions.text,
-        smtp_configured: !!process.env.GMAIL_USER
+        smtp_configured: !!process.env.GMAIL_USER,
       });
 
       const result = await this.transporter.sendMail(mailOptions);
@@ -193,18 +187,17 @@ export class EmailIntegradoService {
       console.log('✅ [EMAIL REAL] Email enviado com sucesso!', {
         messageId: result.messageId,
         accepted: result.accepted,
-        rejected: result.rejected
+        rejected: result.rejected,
       });
 
       return true;
-
     } catch (error) {
       console.error('❌ [EMAIL ERRO] Erro ao enviar email genérico:', error);
       console.error('❌ [EMAIL ERRO] Detalhes:', {
         message: error.message,
         code: error.code,
         command: error.command,
-        response: error.response
+        response: error.response,
       });
       return false;
     }

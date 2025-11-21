@@ -54,9 +54,9 @@ export interface EnviarMensagemResponse {
 class AtendimentoService {
   /**
    * Buscar todos os tickets de uma empresa
+   * 🔐 SEGURANÇA: empresaId agora vem do JWT no backend
    */
   async listarTickets(
-    empresaId: string,
     filtros?: {
       status?: string[];
       atendenteId?: string;
@@ -69,7 +69,7 @@ class AtendimentoService {
   ): Promise<Ticket[]> {
     try {
       const params = new URLSearchParams();
-      params.append('empresaId', empresaId);
+      // 🔐 empresaId removido - vem do JWT automaticamente no backend
 
       if (filtros?.status?.length) {
         params.append('status', filtros.status.join(','));

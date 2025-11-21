@@ -101,59 +101,145 @@ export class DashboardService {
     private clienteRepository: Repository<Cliente>,
     private metasService: MetasService,
     private eventosService: EventosService,
-  ) { }
+  ) {}
 
   /**
    * Obter KPIs principais do dashboard
    */
-  async getKPIs(periodo: string = 'mensal', vendedorId?: string, regiao?: string, empresaId?: number): Promise<DashboardKPIs> {
+  async getKPIs(
+    periodo: string = 'mensal',
+    vendedorId?: string,
+    regiao?: string,
+    empresaId?: number,
+  ): Promise<DashboardKPIs> {
     const { dataInicio, dataFim } = this.getDateRange(periodo);
     const periodoAnterior = this.getDateRange(this.getPeriodoAnterior(periodo));
 
     // Buscar meta atual para o vendedor/região específica
     const metaAtual = await this.metasService.getMetaAtual(
       vendedorId ? parseInt(vendedorId) : undefined,
-      regiao
+      regiao,
     );
     const valorMeta = metaAtual?.valor || 450000; // Meta padrão se não encontrar
 
     // Faturamento Total
-    const faturamentoAtual = await this.calculateFaturamento(dataInicio, dataFim, vendedorId, regiao);
-    const faturamentoAnterior = await this.calculateFaturamento(periodoAnterior.dataInicio, periodoAnterior.dataFim, vendedorId, regiao);
-    const variacaoFaturamento = faturamentoAnterior > 0 ? ((faturamentoAtual - faturamentoAnterior) / faturamentoAnterior) * 100 : 0;
+    const faturamentoAtual = await this.calculateFaturamento(
+      dataInicio,
+      dataFim,
+      vendedorId,
+      regiao,
+    );
+    const faturamentoAnterior = await this.calculateFaturamento(
+      periodoAnterior.dataInicio,
+      periodoAnterior.dataFim,
+      vendedorId,
+      regiao,
+    );
+    const variacaoFaturamento =
+      faturamentoAnterior > 0
+        ? ((faturamentoAtual - faturamentoAnterior) / faturamentoAnterior) * 100
+        : 0;
 
     // Ticket Médio
-    const ticketMedioAtual = await this.calculateTicketMedio(dataInicio, dataFim, vendedorId, regiao);
-    const ticketMedioAnterior = await this.calculateTicketMedio(periodoAnterior.dataInicio, periodoAnterior.dataFim, vendedorId, regiao);
-    const variacaoTicketMedio = ticketMedioAnterior > 0 ? ((ticketMedioAtual - ticketMedioAnterior) / ticketMedioAnterior) * 100 : 0;
+    const ticketMedioAtual = await this.calculateTicketMedio(
+      dataInicio,
+      dataFim,
+      vendedorId,
+      regiao,
+    );
+    const ticketMedioAnterior = await this.calculateTicketMedio(
+      periodoAnterior.dataInicio,
+      periodoAnterior.dataFim,
+      vendedorId,
+      regiao,
+    );
+    const variacaoTicketMedio =
+      ticketMedioAnterior > 0
+        ? ((ticketMedioAtual - ticketMedioAnterior) / ticketMedioAnterior) * 100
+        : 0;
 
     // Vendas Fechadas
-    const vendasFechadasAtual = await this.calculateVendasFechadas(dataInicio, dataFim, vendedorId, regiao);
-    const vendasFechadasAnterior = await this.calculateVendasFechadas(periodoAnterior.dataInicio, periodoAnterior.dataFim, vendedorId, regiao);
-    const variacaoVendasFechadas = vendasFechadasAnterior > 0 ? ((vendasFechadasAtual - vendasFechadasAnterior) / vendasFechadasAnterior) * 100 : 0;
+    const vendasFechadasAtual = await this.calculateVendasFechadas(
+      dataInicio,
+      dataFim,
+      vendedorId,
+      regiao,
+    );
+    const vendasFechadasAnterior = await this.calculateVendasFechadas(
+      periodoAnterior.dataInicio,
+      periodoAnterior.dataFim,
+      vendedorId,
+      regiao,
+    );
+    const variacaoVendasFechadas =
+      vendasFechadasAnterior > 0
+        ? ((vendasFechadasAtual - vendasFechadasAnterior) / vendasFechadasAnterior) * 100
+        : 0;
 
     // Em Negociação
     const emNegociacao = await this.calculateEmNegociacao(vendedorId, regiao);
 
     // Novos Clientes
     const novosClientesAtual = await this.calculateNovosClientes(dataInicio, dataFim, regiao);
-    const novosClientesAnterior = await this.calculateNovosClientes(periodoAnterior.dataInicio, periodoAnterior.dataFim, regiao);
-    const variacaoNovosClientes = novosClientesAnterior > 0 ? ((novosClientesAtual - novosClientesAnterior) / novosClientesAnterior) * 100 : 0;
+    const novosClientesAnterior = await this.calculateNovosClientes(
+      periodoAnterior.dataInicio,
+      periodoAnterior.dataFim,
+      regiao,
+    );
+    const variacaoNovosClientes =
+      novosClientesAnterior > 0
+        ? ((novosClientesAtual - novosClientesAnterior) / novosClientesAnterior) * 100
+        : 0;
 
     // Leads Qualificados (propostas enviadas)
-    const leadsAtual = await this.calculateLeadsQualificados(dataInicio, dataFim, vendedorId, regiao);
-    const leadsAnterior = await this.calculateLeadsQualificados(periodoAnterior.dataInicio, periodoAnterior.dataFim, vendedorId, regiao);
-    const variacaoLeads = leadsAnterior > 0 ? ((leadsAtual - leadsAnterior) / leadsAnterior) * 100 : 0;
+    const leadsAtual = await this.calculateLeadsQualificados(
+      dataInicio,
+      dataFim,
+      vendedorId,
+      regiao,
+    );
+    const leadsAnterior = await this.calculateLeadsQualificados(
+      periodoAnterior.dataInicio,
+      periodoAnterior.dataFim,
+      vendedorId,
+      regiao,
+    );
+    const variacaoLeads =
+      leadsAnterior > 0 ? ((leadsAtual - leadsAnterior) / leadsAnterior) * 100 : 0;
 
     // Propostas Enviadas (valor)
-    const propostasEnviadasAtual = await this.calculatePropostasEnviadas(dataInicio, dataFim, vendedorId, regiao);
-    const propostasEnviadasAnterior = await this.calculatePropostasEnviadas(periodoAnterior.dataInicio, periodoAnterior.dataFim, vendedorId, regiao);
-    const variacaoPropostasEnviadas = propostasEnviadasAnterior > 0 ? ((propostasEnviadasAtual - propostasEnviadasAnterior) / propostasEnviadasAnterior) * 100 : 0;
+    const propostasEnviadasAtual = await this.calculatePropostasEnviadas(
+      dataInicio,
+      dataFim,
+      vendedorId,
+      regiao,
+    );
+    const propostasEnviadasAnterior = await this.calculatePropostasEnviadas(
+      periodoAnterior.dataInicio,
+      periodoAnterior.dataFim,
+      vendedorId,
+      regiao,
+    );
+    const variacaoPropostasEnviadas =
+      propostasEnviadasAnterior > 0
+        ? ((propostasEnviadasAtual - propostasEnviadasAnterior) / propostasEnviadasAnterior) * 100
+        : 0;
 
     // Taxa de Sucesso
-    const taxaSucessoAtual = await this.calculateTaxaSucesso(dataInicio, dataFim, vendedorId, regiao);
-    const taxaSucessoAnterior = await this.calculateTaxaSucesso(periodoAnterior.dataInicio, periodoAnterior.dataFim, vendedorId, regiao);
-    const variacaoTaxaSucesso = taxaSucessoAnterior > 0 ? taxaSucessoAtual - taxaSucessoAnterior : 0;
+    const taxaSucessoAtual = await this.calculateTaxaSucesso(
+      dataInicio,
+      dataFim,
+      vendedorId,
+      regiao,
+    );
+    const taxaSucessoAnterior = await this.calculateTaxaSucesso(
+      periodoAnterior.dataInicio,
+      periodoAnterior.dataFim,
+      vendedorId,
+      regiao,
+    );
+    const variacaoTaxaSucesso =
+      taxaSucessoAnterior > 0 ? taxaSucessoAtual - taxaSucessoAnterior : 0;
 
     // Estatísticas da Agenda - filtrar por empresa do usuário logado
     // empresaId deve ser string UUID, não number
@@ -162,7 +248,7 @@ export class DashboardService {
       dataInicio.toISOString().split('T')[0],
       dataFim.toISOString().split('T')[0],
       vendedorId,
-      empresaIdString
+      empresaIdString,
     );
 
     return {
@@ -170,38 +256,38 @@ export class DashboardService {
         valor: faturamentoAtual,
         meta: valorMeta, // Usando a meta obtida dinamicamente
         variacao: Number(variacaoFaturamento.toFixed(1)),
-        periodo: this.getPeriodoLabel(periodo)
+        periodo: this.getPeriodoLabel(periodo),
       },
       ticketMedio: {
         valor: ticketMedioAtual,
         variacao: Number(variacaoTicketMedio.toFixed(1)),
-        periodo: this.getPeriodoLabel(periodo)
+        periodo: this.getPeriodoLabel(periodo),
       },
       vendasFechadas: {
         quantidade: vendasFechadasAtual,
         variacao: Number(variacaoVendasFechadas.toFixed(1)),
-        periodo: this.getPeriodoLabel(periodo)
+        periodo: this.getPeriodoLabel(periodo),
       },
       emNegociacao: {
         valor: emNegociacao.valor,
         quantidade: emNegociacao.quantidade,
-        propostas: emNegociacao.propostas
+        propostas: emNegociacao.propostas,
       },
       novosClientesMes: {
         quantidade: novosClientesAtual,
-        variacao: Number(variacaoNovosClientes.toFixed(1))
+        variacao: Number(variacaoNovosClientes.toFixed(1)),
       },
       leadsQualificados: {
         quantidade: leadsAtual,
-        variacao: Number(variacaoLeads.toFixed(1))
+        variacao: Number(variacaoLeads.toFixed(1)),
       },
       propostasEnviadas: {
         valor: propostasEnviadasAtual,
-        variacao: Number(variacaoPropostasEnviadas.toFixed(1))
+        variacao: Number(variacaoPropostasEnviadas.toFixed(1)),
       },
       taxaSucessoGeral: {
         percentual: Number(taxaSucessoAtual.toFixed(1)),
-        variacao: Number(variacaoTaxaSucesso.toFixed(1))
+        variacao: Number(variacaoTaxaSucesso.toFixed(1)),
       },
       agenda: {
         totalEventos: eventStats.totalEventos,
@@ -209,8 +295,8 @@ export class DashboardService {
         proximosEventos: eventStats.proximosEventos,
         eventosHoje: eventStats.eventosHoje,
         estatisticasPorTipo: eventStats.estatisticasPorTipo,
-        produtividade: eventStats.produtividade
-      }
+        produtividade: eventStats.produtividade,
+      },
     };
   }
 
@@ -225,7 +311,7 @@ export class DashboardService {
 
     // Buscar todos os vendedores
     const vendedores = await this.userRepository.find({
-      where: { role: UserRole.VENDEDOR, ativo: true }
+      where: { role: UserRole.VENDEDOR, ativo: true },
     });
 
     const ranking: VendedorRanking[] = [];
@@ -233,8 +319,13 @@ export class DashboardService {
     for (const vendedor of vendedores) {
       // Vendas do período
       const vendasAtual = await this.calculateFaturamento(dataInicio, dataFim, vendedor.id);
-      const vendasAnterior = await this.calculateFaturamento(dataInicioAnterior, dataFimAnterior, vendedor.id);
-      const variacao = vendasAnterior > 0 ? ((vendasAtual - vendasAnterior) / vendasAnterior) * 100 : 0;
+      const vendasAnterior = await this.calculateFaturamento(
+        dataInicioAnterior,
+        dataFimAnterior,
+        vendedor.id,
+      );
+      const variacao =
+        vendasAnterior > 0 ? ((vendasAtual - vendasAnterior) / vendasAnterior) * 100 : 0;
 
       // Meta do vendedor (exemplo: 20% da meta total)
       const meta = this.getMeta(periodo) * 0.2;
@@ -254,7 +345,7 @@ export class DashboardService {
         variacao: Number(variacao.toFixed(1)),
         posicao: 0, // Será definido após ordenação
         badges: badges,
-        cor: cor
+        cor: cor,
       });
     }
 
@@ -276,7 +367,7 @@ export class DashboardService {
 
     // Verificar metas em risco
     const ranking = await this.getVendedoresRanking('mensal');
-    const vendedoresEmRisco = ranking.filter(v => (v.vendas / v.meta) < 0.7);
+    const vendedoresEmRisco = ranking.filter((v) => v.vendas / v.meta < 0.7);
 
     for (const vendedor of vendedoresEmRisco) {
       alertas.push({
@@ -288,10 +379,10 @@ export class DashboardService {
         valor: vendedor.meta - vendedor.vendas,
         acao: {
           texto: 'Ver Vendedor',
-          url: `/vendedores/${vendedor.id}`
+          url: `/vendedores/${vendedor.id}`,
         },
         timestamp: agora,
-        lido: false
+        lido: false,
       });
     }
 
@@ -299,12 +390,9 @@ export class DashboardService {
     const propostas = await this.propostaRepository.find({
       where: {
         status: 'enviada',
-        dataVencimento: Between(
-          agora,
-          new Date(agora.getTime() + 3 * 24 * 60 * 60 * 1000)
-        )
+        dataVencimento: Between(agora, new Date(agora.getTime() + 3 * 24 * 60 * 60 * 1000)),
       },
-      relations: ['vendedor']
+      relations: ['vendedor'],
     });
 
     for (const proposta of propostas) {
@@ -318,10 +406,10 @@ export class DashboardService {
         dataLimite: proposta.dataVencimento?.toISOString().split('T')[0],
         acao: {
           texto: 'Ver Proposta',
-          url: `/propostas/${proposta.id}`
+          url: `/propostas/${proposta.id}`,
         },
         timestamp: agora,
-        lido: false
+        lido: false,
       });
     }
 
@@ -336,7 +424,7 @@ export class DashboardService {
         descricao: `Parabéns! A meta mensal de ${kpis.faturamentoTotal.meta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} foi superada!`,
         valor: kpis.faturamentoTotal.valor,
         timestamp: agora,
-        lido: false
+        lido: false,
       });
     }
 
@@ -350,7 +438,7 @@ export class DashboardService {
   private getDateRange(periodo: string): { dataInicio: Date; dataFim: Date } {
     const agora = new Date();
     let dataInicio: Date;
-    let dataFim: Date = new Date(agora);
+    const dataFim: Date = new Date(agora);
 
     switch (periodo) {
       case 'mensal':
@@ -420,10 +508,15 @@ export class DashboardService {
     }
   }
 
-  private async calculateFaturamento(dataInicio: Date, dataFim: Date, vendedorId?: string, regiao?: string): Promise<number> {
+  private async calculateFaturamento(
+    dataInicio: Date,
+    dataFim: Date,
+    vendedorId?: string,
+    regiao?: string,
+  ): Promise<number> {
     const whereConditions: any = {
       status: 'aprovada',
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString())
+      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
     };
 
     if (vendedorId) {
@@ -439,10 +532,15 @@ export class DashboardService {
     return Number(result?.total || 0);
   }
 
-  private async calculateTicketMedio(dataInicio: Date, dataFim: Date, vendedorId?: string, regiao?: string): Promise<number> {
+  private async calculateTicketMedio(
+    dataInicio: Date,
+    dataFim: Date,
+    vendedorId?: string,
+    regiao?: string,
+  ): Promise<number> {
     const whereConditions: any = {
       status: 'aprovada',
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString())
+      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
     };
 
     if (vendedorId) {
@@ -458,10 +556,15 @@ export class DashboardService {
     return Number(result?.media || 0);
   }
 
-  private async calculateVendasFechadas(dataInicio: Date, dataFim: Date, vendedorId?: string, regiao?: string): Promise<number> {
+  private async calculateVendasFechadas(
+    dataInicio: Date,
+    dataFim: Date,
+    vendedorId?: string,
+    regiao?: string,
+  ): Promise<number> {
     const whereConditions: any = {
       status: 'aprovada',
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString())
+      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
     };
 
     if (vendedorId) {
@@ -471,9 +574,12 @@ export class DashboardService {
     return await this.propostaRepository.count({ where: whereConditions });
   }
 
-  private async calculateEmNegociacao(vendedorId?: string, regiao?: string): Promise<{ valor: number; quantidade: number; propostas: string[] }> {
+  private async calculateEmNegociacao(
+    vendedorId?: string,
+    regiao?: string,
+  ): Promise<{ valor: number; quantidade: number; propostas: string[] }> {
     const whereConditions: any = {
-      status: 'enviada'
+      status: 'enviada',
     };
 
     if (vendedorId) {
@@ -489,23 +595,32 @@ export class DashboardService {
     }, 0);
 
     const quantidade = propostas.length;
-    const propostasIds = propostas.slice(0, 5).map(p => p.numero);
+    const propostasIds = propostas.slice(0, 5).map((p) => p.numero);
 
     return { valor, quantidade, propostas: propostasIds };
   }
 
-  private async calculateNovosClientes(dataInicio: Date, dataFim: Date, regiao?: string): Promise<number> {
+  private async calculateNovosClientes(
+    dataInicio: Date,
+    dataFim: Date,
+    regiao?: string,
+  ): Promise<number> {
     const whereConditions: any = {
-      created_at: Between(dataInicio.toISOString(), dataFim.toISOString())
+      created_at: Between(dataInicio.toISOString(), dataFim.toISOString()),
     };
 
     return await this.clienteRepository.count({ where: whereConditions });
   }
 
-  private async calculateLeadsQualificados(dataInicio: Date, dataFim: Date, vendedorId?: string, regiao?: string): Promise<number> {
+  private async calculateLeadsQualificados(
+    dataInicio: Date,
+    dataFim: Date,
+    vendedorId?: string,
+    regiao?: string,
+  ): Promise<number> {
     const whereConditions: any = {
       status: 'enviada',
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString())
+      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
     };
 
     if (vendedorId) {
@@ -515,10 +630,15 @@ export class DashboardService {
     return await this.propostaRepository.count({ where: whereConditions });
   }
 
-  private async calculatePropostasEnviadas(dataInicio: Date, dataFim: Date, vendedorId?: string, regiao?: string): Promise<number> {
+  private async calculatePropostasEnviadas(
+    dataInicio: Date,
+    dataFim: Date,
+    vendedorId?: string,
+    regiao?: string,
+  ): Promise<number> {
     const whereConditions: any = {
       status: 'enviada',
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString())
+      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
     };
 
     if (vendedorId) {
@@ -534,14 +654,19 @@ export class DashboardService {
     return Number(result?.total || 0);
   }
 
-  private async calculateTaxaSucesso(dataInicio: Date, dataFim: Date, vendedorId?: string, regiao?: string): Promise<number> {
+  private async calculateTaxaSucesso(
+    dataInicio: Date,
+    dataFim: Date,
+    vendedorId?: string,
+    regiao?: string,
+  ): Promise<number> {
     const whereConditionsTotal: any = {
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString())
+      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
     };
 
     const whereConditionsAprovadas: any = {
       status: 'aprovada',
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString())
+      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
     };
 
     if (vendedorId) {
@@ -569,8 +694,16 @@ export class DashboardService {
 
   private getVendedorCor(progressoMeta: number): string {
     if (progressoMeta >= 100) return '#10B981'; // Verde
-    if (progressoMeta >= 90) return '#3B82F6';  // Azul
-    if (progressoMeta >= 70) return '#F59E0B';  // Amarelo
+    if (progressoMeta >= 90) return '#3B82F6'; // Azul
+    if (progressoMeta >= 70) return '#F59E0B'; // Amarelo
     return '#EF4444'; // Vermelho
+  }
+
+  getPeriodosDisponiveis(): string[] {
+    return ['semanal', 'mensal', 'trimestral', 'semestral', 'anual'];
+  }
+
+  getRegioesDisponiveis(): string[] {
+    return ['Todas', 'Norte', 'Nordeste', 'Centro-Oeste', 'Sudeste', 'Sul'];
   }
 }

@@ -1,3 +1,7 @@
+// Importar e re-exportar enums do arquivo enums.ts
+import { EstagioOportunidade, PrioridadeOportunidade, OrigemOportunidade, TipoAtividade } from './enums';
+export { EstagioOportunidade, PrioridadeOportunidade, OrigemOportunidade, TipoAtividade };
+
 export interface Oportunidade {
   id: number;
   titulo: string;
@@ -21,7 +25,7 @@ export interface Oportunidade {
 
   // Cliente (opcional)
   cliente?: {
-    id: number;
+    id: string;
     nome: string;
     email?: string;
     telefone?: string;
@@ -52,33 +56,6 @@ export interface Oportunidade {
   probabilidadeVisual: 'baixa' | 'media' | 'alta';
 }
 
-export enum EstagioOportunidade {
-  LEADS = 'leads',
-  QUALIFICACAO = 'qualification',
-  PROPOSTA = 'proposal',
-  NEGOCIACAO = 'negotiation',
-  FECHAMENTO = 'closing',
-  GANHO = 'won',
-  PERDIDO = 'lost'
-}
-
-export enum PrioridadeOportunidade {
-  BAIXA = 'low',
-  MEDIA = 'medium',
-  ALTA = 'high'
-}
-
-export enum OrigemOportunidade {
-  WEBSITE = 'website',
-  INDICACAO = 'indicacao',
-  TELEFONE = 'telefone',
-  EMAIL = 'email',
-  REDES_SOCIAIS = 'redes_sociais',
-  EVENTO = 'evento',
-  PARCEIRO = 'parceiro',
-  CAMPANHA = 'campanha'
-}
-
 export interface Atividade {
   id: number;
   tipo: TipoAtividade;
@@ -91,14 +68,6 @@ export interface Atividade {
     avatar?: string;
   };
   createdAt: Date;
-}
-
-export enum TipoAtividade {
-  LIGACAO = 'call',
-  EMAIL = 'email',
-  REUNIAO = 'meeting',
-  NOTA = 'note',
-  TAREFA = 'task'
 }
 
 export interface FiltrosOportunidade {
@@ -133,10 +102,10 @@ export interface NovaOportunidade {
   estagio: EstagioOportunidade;
   prioridade: PrioridadeOportunidade;
   origem: OrigemOportunidade;
-  tags: string[];
+  tags?: string[]; // ✅ Opcional - não enviar array vazio
   dataFechamentoEsperado?: Date | string | null;
-  responsavelId: string;
-  clienteId?: string; // Alterado de number para string (UUID)
+  responsavel_id: string; // ✅ Corrigido - alinhado com backend (snake_case)
+  cliente_id?: string; // ✅ Corrigido - alinhado com backend (snake_case)
   nomeContato?: string;
   emailContato?: string;
   telefoneContato?: string;

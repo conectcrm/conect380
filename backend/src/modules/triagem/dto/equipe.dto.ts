@@ -7,7 +7,7 @@ import {
   IsNumber,
   Min,
   Matches,
-} from "class-validator";
+} from 'class-validator';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -17,7 +17,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 
 export class CreateEquipeDto {
   @IsString()
-  @IsNotEmpty({ message: "O nome da equipe é obrigatório" })
+  @IsNotEmpty({ message: 'O nome da equipe é obrigatório' })
   nome: string;
 
   @IsString()
@@ -64,16 +64,16 @@ export class UpdateEquipeDto {
 // ========================================================================
 
 export enum FuncaoEquipe {
-  LIDER = "lider",
-  MEMBRO = "membro",
-  SUPERVISOR = "supervisor",
+  LIDER = 'lider',
+  MEMBRO = 'membro',
+  SUPERVISOR = 'supervisor',
 }
 
 export class AdicionarAtendenteEquipeDto {
   @Matches(UUID_PATTERN, {
-    message: "O ID do atendente deve estar no formato UUID",
+    message: 'O ID do atendente deve estar no formato UUID',
   })
-  @IsNotEmpty({ message: "O ID do atendente é obrigatório" })
+  @IsNotEmpty({ message: 'O ID do atendente é obrigatório' })
   atendenteId: string;
 
   @IsEnum(FuncaoEquipe)
@@ -83,9 +83,9 @@ export class AdicionarAtendenteEquipeDto {
 
 export class RemoverAtendenteEquipeDto {
   @Matches(UUID_PATTERN, {
-    message: "O ID do atendente deve estar no formato UUID",
+    message: 'O ID do atendente deve estar no formato UUID',
   })
-  @IsNotEmpty({ message: "O ID do atendente é obrigatório" })
+  @IsNotEmpty({ message: 'O ID do atendente é obrigatório' })
   atendenteId: string;
 }
 
@@ -95,20 +95,20 @@ export class RemoverAtendenteEquipeDto {
 
 export class AtribuirAtendenteDto {
   @Matches(UUID_PATTERN, {
-    message: "O ID do atendente deve estar no formato UUID",
+    message: 'O ID do atendente deve estar no formato UUID',
   })
-  @IsNotEmpty({ message: "O ID do atendente é obrigatório" })
+  @IsNotEmpty({ message: 'O ID do atendente é obrigatório' })
   atendenteId: string;
 
   @IsOptional()
   @Matches(UUID_PATTERN, {
-    message: "O ID do núcleo deve estar no formato UUID",
+    message: 'O ID do núcleo deve estar no formato UUID',
   })
   nucleoId?: string;
 
   @IsOptional()
   @Matches(UUID_PATTERN, {
-    message: "O ID do departamento deve estar no formato UUID",
+    message: 'O ID do departamento deve estar no formato UUID',
   })
   departamentoId?: string;
 
@@ -120,9 +120,9 @@ export class AtribuirAtendenteDto {
 
 export class RemoverAtribuicaoAtendenteDto {
   @Matches(UUID_PATTERN, {
-    message: "O ID da atribuição deve estar no formato UUID",
+    message: 'O ID da atribuição deve estar no formato UUID',
   })
-  @IsNotEmpty({ message: "O ID da atribuição é obrigatório" })
+  @IsNotEmpty({ message: 'O ID da atribuição é obrigatório' })
   atribuicaoId: string;
 }
 
@@ -132,20 +132,20 @@ export class RemoverAtribuicaoAtendenteDto {
 
 export class AtribuirEquipeDto {
   @Matches(UUID_PATTERN, {
-    message: "O ID da equipe deve estar no formato UUID",
+    message: 'O ID da equipe deve estar no formato UUID',
   })
-  @IsNotEmpty({ message: "O ID da equipe é obrigatório" })
+  @IsNotEmpty({ message: 'O ID da equipe é obrigatório' })
   equipeId: string;
 
   @IsOptional()
   @Matches(UUID_PATTERN, {
-    message: "O ID do núcleo deve estar no formato UUID",
+    message: 'O ID do núcleo deve estar no formato UUID',
   })
   nucleoId?: string;
 
   @IsOptional()
   @Matches(UUID_PATTERN, {
-    message: "O ID do departamento deve estar no formato UUID",
+    message: 'O ID do departamento deve estar no formato UUID',
   })
   departamentoId?: string;
 
@@ -157,9 +157,9 @@ export class AtribuirEquipeDto {
 
 export class RemoverAtribuicaoEquipeDto {
   @Matches(UUID_PATTERN, {
-    message: "O ID da atribuição deve estar no formato UUID",
+    message: 'O ID da atribuição deve estar no formato UUID',
   })
-  @IsNotEmpty({ message: "O ID da atribuição é obrigatório" })
+  @IsNotEmpty({ message: 'O ID da atribuição é obrigatório' })
   atribuicaoId: string;
 }
 
@@ -169,14 +169,14 @@ export class RemoverAtribuicaoEquipeDto {
 
 export class BuscarAtendentesDisponiveisDto {
   @Matches(UUID_PATTERN, {
-    message: "O ID do núcleo deve estar no formato UUID",
+    message: 'O ID do núcleo deve estar no formato UUID',
   })
-  @IsNotEmpty({ message: "O ID do núcleo é obrigatório" })
+  @IsNotEmpty({ message: 'O ID do núcleo é obrigatório' })
   nucleoId: string;
 
   @IsOptional()
   @Matches(UUID_PATTERN, {
-    message: "O ID do departamento deve estar no formato UUID",
+    message: 'O ID do departamento deve estar no formato UUID',
   })
   departamentoId?: string;
 }

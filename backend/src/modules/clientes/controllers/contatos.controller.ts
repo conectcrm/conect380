@@ -7,21 +7,18 @@ import {
   Param,
   Body,
   UseGuards,
-  Request,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../modules/auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { ContatosService } from '../services/contatos.service';
-import {
-  CreateContatoDto,
-  UpdateContatoDto,
-  ResponseContatoDto,
-} from '../dto/contato.dto';
+import { CreateContatoDto, UpdateContatoDto, ResponseContatoDto } from '../dto/contato.dto';
 
 /**
  * Controller para gerenciar contatos vinculados a clientes
- * 
+ *
  * Rotas:
  * GET    /api/crm/clientes/:clienteId/contatos     - Lista todos os contatos do cliente
  * GET    /api/crm/contatos/:id                     - Busca um contato específico
@@ -31,7 +28,7 @@ import {
  * DELETE /api/crm/contatos/:id                     - Remove contato (soft delete)
  */
 @Controller('api/crm')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class ContatosController {
   constructor(private readonly contatosService: ContatosService) { }
 
@@ -40,8 +37,7 @@ export class ContatosController {
    * GET /api/crm/contatos
    */
   @Get('contatos')
-  async listarTodos(@Request() req): Promise<ResponseContatoDto[]> {
-    const empresaId = req.user?.empresa_id ?? req.user?.empresaId;
+  async listarTodos(@EmpresaId() empresaId: string): Promise<ResponseContatoDto[]> {
     return this.contatosService.listarTodos(empresaId);
   }
 
@@ -52,9 +48,8 @@ export class ContatosController {
   @Get('clientes/:clienteId/contatos')
   async listar(
     @Param('clienteId') clienteId: string,
-    @Request() req,
+    @EmpresaId() empresaId: string,
   ): Promise<ResponseContatoDto[]> {
-    const empresaId = req.user?.empresa_id ?? req.user?.empresaId;
     return this.contatosService.listarPorCliente(clienteId, empresaId);
   }
 
@@ -63,17 +58,14 @@ export class ContatosController {
    * GET /api/crm/contatos/:id
    */
   @Get('contatos/:id')
-  async buscar(
-    @Param('id') id: string,
-    @Request() req,
-  ): Promise<ResponseContatoDto> {
+  async buscar(@Param('id') id: string): Promise<ResponseContatoDto> {
     return this.contatosService.buscarPorId(id);
   }
 
   /**
    * Cria um novo contato para um cliente
    * POST /api/crm/clientes/:clienteId/contatos
-   * 
+   *
    * Body exemplo:
    * {
    *   "nome": "João Silva",
@@ -89,16 +81,15 @@ export class ContatosController {
   async criar(
     @Param('clienteId') clienteId: string,
     @Body() createContatoDto: CreateContatoDto,
-    @Request() req,
+    @EmpresaId() empresaId: string,
   ): Promise<ResponseContatoDto> {
-    const empresaId = req.user?.empresa_id ?? req.user?.empresaId;
     return this.contatosService.criar(clienteId, createContatoDto, empresaId);
   }
 
   /**
    * Atualiza um contato existente
    * PATCH /api/crm/contatos/:id
-   * 
+   *
    * Body exemplo (todos os campos opcionais):
    * {
    *   "nome": "João Silva Jr.",
@@ -110,7 +101,6 @@ export class ContatosController {
   async atualizar(
     @Param('id') id: string,
     @Body() updateContatoDto: UpdateContatoDto,
-    @Request() req,
   ): Promise<ResponseContatoDto> {
     return this.contatosService.atualizar(id, updateContatoDto);
   }
@@ -120,10 +110,7 @@ export class ContatosController {
    * PATCH /api/crm/contatos/:id/principal
    */
   @Patch('contatos/:id/principal')
-  async definirComoPrincipal(
-    @Param('id') id: string,
-    @Request() req,
-  ): Promise<ResponseContatoDto> {
+  async definirComoPrincipal(@Param('id') id: string): Promise<ResponseContatoDto> {
     return this.contatosService.definirComoPrincipal(id);
   }
 
@@ -133,7 +120,7 @@ export class ContatosController {
    */
   @Delete('contatos/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remover(@Param('id') id: string, @Request() req): Promise<void> {
+  async remover(@Param('id') id: string): Promise<void> {
     return this.contatosService.remover(id);
   }
 }

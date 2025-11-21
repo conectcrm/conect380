@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, In } from 'typeorm';
 import { CreateFornecedorDto, UpdateFornecedorDto } from '../dto/fornecedor.dto';
@@ -12,7 +17,7 @@ export class FornecedorService {
     private fornecedorRepository: Repository<Fornecedor>,
     @InjectRepository(ContaPagar)
     private contaPagarRepository: Repository<ContaPagar>,
-  ) { }
+  ) {}
 
   async create(createFornecedorDto: CreateFornecedorDto, empresaId: string): Promise<Fornecedor> {
     // Verificar se já existe fornecedor com este CNPJ/CPF na empresa
@@ -36,7 +41,10 @@ export class FornecedorService {
     return await this.fornecedorRepository.save(fornecedor);
   }
 
-  async findAll(empresaId: string, filtros?: { busca?: string; ativo?: boolean }): Promise<Fornecedor[]> {
+  async findAll(
+    empresaId: string,
+    filtros?: { busca?: string; ativo?: boolean },
+  ): Promise<Fornecedor[]> {
     const where: any = { empresaId };
 
     if (filtros?.ativo !== undefined) {
@@ -94,7 +102,11 @@ export class FornecedorService {
     return fornecedor;
   }
 
-  async update(id: string, updateFornecedorDto: UpdateFornecedorDto, empresaId: string): Promise<Fornecedor> {
+  async update(
+    id: string,
+    updateFornecedorDto: UpdateFornecedorDto,
+    empresaId: string,
+  ): Promise<Fornecedor> {
     const fornecedor = await this.findOne(id, empresaId);
 
     // Se estiver atualizando CNPJ/CPF, verificar se não existe outro com o mesmo
@@ -129,7 +141,7 @@ export class FornecedorService {
       if (error.code === '23503' || error.message.includes('foreign key constraint')) {
         throw new BadRequestException(
           'Não é possível excluir este fornecedor pois ele possui contas a pagar vinculadas. ' +
-          'Para excluir o fornecedor, primeiro quite ou remova todas as contas a pagar relacionadas.'
+            'Para excluir o fornecedor, primeiro quite ou remova todas as contas a pagar relacionadas.',
         );
       }
 
@@ -146,13 +158,15 @@ export class FornecedorService {
       // Buscar contas a pagar do fornecedor
       const contasPagar = await this.contaPagarRepository.find({
         where: { fornecedorId },
-        select: ['id', 'descricao', 'valor', 'status', 'dataVencimento']
+        select: ['id', 'descricao', 'valor', 'status', 'dataVencimento'],
       });
 
       if (contasPagar.length > 0) {
         // Separar contas por status
-        const contasAbertas = contasPagar.filter(c => c.status !== 'paga' && c.status !== 'cancelada');
-        const contasPagas = contasPagar.filter(c => c.status === 'paga');
+        const contasAbertas = contasPagar.filter(
+          (c) => c.status !== 'paga' && c.status !== 'cancelada',
+        );
+        const contasPagas = contasPagar.filter((c) => c.status === 'paga');
 
         const valorEmAberto = contasAbertas.reduce((acc, conta) => acc + Number(conta.valor), 0);
         const valorPago = contasPagas.reduce((acc, conta) => acc + Number(conta.valor), 0);
@@ -184,13 +198,13 @@ export class FornecedorService {
             contasPagas: contasPagas.length,
             valorEmAberto,
             valorPago,
-            contasDetalhes: contasAbertas.slice(0, 5).map(c => ({
+            contasDetalhes: contasAbertas.slice(0, 5).map((c) => ({
               descricao: c.descricao,
               valor: c.valor,
               status: c.status,
-              vencimento: c.dataVencimento
-            }))
-          }
+              vencimento: c.dataVencimento,
+            })),
+          },
         });
       }
     } catch (error) {
@@ -202,19 +216,20 @@ export class FornecedorService {
       try {
         const contasPagar = await this.fornecedorRepository.query(
           'SELECT COUNT(*) as total FROM contas_pagar WHERE fornecedor_id = $1 AND status NOT IN ($2, $3)',
-          [fornecedorId, 'paga', 'cancelada']
+          [fornecedorId, 'paga', 'cancelada'],
         );
 
         const totalContas = parseInt(contasPagar[0]?.total || '0');
 
         if (totalContas > 0) {
           throw new BadRequestException({
-            message: `❌ **Não é possível excluir este fornecedor**\n\n` +
+            message:
+              `❌ **Não é possível excluir este fornecedor**\n\n` +
               `Este fornecedor possui **${totalContas} conta(s) a pagar em aberto**.\n\n` +
               `💡 **Para excluir o fornecedor:**\n` +
               `1. **Quite ou cancele** todas as contas em aberto primeiro\n` +
               `2. **Ou use a opção "Desativar"** para mantê-lo inativo`,
-            details: { totalContas }
+            details: { totalContas },
           });
         }
       } catch (queryError) {
@@ -239,7 +254,7 @@ export class FornecedorService {
    */
   async limparContasPagas(id: string, empresaId: number) {
     const fornecedor = await this.fornecedorRepository.findOne({
-      where: { id: id, empresaId: empresaId.toString() }
+      where: { id: id, empresaId: empresaId.toString() },
     });
 
     if (!fornecedor) {
@@ -249,13 +264,13 @@ export class FornecedorService {
     // Remove apenas contas com status 'PAGO' ou 'FINALIZADO'
     const contasRemovidasResult = await this.contaPagarRepository.delete({
       fornecedor: { id: id },
-      status: In(['PAGO', 'FINALIZADO', 'QUITADO'])
+      status: In(['PAGO', 'FINALIZADO', 'QUITADO']),
     });
 
     return {
       fornecedor,
       contasRemovidasCount: contasRemovidasResult.affected || 0,
-      message: `${contasRemovidasResult.affected || 0} conta(s) paga(s) removida(s) do histórico`
+      message: `${contasRemovidasResult.affected || 0} conta(s) paga(s) removida(s) do histórico`,
     };
   }
 }

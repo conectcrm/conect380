@@ -11,7 +11,11 @@ import {
   HttpException,
   UseInterceptors,
   UploadedFiles,
+  UseGuards,
+  Request,
+  ForbiddenException,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { TicketService } from '../services/ticket.service';
 import { MensagemService } from '../services/mensagem.service';
@@ -20,8 +24,10 @@ import { StatusTicket, PrioridadeTicket } from '../entities/ticket.entity';
 /**
  * Controller REST para gerenciamento de tickets
  * Endpoints para listar, buscar, atualizar status e atribuir tickets
+ * 🔐 SEGURANÇA: Todos os endpoints protegidos com JWT - empresa_id extraído do token
  */
 @Controller('api/atendimento/tickets')
+@UseGuards(AuthGuard('jwt')) // 🔐 Proteção global - requer autenticação JWT
 export class TicketController {
   private readonly logger = new Logger(TicketController.name);
 
@@ -33,9 +39,9 @@ export class TicketController {
   /**
    * GET /api/atendimento/tickets
    * Lista tickets com filtros opcionais
-   * 
+   * 🔐 SEGURANÇA: empresa_id extraído do JWT (não do query param)
+   *
    * Query params:
-   * - empresaId: string (obrigatório)
    * - status: string | string[] (opcional)
    * - canalId: string (opcional)
    * - limite: number (opcional, padrão: 50)
@@ -43,19 +49,19 @@ export class TicketController {
    */
   @Get()
   async listar(
-    @Query('empresaId') empresaId: string,
+    @Request() req,
     @Query('status') status?: string | string[],
     @Query('canalId') canalId?: string,
     @Query('limite') limite?: string,
     @Query('pagina') pagina?: string,
   ) {
-    this.logger.log(`📋 [GET /tickets] empresaId=${empresaId} status=${status}`);
+    // 🔐 SEGURANÇA: empresa_id vem do JWT, não pode ser manipulado
+    const empresaId = req.user.empresa_id;
+
+    this.logger.log(`📋 [GET /tickets] empresaId=${empresaId} user=${req.user.email} status=${status}`);
 
     if (!empresaId) {
-      throw new HttpException(
-        'empresaId é obrigatório',
-        HttpStatus.BAD_REQUEST,
-      );
+      throw new HttpException('Usuário não possui empresa associada', HttpStatus.FORBIDDEN);
     }
 
     try {
@@ -66,8 +72,8 @@ export class TicketController {
         // Converter para maiúsculo para match com enum StatusTicket
         // Garantir que são strings antes de converter
         statusArray = statusRaw
-          .filter(s => s && typeof s === 'string')
-          .map(s => s.toString().toUpperCase());
+          .filter((s) => s && typeof s === 'string')
+          .map((s) => s.toString().toUpperCase());
       }
 
       const resultado = await this.ticketService.listar({
@@ -78,7 +84,9 @@ export class TicketController {
         pagina: pagina ? parseInt(pagina, 10) : undefined,
       });
 
-      this.logger.log(`✅ Retornando ${resultado.tickets.length} tickets (total: ${resultado.total})`);
+      this.logger.log(
+        `✅ Retornando ${resultado.tickets.length} tickets (total: ${resultado.total})`,
+      );
 
       return {
         success: true,
@@ -103,16 +111,22 @@ export class TicketController {
   /**
    * GET /api/atendimento/tickets/:id
    * Busca um ticket específico por ID
+   * 🔐 SEGURANÇA: Valida se ticket pertence à empresa do usuário
    */
   @Get(':id')
-  async buscar(
-    @Param('id') id: string,
-    @Query('empresaId') empresaId?: string,
-  ) {
-    this.logger.log(`🔍 [GET /tickets/${id}]`);
+  async buscar(@Request() req, @Param('id') id: string) {
+    // 🔐 SEGURANÇA: empresa_id vem do JWT
+    const empresaId = req.user.empresa_id;
+
+    this.logger.log(`🔍 [GET /tickets/${id}] empresaId=${empresaId} user=${req.user.email}`);
 
     try {
       const ticket = await this.ticketService.buscarPorId(id, empresaId);
+
+      // 🔐 SEGURANÇA: Verificação adicional de propriedade
+      if (ticket.empresaId !== empresaId) {
+        throw new ForbiddenException('Este ticket não pertence à sua empresa');
+      }
 
       return {
         success: true,
@@ -145,21 +159,15 @@ export class TicketController {
   /**
    * PATCH /api/atendimento/tickets/:id/status
    * Atualiza o status de um ticket
-   * 
+   *
    * Body: { status: 'ABERTO' | 'EM_ATENDIMENTO' | 'AGUARDANDO_CLIENTE' | 'RESOLVIDO' | 'FECHADO' }
    */
   @Patch(':id/status')
-  async atualizarStatus(
-    @Param('id') id: string,
-    @Body('status') status: string,
-  ) {
+  async atualizarStatus(@Param('id') id: string, @Body('status') status: string) {
     this.logger.log(`🔄 [PATCH /tickets/${id}/status] status=${status}`);
 
     if (!status) {
-      throw new HttpException(
-        'status é obrigatório',
-        HttpStatus.BAD_REQUEST,
-      );
+      throw new HttpException('status é obrigatório', HttpStatus.BAD_REQUEST);
     }
 
     // Validar status
@@ -172,10 +180,7 @@ export class TicketController {
     }
 
     try {
-      const ticket = await this.ticketService.atualizarStatus(
-        id,
-        status as StatusTicket,
-      );
+      const ticket = await this.ticketService.atualizarStatus(id, status as StatusTicket);
 
       this.logger.log(`✅ Status atualizado: ${id} → ${status}`);
 
@@ -200,21 +205,15 @@ export class TicketController {
   /**
    * PATCH /api/atendimento/tickets/:id/atribuir
    * Atribui ticket a um atendente
-   * 
+   *
    * Body: { atendenteId: string }
    */
   @Patch(':id/atribuir')
-  async atribuir(
-    @Param('id') id: string,
-    @Body('atendenteId') atendenteId: string,
-  ) {
+  async atribuir(@Param('id') id: string, @Body('atendenteId') atendenteId: string) {
     this.logger.log(`👤 [PATCH /tickets/${id}/atribuir] atendenteId=${atendenteId}`);
 
     if (!atendenteId) {
-      throw new HttpException(
-        'atendenteId é obrigatório',
-        HttpStatus.BAD_REQUEST,
-      );
+      throw new HttpException('atendenteId é obrigatório', HttpStatus.BAD_REQUEST);
     }
 
     try {
@@ -243,21 +242,15 @@ export class TicketController {
   /**
    * PATCH /api/atendimento/tickets/:id/prioridade
    * Atualiza a prioridade de um ticket
-   * 
+   *
    * Body: { prioridade: 'BAIXA' | 'MEDIA' | 'ALTA' | 'URGENTE' }
    */
   @Patch(':id/prioridade')
-  async atualizarPrioridade(
-    @Param('id') id: string,
-    @Body('prioridade') prioridade: string,
-  ) {
+  async atualizarPrioridade(@Param('id') id: string, @Body('prioridade') prioridade: string) {
     this.logger.log(`⭐ [PATCH /tickets/${id}/prioridade] prioridade=${prioridade}`);
 
     if (!prioridade) {
-      throw new HttpException(
-        'prioridade é obrigatória',
-        HttpStatus.BAD_REQUEST,
-      );
+      throw new HttpException('prioridade é obrigatória', HttpStatus.BAD_REQUEST);
     }
 
     // Validar prioridade
@@ -298,7 +291,7 @@ export class TicketController {
   /**
    * POST /api/atendimento/tickets
    * Cria um novo ticket
-   * 
+   *
    * Body: CriarTicketDto
    */
   @Post()
@@ -331,14 +324,11 @@ export class TicketController {
   /**
    * POST /api/atendimento/tickets/:id/transferir
    * Transfere ticket para outro atendente
-   * 
+   *
    * Body: TransferirTicketDto
    */
   @Post(':id/transferir')
-  async transferir(
-    @Param('id') id: string,
-    @Body() dados: any,
-  ) {
+  async transferir(@Param('id') id: string, @Body() dados: any) {
     this.logger.log(`🔄 [POST /tickets/${id}/transferir] → ${dados.atendenteId}`);
 
     try {
@@ -368,14 +358,11 @@ export class TicketController {
   /**
    * POST /api/atendimento/tickets/:id/encerrar
    * Encerra um ticket
-   * 
+   *
    * Body: EncerrarTicketDto
    */
   @Post(':id/encerrar')
-  async encerrar(
-    @Param('id') id: string,
-    @Body() dados: any,
-  ) {
+  async encerrar(@Param('id') id: string, @Body() dados: any) {
     this.logger.log(`🏁 [POST /tickets/${id}/encerrar] motivo=${dados.motivo}`);
 
     try {
@@ -468,7 +455,7 @@ export class TicketController {
       const dadosCompletos = {
         ...dados,
         ticketId,
-        conteudo // Garante que conteudo está presente
+        conteudo, // Garante que conteudo está presente
       };
 
       const mensagem = await this.mensagemService.enviar(dadosCompletos, arquivos);

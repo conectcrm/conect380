@@ -1,7 +1,25 @@
 // Tipos e interfaces para o chat omnichannel
 
 export type CanalTipo = 'whatsapp' | 'telegram' | 'email' | 'chat' | 'telefone';
-export type StatusAtendimento = 'aberto' | 'resolvido' | 'retorno';
+
+// ✅ MELHORADO: Enum alinhado 1:1 com backend (StatusTicket)
+// Mapeamento direto: frontend (minúsculo) ↔ backend (MAIÚSCULO)
+export enum StatusAtendimento {
+  ABERTO = 'aberto',
+  EM_ATENDIMENTO = 'em_atendimento',
+  AGUARDANDO = 'aguardando',
+  RESOLVIDO = 'resolvido',
+  FECHADO = 'fechado',
+}
+
+// Type helper para compatibilidade
+export type StatusAtendimentoType =
+  | 'aberto'
+  | 'em_atendimento'
+  | 'aguardando'
+  | 'resolvido'
+  | 'fechado';
+
 export type StatusMensagem = 'enviando' | 'enviado' | 'entregue' | 'lido';
 
 export interface Contato {
@@ -23,11 +41,12 @@ export interface Ticket {
   contatoId: string;
   contato: Contato;
   canal: CanalTipo;
-  status: StatusAtendimento;
+  status: StatusAtendimentoType; // ✅ Usar type ao invés de enum direto
   statusOriginal?: string;
   ultimaMensagem: string;
   tempoUltimaMensagem: Date;
   tempoAtendimento: number; // em segundos
+  filaId?: string | null; // 🆕 Sistema de Filas
   atendente?: {
     id: string;
     nome: string;
@@ -89,6 +108,7 @@ export interface Demanda {
   tipo: 'tecnica' | 'comercial' | 'financeira' | 'suporte' | 'reclamacao' | 'solicitacao' | 'outros';
   prioridade: 'baixa' | 'media' | 'alta' | 'urgente';
   status: 'aberta' | 'em_andamento' | 'aguardando' | 'concluida' | 'cancelada';
+  dataAbertura?: string;
   dataVencimento?: string;
   dataConclusao?: string;
   responsavelId?: string;
@@ -102,6 +122,8 @@ export interface Demanda {
     id: string;
     username: string;
     nome?: string;
+    foto?: string;
+    avatarUrl?: string;
   };
   createdAt: string;
   updatedAt: string;
@@ -120,7 +142,11 @@ export interface NotaCliente {
     id: string;
     username: string;
     nome?: string;
+    foto?: string;
+    avatarUrl?: string;
   };
   createdAt: string;
   updatedAt: string;
+  dataCriacao?: string;
+  dataEdicao?: string;
 }

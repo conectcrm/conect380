@@ -12,7 +12,7 @@ export class ContatosTestController {
   constructor(
     @InjectRepository(Contato)
     private contatoRepository: Repository<Contato>,
-  ) { }
+  ) {}
 
   @Get('health')
   async health() {

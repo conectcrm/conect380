@@ -1,18 +1,9 @@
 // @ts-nocheck
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FluxoTriagem } from '../entities/fluxo-triagem.entity';
-import {
-  CreateFluxoDto,
-  UpdateFluxoDto,
-  PublicarFluxoDto,
-} from '../dto';
+import { CreateFluxoDto, UpdateFluxoDto, PublicarFluxoDto } from '../dto';
 import { validarFluxoParaPublicacao } from '../utils/loop-detector.util';
 
 @Injectable()
@@ -22,7 +13,7 @@ export class FluxoTriagemService {
   constructor(
     @InjectRepository(FluxoTriagem)
     private readonly fluxoRepository: Repository<FluxoTriagem>,
-  ) { }
+  ) {}
 
   /**
    * Criar novo fluxo

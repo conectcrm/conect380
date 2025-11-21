@@ -35,28 +35,22 @@ export class MensagemController {
     private readonly ticketService: TicketService,
     private readonly onlineStatusService: OnlineStatusService,
     private readonly atendimentoGateway: AtendimentoGateway,
-  ) { }
+  ) {}
 
   /**
    * GET /api/atendimento/mensagens
    * Lista mensagens de um ticket específico
-   * 
+   *
    * Query params:
    * - ticketId: string (obrigatório)
    * - limite: number (opcional, padrão: 100)
    */
   @Get()
-  async listar(
-    @Query('ticketId') ticketId: string,
-    @Query('limite') limite?: string,
-  ) {
+  async listar(@Query('ticketId') ticketId: string, @Query('limite') limite?: string) {
     this.logger.log(`💬 [GET /mensagens] ticketId=${ticketId}`);
 
     if (!ticketId) {
-      throw new HttpException(
-        'ticketId é obrigatório',
-        HttpStatus.BAD_REQUEST,
-      );
+      throw new HttpException('ticketId é obrigatório', HttpStatus.BAD_REQUEST);
     }
 
     try {
@@ -72,6 +66,7 @@ export class MensagemController {
         this.mensagemService.formatarMensagemParaFrontend(mensagem, {
           fotoContato,
           status: 'lido',
+          atendenteId: ticket?.atendenteId || null,
         }),
       );
 
@@ -135,11 +130,7 @@ export class MensagemController {
   }
 
   @Get(':id/anexo')
-  async baixarAnexo(
-    @Param('id') id: string,
-    @Req() req: Request,
-    @Res() res: Response,
-  ) {
+  async baixarAnexo(@Param('id') id: string, @Req() req: Request, @Res() res: Response) {
     this.logger.log(`⬇️ [GET /mensagens/${id}/anexo] - Versão corrigida v2`);
 
     try {
@@ -172,7 +163,11 @@ export class MensagemController {
       const tamanhoTotal = estatisticasArquivo.size;
       const rangeHeader = req.headers.range;
 
-      const enviarStream = (stream: ReturnType<typeof createReadStream>, status: number, headers: Record<string, string>) => {
+      const enviarStream = (
+        stream: ReturnType<typeof createReadStream>,
+        status: number,
+        headers: Record<string, string>,
+      ) => {
         Object.entries(headers).forEach(([chave, valor]) => res.setHeader(chave, valor));
         res.status(status);
 
@@ -196,7 +191,12 @@ export class MensagemController {
         const inicio = Number.parseInt(intervaloInicial, 10);
         const fim = intervaloFinal ? Number.parseInt(intervaloFinal, 10) : tamanhoTotal - 1;
 
-        if (Number.isNaN(inicio) || inicio >= tamanhoTotal || Number.isNaN(fim) || fim >= tamanhoTotal) {
+        if (
+          Number.isNaN(inicio) ||
+          inicio >= tamanhoTotal ||
+          Number.isNaN(fim) ||
+          fim >= tamanhoTotal
+        ) {
           this.logger.warn(`⚠️ Range inválido solicitado para mensagem ${id}: ${rangeHeader}`);
           res.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE);
           res.setHeader('Content-Range', `bytes */${tamanhoTotal}`);
@@ -229,7 +229,9 @@ export class MensagemController {
         'Content-Disposition': `inline; filename="${encodeURIComponent(midia.nome)}"`,
       });
     } catch (error) {
-      this.logger.error(`❌ Erro ao baixar anexo: ${error instanceof Error ? error.message : error}`);
+      this.logger.error(
+        `❌ Erro ao baixar anexo: ${error instanceof Error ? error.message : error}`,
+      );
 
       if (error instanceof HttpException) {
         throw error;
@@ -248,10 +250,7 @@ export class MensagemController {
 
   @Post()
   @UseInterceptors(FilesInterceptor('anexos', 5))
-  async enviar(
-    @Body() dados: any,
-    @UploadedFiles() arquivos?: Express.Multer.File[],
-  ) {
+  async enviar(@Body() dados: any, @UploadedFiles() arquivos?: Express.Multer.File[]) {
     this.logger.log(`📤 [POST /mensagens] ticketId=${dados.ticketId}`);
 
     try {
@@ -266,23 +265,27 @@ export class MensagemController {
           await this.onlineStatusService.updateActivityFromMessage(
             ticket.contatoTelefone,
             ticket.empresaId,
-            mensagem.createdAt
+            mensagem.createdAt,
           );
           this.logger.log(`🟢 Atividade atualizada para contato: ${ticket.contatoTelefone}`);
 
           // 🔔 Notificar via WebSocket sobre mudança de atividade
           // Buscar ID do contato pelo telefone
           try {
-            const contato = await this.onlineStatusService.findContactByPhone(ticket.contatoTelefone);
+            const contato = await this.onlineStatusService.findContactByPhone(
+              ticket.contatoTelefone,
+            );
             if (contato) {
               await this.atendimentoGateway.atualizarAtividadeContato(
                 contato.id,
                 ticket.empresaId,
-                'mensagem'
+                'mensagem',
               );
             }
           } catch (error) {
-            this.logger.warn(`⚠️ Erro ao notificar mudança de status via WebSocket: ${error.message}`);
+            this.logger.warn(
+              `⚠️ Erro ao notificar mudança de status via WebSocket: ${error.message}`,
+            );
           }
         }
       }
@@ -290,6 +293,7 @@ export class MensagemController {
       const mensagemFormatada = this.mensagemService.formatarMensagemParaFrontend(mensagem, {
         fotoContato: ticket?.contatoFoto || null,
         status: 'enviado',
+        atendenteId: ticket?.atendenteId || null,
       });
 
       return {

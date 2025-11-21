@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Separator } from '../ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
@@ -76,6 +76,8 @@ interface AnalyticsDashboardProps {
   vendedorId?: string;
 }
 
+type PeriodoFiltro = Exclude<AnalyticsDashboardProps['periodo'], undefined>;
+
 const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   periodo = '30d',
   vendedorId
@@ -84,6 +86,10 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   const [loading, setLoading] = useState(true);
   const [selectedPeriodo, setSelectedPeriodo] = useState(periodo);
   const [selectedVendedor, setSelectedVendedor] = useState(vendedorId || 'todos');
+
+  const handlePeriodoChange = (value: string) => {
+    setSelectedPeriodo(value as PeriodoFiltro);
+  };
 
   useEffect(() => {
     carregarDados();
@@ -182,7 +188,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Select value={selectedPeriodo} onValueChange={setSelectedPeriodo}>
+          <Select value={selectedPeriodo} onValueChange={handlePeriodoChange}>
             <SelectTrigger className="w-32">
               <SelectValue />
             </SelectTrigger>

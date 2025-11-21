@@ -6,14 +6,9 @@ import { FluxoAutomatizado } from './entities/fluxo-automatizado.entity';
 import { EventoFluxo } from './entities/evento-fluxo.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([
-      FluxoAutomatizado,
-      EventoFluxo
-    ])
-  ],
+  imports: [TypeOrmModule.forFeature([FluxoAutomatizado, EventoFluxo])],
   controllers: [OrquestradorController],
   providers: [OrquestradorService],
-  exports: [OrquestradorService]
+  exports: [OrquestradorService],
 })
-export class OrquestradorModule { }
+export class OrquestradorModule {}

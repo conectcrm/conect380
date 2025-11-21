@@ -8,9 +8,7 @@ import { ContextoClienteQueryDto, ContextoClienteResponseDto } from '../dto/cont
 export class ContextoClienteController {
   private readonly logger = new Logger(ContextoClienteController.name);
 
-  constructor(
-    private readonly contextoClienteService: ContextoClienteService,
-  ) { }
+  constructor(private readonly contextoClienteService: ContextoClienteService) {}
 
   /**
    * GET /api/atendimento/clientes/:clienteId/contexto
@@ -23,10 +21,7 @@ export class ContextoClienteController {
   ): Promise<ContextoClienteResponseDto> {
     this.logger.log(`📊 GET /api/atendimento/clientes/${clienteId}/contexto`);
 
-    return this.contextoClienteService.obterContextoCompleto(
-      clienteId,
-      query.empresaId,
-    );
+    return this.contextoClienteService.obterContextoCompleto(clienteId, query.empresaId);
   }
 
   /**
@@ -40,10 +35,7 @@ export class ContextoClienteController {
   ): Promise<ContextoClienteResponseDto> {
     this.logger.log(`📞 GET /api/atendimento/clientes/por-telefone/${telefone}/contexto`);
 
-    return this.contextoClienteService.obterContextoPorTelefone(
-      telefone,
-      query.empresaId,
-    );
+    return this.contextoClienteService.obterContextoPorTelefone(telefone, query.empresaId);
   }
 
   /**

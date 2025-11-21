@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
+import { useAuth } from '../../hooks/useAuth';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -52,6 +53,7 @@ interface BuscaRapidaProps {
 // ============================
 
 export function BuscaRapida({ isOpen, onClose, onSelecionarResultado, onEnviarNoChat }: BuscaRapidaProps) {
+  const { user } = useAuth();
   const [query, setQuery] = useState('');
   const [resultados, setResultados] = useState<ResultadoBusca[]>([]);
   const [loading, setLoading] = useState(false);
@@ -112,10 +114,10 @@ export function BuscaRapida({ isOpen, onClose, onSelecionarResultado, onEnviarNo
 
     try {
       const token = localStorage.getItem('authToken');
-      const empresaId = localStorage.getItem('empresaId');
+      const empresaId = user?.empresa?.id;
 
       if (!empresaId) {
-        throw new Error('EmpresaId não encontrado');
+        throw new Error('Usuário não possui empresa associada');
       }
 
       const response = await axios.post<RespostaBuscaGlobal>(
@@ -298,8 +300,8 @@ export function BuscaRapida({ isOpen, onClose, onSelecionarResultado, onEnviarNo
                         <div
                           key={resultado.id}
                           className={`px-4 py-3 cursor-pointer transition-colors ${isSelected
-                              ? 'bg-blue-50 border-l-4 border-blue-600'
-                              : 'hover:bg-gray-50 border-l-4 border-transparent'
+                            ? 'bg-blue-50 border-l-4 border-blue-600'
+                            : 'hover:bg-gray-50 border-l-4 border-transparent'
                             }`}
                           onClick={() => handleSelecionarResultado(resultado)}
                         >

@@ -41,19 +41,19 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
   ];
 
   const stageOptions = [
-    { value: 'leads', label: 'Leads', color: '#6B7280' },
-    { value: 'qualification', label: 'Qualificação', color: '#3B82F6' },
-    { value: 'proposal', label: 'Proposta', color: '#F59E0B' },
-    { value: 'negotiation', label: 'Negociação', color: '#8B5CF6' },
-    { value: 'closing', label: 'Fechamento', color: '#06B6D4' },
-    { value: 'won', label: 'Ganho', color: '#10B981' },
-    { value: 'lost', label: 'Perdido', color: '#EF4444' }
+    { value: 'leads', label: 'Leads', badgeClasses: 'bg-[#DEEFE7] text-[#002333] border border-[#B4BEC9]' },
+    { value: 'qualification', label: 'Qualificação', badgeClasses: 'bg-[#159A9C]/10 text-[#0F7B7D] border border-[#159A9C]/40' },
+    { value: 'proposal', label: 'Proposta', badgeClasses: 'bg-white text-[#002333] border border-[#B4BEC9]' },
+    { value: 'negotiation', label: 'Negociação', badgeClasses: 'bg-[#DEEFE7] text-[#0F7B7D] border border-[#159A9C]/40' },
+    { value: 'closing', label: 'Fechamento', badgeClasses: 'bg-[#159A9C] text-white border border-transparent' },
+    { value: 'won', label: 'Ganho', badgeClasses: 'bg-[#0F7B7D] text-white border border-transparent' },
+    { value: 'lost', label: 'Perdido', badgeClasses: 'bg-[#B4BEC9]/40 text-[#002333] border border-[#B4BEC9]' }
   ];
 
   const priorityOptions = [
-    { value: 'low', label: 'Baixa', color: '#10B981' },
-    { value: 'medium', label: 'Média', color: '#F59E0B' },
-    { value: 'high', label: 'Alta', color: '#EF4444' }
+    { value: 'low', label: 'Baixa', badgeClasses: 'bg-[#DEEFE7] text-[#0F7B7D] border border-[#159A9C]/40' },
+    { value: 'medium', label: 'Média', badgeClasses: 'bg-white text-[#002333] border border-[#B4BEC9]' },
+    { value: 'high', label: 'Alta', badgeClasses: 'bg-[#159A9C] text-white border border-transparent' }
   ];
 
   const activityTypes = [
@@ -109,45 +109,48 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
     return new Date(dateString).toLocaleDateString('pt-BR');
   };
 
-  const getPriorityColor = (priority) => {
+  const getPriorityBadgeClasses = (priority) => {
     const option = priorityOptions.find(p => p.value === priority);
-    return option ? option.color : '#6B7280';
+    return option ? option.badgeClasses : 'bg-[#DEEFE7] text-[#002333] border border-[#B4BEC9]';
   };
 
-  const getStageColor = (stage) => {
+  const getStageBadgeClasses = (stage) => {
     const option = stageOptions.find(s => s.value === stage);
-    return option ? option.color : '#6B7280';
+    return option ? option.badgeClasses : 'bg-[#DEEFE7] text-[#002333] border border-[#B4BEC9]';
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-2xl border border-[#DEEFE7] shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D]">
+        <div className="flex items-center justify-between px-6 py-5 bg-white border-b border-[#DEEFE7]">
           <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#159A9C]/10 text-[#159A9C]">
+              <Target className="w-6 h-6" />
+            </div>
             <div>
-              <h2 className="text-xl font-bold text-white">
+              <h2 className="text-2xl font-bold text-[#002333]">
                 {isEditing ? (
                   <input
                     type="text"
                     value={editData.title}
-                    onChange={(e) => setEditData({...editData, title: e.target.value})}
-                    className="bg-white bg-opacity-20 text-white placeholder-white placeholder-opacity-70 border border-white border-opacity-30 rounded-lg px-3 py-1 w-96"
+                    onChange={(e) => setEditData({ ...editData, title: e.target.value })}
+                    className="bg-white border border-[#B4BEC9] rounded-lg px-3 py-2 w-96 text-[#002333] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                   />
                 ) : (
                   opportunity.title
                 )}
               </h2>
-              <p className="text-white text-opacity-90">{opportunity.client}</p>
+              <p className="text-sm text-[#002333]/70">{opportunity.client}</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
             {isEditing ? (
               <>
                 <button
                   onClick={handleSave}
-                  className="flex items-center gap-2 bg-white text-[#159A9C] px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-2 bg-[#159A9C] text-white px-4 py-2 rounded-lg hover:bg-[#0F7B7D] transition-colors"
                 >
                   <Save className="w-4 h-4" />
                   Salvar
@@ -157,7 +160,7 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                     setIsEditing(false);
                     setEditData(opportunity);
                   }}
-                  className="text-white hover:text-gray-200 transition-colors"
+                  className="text-[#002333] hover:text-[#0F7B7D] transition-colors"
                 >
                   Cancelar
                 </button>
@@ -165,16 +168,16 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
             ) : (
               <button
                 onClick={() => setIsEditing(true)}
-                className="flex items-center gap-2 bg-white bg-opacity-20 text-white px-4 py-2 rounded-lg hover:bg-opacity-30 transition-colors"
+                className="flex items-center gap-2 bg-[#159A9C] text-white px-4 py-2 rounded-lg hover:bg-[#0F7B7D] transition-colors"
               >
                 <Edit className="w-4 h-4" />
                 Editar
               </button>
             )}
-            
+
             <button
               onClick={onClose}
-              className="text-white hover:text-gray-200 transition-colors p-2"
+              className="text-[#002333] hover:text-[#0F7B7D] transition-colors p-2"
             >
               <X className="w-6 h-6" />
             </button>
@@ -182,18 +185,17 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-200 bg-gray-50">
+        <div className="flex border-b border-[#DEEFE7] bg-[#DEEFE7] px-2">
           {tabs.map(tab => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors ${
-                  activeTab === tab.id
-                    ? 'text-[#159A9C] border-b-2 border-[#159A9C] bg-white'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
+                className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors rounded-t-lg ${activeTab === tab.id
+                    ? 'bg-white text-[#159A9C] border border-[#DEEFE7] border-b-0 shadow-sm'
+                    : 'text-[#002333]/60 hover:text-[#002333]'
+                  }`}
               >
                 <Icon className="w-4 h-4" />
                 {tab.label}
@@ -209,17 +211,17 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
               {/* Informações Principais */}
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Informações Principais</h3>
-                  
+                  <h3 className="text-lg font-semibold text-[#002333] mb-4">Informações Principais</h3>
+
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium text-gray-700">Valor</label>
+                      <label className="text-sm font-medium text-[#002333]/80">Valor</label>
                       {isEditing ? (
                         <input
                           type="number"
                           value={editData.value}
-                          onChange={(e) => setEditData({...editData, value: parseFloat(e.target.value) || 0})}
-                          className="border border-gray-300 rounded-lg px-3 py-2 w-48 text-right"
+                          onChange={(e) => setEditData({ ...editData, value: parseFloat(e.target.value) || 0 })}
+                          className="border border-[#B4BEC9] rounded-lg px-3 py-2 w-48 text-right text-[#002333] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                         />
                       ) : (
                         <span className="text-2xl font-bold text-[#159A9C]">
@@ -229,19 +231,19 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium text-gray-700">Probabilidade</label>
+                      <label className="text-sm font-medium text-[#002333]/80">Probabilidade</label>
                       {isEditing ? (
                         <input
                           type="range"
                           min="0"
                           max="100"
                           value={editData.probability}
-                          onChange={(e) => setEditData({...editData, probability: parseInt(e.target.value)})}
+                          onChange={(e) => setEditData({ ...editData, probability: parseInt(e.target.value) })}
                           className="w-32"
                         />
                       ) : (
                         <div className="flex items-center gap-2">
-                          <div className="w-24 bg-gray-200 rounded-full h-2">
+                          <div className="w-24 bg-[#DEEFE7] rounded-full h-2">
                             <div
                               className="bg-[#159A9C] h-2 rounded-full"
                               style={{ width: `${opportunity.probability}%` }}
@@ -253,12 +255,12 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium text-gray-700">Estágio</label>
+                      <label className="text-sm font-medium text-[#002333]/80">Estágio</label>
                       {isEditing ? (
                         <select
                           value={editData.stage}
-                          onChange={(e) => setEditData({...editData, stage: e.target.value})}
-                          className="border border-gray-300 rounded-lg px-3 py-2"
+                          onChange={(e) => setEditData({ ...editData, stage: e.target.value })}
+                          className="border border-[#B4BEC9] rounded-lg px-3 py-2 text-[#002333] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                         >
                           {stageOptions.map(option => (
                             <option key={option.value} value={option.value}>
@@ -267,9 +269,8 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                           ))}
                         </select>
                       ) : (
-                        <span 
-                          className="px-3 py-1 rounded-full text-white text-sm font-medium"
-                          style={{ backgroundColor: getStageColor(opportunity.stage) }}
+                        <span
+                          className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStageBadgeClasses(opportunity.stage)}`}
                         >
                           {stageOptions.find(s => s.value === opportunity.stage)?.label}
                         </span>
@@ -277,12 +278,12 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium text-gray-700">Prioridade</label>
+                      <label className="text-sm font-medium text-[#002333]/80">Prioridade</label>
                       {isEditing ? (
                         <select
                           value={editData.priority}
-                          onChange={(e) => setEditData({...editData, priority: e.target.value})}
-                          className="border border-gray-300 rounded-lg px-3 py-2"
+                          onChange={(e) => setEditData({ ...editData, priority: e.target.value })}
+                          className="border border-[#B4BEC9] rounded-lg px-3 py-2 text-[#002333] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                         >
                           {priorityOptions.map(option => (
                             <option key={option.value} value={option.value}>
@@ -291,9 +292,8 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                           ))}
                         </select>
                       ) : (
-                        <span 
-                          className="px-3 py-1 rounded-full text-white text-sm font-medium"
-                          style={{ backgroundColor: getPriorityColor(opportunity.priority) }}
+                        <span
+                          className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getPriorityBadgeClasses(opportunity.priority)}`}
                         >
                           {priorityOptions.find(p => p.value === opportunity.priority)?.label}
                         </span>
@@ -304,30 +304,30 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
 
                 {/* Datas */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Datas Importantes</h3>
-                  
+                  <h3 className="text-lg font-semibold text-[#002333] mb-4">Datas Importantes</h3>
+
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
-                      <Calendar className="w-5 h-5 text-gray-400" />
+                      <Calendar className="w-5 h-5 text-[#B4BEC9]" />
                       <div>
-                        <p className="text-sm text-gray-600">Data de Criação</p>
-                        <p className="font-medium">{formatDate(opportunity.createdDate)}</p>
+                        <p className="text-sm text-[#002333]/70">Data de Criação</p>
+                        <p className="font-medium text-[#002333]">{formatDate(opportunity.createdDate)}</p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-3">
-                      <Target className="w-5 h-5 text-gray-400" />
+                      <Target className="w-5 h-5 text-[#B4BEC9]" />
                       <div>
-                        <p className="text-sm text-gray-600">Fechamento Esperado</p>
+                        <p className="text-sm text-[#002333]/70">Fechamento Esperado</p>
                         {isEditing ? (
                           <input
                             type="date"
                             value={editData.expectedCloseDate}
-                            onChange={(e) => setEditData({...editData, expectedCloseDate: e.target.value})}
-                            className="border border-gray-300 rounded-lg px-3 py-1"
+                            onChange={(e) => setEditData({ ...editData, expectedCloseDate: e.target.value })}
+                            className="border border-[#B4BEC9] rounded-lg px-3 py-1 text-[#002333] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                           />
                         ) : (
-                          <p className="font-medium">{formatDate(opportunity.expectedCloseDate)}</p>
+                          <p className="font-medium text-[#002333]">{formatDate(opportunity.expectedCloseDate)}</p>
                         )}
                       </div>
                     </div>
@@ -338,55 +338,55 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
               {/* Informações do Cliente */}
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Informações do Cliente</h3>
-                  
+                  <h3 className="text-lg font-semibold text-[#002333] mb-4">Informações do Cliente</h3>
+
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
-                      <Building className="w-5 h-5 text-gray-400" />
+                      <Building className="w-5 h-5 text-[#B4BEC9]" />
                       <div>
-                        <p className="text-sm text-gray-600">Empresa</p>
+                        <p className="text-sm text-[#002333]/70">Empresa</p>
                         {isEditing ? (
                           <input
                             type="text"
                             value={editData.client}
-                            onChange={(e) => setEditData({...editData, client: e.target.value})}
-                            className="border border-gray-300 rounded-lg px-3 py-2 w-full"
+                            onChange={(e) => setEditData({ ...editData, client: e.target.value })}
+                            className="border border-[#B4BEC9] rounded-lg px-3 py-2 w-full text-[#002333] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                           />
                         ) : (
-                          <p className="font-medium">{opportunity.client}</p>
+                          <p className="font-medium text-[#002333]">{opportunity.client}</p>
                         )}
                       </div>
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <User className="w-5 h-5 text-gray-400" />
+                      <User className="w-5 h-5 text-[#B4BEC9]" />
                       <div>
-                        <p className="text-sm text-gray-600">Responsável</p>
+                        <p className="text-sm text-[#002333]/70">Responsável</p>
                         {isEditing ? (
                           <select
                             value={editData.assignedTo}
-                            onChange={(e) => setEditData({...editData, assignedTo: e.target.value})}
-                            className="border border-gray-300 rounded-lg px-3 py-2 w-full"
+                            onChange={(e) => setEditData({ ...editData, assignedTo: e.target.value })}
+                            className="border border-[#B4BEC9] rounded-lg px-3 py-2 w-full text-[#002333] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                           >
                             <option value="Ana Silva">Ana Silva</option>
                             <option value="Carlos Vendas">Carlos Vendas</option>
                             <option value="João Santos">João Santos</option>
                           </select>
                         ) : (
-                          <p className="font-medium">{opportunity.assignedTo}</p>
+                          <p className="font-medium text-[#002333]">{opportunity.assignedTo}</p>
                         )}
                       </div>
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <Tag className="w-5 h-5 text-gray-400" />
+                      <Tag className="w-5 h-5 text-[#B4BEC9]" />
                       <div>
-                        <p className="text-sm text-gray-600">Origem</p>
+                        <p className="text-sm text-[#002333]/70">Origem</p>
                         {isEditing ? (
                           <select
                             value={editData.source}
-                            onChange={(e) => setEditData({...editData, source: e.target.value})}
-                            className="border border-gray-300 rounded-lg px-3 py-2 w-full"
+                            onChange={(e) => setEditData({ ...editData, source: e.target.value })}
+                            className="border border-[#B4BEC9] rounded-lg px-3 py-2 w-full text-[#002333] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                           >
                             <option value="Website">Website</option>
                             <option value="Indicação">Indicação</option>
@@ -395,7 +395,7 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                             <option value="Redes Sociais">Redes Sociais</option>
                           </select>
                         ) : (
-                          <p className="font-medium">{opportunity.source}</p>
+                          <p className="font-medium text-[#002333]">{opportunity.source}</p>
                         )}
                       </div>
                     </div>
@@ -404,7 +404,7 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
 
                 {/* Tags */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Tags</h3>
+                  <h3 className="text-lg font-semibold text-[#002333] mb-4">Tags</h3>
                   <div className="flex flex-wrap gap-2">
                     {opportunity.tags?.map(tag => (
                       <span
@@ -415,7 +415,7 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                       </span>
                     ))}
                     {isEditing && (
-                      <button className="px-3 py-1 border-2 border-dashed border-gray-300 rounded-full text-sm text-gray-600 hover:border-[#159A9C] transition-colors">
+                      <button className="px-3 py-1 border-2 border-dashed border-[#B4BEC9] rounded-full text-sm text-[#002333]/70 hover:border-[#159A9C] transition-colors">
                         <Plus className="w-4 h-4 inline mr-1" />
                         Adicionar
                       </button>
@@ -429,14 +429,14 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
           {activeTab === 'activities' && (
             <div className="space-y-6">
               {/* Adicionar Nova Atividade */}
-              <div className="bg-gray-50 rounded-xl p-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Nova Atividade</h3>
-                
+              <div className="bg-[#DEEFE7] rounded-xl p-4 border border-[#DEEFE7]">
+                <h3 className="text-lg font-semibold text-[#002333] mb-4">Nova Atividade</h3>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                   <select
                     value={newActivity.type}
-                    onChange={(e) => setNewActivity({...newActivity, type: e.target.value})}
-                    className="border border-gray-300 rounded-lg px-3 py-2"
+                    onChange={(e) => setNewActivity({ ...newActivity, type: e.target.value })}
+                    className="border border-[#B4BEC9] rounded-lg px-3 py-2 text-[#002333] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                   >
                     {activityTypes.map(type => (
                       <option key={type.value} value={type.value}>
@@ -448,8 +448,8 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                   <input
                     type="date"
                     value={newActivity.date}
-                    onChange={(e) => setNewActivity({...newActivity, date: e.target.value})}
-                    className="border border-gray-300 rounded-lg px-3 py-2"
+                    onChange={(e) => setNewActivity({ ...newActivity, date: e.target.value })}
+                    className="border border-[#B4BEC9] rounded-lg px-3 py-2 text-[#002333] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                   />
 
                   <button
@@ -463,40 +463,40 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                 <textarea
                   placeholder="Descreva a atividade..."
                   value={newActivity.description}
-                  onChange={(e) => setNewActivity({...newActivity, description: e.target.value})}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 h-24 resize-none"
+                  onChange={(e) => setNewActivity({ ...newActivity, description: e.target.value })}
+                  className="w-full border border-[#B4BEC9] rounded-lg px-3 py-2 h-24 resize-none text-[#002333] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                 />
               </div>
 
               {/* Lista de Atividades */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Histórico de Atividades</h3>
-                
+                <h3 className="text-lg font-semibold text-[#002333] mb-4">Histórico de Atividades</h3>
+
                 <div className="space-y-4">
                   {(editData.activities || []).map(activity => {
                     const Icon = getActivityIcon(activity.type);
                     return (
-                      <div key={activity.id || activity.date} className="flex gap-4 p-4 bg-white border border-gray-200 rounded-lg">
-                        <div className="p-2 bg-gray-100 rounded-lg">
-                          <Icon className="w-5 h-5 text-gray-600" />
+                      <div key={activity.id || activity.date} className="flex gap-4 p-4 bg-white border border-[#DEEFE7] rounded-lg">
+                        <div className="p-2 bg-[#DEEFE7] rounded-lg">
+                          <Icon className="w-5 h-5 text-[#002333]/70" />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-medium text-gray-900">
+                            <h4 className="font-medium text-[#002333]">
                               {activityTypes.find(t => t.value === activity.type)?.label}
                             </h4>
-                            <span className="text-sm text-gray-500">
+                            <span className="text-sm text-[#002333]/60">
                               {formatDate(activity.date)}
                             </span>
                           </div>
-                          <p className="text-gray-700">{activity.description}</p>
+                          <p className="text-[#002333]/80">{activity.description}</p>
                         </div>
                       </div>
                     );
                   })}
-                  
+
                   {(!editData.activities || editData.activities.length === 0) && (
-                    <div className="text-center py-8 text-gray-500">
+                    <div className="text-center py-8 text-[#002333]/60">
                       Nenhuma atividade registrada ainda.
                     </div>
                   )}
@@ -507,20 +507,20 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
 
           {activeTab === 'timeline' && (
             <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-gray-900">Timeline da Oportunidade</h3>
-              
+              <h3 className="text-lg font-semibold text-[#002333]">Timeline da Oportunidade</h3>
+
               <div className="relative">
                 {/* Timeline vertical */}
-                <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-200"></div>
-                
+                <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-[#DEEFE7]"></div>
+
                 <div className="space-y-6">
                   <div className="flex items-start gap-4">
-                    <div className="relative z-10 w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                      <CheckCircle className="w-6 h-6 text-green-600" />
+                    <div className="relative z-10 w-12 h-12 bg-[#159A9C]/10 rounded-full flex items-center justify-center text-[#159A9C]">
+                      <CheckCircle className="w-6 h-6" />
                     </div>
                     <div className="flex-1 pt-2">
-                      <h4 className="font-medium text-gray-900">Oportunidade Criada</h4>
-                      <p className="text-sm text-gray-600">{formatDate(opportunity.createdDate)}</p>
+                      <h4 className="font-medium text-[#002333]">Oportunidade Criada</h4>
+                      <p className="text-sm text-[#002333]/70">{formatDate(opportunity.createdDate)}</p>
                     </div>
                   </div>
 
@@ -528,24 +528,24 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                     const Icon = getActivityIcon(activity.type);
                     return (
                       <div key={index} className="flex items-start gap-4">
-                        <div className="relative z-10 w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                          <Icon className="w-6 h-6 text-blue-600" />
+                        <div className="relative z-10 w-12 h-12 rounded-full flex items-center justify-center bg-[#DEEFE7] text-[#002333]">
+                          <Icon className="w-6 h-6" />
                         </div>
                         <div className="flex-1 pt-2">
-                          <h4 className="font-medium text-gray-900">{activity.description}</h4>
-                          <p className="text-sm text-gray-600">{formatDate(activity.date)}</p>
+                          <h4 className="font-medium text-[#002333]">{activity.description}</h4>
+                          <p className="text-sm text-[#002333]/70">{formatDate(activity.date)}</p>
                         </div>
                       </div>
                     );
                   })}
 
                   <div className="flex items-start gap-4">
-                    <div className="relative z-10 w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
-                      <Target className="w-6 h-6 text-yellow-600" />
+                    <div className="relative z-10 w-12 h-12 rounded-full flex items-center justify-center bg-[#159A9C]/10 text-[#0F7B7D]">
+                      <Target className="w-6 h-6" />
                     </div>
                     <div className="flex-1 pt-2">
-                      <h4 className="font-medium text-gray-900">Fechamento Esperado</h4>
-                      <p className="text-sm text-gray-600">{formatDate(opportunity.expectedCloseDate)}</p>
+                      <h4 className="font-medium text-[#002333]">Fechamento Esperado</h4>
+                      <p className="text-sm text-[#002333]/70">{formatDate(opportunity.expectedCloseDate)}</p>
                     </div>
                   </div>
                 </div>
@@ -556,15 +556,15 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
           {activeTab === 'documents' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Documentos</h3>
+                <h3 className="text-lg font-semibold text-[#002333]">Documentos</h3>
                 <button className="flex items-center gap-2 bg-[#159A9C] text-white px-4 py-2 rounded-lg hover:bg-[#0F7B7D] transition-colors">
                   <Plus className="w-4 h-4" />
                   Adicionar Documento
                 </button>
               </div>
-              
-              <div className="text-center py-12 text-gray-500">
-                <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+
+              <div className="text-center py-12 text-[#002333]/60">
+                <FileText className="w-12 h-12 text-[#B4BEC9] mx-auto mb-4" />
                 <p>Nenhum documento anexado ainda.</p>
                 <p className="text-sm">Clique em "Adicionar Documento" para fazer upload de arquivos.</p>
               </div>

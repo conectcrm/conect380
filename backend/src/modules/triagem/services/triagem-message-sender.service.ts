@@ -13,7 +13,7 @@ export class TriagemMessageSenderService {
   constructor(
     @Inject(forwardRef(() => WhatsAppSenderService))
     private readonly whatsappSender: WhatsAppSenderService,
-  ) { }
+  ) {}
 
   /**
    * Envia resposta do bot para o cliente
@@ -77,7 +77,9 @@ export class TriagemMessageSenderService {
     }
 
     // Mais de 10: fallback texto numerado
-    this.logger.warn(`⚠️ ${opcoes.length} opções excede limite do WhatsApp (10). Usando fallback texto.`);
+    this.logger.warn(
+      `⚠️ ${opcoes.length} opções excede limite do WhatsApp (10). Usando fallback texto.`,
+    );
     return await this.enviarFallbackTexto(empresaId, telefone, mensagem, opcoes);
   }
 
@@ -95,12 +97,7 @@ export class TriagemMessageSenderService {
       title: this.truncarTexto(opcao.texto, 20), // WhatsApp limita a 20 caracteres
     }));
 
-    return await this.whatsappSender.enviarMensagemComBotoes(
-      empresaId,
-      telefone,
-      mensagem,
-      botoes,
-    );
+    return await this.whatsappSender.enviarMensagemComBotoes(empresaId, telefone, mensagem, botoes);
   }
 
   /**

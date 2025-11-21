@@ -7,7 +7,7 @@ import { TelefoneBrasilUtil } from '../utils/telefone-brasil.util';
 
 /**
  * 🔘 SERVIÇO DE MENSAGENS INTERATIVAS WHATSAPP
- * 
+ *
  * Este serviço envia mensagens com botões e listas interativas
  * via WhatsApp Business API
  */
@@ -18,7 +18,7 @@ export class WhatsAppInteractiveService {
   constructor(
     @InjectRepository(IntegracoesConfig)
     private integracaoRepo: Repository<IntegracoesConfig>,
-  ) { }
+  ) {}
 
   /**
    * Envia mensagem com botões interativos (Reply Buttons - até 3 botões)
@@ -32,13 +32,15 @@ export class WhatsAppInteractiveService {
     try {
       // Limitar a 3 botões (limitação da API do WhatsApp)
       if (botoes.length > 3) {
-        this.logger.warn(`⚠️ WhatsApp suporta apenas 3 botões. Usando primeiros 3 de ${botoes.length}`);
+        this.logger.warn(
+          `⚠️ WhatsApp suporta apenas 3 botões. Usando primeiros 3 de ${botoes.length}`,
+        );
         botoes = botoes.slice(0, 3);
       }
 
       this.logger.log(`🔘 Enviando mensagem com botões interativos`);
       this.logger.log(`   Para: ${para}`);
-      this.logger.log(`   Botões: ${botoes.map(b => b.titulo).join(', ')}`);
+      this.logger.log(`   Botões: ${botoes.map((b) => b.titulo).join(', ')}`);
 
       const config = await this.integracaoRepo.findOne({
         where: { empresaId, tipo: 'whatsapp_business_api', ativo: true },
@@ -84,7 +86,7 @@ export class WhatsAppInteractiveService {
         },
         {
           headers: {
-            'Authorization': `Bearer ${whatsapp_api_token}`,
+            Authorization: `Bearer ${whatsapp_api_token}`,
             'Content-Type': 'application/json',
           },
           timeout: 30000,
@@ -98,7 +100,6 @@ export class WhatsAppInteractiveService {
         sucesso: true,
         messageId,
       };
-
     } catch (error) {
       this.logger.error(`❌ Erro ao enviar mensagem com botões: ${error.message}`);
 
@@ -128,7 +129,9 @@ export class WhatsAppInteractiveService {
   ): Promise<{ sucesso: boolean; messageId?: string; erro?: string; detalhes?: any }> {
     try {
       if (opcoes.length > 10) {
-        this.logger.warn(`⚠️ WhatsApp suporta apenas 10 opções em lista. Usando primeiras 10 de ${opcoes.length}`);
+        this.logger.warn(
+          `⚠️ WhatsApp suporta apenas 10 opções em lista. Usando primeiras 10 de ${opcoes.length}`,
+        );
         opcoes = opcoes.slice(0, 10);
       }
 
@@ -184,7 +187,7 @@ export class WhatsAppInteractiveService {
         },
         {
           headers: {
-            'Authorization': `Bearer ${whatsapp_api_token}`,
+            Authorization: `Bearer ${whatsapp_api_token}`,
             'Content-Type': 'application/json',
           },
           timeout: 30000,
@@ -198,7 +201,6 @@ export class WhatsAppInteractiveService {
         sucesso: true,
         messageId,
       };
-
     } catch (error) {
       this.logger.error(`❌ Erro ao enviar mensagem com lista: ${error.message}`);
 

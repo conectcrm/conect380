@@ -11,18 +11,14 @@ import {
   Req,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { Ticket, StatusTicket, OrigemTicket, PrioridadeTicket } from '../entities/ticket.entity';
 import { Mensagem } from '../entities/mensagem.entity';
+import { Tag } from '../entities/tag.entity';
 import { AtendimentoGateway } from '../gateways/atendimento.gateway';
 import { OnlineStatusService } from '../services/online-status.service';
-import {
-  CriarTicketDto,
-  AtualizarTicketDto,
-  AtribuirTicketDto,
-  FiltrarTicketsDto,
-} from '../dto';
+import { CriarTicketDto, AtualizarTicketDto, AtribuirTicketDto, FiltrarTicketsDto } from '../dto';
 
 @Controller('atendimento/tickets')
 @UseGuards(JwtAuthGuard)
@@ -33,6 +29,9 @@ export class TicketsController {
 
     @InjectRepository(Mensagem)
     private mensagemRepo: Repository<Mensagem>,
+
+    @InjectRepository(Tag)
+    private tagRepo: Repository<Tag>,
 
     private atendimentoGateway: AtendimentoGateway,
     private onlineStatusService: OnlineStatusService,
@@ -45,7 +44,35 @@ export class TicketsController {
 
       const where: any = { empresaId };
 
-      if (filtros.status) where.status = filtros.status;
+      if (filtros.status) {
+        const statusFiltro = filtros.status.toString().toLowerCase();
+
+        switch (statusFiltro) {
+          case 'aberto':
+            where.status = In([StatusTicket.ABERTO, StatusTicket.EM_ATENDIMENTO]);
+            break;
+          case 'em_atendimento':
+            where.status = StatusTicket.EM_ATENDIMENTO;
+            break;
+          case 'retorno':
+          case 'aguardando':
+          case 'aguardando_cliente':
+          case 'aguardando_cliente_bot':
+          case 'pendente':
+          case 'follow_up':
+            where.status = StatusTicket.AGUARDANDO;
+            break;
+          case 'resolvido':
+            where.status = In([StatusTicket.RESOLVIDO, StatusTicket.FECHADO]);
+            break;
+          case 'fechado':
+            where.status = StatusTicket.FECHADO;
+            break;
+          default:
+            where.status = statusFiltro.toUpperCase();
+            break;
+        }
+      }
       if (filtros.canalId) where.canalId = filtros.canalId;
       if (filtros.filaId) where.filaId = filtros.filaId;
       if (filtros.atendenteId) where.atendenteId = filtros.atendenteId;
@@ -65,17 +92,20 @@ export class TicketsController {
           // Calcular status online baseado na última atividade
           if (ticket.contatoTelefone) {
             // Buscar última atividade do contato por telefone
-            const lastActivity = await this.ticketRepo.query(`
+            const lastActivity = await this.ticketRepo.query(
+              `
               SELECT MAX(contato_last_activity) as last_activity
               FROM atendimento_tickets 
               WHERE contato_telefone = $1 
                 AND empresa_id = $2
                 AND contato_last_activity IS NOT NULL
-            `, [ticket.contatoTelefone, empresaId]);
+            `,
+              [ticket.contatoTelefone, empresaId],
+            );
 
             if (lastActivity.length > 0 && lastActivity[0].last_activity) {
               contatoOnline = this.onlineStatusService.calculateOnlineStatus(
-                new Date(lastActivity[0].last_activity)
+                new Date(lastActivity[0].last_activity),
               );
             }
           }
@@ -88,9 +118,9 @@ export class TicketsController {
               telefone: ticket.contatoTelefone || '',
               email: '', // Campo não está na entidade atual
               online: contatoOnline,
-            }
+            },
           };
-        })
+        }),
       );
 
       return {
@@ -138,14 +168,24 @@ export class TicketsController {
   async criar(@Req() req, @Body() dto: CriarTicketDto) {
     const empresaId = req.user.empresa_id || req.user.empresaId;
 
+    // Separar tags do DTO (não pode ir direto no create)
+    const { tags: tagIds, ...ticketData } = dto;
+
     const ticket = this.ticketRepo.create({
-      ...dto,
+      ...ticketData,
       empresaId,
       status: StatusTicket.ABERTO,
       prioridade: dto.prioridade || PrioridadeTicket.MEDIA,
     });
 
     await this.ticketRepo.save(ticket);
+
+    // Se tags foram fornecidas, carregar e associar
+    if (tagIds && tagIds.length > 0) {
+      const tags = await this.tagRepo.findByIds(tagIds);
+      ticket.tags = tags;
+      await this.ticketRepo.save(ticket);
+    }
 
     // 🔥 EMITIR EVENTO WEBSOCKET - Novo ticket criado
     this.atendimentoGateway.notificarNovoTicket(ticket);
@@ -158,11 +198,7 @@ export class TicketsController {
   }
 
   @Put(':id')
-  async atualizar(
-    @Req() req,
-    @Param('id') id: string,
-    @Body() dto: AtualizarTicketDto,
-  ) {
+  async atualizar(@Req() req, @Param('id') id: string, @Body() dto: AtualizarTicketDto) {
     const empresaId = req.user.empresa_id || req.user.empresaId;
 
     const ticket = await this.ticketRepo.findOne({
@@ -180,11 +216,7 @@ export class TicketsController {
     await this.ticketRepo.save(ticket);
 
     // 🔥 EMITIR EVENTO WEBSOCKET - Status/dados do ticket atualizados
-    this.atendimentoGateway.notificarStatusTicket(
-      ticket.id,
-      ticket.status,
-      ticket,
-    );
+    this.atendimentoGateway.notificarStatusTicket(ticket.id, ticket.status, ticket);
 
     return {
       success: true,
@@ -194,11 +226,7 @@ export class TicketsController {
   }
 
   @Post(':id/atribuir')
-  async atribuir(
-    @Req() req,
-    @Param('id') id: string,
-    @Body() dto: AtribuirTicketDto,
-  ) {
+  async atribuir(@Req() req, @Param('id') id: string, @Body() dto: AtribuirTicketDto) {
     const empresaId = req.user.empresa_id || req.user.empresaId;
 
     const ticket = await this.ticketRepo.findOne({
@@ -217,11 +245,7 @@ export class TicketsController {
     await this.ticketRepo.save(ticket);
 
     // 🔥 EMITIR EVENTO WEBSOCKET - Ticket atribuído a atendente
-    this.atendimentoGateway.notificarAtribuicaoTicket(
-      ticket.id,
-      dto.atendenteId,
-      ticket,
-    );
+    this.atendimentoGateway.notificarAtribuicaoTicket(ticket.id, dto.atendenteId, ticket);
 
     return {
       success: true,
@@ -257,12 +281,7 @@ export class TicketsController {
   async estatisticas(@Req() req) {
     const empresaId = req.user.empresa_id || req.user.empresaId;
 
-    const [
-      totalAbertos,
-      totalEmAtendimento,
-      totalResolvidos,
-      totalFechados,
-    ] = await Promise.all([
+    const [totalAbertos, totalEmAtendimento, totalResolvidos, totalFechados] = await Promise.all([
       this.ticketRepo.count({ where: { empresaId, status: StatusTicket.ABERTO } }),
       this.ticketRepo.count({ where: { empresaId, status: StatusTicket.EM_ATENDIMENTO } }),
       this.ticketRepo.count({ where: { empresaId, status: StatusTicket.RESOLVIDO } }),
@@ -349,8 +368,3 @@ export class TicketsController {
   }
   */
 }
-
-
-
-
-

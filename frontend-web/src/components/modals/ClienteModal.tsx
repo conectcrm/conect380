@@ -129,7 +129,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
     if (isOpen) {
       setHasUnsavedChanges(false);
       setIsFormInitialized(false);
-      
+
       if (cliente) {
         // Modo edição - carregar dados do cliente
         reset({
@@ -179,7 +179,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
           tags: []
         });
       }
-      
+
       // Ativar detecção de mudanças após inicialização
       setTimeout(() => {
         setIsFormInitialized(true);
@@ -193,7 +193,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
       try {
         const response = await fetch(`https://viacep.com.br/ws/${cep.replace('-', '')}/json/`);
         const data = await response.json();
-        
+
         if (!data.erro) {
           setValue('endereco.logradouro', data.logradouro || '');
           setValue('endereco.bairro', data.bairro || '');
@@ -298,7 +298,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
 
       {/* Modal Principal */}
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2">
-        <div className="bg-white rounded-lg shadow-xl w-full max-w-7xl max-h-[96vh] overflow-hidden flex flex-col">
+        <div className="bg-white rounded-lg shadow-xl w-[calc(100%-2rem)] sm:w-[700px] md:w-[900px] lg:w-[1100px] xl:w-[1300px] max-w-[1600px] max-h-[96vh] overflow-hidden flex flex-col">
           {/* Header compacto */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
             <div className="flex items-center space-x-3">
@@ -314,9 +314,9 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
                 </p>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-4">
-              <SaveStatus 
+              <SaveStatus
                 isDirty={hasUnsavedChanges}
                 isSaving={isSubmitting}
                 lastSaved={isFormInitialized ? undefined : (lastSaveAttempt ? new Date(lastSaveAttempt) : undefined)}
@@ -336,14 +336,14 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
           <form onSubmit={handleSubmit(onFormSubmit)} className="flex-1 overflow-y-auto">
             <div className="p-4">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
+
                 {/* Coluna 1: Dados Básicos */}
                 <div className="space-y-3">
                   <div className="flex items-center mb-3">
                     <User className="w-5 h-5 text-[#159A9C] mr-2" />
                     <h3 className="text-lg font-medium text-gray-900">Dados Básicos</h3>
                   </div>
-                  
+
                   <FormField
                     name="nome"
                     label="Nome Completo"
@@ -352,7 +352,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
                     error={errors.nome}
                     placeholder="Digite o nome completo"
                   />
-                  
+
                   <FormField
                     name="email"
                     label="E-mail"
@@ -371,7 +371,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
                     error={errors.telefone}
                     placeholder="(11) 99999-9999"
                   />
-                  
+
                   <FormField
                     name="tipo"
                     label="Tipo de Cliente"
@@ -429,7 +429,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
                     <MapPin className="w-5 h-5 text-[#159A9C] mr-2" />
                     <h3 className="text-lg font-medium text-gray-900">Endereço</h3>
                   </div>
-                  
+
                   {/* CEP com busca automática */}
                   <FormField
                     name="endereco.cep"
@@ -456,7 +456,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
                     <FileText className="w-5 h-5 text-[#159A9C] mr-2" />
                     <h3 className="text-lg font-medium text-gray-900">Observações</h3>
                   </div>
-                  
+
                   <FormField
                     name="observacoes"
                     label="Observações"
@@ -509,7 +509,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
                   </span>
                 )}
               </div>
-              
+
               <div className="flex space-x-3">
                 <button
                   type="button"

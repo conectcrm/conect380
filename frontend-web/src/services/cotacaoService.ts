@@ -4,11 +4,12 @@ import {
   CriarCotacaoRequest,
   AtualizarCotacaoRequest,
   FiltroCotacao,
-  StatusCotacao
+  StatusCotacao,
+  CotacaoListResponse
 } from '../types/cotacaoTypes';
 
 export const cotacaoService = {
-  async listar(filtros?: FiltroCotacao): Promise<Cotacao[]> {
+  async listar(filtros?: FiltroCotacao): Promise<CotacaoListResponse> {
     const params = new URLSearchParams();
 
     if (filtros) {
@@ -23,8 +24,50 @@ export const cotacaoService = {
       });
     }
 
-    const response = await api.get(`/cotacao?${params.toString()}`);
-    return response.data;
+    const queryString = params.toString();
+    const response = await api.get(`/cotacao${queryString ? `?${queryString}` : ''}`);
+    const payload = response.data;
+
+    if (Array.isArray(payload)) {
+      const fallbackItems = payload;
+      return {
+        items: fallbackItems,
+        pagination: {
+          page: 1,
+          limit: fallbackItems.length,
+          total: fallbackItems.length,
+          pages: 1
+        },
+        statistics: {
+          total: fallbackItems.length,
+          totalValue: fallbackItems.reduce((sum, item) => sum + (item.valorTotal || 0), 0),
+          byStatus: [],
+          byPriority: []
+        }
+      };
+    }
+
+    const items = Array.isArray(payload?.items) ? payload.items : [];
+
+    const pagination = payload?.pagination ?? {
+      page: 1,
+      limit: items.length,
+      total: items.length,
+      pages: 1
+    };
+
+    const statistics = payload?.statistics ?? {
+      total: items.length,
+      totalValue: items.reduce((sum: number, item: Cotacao) => sum + (item.valorTotal || 0), 0),
+      byStatus: [],
+      byPriority: []
+    };
+
+    return {
+      items,
+      pagination,
+      statistics
+    };
   },
 
   async buscarPorId(id: string): Promise<Cotacao> {
@@ -33,40 +76,39 @@ export const cotacaoService = {
   },
 
   async criar(data: CriarCotacaoRequest): Promise<Cotacao> {
-    // Calcular valores dos itens
-    const itensComValor = data.itens.map(item => ({
-      ...item,
-      valorTotal: item.quantidade * item.valorUnitario
-    }));
-
-    const cotacaoData = {
-      ...data,
-      itens: itensComValor,
-      valorTotal: itensComValor.reduce((sum, item) => sum + item.valorTotal, 0)
-    };
-
-    const response = await api.post('/cotacao', cotacaoData);
+    // Backend calcula todos os valores (valorTotal, descontos, impostos)
+    // Frontend envia apenas dados brutos
+    const response = await api.post('/cotacao', data);
     return response.data;
   },
 
   async atualizar(id: string, data: AtualizarCotacaoRequest): Promise<Cotacao> {
-    // Recalcular valores se itens foram alterados
-    if (data.itens) {
-      const itensComValor = data.itens.map(item => ({
-        ...item,
-        valorTotal: item.quantidade * item.valorUnitario
-      }));
-
-      data.itens = itensComValor as any;
-      (data as any).valorTotal = itensComValor.reduce((sum, item) => sum + item.valorTotal, 0);
-    }
-
+    // Backend calcula todos os valores automaticamente
     const response = await api.put(`/cotacao/${id}`, data);
     return response.data;
   },
 
   async deletar(id: string): Promise<void> {
     await api.delete(`/cotacao/${id}`);
+  },
+
+  async aprovar(id: string, justificativa?: string): Promise<Cotacao> {
+    const response = await api.post(`/cotacao/${id}/aprovar`, {
+      justificativa
+    });
+    return response.data.data;
+  },
+
+  async reprovar(id: string, justificativa: string): Promise<Cotacao> {
+    const response = await api.post(`/cotacao/${id}/reprovar`, {
+      justificativa
+    });
+    return response.data.data;
+  },
+
+  async enviarParaAprovacao(id: string): Promise<Cotacao> {
+    const response = await api.post(`/cotacao/${id}/enviar-para-aprovacao`);
+    return response.data.data;
   },
 
   async alterarStatus(id: string, status: StatusCotacao, observacao?: string): Promise<Cotacao> {
@@ -84,7 +126,7 @@ export const cotacaoService = {
 
   async enviarPorEmail(id: string, emails: string[], mensagem?: string): Promise<void> {
     await api.post(`/cotacao/${id}/enviar-email`, {
-      emails,
+      destinatarios: emails,
       mensagem
     });
   },
@@ -123,6 +165,11 @@ export const cotacaoService = {
     return response.data.numero;
   },
 
+  async minhasAprovacoes(): Promise<Cotacao[]> {
+    const response = await api.get('/cotacao/minhas-aprovacoes');
+    return response.data;
+  },
+
   async buscarTemplates(): Promise<any[]> {
     const response = await api.get('/cotacao/templates');
     return response.data;
@@ -133,5 +180,33 @@ export const cotacaoService = {
       nome,
       cotacaoId
     });
+  },
+
+  async aprovarLote(cotacaoIds: string[], justificativa?: string): Promise<{
+    total: number;
+    sucessos: number;
+    falhas: number;
+    cotacoesProcessadas: string[];
+    erros: Array<{ cotacaoId: string; erro: string }>;
+  }> {
+    const response = await api.post('/cotacao/aprovar-lote', {
+      cotacaoIds,
+      justificativa
+    });
+    return response.data.data;
+  },
+
+  async reprovarLote(cotacaoIds: string[], justificativa: string): Promise<{
+    total: number;
+    sucessos: number;
+    falhas: number;
+    cotacoesProcessadas: string[];
+    erros: Array<{ cotacaoId: string; erro: string }>;
+  }> {
+    const response = await api.post('/cotacao/reprovar-lote', {
+      cotacaoIds,
+      justificativa
+    });
+    return response.data.data;
   }
 };

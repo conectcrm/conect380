@@ -7,7 +7,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 export class CreateNotaClienteDto {
   @ApiPropertyOptional({
     description: 'UUID do cliente (CRM)',
-    example: '123e4567-e89b-12d3-a456-426614174000'
+    example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @IsOptional()
   @IsUUID()
@@ -15,7 +15,7 @@ export class CreateNotaClienteDto {
 
   @ApiPropertyOptional({
     description: 'UUID do ticket relacionado',
-    example: '123e4567-e89b-12d3-a456-426614174001'
+    example: '123e4567-e89b-12d3-a456-426614174001',
   })
   @IsOptional()
   @IsUUID()
@@ -23,7 +23,7 @@ export class CreateNotaClienteDto {
 
   @ApiPropertyOptional({
     description: 'Telefone do contato (fallback quando não há clienteId)',
-    example: '+5511999999999'
+    example: '+5511999999999',
   })
   @IsOptional()
   @IsString()
@@ -31,7 +31,7 @@ export class CreateNotaClienteDto {
 
   @ApiProperty({
     description: 'Conteúdo da nota',
-    example: 'Cliente prefere contato por WhatsApp. Sempre disponível à tarde.'
+    example: 'Cliente prefere contato por WhatsApp. Sempre disponível à tarde.',
   })
   @IsString()
   @MinLength(1, { message: 'O conteúdo não pode estar vazio' })
@@ -41,7 +41,7 @@ export class CreateNotaClienteDto {
   @ApiPropertyOptional({
     description: 'Marca a nota como importante/destacada',
     example: false,
-    default: false
+    default: false,
   })
   @IsOptional()
   @IsBoolean()
@@ -49,7 +49,7 @@ export class CreateNotaClienteDto {
 
   @ApiPropertyOptional({
     description: 'UUID da empresa (multi-tenant) - preenchido automaticamente se não fornecido',
-    example: '123e4567-e89b-12d3-a456-426614174002'
+    example: '123e4567-e89b-12d3-a456-426614174002',
   })
   @IsOptional()
   @IsUUID()

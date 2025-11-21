@@ -29,7 +29,7 @@ export class WhatsAppSenderService {
   constructor(
     @InjectRepository(IntegracoesConfig)
     private readonly integracaoRepo: Repository<IntegracoesConfig>,
-  ) { }
+  ) {}
 
   private async prepararEnvioWhatsApp(
     empresaId: string,
@@ -49,10 +49,7 @@ export class WhatsAppSenderService {
     this.logger.log(`🔍 Configuração encontrada: ${config.id}`);
     this.logger.log(`🔍 Credenciais presentes? ${!!config.credenciais}`);
 
-    const {
-      whatsapp_api_token,
-      whatsapp_phone_number_id,
-    } = config.credenciais || {};
+    const { whatsapp_api_token, whatsapp_phone_number_id } = config.credenciais || {};
 
     if (!whatsapp_api_token || !whatsapp_phone_number_id) {
       this.logger.error('❌ Credenciais WhatsApp incompletas');
@@ -67,13 +64,13 @@ export class WhatsAppSenderService {
     this.logger.log(`   Limpo: ${resultado.original}`);
     this.logger.log(`   Corrigido: ${resultado.corrigido}`);
     this.logger.log(
-      `   Foi corrigido? ${resultado.foiCorrigido ? '✅ SIM (adicionou dígito 9)' : '✅ NÃO (já estava correto)'
+      `   Foi corrigido? ${
+        resultado.foiCorrigido ? '✅ SIM (adicionou dígito 9)' : '✅ NÃO (já estava correto)'
       }`,
     );
     this.logger.log(
-      `   Validação: ${resultado.validacao.valido
-        ? '✅ VÁLIDO'
-        : `❌ INVÁLIDO - ${resultado.validacao.erro}`
+      `   Validação: ${
+        resultado.validacao.valido ? '✅ VÁLIDO' : `❌ INVÁLIDO - ${resultado.validacao.erro}`
       }`,
     );
 
@@ -178,9 +175,7 @@ export class WhatsAppSenderService {
         token,
       };
     } catch (error: any) {
-      this.logger.error(
-        `❌ Erro ao obter mídia temporária ${mediaId}: ${error?.message || error}`,
-      );
+      this.logger.error(`❌ Erro ao obter mídia temporária ${mediaId}: ${error?.message || error}`);
 
       if (error?.response) {
         this.logger.error(`🔍 Status: ${error.response.status}`);
@@ -195,16 +190,10 @@ export class WhatsAppSenderService {
    * Envia indicador de digitação (typing indicator)
    * Mostra "..." para o usuário por alguns segundos
    */
-  async enviarIndicadorDigitacao(
-    empresaId: string,
-    para: string,
-  ): Promise<boolean> {
+  async enviarIndicadorDigitacao(empresaId: string, para: string): Promise<boolean> {
     try {
-      const {
-        whatsapp_api_token,
-        whatsapp_phone_number_id,
-        numeroParaEnviar,
-      } = await this.prepararEnvioWhatsApp(empresaId, para, '');
+      const { whatsapp_api_token, whatsapp_phone_number_id, numeroParaEnviar } =
+        await this.prepararEnvioWhatsApp(empresaId, para, '');
 
       await axios.post(
         `https://graph.facebook.com/v21.0/${whatsapp_phone_number_id}/messages`,
@@ -243,11 +232,8 @@ export class WhatsAppSenderService {
     mensagem: string,
   ): Promise<{ sucesso: boolean; messageId?: string; erro?: string; detalhes?: any }> {
     try {
-      const {
-        whatsapp_api_token,
-        whatsapp_phone_number_id,
-        numeroParaEnviar,
-      } = await this.prepararEnvioWhatsApp(empresaId, para, mensagem);
+      const { whatsapp_api_token, whatsapp_phone_number_id, numeroParaEnviar } =
+        await this.prepararEnvioWhatsApp(empresaId, para, mensagem);
 
       this.logger.log(`📝 Corpo da mensagem: ${mensagem.substring(0, 50)}...`);
 
@@ -298,7 +284,8 @@ export class WhatsAppSenderService {
 
           // ⚠️ Erro 131030: Número não está na whitelist (modo desenvolvimento)
           if (codigoErro === 131030) {
-            mensagemErro = '📋 Número não está na lista de permissão (whitelist). ' +
+            mensagemErro =
+              '📋 Número não está na lista de permissão (whitelist). ' +
               'Modo desenvolvimento da Meta requer adicionar números manualmente. ' +
               'Acesse: https://business.facebook.com/settings/whatsapp-business-accounts > ' +
               'Números de telefone > Adicionar número de teste.';
@@ -306,7 +293,8 @@ export class WhatsAppSenderService {
           }
           // ⚠️ Erro 131026: Número inválido
           else if (codigoErro === 131026) {
-            mensagemErro = '📱 Número de telefone inválido. Verifique o formato (ex: 5562999999999).';
+            mensagemErro =
+              '📱 Número de telefone inválido. Verifique o formato (ex: 5562999999999).';
           }
           // ⚠️ Outros erros do WhatsApp
           else if (whatsappError.message) {
@@ -340,11 +328,8 @@ export class WhatsAppSenderService {
         ? `mídia com legenda: ${legenda}`
         : `mídia (${arquivo.mimetype || 'sem mimetype'})`;
 
-      const {
-        whatsapp_api_token,
-        whatsapp_phone_number_id,
-        numeroParaEnviar,
-      } = await this.prepararEnvioWhatsApp(empresaId, para, descricao);
+      const { whatsapp_api_token, whatsapp_phone_number_id, numeroParaEnviar } =
+        await this.prepararEnvioWhatsApp(empresaId, para, descricao);
 
       const tipoEnvio = this.mapearTipoEnvio(arquivo.mimetype, tipoMensagem);
       const mimeBase = arquivo.mimetype?.split(';')[0] || arquivo.mimetype || '';
@@ -467,7 +452,8 @@ export class WhatsAppSenderService {
 
           // ⚠️ Erro 131030: Número não está na whitelist (modo desenvolvimento)
           if (codigoErro === 131030) {
-            mensagemErro = '📋 Número não está na lista de permissão (whitelist). ' +
+            mensagemErro =
+              '📋 Número não está na lista de permissão (whitelist). ' +
               'Modo desenvolvimento da Meta requer adicionar números manualmente. ' +
               'Acesse: https://business.facebook.com/settings/whatsapp-business-accounts > ' +
               'Números de telefone > Adicionar número de teste.';
@@ -475,7 +461,8 @@ export class WhatsAppSenderService {
           }
           // ⚠️ Erro 131026: Número inválido
           else if (codigoErro === 131026) {
-            mensagemErro = '📱 Número de telefone inválido. Verifique o formato (ex: 5562999999999).';
+            mensagemErro =
+              '📱 Número de telefone inválido. Verifique o formato (ex: 5562999999999).';
           }
           // ⚠️ Outros erros do WhatsApp
           else if (whatsappError.message) {
@@ -497,10 +484,7 @@ export class WhatsAppSenderService {
   /**
    * Marca mensagem como lida
    */
-  async marcarComoLida(
-    empresaId: string,
-    messageId: string,
-  ): Promise<{ sucesso: boolean }> {
+  async marcarComoLida(empresaId: string, messageId: string): Promise<{ sucesso: boolean }> {
     try {
       const config = await this.integracaoRepo.findOne({
         where: { empresaId, tipo: 'whatsapp_business_api', ativo: true },
@@ -510,10 +494,7 @@ export class WhatsAppSenderService {
         throw new Error('Configuração WhatsApp não encontrada');
       }
 
-      const {
-        whatsapp_api_token,
-        whatsapp_phone_number_id,
-      } = config.credenciais || {};
+      const { whatsapp_api_token, whatsapp_phone_number_id } = config.credenciais || {};
 
       await axios.post(
         `https://graph.facebook.com/v21.0/${whatsapp_phone_number_id}/messages`,
@@ -543,10 +524,7 @@ export class WhatsAppSenderService {
   /**
    * Busca a foto do perfil do contato no WhatsApp
    */
-  async buscarFotoPerfilContato(
-    empresaId: string,
-    telefone: string,
-  ): Promise<string | null> {
+  async buscarFotoPerfilContato(empresaId: string, telefone: string): Promise<string | null> {
     try {
       this.logger.log(`🖼️ Buscando foto do perfil do contato: ${telefone}`);
 
@@ -559,10 +537,7 @@ export class WhatsAppSenderService {
         return null;
       }
 
-      const {
-        whatsapp_api_token,
-        whatsapp_phone_number_id,
-      } = config.credenciais || {};
+      const { whatsapp_api_token, whatsapp_phone_number_id } = config.credenciais || {};
 
       if (!whatsapp_api_token || !whatsapp_phone_number_id) {
         this.logger.warn('⚠️ Credenciais WhatsApp incompletas');
@@ -631,14 +606,11 @@ export class WhatsAppSenderService {
         botoes = botoes.slice(0, 3);
       }
 
-      const {
-        whatsapp_api_token,
-        whatsapp_phone_number_id,
-        numeroParaEnviar,
-      } = await this.prepararEnvioWhatsApp(empresaId, para, `botões: ${mensagem.substring(0, 30)}`);
+      const { whatsapp_api_token, whatsapp_phone_number_id, numeroParaEnviar } =
+        await this.prepararEnvioWhatsApp(empresaId, para, `botões: ${mensagem.substring(0, 30)}`);
 
       this.logger.log(`🔘 Enviando mensagem com ${botoes.length} botões interativos`);
-      this.logger.log(`   Botões: ${botoes.map(b => b.title).join(', ')}`);
+      this.logger.log(`   Botões: ${botoes.map((b) => b.title).join(', ')}`);
 
       const payload = {
         messaging_product: 'whatsapp',
@@ -738,15 +710,14 @@ export class WhatsAppSenderService {
       }
 
       if (itens.length > 10) {
-        this.logger.warn(`⚠️ WhatsApp permite máximo 10 itens na lista. Truncando ${itens.length} para 10.`);
+        this.logger.warn(
+          `⚠️ WhatsApp permite máximo 10 itens na lista. Truncando ${itens.length} para 10.`,
+        );
         itens = itens.slice(0, 10);
       }
 
-      const {
-        whatsapp_api_token,
-        whatsapp_phone_number_id,
-        numeroParaEnviar,
-      } = await this.prepararEnvioWhatsApp(empresaId, para, `lista: ${mensagem.substring(0, 30)}`);
+      const { whatsapp_api_token, whatsapp_phone_number_id, numeroParaEnviar } =
+        await this.prepararEnvioWhatsApp(empresaId, para, `lista: ${mensagem.substring(0, 30)}`);
 
       this.logger.log(`📋 Enviando mensagem com lista de ${itens.length} itens`);
 
@@ -822,4 +793,3 @@ export class WhatsAppSenderService {
     }
   }
 }
-

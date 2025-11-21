@@ -1,7 +1,14 @@
-import { Controller, Get, Query } from '@nestjs/common';
-import { DashboardService, DashboardKPIs, VendedorRanking, AlertaInteligente } from './dashboard.service';
+import { Controller, Get, Query, UseInterceptors } from '@nestjs/common';
+import {
+  DashboardService,
+  DashboardKPIs,
+  VendedorRanking,
+  AlertaInteligente,
+} from './dashboard.service';
+import { CacheInterceptor, CacheTTL } from '../../common/interceptors/cache.interceptor';
 
 @Controller('dashboard')
+@UseInterceptors(CacheInterceptor) // 🚀 Cache ativado para dashboard
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) { }
 
@@ -10,6 +17,7 @@ export class DashboardController {
    * Obter KPIs principais do dashboard
    */
   @Get('kpis')
+  @CacheTTL(30 * 1000) // 🚀 Cache: 30 segundos (KPIs precisam ser atualizados frequentemente)
   async getKPIs(
     @Query('periodo') periodo: string = 'mensal',
     @Query('vendedor') vendedorId?: string,
@@ -23,8 +31,9 @@ export class DashboardController {
    * Obter ranking de vendedores
    */
   @Get('vendedores-ranking')
+  @CacheTTL(60 * 1000) // 🚀 Cache: 1 minuto (ranking muda menos frequentemente)
   async getVendedoresRanking(
-    @Query('periodo') periodo: string = 'mensal'
+    @Query('periodo') periodo: string = 'mensal',
   ): Promise<VendedorRanking[]> {
     return await this.dashboardService.getVendedoresRanking(periodo);
   }
@@ -34,6 +43,7 @@ export class DashboardController {
    * Obter alertas inteligentes
    */
   @Get('alertas')
+  @CacheTTL(45 * 1000) // 🚀 Cache: 45 segundos (alertas devem ser relativamente frescos)
   async getAlertasInteligentes(): Promise<AlertaInteligente[]> {
     return await this.dashboardService.getAlertasInteligentes();
   }
@@ -49,6 +59,7 @@ export class DashboardController {
     @Query('regiao') regiao?: string,
   ) {
     // TEMPORÁRIO: Retornar mock data até que as migrations sejam completadas
+    const agora = new Date();
     try {
       const [kpis, vendedoresRanking, alertas] = await Promise.all([
         this.dashboardService.getKPIs(periodo, vendedorId, regiao),
@@ -60,15 +71,47 @@ export class DashboardController {
         kpis,
         vendedoresRanking,
         alertas,
+        metadata: {
+          periodo,
+          vendedorId,
+          regiao,
+          atualizadoEm: agora.toISOString(),
+          proximaAtualizacao: new Date(agora.getTime() + 15 * 60 * 1000).toISOString(),
+          periodosDisponiveis: this.dashboardService.getPeriodosDisponiveis(),
+          vendedoresDisponiveis: vendedoresRanking.map((vendedor) => ({
+            id: vendedor.id,
+            nome: vendedor.nome,
+          })),
+          regioesDisponiveis: this.dashboardService.getRegioesDisponiveis(),
+        },
       };
     } catch (error) {
       console.log('⚠️  Erro no dashboard, retornando mock data:', error.message);
       return {
         kpis: {
-          faturamento: { atual: 0, anterior: 0, crescimento: 0, meta: 100000 },
-          propostas: { total: 0, aprovadas: 0, pendentes: 0, taxaConversao: 0 },
-          ticketMedio: { valor: 0, crescimento: 0 },
-          clientes: { total: 0, novos: 0, crescimento: 0 },
+          faturamentoTotal: { valor: 0, meta: 100000, variacao: 0, periodo: 'vs mês anterior' },
+          ticketMedio: { valor: 0, variacao: 0, periodo: 'vs mês anterior' },
+          vendasFechadas: { quantidade: 0, variacao: 0, periodo: 'vs mês anterior' },
+          emNegociacao: { valor: 0, quantidade: 0, propostas: [] },
+          novosClientesMes: { quantidade: 0, variacao: 0 },
+          leadsQualificados: { quantidade: 0, variacao: 0 },
+          propostasEnviadas: { valor: 0, variacao: 0 },
+          taxaSucessoGeral: { percentual: 0, variacao: 0 },
+          agenda: {
+            totalEventos: 0,
+            eventosConcluidos: 0,
+            proximosEventos: 0,
+            eventosHoje: 0,
+            estatisticasPorTipo: {
+              reuniao: 0,
+              ligacao: 0,
+              apresentacao: 0,
+              visita: 0,
+              'follow-up': 0,
+              outro: 0,
+            },
+            produtividade: 0,
+          },
         },
         vendedoresRanking: [],
         alertas: [],
@@ -76,9 +119,12 @@ export class DashboardController {
           periodo,
           vendedorId,
           regiao,
-          atualizadoEm: new Date().toISOString(),
-          proximaAtualizacao: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutos
-        }
+          atualizadoEm: agora.toISOString(),
+          proximaAtualizacao: new Date(agora.getTime() + 15 * 60 * 1000).toISOString(),
+          periodosDisponiveis: this.dashboardService.getPeriodosDisponiveis(),
+          vendedoresDisponiveis: [],
+          regioesDisponiveis: this.dashboardService.getRegioesDisponiveis(),
+        },
       };
     }
   }

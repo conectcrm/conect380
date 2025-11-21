@@ -3,7 +3,7 @@ import { PortalService } from './portal.service';
 
 @Controller('api/portal')
 export class PortalController {
-  constructor(private readonly portalService: PortalService) { }
+  constructor(private readonly portalService: PortalService) {}
 
   /**
    * Atualiza o status de uma proposta via token do portal
@@ -11,25 +11,22 @@ export class PortalController {
   @Put('proposta/:token/status')
   async atualizarStatusPorToken(
     @Param('token') token: string,
-    @Body() updateData: {
+    @Body()
+    updateData: {
       status: string;
       timestamp?: string;
       ip?: string;
       userAgent?: string;
-    }
+    },
   ) {
     try {
       console.log(`📝 Portal: Atualizando status via token ${token} para: ${updateData.status}`);
 
-      const resultado = await this.portalService.atualizarStatusPorToken(
-        token,
-        updateData.status,
-        {
-          timestamp: updateData.timestamp,
-          ip: updateData.ip,
-          userAgent: updateData.userAgent
-        }
-      );
+      const resultado = await this.portalService.atualizarStatusPorToken(token, updateData.status, {
+        timestamp: updateData.timestamp,
+        ip: updateData.ip,
+        userAgent: updateData.userAgent,
+      });
 
       console.log('✅ Portal: Status atualizado com sucesso');
 
@@ -37,9 +34,8 @@ export class PortalController {
         success: true,
         message: 'Status atualizado via portal',
         proposta: resultado,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
-
     } catch (error) {
       console.error('❌ Portal: Erro ao atualizar status:', error);
 
@@ -47,9 +43,9 @@ export class PortalController {
         {
           success: false,
           message: 'Erro ao atualizar status via portal',
-          error: error.message
+          error: error.message,
         },
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -66,17 +62,16 @@ export class PortalController {
         throw new HttpException(
           {
             success: false,
-            message: 'Token inválido ou proposta não encontrada'
+            message: 'Token inválido ou proposta não encontrada',
           },
-          HttpStatus.NOT_FOUND
+          HttpStatus.NOT_FOUND,
         );
       }
 
       return {
         success: true,
-        proposta
+        proposta,
       };
-
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -86,9 +81,9 @@ export class PortalController {
         {
           success: false,
           message: 'Erro ao buscar proposta via portal',
-          error: error.message
+          error: error.message,
         },
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -99,27 +94,27 @@ export class PortalController {
   @Put('proposta/:token/view')
   async registrarVisualizacao(
     @Param('token') token: string,
-    @Body() viewData: {
+    @Body()
+    viewData: {
       ip?: string;
       userAgent?: string;
       timestamp?: string;
-    }
+    },
   ) {
     try {
       await this.portalService.registrarVisualizacao(token, viewData);
 
       return {
         success: true,
-        message: 'Visualização registrada'
+        message: 'Visualização registrada',
       };
-
     } catch (error) {
       console.error('❌ Portal: Erro ao registrar visualização:', error);
 
       return {
         success: false,
         message: 'Erro ao registrar visualização',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -130,36 +125,32 @@ export class PortalController {
   @Post('proposta/:token/acao')
   async registrarAcao(
     @Param('token') token: string,
-    @Body() acaoData: {
+    @Body()
+    acaoData: {
       acao: string;
       timestamp?: string;
       ip?: string;
       userAgent?: string;
       dados?: any;
-    }
+    },
   ) {
     try {
       console.log(`📊 Portal: Registrando ação "${acaoData.acao}" para token ${token}`);
 
-      const resultado = await this.portalService.registrarAcaoCliente(
-        token,
-        acaoData.acao,
-        {
-          timestamp: acaoData.timestamp,
-          ip: acaoData.ip,
-          userAgent: acaoData.userAgent,
-          dados: acaoData.dados
-        }
-      );
+      const resultado = await this.portalService.registrarAcaoCliente(token, acaoData.acao, {
+        timestamp: acaoData.timestamp,
+        ip: acaoData.ip,
+        userAgent: acaoData.userAgent,
+        dados: acaoData.dados,
+      });
 
       return {
         success: resultado.sucesso,
         message: resultado.mensagem,
         status: resultado.status,
         acao: acaoData.acao,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
-
     } catch (error) {
       console.error('❌ Portal: Erro ao registrar ação:', error);
 
@@ -167,9 +158,9 @@ export class PortalController {
         {
           success: false,
           message: 'Erro ao registrar ação',
-          error: error.message
+          error: error.message,
         },
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }

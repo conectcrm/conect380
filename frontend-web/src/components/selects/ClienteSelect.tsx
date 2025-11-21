@@ -20,6 +20,7 @@ interface ClienteSelectProps {
   disabled?: boolean;
   className?: string;
   label?: string | null;
+  error?: string;
 }
 
 export default function ClienteSelect({
@@ -29,7 +30,8 @@ export default function ClienteSelect({
   required = false,
   disabled = false,
   className = "",
-  label = 'Cliente'
+  label = 'Cliente',
+  error
 }: ClienteSelectProps) {
   const [clientes, setClientes] = useState<ClienteSelectValue[]>([]);
   const [loading, setLoading] = useState(false);
@@ -109,6 +111,7 @@ export default function ClienteSelect({
             loading={loading}
             icon="user"
             emptyMessage={searchQuery ? "Nenhum cliente encontrado" : "Digite para buscar clientes"}
+            error={error}
           />
         </div>
 

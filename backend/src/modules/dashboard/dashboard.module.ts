@@ -9,13 +9,9 @@ import { User } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Proposta, User, Cliente]),
-    MetasModule,
-    EventosModule
-  ],
+  imports: [TypeOrmModule.forFeature([Proposta, User, Cliente]), MetasModule, EventosModule],
   providers: [DashboardService],
   controllers: [DashboardController],
   exports: [DashboardService],
 })
-export class DashboardModule { }
+export class DashboardModule {}

@@ -1,23 +1,19 @@
-import {
-  Injectable,
-  NestInterceptor,
-  ExecutionContext,
-  CallHandler,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, NestInterceptor, ExecutionContext, CallHandler, Inject } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
+import { Logger } from 'winston';
+import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 
 /**
  * 📊 Logging Interceptor
- * 
+ *
  * Interceptor global que loga todas as requisições HTTP com informações estruturadas:
  * - Método, URL, status code
  * - Tempo de execução
  * - User ID (se autenticado)
  * - IP do cliente
  * - User agent
- * 
+ *
  * Útil para:
  * - Debugging de problemas em produção
  * - Análise de performance
@@ -26,7 +22,9 @@ import { tap } from 'rxjs/operators';
  */
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
-  private readonly logger = new Logger('HTTP');
+  constructor(
+    @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
+  ) { }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
@@ -34,7 +32,7 @@ export class LoggingInterceptor implements NestInterceptor {
     const { method, url, ip, headers } = request;
     const userAgent = headers['user-agent'] || 'Unknown';
     const userId = request.user?.id || 'Anonymous';
-    
+
     const startTime = Date.now();
 
     return next.handle().pipe(
@@ -44,8 +42,9 @@ export class LoggingInterceptor implements NestInterceptor {
           const duration = endTime - startTime;
           const statusCode = response.statusCode;
 
-          // Log estruturado
-          const logData = {
+          // Log estruturado com Winston
+          this.logger.info('HTTP Request', {
+            context: 'HTTP',
             method,
             url,
             statusCode,
@@ -54,23 +53,15 @@ export class LoggingInterceptor implements NestInterceptor {
             ip,
             userAgent,
             timestamp: new Date().toISOString(),
-          };
-
-          // Escolher nível de log baseado no status
-          if (statusCode >= 500) {
-            this.logger.error(JSON.stringify(logData));
-          } else if (statusCode >= 400) {
-            this.logger.warn(JSON.stringify(logData));
-          } else {
-            this.logger.log(JSON.stringify(logData));
-          }
+          });
         },
         error: (error) => {
           const endTime = Date.now();
           const duration = endTime - startTime;
 
-          // Log de erro estruturado
-          const errorData = {
+          // Log de erro estruturado com Winston
+          this.logger.error('HTTP Error', {
+            context: 'HTTP',
             method,
             url,
             statusCode: error.status || 500,
@@ -81,9 +72,7 @@ export class LoggingInterceptor implements NestInterceptor {
             error: error.message,
             stack: error.stack,
             timestamp: new Date().toISOString(),
-          };
-
-          this.logger.error(JSON.stringify(errorData));
+          });
         },
       }),
     );

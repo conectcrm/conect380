@@ -28,6 +28,16 @@ export const authService = {
     return response.data;
   },
 
+  async solicitarRecuperacaoSenha(email: string): Promise<ApiResponse> {
+    const response = await api.post<ApiResponse>('/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  async redefinirSenhaComToken(dados: { token: string; senhaNova: string }): Promise<ApiResponse> {
+    const response = await api.post<ApiResponse>('/auth/reset-password', dados);
+    return response.data;
+  },
+
   logout() {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user_data');

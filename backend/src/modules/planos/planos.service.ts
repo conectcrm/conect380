@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Plano } from './entities/plano.entity';
@@ -20,20 +25,20 @@ export class PlanosService {
     private planoModuloRepository: Repository<PlanoModulo>,
 
     private dataSource: DataSource,
-  ) { }
+  ) {}
 
   async listarTodos(): Promise<Plano[]> {
     return this.planoRepository.find({
       where: { ativo: true },
       relations: ['modulosInclusos', 'modulosInclusos.modulo'],
-      order: { ordem: 'ASC', preco: 'ASC' }
+      order: { ordem: 'ASC', preco: 'ASC' },
     });
   }
 
   async buscarPorId(id: string): Promise<Plano> {
     const plano = await this.planoRepository.findOne({
       where: { id },
-      relations: ['modulosInclusos', 'modulosInclusos.modulo']
+      relations: ['modulosInclusos', 'modulosInclusos.modulo'],
     });
 
     if (!plano) {
@@ -46,7 +51,7 @@ export class PlanosService {
   async buscarPorCodigo(codigo: string): Promise<Plano> {
     const plano = await this.planoRepository.findOne({
       where: { codigo },
-      relations: ['modulosInclusos', 'modulosInclusos.modulo']
+      relations: ['modulosInclusos', 'modulosInclusos.modulo'],
     });
 
     if (!plano) {
@@ -59,7 +64,7 @@ export class PlanosService {
   async criar(dados: CriarPlanoDto): Promise<Plano> {
     // Verificar se código já existe
     const planoExistente = await this.planoRepository.findOne({
-      where: { codigo: dados.codigo }
+      where: { codigo: dados.codigo },
     });
 
     if (planoExistente) {
@@ -78,7 +83,7 @@ export class PlanosService {
       whiteLabel: dados.whiteLabel || false,
       suportePrioritario: dados.suportePrioritario || false,
       ativo: dados.ativo !== false,
-      ordem: dados.ordem || 0
+      ordem: dados.ordem || 0,
     });
 
     const planoSalvo = await this.planoRepository.save(plano);
@@ -97,7 +102,7 @@ export class PlanosService {
     // Verificar conflito de código se estiver sendo alterado
     if (dados.codigo && dados.codigo !== plano.codigo) {
       const planoExistente = await this.planoRepository.findOne({
-        where: { codigo: dados.codigo }
+        where: { codigo: dados.codigo },
       });
 
       if (planoExistente) {
@@ -127,15 +132,18 @@ export class PlanosService {
     const plano = await this.buscarPorId(id);
 
     // Verificar se há assinaturas ativas vinculadas a este plano
-    const assinaturasAtivas = await this.dataSource.query(`
+    const assinaturasAtivas = await this.dataSource.query(
+      `
       SELECT COUNT(*) as total 
       FROM assinaturas_empresas 
       WHERE plano_id = $1 AND status = 'ativa'
-    `, [id]);
+    `,
+      [id],
+    );
 
     if (assinaturasAtivas[0]?.total > 0) {
       throw new BadRequestException(
-        `Não é possível excluir este plano pois existem ${assinaturasAtivas[0].total} empresa(s) com assinatura ativa. Desative o plano ao invés de excluí-lo.`
+        `Não é possível excluir este plano pois existem ${assinaturasAtivas[0].total} empresa(s) com assinatura ativa. Desative o plano ao invés de excluí-lo.`,
       );
     }
 
@@ -158,13 +166,13 @@ export class PlanosService {
     for (const moduloId of modulosIds) {
       // Verificar se módulo existe
       const modulo = await this.moduloSistemaRepository.findOne({
-        where: { id: moduloId }
+        where: { id: moduloId },
       });
 
       if (modulo) {
         const planoModulo = this.planoModuloRepository.create({
           plano: { id: planoId },
-          modulo: { id: moduloId }
+          modulo: { id: moduloId },
         });
 
         await this.planoModuloRepository.save(planoModulo);
@@ -176,7 +184,7 @@ export class PlanosService {
   async listarModulosDisponiveis(): Promise<ModuloSistema[]> {
     return this.moduloSistemaRepository.find({
       where: { ativo: true },
-      order: { ordem: 'ASC', nome: 'ASC' }
+      order: { ordem: 'ASC', nome: 'ASC' },
     });
   }
 

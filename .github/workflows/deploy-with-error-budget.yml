@@ -1,0 +1,209 @@
+name: Deploy with Error Budget Check
+
+on:
+  push:
+    branches:
+      - main
+      - production
+  workflow_dispatch:
+    inputs:
+      override_freeze:
+        description: 'Override deploy freeze (requires CTO approval)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL || 'http://prometheus:9090' }}
+
+jobs:
+  check-error-budget:
+    name: Check Error Budget
+    runs-on: ubuntu-latest
+    outputs:
+      can_deploy: ${{ steps.check.outputs.can_deploy }}
+      budget_status: ${{ steps.check.outputs.status }}
+      budget_remaining: ${{ steps.check.outputs.remaining }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl jq bc
+      
+      - name: Check error budget
+        id: check
+        env:
+          OVERRIDE_DEPLOY: ${{ github.event.inputs.override_freeze }}
+          OVERRIDE_DEPLOY_FREEZE: ${{ github.event.inputs.override_freeze }}
+        run: |
+          chmod +x scripts/can-deploy.sh
+          chmod +x scripts/check-error-budget.sh
+          
+          # Executar verificação
+          if ./scripts/can-deploy.sh; then
+            echo "can_deploy=true" >> $GITHUB_OUTPUT
+            echo "✅ Deploy permitido" >> $GITHUB_STEP_SUMMARY
+          else
+            EXIT_CODE=$?
+            echo "can_deploy=false" >> $GITHUB_OUTPUT
+            echo "❌ Deploy bloqueado (exit code: $EXIT_CODE)" >> $GITHUB_STEP_SUMMARY
+            
+            # Ler status do JSON
+            if [ -f /tmp/error-budget-status.json ]; then
+              STATUS=$(jq -r '.error_budget.status' /tmp/error-budget-status.json)
+              REMAINING=$(jq -r '.error_budget.remaining_percent' /tmp/error-budget-status.json)
+              echo "status=$STATUS" >> $GITHUB_OUTPUT
+              echo "remaining=$REMAINING" >> $GITHUB_OUTPUT
+              
+              echo "### Error Budget Status: $STATUS" >> $GITHUB_STEP_SUMMARY
+              echo "Budget Remaining: $REMAINING%" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            exit $EXIT_CODE
+          fi
+      
+      - name: Upload error budget status
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: error-budget-status
+          path: /tmp/error-budget-status.json
+  
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: check-error-budget
+    if: needs.check-error-budget.outputs.can_deploy == 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+      
+      - name: Run tests
+        working-directory: backend
+        run: npm test
+      
+      - name: Build
+        working-directory: backend
+        run: npm run build
+      
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: backend-build
+          path: backend/dist
+  
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [check-error-budget, build]
+    if: needs.check-error-budget.outputs.can_deploy == 'true'
+    environment:
+      name: production
+      url: https://conectcrm.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: backend-build
+          path: backend/dist
+      
+      - name: Deploy to production
+        run: |
+          echo "🚀 Deploying to production..."
+          # Adicionar comandos de deploy aqui
+          # Ex: scp, rsync, kubectl, docker push, etc.
+      
+      - name: Notify success
+        if: success()
+        run: |
+          echo "✅ Deploy completed successfully"
+          echo "Error Budget Status: ${{ needs.check-error-budget.outputs.budget_status }}"
+          echo "Budget Remaining: ${{ needs.check-error-budget.outputs.budget_remaining }}%"
+      
+      - name: Log deploy freeze override
+        if: github.event.inputs.override_freeze == 'true'
+        run: |
+          echo "⚠️  DEPLOY FREEZE WAS OVERRIDDEN"
+          echo "Approver: ${{ github.actor }}"
+          echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          echo "Commit: ${{ github.sha }}"
+          # Enviar para sistema de auditoria
+  
+  notify-blocked:
+    name: Notify Deploy Blocked
+    runs-on: ubuntu-latest
+    needs: check-error-budget
+    if: needs.check-error-budget.outputs.can_deploy != 'true'
+    
+    steps:
+      - name: Notify team
+        run: |
+          echo "🚫 Deploy bloqueado devido ao error budget"
+          echo "Status: ${{ needs.check-error-budget.outputs.budget_status }}"
+          echo "Budget Remaining: ${{ needs.check-error-budget.outputs.budget_remaining }}%"
+          
+          # Enviar notificação para Slack
+          # curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+          #   -H 'Content-Type: application/json' \
+          #   -d '{
+          #     "text": "🚫 Deploy bloqueado",
+          #     "blocks": [
+          #       {
+          #         "type": "section",
+          #         "text": {
+          #           "type": "mrkdwn",
+          #           "text": "*Deploy Bloqueado*\nError Budget: ${{ needs.check-error-budget.outputs.budget_remaining }}%\nStatus: ${{ needs.check-error-budget.outputs.budget_status }}"
+          #         }
+          #       }
+          #     ]
+          #   }'
+      
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🚫 Deploy Bloqueado
+              
+              **Motivo**: Error budget muito baixo
+              
+              **Status**: ${{ needs.check-error-budget.outputs.budget_status }}
+              **Budget Remaining**: ${{ needs.check-error-budget.outputs.budget_remaining }}%
+              
+              ### Ações necessárias:
+              
+              ${
+                needs.check-error-budget.outputs.budget_status === 'FREEZE'
+                  ? '- ❌ Deploy FREEZE ativo\n- ⚠️ Apenas correções críticas de segurança/disponibilidade\n- 📝 Aprovação do CTO obrigatória'
+                  : needs.check-error-budget.outputs.budget_status === 'WARNING'
+                  ? '- ⚠️ Modo de confiabilidade ativo\n- 🔧 Apenas correções de emergência\n- 📋 Revisar todas as mudanças cuidadosamente'
+                  : '- 🔍 Investigar causa do consumo de error budget\n- 📊 Analisar métricas de SLO\n- 🛠️ Implementar melhorias de confiabilidade'
+              }
+              
+              [Ver Dashboard de Error Budget](https://grafana.conectcrm.com/d/error-budget-slo)
+              `
+            })

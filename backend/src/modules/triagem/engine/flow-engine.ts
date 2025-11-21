@@ -86,7 +86,10 @@ export class FlowEngine {
     }
 
     // 🎯 PROCESSAR ETAPA DE TRANSFERÊNCIA
-    if (etapaId === 'transferir-atendimento' || etapa.tipo === 'acao' && etapa.acao === 'transferir') {
+    if (
+      etapaId === 'transferir-atendimento' ||
+      (etapa.tipo === 'acao' && etapa.acao === 'transferir')
+    ) {
       this.logger.log(`🎯 [FLOW ENGINE] Processando transferência de atendimento`);
       return await this.processarTransferenciaAtendimento(etapa);
     }
@@ -135,9 +138,7 @@ export class FlowEngine {
       this.logger.log('📋 Mensagem de confirmação de dados formatada');
     }
 
-    let opcoesMenu: BotOption[] = Array.isArray(etapa.opcoes)
-      ? [...(etapa.opcoes as any[])]
-      : [];
+    let opcoesMenu: BotOption[] = Array.isArray(etapa.opcoes) ? [...(etapa.opcoes as any[])] : [];
 
     if (
       (etapaId === 'confirmar-dados-cliente' || etapaId === 'confirmacao-dados') &&
@@ -203,11 +204,14 @@ export class FlowEngine {
   ): Promise<{ mensagem: string; opcoes: BotOption[] } | null> {
     const etapaPossuiMenuEstatico = Array.isArray(opcoesExistentes) && opcoesExistentes.length > 0;
     const fluxoConfig: any = this.config.fluxo?.estrutura || {};
-    const etapaConfig = this.config.fluxo?.estrutura?.etapas?.[this.config.sessao.etapaAtual] as Record<string, any> | undefined;
+    const etapaConfig = this.config.fluxo?.estrutura?.etapas?.[this.config.sessao.etapaAtual] as
+      | Record<string, any>
+      | undefined;
 
     // 🎯 PRIORIDADE: Se nucleosMenu está definido, usar menu dinâmico filtrado
     const nucleosMenuSelecionados = etapaConfig?.nucleosMenu;
-    const temNucleosMenuSelecionados = Array.isArray(nucleosMenuSelecionados) && nucleosMenuSelecionados.length > 0;
+    const temNucleosMenuSelecionados =
+      Array.isArray(nucleosMenuSelecionados) && nucleosMenuSelecionados.length > 0;
 
     // Flag de menu dinâmico (compatibilidade com versões anteriores)
     const flagMenuDinamico = Boolean(
@@ -217,7 +221,8 @@ export class FlowEngine {
       fluxoConfig?.config?.usarNucleosDinamicos,
     );
 
-    const deveUsarMenuDinamico = temNucleosMenuSelecionados || flagMenuDinamico || !etapaPossuiMenuEstatico;
+    const deveUsarMenuDinamico =
+      temNucleosMenuSelecionados || flagMenuDinamico || !etapaPossuiMenuEstatico;
 
     if (!deveUsarMenuDinamico) {
       return null;
@@ -235,13 +240,17 @@ export class FlowEngine {
     let nucleosVisiveis = todosNucleos;
 
     if (temNucleosMenuSelecionados) {
-      this.logger.log(`🎯 [FLOW ENGINE] Filtrando núcleos: ${nucleosMenuSelecionados.length} selecionados`);
-
-      nucleosVisiveis = todosNucleos.filter(nucleo =>
-        nucleosMenuSelecionados.includes(nucleo.id)
+      this.logger.log(
+        `🎯 [FLOW ENGINE] Filtrando núcleos: ${nucleosMenuSelecionados.length} selecionados`,
       );
 
-      this.logger.log(`✅ [FLOW ENGINE] Núcleos filtrados: ${nucleosVisiveis.length} de ${todosNucleos.length}`);
+      nucleosVisiveis = todosNucleos.filter((nucleo) =>
+        nucleosMenuSelecionados.includes(nucleo.id),
+      );
+
+      this.logger.log(
+        `✅ [FLOW ENGINE] Núcleos filtrados: ${nucleosVisiveis.length} de ${todosNucleos.length}`,
+      );
 
       if (nucleosVisiveis.length === 0) {
         this.logger.warn('[FLOW ENGINE] ⚠️ Nenhum núcleo encontrado após filtro nucleosMenu');
@@ -256,7 +265,9 @@ export class FlowEngine {
     const ultimoTicketId = this.config.sessao.contexto?.__ultimoTicketId;
 
     if (ultimoDepartamentoNome && ultimoTicketId) {
-      this.logger.log(`🔄 Adicionando opção de continuar no departamento: ${ultimoDepartamentoNome}`);
+      this.logger.log(
+        `🔄 Adicionando opção de continuar no departamento: ${ultimoDepartamentoNome}`,
+      );
 
       // Adicionar opção "Continuar" no início
       opcoes.unshift({
@@ -268,6 +279,17 @@ export class FlowEngine {
         departamentoId: this.config.sessao.contexto?.__ultimoDepartamentoId,
       } as any);
     }
+
+    // 🆕 QUICK WIN: Adicionar botão "Não entendi" para falar com humano
+    opcoes.push({
+      numero: 'ajuda',
+      valor: 'ajuda',
+      texto: '❓ Não entendi essas opções',
+      descricao: 'Falar com um atendente humano',
+      acao: 'transferir_nucleo',
+      proximaEtapa: 'transferir_atendimento',
+      nucleoId: this.config.sessao.contexto?.__nucleoGeralId || null,
+    } as any);
 
     const suportaBotoesInterativos = this.sessaoSuportaBotoesInterativos();
     const deveIncluirFallbackTexto = !suportaBotoesInterativos || opcoes.length > 3;
@@ -329,7 +351,9 @@ export class FlowEngine {
 
     // 🎯 Cenário 1: Núcleo SEM departamentos, mas COM atendentes diretos
     if ((!Array.isArray(departamentos) || departamentos.length === 0) && temAtendentesNoNucleo) {
-      this.logger.log('[FLOW ENGINE] 🎯 Núcleo sem departamentos, mas com atendentes diretos. Transferindo...');
+      this.logger.log(
+        '[FLOW ENGINE] 🎯 Núcleo sem departamentos, mas com atendentes diretos. Transferindo...',
+      );
 
       // Salva contexto para transferência direta ao núcleo
       this.config.sessao.contexto = {
@@ -352,14 +376,20 @@ export class FlowEngine {
       };
     }
 
-    const etapaConfig = this.config.fluxo?.estrutura?.etapas?.['escolha-departamento'] as Record<string, any> | undefined;
+    const etapaConfig = this.config.fluxo?.estrutura?.etapas?.['escolha-departamento'] as
+      | Record<string, any>
+      | undefined;
 
-    let proximaEtapaDepartamento: string = etapaConfig?.proximaEtapaDepartamento
-      ?? etapaConfig?.metadata?.proximaEtapaDepartamento
-      ?? this.config.sessao.contexto?.__proximaEtapaDepartamento
-      ?? 'transferir-atendimento';
+    let proximaEtapaDepartamento: string =
+      etapaConfig?.proximaEtapaDepartamento ??
+      etapaConfig?.metadata?.proximaEtapaDepartamento ??
+      this.config.sessao.contexto?.__proximaEtapaDepartamento ??
+      'transferir-atendimento';
 
-    if (typeof proximaEtapaDepartamento !== 'string' || proximaEtapaDepartamento.trim().length === 0) {
+    if (
+      typeof proximaEtapaDepartamento !== 'string' ||
+      proximaEtapaDepartamento.trim().length === 0
+    ) {
       proximaEtapaDepartamento = 'transferir-atendimento';
     } else {
       proximaEtapaDepartamento = proximaEtapaDepartamento.trim();
@@ -392,7 +422,9 @@ export class FlowEngine {
     const nucleoNome = this.config.sessao.contexto?.nucleoNome || 'setor';
 
     // Usar mensagem do fluxo se definida, com substituição de variáveis
-    let mensagemBase = etapaConfig?.mensagem || `🏢 *${nucleoNome}*\n\nAgora escolha o *departamento* específico:\n\n_💡 Dica: Escolha a área que melhor atende sua necessidade_`;
+    let mensagemBase =
+      etapaConfig?.mensagem ||
+      `🏢 *${nucleoNome}*\n\nAgora escolha o *departamento* específico:\n\n_💡 Dica: Escolha a área que melhor atende sua necessidade_`;
 
     // Substituir variável {{nucleoNome}} na mensagem
     mensagemBase = mensagemBase.replace(/\{\{nucleoNome\}\}/g, nucleoNome);
@@ -401,7 +433,9 @@ export class FlowEngine {
     const suportaBotoesInterativos = this.sessaoSuportaBotoesInterativos();
 
     if (suportaBotoesInterativos) {
-      this.logger.debug(`📱 [DEPARTAMENTOS] Usando botões interativos (${opcoes.length} departamentos)`);
+      this.logger.debug(
+        `📱 [DEPARTAMENTOS] Usando botões interativos (${opcoes.length} departamentos)`,
+      );
       return {
         mensagem: mensagemBase,
         opcoes,
@@ -439,7 +473,7 @@ export class FlowEngine {
 
       // 🔧 Suporta tanto {{variavel}} (Handlebars) quanto {variavel}
       const regexHandlebars = new RegExp(`\\{\\{${chave}\\}\\}`, 'g'); // {{var}}
-      const regexSimples = new RegExp(`\\{${chave}\\}`, 'g');          // {var}
+      const regexSimples = new RegExp(`\\{${chave}\\}`, 'g'); // {var}
 
       mensagem = mensagem.replace(regexHandlebars, String(valor));
       mensagem = mensagem.replace(regexSimples, String(valor));
@@ -482,11 +516,7 @@ export class FlowEngine {
       return false;
     }
 
-    const canaisComSuporte = new Set([
-      'whatsapp',
-      'whatsapp_business',
-      'whatsapp_business_api',
-    ]);
+    const canaisComSuporte = new Set(['whatsapp', 'whatsapp_business', 'whatsapp_business_api']);
 
     if (canaisComSuporte.has(canal)) {
       return true;
@@ -505,7 +535,9 @@ export class FlowEngine {
       this.config.sessao.adicionarAoHistorico(this.config.sessao.etapaAtual, '[AUTO-AVANCO]');
       this.sessionMutated = true;
     } catch (erro) {
-      this.logger.warn(`Não foi possível registrar histórico de auto avanço: ${erro instanceof Error ? erro.message : String(erro)}`);
+      this.logger.warn(
+        `Não foi possível registrar histórico de auto avanço: ${erro instanceof Error ? erro.message : String(erro)}`,
+      );
     }
   }
 
@@ -641,7 +673,9 @@ export class FlowEngine {
     const nucleoId = sessao.contexto?.destinoNucleoId;
     const nucleoNome = sessao.contexto?.nucleoNome || 'setor';
 
-    this.logger.log(`🎯 [TRANSFERÊNCIA] Iniciando transferência para departamento: ${departamentoNome}`);
+    this.logger.log(
+      `🎯 [TRANSFERÊNCIA] Iniciando transferência para departamento: ${departamentoNome}`,
+    );
 
     if (!departamentoId) {
       throw new BadRequestException('Departamento não informado para transferência');
@@ -653,7 +687,8 @@ export class FlowEngine {
 
     // Preparar resumo para salvar no contexto
     const resumoAtendimento = (sessao.contexto?.resumoAtendimento || '').toString().trim();
-    const resumoFallback = resumoAtendimento.length > 0 ? resumoAtendimento : 'Detalhes não informados';
+    const resumoFallback =
+      resumoAtendimento.length > 0 ? resumoAtendimento : 'Detalhes não informados';
 
     this.logger.log(`📋 [TRANSFERÊNCIA] Sessão marcada para transferência`);
 

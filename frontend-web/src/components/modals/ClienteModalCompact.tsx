@@ -177,7 +177,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-7xl max-h-[96vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg shadow-xl w-[calc(100%-2rem)] sm:w-[700px] md:w-[900px] lg:w-[1100px] xl:w-[1300px] max-w-[1600px] max-h-[96vh] overflow-hidden flex flex-col">
         {/* Header compacto */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">

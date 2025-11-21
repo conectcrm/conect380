@@ -104,7 +104,7 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
   const onSubmit = async (data: Configuracao) => {
     try {
       setIsSaving(true);
-      
+
       const configuracaoData: Configuracao = {
         ...data,
         id: configuracao?.id
@@ -351,7 +351,7 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
                 <button
                   type="submit"
                   disabled={isSaving || isLoading}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-[#159A9C] text-base font-medium text-white hover:bg-[#0F7B7D] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C] sm:ml-3 sm:w-auto sm:text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
                   {isSaving ? (
                     <>

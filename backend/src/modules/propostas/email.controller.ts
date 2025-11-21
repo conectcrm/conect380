@@ -6,8 +6,8 @@ import { PortalService } from './portal.service';
 export class EmailController {
   constructor(
     private readonly emailService: EmailIntegradoService,
-    private readonly portalService: PortalService
-  ) { }
+    private readonly portalService: PortalService,
+  ) {}
 
   /**
    * Envia notificação de proposta aceita
@@ -23,15 +23,15 @@ export class EmailController {
         return {
           success: true,
           message: 'Notificação de aceite enviada com sucesso',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       } else {
         throw new HttpException(
           {
             success: false,
-            message: 'Erro ao enviar notificação de aceite'
+            message: 'Erro ao enviar notificação de aceite',
           },
-          HttpStatus.INTERNAL_SERVER_ERROR
+          HttpStatus.INTERNAL_SERVER_ERROR,
         );
       }
     } catch (error) {
@@ -40,9 +40,9 @@ export class EmailController {
         {
           success: false,
           message: 'Erro interno no envio de email',
-          error: error.message
+          error: error.message,
         },
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -51,12 +51,15 @@ export class EmailController {
    * Envia proposta por email para cliente
    */
   @Post('enviar-proposta')
-  async enviarProposta(@Body() dados: {
-    proposta: any;
-    emailCliente: string;
-    linkPortal: string;
-    registrarToken?: boolean;
-  }) {
+  async enviarProposta(
+    @Body()
+    dados: {
+      proposta: any;
+      emailCliente: string;
+      linkPortal: string;
+      registrarToken?: boolean;
+    },
+  ) {
     try {
       console.log('📧 Enviando proposta para:', dados.emailCliente);
 
@@ -65,7 +68,7 @@ export class EmailController {
         console.log('🎫 Registrando token no sistema de portal:', dados.proposta.token);
         await this.portalService.registrarTokenProposta(
           dados.proposta.token,
-          dados.proposta.numero || dados.proposta.id
+          dados.proposta.numero || dados.proposta.id,
         );
       }
 
@@ -73,7 +76,7 @@ export class EmailController {
         dados.proposta,
         dados.emailCliente,
         dados.linkPortal,
-        dados.proposta.numero || dados.proposta.id // Passar ID da proposta para sincronização automática
+        dados.proposta.numero || dados.proposta.id, // Passar ID da proposta para sincronização automática
       );
 
       if (sucesso) {
@@ -81,15 +84,15 @@ export class EmailController {
           success: true,
           message: 'Proposta enviada por email com sucesso',
           emailCliente: dados.emailCliente,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       } else {
         throw new HttpException(
           {
             success: false,
-            message: 'Erro ao enviar proposta por email'
+            message: 'Erro ao enviar proposta por email',
           },
-          HttpStatus.INTERNAL_SERVER_ERROR
+          HttpStatus.INTERNAL_SERVER_ERROR,
         );
       }
     } catch (error) {
@@ -98,9 +101,9 @@ export class EmailController {
         {
           success: false,
           message: 'Erro interno no envio de proposta',
-          error: error.message
+          error: error.message,
         },
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -120,9 +123,13 @@ export class EmailController {
           config: {
             smtp_host: process.env.SMTP_HOST,
             smtp_port: process.env.SMTP_PORT,
-            smtp_user: process.env.SMTP_USER ? '***' + process.env.SMTP_USER.slice(-10) : 'não configurado',
-            gmail_user: process.env.GMAIL_USER ? '***' + process.env.GMAIL_USER.slice(-10) : 'não configurado'
-          }
+            smtp_user: process.env.SMTP_USER
+              ? '***' + process.env.SMTP_USER.slice(-10)
+              : 'não configurado',
+            gmail_user: process.env.GMAIL_USER
+              ? '***' + process.env.GMAIL_USER.slice(-10)
+              : 'não configurado',
+          },
         };
       } else {
         return {
@@ -130,8 +137,8 @@ export class EmailController {
           message: 'Problema na configuração de email',
           config: {
             smtp_configured: !!process.env.SMTP_USER,
-            gmail_configured: !!process.env.GMAIL_USER
-          }
+            gmail_configured: !!process.env.GMAIL_USER,
+          },
         };
       }
     } catch (error) {
@@ -139,7 +146,7 @@ export class EmailController {
       return {
         success: false,
         message: 'Erro ao testar configuração de email',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -170,7 +177,7 @@ export class EmailController {
         cc: para.slice(1).join(','), // Outros como cópia se houver
         subject: assunto || 'Email ConectCRM',
         html: corpo || '',
-        text: (corpo || '').replace(/<[^>]*>/g, '') // Remover HTML para versão texto
+        text: (corpo || '').replace(/<[^>]*>/g, ''), // Remover HTML para versão texto
       };
 
       console.log('📧 Dados preparados para envio:', JSON.stringify(emailData, null, 2));
@@ -185,21 +192,20 @@ export class EmailController {
           id: `email_${Date.now()}`,
           status: 'enviado',
           timestamp: new Date().toISOString(),
-          destinatarios: para
+          destinatarios: para,
         };
       } else {
         throw new Error('Falha no envio do email');
       }
-
     } catch (error) {
       console.error('❌ Erro no envio de email genérico:', error);
       throw new HttpException(
         {
           success: false,
           message: 'Erro no envio de email',
-          error: error.message
+          error: error.message,
         },
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -217,8 +223,8 @@ export class EmailController {
         'POST /email/notificar-aceite',
         'POST /email/enviar-proposta',
         'GET /email/testar',
-        'GET /email/status'
-      ]
+        'GET /email/status',
+      ],
     };
   }
 }

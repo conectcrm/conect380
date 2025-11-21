@@ -166,6 +166,7 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
               ${colorClasses.hover} ${isChildActive(item) ? colorClasses.active : ''}
             `}
             title={item.title}
+            aria-current={isChildActive(item) ? 'page' : undefined}
           >
             <div className="flex flex-col items-center">
               <Icon className={`
@@ -202,8 +203,11 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
               transition-all duration-200 ease-in-out
               focus:outline-none focus:ring-2 focus:ring-blue-500/20
               ${colorClasses.hover} ${isChildActive(item) ? colorClasses.active : ''}
-              ${isChild ? 'ml-4 pl-6' : ''}
+              ${!isChild ? 'hover:translate-x-1 hover:shadow-sm' : ''}
+              ${isChild ? 'ml-0 pl-3' : ''}
             `}
+            aria-expanded={isExpanded}
+            aria-controls={`submenu-${item.id}`}
           >
             <div className="flex items-center min-w-0 flex-1">
               <Icon className={`
@@ -232,11 +236,15 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
           </button>
 
           {/* Submenu */}
-          <div className={`
+          <div
+            id={`submenu-${item.id}`}
+            className={`
             overflow-hidden transition-all duration-300 ease-in-out
             ${isExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}
-          `}>
-            <div className="pl-4 space-y-1">
+          `}
+            aria-hidden={!isExpanded}
+          >
+            <div className="pl-8 ml-2 border-l-2 border-[#DEEFE7]/60 space-y-1">
               {item.children?.map(child => renderMenuItem(child, true))}
             </div>
           </div>
@@ -290,10 +298,11 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
             group flex items-center relative
             transition-all duration-200 ease-in-out
             focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-2
-            ${sidebarCollapsed ? 'justify-center flex-col p-2 mx-1' : `px-3 py-2 rounded-lg ${colorClasses.hover} ${isActive ? colorClasses.active : ''}`}
-            ${isChild ? 'ml-4 pl-6' : ''}
+            ${sidebarCollapsed ? 'justify-center flex-col p-2 mx-1' : `px-3 py-2 rounded-lg ${colorClasses.hover} ${isActive ? colorClasses.active : ''} ${!isChild ? 'hover:translate-x-1 hover:shadow-sm' : ''}`}
+            ${isChild ? 'ml-0 pl-3' : ''}
           `}
-          title={sidebarCollapsed ? item.title : undefined}
+          title={item.title}
+          aria-current={isActive ? 'page' : undefined}
         >
           {linkContent}
 
@@ -318,9 +327,54 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
     return true;
   });
 
+  // Agrupar menus por seção para exibir cabeçalhos quando a sidebar está expandida
+  const groupedMenuItems = filteredMenuItems.reduce(
+    (sections: { name: string; items: MenuConfig[] }[], item) => {
+      const sectionName = item.section || 'Outros';
+      const existingSection = sections.find(section => section.name === sectionName);
+
+      if (existingSection) {
+        existingSection.items.push(item);
+      } else {
+        sections.push({ name: sectionName, items: [item] });
+      }
+
+      return sections;
+    },
+    []
+  );
+
+  const isSectionActive = (items: MenuConfig[]) => items.some(item => isMenuItemActive(item));
+
   return (
-    <nav className={`flex-1 space-y-1 ${sidebarCollapsed ? 'px-1' : 'px-2'}`}>
-      {filteredMenuItems.map(item => renderMenuItem(item))}
+    <nav className={`flex-1 ${sidebarCollapsed ? 'px-1 space-y-1' : 'px-2 space-y-4'}`}>
+      {groupedMenuItems.map((section, index) => {
+        if (sidebarCollapsed) {
+          return section.items.map(item => renderMenuItem(item));
+        }
+
+        const sectionActive = isSectionActive(section.items);
+
+        return (
+          <div
+            key={section.name}
+            className={`space-y-2 ${index > 0 ? 'pt-6 mt-2' : ''}`}
+          >
+            {index > 0 && (
+              <div className="mx-3 border-t border-[#DEEFE7]/60"></div>
+            )}
+            <div className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#B4BEC9] flex items-center gap-2">
+              <span className={`h-1.5 w-1.5 rounded-full transition-colors duration-200 ${sectionActive ? 'bg-[#159A9C]' : 'bg-[#B4BEC9]'}`} />
+              <span className={`transition-colors duration-200 ${sectionActive ? 'text-[#159A9C]' : ''}`}>
+                {section.name}
+              </span>
+            </div>
+            <div className="space-y-1">
+              {section.items.map(item => renderMenuItem(item))}
+            </div>
+          </div>
+        );
+      })}
     </nav>
   );
 };

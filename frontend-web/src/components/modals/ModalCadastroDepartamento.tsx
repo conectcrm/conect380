@@ -165,7 +165,7 @@ const ModalCadastroDepartamento: React.FC<ModalCadastroDepartamentoProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl w-[calc(100%-2rem)] sm:w-[600px] md:w-[750px] lg:w-[850px] xl:w-[900px] max-w-[1000px] max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-[#002333] to-[#159A9C] text-white px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">

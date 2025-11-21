@@ -18,10 +18,10 @@ export class UserActivitiesController {
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   async listarAtividades(@Request() req: any, @Query('limit') limit: number) {
     this.logger.log(`Obtendo atividades para empresa ${req.user.empresaId}`);
-    
+
     return this.userActivitiesService.listarAtividades(
-      req.user.empresaId, 
-      limit ? parseInt(limit.toString(), 10) : 20
+      req.user.empresaId,
+      limit ? parseInt(limit.toString(), 10) : 20,
     );
   }
 
@@ -30,19 +30,23 @@ export class UserActivitiesController {
   @ApiOperation({ summary: 'Registrar atividade de usuário' })
   @ApiResponse({ status: 201, description: 'Atividade registrada com sucesso' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
-  async registrarAtividade(@Request() req: any, @Body() dadosAtividade: {
-    tipo: AtividadeTipo;
-    descricao: string;
-    detalhes?: string;
-  }) {
+  async registrarAtividade(
+    @Request() req: any,
+    @Body()
+    dadosAtividade: {
+      tipo: AtividadeTipo;
+      descricao: string;
+      detalhes?: string;
+    },
+  ) {
     this.logger.log(`Registrando atividade: ${dadosAtividade.tipo}`);
-    
+
     return this.userActivitiesService.registrarAtividade(
       req.user.id,
       req.user.empresaId,
       dadosAtividade.tipo,
       dadosAtividade.descricao,
-      dadosAtividade.detalhes
+      dadosAtividade.detalhes,
     );
   }
 }

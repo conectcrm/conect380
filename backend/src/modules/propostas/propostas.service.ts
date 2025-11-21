@@ -41,13 +41,15 @@ export interface Proposta {
   createdAt: string; // Alias para criadaEm (compatibilidade com DTO)
   updatedAt: string; // Alias para atualizadaEm (compatibilidade com DTO)
   source?: string;
-  vendedor?: {
-    id: string;
-    nome: string;
-    email: string;
-    tipo: string;
-    ativo: boolean;
-  } | string;
+  vendedor?:
+    | {
+        id: string;
+        nome: string;
+        email: string;
+        tipo: string;
+        ativo: boolean;
+      }
+    | string;
   portalAccess?: {
     accessedAt?: string;
     ip?: string;
@@ -80,7 +82,7 @@ export class PropostasService {
     try {
       const ultimaProposta = await this.propostaRepository.findOne({
         order: { criadaEm: 'DESC' },
-        where: {}
+        where: {},
       });
 
       if (ultimaProposta?.numero) {
@@ -98,16 +100,6 @@ export class PropostasService {
    * Converter entidade para interface de retorno
    */
   private entityToInterface(entity: PropostaEntity): Proposta {
-    // 🐛 DEBUG: Log para verificar o carregamento do vendedor
-    console.log(`🔍 [entityToInterface] Proposta ${entity.numero}:`);
-    console.log(`   vendedor_id: ${entity.vendedor_id}`);
-    console.log(`   vendedor entity:`, entity.vendedor ? {
-      id: entity.vendedor.id,
-      nome: entity.vendedor.nome,
-      email: entity.vendedor.email,
-      role: entity.vendedor.role
-    } : 'null/undefined');
-
     return {
       id: entity.id,
       numero: entity.numero,
@@ -130,15 +122,22 @@ export class PropostasService {
       createdAt: entity.criadaEm?.toISOString(),
       updatedAt: entity.atualizadaEm?.toISOString(),
       source: entity.source,
-      vendedor: entity.vendedor ? {
-        id: entity.vendedor.id,
-        nome: entity.vendedor.nome,
-        email: entity.vendedor.email,
-        tipo: entity.vendedor.role === 'admin' ? 'admin' : entity.vendedor.role === 'manager' ? 'gerente' : 'vendedor',
-        ativo: entity.vendedor.ativo
-      } : entity.vendedor_id,
+      vendedor: entity.vendedor
+        ? {
+            id: entity.vendedor.id,
+            nome: entity.vendedor.nome,
+            email: entity.vendedor.email,
+            tipo:
+              entity.vendedor.role === 'admin'
+                ? 'admin'
+                : entity.vendedor.role === 'manager'
+                  ? 'gerente'
+                  : 'vendedor',
+            ativo: entity.vendedor.ativo,
+          }
+        : entity.vendedor_id,
       portalAccess: entity.portalAccess || undefined,
-      emailDetails: entity.emailDetails || undefined
+      emailDetails: entity.emailDetails || undefined,
     };
   }
 
@@ -159,11 +158,11 @@ export class PropostasService {
     try {
       const entities = await this.propostaRepository.find({
         order: { criadaEm: 'DESC' },
-        relations: ['vendedor']
+        relations: ['vendedor'],
       });
 
       console.log(`📊 ${entities.length} propostas encontradas no banco`);
-      return entities.map(entity => this.entityToInterface(entity));
+      return entities.map((entity) => this.entityToInterface(entity));
     } catch (error) {
       console.error('❌ Erro ao listar propostas:', error);
       return [];
@@ -177,7 +176,7 @@ export class PropostasService {
     try {
       const entity = await this.propostaRepository.findOne({
         where: { id },
-        relations: ['vendedor']
+        relations: ['vendedor'],
       });
 
       return entity ? this.entityToInterface(entity) : null;
@@ -201,15 +200,18 @@ export class PropostasService {
         // Se vendedor for um objeto, usar o ID direto
         if (typeof dadosProposta.vendedor === 'object' && dadosProposta.vendedor.id) {
           vendedorId = dadosProposta.vendedor.id;
-          console.log(`👤 Vendedor recebido como objeto: ${dadosProposta.vendedor.nome} -> ${vendedorId}`);
+          console.log(
+            `👤 Vendedor recebido como objeto: ${dadosProposta.vendedor.nome} -> ${vendedorId}`,
+          );
         } else {
           // Se vendedor for uma string, buscar pelo nome
-          const nomeVendedor = typeof dadosProposta.vendedor === 'string'
-            ? dadosProposta.vendedor
-            : dadosProposta.vendedor.nome;
+          const nomeVendedor =
+            typeof dadosProposta.vendedor === 'string'
+              ? dadosProposta.vendedor
+              : dadosProposta.vendedor.nome;
 
           const vendedor = await this.userRepository.findOne({
-            where: { nome: nomeVendedor }
+            where: { nome: nomeVendedor },
           });
 
           if (vendedor) {
@@ -231,10 +233,7 @@ export class PropostasService {
         try {
           // Buscar cliente real pelo nome (busca flexível)
           const clienteReal = await this.clienteRepository.findOne({
-            where: [
-              { nome: Like(`%${nomeCliente}%`) },
-              { nome: nomeCliente }
-            ]
+            where: [{ nome: Like(`%${nomeCliente}%`) }, { nome: nomeCliente }],
           });
 
           if (clienteReal) {
@@ -242,10 +241,10 @@ export class PropostasService {
             clienteProcessado = {
               id: clienteReal.id,
               nome: clienteReal.nome,
-              email: clienteReal.email,          // ✅ USAR EMAIL REAL
-              telefone: clienteReal.telefone,    // ✅ USAR TELEFONE REAL
+              email: clienteReal.email, // ✅ USAR EMAIL REAL
+              telefone: clienteReal.telefone, // ✅ USAR TELEFONE REAL
               documento: clienteReal.documento || '',
-              status: clienteReal.status || 'lead'
+              status: clienteReal.status || 'lead',
             };
           } else {
             console.warn(`⚠️ Cliente "${nomeCliente}" não encontrado no cadastro`);
@@ -253,10 +252,10 @@ export class PropostasService {
             clienteProcessado = {
               id: 'cliente-temp',
               nome: nomeCliente,
-              email: '',  // ← DEIXAR VAZIO ao invés de gerar fictício
+              email: '', // ← DEIXAR VAZIO ao invés de gerar fictício
               telefone: '',
               documento: '',
-              status: 'lead'
+              status: 'lead',
             };
           }
         } catch (error) {
@@ -265,10 +264,10 @@ export class PropostasService {
           clienteProcessado = {
             id: 'cliente-temp',
             nome: nomeCliente,
-            email: '',  // ← NÃO gerar email fictício
+            email: '', // ← NÃO gerar email fictício
             telefone: '',
             documento: '',
-            status: 'lead'
+            status: 'lead',
           };
         }
       } else if (dadosProposta.cliente && typeof dadosProposta.cliente === 'object') {
@@ -279,10 +278,10 @@ export class PropostasService {
         clienteProcessado = {
           id: 'cliente-default',
           nome: 'Cliente Temporário',
-          email: '',  // ✅ NÃO gerar email fictício
+          email: '', // ✅ NÃO gerar email fictício
           telefone: '',
           documento: '',
-          status: 'lead'
+          status: 'lead',
         };
       }
 
@@ -305,7 +304,7 @@ export class PropostasService {
           ? new Date(dadosProposta.dataVencimento)
           : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         source: dadosProposta.source || 'api',
-        vendedor_id: vendedorId
+        vendedor_id: vendedorId,
       });
 
       const propostaSalva = await this.propostaRepository.save(novaProposta);
@@ -338,14 +337,16 @@ export class PropostasService {
     propostaId: string,
     status: string,
     source?: string,
-    observacoes?: string
+    observacoes?: string,
   ): Promise<Proposta> {
     try {
-      console.log(`🔧 DEBUG: atualizarStatus chamado com propostaId: "${propostaId}" (tipo: ${typeof propostaId})`);
+      console.log(
+        `🔧 DEBUG: atualizarStatus chamado com propostaId: "${propostaId}" (tipo: ${typeof propostaId})`,
+      );
       console.log(`🔧 DEBUG: Tentando buscar proposta por ID: ${propostaId}`);
 
       const proposta = await this.propostaRepository.findOne({
-        where: { id: propostaId }
+        where: { id: propostaId },
       });
 
       if (!proposta) {
@@ -373,11 +374,11 @@ export class PropostasService {
     propostaId: string,
     status: string,
     source?: string,
-    observacoes?: string
+    observacoes?: string,
   ): Promise<Proposta> {
     try {
       const proposta = await this.propostaRepository.findOne({
-        where: { id: propostaId }
+        where: { id: propostaId },
       });
 
       if (!proposta) {
@@ -387,7 +388,9 @@ export class PropostasService {
       // Validações específicas para transições automáticas
       if (status === 'aprovada' || status === 'rejeitada') {
         if (proposta.status !== 'visualizada' && proposta.status !== 'enviada') {
-          console.warn(`⚠️ Transição automática de '${proposta.status}' para '${status}' pode não ser válida`);
+          console.warn(
+            `⚠️ Transição automática de '${proposta.status}' para '${status}' pode não ser válida`,
+          );
         }
       }
 
@@ -411,11 +414,11 @@ export class PropostasService {
   async marcarComoVisualizada(
     propostaId: string,
     ip?: string,
-    userAgent?: string
+    userAgent?: string,
   ): Promise<Proposta> {
     try {
       const proposta = await this.propostaRepository.findOne({
-        where: { id: propostaId }
+        where: { id: propostaId },
       });
 
       if (!proposta) {
@@ -426,7 +429,7 @@ export class PropostasService {
       proposta.portalAccess = {
         accessedAt: new Date().toISOString(),
         ip,
-        userAgent
+        userAgent,
       };
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
@@ -445,11 +448,11 @@ export class PropostasService {
   async registrarEnvioEmail(
     propostaId: string,
     emailCliente: string,
-    linkPortal?: string
+    linkPortal?: string,
   ): Promise<Proposta> {
     try {
       const proposta = await this.propostaRepository.findOne({
-        where: { id: propostaId }
+        where: { id: propostaId },
       });
 
       if (!proposta) {
@@ -460,7 +463,7 @@ export class PropostasService {
       proposta.emailDetails = {
         sentAt: new Date().toISOString(),
         emailCliente,
-        linkPortal
+        linkPortal,
       };
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
@@ -479,20 +482,22 @@ export class PropostasService {
   async marcarComoEnviada(
     propostaIdOuNumero: string,
     emailCliente: string,
-    linkPortal?: string
+    linkPortal?: string,
   ): Promise<Proposta> {
     try {
       console.log(`🔄 Marcando proposta ${propostaIdOuNumero} como enviada automaticamente`);
 
       // Tentar encontrar por ID (UUID) primeiro, depois por número
-      let proposta = await this.propostaRepository.findOne({
-        where: { id: propostaIdOuNumero }
-      }).catch(() => null); // Capturar erro de UUID inválido
+      let proposta = await this.propostaRepository
+        .findOne({
+          where: { id: propostaIdOuNumero },
+        })
+        .catch(() => null); // Capturar erro de UUID inválido
 
       // Se não encontrou por ID, tentar por número
       if (!proposta) {
         proposta = await this.propostaRepository.findOne({
-          where: { numero: propostaIdOuNumero }
+          where: { numero: propostaIdOuNumero },
         });
       }
 
@@ -505,7 +510,7 @@ export class PropostasService {
       proposta.emailDetails = {
         sentAt: new Date().toISOString(),
         emailCliente,
-        linkPortal
+        linkPortal,
       };
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);

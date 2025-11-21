@@ -11,10 +11,10 @@ import { User } from '../../users/user.entity';
 
 /**
  * 📝 Entity: Notas do Cliente
- * 
+ *
  * Permite que atendentes adicionem anotações importantes
  * sobre o cliente durante ou após atendimentos.
- * 
+ *
  * Casos de uso:
  * - Observações sobre comportamento do cliente
  * - Preferências de atendimento

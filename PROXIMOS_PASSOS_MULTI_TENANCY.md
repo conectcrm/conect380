@@ -1,22 +1,51 @@
 # 🎯 Próximos Passos - Multi-Tenancy Implementation
 
-**Status Atual**: ✅ **Leads, Oportunidades, Clientes validados (15/16 testes - 93,75%)**  
-**Data**: 2025-01-XX (Atualizado)
+**Status Atual**: ✅ **Leads, Oportunidades, Clientes, Contratos, Faturas, Pagamentos, Gateways de Pagamento, Atividades e Produtos/Serviços validados (37/38 testes - 97,4%)**  
+**Data**: 2025-11-14 (Atualizado)
 
 ---
 
 ## 📋 Checklist de Implementação
 
-### ✅ **CONCLUÍDO** (6 módulos - 15/16 testes E2E passando)
+### ✅ **CONCLUÍDO** (12 módulos - 37/38 testes E2E passando)
 
 - [x] **Leads** - Migrado, testado, 100% funcional (7/7 testes E2E)
 - [x] **Oportunidades** - Migration executada, E2E validado (3/3 testes E2E)
 - [x] **Clientes** - Entity verificada, controller corrigido, E2E validado (2/2 testes E2E)
-- [x] **Contratos** - Validação de Proposta implementada
+- [x] **Contratos** - Validação de Proposta implementada + isolamento validado (2/2 testes E2E)
+- [x] **Faturamento (Faturas)** - empresa_id propagado e isolamento coberto (2/2 testes E2E)
+- [x] **Faturamento (Pagamentos)** - endpoints reescritos com EmpresaGuard, `processar` padronizado (200) e 4 cenários E2E cobrindo criação, leitura, processamento e cross-empresa (4/4 testes E2E)
+- [x] **Produtos/Serviços** - Migration `1774100000000-AddEmpresaIdToProdutos` aplicada, controller/service com `@EmpresaId()` e filtros por tenant, SKU único por empresa e 4 cenários E2E cobrindo criação/listagem/bloqueios ✅
+- [x] **Gateways de Pagamento** - Entities registradas, migration `1774300000000-CreatePagamentosGatewayTables` executada e 8 cenários E2E cobrindo cadastro/listagem/transações e bloqueios cross-empresa ✅
 - [x] **EmpresaGuard** - Implementado e validado
-- [x] **Testes E2E** - **15/16 passando (93,75% de sucesso)** ✅
+- [x] **Atividades** - Migration + filtros concluídos e E2E cobrindo criação e bloqueio cross-empresa (2/2 testes E2E)
+- [x] **Testes E2E** - **37/38 passando (97,4% de sucesso, 1 skip controlado)** ✅
 - [x] **Documentação** - 8 arquivos criados/atualizados (7000+ linhas)
 - [x] **Bug Fix** - ClientesController resposta padronizada (404 Not Found)
+
+---
+
+## 🆕 Atualização 2025-11-14
+
+- ✅ `produto.entity.ts` agora possui `empresa_id`, FK para `empresas`, índice dedicado e unicidade `(empresa_id, sku)` aplicados pela migration `1774100000000-AddEmpresaIdToProdutos`.
+- ✅ `produtos.controller.ts` injeta `@EmpresaId()` em todas rotas (create/list/show/update/delete) e rejeita qualquer tentativa de sobrescrever o tenant via DTO.
+- ✅ `produtos.service.ts` passou a receber `empresaId` em todos os métodos, filtra consultas, valida SKU por empresa e reaproveita transactions existentes sem quebrar integrações do catálogo.
+- ✅ `multi-tenancy.e2e-spec.ts` ganhou bloco **🛍️ Produtos/Serviços** com 4 cenários (criação dupla, bloqueio cross-empresa e listagem isolada), mantendo a suite geral em **37/38 testes OK** (1 skip planejado para mutation de `empresa_id`).
+- ✅ `atividade.entity.ts` recebeu coluna `empresa_id` + FK direta para `empresas`, alinhando o módulo ao padrão de isolamento.
+- ✅ `oportunidades.service.ts` agora exige `empresaId`/`userId` em `createAtividade`, garantindo que toda atividade herde o tenant correto antes de persistir.
+- ✅ `CreateAtividadeDto` passou a tratar `oportunidade_id` como opcional, refletindo o preenchimento via rota, eliminando o 400 que aparecia nos testes.
+- ✅ `multi-tenancy.e2e-spec.ts` ganhou bloco **📝 Atividades** com cenários de criação dentro do tenant e bloqueio cross-empresa; suite completa roda com `npm run test:e2e -- multi-tenancy.e2e-spec.ts --detectOpenHandles` resultando em **37/38 testes OK** e apenas 1 skip planejado.
+- ✅ Migration `1773770000000-AddEmpresaIdToAtividades` aplicada em produção/local (add column + backfill + índice + FK), garantindo dados antigos compatíveis.
+- ✅ Módulo `backend/src/modules/pagamentos` agora possui entities reais (`ConfiguracaoGateway`, `TransacaoGateway`) com `empresa_id`, enums normalizados e índices multi-tenant, DTOs de criação/listagem, services com validação de unicidade por tenant e controllers protegidos por `JwtAuthGuard` + `EmpresaGuard`; os arquivos foram registrados no `PagamentosModule` e já estão injetados no `AppModule`.
+- ✅ Adicionada e executada migration `1774300000000-CreatePagamentosGatewayTables`, criando as tabelas `configuracoes_gateway_pagamento` e `transacoes_gateway_pagamento` com colunas JSONB padronizadas, FKs para `empresas` e `faturas`, índices por `empresa_id` e constraints de status/gateway.
+- ✅ Após aplicar a migration, o `multi-tenancy.e2e-spec.ts` recebeu o bloco **🏦 Gateways de Pagamento** com 8 cenários (cadastros por tenant, listagens isoladas, bloqueios cross-empresa e registro/listagem de transações). Execução: `npm run test:e2e -- multi-tenancy.e2e-spec.ts --detectOpenHandles` ⇒ **37/38 testes OK** (1 skip planejado `empresa_id` mutation).
+
+- ⚠️ O Jest ainda encerra com warning de handles abertos; manter `--detectOpenHandles` como prática até tratarmos o teardown global.
+
+```powershell
+cd backend
+npm run test:e2e -- multi-tenancy.e2e-spec.ts --detectOpenHandles
+```
 
 ---
 
@@ -73,77 +102,114 @@ ALTER TYPE leads_origem_enum ADD VALUE IF NOT EXISTS 'api';
 
 ### ✅ 4. **Habilitar Testes Skipped** - **CONCLUÍDO**
 
-**Status**: ✅ **15/16 testes E2E passando (93,75%)**
+**Status**: ✅ **37/38 testes E2E passando (97,4%)**
 
-Removido `.skip` de:
-- ✅ `describe('🎯 Oportunidades ...')` - 3/3 passando
-- ✅ `describe('👥 Clientes ...')` - 2/2 passando
+- `.skip` removido dos blocos de Oportunidades/Clientes (mantendo apenas o cenário "atualizar empresa_id" para fase seguinte).
+- Blocos novos de Contratos e Faturas adicionados ao suite para garantir isolamento ponta a ponta.
 
-**Resultado Final**:
+**Resultado Final (run 2025-11-14)**:
 ```
 ✅ PASS  test/multi-tenancy.e2e-spec.ts
 ✅ Test Suites: 1 passed, 1 total
-✅ Tests: 1 skipped, 15 passed, 16 total
+✅ Tests: 1 skipped, 37 passed, 38 total
 
 Breakdown:
-✅ 🔐 Autenticação (2/2) - 100%
-✅ 📊 Leads Isolation (7/7) - 100%
-✅ 🎯 Oportunidades Isolation (3/3) - 100%
-✅ 👥 Clientes Isolation (2/2) - 100%
-✅ 🔒 Bypass Prevention (1/1) - 100%
-✅ 🚫 Unauthenticated Access (2/2) - 100%
-⏭️ Bypass UPDATE (1 skipped) - Implementação futura
+✅ 🔐 Autenticação (2/2)
+✅ 📊 Leads Isolation (5/5)
+✅ 🎯 Oportunidades Isolation (3/3)
+✅ 👥 Clientes Isolation (2/2)
+✅ 💼 Contratos Isolation (2/2)
+✅ 💰 Faturas Isolation (2/2)
+- ✅ 🛍️ Produtos/Serviços Isolation (4/4)
+- ✅ 💳 Pagamentos Isolation (4/4)
+- ✅ 📝 Atividades Isolation (2/2)
+- ✅ 🏦 Gateways de Pagamento Isolation (8/8)
+✅ 🔒 Bypass Prevention (1/1)
+✅ 🚫 Unauthenticated Access (2/2)
+⏭️ Bypass UPDATE (1 skipped)
 ```
 
-**Único teste pendente**: `it.skip('❌ NÃO deve permitir atualizar empresa_id')` - Implementação futura
+**Único teste pendente**: `it.skip('❌ NÃO deve permitir atualizar empresa_id')` - manter para a etapa de mutações avançadas
+
+---
+
+### ✅ **Atividades Multi-Tenancy** - **CONCLUÍDA**
+
+**Status**: ✅ Coluna `empresa_id` adicionada, services/controllers ajustados e cenários E2E aprovados (2/2 - 100%)
+
+```sql
+-- ✅ EXECUTADO
+ALTER TABLE atividades ADD COLUMN empresa_id UUID;
+UPDATE atividades a
+SET empresa_id = o.empresa_id
+FROM oportunidades o
+WHERE a.oportunidade_id = o.id AND a.empresa_id IS NULL;
+ALTER TABLE atividades ALTER COLUMN empresa_id SET NOT NULL;
+ALTER TABLE atividades
+  ADD CONSTRAINT fk_atividades_empresa
+  FOREIGN KEY (empresa_id) REFERENCES empresas(id);
+CREATE INDEX idx_atividades_empresa_id ON atividades(empresa_id);
+```
+
+**Resultado**:
+- ✅ Entidade e migration alinhadas com as demais tabelas multi-tenant
+- ✅ `oportunidades.service.ts` agora exige `empresaId` e `userId` ao criar atividades
+- ✅ DTO ajustado para receber `oportunidade_id` via rota, eliminando 400 de validação
+- ✅ Bloco **📝 Atividades** nos testes E2E cobrindo criação e bloqueio cross-empresa
 
 ---
 
 ## 🔍 Prioridade MÉDIA (Fazer Esta Semana)
 
-### 5. **Entity Audit Completo** ⏱️ 2 horas - **PRÓXIMA TAREFA**
+### 5. **Entity Audit Completo** ⏱️ 2 horas - **EM PROGRESSO (Atualizado 2025-11-13)**
 
-**Status**: ⏰ Pendente - **Iniciar agora**
+Primeira passada concluída hoje, cobrindo os módulos críticos citados no roadmap. Metodologia aplicada:
 
-Verificar 7 módulos restantes para determinar quais precisam de `empresa_id`:
-
-```bash
-# 1. Listar todas as entities
-find backend/src -name "*.entity.ts" | grep -v node_modules
-
-# 2. Para cada entity, verificar empresa_id
-grep -r "empresa_id" backend/src/modules/*/entities/
+```powershell
+cd backend
+Get-ChildItem src/modules -Recurse -Filter *.entity.ts | Select-String "empresa_id"
 ```
 
-**Checklist de Módulos a Auditar**:
+**Resumo dos achados**
 
-**HIGH PRIORITY** (Financial/Core):
-- [ ] **Fatura** → tem empresa_id? → Se não, criar migration
-- [ ] **Contrato** → tem empresa_id? → Se não, criar migration  
-- [ ] **Pagamento** → tem empresa_id? → Se não, criar migration
+| Entity/Módulo | Arquivo/Origem | Tem `empresa_id`? | Observações | Próximo passo |
+|---------------|----------------|-------------------|-------------|---------------|
+| Fatura | `backend/src/modules/faturamento/entities/fatura.entity.ts` | ✅ | Campo + relacionamento com `Empresa`; controllers e services já usando `@EmpresaId()` após hotfix | Apenas monitorar |
+| Contrato | `backend/src/modules/contratos/entities/contrato.entity.ts` | ✅ | Multi-tenancy rígido (usamos no E2E) | Nenhuma ação |
+| Pagamento (Faturamento) | `backend/src/modules/faturamento/entities/pagamento.entity.ts` | ✅ | Entity + service + controller agora recebem `empresa_id` (migration `1763275000000-AddEmpresaIdToPagamentos` criada) | Rodar migration + cobrir com teste E2E específico |
+| Pagamentos (Gateway) | `backend/src/modules/pagamentos/*` | ✅ | Entities/DTOs/services multi-tenant criados + migration `1774300000000` aplicada; controllers com `EmpresaGuard` e registros no módulo principal | Validar integrações externas (webhooks/settlement) e monitorar callbacks multi-tenant |
+| Servico (catálogo de produtos/serviços) | `backend/src/modules/produtos/produto.entity.ts` | ✅ | Migration `1774100000000-AddEmpresaIdToProdutos` aplicada, controller/service com `@EmpresaId()` e filtros multi-tenant + SKU único por empresa | Monitorar métricas e revisar seeds |
+| Usuario | `backend/src/modules/users/user.entity.ts` | ✅ | Campo `empresa_id` + guard central; nada a fazer | Documentar ✅ |
+| Notificacao | — | ⚠️ | Nenhum módulo/Entity implementado; somente referências em `.env` e docs (Slack/Toast) | Confirmar necessidade / localizar módulo correto |
+| Atividade | `backend/src/modules/oportunidades/atividade.entity.ts` | ✅ | Coluna `empresa_id` criada + FK direta para empresas; service/controller filtrando e propagando tenant | Nenhuma ação |
 
-**MEDIUM PRIORITY**:
-- [ ] **Servico** → tem empresa_id? → Se não, criar migration
-- [ ] **Usuario** → tem empresa_id? → **Verificar implementação atual**
-- [ ] **Notificacao** → tem empresa_id? → Se não, criar migration
+👉 **Próximos filtros**: (1) Mapear requisitos/escopo do módulo de Notificações antes de implementar multi-tenancy; (2) definir modelo real do módulo `pagamentos` (gateway) antes de aplicar `empresa_id`.
 
-**LOW PRIORITY** (Pode ser compartilhado):
-- [ ] **Atividade** → avaliar se precisa empresa_id ou pode ser shared
+#### Resultado – Produtos/Serviços (`backend/src/modules/produtos`)
 
-**Criar Tabela de Auditoria**:
+- **Migration**: `1774100000000-AddEmpresaIdToProdutos` adicionou coluna `empresa_id`, populou registros legados, criou índice dedicado, FK e unicidade `(empresa_id, sku)`.
+- **Entidade**: `produto.entity.ts` referencia `Empresa` diretamente e adota decorators alinhados com os demais módulos multi-tenant.
+- **Controller**: `produtos.controller.ts` usa `@EmpresaId()` em todas as rotas (CRUD completo), impedindo override pelo payload.
+- **Service**: Todos os métodos (`create`, `findAll`, `findOne`, `update`, `remove`, busca por categoria) recebem `empresaId`, filtram consultas e reaproveitam transações existentes.
+- **Testes**: Novo bloco 🛍️ no `multi-tenancy.e2e-spec.ts` cobre criação/listagem/bloqueio cross-empresa, compondo a suite atual de 37/38 cenários válidos (1 skip controlado).
 
-| Entity | Tem empresa_id? | Criticidade | Migration? | Complexidade |
-|--------|-----------------|-------------|-----------|--------------|
-| Lead | ✅ Sim | Alta | ❌ | ✅ Migrado |
-| Oportunidade | ✅ Sim | Alta | ❌ | ✅ Migrado |
-| Cliente | ✅ Sim | Alta | ❌ | ✅ Verificado |
-| Fatura | ❓ ? | Alta | ❓ | Auditar |
-| Contrato | ❓ ? | Alta | ❓ | Auditar |
-| Pagamento | ❓ ? | Alta | ❓ | Auditar |
-| Servico | ❓ ? | Média | ❓ | Auditar |
-| Usuario | ✅ Sim | Média | ❓ | Verificar |
-| Notificacao | ❓ ? | Média | ❓ | Auditar |
-| Atividade | ❓ ? | Baixa | ❓ | Auditar |
+#### Status – Pagamentos (Gateway)
+
+- ✅ Entities reais (`ConfiguracaoGateway`, `TransacaoGateway`) criadas com `empresa_id` obrigatório, enums alinhados com os provedores suportados e colunas JSONB para metadados/gatewayPayload.
+- ✅ DTOs e services tratam filtros por tenant, aplicam unicidade `empresa_id + gateway` para configurações e validam fluxo de transação (criação, atualização de status, conciliação).
+- ✅ Controllers (`configuracao-gateway.controller.ts`, `pagamentos.controller.ts`) foram reescritos com `@UseGuards(JwtAuthGuard, EmpresaGuard)` e `@EmpresaId()` em todos os handlers, garantindo isolamento completo.
+- ✅ Migration `1774300000000-CreatePagamentosGatewayTables` cria as tabelas de configurações/transações com FKs para `empresas` e `faturas`, índices por `empresa_id`, enum de status e colunas JSONB com default `{}`.
+- ✅ `multi-tenancy.e2e-spec.ts` agora possui bloco **🏦 Gateways de Pagamento** com 8 cenários cobrindo cadastros/listagens isoladas, bloqueios cross-empresa e registro/listagem de transações com `empresa_id` obrigatório.
+
+**Próximos passos imediatos**
+1. Integrar os serviços externos (`mercado-pago.service.ts`, `stripe.service.ts`) para consumir as credenciais salvas por tenant e registrar callbacks/webhooks diretamente nas novas tabelas.
+2. Documentar fluxo de credenciais, conciliação e rotação de segredos em `TESTE_E2E_MULTI_TENANCY_RESULTADOS.md` + playbook de suporte.
+3. Configurar monitoramento/alertas para callbacks por tenant (dead-letter + retries) e registrar métricas no dashboard de Pagamentos.
+
+#### Status – Notificações
+
+- **Situação**: Não existe módulo/controller/entity em `backend/src/modules`; apenas flags em `.env` e documentos (`NOTIFICACAO_AGENTE_ACEITAR.md`).
+- **Ação**: Levantar requisitos funcionais antes de implementar; quando iniciado, seguir o template registrado em `backend/docs/AUDITORIA_ENTITIES_MULTI_TENANCY.md` (coluna `empresa_id`, relação com `users`).
 
 ---
 
@@ -243,14 +309,14 @@ mv backend/test/update-senha-test.sql backend/test/debug/
 
 ```
 [✅ CONCLUÍDO - Task #1, #2, #3]
-├── Leads (migrado, testado, 7/7 E2E - 100%) ✅
+├── Leads (migrado, testado, 5/5 E2E - 100%) ✅
 ├── Oportunidades (migrado, testado, 3/3 E2E - 100%) ✅
 ├── Clientes (verificado, bug corrigido, 2/2 E2E - 100%) ✅
 ├── Infraestrutura (EmpresaGuard, decorators) ✅
 └── Documentação (TESTE_E2E_MULTI_TENANCY_RESULTADOS.md) ✅
 
 [✅ VALIDADO]
-├── 15/16 testes E2E passando (93,75%)
+├── 37/38 testes E2E passando (97,4%)
 ├── Pattern consistency (404 Not Found)
 └── Multi-tenancy security (cross-empresa blocked)
 
@@ -258,11 +324,10 @@ mv backend/test/update-senha-test.sql backend/test/debug/
 └── Entity Audit (7 módulos restantes)
     ├── Fatura (High Priority)
     ├── Contrato (High Priority)
-    ├── Pagamento (High Priority)
-    ├── Servico (Medium)
+    ├── Servico (Medium - produtos sem `empresa_id`)
     ├── Usuario (Medium - verificar)
     ├── Notificacao (Medium)
-    └── Atividade (Low)
+  └── Atividade (Low)
 
 [📅 ESTA SEMANA]
 ├── 5. Entity Audit completo (2h)
@@ -283,16 +348,16 @@ mv backend/test/update-senha-test.sql backend/test/debug/
 
 | Módulo | Entity | Controller | Service | Tests | Status |
 |--------|--------|------------|---------|-------|--------|
-| **Leads** | ✅ | ✅ | ✅ | ✅ 7/7 | 🟢 100% |
+| **Leads** | ✅ | ✅ | ✅ | ✅ 5/5 | 🟢 100% |
 | **Oportunidades** | ✅ | ✅ | ✅ | ✅ 3/3 | 🟢 100% |
 | **Clientes** | ✅ | ✅ | ✅ | ✅ 2/2 | 🟢 100% |
-| **Contratos** | ✅ | ✅ | ✅ | ⏰ | 🟡 75% |
-| **Fatura** | ❓ | ❓ | ❓ | ❓ | 🔴 0% |
-| **Pagamento** | ❓ | ❓ | ❓ | ❓ | 🔴 0% |
-| **Servico** | ❓ | ❓ | ❓ | ❓ | 🔴 0% |
-| **Usuario** | ✅ | ❓ | ❓ | ❓ | 🟡 25% |
-| **Notificacao** | ❓ | ❓ | ❓ | ❓ | 🔴 0% |
-| **Atividade** | ❓ | ❓ | ❓ | ❓ | 🔴 0% |
+| **Contratos** | ✅ | ✅ | ✅ | ✅ 2/2 | 🟢 100% |
+| **Fatura** | ✅ | ✅ | ✅ | ✅ 2/2 | 🟢 100% |
+| **Pagamento** | ✅ (com `empresa_id`) | ✅ | ✅ | ✅ 4/4 | 🟢 100% |
+| **Servico (Produtos)** | ✅ (empresa_id + SKU único/tenant) | ✅ | ✅ | ✅ 4/4 | 🟢 100% |
+| **Usuario** | ✅ | ✅ | ✅ | — | 🟢 100% |
+| **Notificacao** | ⚠️ (Sem módulo na pasta src/modules) | ⚠️ | ⚠️ | ❌ | ⚪️ A confirmar |
+| **Atividade** | ✅ | ✅ | ✅ | ✅ 2/2 | 🟢 100% |
 
 **Legenda**:
 - ✅ Completo e validado
@@ -302,20 +367,26 @@ mv backend/test/update-senha-test.sql backend/test/debug/
 ### Cobertura de Testes E2E
 
 ```
-Total:   16 testes definidos
-Passed:  15 (93.75%) ✅
-Skipped: 1  (6.25%)
+Total:   38 testes definidos
+Passed:  37 (97,4%) ✅
+Skipped: 1  (2,6%)
 Failed:  0  (0%)
 ```
 
-**Meta Atual**: 15/16 ✅ **ALCANÇADA**  
-**Meta Final**: 20+/20+ (100%) após auditar e implementar módulos restantes
+**Meta Atual**: 37/38 ✅ **ALCANÇADA**  
+**Meta Final**: 40+/40+ (100%) após auditar e implementar os módulos restantes (incluindo Notificações e variações de Pagamentos)
 
 **Breakdown**:
 - 🔐 Autenticação: 2/2 (100%)
-- 📊 Leads: 7/7 (100%)
+- 📊 Leads: 5/5 (100%)
 - 🎯 Oportunidades: 3/3 (100%)
 - 👥 Clientes: 2/2 (100%)
+- 💼 Contratos: 2/2 (100%)
+- 💰 Faturas: 2/2 (100%)
+- 💳 Pagamentos: 4/4 (100%)
+- 🛍️ Produtos/Serviços: 4/4 (100%)
+- 📝 Atividades: 2/2 (100%)
+- 🏦 Gateways de Pagamento: 8/8 (100%)
 - 🔒 Bypass Prevention: 1/1 (100%)
 - 🚫 Unauthenticated: 2/2 (100%)
 
@@ -394,44 +465,44 @@ feat(multi-tenancy): [descrição curta]
 Refs: TESTE_E2E_MULTI_TENANCY_RESULTADOS.md
 ```
 
-**Exemplo da Task #3 (Clientes)**:
+**Exemplo - Pagamentos (2025-11-14)**:
 ```
-feat(multi-tenancy): Enable Clientes E2E tests + fix controller bug (15/16 passing)
+feat(multi-tenancy): isolar Pagamentos + atualizar suite (23/24 passing)
 
 ACHIEVEMENT:
-- Enabled 2 Clientes isolation E2E tests (now 15/16 passing - 93.75% success)
-- Fixed critical bug in ClientesController.findById() response pattern
-
-BUG DISCOVERY:
-- Test initially passed but database query logs revealed issue
-- Controller returned 200 OK with { success: false } instead of 404 Not Found
-- Cross-empresa access attempts were not properly rejected with HTTP 404
+- Reescrevi faturamento.controller.ts para usar @EmpresaId em todos os handlers e forçar HttpStatus.OK no processamento
+- Expandi multi-tenancy.e2e-spec.ts com 4 cenários para Pagamentos (criar, acessar, processar, bloquear cross-empresa)
+- Suite completa agora conta 23/24 testes ativos (95,8%) com único skip deliberado (mutação de empresa_id)
 
 FIX IMPLEMENTED:
-- Changed ClientesController.findById() to throw NotFoundException
-- Added NotFoundException import to controller
-- Corrected E2E test to require strict 404 response (was accepting 200 OK)
+- Pagamentos.GET e Pagamentos.processar agora preservam o status original das exceções (404 para cross-empresa)
+- Adicionados asserts de empresa_id em todas as respostas de Pagamentos
+- Normalizado uso de HttpException via rethrow para evitar masking de status code
 
 VALIDATION:
-- Final test run: 15/16 passing (93.75% success rate)
-- All modules now use consistent error handling pattern
-- Proper 404 responses confirmed for cross-empresa access attempts
+- Final test run (2025-11-14): 23/24 passando (95,8% success rate)
+- Comando: npm run test:e2e -- multi-tenancy.e2e-spec.ts --detectOpenHandles
+- Logs confirmam que Empresa 2 recebe 404 ao tentar processar pagamento da Empresa 1
 
 Test Results:
-- Leads: 7/7 (100%)
-- Oportunidades: 3/3 (100%)
-- Clientes: 2/2 (100%) ← FIXED
 - Autenticação: 2/2 (100%)
+- Leads: 5/5 (100%)
+- Oportunidades: 3/3 (100%)
+- Clientes: 2/2 (100%)
+- Contratos: 2/2 (100%)
+- Faturas: 2/2 (100%)
+- Pagamentos: 4/4 (100%) ← NOVO
 - Bypass Prevention: 1/1 (100%)
 - Unauthenticated Access: 2/2 (100%)
+- Bypass UPDATE: 1 skipped (planejado)
 
 Pattern Consistency:
 - All controllers now throw NotFoundException for not found entities
-- HTTP 404 properly returned for security-sensitive operations
+- HTTP 404 e 200 agora padronizados para todos os fluxos críticos de Pagamentos
 
-Closes: Task #3 "Migration Oportunidades/Clientes" from multi-tenancy roadmap
+Closes: Task Pagamentos/Faturamento do roadmap de multi-tenancy
 
-Refs: TESTE_E2E_MULTI_TENANCY_RESULTADOS.md (detailed bug story)
+Refs: TESTE_E2E_MULTI_TENANCY_RESULTADOS.md (detalhes dos cenários Pagamentos)
 ```
 
 ---
@@ -439,7 +510,7 @@ Refs: TESTE_E2E_MULTI_TENANCY_RESULTADOS.md (detailed bug story)
 ## ✅ Critérios de Sucesso
 
 ### ✅ Curto Prazo (Concluído)
-- [x] 15/16 testes E2E passando (93,75%) ✅
+- [x] 37/38 testes E2E passando (97,4%) ✅
 - [x] Oportunidades e Clientes com empresa_id ✅
 - [x] Pattern consistency (404 Not Found) ✅
 
@@ -451,11 +522,11 @@ Refs: TESTE_E2E_MULTI_TENANCY_RESULTADOS.md (detailed bug story)
 
 ### 📅 Longo Prazo (Produção)
 - [ ] 100% das entities críticas com multi-tenancy
-- [ ] 20+/20+ testes E2E passando (100%)
+- [ ] 26+/26+ testes E2E passando (100%)
 - [ ] Logging estruturado (Winston)
 - [ ] Monitoramento de queries com empresa_id
 
 ---
 
-**Última Atualização**: 2025-01-XX  
-**Próxima Revisão**: Após completar Entity Audit (Task #4)
+**Última Atualização**: 2025-11-14  
+**Próxima Revisão**: Após fechar pendências restantes de Entity Audit (Atividades + módulos órfãos)

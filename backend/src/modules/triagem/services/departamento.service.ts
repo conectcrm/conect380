@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike } from 'typeorm';
 import { Departamento } from '../entities/departamento.entity';
@@ -20,18 +15,13 @@ export class DepartamentoService {
   constructor(
     @InjectRepository(Departamento)
     private readonly departamentoRepository: Repository<Departamento>,
-  ) { }
+  ) {}
 
   /**
    * Cria um novo departamento
    */
-  async create(
-    empresaId: string,
-    createDto: CreateDepartamentoDto,
-  ): Promise<Departamento> {
-    this.logger.log(
-      `Criando departamento "${createDto.nome}" para empresa ${empresaId}`,
-    );
+  async create(empresaId: string, createDto: CreateDepartamentoDto): Promise<Departamento> {
+    this.logger.log(`Criando departamento "${createDto.nome}" para empresa ${empresaId}`);
 
     // Validar se o nome já existe no mesmo núcleo
     const existente = await this.departamentoRepository.findOne({
@@ -79,10 +69,7 @@ export class DepartamentoService {
   /**
    * Busca todos os departamentos com filtros opcionais
    */
-  async findAll(
-    empresaId: string,
-    filters?: FilterDepartamentoDto,
-  ): Promise<Departamento[]> {
+  async findAll(empresaId: string, filters?: FilterDepartamentoDto): Promise<Departamento[]> {
     try {
       this.logger.log(`Buscando departamentos para empresa ${empresaId}`);
 
@@ -141,13 +128,8 @@ export class DepartamentoService {
   /**
    * Busca departamentos por núcleo (apenas ativos)
    */
-  async findByNucleo(
-    empresaId: string,
-    nucleoId: string,
-  ): Promise<Departamento[]> {
-    this.logger.log(
-      `Buscando departamentos ativos do núcleo ${nucleoId}`,
-    );
+  async findByNucleo(empresaId: string, nucleoId: string): Promise<Departamento[]> {
+    this.logger.log(`Buscando departamentos ativos do núcleo ${nucleoId}`);
 
     return this.departamentoRepository.find({
       where: {
@@ -172,9 +154,7 @@ export class DepartamentoService {
     });
 
     if (!departamento) {
-      throw new NotFoundException(
-        `Departamento com ID ${id} não encontrado`,
-      );
+      throw new NotFoundException(`Departamento com ID ${id} não encontrado`);
     }
 
     return departamento;
@@ -265,9 +245,7 @@ export class DepartamentoService {
   ): Promise<Departamento> {
     const departamento = await this.findOne(empresaId, id);
 
-    departamento.atendentesIds = departamento.atendentesIds.filter(
-      (id) => id !== atendenteId,
-    );
+    departamento.atendentesIds = departamento.atendentesIds.filter((id) => id !== atendenteId);
 
     return this.departamentoRepository.save(departamento);
   }

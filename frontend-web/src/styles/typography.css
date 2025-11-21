@@ -17,9 +17,9 @@
 }
 
 html {
-  /* Base font-size moderna: 16px para melhor acessibilidade */
-  font-size: 16px;
-  line-height: 1.5;
+  /* Base font-size ajustada: ~15px para densidade maior em desktop */
+  font-size: 93.75%;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -28,7 +28,8 @@ html {
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
   font-weight: 400;
-  color: #1f2937; /* Gray-800 mais suave para leitura */
+  color: #1f2937;
+  /* Gray-800 mais suave para leitura */
   background-color: #ffffff;
 }
 
@@ -38,15 +39,18 @@ body {
 
 /* Headings - Seguindo padrão dos CRMs líderes */
 h1 {
-  font-size: clamp(1.75rem, 4vw, 2.5rem); /* 28px → 40px */
+  font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+  /* 24px → 35px */
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: -0.025em;
-  color: #111827; /* Gray-900 */
+  color: #111827;
+  /* Gray-900 */
 }
 
 h2 {
-  font-size: clamp(1.5rem, 3.5vw, 2rem); /* 24px → 32px */
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+  /* 22px → 30px */
   font-weight: 600;
   line-height: 1.25;
   letter-spacing: -0.015em;
@@ -54,7 +58,8 @@ h2 {
 }
 
 h3 {
-  font-size: clamp(1.25rem, 3vw, 1.5rem); /* 20px → 24px */
+  font-size: clamp(1.2rem, 2.4vw, 1.4rem);
+  /* 19px → 22px */
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: -0.01em;
@@ -62,21 +67,24 @@ h3 {
 }
 
 h4 {
-  font-size: clamp(1.125rem, 2.5vw, 1.25rem); /* 18px → 20px */
+  font-size: clamp(1.1rem, 2.1vw, 1.25rem);
+  /* 17px → 20px */
   font-weight: 600;
   line-height: 1.4;
   color: #1f2937;
 }
 
 h5 {
-  font-size: clamp(1rem, 2vw, 1.125rem); /* 16px → 18px */
+  font-size: clamp(0.95rem, 1.8vw, 1.1rem);
+  /* 15px → 18px */
   font-weight: 600;
   line-height: 1.4;
   color: #374151;
 }
 
 h6 {
-  font-size: clamp(0.875rem, 1.5vw, 1rem); /* 14px → 16px */
+  font-size: clamp(0.85rem, 1.4vw, 0.95rem);
+  /* 13.5px → 15px */
   font-weight: 600;
   line-height: 1.4;
   color: #374151;
@@ -89,37 +97,46 @@ h6 {
    ================================= */
 
 /* Texto base - otimizado para leitura */
-p, .text-base {
-  font-size: clamp(0.875rem, 2vw, 1rem); /* 14px → 16px */
+p,
+.text-base {
+  font-size: clamp(0.85rem, 1.8vw, 0.95rem);
+  /* 13.5px → 15px */
   line-height: 1.6;
-  color: #374151; /* Gray-700 */
+  color: #374151;
+  /* Gray-700 */
   margin-bottom: 1rem;
 }
 
 /* Texto pequeno - labels, hints, metadados */
-.text-sm, small {
-  font-size: clamp(0.75rem, 1.5vw, 0.875rem); /* 12px → 14px */
+.text-sm,
+small {
+  font-size: clamp(0.72rem, 1.3vw, 0.82rem);
+  /* 11.5px → 13px */
   line-height: 1.5;
-  color: #6b7280; /* Gray-500 */
+  color: #6b7280;
+  /* Gray-500 */
 }
 
 /* Texto muito pequeno - códigos, timestamps */
 .text-xs {
-  font-size: clamp(0.6875rem, 1.2vw, 0.75rem); /* 11px → 12px */
+  font-size: clamp(0.65rem, 1.1vw, 0.72rem);
+  /* 10.5px → 11.5px */
   line-height: 1.4;
   color: #6b7280;
 }
 
 /* Texto grande - destaque, lead paragraphs */
 .text-lg {
-  font-size: clamp(1rem, 2.5vw, 1.125rem); /* 16px → 18px */
+  font-size: clamp(0.98rem, 2.3vw, 1.08rem);
+  /* 15.5px → 17px */
   line-height: 1.6;
   color: #374151;
 }
 
 /* Texto extra grande - números, KPIs */
 .text-xl {
-  font-size: clamp(1.25rem, 3vw, 1.5rem); /* 20px → 24px */
+  font-size: clamp(1.15rem, 2.6vw, 1.35rem);
+  /* 18px → 22px */
   line-height: 1.4;
   color: #1f2937;
 }
@@ -128,12 +145,29 @@ p, .text-base {
    PESOS E ESTILOS DE FONTE
    ================================= */
 
-.font-light { font-weight: 300; }
-.font-normal { font-weight: 400; }
-.font-medium { font-weight: 500; }
-.font-semibold { font-weight: 600; }
-.font-bold { font-weight: 700; }
-.font-extrabold { font-weight: 800; }
+.font-light {
+  font-weight: 300;
+}
+
+.font-normal {
+  font-weight: 400;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+.font-bold {
+  font-weight: 700;
+}
+
+.font-extrabold {
+  font-weight: 800;
+}
 
 /* =================================
    ELEMENTOS ESPECÍFICOS DE CRM
@@ -141,7 +175,7 @@ p, .text-base {
 
 /* Labels de formulário */
 .form-label {
-  font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+  font-size: clamp(0.72rem, 1.3vw, 0.82rem);
   font-weight: 500;
   color: #374151;
   margin-bottom: 0.5rem;
@@ -151,37 +185,41 @@ p, .text-base {
 
 /* Inputs e campos de formulário */
 .form-input {
-  font-size: clamp(0.875rem, 2vw, 1rem);
+  font-size: clamp(0.84rem, 1.7vw, 0.94rem);
   line-height: 1.5;
   color: #1f2937;
   font-weight: 400;
 }
 
 .form-input::placeholder {
-  color: #9ca3af; /* Gray-400 */
+  color: #9ca3af;
+  /* Gray-400 */
   font-weight: 400;
 }
 
 /* Textos de erro */
 .error-text {
-  font-size: clamp(0.75rem, 1.5vw, 0.875rem);
-  color: #dc2626; /* Red-600 */
+  font-size: clamp(0.72rem, 1.3vw, 0.82rem);
+  color: #dc2626;
+  /* Red-600 */
   font-weight: 500;
   margin-top: 0.25rem;
 }
 
 /* Textos de sucesso */
 .success-text {
-  font-size: clamp(0.75rem, 1.5vw, 0.875rem);
-  color: #16a34a; /* Green-600 */
+  font-size: clamp(0.72rem, 1.3vw, 0.82rem);
+  color: #16a34a;
+  /* Green-600 */
   font-weight: 500;
   margin-top: 0.25rem;
 }
 
 /* Textos de aviso */
 .warning-text {
-  font-size: clamp(0.75rem, 1.5vw, 0.875rem);
-  color: #d97706; /* Amber-600 */
+  font-size: clamp(0.72rem, 1.3vw, 0.82rem);
+  color: #d97706;
+  /* Amber-600 */
   font-weight: 500;
   margin-top: 0.25rem;
 }
@@ -191,7 +229,7 @@ p, .text-base {
    ================================= */
 
 .badge {
-  font-size: clamp(0.6875rem, 1.2vw, 0.75rem);
+  font-size: clamp(0.65rem, 1.05vw, 0.72rem);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -206,19 +244,19 @@ p, .text-base {
    ================================= */
 
 .btn-text {
-  font-size: clamp(0.875rem, 2vw, 1rem);
+  font-size: clamp(0.84rem, 1.7vw, 0.95rem);
   font-weight: 500;
   letter-spacing: 0.025em;
 }
 
 .btn-text-sm {
-  font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+  font-size: clamp(0.72rem, 1.3vw, 0.82rem);
   font-weight: 500;
   letter-spacing: 0.025em;
 }
 
 .btn-text-lg {
-  font-size: clamp(1rem, 2.5vw, 1.125rem);
+  font-size: clamp(0.98rem, 2.2vw, 1.1rem);
   font-weight: 600;
   letter-spacing: 0.025em;
 }
@@ -228,7 +266,7 @@ p, .text-base {
    ================================= */
 
 .nav-link {
-  font-size: clamp(0.875rem, 2vw, 1rem);
+  font-size: clamp(0.84rem, 1.7vw, 0.95rem);
   font-weight: 500;
   color: #6b7280;
   transition: color 0.2s ease;
@@ -236,11 +274,12 @@ p, .text-base {
 
 .nav-link:hover,
 .nav-link.active {
-  color: #2563eb; /* Blue-600 */
+  color: #2563eb;
+  /* Blue-600 */
 }
 
 .nav-title {
-  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  font-size: clamp(0.95rem, 2.1vw, 1.18rem);
   font-weight: 700;
   color: #111827;
 }
@@ -250,7 +289,7 @@ p, .text-base {
    ================================= */
 
 .table-header {
-  font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+  font-size: clamp(0.7rem, 1.2vw, 0.8rem);
   font-weight: 600;
   color: #374151;
   text-transform: uppercase;
@@ -258,14 +297,14 @@ p, .text-base {
 }
 
 .table-cell {
-  font-size: clamp(0.875rem, 2vw, 1rem);
+  font-size: clamp(0.84rem, 1.7vw, 0.95rem);
   color: #1f2937;
   line-height: 1.5;
 }
 
 .table-cell-numeric {
   font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
-  font-size: clamp(0.875rem, 2vw, 1rem);
+  font-size: clamp(0.84rem, 1.7vw, 0.95rem);
   font-weight: 500;
   color: #1f2937;
 }
@@ -275,7 +314,7 @@ p, .text-base {
    ================================= */
 
 .card-title {
-  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  font-size: clamp(0.98rem, 2.2vw, 1.18rem);
   font-weight: 600;
   color: #111827;
   margin-bottom: 0.5rem;
@@ -283,14 +322,14 @@ p, .text-base {
 }
 
 .card-subtitle {
-  font-size: clamp(0.875rem, 2vw, 1rem);
+  font-size: clamp(0.84rem, 1.7vw, 0.95rem);
   color: #6b7280;
   font-weight: 400;
   margin-bottom: 1rem;
 }
 
 .card-content {
-  font-size: clamp(0.875rem, 2vw, 1rem);
+  font-size: clamp(0.84rem, 1.7vw, 0.95rem);
   line-height: 1.6;
   color: #374151;
 }
@@ -301,14 +340,14 @@ p, .text-base {
 
 .metric-value {
   font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
-  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  font-size: clamp(1.4rem, 3.4vw, 2.2rem);
   font-weight: 700;
   color: #111827;
   line-height: 1.1;
 }
 
 .metric-label {
-  font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+  font-size: clamp(0.7rem, 1.2vw, 0.82rem);
   font-weight: 500;
   color: #6b7280;
   text-transform: uppercase;
@@ -316,21 +355,31 @@ p, .text-base {
 }
 
 .metric-change {
-  font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+  font-size: clamp(0.7rem, 1.2vw, 0.82rem);
   font-weight: 600;
 }
 
-.metric-change.positive { color: #16a34a; }
-.metric-change.negative { color: #dc2626; }
-.metric-change.neutral { color: #6b7280; }
+.metric-change.positive {
+  color: #16a34a;
+}
+
+.metric-change.negative {
+  color: #dc2626;
+}
+
+.metric-change.neutral {
+  color: #6b7280;
+}
 
 /* =================================
    CÓDIGO E MONOSPACE
    ================================= */
 
-code, pre, .code {
+code,
+pre,
+.code {
   font-family: 'JetBrains Mono', 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+  font-size: clamp(0.72rem, 1.3vw, 0.82rem);
   color: #1f2937;
   background-color: #f3f4f6;
   padding: 0.125rem 0.25rem;
@@ -353,12 +402,12 @@ pre {
   .mobile-text-sm {
     font-size: 0.875rem !important;
   }
-  
+
   .mobile-hide-text {
     font-size: 0 !important;
     overflow: hidden;
   }
-  
+
   .mobile-compact {
     line-height: 1.3 !important;
   }
@@ -376,7 +425,7 @@ pre {
   .desktop-text-lg {
     font-size: 1.125rem !important;
   }
-  
+
   .desktop-comfortable {
     line-height: 1.7 !important;
   }
@@ -399,7 +448,7 @@ pre {
   body {
     color: #000000;
   }
-  
+
   .text-muted {
     color: #333333 !important;
   }
@@ -453,11 +502,11 @@ pre {
   color: #f9fafb;
 }
 
-[data-theme="dark"] h1, 
-[data-theme="dark"] h2, 
-[data-theme="dark"] h3, 
-[data-theme="dark"] h4, 
-[data-theme="dark"] h5, 
+[data-theme="dark"] h1,
+[data-theme="dark"] h2,
+[data-theme="dark"] h3,
+[data-theme="dark"] h4,
+[data-theme="dark"] h5,
 [data-theme="dark"] h6 {
   color: #ffffff;
 }

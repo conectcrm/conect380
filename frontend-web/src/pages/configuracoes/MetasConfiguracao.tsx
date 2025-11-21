@@ -271,7 +271,7 @@ const MetasConfiguracao: React.FC = () => {
 
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
           >
             <Plus className="w-4 h-4" />
             Nova Meta
@@ -509,7 +509,7 @@ const MetasConfiguracao: React.FC = () => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2 bg-[#159A9C] hover:bg-[#0F7B7D] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
                   >
                     <Save className="w-4 h-4" />
                     {loading ? 'Salvando...' : editingMeta ? 'Atualizar' : 'Criar Meta'}

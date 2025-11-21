@@ -1,18 +1,25 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Contrato } from './contrato.entity';
 import { User } from '../../users/user.entity';
 
 export enum TipoAssinatura {
   DIGITAL = 'digital',
   ELETRONICA = 'eletronica',
-  PRESENCIAL = 'presencial'
+  PRESENCIAL = 'presencial',
 }
 
 export enum StatusAssinatura {
   PENDENTE = 'pendente',
   ASSINADO = 'assinado',
   REJEITADO = 'rejeitado',
-  EXPIRADO = 'expirado'
+  EXPIRADO = 'expirado',
 }
 
 @Entity('assinaturas_contrato')
@@ -23,7 +30,7 @@ export class AssinaturaContrato {
   @Column()
   contratoId: number;
 
-  @ManyToOne(() => Contrato, contrato => contrato.assinaturas)
+  @ManyToOne(() => Contrato, (contrato) => contrato.assinaturas)
   @JoinColumn({ name: 'contratoId' })
   contrato: Contrato;
 
@@ -37,14 +44,14 @@ export class AssinaturaContrato {
   @Column({
     type: 'enum',
     enum: TipoAssinatura,
-    default: TipoAssinatura.DIGITAL
+    default: TipoAssinatura.DIGITAL,
   })
   tipo: TipoAssinatura;
 
   @Column({
     type: 'enum',
     enum: StatusAssinatura,
-    default: StatusAssinatura.PENDENTE
+    default: StatusAssinatura.PENDENTE,
   })
   status: StatusAssinatura;
 

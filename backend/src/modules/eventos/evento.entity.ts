@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 export enum TipoEvento {
   REUNIAO = 'reuniao',
@@ -6,7 +12,7 @@ export enum TipoEvento {
   APRESENTACAO = 'apresentacao',
   VISITA = 'visita',
   FOLLOW_UP = 'follow-up',
-  OUTRO = 'outro'
+  OUTRO = 'outro',
 }
 
 @Entity('evento')
@@ -35,7 +41,7 @@ export class Evento {
   @Column({
     type: 'enum',
     enum: TipoEvento,
-    default: TipoEvento.REUNIAO
+    default: TipoEvento.REUNIAO,
   })
   tipo: TipoEvento;
 

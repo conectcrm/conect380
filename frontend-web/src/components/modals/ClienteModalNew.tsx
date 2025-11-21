@@ -121,7 +121,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
       try {
         const response = await fetch(`https://viacep.com.br/ws/${cep.replace('-', '')}/json/`);
         const data = await response.json();
-        
+
         if (!data.erro) {
           setValue('endereco.logradouro', data.logradouro || '');
           setValue('endereco.bairro', data.bairro || '');
@@ -192,7 +192,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg shadow-xl w-[calc(100%-2rem)] sm:w-[700px] md:w-[800px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
@@ -217,11 +217,10 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => setCurrentTab(tab.id)}
-                className={`flex-1 flex items-center justify-center px-4 py-3 text-sm font-medium transition-colors ${
-                  currentTab === tab.id
+                className={`flex-1 flex items-center justify-center px-4 py-3 text-sm font-medium transition-colors ${currentTab === tab.id
                     ? 'text-[#159A9C] border-b-2 border-[#159A9C] bg-[#DEEFE7]/30'
                     : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                }`}
+                  }`}
               >
                 <Icon className="w-4 h-4 mr-2" />
                 {tab.label}
@@ -353,7 +352,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
                 <h3 className="text-lg font-medium text-gray-900 mb-4">
                   Informações de Endereço
                 </h3>
-                
+
                 {/* CEP com busca automática */}
                 <FormField
                   name="endereco.cep"
@@ -381,7 +380,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
                 <h3 className="text-lg font-medium text-gray-900 mb-4">
                   Informações Adicionais
                 </h3>
-                
+
                 <FormField
                   name="observacoes"
                   label="Observações"
@@ -405,7 +404,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
                 </span>
               )}
             </div>
-            
+
             <div className="flex space-x-3">
               <button
                 type="button"

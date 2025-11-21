@@ -47,11 +47,11 @@ export const ModuloBloqueado: React.FC<ModuloBloqueadoProps> = ({
             <div className="inline-flex items-center justify-center w-24 h-24 bg-white/20 backdrop-blur-sm rounded-full mb-6">
               <Lock className="h-12 w-12 text-white" />
             </div>
-            
+
             <h1 className="text-3xl font-bold text-white mb-3">
               Módulo {moduloNome}
             </h1>
-            
+
             <p className="text-blue-100 text-lg">
               Este recurso não está disponível no seu plano atual
             </p>
@@ -124,16 +124,16 @@ export const ModuloBloqueado: React.FC<ModuloBloqueadoProps> = ({
           {/* Footer */}
           <div className="bg-gray-50 px-8 py-6 border-t border-gray-200">
             <div className="flex items-center justify-center gap-6 text-sm text-gray-600">
-              <a 
-                href="mailto:vendas@conectcrm.com.br" 
+              <a
+                href="mailto:vendas@conectcrm.com.br"
                 className="flex items-center gap-2 hover:text-[#159A9C] transition"
               >
                 <Mail className="h-4 w-4" />
                 vendas@conectcrm.com.br
               </a>
               <span className="text-gray-300">|</span>
-              <a 
-                href="tel:+5511999999999" 
+              <a
+                href="tel:+5511999999999"
                 className="flex items-center gap-2 hover:text-[#159A9C] transition"
               >
                 <Phone className="h-4 w-4" />

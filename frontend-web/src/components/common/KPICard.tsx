@@ -1,18 +1,23 @@
 import React from 'react';
+import { LucideIcon } from 'lucide-react';
 import { LoaderIcon, ArrowUpIcon, ArrowDownIcon } from '../icons';
 
 interface KPICardProps {
-  title: string;
-  value: string | number;
+  title?: string;
+  titulo?: string;
+  value?: string | number;
+  valor?: string | number;
   subtitle?: string;
-  icon: React.ReactNode;
+  descricao?: string;
+  icon?: React.ReactNode;
+  icone?: LucideIcon;
   trend?: {
     value: number;
     isPositive: boolean;
     label: string;
   };
   isLoading?: boolean;
-  color?: 'blue' | 'green' | 'purple' | 'orange' | 'red';
+  color?: 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'crevasse';
   className?: string;
   'aria-label'?: string;
   'aria-describedby'?: string;
@@ -54,13 +59,25 @@ const colorClasses = {
     text: 'text-red-600',
     border: 'border-red-200',
   },
+  // Tema Crevasse - Paleta oficial do sistema
+  crevasse: {
+    bg: 'bg-white',
+    iconBg: 'bg-gradient-to-br from-[#DEEFE7] to-[#B4BEC9]',
+    iconColor: 'text-[#159A9C]',
+    text: 'text-[#002333]',
+    border: 'border-[#DEEFE7]',
+  },
 };
 
 export const KPICard: React.FC<KPICardProps> = ({
   title,
+  titulo,
   value,
+  valor,
   subtitle,
+  descricao,
   icon,
+  icone,
   trend,
   isLoading = false,
   color = 'blue',
@@ -68,17 +85,26 @@ export const KPICard: React.FC<KPICardProps> = ({
   'aria-label': ariaLabel,
   'aria-describedby': ariaDescribedBy,
 }) => {
+  // Suportar props em português e inglês
+  const displayTitle = titulo || title || '';
+  const displayValue = valor ?? value ?? '';
+  const displaySubtitle = descricao || subtitle;
+
+  // Se icone (LucideIcon) for passado, renderizar como componente
+  const Icon = icone;
+  const displayIcon = Icon ? <Icon className="h-8 w-8" /> : icon;
+
   const colors = colorClasses[color];
   const cardId = React.useId();
   const valueId = `${cardId}-value`;
   const trendId = `${cardId}-trend`;
 
   // Gera aria-label automático se não fornecido
-  const autoAriaLabel = ariaLabel || `${title}: ${typeof value === 'number' ? value.toLocaleString('pt-BR') : value}${trend ? `, tendência ${trend.isPositive ? 'positiva' : 'negativa'} de ${trend.value}%` : ''}`;
+  const autoAriaLabel = ariaLabel || `${displayTitle}: ${typeof displayValue === 'number' ? displayValue.toLocaleString('pt-BR') : displayValue}${trend ? `, tendência ${trend.isPositive ? 'positiva' : 'negativa'} de ${trend.value}%` : ''}`;
 
   if (isLoading) {
     return (
-      <div 
+      <div
         className={`bg-white rounded-xl shadow-sm border p-4 sm:p-6 ${className}`}
         role="status"
         aria-label="Carregando dados do indicador"
@@ -94,13 +120,13 @@ export const KPICard: React.FC<KPICardProps> = ({
           <div className="h-6 sm:h-8 bg-gray-200 rounded animate-pulse w-16 sm:w-20" aria-hidden="true"></div>
           <div className="h-2 sm:h-3 bg-gray-200 rounded animate-pulse w-24 sm:w-32" aria-hidden="true"></div>
         </div>
-        <span className="sr-only">Carregando indicador: {title}</span>
+        <span className="sr-only">Carregando indicador: {displayTitle}</span>
       </div>
     );
   }
 
   return (
-    <article 
+    <article
       className={`
         bg-white rounded-xl shadow-sm border hover:shadow-md 
         transition-all duration-200 p-4 sm:p-6 ${colors.border} ${className}
@@ -113,50 +139,50 @@ export const KPICard: React.FC<KPICardProps> = ({
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-3 sm:mb-4">
-        <h3 
+        <h3
           className="text-xs sm:text-sm font-medium text-gray-600 truncate pr-2"
           id={`${cardId}-title`}
         >
-          {title}
+          {displayTitle}
         </h3>
-        <div 
+        <div
           className={`p-2 sm:p-3 rounded-xl ${colors.iconBg} flex-shrink-0`}
-          aria-label={`Ícone do indicador ${title}`}
+          aria-label={`Ícone do indicador ${displayTitle}`}
           role="img"
         >
           <div className={colors.iconColor} aria-hidden="true">
-            {icon}
+            {displayIcon}
           </div>
         </div>
       </div>
 
       {/* Value */}
       <div className="space-y-1 sm:space-y-2">
-        <p 
+        <p
           className="text-xl sm:text-3xl font-bold text-gray-900 break-all"
           id={valueId}
-          aria-label={`Valor: ${typeof value === 'number' ? value.toLocaleString('pt-BR') : value}`}
+          aria-label={`Valor: ${typeof displayValue === 'number' ? displayValue.toLocaleString('pt-BR') : displayValue}`}
         >
-          {typeof value === 'number' ? value.toLocaleString('pt-BR') : value}
+          {typeof displayValue === 'number' ? displayValue.toLocaleString('pt-BR') : displayValue}
         </p>
-        
+
         {/* Trend and Subtitle */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0">
-          {subtitle && (
-            <p 
+          {displaySubtitle && (
+            <p
               className="text-xs sm:text-sm text-gray-500 truncate"
-              aria-label={`Descrição: ${subtitle}`}
+              aria-label={`Descrição: ${displaySubtitle}`}
             >
-              {subtitle}
+              {displaySubtitle}
             </p>
           )}
-          
+
           {trend && (
-            <div 
+            <div
               className={`
                 flex items-center space-x-1 text-xs font-medium px-2 py-1 rounded-full self-start sm:self-auto
-                ${trend.isPositive 
-                  ? 'text-green-700 bg-green-100' 
+                ${trend.isPositive
+                  ? 'text-green-700 bg-green-100'
                   : 'text-red-700 bg-red-100'
                 }
               `}

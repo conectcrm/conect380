@@ -1,4 +1,14 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany, Index } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+  Index,
+} from 'typeorm';
 import { Contrato } from '../../contratos/entities/contrato.entity';
 import { User } from '../../users/user.entity';
 import { Cliente } from '../../clientes/cliente.entity';
@@ -11,14 +21,14 @@ export enum StatusFatura {
   PAGA = 'paga',
   VENCIDA = 'vencida',
   CANCELADA = 'cancelada',
-  PARCIALMENTE_PAGA = 'parcialmente_paga'
+  PARCIALMENTE_PAGA = 'parcialmente_paga',
 }
 
 export enum TipoFatura {
   UNICA = 'unica',
   RECORRENTE = 'recorrente',
   PARCELA = 'parcela',
-  ADICIONAL = 'adicional'
+  ADICIONAL = 'adicional',
 }
 
 export enum FormaPagamento {
@@ -27,7 +37,7 @@ export enum FormaPagamento {
   CARTAO_DEBITO = 'cartao_debito',
   BOLETO = 'boleto',
   TRANSFERENCIA = 'transferencia',
-  DINHEIRO = 'dinheiro'
+  DINHEIRO = 'dinheiro',
 }
 
 @Entity('faturas')
@@ -68,14 +78,14 @@ export class Fatura {
   @Column({
     type: 'enum',
     enum: TipoFatura,
-    default: TipoFatura.UNICA
+    default: TipoFatura.UNICA,
   })
   tipo: TipoFatura;
 
   @Column({
     type: 'enum',
     enum: StatusFatura,
-    default: StatusFatura.PENDENTE
+    default: StatusFatura.PENDENTE,
   })
   @Index()
   status: StatusFatura;
@@ -83,7 +93,7 @@ export class Fatura {
   @Column({
     type: 'enum',
     enum: FormaPagamento,
-    nullable: true
+    nullable: true,
   })
   formaPagamentoPreferida: FormaPagamento;
 
@@ -142,14 +152,14 @@ export class Fatura {
   };
 
   // ✅ CORREÇÃO: Relacionamento explícito com cascade controlado
-  @OneToMany(() => ItemFatura, item => item.fatura, { 
+  @OneToMany(() => ItemFatura, (item) => item.fatura, {
     cascade: ['insert', 'update'],
-    orphanedRowAction: 'delete'
+    orphanedRowAction: 'delete',
   })
   itens: ItemFatura[];
 
-  @OneToMany(() => Pagamento, pagamento => pagamento.fatura, {
-    cascade: ['insert', 'update']
+  @OneToMany(() => Pagamento, (pagamento) => pagamento.fatura, {
+    cascade: ['insert', 'update'],
   })
   pagamentos: Pagamento[];
 
@@ -189,7 +199,12 @@ export class Fatura {
   }
 
   getValorComJurosMulta(): number {
-    return Number(this.valorTotal) + Number(this.valorJuros) + Number(this.valorMulta) - Number(this.valorDesconto);
+    return (
+      Number(this.valorTotal) +
+      Number(this.valorJuros) +
+      Number(this.valorMulta) -
+      Number(this.valorDesconto)
+    );
   }
 
   getDiasAtraso(): number {
@@ -208,31 +223,31 @@ export class Fatura {
   // ✅ MÉTODO PARA VALIDAÇÃO DE INTEGRIDADE
   validateIntegrity(): string[] {
     const errors: string[] = [];
-    
+
     if (!this.clienteId) {
       errors.push('Cliente é obrigatório');
     }
-    
+
     if (!this.usuarioResponsavelId) {
       errors.push('Usuário responsável é obrigatório');
     }
-    
+
     if (Number(this.valorTotal) <= 0) {
       errors.push('Valor total deve ser maior que zero');
     }
-    
+
     if (Number(this.valorPago) < 0) {
       errors.push('Valor pago não pode ser negativo');
     }
-    
+
     if (Number(this.valorPago) > Number(this.valorTotal)) {
       errors.push('Valor pago não pode ser maior que o total');
     }
-    
+
     if (new Date(this.dataVencimento) < new Date(this.dataEmissao)) {
       errors.push('Data de vencimento deve ser posterior à data de emissão');
     }
-    
+
     return errors;
   }
 
@@ -241,7 +256,7 @@ export class Fatura {
     // Auto-atualizar status baseado em pagamento
     const totalPago = Number(this.valorPago);
     const totalFatura = Number(this.valorTotal);
-    
+
     if (totalPago >= totalFatura && this.status !== StatusFatura.CANCELADA) {
       this.status = StatusFatura.PAGA;
       if (!this.dataPagamento) {

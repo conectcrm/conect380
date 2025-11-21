@@ -34,15 +34,15 @@ const schema = yup.object({
     .string()
     .required('Nome é obrigatório')
     .min(2, 'Nome deve ter pelo menos 2 caracteres'),
-    
+
   tipo: yup
     .string()
     .required('Tipo do item é obrigatório'),
-    
+
   categoria: yup
     .string()
     .required('Categoria é obrigatória'),
-    
+
   precoUnitario: yup
     .number()
     .transform((value, originalValue) => {
@@ -58,23 +58,23 @@ const schema = yup.object({
     })
     .required('Preço unitário é obrigatório')
     .min(0.01, 'Preço deve ser maior que zero'),
-    
+
   frequencia: yup
     .string()
     .required('Frequência é obrigatória'),
-    
+
   unidadeMedida: yup
     .string()
     .required('Unidade de medida é obrigatória'),
-    
+
   status: yup
     .string()
     .required('Status é obrigatório'),
-    
+
   descricao: yup
     .string()
     .max(500, 'Descrição deve ter no máximo 500 caracteres'),
-    
+
   tags: yup
     .array()
     .of(yup.string())
@@ -203,21 +203,21 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
         ...data,
         precoUnitario: preco.value
       };
-      
+
       await onSave(dadosComPreco);
-      
+
       toast.success(
         produto ? 'Produto atualizado com sucesso!' : 'Produto cadastrado com sucesso!',
         { id: toastId }
       );
-      
+
       setTimeout(() => {
         handleClose();
       }, 1000);
-      
+
     } catch (error) {
       console.error('Erro ao salvar produto:', error);
-      
+
       toast.error(
         produto ? 'Erro ao atualizar produto. Tente novamente.' : 'Erro ao cadastrar produto. Tente novamente.',
         { id: toastId }
@@ -265,14 +265,14 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       {/* Backdrop */}
-      <div 
+      <div
         className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
         onClick={handleClose}
       />
-      
+
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative bg-white rounded-lg shadow-xl w-full max-w-4xl mx-auto">
+        <div className="relative bg-white rounded-lg shadow-xl w-[calc(100%-2rem)] sm:w-[700px] md:w-[800px] lg:w-[900px] xl:w-[1000px] max-w-[1100px]">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div className="flex items-center space-x-3">
@@ -301,7 +301,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
             <div className="p-6">
               {/* Grid 2 colunas */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
+
                 {/* COLUNA 1 - Campos Principais */}
                 <div className="space-y-4">
                   {/* Nome do Produto */}
@@ -313,9 +313,8 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                       {...register('nome')}
                       type="text"
                       placeholder="Digite o nome do produto ou serviço"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                        errors.nome ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${errors.nome ? 'border-red-300' : 'border-gray-300'
+                        }`}
                     />
                     {errors.nome && (
                       <p className="mt-1 text-sm text-red-600">{errors.nome.message}</p>
@@ -373,9 +372,8 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                           setValue('precoUnitario', preco.value, { shouldValidate: true });
                         }}
                         placeholder="R$ 0,00"
-                        className={`w-full pr-3 pl-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-right ${
-                          errors.precoUnitario ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                        className={`w-full pr-3 pl-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-right ${errors.precoUnitario ? 'border-red-300' : 'border-gray-300'
+                          }`}
                       />
                     </div>
                     {errors.precoUnitario && (
@@ -456,7 +454,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                         <Plus className="w-4 h-4" />
                       </button>
                     </div>
-                    
+
                     {/* Lista de Tags */}
                     {watchedTags.length > 0 && (
                       <div className="flex flex-wrap gap-2">
@@ -491,9 +489,8 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                   {...register('descricao')}
                   rows={3}
                   placeholder="Descreva detalhes adicionais sobre o produto ou serviço..."
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-colors ${
-                    errors.descricao ? 'border-red-300' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-colors ${errors.descricao ? 'border-red-300' : 'border-gray-300'
+                    }`}
                 />
                 {errors.descricao && (
                   <p className="mt-1 text-sm text-red-600">{errors.descricao.message}</p>

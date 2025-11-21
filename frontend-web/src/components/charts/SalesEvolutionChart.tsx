@@ -26,12 +26,15 @@ const salesData: SalesData[] = [
   { month: 'Dez', sales: 320000, quantity: 125 }
 ];
 
-export const SalesEvolutionChart: React.FC<SalesEvolutionChartProps> = ({ 
-  className = '', 
-  isLoading = false 
+export const SalesEvolutionChart: React.FC<SalesEvolutionChartProps> = ({
+  className = '',
+  isLoading = false
 }) => {
   const [viewMode, setViewMode] = useState<'sales' | 'quantity'>('sales');
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  // Guard: Se salesData for undefined/null/vazio, usar array vazio
+  const safeData = salesData && salesData.length > 0 ? salesData : [];
 
   if (isLoading) {
     return (
@@ -44,7 +47,15 @@ export const SalesEvolutionChart: React.FC<SalesEvolutionChartProps> = ({
     );
   }
 
-  const maxValue = Math.max(...salesData.map(item => 
+  if (safeData.length === 0) {
+    return (
+      <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6 ${className}`}>
+        <p className="text-gray-400 text-center py-8">Sem dados para exibir</p>
+      </div>
+    );
+  }
+
+  const maxValue = Math.max(...safeData.map(item =>
     viewMode === 'sales' ? item.sales : item.quantity
   ));
 
@@ -70,22 +81,20 @@ export const SalesEvolutionChart: React.FC<SalesEvolutionChartProps> = ({
         <div className="flex bg-gray-100 rounded-lg p-1">
           <button
             onClick={() => setViewMode('sales')}
-            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-              viewMode === 'sales'
+            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'sales'
                 ? 'bg-white text-blue-600 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
-            }`}
+              }`}
             aria-pressed={viewMode === 'sales'}
           >
             Valor
           </button>
           <button
             onClick={() => setViewMode('quantity')}
-            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-              viewMode === 'quantity'
+            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'quantity'
                 ? 'bg-white text-blue-600 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
-            }`}
+              }`}
             aria-pressed={viewMode === 'quantity'}
           >
             Quantidade
@@ -96,10 +105,10 @@ export const SalesEvolutionChart: React.FC<SalesEvolutionChartProps> = ({
       {/* Chart */}
       <div className="relative h-64">
         <div className="flex items-end justify-between h-full space-x-2">
-          {salesData.map((item, index) => {
+          {safeData.map((item, index) => {
             const value = viewMode === 'sales' ? item.sales : item.quantity;
             const height = (value / maxValue) * 100;
-            
+
             return (
               <div
                 key={item.month}
@@ -115,15 +124,15 @@ export const SalesEvolutionChart: React.FC<SalesEvolutionChartProps> = ({
                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
                   </div>
                 )}
-                
+
                 {/* Bar */}
-                <div 
+                <div
                   className="w-full bg-blue-500 rounded-t-sm transition-all duration-300 hover:bg-blue-600"
                   style={{ height: `${height}%`, minHeight: '4px' }}
                   role="img"
                   aria-label={`${item.month}: ${formatValue(value)}`}
                 />
-                
+
                 {/* Month label */}
                 <div className="mt-2 text-xs text-gray-600 font-medium">
                   {item.month}
@@ -147,7 +156,7 @@ export const SalesEvolutionChart: React.FC<SalesEvolutionChartProps> = ({
           </div>
           <div className="text-gray-500">
             Total: {formatValue(
-              salesData.reduce((sum, item) => 
+              safeData.reduce((sum, item) =>
                 sum + (viewMode === 'sales' ? item.sales : item.quantity), 0
               )
             )}
@@ -166,7 +175,7 @@ export const SalesEvolutionChart: React.FC<SalesEvolutionChartProps> = ({
           </tr>
         </thead>
         <tbody>
-          {salesData.map((item) => (
+          {safeData.map((item) => (
             <tr key={item.month}>
               <td>{item.month}</td>
               <td>{formatValue(item.sales)}</td>

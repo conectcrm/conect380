@@ -21,13 +21,14 @@ export class FaturamentoService {
     private emailService: EmailIntegradoService,
   ) { }
 
-  async criarFatura(createFaturaDto: CreateFaturaDto): Promise<Fatura> {
+  async criarFatura(createFaturaDto: CreateFaturaDto, empresaId: string): Promise<Fatura> {
     try {
       let contrato: Contrato | null = null;
 
       if (createFaturaDto.contratoId) {
+        // 🔒 MULTI-TENANCY: Validar que contrato pertence à empresa
         contrato = await this.contratoRepository.findOne({
-          where: { id: createFaturaDto.contratoId },
+          where: { id: createFaturaDto.contratoId, empresa_id: empresaId },
           relations: ['proposta'],
         });
 
@@ -52,23 +53,24 @@ export class FaturamentoService {
         valorPago: 0,
         dataEmissao: new Date(),
         status: StatusFatura.PENDENTE,
+        empresa_id: empresaId,
       });
 
       const faturaSalva = await this.faturaRepository.save(fatura);
 
       // Criar itens da fatura
-      const itens = createFaturaDto.itens.map(item =>
+      const itens = createFaturaDto.itens.map((item) =>
         this.itemFaturaRepository.create({
           ...item,
           faturaId: faturaSalva.id,
           valorTotal: this.calcularValorTotalItem(item),
-        })
+        }),
       );
 
       await this.itemFaturaRepository.save(itens);
 
       // Recarregar fatura com itens
-      const faturaCompleta = await this.buscarFaturaPorId(faturaSalva.id);
+      const faturaCompleta = await this.buscarFaturaPorId(faturaSalva.id, empresaId);
 
       this.logger.log(`Fatura criada: ${faturaCompleta.numero}`);
 
@@ -79,10 +81,11 @@ export class FaturamentoService {
     }
   }
 
-  async gerarFaturaAutomatica(gerarFaturaDto: GerarFaturaAutomaticaDto): Promise<Fatura> {
+  async gerarFaturaAutomatica(gerarFaturaDto: GerarFaturaAutomaticaDto, empresaId: string): Promise<Fatura> {
     try {
+      // 🔒 MULTI-TENANCY: Validar que contrato pertence à empresa
       const contrato = await this.contratoRepository.findOne({
-        where: { id: gerarFaturaDto.contratoId },
+        where: { id: gerarFaturaDto.contratoId, empresa_id: empresaId },
         relations: ['proposta'],
       });
 
@@ -101,26 +104,32 @@ export class FaturamentoService {
         usuarioResponsavelId: contrato.usuarioResponsavelId,
         tipo: contrato.condicoesPagamento?.parcelas > 1 ? TipoFatura.PARCELA : TipoFatura.UNICA,
         descricao: `Fatura referente ao contrato ${contrato.numero} - ${contrato.objeto}`,
-        formaPagamentoPreferida: this.mapearFormaPagamento(contrato.condicoesPagamento?.formaPagamento),
+        formaPagamentoPreferida: this.mapearFormaPagamento(
+          contrato.condicoesPagamento?.formaPagamento,
+        ),
         dataVencimento: this.calcularDataVencimento(contrato),
         observacoes: gerarFaturaDto.observacoes,
-        itens: [{
-          descricao: contrato.objeto,
-          quantidade: 1,
-          valorUnitario: contrato.valorTotal,
-          unidade: 'un',
-          codigoProduto: `CT-${contrato.numero}`,
-        }],
+        itens: [
+          {
+            descricao: contrato.objeto,
+            quantidade: 1,
+            valorUnitario: contrato.valorTotal,
+            unidade: 'un',
+            codigoProduto: `CT-${contrato.numero}`,
+          },
+        ],
       };
 
-      const fatura = await this.criarFatura(createFaturaDto);
+      const fatura = await this.criarFatura(createFaturaDto, empresaId);
 
       // Enviar email se solicitado
       if (gerarFaturaDto.enviarEmail) {
-        await this.enviarFaturaPorEmail(fatura.id);
+        await this.enviarFaturaPorEmail(fatura.id, empresaId);
       }
 
-      this.logger.log(`Fatura automática gerada para contrato ${contrato.numero}: ${fatura.numero}`);
+      this.logger.log(
+        `Fatura automática gerada para contrato ${contrato.numero}: ${fatura.numero}`,
+      );
 
       return fatura;
     } catch (error) {
@@ -129,22 +138,22 @@ export class FaturamentoService {
     }
   }
 
-  async buscarFaturas(
-    filtros?: {
-      status?: StatusFatura;
-      clienteId?: number;
-      contratoId?: number;
-      dataInicio?: Date;
-      dataFim?: Date;
-    }
-  ): Promise<Fatura[]> {
+  async buscarFaturas(empresaId: string, filtros?: {
+    status?: StatusFatura;
+    clienteId?: number;
+    contratoId?: number;
+    dataInicio?: Date;
+    dataFim?: Date;
+  }): Promise<Fatura[]> {
+    // 🔒 MULTI-TENANCY: Filtrar por empresa_id
     const query = this.faturaRepository
       .createQueryBuilder('fatura')
       .leftJoinAndSelect('fatura.contrato', 'contrato')
       .leftJoinAndSelect('fatura.usuarioResponsavel', 'usuario')
       .leftJoinAndSelect('fatura.itens', 'itens')
       .leftJoinAndSelect('fatura.pagamentos', 'pagamentos')
-      .where('fatura.ativo = :ativo', { ativo: true });
+      .where('fatura.ativo = :ativo', { ativo: true })
+      .andWhere('fatura.empresa_id = :empresaId', { empresaId });
 
     if (filtros?.status) {
       query.andWhere('fatura.status = :status', { status: filtros.status });
@@ -166,26 +175,27 @@ export class FaturamentoService {
       query.andWhere('fatura.dataEmissao <= :dataFim', { dataFim: filtros.dataFim });
     }
 
-    return query
-      .orderBy('fatura.createdAt', 'DESC')
-      .getMany();
+    return query.orderBy('fatura.createdAt', 'DESC').getMany();
   }
 
   async buscarFaturasPaginadas(
+    empresaId: string,
     page: number = 1,
     pageSize: number = 10,
     sortBy: string = 'createdAt',
-    sortOrder: 'ASC' | 'DESC' = 'DESC'
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
   ): Promise<{ faturas: any[]; total: number; resumo: any }> {
+    // 🔒 MULTI-TENANCY: Filtrar por empresa_id
     const queryBuilder = this.faturaRepository
       .createQueryBuilder('fatura')
       .leftJoinAndSelect('fatura.contrato', 'contrato')
       .leftJoinAndSelect('contrato.proposta', 'proposta')
-      .leftJoinAndSelect('fatura.cliente', 'cliente')  // ✅ CORREÇÃO: Usar relacionamento TypeORM nativo
+      .leftJoinAndSelect('fatura.cliente', 'cliente') // ✅ CORREÇÃO: Usar relacionamento TypeORM nativo
       .leftJoinAndSelect('fatura.usuarioResponsavel', 'usuario')
       .leftJoinAndSelect('fatura.itens', 'itens')
       .leftJoinAndSelect('fatura.pagamentos', 'pagamentos')
-      .where('fatura.ativo = :ativo', { ativo: true });
+      .where('fatura.ativo = :ativo', { ativo: true })
+      .andWhere('fatura.empresa_id = :empresaId', { empresaId });
 
     const [faturas, total] = await queryBuilder
       .orderBy(`fatura.${sortBy}`, sortOrder)
@@ -205,14 +215,22 @@ export class FaturamentoService {
     return {
       faturas,
       total,
-      resumo: resumo[0]
+      resumo: resumo[0],
     };
   }
 
-  async buscarFaturaPorId(id: number): Promise<Fatura> {
+  async buscarFaturaPorId(id: number, empresaId: string): Promise<Fatura> {
+    // 🔒 MULTI-TENANCY: Filtrar por empresa_id
     const fatura = await this.faturaRepository.findOne({
-      where: { id, ativo: true },
-      relations: ['contrato', 'contrato.proposta', 'usuarioResponsavel', 'itens', 'pagamentos', 'cliente'],
+      where: { id, empresa_id: empresaId, ativo: true },
+      relations: [
+        'contrato',
+        'contrato.proposta',
+        'usuarioResponsavel',
+        'itens',
+        'pagamentos',
+        'cliente',
+      ],
     });
 
     if (!fatura) {
@@ -222,10 +240,18 @@ export class FaturamentoService {
     return fatura;
   }
 
-  async buscarFaturaPorNumero(numero: string): Promise<any> {
+  async buscarFaturaPorNumero(numero: string, empresaId: string): Promise<any> {
+    // 🔒 MULTI-TENANCY: Filtrar por empresa_id
     const fatura = await this.faturaRepository.findOne({
-      where: { numero, ativo: true },
-      relations: ['contrato', 'contrato.proposta', 'usuarioResponsavel', 'itens', 'pagamentos', 'cliente'],
+      where: { numero, empresa_id: empresaId, ativo: true },
+      relations: [
+        'contrato',
+        'contrato.proposta',
+        'usuarioResponsavel',
+        'itens',
+        'pagamentos',
+        'cliente',
+      ],
     });
 
     if (!fatura) {
@@ -235,8 +261,9 @@ export class FaturamentoService {
     return fatura;
   }
 
-  async atualizarFatura(id: number, updateFaturaDto: UpdateFaturaDto): Promise<Fatura> {
-    const fatura = await this.buscarFaturaPorId(id);
+  async atualizarFatura(id: number, updateFaturaDto: UpdateFaturaDto, empresaId: string): Promise<Fatura> {
+    // 🔒 MULTI-TENANCY: Validar empresa_id
+    const fatura = await this.buscarFaturaPorId(id, empresaId);
 
     // Verificação direta do status em vez de usar o método isPaga()
     if (fatura.status === StatusFatura.PAGA) {
@@ -252,12 +279,12 @@ export class FaturamentoService {
       await this.itemFaturaRepository.delete({ faturaId: id });
 
       // Criar novos itens
-      const novosItens = updateFaturaDto.itens.map(item =>
+      const novosItens = updateFaturaDto.itens.map((item) =>
         this.itemFaturaRepository.create({
           ...item,
           faturaId: id,
           valorTotal: item.quantidade * item.valorUnitario - (item.valorDesconto || 0),
-        })
+        }),
       );
 
       await this.itemFaturaRepository.save(novosItens);
@@ -269,11 +296,12 @@ export class FaturamentoService {
     const faturaAtualizada = await this.faturaRepository.save(fatura);
     this.logger.log(`Fatura atualizada: ${faturaAtualizada.numero}`);
 
-    return this.buscarFaturaPorId(faturaAtualizada.id);
+    return this.buscarFaturaPorId(faturaAtualizada.id, empresaId);
   }
 
-  async marcarComoPaga(id: number, valorPago: number): Promise<Fatura> {
-    const fatura = await this.buscarFaturaPorId(id);
+  async marcarComoPaga(id: number, valorPago: number, empresaId: string): Promise<Fatura> {
+    // 🔒 MULTI-TENANCY: Validar empresa_id
+    const fatura = await this.buscarFaturaPorId(id, empresaId);
 
     // Verificação direta do status em vez de usar o método isPaga()
     if (fatura.status === StatusFatura.PAGA) {
@@ -295,12 +323,15 @@ export class FaturamentoService {
     return faturaAtualizada;
   }
 
-  async cancelarFatura(id: number, motivo?: string): Promise<Fatura> {
+  async cancelarFatura(id: number, empresaId: string, motivo?: string): Promise<Fatura> {
     this.logger.log(`🔍 [CANCELAR] Iniciando cancelamento da fatura ID: ${id}`);
 
     try {
-      const fatura = await this.buscarFaturaPorId(id);
-      this.logger.log(`🔍 [CANCELAR] Fatura encontrada: ${fatura.numero}, Status: ${fatura.status}`);
+      // 🔒 MULTI-TENANCY: Validar empresa_id
+      const fatura = await this.buscarFaturaPorId(id, empresaId);
+      this.logger.log(
+        `🔍 [CANCELAR] Fatura encontrada: ${fatura.numero}, Status: ${fatura.status}`,
+      );
 
       // Verificação direta do status em vez de usar o método isPaga()
       if (fatura.status === StatusFatura.PAGA) {
@@ -326,11 +357,11 @@ export class FaturamentoService {
     }
   }
 
-  async excluirFatura(id: number): Promise<Fatura> {
+  async excluirFatura(id: number, empresaId: string): Promise<Fatura> {
     this.logger.log(`🔍 [EXCLUIR] Iniciando exclusão da fatura ID: ${id}`);
 
     try {
-      const fatura = await this.buscarFaturaPorId(id);
+      const fatura = await this.buscarFaturaPorId(id, empresaId);
       this.logger.log(`🔍 [EXCLUIR] Fatura encontrada: ${fatura.numero}, Status: ${fatura.status}`);
 
       // Verificação direta do status em vez de usar o método isPaga()
@@ -375,9 +406,10 @@ export class FaturamentoService {
     }
   }
 
-  async enviarFaturaPorEmail(faturaId: number): Promise<boolean> {
+  async enviarFaturaPorEmail(faturaId: number, empresaId: string): Promise<boolean> {
     try {
-      const fatura = await this.buscarFaturaPorId(faturaId);
+      // 🔒 MULTI-TENANCY: Validar empresa_id
+      const fatura = await this.buscarFaturaPorId(faturaId, empresaId);
 
       // Buscar dados do cliente para obter o email
       // Por enquanto, usar um email de exemplo
@@ -442,10 +474,10 @@ export class FaturamentoService {
 
   private mapearFormaPagamento(formaPagamento?: string): any {
     const mapeamento: Record<string, any> = {
-      'PIX': 'pix',
+      PIX: 'pix',
       'Cartão de Crédito': 'cartao_credito',
-      'Boleto': 'boleto',
-      'Transferência': 'transferencia',
+      Boleto: 'boleto',
+      Transferência: 'transferencia',
     };
 
     return mapeamento[formaPagamento] || 'pix';

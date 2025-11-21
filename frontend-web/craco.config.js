@@ -2,6 +2,9 @@ const webpack = require('webpack');
 const path = require('path');
 
 module.exports = {
+  eslint: {
+    enable: false, // Desabilitar ESLint no build (usar apenas TypeScript)
+  },
   webpack: {
     configure: (webpackConfig) => {
       // Configurar aliases

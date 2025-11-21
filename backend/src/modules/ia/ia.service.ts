@@ -81,7 +81,10 @@ export class IAService {
         });
       } else if (this.config.provider === 'azure') {
         const azureEndpoint = this.configService.get<string>('AZURE_OPENAI_ENDPOINT');
-        const azureApiVersion = this.configService.get<string>('AZURE_OPENAI_API_VERSION', '2024-02-01');
+        const azureApiVersion = this.configService.get<string>(
+          'AZURE_OPENAI_API_VERSION',
+          '2024-02-01',
+        );
 
         if (!azureEndpoint) {
           throw new Error('AZURE_OPENAI_ENDPOINT não configurado');
@@ -244,7 +247,10 @@ export class IAService {
   /**
    * Detecta se a resposta indica necessidade de atendimento humano
    */
-  private detectaNecessidadeAtendimentoHumano(resposta: string, contexto: ContextoConversa): boolean {
+  private detectaNecessidadeAtendimentoHumano(
+    resposta: string,
+    contexto: ContextoConversa,
+  ): boolean {
     const palavrasChave = [
       'atendente humano',
       'transferir',

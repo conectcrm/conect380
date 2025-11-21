@@ -1,9 +1,17 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AssinaturaContrato, StatusAssinatura, TipoAssinatura } from '../entities/assinatura-contrato.entity';
+import {
+  AssinaturaContrato,
+  StatusAssinatura,
+  TipoAssinatura,
+} from '../entities/assinatura-contrato.entity';
 import { Contrato, StatusContrato } from '../entities/contrato.entity';
-import { CreateAssinaturaDto, ProcessarAssinaturaDto, RejeitarAssinaturaDto } from '../dto/assinatura.dto';
+import {
+  CreateAssinaturaDto,
+  ProcessarAssinaturaDto,
+  RejeitarAssinaturaDto,
+} from '../dto/assinatura.dto';
 import { EmailIntegradoService } from '../../propostas/email-integrado.service';
 import * as crypto from 'crypto';
 
@@ -17,7 +25,7 @@ export class AssinaturaDigitalService {
     @InjectRepository(Contrato)
     private contratoRepository: Repository<Contrato>,
     private emailService: EmailIntegradoService,
-  ) { }
+  ) {}
 
   async criarAssinatura(createAssinaturaDto: CreateAssinaturaDto): Promise<AssinaturaContrato> {
     try {
@@ -45,7 +53,9 @@ export class AssinaturaDigitalService {
       });
 
       if (assinaturaExistente) {
-        throw new BadRequestException('Já existe uma solicitação de assinatura pendente para este usuário');
+        throw new BadRequestException(
+          'Já existe uma solicitação de assinatura pendente para este usuário',
+        );
       }
 
       // Gerar token de validação único
@@ -69,7 +79,9 @@ export class AssinaturaDigitalService {
       // Enviar email de solicitação de assinatura
       await this.enviarEmailSolicitacaoAssinatura(assinaturaSalva, contrato);
 
-      this.logger.log(`Assinatura criada para contrato ${contrato.numero}, usuário ${createAssinaturaDto.usuarioId}`);
+      this.logger.log(
+        `Assinatura criada para contrato ${contrato.numero}, usuário ${createAssinaturaDto.usuarioId}`,
+      );
 
       return assinaturaSalva;
     } catch (error) {
@@ -78,7 +90,9 @@ export class AssinaturaDigitalService {
     }
   }
 
-  async processarAssinatura(processarAssinaturaDto: ProcessarAssinaturaDto): Promise<AssinaturaContrato> {
+  async processarAssinatura(
+    processarAssinaturaDto: ProcessarAssinaturaDto,
+  ): Promise<AssinaturaContrato> {
     try {
       // Buscar assinatura pelo token
       const assinatura = await this.assinaturaRepository.findOne({
@@ -125,7 +139,9 @@ export class AssinaturaDigitalService {
     }
   }
 
-  async rejeitarAssinatura(rejeitarAssinaturaDto: RejeitarAssinaturaDto): Promise<AssinaturaContrato> {
+  async rejeitarAssinatura(
+    rejeitarAssinaturaDto: RejeitarAssinaturaDto,
+  ): Promise<AssinaturaContrato> {
     try {
       const assinatura = await this.assinaturaRepository.findOne({
         where: { tokenValidacao: rejeitarAssinaturaDto.tokenValidacao },
@@ -198,8 +214,12 @@ export class AssinaturaDigitalService {
     if (!contrato) return;
 
     // Verificar se todas as assinaturas obrigatórias foram realizadas
-    const assinaturasAssinadas = contrato.assinaturas.filter(a => a.status === StatusAssinatura.ASSINADO);
-    const assinaturasPendentes = contrato.assinaturas.filter(a => a.status === StatusAssinatura.PENDENTE);
+    const assinaturasAssinadas = contrato.assinaturas.filter(
+      (a) => a.status === StatusAssinatura.ASSINADO,
+    );
+    const assinaturasPendentes = contrato.assinaturas.filter(
+      (a) => a.status === StatusAssinatura.PENDENTE,
+    );
 
     // Para este exemplo, consideramos que o contrato está pronto quando há pelo menos uma assinatura
     // Em cenários reais, você pode ter regras mais complexas
@@ -263,7 +283,7 @@ export class AssinaturaDigitalService {
 
   private async enviarEmailSolicitacaoAssinatura(
     assinatura: AssinaturaContrato,
-    contrato: Contrato
+    contrato: Contrato,
   ): Promise<void> {
     try {
       // Buscar dados do usuário para obter o email

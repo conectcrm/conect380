@@ -1,0 +1,17 @@
+                                                                            jsonb_pretty                                                                            
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {                                                                                                                                                                 +
+     "id": "boas-vindas",                                                                                                                                          +
+     "tipo": "mensagem",                                                                                                                                           +
+     "mensagem": "­ƒæï Ol├í{{#if primeiroNome}}, *{{primeiroNome}}*{{/if}}! Seja muito bem-vindo(a) ao *ConectCRM*!\n\n­ƒÿè ├ë um prazer ter voc├¬ aqui!",                +
+     "metadata": {                                                                                                                                                 +
+         "usarNomeSeDisponivel": true,                                                                                                                             +
+         "mensagemClienteExistente": "­ƒæï Ol├í, *{{primeiroNome}}*! Que bom ter voc├¬ de volta ao *ConectCRM*! ­ƒÿè\n\nVamos confirmar seus dados antes de prosseguir?",+
+         "personalizarSeClienteExistente": true,                                                                                                                   +
+         "verificarContatoAutomaticamente": true                                                                                                                   +
+     },                                                                                                                                                            +
+     "nomeExibicao": "Boas-vindas",                                                                                                                                +
+     "proximaEtapa": "coleta-primeiro-nome"                                                                                                                        +
+ }
+(1 row)
+

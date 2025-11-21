@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+} from 'typeorm';
 import { AssinaturaEmpresa } from './assinatura-empresa.entity';
 import { PlanoModulo } from './plano-modulo.entity';
 
@@ -50,9 +57,9 @@ export class Plano {
   atualizadoEm: Date;
 
   // Relacionamentos
-  @OneToMany(() => AssinaturaEmpresa, assinatura => assinatura.plano)
+  @OneToMany(() => AssinaturaEmpresa, (assinatura) => assinatura.plano)
   assinaturas: AssinaturaEmpresa[];
 
-  @OneToMany(() => PlanoModulo, planoModulo => planoModulo.plano)
+  @OneToMany(() => PlanoModulo, (planoModulo) => planoModulo.plano)
   modulosInclusos: PlanoModulo[];
 }

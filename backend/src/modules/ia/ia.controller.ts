@@ -18,7 +18,7 @@ class GerarRespostaDto {
 export class IAController {
   private readonly logger = new Logger(IAController.name);
 
-  constructor(private readonly iaService: IAService) { }
+  constructor(private readonly iaService: IAService) {}
 
   /**
    * POST /ia/resposta

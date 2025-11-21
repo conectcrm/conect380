@@ -44,7 +44,7 @@ export class MetasService {
           descricao: 'Meta geral mensal para toda equipe',
           ativa: true,
           criadaEm: new Date('2025-01-01'),
-          atualizadaEm: new Date('2025-01-01')
+          atualizadaEm: new Date('2025-01-01'),
         },
         {
           id: '2',
@@ -56,8 +56,8 @@ export class MetasService {
           descricao: 'Meta específica para região SP',
           ativa: true,
           criadaEm: new Date('2025-01-01'),
-          atualizadaEm: new Date('2025-01-01')
-        }
+          atualizadaEm: new Date('2025-01-01'),
+        },
       ];
     } catch (error) {
       console.error('Erro ao buscar metas:', error);
@@ -68,7 +68,7 @@ export class MetasService {
   async findOne(id: string): Promise<Meta> {
     try {
       const metas = await this.findAll();
-      const meta = metas.find(m => m.id === id);
+      const meta = metas.find((m) => m.id === id);
 
       if (!meta) {
         throw new Error('Meta não encontrada');
@@ -89,7 +89,7 @@ export class MetasService {
         ...createMetaDto,
         ativa: true,
         criadaEm: agora,
-        atualizadaEm: agora
+        atualizadaEm: agora,
       };
 
       // Aqui seria a lógica para salvar no banco
@@ -109,7 +109,7 @@ export class MetasService {
       const metaAtualizada: Meta = {
         ...meta,
         ...updateMetaDto,
-        atualizadaEm: new Date()
+        atualizadaEm: new Date(),
       };
 
       // Aqui seria a lógica para atualizar no banco
@@ -139,11 +139,7 @@ export class MetasService {
   async findByPeriodo(tipo: string, periodo: string): Promise<Meta[]> {
     try {
       const metas = await this.findAll();
-      return metas.filter(meta =>
-        meta.tipo === tipo &&
-        meta.periodo === periodo &&
-        meta.ativa
-      );
+      return metas.filter((meta) => meta.tipo === tipo && meta.periodo === periodo && meta.ativa);
     } catch (error) {
       console.error('Erro ao buscar metas por período:', error);
       throw new Error('Erro ao buscar metas');
@@ -153,10 +149,7 @@ export class MetasService {
   async findByVendedor(vendedorId: number): Promise<Meta[]> {
     try {
       const metas = await this.findAll();
-      return metas.filter(meta =>
-        meta.vendedorId === vendedorId &&
-        meta.ativa
-      );
+      return metas.filter((meta) => meta.vendedorId === vendedorId && meta.ativa);
     } catch (error) {
       console.error('Erro ao buscar metas por vendedor:', error);
       throw new Error('Erro ao buscar metas');
@@ -174,43 +167,35 @@ export class MetasService {
 
       // Busca por meta específica (vendedor + região)
       if (vendedorId && regiao) {
-        const meta = metas.find(m =>
-          m.vendedorId === vendedorId &&
-          m.regiao === regiao &&
-          m.periodo === periodoMensal &&
-          m.ativa
+        const meta = metas.find(
+          (m) =>
+            m.vendedorId === vendedorId &&
+            m.regiao === regiao &&
+            m.periodo === periodoMensal &&
+            m.ativa,
         );
         if (meta) return meta;
       }
 
       // Busca por meta específica do vendedor
       if (vendedorId) {
-        const meta = metas.find(m =>
-          m.vendedorId === vendedorId &&
-          !m.regiao &&
-          m.periodo === periodoMensal &&
-          m.ativa
+        const meta = metas.find(
+          (m) => m.vendedorId === vendedorId && !m.regiao && m.periodo === periodoMensal && m.ativa,
         );
         if (meta) return meta;
       }
 
       // Busca por meta específica da região
       if (regiao) {
-        const meta = metas.find(m =>
-          !m.vendedorId &&
-          m.regiao === regiao &&
-          m.periodo === periodoMensal &&
-          m.ativa
+        const meta = metas.find(
+          (m) => !m.vendedorId && m.regiao === regiao && m.periodo === periodoMensal && m.ativa,
         );
         if (meta) return meta;
       }
 
       // Busca por meta geral
-      const metaGeral = metas.find(m =>
-        !m.vendedorId &&
-        !m.regiao &&
-        m.periodo === periodoMensal &&
-        m.ativa
+      const metaGeral = metas.find(
+        (m) => !m.vendedorId && !m.regiao && m.periodo === periodoMensal && m.ativa,
       );
 
       return metaGeral || null;

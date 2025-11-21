@@ -4,20 +4,20 @@ import { DataSource } from 'typeorm';
 
 /**
  * Middleware de Contexto de Tenant (Multi-Tenancy)
- * 
+ *
  * OBJETIVO: Definir automaticamente o tenant (empresaId) no PostgreSQL
  * para cada requisição autenticada, garantindo isolamento de dados via RLS.
- * 
+ *
  * COMO FUNCIONA:
  * 1. Extrai empresaId do usuário autenticado (JWT)
  * 2. Chama set_current_tenant(empresaId) no PostgreSQL
  * 3. Row Level Security usa esse valor para filtrar queries
- * 
+ *
  * IMPORTANTE: Este middleware é CRÍTICO para segurança multi-tenant!
  */
 @Injectable()
 export class TenantContextMiddleware implements NestMiddleware {
-  constructor(private readonly dataSource: DataSource) { }
+  constructor(private readonly dataSource: DataSource) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
     const user = (req as any).user;
@@ -30,9 +30,7 @@ export class TenantContextMiddleware implements NestMiddleware {
         await queryRunner.connect();
 
         // Definir tenant context no PostgreSQL
-        await queryRunner.query('SELECT set_current_tenant($1)', [
-          user.empresa_id,
-        ]);
+        await queryRunner.query('SELECT set_current_tenant($1)', [user.empresa_id]);
 
         // Log para debug (remover em produção ou usar logger apropriado)
         if (process.env.NODE_ENV === 'development') {
@@ -51,10 +49,7 @@ export class TenantContextMiddleware implements NestMiddleware {
               await (req as any).tenantQueryRunner.release();
             }
           } catch (error) {
-            console.error(
-              '❌ [TenantContext] Erro ao liberar query runner:',
-              error.message,
-            );
+            console.error('❌ [TenantContext] Erro ao liberar query runner:', error.message);
           }
         });
       } catch (error) {
@@ -71,10 +66,7 @@ export class TenantContextMiddleware implements NestMiddleware {
       // Requisição sem autenticação ou sem empresa_id
       // RLS não será aplicado (guards devem bloquear rotas protegidas)
       if (process.env.NODE_ENV === 'development') {
-        console.log(
-          '⚠️  [TenantContext] Requisição sem tenant context:',
-          req.path,
-        );
+        console.log('⚠️  [TenantContext] Requisição sem tenant context:', req.path);
       }
     }
 

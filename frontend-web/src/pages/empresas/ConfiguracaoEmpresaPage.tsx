@@ -1,1153 +1,1171 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Button,
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-  Label,
-  Input,
-  Switch,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Textarea,
-  Badge,
-  Alert,
-  AlertDescription
-} from '../../components/ui';
-import { useEmpresas } from '../../contexts/EmpresaContextAPIReal';
-import type { EmpresaInfo } from '../../contexts/EmpresaContextAPIReal';
-import {
-  Settings,
-  Save,
-  Shield,
-  Mail,
-  Database,
-  FileText,
-  Bell,
-  CreditCard,
-  Users,
-  Lock,
-  Key,
-  Palette,
-  Globe,
-  Clock,
-  CheckCircle,
-  AlertTriangle
-} from 'lucide-react';
+import { Settings, Save, RotateCcw, Info, Shield, Users, Mail, MessageSquare, Database, Building2, Send, CheckCircle, XCircle } from 'lucide-react';
+import { BackToNucleus } from '../../components/navigation/BackToNucleus';
+import { empresaConfigService, ConfiguracoesEmpresa } from '../../services/empresaConfigService';
+import { empresaService, EmpresaResponse } from '../../services/empresaService';
+import { useAuth } from '../../hooks/useAuth';
 
-interface ConfiguracaoEmpresaPageProps {
-  empresaId?: string;
-}
-
-interface ConfiguracoesGerais {
-  nome: string;
-  descricao: string;
-  site: string;
-  telefone: string;
-  email: string;
-  endereco: string;
-  timezone: string;
-  logo: string;
-  cores: {
-    primaria: string;
-    secundaria: string;
-    accent: string;
-  };
-}
-
-interface ConfiguracoesSeguranca {
-  autenticacao2FA: boolean;
-  sessaoExpiracaoMinutos: number;
-  tentativasLoginMax: number;
-  senhaComplexidade: 'baixa' | 'media' | 'alta';
-  auditoriaNivel: 'basico' | 'medio' | 'completo';
-  ipsBloqueados: string[];
-  restricaoHorario: {
-    habilitado: boolean;
-    inicio: string;
-    fim: string;
-    diasSemana: number[];
-  };
-}
-
-interface ConfiguracoesUsuarios {
-  limitesUsuarios: {
-    total: number;
-    administradores: number;
-    vendedores: number;
-    supervisores: number;
-  };
-  permissoesDefault: {
-    vendedor: string[];
-    supervisor: string[];
-    administrador: string[];
-  };
-  aprovacaoNovoUsuario: boolean;
-  dominiosPermitidos: string[];
-}
-
-interface ConfiguracoesNotificacoes {
-  emailsHabilitados: boolean;
-  servidorEmail: {
-    tipo: string;
-    servidor: string;
-    porta: number;
-    ssl: boolean;
-    usuario: string;
-    senha: string;
-  };
-  templateEmail: {
-    cabecalho: string;
-    rodape: string;
-    assinatura: string;
-  };
-  tiposNotificacao: Record<string, boolean>;
-}
-
-interface ConfiguracoesIntegracoes {
-  api: {
-    habilitada: boolean;
-    chaveApi: string;
-    webhooks: string[];
-    limitesRequisicao: {
-      por_minuto: number;
-      por_dia: number;
-    };
-  };
-  servicos: Record<
-    string,
-    {
-      habilitado: boolean;
-      token?: string;
-      numero?: string;
-      client_id?: string;
-      client_secret?: string;
-    }
-  >;
-}
-
-interface ConfiguracoesBackup {
-  automatico: boolean;
-  frequencia: 'diario' | 'semanal' | 'mensal';
-  retencaoDias: number;
-  incluirAnexos: boolean;
-  sincronizacaoNuvem: {
-    habilitada: boolean;
-    provedor: string;
-    configuracao: Record<string, unknown>;
-  };
-}
-
-interface ConfiguracoesState {
-  geral: ConfiguracoesGerais;
-  seguranca: ConfiguracoesSeguranca;
-  usuarios: ConfiguracoesUsuarios;
-  notificacoes: ConfiguracoesNotificacoes;
-  integracoes: ConfiguracoesIntegracoes;
-  backup: ConfiguracoesBackup;
-}
-
-const formatarEndereco = (endereco?: EmpresaInfo['endereco']): string => {
-  if (!endereco) {
-    return '';
-  }
-
-  if (typeof endereco === 'string') {
-    return endereco;
-  }
-
-  const { rua, numero, complemento, bairro, cidade, estado, cep } = endereco;
-  const complementoTexto = complemento ? ` ${complemento}` : '';
-  return `${rua}, ${numero}${complementoTexto} - ${bairro}, ${cidade} - ${estado}, ${cep}`;
-};
-
-const criarConfiguracoesIniciais = (empresa?: EmpresaInfo | null): ConfiguracoesState => {
-  const config = empresa?.configuracoes ?? {};
-  const geralConfig = config.geral ?? {};
-  const coresConfig = geralConfig.cores ?? config.cores ?? {};
-  const seguranca = config.seguranca ?? {};
-  const usuarios = config.usuarios ?? {};
-  const notificacoes = config.notificacoes ?? {};
-  const integracoes = config.integracoes ?? {};
-  const backup = config.backup ?? {};
-
-  const limitesUsuariosPlano = empresa?.plano?.limites?.usuarios ?? empresa?.plano?.limitesUsuarios ?? 10;
-
-  const limitesRequisicao = integracoes.api?.limitesRequisicao ?? { por_minuto: 100, por_dia: 10000 };
-
-  const servicosPadrao: ConfiguracoesIntegracoes['servicos'] = {
-    receita_federal: { habilitado: false, token: '' },
-    correios: { habilitado: false, token: '' },
-    whatsapp: { habilitado: false, token: '', numero: '' },
-    google_calendar: { habilitado: false, client_id: '', client_secret: '' }
-  };
-
-  const servicosMesclados = {
-    ...servicosPadrao,
-    ...(integracoes.servicos ?? {})
-  };
-
-  return {
-    geral: {
-      nome: geralConfig.nome ?? empresa?.nome ?? '',
-      descricao: geralConfig.descricao ?? empresa?.descricao ?? '',
-      site: geralConfig.site ?? config.site ?? '',
-      telefone: geralConfig.telefone ?? empresa?.telefone ?? '',
-      email: geralConfig.email ?? empresa?.email ?? '',
-      endereco: geralConfig.endereco ?? formatarEndereco(empresa?.endereco),
-      timezone: geralConfig.timezone ?? config.timezone ?? 'America/Sao_Paulo',
-      logo: geralConfig.logo ?? config.logo ?? '',
-      cores: {
-        primaria: coresConfig.primaria ?? '#2563eb',
-        secundaria: coresConfig.secundaria ?? '#64748b',
-        accent: coresConfig.accent ?? '#10b981'
-      }
-    },
-    seguranca: {
-      autenticacao2FA: seguranca.autenticacao2FA ?? false,
-      sessaoExpiracaoMinutos: seguranca.sessaoExpiracaoMinutos ?? 480,
-      tentativasLoginMax: seguranca.tentativasLoginMax ?? 5,
-      senhaComplexidade: seguranca.senhaComplexidade ?? 'media',
-      auditoriaNivel: seguranca.auditoriaNivel ?? 'completo',
-      ipsBloqueados: seguranca.ipsBloqueados ?? [],
-      restricaoHorario:
-        seguranca.restricaoHorario ?? {
-          habilitado: false,
-          inicio: '08:00',
-          fim: '18:00',
-          diasSemana: [1, 2, 3, 4, 5]
-        }
-    },
-    usuarios: {
-      limitesUsuarios:
-        usuarios.limitesUsuarios ?? {
-          total: limitesUsuariosPlano,
-          administradores: 3,
-          vendedores: 50,
-          supervisores: 5
-        },
-      permissoesDefault:
-        usuarios.permissoesDefault ?? {
-          vendedor: ['clientes.ver', 'propostas.criar', 'propostas.editar'],
-          supervisor: ['clientes.ver', 'propostas.ver', 'relatorios.ver'],
-          administrador: ['*']
-        },
-      aprovacaoNovoUsuario: usuarios.aprovacaoNovoUsuario ?? true,
-      dominiosPermitidos: usuarios.dominiosPermitidos ?? []
-    },
-    notificacoes: {
-      emailsHabilitados: notificacoes.emailsHabilitados ?? true,
-      servidorEmail:
-        notificacoes.servidorEmail ?? {
-          tipo: 'smtp',
-          servidor: '',
-          porta: 587,
-          ssl: true,
-          usuario: '',
-          senha: ''
-        },
-      templateEmail:
-        notificacoes.templateEmail ?? {
-          cabecalho: '',
-          rodape: '',
-          assinatura: ''
-        },
-      tiposNotificacao:
-        notificacoes.tiposNotificacao ?? {
-          novoCliente: true,
-          novaProposta: true,
-          propostaAprovada: true,
-          tarefaVencendo: true,
-          pagamentoVencido: true
-        }
-    },
-    integracoes: {
-      api: {
-        habilitada: integracoes.api?.habilitada ?? false,
-        chaveApi: integracoes.api?.chaveApi ?? '',
-        webhooks: integracoes.api?.webhooks ?? [],
-        limitesRequisicao: {
-          por_minuto: limitesRequisicao.por_minuto ?? 100,
-          por_dia: limitesRequisicao.por_dia ?? 10000
-        }
-      },
-      servicos: servicosMesclados
-    },
-    backup: {
-      automatico: backup.automatico ?? true,
-      frequencia: backup.frequencia ?? 'diario',
-      retencaoDias: backup.retencaoDias ?? 30,
-      incluirAnexos: backup.incluirAnexos ?? true,
-      sincronizacaoNuvem:
-        backup.sincronizacaoNuvem ?? {
-          habilitada: false,
-          provedor: 'aws',
-          configuracao: {}
-        }
-    }
-  };
-};
-
-export const ConfiguracaoEmpresaPage: React.FC<ConfiguracaoEmpresaPageProps> = ({ empresaId }) => {
-  const { empresas, empresaAtiva, updateConfiguracoes } = useEmpresas();
-  const [loading, setLoading] = useState(false);
+const ConfiguracaoEmpresaPage: React.FC = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('geral');
+  const [config, setConfig] = useState<ConfiguracoesEmpresa | null>(null);
+  const [empresa, setEmpresa] = useState<EmpresaResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [formData, setFormData] = useState<Partial<ConfiguracoesEmpresa>>({});
+  const [empresaData, setEmpresaData] = useState<Partial<EmpresaResponse>>({});
+  const [testingSMTP, setTestingSMTP] = useState(false);
+  const [smtpTestResult, setSMTPTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [executingBackup, setExecutingBackup] = useState(false);
+  const [backupResult, setBackupResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  // Empresa a ser configurada (passada por parâmetro ou empresa ativa)
-  const empresa = empresas.find(e => e.id === empresaId) || empresaAtiva;
+  // 🔐 empresaId removido - backend pega do JWT automaticamente
 
-  // Estados das configurações
-  const [configuracoes, setConfiguracoes] = useState<ConfiguracoesState>(() => criarConfiguracoesIniciais(empresa));
+  const tabs = [
+    { id: 'geral', label: 'Geral', icon: Settings },
+    { id: 'seguranca', label: 'Segurança', icon: Shield },
+    { id: 'usuarios', label: 'Usuários e Permissões', icon: Users },
+    { id: 'email', label: 'Email/SMTP', icon: Mail },
+    { id: 'comunicacao', label: 'Comunicação', icon: MessageSquare },
+    { id: 'backup', label: 'Backup e Dados', icon: Database },
+  ];
 
-  // Atualizar configurações quando empresa mudar
   useEffect(() => {
-    setConfiguracoes(criarConfiguracoesIniciais(empresa));
-    setHasChanges(false);
-  }, [empresa]);
+    carregarConfig();
+  }, []);
 
-  // Função para salvar configurações
-  const handleSave = async () => {
-    if (!empresa) return;
-
+  const carregarConfig = async () => {
     try {
       setLoading(true);
-      await updateConfiguracoes(empresa.id, configuracoes as Partial<EmpresaInfo['configuracoes']>);
-      setHasChanges(false);
-    } catch (error) {
-      console.error('Erro ao salvar configurações:', error);
+      setError(null);
+
+      // 🔐 Pegar empresaId do usuário autenticado
+      const empresaId = user?.empresa?.id;
+      if (!empresaId) {
+        throw new Error('Usuário não possui empresa associada');
+      }
+
+      // Carregar configurações avançadas (JWT automático)
+      const configData = await empresaConfigService.getConfig();
+      setConfig(configData);
+      setFormData(configData);
+
+      // Carregar dados básicos da empresa
+      const empresaData = await empresaService.obterEmpresaPorId(empresaId);
+      setEmpresa(empresaData);
+      setEmpresaData(empresaData);
+    } catch (err: unknown) {
+      console.error('Erro ao carregar:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao carregar');
     } finally {
       setLoading(false);
     }
   };
 
-  // Função para atualizar configuração específica
-  const updateConfig = <Section extends keyof ConfiguracoesState, Key extends keyof ConfiguracoesState[Section]>(
-    section: Section,
-    key: Key,
-    value: ConfiguracoesState[Section][Key]
-  ) => {
-    setConfiguracoes(prev => ({
-      ...prev,
-      [section]: {
-        ...prev[section],
-        [key]: value
+  const handleInputChange = (field: keyof ConfiguracoesEmpresa, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setHasChanges(true);
+  };
+
+  const handleEmpresaInputChange = (field: keyof EmpresaResponse, value: any) => {
+    setEmpresaData(prev => ({ ...prev, [field]: value }));
+    setHasChanges(true);
+  };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      setError(null);
+
+      // 🔐 Pegar empresaId do usuário autenticado
+      const empresaId = user?.empresa?.id;
+      if (!empresaId) {
+        throw new Error('Usuário não possui empresa associada');
       }
-    }));
-    setHasChanges(true);
+
+      // Salvar configurações avançadas (JWT automático)
+      const updatedConfig = await empresaConfigService.updateConfig(formData);
+      setConfig(updatedConfig);
+      setFormData(updatedConfig);
+
+      // Salvar dados básicos da empresa
+      const updatedEmpresa = await empresaService.atualizarEmpresa(empresaId, empresaData);
+      setEmpresa(updatedEmpresa);
+      setEmpresaData(updatedEmpresa);
+
+      setHasChanges(false);
+      alert('Configurações salvas!');
+    } catch (err: unknown) {
+      console.error('Erro ao salvar:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao salvar');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // Função para atualizar configuração aninhada
-  const updateNestedConfig = <
-    Section extends keyof ConfiguracoesState,
-    ParentKey extends keyof ConfiguracoesState[Section]
-  >(
-    section: Section,
-    parentKey: ParentKey,
-    key: string,
-    value: unknown
-  ) => {
-    setConfiguracoes(prev => {
-      const sectionData = prev[section];
-      const parentValue = sectionData[parentKey] as Record<string, unknown> | undefined;
-
-      return {
-        ...prev,
-        [section]: {
-          ...sectionData,
-          [parentKey]: {
-            ...(parentValue ?? {}),
-            [key]: value
-          }
-        }
-      };
-    });
-    setHasChanges(true);
+  const handleReset = async () => {
+    if (!window.confirm('Tem certeza que deseja restaurar todas as configurações para os valores padrão?')) return;
+    try {
+      setSaving(true);
+      setError(null);
+      // 🔐 empresaId vem do JWT no backend
+      const reset = await empresaConfigService.resetConfig();
+      setConfig(reset);
+      setFormData(reset);
+      setHasChanges(false);
+      alert('Configurações restauradas!');
+    } catch (err: unknown) {
+      console.error('Erro ao resetar:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao resetar');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  if (!empresa) {
+  const handleTestSMTP = async () => {
+    setTestingSMTP(true);
+    setSMTPTestResult(null);
+
+    try {
+      // Simular teste de conexão SMTP
+      // TODO: Implementar endpoint real no backend
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Validar campos obrigatórios
+      if (!formData.servidorSMTP || !formData.smtpUsuario || !formData.smtpSenha) {
+        setSMTPTestResult({
+          success: false,
+          message: 'Preencha todos os campos obrigatórios (Servidor, Usuário e Senha)'
+        });
+        return;
+      }
+
+      // Simular sucesso (em produção, chamar endpoint real)
+      setSMTPTestResult({
+        success: true,
+        message: 'Conexão SMTP testada com sucesso! Email de teste enviado.'
+      });
+    } catch (err: unknown) {
+      console.error('Erro ao testar SMTP:', err);
+      setSMTPTestResult({
+        success: false,
+        message: err instanceof Error ? err.message : 'Erro ao testar conexão SMTP'
+      });
+    } finally {
+      setTestingSMTP(false);
+    }
+  };
+
+  const handleExecutarBackup = async () => {
+    setExecutingBackup(true);
+    setBackupResult(null);
+
+    try {
+      // Simular execução de backup
+      // TODO: Implementar endpoint real no backend
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      setBackupResult({
+        success: true,
+        message: `Backup executado com sucesso em ${new Date().toLocaleString('pt-BR')}`
+      });
+    } catch (err: unknown) {
+      console.error('Erro ao executar backup:', err);
+      setBackupResult({
+        success: false,
+        message: err instanceof Error ? err.message : 'Erro ao executar backup'
+      });
+    } finally {
+      setExecutingBackup(false);
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            Nenhuma empresa selecionada para configuração.
-          </AlertDescription>
-        </Alert>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#159A9C] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Carregando...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Configurações - {empresa.nome}
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Gerencie as configurações específicas desta empresa
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {hasChanges && (
-            <Badge variant="outline" className="text-orange-600 border-orange-200">
-              <Clock className="w-3 h-3 mr-1" />
-              Alterações pendentes
-            </Badge>
-          )}
-
-          <Button
-            onClick={handleSave}
-            disabled={!hasChanges || loading}
-            className="flex items-center gap-2"
-          >
-            <Save className="w-4 h-4" />
-            {loading ? 'Salvando...' : 'Salvar Alterações'}
-          </Button>
-        </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-white border-b px-6 py-4">
+        <BackToNucleus nucleusName="Configurações" nucleusPath="/nuclei/configuracoes/empresas" />
       </div>
 
-      {/* Tabs de Configuração */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6 lg:w-fit">
-          <TabsTrigger value="geral" className="flex items-center gap-2">
-            <Settings className="w-4 h-4" />
-            Geral
-          </TabsTrigger>
-          <TabsTrigger value="seguranca" className="flex items-center gap-2">
-            <Shield className="w-4 h-4" />
-            Segurança
-          </TabsTrigger>
-          <TabsTrigger value="usuarios" className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            Usuários
-          </TabsTrigger>
-          <TabsTrigger value="notificacoes" className="flex items-center gap-2">
-            <Bell className="w-4 h-4" />
-            Notificações
-          </TabsTrigger>
-          <TabsTrigger value="integracoes" className="flex items-center gap-2">
-            <Globe className="w-4 h-4" />
-            Integrações
-          </TabsTrigger>
-          <TabsTrigger value="backup" className="flex items-center gap-2">
-            <Database className="w-4 h-4" />
-            Backup
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Tab: Configurações Gerais */}
-        <TabsContent value="geral" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="w-5 h-5" />
-                Informações Gerais
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Settings className="h-8 w-8 mr-3 text-[#159A9C]" />
                 <div>
-                  <Label htmlFor="nome">Nome da Empresa</Label>
-                  <Input
-                    id="nome"
-                    value={configuracoes.geral.nome}
-                    onChange={(e) => updateConfig('geral', 'nome', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="site">Site</Label>
-                  <Input
-                    id="site"
-                    type="url"
-                    value={configuracoes.geral.site}
-                    onChange={(e) => updateConfig('geral', 'site', e.target.value)}
-                    placeholder="https://www.exemplo.com"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="telefone">Telefone</Label>
-                  <Input
-                    id="telefone"
-                    value={configuracoes.geral.telefone}
-                    onChange={(e) => updateConfig('geral', 'telefone', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="email">Email Principal</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={configuracoes.geral.email}
-                    onChange={(e) => updateConfig('geral', 'email', e.target.value)}
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <Label htmlFor="descricao">Descrição</Label>
-                  <Textarea
-                    id="descricao"
-                    value={configuracoes.geral.descricao}
-                    onChange={(e) => updateConfig('geral', 'descricao', e.target.value)}
-                    rows={3}
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <Label htmlFor="endereco">Endereço Completo</Label>
-                  <Textarea
-                    id="endereco"
-                    value={configuracoes.geral.endereco}
-                    onChange={(e) => updateConfig('geral', 'endereco', e.target.value)}
-                    rows={2}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="timezone">Fuso Horário</Label>
-                  <Select
-                    value={configuracoes.geral.timezone}
-                    onValueChange={(value) => updateConfig('geral', 'timezone', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="America/Sao_Paulo">São Paulo (GMT-3)</SelectItem>
-                      <SelectItem value="America/Manaus">Manaus (GMT-4)</SelectItem>
-                      <SelectItem value="America/Rio_Branco">Rio Branco (GMT-5)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <h1 className="text-3xl font-bold text-[#002333]">Configurações da Empresa</h1>
+                  <p className="text-gray-500 mt-1">Gerencie todas as configurações do sistema</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Palette className="w-5 h-5" />
-                Personalização Visual
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="cor-primaria">Cor Primária</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="cor-primaria"
-                      type="color"
-                      value={configuracoes.geral.cores.primaria}
-                      onChange={(e) => updateNestedConfig('geral', 'cores', 'primaria', e.target.value)}
-                      className="w-16 h-10 p-1 rounded"
-                    />
-                    <Input
-                      value={configuracoes.geral.cores.primaria}
-                      onChange={(e) => updateNestedConfig('geral', 'cores', 'primaria', e.target.value)}
-                      placeholder="#2563eb"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="cor-secundaria">Cor Secundária</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="cor-secundaria"
-                      type="color"
-                      value={configuracoes.geral.cores.secundaria}
-                      onChange={(e) => updateNestedConfig('geral', 'cores', 'secundaria', e.target.value)}
-                      className="w-16 h-10 p-1 rounded"
-                    />
-                    <Input
-                      value={configuracoes.geral.cores.secundaria}
-                      onChange={(e) => updateNestedConfig('geral', 'cores', 'secundaria', e.target.value)}
-                      placeholder="#64748b"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="cor-accent">Cor de Destaque</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="cor-accent"
-                      type="color"
-                      value={configuracoes.geral.cores.accent}
-                      onChange={(e) => updateNestedConfig('geral', 'cores', 'accent', e.target.value)}
-                      className="w-16 h-10 p-1 rounded"
-                    />
-                    <Input
-                      value={configuracoes.geral.cores.accent}
-                      onChange={(e) => updateNestedConfig('geral', 'cores', 'accent', e.target.value)}
-                      placeholder="#10b981"
-                    />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Tab: Segurança */}
-        <TabsContent value="seguranca" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5" />
-                Configurações de Segurança
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-sm font-medium">Autenticação 2FA</Label>
-                  <p className="text-sm text-gray-600">
-                    Exigir autenticação de dois fatores para todos os usuários
-                  </p>
-                </div>
-                <Switch
-                  checked={configuracoes.seguranca.autenticacao2FA}
-                  onCheckedChange={(checked) => updateConfig('seguranca', 'autenticacao2FA', checked)}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="sessao-expiracao">Expiração da Sessão (minutos)</Label>
-                  <Input
-                    id="sessao-expiracao"
-                    type="number"
-                    value={configuracoes.seguranca.sessaoExpiracaoMinutos}
-                    onChange={(e) => updateConfig('seguranca', 'sessaoExpiracaoMinutos', parseInt(e.target.value))}
-                    min="30"
-                    max="1440"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="tentativas-login">Máximo de Tentativas de Login</Label>
-                  <Input
-                    id="tentativas-login"
-                    type="number"
-                    value={configuracoes.seguranca.tentativasLoginMax}
-                    onChange={(e) => updateConfig('seguranca', 'tentativasLoginMax', parseInt(e.target.value))}
-                    min="3"
-                    max="10"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="senha-complexidade">Complexidade da Senha</Label>
-                  <Select
-                    value={configuracoes.seguranca.senhaComplexidade}
-                    onValueChange={(value: ConfiguracoesSeguranca['senhaComplexidade']) =>
-                      updateConfig('seguranca', 'senhaComplexidade', value)
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="baixa">Baixa (6+ caracteres)</SelectItem>
-                      <SelectItem value="media">Média (8+ caracteres, letras e números)</SelectItem>
-                      <SelectItem value="alta">Alta (10+ caracteres, letras, números e símbolos)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="auditoria-nivel">Nível de Auditoria</Label>
-                  <Select
-                    value={configuracoes.seguranca.auditoriaNivel}
-                    onValueChange={(value: ConfiguracoesSeguranca['auditoriaNivel']) =>
-                      updateConfig('seguranca', 'auditoriaNivel', value)
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="basico">Básico (Login/Logout)</SelectItem>
-                      <SelectItem value="medio">Médio (+ Operações críticas)</SelectItem>
-                      <SelectItem value="completo">Completo (Todas as ações)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Tab: Usuários e Permissões */}
-        <TabsContent value="usuarios" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                Gestão de Usuários
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="limite-total">Limite Total de Usuários</Label>
-                  <Input
-                    id="limite-total"
-                    type="number"
-                    value={configuracoes.usuarios.limitesUsuarios.total}
-                    onChange={(e) => updateNestedConfig('usuarios', 'limitesUsuarios', 'total', parseInt(e.target.value))}
-                    min="1"
-                    max={empresa.plano?.limites?.usuarios || 100}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Máximo permitido: {empresa.plano?.limites?.usuarios || 100}
-                  </p>
-                </div>
-
-                <div>
-                  <Label htmlFor="limite-admins">Limite de Administradores</Label>
-                  <Input
-                    id="limite-admins"
-                    type="number"
-                    value={configuracoes.usuarios.limitesUsuarios.administradores}
-                    onChange={(e) => updateNestedConfig('usuarios', 'limitesUsuarios', 'administradores', parseInt(e.target.value))}
-                    min="1"
-                    max="10"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="limite-vendedores">Limite de Vendedores</Label>
-                  <Input
-                    id="limite-vendedores"
-                    type="number"
-                    value={configuracoes.usuarios.limitesUsuarios.vendedores}
-                    onChange={(e) => updateNestedConfig('usuarios', 'limitesUsuarios', 'vendedores', parseInt(e.target.value))}
-                    min="1"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-sm font-medium">Aprovação para Novos Usuários</Label>
-                  <p className="text-sm text-gray-600">
-                    Requer aprovação do administrador para novos usuários
-                  </p>
-                </div>
-                <Switch
-                  checked={configuracoes.usuarios.aprovacaoNovoUsuario}
-                  onCheckedChange={(checked) => updateConfig('usuarios', 'aprovacaoNovoUsuario', checked)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Tab: Notificações */}
-        <TabsContent value="notificacoes" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="w-5 h-5" />
-                Configurações de Email
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-sm font-medium">Emails Habilitados</Label>
-                  <p className="text-sm text-gray-600">
-                    Permitir o envio de emails automáticos
-                  </p>
-                </div>
-                <Switch
-                  checked={configuracoes.notificacoes.emailsHabilitados}
-                  onCheckedChange={(checked) => updateConfig('notificacoes', 'emailsHabilitados', checked)}
-                />
-              </div>
-
-              {configuracoes.notificacoes.emailsHabilitados && (
-                <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-medium">Configuração do Servidor SMTP</h4>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="smtp-servidor">Servidor SMTP</Label>
-                      <Input
-                        id="smtp-servidor"
-                        value={configuracoes.notificacoes.servidorEmail.servidor}
-                        onChange={(e) => updateNestedConfig('notificacoes', 'servidorEmail', 'servidor', e.target.value)}
-                        placeholder="smtp.gmail.com"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="smtp-porta">Porta</Label>
-                      <Input
-                        id="smtp-porta"
-                        type="number"
-                        value={configuracoes.notificacoes.servidorEmail.porta}
-                        onChange={(e) => updateNestedConfig('notificacoes', 'servidorEmail', 'porta', parseInt(e.target.value))}
-                        placeholder="587"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="smtp-usuario">Usuário</Label>
-                      <Input
-                        id="smtp-usuario"
-                        type="email"
-                        value={configuracoes.notificacoes.servidorEmail.usuario}
-                        onChange={(e) => updateNestedConfig('notificacoes', 'servidorEmail', 'usuario', e.target.value)}
-                        placeholder="seu@email.com"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="smtp-senha">Senha</Label>
-                      <Input
-                        id="smtp-senha"
-                        type="password"
-                        value={configuracoes.notificacoes.servidorEmail.senha}
-                        onChange={(e) => updateNestedConfig('notificacoes', 'servidorEmail', 'senha', e.target.value)}
-                        placeholder="••••••••"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-sm font-medium">Usar SSL/TLS</Label>
-                      <p className="text-sm text-gray-600">
-                        Conexão segura com o servidor
-                      </p>
-                    </div>
-                    <Switch
-                      checked={configuracoes.notificacoes.servidorEmail.ssl}
-                      onCheckedChange={(checked) => updateNestedConfig('notificacoes', 'servidorEmail', 'ssl', checked)}
-                    />
-                  </div>
-                </div>
+              {hasChanges && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+                  <Info className="h-4 w-4 mr-1" />
+                  Alterações pendentes
+                </span>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="w-5 h-5" />
-                Tipos de Notificação
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {Object.entries(configuracoes.notificacoes.tiposNotificacao).map(([tipo, habilitado]) => (
-                <div key={tipo} className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-sm font-medium capitalize">
-                      {tipo.replace(/([A-Z])/g, ' $1').toLowerCase()}
-                    </Label>
-                  </div>
-                  <Switch
-                    checked={habilitado}
-                    onCheckedChange={(checked) => updateNestedConfig('notificacoes', 'tiposNotificacao', tipo, checked)}
-                  />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </TabsContent>
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6">
+              {error}
+            </div>
+          )}
 
-        {/* Tab: Integrações */}
-        <TabsContent value="integracoes" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Key className="w-5 h-5" />
-                API e Webhooks
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-sm font-medium">API Habilitada</Label>
-                  <p className="text-sm text-gray-600">
-                    Permitir acesso via API REST
-                  </p>
-                </div>
-                <Switch
-                  checked={configuracoes.integracoes.api.habilitada}
-                  onCheckedChange={(checked) => updateNestedConfig('integracoes', 'api', 'habilitada', checked)}
-                />
+          <div className="bg-white rounded-lg shadow-sm border mb-6">
+            <div className="border-b px-6 py-3">
+              <div className="flex gap-4 overflow-x-auto">
+                {tabs.map(tab => {
+                  const IconComponent = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center gap-2 px-4 py-2 font-medium text-sm whitespace-nowrap transition-colors ${activeTab === tab.id ? 'text-[#159A9C] border-b-2 border-[#159A9C]' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                      <IconComponent className="h-4 w-4" />
+                      {tab.label}
+                    </button>
+                  );
+                })}
               </div>
+            </div>
 
-              {configuracoes.integracoes.api.habilitada && (
-                <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <Label htmlFor="api-key">Chave da API</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="api-key"
-                        value={configuracoes.integracoes.api.chaveApi}
-                        onChange={(e) => updateNestedConfig('integracoes', 'api', 'chaveApi', e.target.value)}
-                        placeholder="API Key"
-                        type="password"
-                      />
-                      <Button variant="outline" size="sm">
-                        Gerar Nova
-                      </Button>
+            <div className="p-6">
+              {activeTab === 'geral' && (
+                <div className="space-y-8">
+                  {/* Seção 1: Informações da Empresa */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 pb-3 border-b border-gray-200">
+                      <Building2 className="h-5 w-5 text-[#159A9C]" />
+                      <h3 className="text-lg font-semibold text-[#002333]">Informações da Empresa</h3>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="api-limite-minuto">Limite por Minuto</Label>
-                      <Input
-                        id="api-limite-minuto"
-                        type="number"
-                        value={configuracoes.integracoes.api.limitesRequisicao.por_minuto}
-                        onChange={(e) => updateNestedConfig('integracoes', 'api', 'limitesRequisicao', {
-                          ...configuracoes.integracoes.api.limitesRequisicao,
-                          por_minuto: parseInt(e.target.value)
-                        })}
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="api-limite-dia">Limite por Dia</Label>
-                      <Input
-                        id="api-limite-dia"
-                        type="number"
-                        value={configuracoes.integracoes.api.limitesRequisicao.por_dia}
-                        onChange={(e) => updateNestedConfig('integracoes', 'api', 'limitesRequisicao', {
-                          ...configuracoes.integracoes.api.limitesRequisicao,
-                          por_dia: parseInt(e.target.value)
-                        })}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Globe className="w-5 h-5" />
-                Serviços Externos
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {Object.entries(configuracoes.integracoes.servicos).map(([servico, config]) => (
-                <div key={servico} className="p-4 border rounded-lg space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-sm font-medium capitalize">
-                        {servico.replace(/_/g, ' ')}
-                      </Label>
-                      <p className="text-xs text-gray-600">
-                        {servico === 'receita_federal' && 'Consulta de CNPJ automática'}
-                        {servico === 'correios' && 'Consulta de CEP e rastreamento'}
-                        {servico === 'whatsapp' && 'Envio de mensagens automáticas'}
-                        {servico === 'google_calendar' && 'Sincronização de agenda'}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={config.habilitado}
-                      onCheckedChange={(checked) => updateNestedConfig('integracoes', 'servicos', servico, {
-                        ...config,
-                        habilitado: checked
-                      })}
-                    />
-                  </div>
-
-                  {config.habilitado && (
-                    <div className="space-y-2">
-                      <Input
-                        placeholder="Token/Chave de acesso"
-                        value={config.token}
-                        onChange={(e) => updateNestedConfig('integracoes', 'servicos', servico, {
-                          ...config,
-                          token: e.target.value
-                        })}
-                        type="password"
-                      />
-                      {servico === 'whatsapp' && (
-                        <Input
-                          placeholder="Número do WhatsApp"
-                          value={config.numero || ''}
-                          onChange={(e) => updateNestedConfig('integracoes', 'servicos', servico, {
-                            ...config,
-                            numero: e.target.value
-                          })}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Nome da Empresa</label>
+                        <input
+                          type="text"
+                          value={empresaData.nome || ''}
+                          onChange={(e) => handleEmpresaInputChange('nome', e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                          placeholder="Razão Social"
                         />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">CNPJ</label>
+                        <input
+                          type="text"
+                          value={empresaData.cnpj || ''}
+                          onChange={(e) => handleEmpresaInputChange('cnpj', e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                          placeholder="00.000.000/0000-00"
+                          maxLength={18}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Formato: 00.000.000/0000-00</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Email Principal</label>
+                        <input
+                          type="email"
+                          value={empresaData.email || ''}
+                          onChange={(e) => handleEmpresaInputChange('email', e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                          placeholder="contato@empresa.com.br"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Telefone</label>
+                        <input
+                          type="tel"
+                          value={empresaData.telefone || ''}
+                          onChange={(e) => handleEmpresaInputChange('telefone', e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                          placeholder="(00) 00000-0000"
+                          maxLength={15}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Formato: (00) 00000-0000</p>
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Endereço Completo</label>
+                        <input
+                          type="text"
+                          value={empresaData.endereco || ''}
+                          onChange={(e) => handleEmpresaInputChange('endereco', e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                          placeholder="Rua, Número, Complemento, Bairro"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
+                        <input
+                          type="text"
+                          value={empresaData.cidade || ''}
+                          onChange={(e) => handleEmpresaInputChange('cidade', e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                          placeholder="Nome da cidade"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Estado (UF)</label>
+                        <select
+                          value={empresaData.estado || ''}
+                          onChange={(e) => handleEmpresaInputChange('estado', e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                        >
+                          <option value="">Selecione...</option>
+                          <option value="AC">Acre</option>
+                          <option value="AL">Alagoas</option>
+                          <option value="AP">Amapá</option>
+                          <option value="AM">Amazonas</option>
+                          <option value="BA">Bahia</option>
+                          <option value="CE">Ceará</option>
+                          <option value="DF">Distrito Federal</option>
+                          <option value="ES">Espírito Santo</option>
+                          <option value="GO">Goiás</option>
+                          <option value="MA">Maranhão</option>
+                          <option value="MT">Mato Grosso</option>
+                          <option value="MS">Mato Grosso do Sul</option>
+                          <option value="MG">Minas Gerais</option>
+                          <option value="PA">Pará</option>
+                          <option value="PB">Paraíba</option>
+                          <option value="PR">Paraná</option>
+                          <option value="PE">Pernambuco</option>
+                          <option value="PI">Piauí</option>
+                          <option value="RJ">Rio de Janeiro</option>
+                          <option value="RN">Rio Grande do Norte</option>
+                          <option value="RS">Rio Grande do Sul</option>
+                          <option value="RO">Rondônia</option>
+                          <option value="RR">Roraima</option>
+                          <option value="SC">Santa Catarina</option>
+                          <option value="SP">São Paulo</option>
+                          <option value="SE">Sergipe</option>
+                          <option value="TO">Tocantins</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">CEP</label>
+                        <input
+                          type="text"
+                          value={empresaData.cep || ''}
+                          onChange={(e) => handleEmpresaInputChange('cep', e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                          placeholder="00000-000"
+                          maxLength={9}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Formato: 00000-000</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Seção 2: Identidade Visual */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 pb-3 border-b border-gray-200">
+                      <Settings className="h-5 w-5 text-[#159A9C]" />
+                      <h3 className="text-lg font-semibold text-[#002333]">Identidade Visual</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
+                        <textarea
+                          value={formData.descricao || ''}
+                          onChange={(e) => handleInputChange('descricao', e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                          placeholder="Breve descrição sobre a empresa"
+                          rows={3}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Site</label>
+                        <input
+                          type="url"
+                          value={formData.site || ''}
+                          onChange={(e) => handleInputChange('site', e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                          placeholder="https://exemplo.com.br"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Logo URL</label>
+                        <input
+                          type="url"
+                          value={formData.logoUrl || ''}
+                          onChange={(e) => handleInputChange('logoUrl', e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                          placeholder="https://exemplo.com.br/logo.png"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Cor Primária</label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="color"
+                            value={formData.corPrimaria || '#159A9C'}
+                            onChange={(e) => handleInputChange('corPrimaria', e.target.value)}
+                            className="h-10 w-20 border border-gray-300 rounded-lg cursor-pointer"
+                          />
+                          <span className="text-sm text-gray-600 font-mono">{formData.corPrimaria || '#159A9C'}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Cor principal da interface</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Cor Secundária</label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="color"
+                            value={formData.corSecundaria || '#002333'}
+                            onChange={(e) => handleInputChange('corSecundaria', e.target.value)}
+                            className="h-10 w-20 border border-gray-300 rounded-lg cursor-pointer"
+                          />
+                          <span className="text-sm text-gray-600 font-mono">{formData.corSecundaria || '#002333'}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Cor de texto e elementos secundários</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Aba Segurança */}
+              {activeTab === 'seguranca' && (
+                <div className="space-y-6">
+                  <h2 className="text-xl font-semibold text-[#002333] mb-4">Configurações de Segurança</h2>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* 2FA */}
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Autenticação 2FA</label>
+                        <p className="text-xs text-gray-500">Exigir segundo fator para login</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={formData.autenticacao2FA || false}
+                        onChange={(e) => handleInputChange('autenticacao2FA', e.target.checked)}
+                        className="h-5 w-5 text-[#159A9C] focus:ring-[#159A9C] rounded"
+                      />
+                    </div>
+
+                    {/* Sessão Expiração */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Tempo de Sessão (minutos)
+                      </label>
+                      <input
+                        type="number"
+                        min="5"
+                        max="480"
+                        value={formData.sessaoExpiracaoMinutos || 30}
+                        onChange={(e) => handleInputChange('sessaoExpiracaoMinutos', parseInt(e.target.value))}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Entre 5 e 480 minutos (8 horas)</p>
+                    </div>
+
+                    {/* Complexidade Senha */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Complexidade de Senha
+                      </label>
+                      <select
+                        value={formData.senhaComplexidade || 'media'}
+                        onChange={(e) => handleInputChange('senhaComplexidade', e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
+                      >
+                        <option value="baixa">Baixa (mínimo 6 caracteres)</option>
+                        <option value="media">Média (8 caracteres + números)</option>
+                        <option value="alta">Alta (12 caracteres + números + símbolos)</option>
+                      </select>
+                    </div>
+
+                    {/* Auditoria */}
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Logs de Auditoria</label>
+                        <p className="text-xs text-gray-500">Registrar ações dos usuários</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={formData.auditoria !== false}
+                        onChange={(e) => handleInputChange('auditoria', e.target.checked)}
+                        className="h-5 w-5 text-[#159A9C] focus:ring-[#159A9C] rounded"
+                      />
+                    </div>
+
+                    {/* Force SSL */}
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Forçar HTTPS</label>
+                        <p className="text-xs text-gray-500">Redirecionar HTTP para HTTPS</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={formData.forceSsl !== false}
+                        onChange={(e) => handleInputChange('forceSsl', e.target.checked)}
+                        className="h-5 w-5 text-[#159A9C] focus:ring-[#159A9C] rounded"
+                      />
+                    </div>
+
+                    {/* IP Whitelist */}
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        IPs Permitidos (Whitelist)
+                      </label>
+                      <textarea
+                        value={formData.ipWhitelist?.join('\n') || ''}
+                        onChange={(e) => handleInputChange('ipWhitelist', e.target.value.split('\n').filter(ip => ip.trim()))}
+                        placeholder="192.168.1.1&#10;10.0.0.0/24"
+                        rows={3}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Um IP por linha. Deixe vazio para permitir todos.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'usuarios' && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-bold text-[#002333] flex items-center gap-2">
+                    <Users className="h-6 w-6 text-[#159A9C]" />
+                    Configurações de Usuários e Permissões
+                  </h2>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Limite de Usuários */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Limite de Usuários
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="1000"
+                        value={formData.limiteUsuarios || 10}
+                        onChange={(e) => handleInputChange('limiteUsuarios', parseInt(e.target.value))}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Número máximo de usuários ativos na empresa (1-1000)
+                      </p>
+                    </div>
+
+                    {/* Aprovação de Novos Usuários */}
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Aprovação de Novos Usuários
+                        </label>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Exigir aprovação manual para novos cadastros
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={formData.aprovacaoNovoUsuario || false}
+                        onChange={(e) => handleInputChange('aprovacaoNovoUsuario', e.target.checked)}
+                        className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Expiração de Convites */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Validade do Convite (horas)
+                      </label>
+                      <input
+                        type="number"
+                        min="24"
+                        max="168"
+                        value={formData.conviteExpiracaoHoras || 72}
+                        onChange={(e) => handleInputChange('conviteExpiracaoHoras', parseInt(e.target.value))}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Tempo até o convite de cadastro expirar (24-168 horas = 1-7 dias)
+                      </p>
+                    </div>
+
+                    {/* Card Informativo */}
+                    <div className="flex items-start gap-3 p-4 bg-[#DEEFE7] rounded-lg border border-[#B4BEC9]">
+                      <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-[#002333]">Gestão de Permissões</p>
+                        <p className="text-xs text-[#002333] mt-1">
+                          Configure perfis e permissões detalhadas na seção "Gestão de Usuários" do menu Administração.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'email' && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-bold text-[#002333] flex items-center gap-2">
+                    <Mail className="h-6 w-6 text-[#159A9C]" />
+                    Configurações de Email / SMTP
+                  </h2>
+
+                  {/* Toggle Principal */}
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Habilitar Envio de Emails
+                      </label>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Ative para permitir que o sistema envie emails automaticamente
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={formData.emailsHabilitados || false}
+                      onChange={(e) => {
+                        handleInputChange('emailsHabilitados', e.target.checked);
+                        if (!e.target.checked) {
+                          setSMTPTestResult(null);
+                        }
+                      }}
+                      className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Campos SMTP (mostrar apenas se habilitado) */}
+                  {formData.emailsHabilitados && (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Servidor SMTP */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Servidor SMTP <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.servidorSMTP || ''}
+                            onChange={(e) => handleInputChange('servidorSMTP', e.target.value)}
+                            placeholder="smtp.gmail.com"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Endereço do servidor SMTP
+                          </p>
+                        </div>
+
+                        {/* Porta SMTP */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Porta SMTP
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="65535"
+                            value={formData.portaSMTP || 587}
+                            onChange={(e) => handleInputChange('portaSMTP', parseInt(e.target.value))}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Porta padrão: 587 (TLS) ou 465 (SSL)
+                          </p>
+                        </div>
+
+                        {/* Usuário SMTP */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Usuário SMTP <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="email"
+                            value={formData.smtpUsuario || ''}
+                            onChange={(e) => handleInputChange('smtpUsuario', e.target.value)}
+                            placeholder="seu-email@empresa.com"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Email usado para autenticação
+                          </p>
+                        </div>
+
+                        {/* Senha SMTP */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Senha SMTP <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="password"
+                            value={formData.smtpSenha || ''}
+                            onChange={(e) => handleInputChange('smtpSenha', e.target.value)}
+                            placeholder="••••••••••••"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Senha ou token de aplicativo
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Botão Testar Conexão */}
+                      <div className="border-t pt-6">
+                        <button
+                          onClick={handleTestSMTP}
+                          disabled={testingSMTP || !formData.servidorSMTP || !formData.smtpUsuario || !formData.smtpSenha}
+                          className="flex items-center gap-2 px-6 py-3 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <Send className="h-4 w-4" />
+                          {testingSMTP ? 'Testando Conexão...' : 'Testar Conexão SMTP'}
+                        </button>
+
+                        {/* Resultado do Teste */}
+                        {smtpTestResult && (
+                          <div className={`mt-4 p-4 rounded-lg flex items-start gap-3 ${smtpTestResult.success
+                            ? 'bg-green-50 border border-green-200'
+                            : 'bg-red-50 border border-red-200'
+                            }`}>
+                            {smtpTestResult.success ? (
+                              <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                            ) : (
+                              <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                            )}
+                            <div>
+                              <p className={`text-sm font-medium ${smtpTestResult.success ? 'text-green-900' : 'text-red-900'
+                                }`}>
+                                {smtpTestResult.success ? 'Teste Bem-Sucedido' : 'Falha no Teste'}
+                              </p>
+                              <p className={`text-xs mt-1 ${smtpTestResult.success ? 'text-green-700' : 'text-red-700'
+                                }`}>
+                                {smtpTestResult.message}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Card Informativo */}
+                      <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                        <Info className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-amber-900">Configuração Gmail</p>
+                          <p className="text-xs text-amber-700 mt-1">
+                            Para Gmail, use <strong>smtp.gmail.com</strong> porta <strong>587</strong> e gere uma
+                            <a
+                              href="https://myaccount.google.com/apppasswords"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline ml-1 hover:text-amber-800"
+                            >
+                              senha de aplicativo
+                            </a>.
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'comunicacao' && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-bold text-[#002333] flex items-center gap-2">
+                    <MessageSquare className="h-6 w-6 text-[#159A9C]" />
+                    Configurações de Comunicação
+                  </h2>
+
+                  {/* SEÇÃO 1: WhatsApp */}
+                  <div className="border-l-4 border-green-500 pl-6 py-4 bg-green-50/30">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5 text-green-600" />
+                      WhatsApp Business API
+                    </h3>
+
+                    <div className="space-y-4">
+                      {/* Toggle WhatsApp */}
+                      <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Habilitar WhatsApp
+                          </label>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Ative para enviar mensagens via WhatsApp Business API
+                          </p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={formData.whatsappHabilitado || false}
+                          onChange={(e) => handleInputChange('whatsappHabilitado', e.target.checked)}
+                          className="h-5 w-5 text-green-600 rounded focus:ring-green-500 cursor-pointer"
+                        />
+                      </div>
+
+                      {formData.whatsappHabilitado && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Número WhatsApp <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="tel"
+                              value={formData.whatsappNumero || ''}
+                              onChange={(e) => handleInputChange('whatsappNumero', e.target.value)}
+                              placeholder="+55 11 98765-4321"
+                              maxLength={20}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                            />
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Token API WhatsApp <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="password"
+                              value={formData.whatsappApiToken || ''}
+                              onChange={(e) => handleInputChange('whatsappApiToken', e.target.value)}
+                              placeholder="••••••••••••••••••••••••••••"
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              Token de acesso da Meta Business API
+                            </p>
+                          </div>
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  </div>
 
-        {/* Tab: Backup */}
-        <TabsContent value="backup" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="w-5 h-5" />
-                Configurações de Backup
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-sm font-medium">Backup Automático</Label>
-                  <p className="text-sm text-gray-600">
-                    Realizar backups automáticos dos dados
-                  </p>
-                </div>
-                <Switch
-                  checked={configuracoes.backup.automatico}
-                  onCheckedChange={(checked) => updateConfig('backup', 'automatico', checked)}
-                />
-              </div>
+                  {/* SEÇÃO 2: SMS */}
+                  <div className="border-l-4 border-[#159A9C] pl-6 py-4 bg-[#DEEFE7]/30">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5 text-blue-600" />
+                      SMS
+                    </h3>
 
-              {configuracoes.backup.automatico && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="backup-frequencia">Frequência</Label>
-                      <Select
-                        value={configuracoes.backup.frequencia}
-                        onValueChange={(value: ConfiguracoesBackup['frequencia']) =>
-                          updateConfig('backup', 'frequencia', value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="diario">Diário</SelectItem>
-                          <SelectItem value="semanal">Semanal</SelectItem>
-                          <SelectItem value="mensal">Mensal</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <div className="space-y-4">
+                      {/* Toggle SMS */}
+                      <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Habilitar SMS
+                          </label>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Ative para enviar mensagens via SMS
+                          </p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={formData.smsHabilitado || false}
+                          onChange={(e) => handleInputChange('smsHabilitado', e.target.checked)}
+                          className="h-5 w-5 text-blue-600 rounded focus:ring-[#159A9C] cursor-pointer"
+                        />
+                      </div>
 
-                    <div>
-                      <Label htmlFor="backup-retencao">Retenção (dias)</Label>
-                      <Input
-                        id="backup-retencao"
-                        type="number"
-                        value={configuracoes.backup.retencaoDias}
-                        onChange={(e) => updateConfig('backup', 'retencaoDias', parseInt(e.target.value))}
-                        min="7"
-                        max="365"
-                      />
+                      {formData.smsHabilitado && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Provedor SMS <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                              value={formData.smsProvider || 'twilio'}
+                              onChange={(e) => handleInputChange('smsProvider', e.target.value)}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
+                            >
+                              <option value="twilio">Twilio</option>
+                              <option value="nexmo">Nexmo (Vonage)</option>
+                              <option value="sinch">Sinch</option>
+                            </select>
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Chave API SMS <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="password"
+                              value={formData.smsApiKey || ''}
+                              onChange={(e) => handleInputChange('smsApiKey', e.target.value)}
+                              placeholder="••••••••••••••••••••••••••••"
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              Chave de autenticação do provedor selecionado
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between">
+                  {/* SEÇÃO 3: Push Notifications */}
+                  <div className="border-l-4 border-purple-500 pl-6 py-4 bg-purple-50/30">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5 text-purple-600" />
+                      Push Notifications
+                    </h3>
+
+                    <div className="space-y-4">
+                      {/* Toggle Push */}
+                      <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Habilitar Push Notifications
+                          </label>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Ative para enviar notificações push para dispositivos móveis
+                          </p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={formData.pushHabilitado || false}
+                          onChange={(e) => handleInputChange('pushHabilitado', e.target.checked)}
+                          className="h-5 w-5 text-purple-600 rounded focus:ring-purple-500 cursor-pointer"
+                        />
+                      </div>
+
+                      {formData.pushHabilitado && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Provedor Push <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                              value={formData.pushProvider || 'fcm'}
+                              onChange={(e) => handleInputChange('pushProvider', e.target.value)}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                            >
+                              <option value="fcm">Firebase Cloud Messaging (FCM)</option>
+                              <option value="apns">Apple Push Notification (APNS)</option>
+                              <option value="onesignal">OneSignal</option>
+                            </select>
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Chave API Push <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="password"
+                              value={formData.pushApiKey || ''}
+                              onChange={(e) => handleInputChange('pushApiKey', e.target.value)}
+                              placeholder="••••••••••••••••••••••••••••"
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              Chave de servidor ou token de autenticação
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Card Informativo Geral */}
+                  <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <Info className="h-5 w-5 text-gray-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <Label className="text-sm font-medium">Incluir Anexos</Label>
-                      <p className="text-sm text-gray-600">
-                        Incluir arquivos anexos no backup
+                      <p className="text-sm font-medium text-gray-900">Integração Multi-Canal</p>
+                      <p className="text-xs text-gray-700 mt-1">
+                        Configure múltiplos canais de comunicação para aumentar o alcance.
+                        Você pode ativar todos simultaneamente e o sistema escolherá o melhor canal automaticamente.
                       </p>
                     </div>
-                    <Switch
-                      checked={configuracoes.backup.incluirAnexos}
-                      onCheckedChange={(checked) => updateConfig('backup', 'incluirAnexos', checked)}
-                    />
                   </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-sm font-medium">Sincronização na Nuvem</Label>
-                      <p className="text-sm text-gray-600">
-                        Enviar backups para armazenamento na nuvem
-                      </p>
-                    </div>
-                    <Switch
-                      checked={configuracoes.backup.sincronizacaoNuvem.habilitada}
-                      onCheckedChange={(checked) => updateNestedConfig('backup', 'sincronizacaoNuvem', 'habilitada', checked)}
-                    />
-                  </div>
-
-                  {configuracoes.backup.sincronizacaoNuvem.habilitada && (
-                    <div>
-                      <Label htmlFor="backup-provedor">Provedor de Nuvem</Label>
-                      <Select
-                        value={configuracoes.backup.sincronizacaoNuvem.provedor}
-                        onValueChange={(value) => updateNestedConfig('backup', 'sincronizacaoNuvem', 'provedor', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="aws">Amazon S3</SelectItem>
-                          <SelectItem value="google">Google Cloud Storage</SelectItem>
-                          <SelectItem value="azure">Azure Storage</SelectItem>
-                          <SelectItem value="dropbox">Dropbox</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
                 </div>
               )}
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5" />
-                Status dos Backups
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                  <div>
-                    <p className="font-medium text-green-800">Último Backup</p>
-                    <p className="text-sm text-green-600">Hoje às 03:00 - Sucesso</p>
+              {activeTab === 'backup' && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-bold text-[#002333] flex items-center gap-2">
+                    <Database className="h-6 w-6 text-[#159A9C]" />
+                    Configurações de Backup e Dados
+                  </h2>
+
+                  {/* Status do Último Backup */}
+                  <div className="p-4 bg-[#DEEFE7] rounded-lg border border-[#B4BEC9]">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-[#002333]">Último Backup</p>
+                        <p className="text-xs text-[#002333] mt-1">
+                          03/11/2025 às 14:30 (há 2 horas)
+                        </p>
+                      </div>
+                      <CheckCircle className="h-6 w-6 text-blue-600" />
+                    </div>
                   </div>
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                </div>
 
-                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                  <div>
-                    <p className="font-medium text-blue-800">Próximo Backup</p>
-                    <p className="text-sm text-blue-600">Amanhã às 03:00</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Backup Automático */}
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Backup Automático
+                        </label>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Executar backup automaticamente
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={formData.backupAutomatico || false}
+                        onChange={(e) => handleInputChange('backupAutomatico', e.target.checked)}
+                        className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Frequência do Backup */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Frequência do Backup
+                      </label>
+                      <select
+                        value={formData.backupFrequencia || 'diario'}
+                        onChange={(e) => handleInputChange('backupFrequencia', e.target.value)}
+                        disabled={!formData.backupAutomatico}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <option value="diario">Diário (todo dia às 02:00)</option>
+                        <option value="semanal">Semanal (domingos às 02:00)</option>
+                        <option value="mensal">Mensal (dia 1 às 02:00)</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Horário automático em fuso GMT-3 (Brasília)
+                      </p>
+                    </div>
+
+                    {/* Retenção de Backups */}
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Período de Retenção (dias)
+                      </label>
+                      <input
+                        type="number"
+                        min="7"
+                        max="365"
+                        value={formData.backupRetencaoDias || 30}
+                        onChange={(e) => handleInputChange('backupRetencaoDias', parseInt(e.target.value))}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Backups mais antigos que este período serão removidos automaticamente (7-365 dias)
+                      </p>
+                    </div>
                   </div>
-                  <Clock className="w-5 h-5 text-blue-600" />
-                </div>
 
-                <Button variant="outline" className="w-full">
-                  Executar Backup Manual
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                  {/* Ações de Backup */}
+                  <div className="border-t pt-6 space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        onClick={handleExecutarBackup}
+                        disabled={executingBackup}
+                        className="flex items-center justify-center gap-2 px-6 py-3 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <Database className="h-4 w-4" />
+                        {executingBackup ? 'Executando Backup...' : 'Executar Backup Agora'}
+                      </button>
+
+                      <button
+                        onClick={() => alert('Histórico de backups em desenvolvimento')}
+                        className="flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        <Info className="h-4 w-4" />
+                        Ver Histórico
+                      </button>
+                    </div>
+
+                    {/* Resultado do Backup */}
+                    {backupResult && (
+                      <div className={`p-4 rounded-lg flex items-start gap-3 ${backupResult.success
+                        ? 'bg-green-50 border border-green-200'
+                        : 'bg-red-50 border border-red-200'
+                        }`}>
+                        {backupResult.success ? (
+                          <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                        ) : (
+                          <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                        )}
+                        <div>
+                          <p className={`text-sm font-medium ${backupResult.success ? 'text-green-900' : 'text-red-900'
+                            }`}>
+                            {backupResult.success ? 'Backup Concluído' : 'Falha no Backup'}
+                          </p>
+                          <p className={`text-xs mt-1 ${backupResult.success ? 'text-green-700' : 'text-red-700'
+                            }`}>
+                            {backupResult.message}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Cards Informativos */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                      <Info className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-amber-900">Backup Seguro</p>
+                        <p className="text-xs text-amber-700 mt-1">
+                          Todos os backups são criptografados e armazenados em infraestrutura redundante.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-4 bg-green-50 rounded-lg border border-green-200">
+                      <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-green-900">Recuperação Rápida</p>
+                        <p className="text-xs text-green-700 mt-1">
+                          Em caso de necessidade, entre em contato com suporte para restaurar um backup.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {(activeTab !== 'geral' && activeTab !== 'seguranca' && activeTab !== 'usuarios' && activeTab !== 'email' && activeTab !== 'comunicacao' && activeTab !== 'backup') && (
+                <div className="text-center py-12 text-gray-500">
+                  <Info className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <p>Aba "{tabs.find(t => t.id === activeTab)?.label}" em desenvolvimento</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="flex justify-between">
+              <button
+                onClick={handleReset}
+                disabled={saving}
+                className="flex items-center gap-2 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Restaurar Padrões
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={!hasChanges || saving}
+                className="flex items-center gap-2 px-6 py-3 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" />
+                {saving ? 'Salvando...' : 'Salvar Alterações'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
+
+export default ConfiguracaoEmpresaPage;

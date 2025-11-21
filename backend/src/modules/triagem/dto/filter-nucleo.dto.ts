@@ -1,9 +1,4 @@
-import {
-  IsString,
-  IsOptional,
-  IsBoolean,
-  IsEnum,
-} from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsEnum } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { TipoDistribuicao } from './create-nucleo.dto';
 

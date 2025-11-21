@@ -15,8 +15,8 @@ const AppDataSource = new DataSource({
   // Ajustado caminho das migrations (compilam para dist/src/migrations)
   migrations: ['dist/src/migrations/*.js'],
   migrationsTableName: 'migrations',
-  synchronize: false,
-  logging: true, // Temporariamente ativado para debug
+  synchronize: false, // ✅ DESABILITADO - usar migrations para controle de schema
+  logging: false, // Desabilitar logs verbosos em produção
   ssl: process.env.APP_ENV === 'production' ? {
     rejectUnauthorized: false,
   } : false,

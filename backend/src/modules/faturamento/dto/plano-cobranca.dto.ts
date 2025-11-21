@@ -1,4 +1,15 @@
-import { IsString, IsNumber, IsEnum, IsOptional, IsDateString, IsBoolean, IsObject, Min, Max, IsUUID } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsEnum,
+  IsOptional,
+  IsDateString,
+  IsBoolean,
+  IsObject,
+  Min,
+  Max,
+  IsUUID,
+} from 'class-validator';
 import { TipoRecorrencia } from '../entities/plano-cobranca.entity';
 
 export class CreatePlanoCobrancaDto {

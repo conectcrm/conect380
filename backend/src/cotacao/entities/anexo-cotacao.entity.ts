@@ -5,7 +5,7 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
-  Index
+  Index,
 } from 'typeorm';
 import { Cotacao } from './cotacao.entity';
 import { User } from '../../modules/users/user.entity';
@@ -20,7 +20,7 @@ export class AnexoCotacao {
   @Column({ name: 'cotacao_id' })
   cotacaoId: string;
 
-  @ManyToOne(() => Cotacao, cotacao => cotacao.anexos, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Cotacao, (cotacao) => cotacao.anexos, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'cotacao_id' })
   cotacao: Cotacao;
 
@@ -88,7 +88,7 @@ export class AnexoCotacao {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     if (this.tamanho === 0) return '0 Bytes';
     const i = Math.floor(Math.log(this.tamanho) / Math.log(1024));
-    return Math.round(this.tamanho / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+    return Math.round((this.tamanho / Math.pow(1024, i)) * 100) / 100 + ' ' + sizes[i];
   }
 
   // Método para verificar se é imagem

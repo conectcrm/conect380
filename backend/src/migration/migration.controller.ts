@@ -30,7 +30,7 @@ export class MigrationController {
         })
         .where('cnpj = :cnpj AND nome = :nome', {
           cnpj: '12.345.678/0001-99',
-          nome: 'Fênix Tecnologia'
+          nome: 'Fênix Tecnologia',
         })
         .execute();
 
@@ -40,7 +40,7 @@ export class MigrationController {
       const usuariosUpdates = [
         { old: 'admin@fenixcrm.com', new: 'admin@conectcrm.com' },
         { old: 'maria@fenixcrm.com', new: 'maria@conectcrm.com' },
-        { old: 'joao@fenixcrm.com', new: 'joao@conectcrm.com' }
+        { old: 'joao@fenixcrm.com', new: 'joao@conectcrm.com' },
       ];
 
       const resultados = [];
@@ -64,7 +64,7 @@ export class MigrationController {
 
       // 3. Verificar dados finais
       const empresaFinal = await this.empresaRepository.findOne({
-        where: { cnpj: '12.345.678/0001-99' }
+        where: { cnpj: '12.345.678/0001-99' },
       });
 
       const usuariosFinal = await this.userRepository
@@ -86,16 +86,15 @@ export class MigrationController {
         credenciais: [
           'admin@conectcrm.com | admin123',
           'maria@conectcrm.com | manager123',
-          'joao@conectcrm.com | vendedor123'
-        ]
+          'joao@conectcrm.com | vendedor123',
+        ],
       };
-
     } catch (error) {
       console.error('❌ Erro durante a migração:', error);
       return {
         success: false,
         message: 'Erro durante a migração',
-        error: error.message
+        error: error.message,
       };
     }
   }

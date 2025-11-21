@@ -25,9 +25,7 @@ export class IAAutoRespostaService {
     private readonly configService: ConfigService,
   ) {
     this.isEnabled = this.configService.get<string>('IA_AUTO_RESPOSTA_ENABLED', 'true') === 'true';
-    this.minConfianca = parseFloat(
-      this.configService.get<string>('IA_MIN_CONFIANCA', '0.6'),
-    );
+    this.minConfianca = parseFloat(this.configService.get<string>('IA_MIN_CONFIANCA', '0.6'));
 
     this.logger.log(
       `Auto-resposta IA: ${this.isEnabled ? 'Habilitada' : 'Desabilitada'} (confiança mínima: ${this.minConfianca})`,

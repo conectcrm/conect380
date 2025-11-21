@@ -75,7 +75,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
     const validTelefone = Boolean(telefone && telefone.trim().length > 0);
     const validTipo = tipo === 'pessoa_fisica' || tipo === 'pessoa_juridica';
     const validStatus = ['lead', 'prospect', 'cliente', 'inativo'].includes(status || '');
-    
+
     return validNome && validEmail && validTelefone && validTipo && validStatus;
   }, [nome, email, telefone, tipo, status]);
 
@@ -83,10 +83,10 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
   React.useEffect(() => {
     if (isOpen) {
       console.log('=== DEBUG MODAL COMPLETO ===');
-      console.log('Estado do formulário:', { 
-        isValid, 
+      console.log('Estado do formulário:', {
+        isValid,
         isValidating,
-        errors: Object.keys(errors).length > 0 ? errors : 'Nenhum erro', 
+        errors: Object.keys(errors).length > 0 ? errors : 'Nenhum erro',
         isSubmitting,
         isFormValidManual
       });
@@ -98,7 +98,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
         tipoValido: tipo === 'pessoa_fisica' || tipo === 'pessoa_juridica',
         statusValido: ['lead', 'prospect', 'cliente', 'inativo'].includes(status || '')
       });
-      
+
       // Teste direto do schema
       console.log('=== TESTE DIRETO DO SCHEMA ===');
       try {
@@ -122,7 +122,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
           console.log('Resultado do trigger:', result);
         });
       }, 100);
-      
+
       // Força validação adicional depois de mais tempo
       setTimeout(() => {
         console.log('Forçando trigger adicional...');
@@ -192,7 +192,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
       try {
         const response = await fetch(`https://viacep.com.br/ws/${cep.replace('-', '')}/json/`);
         const data = await response.json();
-        
+
         if (!data.erro) {
           setValue('endereco.logradouro', data.logradouro || '');
           setValue('endereco.bairro', data.bairro || '');
@@ -249,7 +249,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-7xl max-h-[96vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg shadow-xl w-[calc(100%-2rem)] sm:w-[700px] md:w-[900px] lg:w-[1100px] xl:w-[1300px] max-w-[1600px] max-h-[96vh] overflow-hidden flex flex-col">
         {/* Header compacto */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
@@ -273,14 +273,14 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
         })} className="flex-1 overflow-y-auto">
           <div className="p-4">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              
+
               {/* Coluna 1: Dados Básicos */}
               <div className="space-y-3">
                 <div className="flex items-center mb-3">
                   <User className="w-5 h-5 text-[#159A9C] mr-2" />
                   <h3 className="text-lg font-medium text-gray-900">Dados Básicos</h3>
                 </div>
-                
+
                 <FormField
                   name="nome"
                   label="Nome Completo"
@@ -289,7 +289,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
                   error={errors.nome}
                   placeholder="Digite o nome completo"
                 />
-                
+
                 <FormField
                   name="email"
                   label="E-mail"
@@ -308,7 +308,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
                   error={errors.telefone}
                   placeholder="(11) 99999-9999"
                 />
-                
+
                 <FormField
                   name="tipo"
                   label="Tipo de Cliente"
@@ -365,7 +365,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
                   <MapPin className="w-5 h-5 text-[#159A9C] mr-2" />
                   <h3 className="text-lg font-medium text-gray-900">Endereço</h3>
                 </div>
-                
+
                 {/* CEP com busca automática */}
                 <FormField
                   name="endereco.cep"
@@ -392,7 +392,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
                   <FileText className="w-5 h-5 text-[#159A9C] mr-2" />
                   <h3 className="text-lg font-medium text-gray-900">Observações</h3>
                 </div>
-                
+
                 <FormField
                   name="observacoes"
                   label="Observações"
@@ -453,7 +453,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
                 </span>
               )}
             </div>
-            
+
             <div className="flex space-x-3">
               <button
                 type="button"

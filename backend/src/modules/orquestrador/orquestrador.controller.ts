@@ -1,12 +1,18 @@
 import { Controller, Get, Post, Body, Param, Query, Put, Delete, UseGuards } from '@nestjs/common';
 import { OrquestradorService } from './services/orquestrador.service';
-import { CreateFluxoAutomatizadoDto, UpdateFluxoAutomatizadoDto, FiltroFluxosDto, EstatisticasFluxoDto, ProcessarFluxoDto } from './dto/fluxo-automatizado.dto';
+import {
+  CreateFluxoAutomatizadoDto,
+  UpdateFluxoAutomatizadoDto,
+  FiltroFluxosDto,
+  EstatisticasFluxoDto,
+  ProcessarFluxoDto,
+} from './dto/fluxo-automatizado.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('orquestrador')
 @UseGuards(JwtAuthGuard)
 export class OrquestradorController {
-  constructor(private readonly orquestradorService: OrquestradorService) { }
+  constructor(private readonly orquestradorService: OrquestradorService) {}
 
   /**
    * Iniciar fluxo automatizado para uma proposta aceita
@@ -36,10 +42,7 @@ export class OrquestradorController {
    * Atualizar fluxo automatizado
    */
   @Put('fluxos/:id')
-  async atualizarFluxo(
-    @Param('id') id: string,
-    @Body() updateDto: UpdateFluxoAutomatizadoDto
-  ) {
+  async atualizarFluxo(@Param('id') id: string, @Body() updateDto: UpdateFluxoAutomatizadoDto) {
     return await this.orquestradorService.atualizar(id, updateDto);
   }
 
@@ -49,12 +52,12 @@ export class OrquestradorController {
   @Post('fluxos/:id/processar')
   async processarFluxo(
     @Param('id') id: string,
-    @Body() body: { forcarProcessamento?: boolean; parametrosCustomizados?: any }
+    @Body() body: { forcarProcessamento?: boolean; parametrosCustomizados?: any },
   ) {
     const processarDto: ProcessarFluxoDto = {
       fluxoId: id,
       forcarProcessamento: body.forcarProcessamento,
-      parametrosCustomizados: body.parametrosCustomizados
+      parametrosCustomizados: body.parametrosCustomizados,
     };
 
     return await this.orquestradorService.processarFluxo(processarDto);
@@ -64,10 +67,7 @@ export class OrquestradorController {
    * Pausar fluxo automatizado
    */
   @Post('fluxos/:id/pausar')
-  async pausarFluxo(
-    @Param('id') id: string,
-    @Body() body: { motivo?: string }
-  ) {
+  async pausarFluxo(@Param('id') id: string, @Body() body: { motivo?: string }) {
     return await this.orquestradorService.pausarFluxo(id, body.motivo);
   }
 
@@ -83,10 +83,7 @@ export class OrquestradorController {
    * Cancelar fluxo automatizado
    */
   @Post('fluxos/:id/cancelar')
-  async cancelarFluxo(
-    @Param('id') id: string,
-    @Body() body: { motivo?: string }
-  ) {
+  async cancelarFluxo(@Param('id') id: string, @Body() body: { motivo?: string }) {
     return await this.orquestradorService.cancelarFluxo(id, body.motivo);
   }
 
@@ -98,7 +95,7 @@ export class OrquestradorController {
     await this.orquestradorService.processarFluxosPendentes();
     return {
       message: 'Processamento de fluxos pendentes iniciado',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 
@@ -119,8 +116,13 @@ export class OrquestradorController {
 
     const [estatisticas, fluxosRecentes, fluxosComErro] = await Promise.all([
       this.orquestradorService.obterEstatisticas(filtrosBasicos),
-      this.orquestradorService.listarFluxos({ ...filtrosBasicos, limite: 5, ordenarPor: 'createdAt', direcao: 'DESC' }),
-      this.orquestradorService.listarFluxos({ ...filtrosBasicos, comErros: true, limite: 5 })
+      this.orquestradorService.listarFluxos({
+        ...filtrosBasicos,
+        limite: 5,
+        ordenarPor: 'createdAt',
+        direcao: 'DESC',
+      }),
+      this.orquestradorService.listarFluxos({ ...filtrosBasicos, comErros: true, limite: 5 }),
     ]);
 
     return {
@@ -129,12 +131,14 @@ export class OrquestradorController {
       fluxosComErro: fluxosComErro.fluxos,
       resumo: {
         totalFluxos: estatisticas.totalFluxos,
-        fluxosAtivos: estatisticas.resumo.filter(r =>
-          !['workflow_concluido', 'cancelado', 'erro_processamento'].includes(r.status)
-        ).reduce((acc, r) => acc + parseInt(r.total), 0),
+        fluxosAtivos: estatisticas.resumo
+          .filter(
+            (r) => !['workflow_concluido', 'cancelado', 'erro_processamento'].includes(r.status),
+          )
+          .reduce((acc, r) => acc + parseInt(r.total), 0),
         taxaSucesso: this.calcularTaxaSucesso(estatisticas.resumo),
-        tempoMedioProcessamento: '2.5 horas' // Placeholder - implementar cálculo real
-      }
+        tempoMedioProcessamento: '2.5 horas', // Placeholder - implementar cálculo real
+      },
     };
   }
 
@@ -147,14 +151,14 @@ export class OrquestradorController {
       status: 'ok',
       service: 'Orquestrador de Fluxo Automatizado',
       timestamp: new Date().toISOString(),
-      version: '1.0.0'
+      version: '1.0.0',
     };
   }
 
   private calcularTaxaSucesso(resumoEstatisticas: any[]): number {
     const total = resumoEstatisticas.reduce((acc, stat) => acc + parseInt(stat.total), 0);
     const concluidos = resumoEstatisticas
-      .filter(stat => stat.status === 'workflow_concluido')
+      .filter((stat) => stat.status === 'workflow_concluido')
       .reduce((acc, stat) => acc + parseInt(stat.total), 0);
 
     return total > 0 ? Math.round((concluidos / total) * 100) : 0;

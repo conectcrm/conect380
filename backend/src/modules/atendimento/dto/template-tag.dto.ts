@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsObject, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsObject, IsBoolean, IsArray } from 'class-validator';
 
 export class CriarTemplateDto {
   @IsString()
@@ -16,8 +16,9 @@ export class CriarTemplateDto {
   atalho?: string;
 
   @IsOptional()
-  @IsObject()
-  variaveis?: Record<string, any>;
+  @IsArray()
+  @IsString({ each: true })
+  variaveis?: string[]; // Array de variáveis: ['{{nome}}', '{{ticket}}', '{{empresa}}']
 }
 
 export class AtualizarTemplateDto {
@@ -42,8 +43,9 @@ export class AtualizarTemplateDto {
   ativo?: boolean;
 
   @IsOptional()
-  @IsObject()
-  variaveis?: Record<string, any>;
+  @IsArray()
+  @IsString({ each: true })
+  variaveis?: string[]; // Array de variáveis: ['{{nome}}', '{{ticket}}', '{{empresa}}']
 }
 
 export class CriarTagDto {

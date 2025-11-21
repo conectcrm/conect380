@@ -1,4 +1,14 @@
-import { IsUUID, IsEnum, IsOptional, IsObject, IsInt, IsString, IsDateString, Min, Max } from 'class-validator';
+import {
+  IsUUID,
+  IsEnum,
+  IsOptional,
+  IsObject,
+  IsInt,
+  IsString,
+  IsDateString,
+  Min,
+  Max,
+} from 'class-validator';
 import { TipoEvento, StatusEvento } from '../entities/evento-fluxo.entity';
 
 export class CreateEventoFluxoDto {

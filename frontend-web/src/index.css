@@ -43,8 +43,10 @@ code {
 
 .input-field {
   @apply w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200;
-  color: #111827 !important; /* Gray-900 - garantia de texto visível */
-  background-color: #ffffff !important; /* Fundo branco sempre */
+  color: #111827 !important;
+  /* Gray-900 - garantia de texto visível */
+  background-color: #ffffff !important;
+  /* Fundo branco sempre */
 }
 
 .card {
@@ -116,4 +118,71 @@ code {
   cursor: pointer;
   border: 2px solid white;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Slider Heat Map - Indicador de Calor de Probabilidade */
+.slider-heat {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 12px;
+  border-radius: 9999px;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.slider-heat::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  border: 3px solid #159A9C;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15), 0 0 0 4px rgba(21, 154, 156, 0.1);
+  transition: all 0.2s ease;
+}
+
+.slider-heat::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2), 0 0 0 6px rgba(21, 154, 156, 0.15);
+}
+
+.slider-heat::-webkit-slider-thumb:active {
+  transform: scale(1.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 0 3px rgba(21, 154, 156, 0.2);
+}
+
+.slider-heat::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  border: 3px solid #159A9C;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15), 0 0 0 4px rgba(21, 154, 156, 0.1);
+  transition: all 0.2s ease;
+}
+
+.slider-heat::-moz-range-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2), 0 0 0 6px rgba(21, 154, 156, 0.15);
+}
+
+.slider-heat::-moz-range-thumb:active {
+  transform: scale(1.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 0 3px rgba(21, 154, 156, 0.2);
+}
+
+.slider-heat:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.slider-heat:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+}
+
+.slider-heat:disabled::-moz-range-thumb {
+  cursor: not-allowed;
 }

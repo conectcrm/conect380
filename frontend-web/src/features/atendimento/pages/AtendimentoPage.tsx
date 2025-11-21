@@ -1,19 +1,34 @@
 import React, { useState, useEffect } from 'react';
+import { Plus, UserCheck, CheckCircle, Link2 } from 'lucide-react';
+import { useAuth } from '../../../hooks/useAuth';
 import { useWhatsApp } from '../hooks/useWhatsApp';
+import { useNotifications } from '../../../hooks/useNotifications';
 import { TicketList } from '../components/chat/TicketList';
 import { MessageList } from '../components/chat/MessageList';
 import { MessageInput } from '../components/chat/MessageInput';
 import { PainelContextoCliente } from '../components/chat/PainelContextoCliente';
 import { BuscaRapida, TipoRecursoBusca } from '../components/chat/BuscaRapida';
+import { NovoAtendimentoModal } from '../components/modals/NovoAtendimentoModal';
+import { TransferirAtendimentoModal } from '../components/modals/TransferirAtendimentoModal';
+import { EncerrarAtendimentoModal } from '../components/modals/EncerrarAtendimentoModal';
+import { VincularClienteModal } from '../components/modals/VincularClienteModal';
 
 export function AtendimentoPage() {
+  const { user } = useAuth();
   const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
-  const [painelContextoAberto, setPainelContextoAberto] = useState(true); // Estado do painel
-  const [buscaRapidaAberta, setBuscaRapidaAberta] = useState(false); // NOVO: Estado da busca rápida
+  const [painelContextoAberto, setPainelContextoAberto] = useState(true);
+  const [buscaRapidaAberta, setBuscaRapidaAberta] = useState(false);
+  const [modalNovoAtendimentoAberto, setModalNovoAtendimentoAberto] = useState(false);
+  const [modalTransferirAberto, setModalTransferirAberto] = useState(false);
+  const [modalEncerrarAberto, setModalEncerrarAberto] = useState(false);
+  const [modalVincularClienteAberto, setModalVincularClienteAberto] = useState(false);
 
-  // Obter token e empresaId do localStorage ou contexto de autenticação
+  // Obter token e empresaId do contexto de autenticação
   const token = localStorage.getItem('authToken') || '';
-  const empresaId = localStorage.getItem('empresaId') || 'f47ac10b-58cc-4372-a567-0e02b2c3d479'; // ID padrão da empresa de teste
+  const empresaId = user?.empresa?.id || '';
+
+  // ✅ INTEGRAÇÃO: Hook de notificações em tempo real (implementado hoje)
+  const { notifications, unreadCount, markAsRead } = useNotifications();
 
   const whatsapp = useWhatsApp({
     empresaId,
@@ -25,9 +40,26 @@ export function AtendimentoPage() {
   useEffect(() => {
     if (activeTicketId) {
       whatsapp.carregarMensagens(activeTicketId);
+      // Marcar notificações do ticket como lidas
+      notifications
+        .filter(n => n.data?.ticketId === activeTicketId && !n.read)
+        .forEach(n => markAsRead(n.id));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTicketId]);
+
+  // ✅ NOVO: Recarregar tickets quando receber notificação de novo ticket
+  useEffect(() => {
+    const novoTicketNotification = notifications.find(
+      n => n.type === 'novo_ticket' && !n.read
+    );
+
+    if (novoTicketNotification) {
+      console.log('[Atendimento] Nova notificação de ticket, recarregando lista...');
+      whatsapp.carregarTickets();
+      markAsRead(novoTicketNotification.id);
+    }
+  }, [notifications, whatsapp, markAsRead]);
 
   // NOVO: Atalho global Ctrl+K para busca rápida
   useEffect(() => {
@@ -44,6 +76,34 @@ export function AtendimentoPage() {
 
   const handleTicketSelect = (ticketId: string) => {
     setActiveTicketId(ticketId);
+  };
+
+  const handleNovoAtendimentoSucesso = (ticketId: string) => {
+    console.log('[Atendimento] Novo ticket criado:', ticketId);
+    whatsapp.carregarTickets();
+    setActiveTicketId(ticketId);
+  };
+
+  const handleTransferenciaSucesso = () => {
+    console.log('[Atendimento] Ticket transferido com sucesso');
+    whatsapp.carregarTickets();
+    if (activeTicketId) {
+      whatsapp.carregarMensagens(activeTicketId);
+    }
+  };
+
+  const handleEncerramentoSucesso = () => {
+    console.log('[Atendimento] Ticket encerrado com sucesso');
+    whatsapp.carregarTickets();
+    setActiveTicketId(null); // Desseleciona ticket após encerrar
+  };
+
+  const handleVinculacaoSucesso = () => {
+    console.log('[Atendimento] Cliente vinculado com sucesso');
+    whatsapp.carregarTickets();
+    if (activeTicketId) {
+      whatsapp.carregarMensagens(activeTicketId);
+    }
   };
 
   const handleEnviarMensagem = async (mensagem: string) => {
@@ -136,16 +196,35 @@ export function AtendimentoPage() {
       <div className="w-80 bg-white border-r shadow-sm flex flex-col">
         <div className="p-4 border-b">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-lg font-semibold text-gray-800">Atendimentos</h2>
-            {/* NOVO: Botão de busca rápida */}
-            <button
-              onClick={() => setBuscaRapidaAberta(true)}
-              className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded flex items-center gap-1.5 transition-colors"
-              title="Busca rápida (Ctrl+K)"
-            >
-              <span>🔍</span>
-              <kbd className="px-1 py-0.5 bg-white border rounded text-xs">Ctrl+K</kbd>
-            </button>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-gray-800">Atendimentos</h2>
+              {/* ✅ NOVO: Badge de notificações não lidas */}
+              {unreadCount > 0 && (
+                <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full animate-pulse">
+                  {unreadCount}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {/* NOVO: Botão de busca rápida */}
+              <button
+                onClick={() => setBuscaRapidaAberta(true)}
+                className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded flex items-center gap-1.5 transition-colors"
+                title="Busca rápida (Ctrl+K)"
+              >
+                <span>🔍</span>
+                <kbd className="px-1 py-0.5 bg-white border rounded text-xs">Ctrl+K</kbd>
+              </button>
+              {/* ✨ NOVO: Botão Novo Atendimento */}
+              <button
+                onClick={() => setModalNovoAtendimentoAberto(true)}
+                className="px-3 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors flex items-center gap-2 text-sm font-medium shadow-sm"
+                title="Criar novo atendimento"
+              >
+                <Plus className="h-4 w-4" />
+                Novo
+              </button>
+            </div>
           </div>
           <p className="text-sm text-gray-500">
             {whatsapp.tickets?.length || 0} ticket{whatsapp.tickets?.length !== 1 ? 's' : ''}
@@ -184,7 +263,39 @@ export function AtendimentoPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  {/* NOVO: Botão toggle painel contexto */}
+                  {/* Botão Transferir */}
+                  <button
+                    onClick={() => setModalTransferirAberto(true)}
+                    className="px-3 py-1.5 text-sm bg-[#159A9C] text-white hover:bg-[#0F7B7D] rounded-lg transition-colors flex items-center gap-2 shadow-sm"
+                    title="Transferir atendimento"
+                  >
+                    <UserCheck className="h-4 w-4" />
+                    <span>Transferir</span>
+                  </button>
+
+                  {/* Botão Encerrar */}
+                  <button
+                    onClick={() => setModalEncerrarAberto(true)}
+                    className="px-3 py-1.5 text-sm bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors flex items-center gap-2 shadow-sm"
+                    title="Encerrar atendimento"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    <span>Encerrar</span>
+                  </button>
+
+                  {/* Botão Vincular Cliente (só se ticket não tem cliente) */}
+                  {!activeTicket.clienteId && (
+                    <button
+                      onClick={() => setModalVincularClienteAberto(true)}
+                      className="px-3 py-1.5 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2 shadow-sm"
+                      title="Vincular cliente ao ticket"
+                    >
+                      <Link2 className="h-4 w-4" />
+                      <span>Vincular Cliente</span>
+                    </button>
+                  )}
+
+                  {/* Botão toggle painel contexto */}
                   <button
                     onClick={() => setPainelContextoAberto(!painelContextoAberto)}
                     className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-md transition-colors flex items-center gap-2"
@@ -281,6 +392,45 @@ export function AtendimentoPage() {
         onSelecionarResultado={handleSelecionarResultadoBusca}
         onEnviarNoChat={handleEnviarResultadoNoChat}
       />
+
+      {/* Modal: Novo Atendimento */}
+      <NovoAtendimentoModal
+        isOpen={modalNovoAtendimentoAberto}
+        onClose={() => setModalNovoAtendimentoAberto(false)}
+        onSucesso={handleNovoAtendimentoSucesso}
+      />
+
+      {/* Modal: Transferir Atendimento */}
+      {activeTicket && (
+        <TransferirAtendimentoModal
+          isOpen={modalTransferirAberto}
+          onClose={() => setModalTransferirAberto(false)}
+          ticketId={activeTicketId!}
+          ticketNumero={activeTicket.numero}
+          atendenteAtualId={activeTicket.atendenteId || undefined}
+          onSucesso={handleTransferenciaSucesso}
+        />
+      )}
+
+      {/* Modal: Encerrar Atendimento */}
+      {activeTicket && (
+        <EncerrarAtendimentoModal
+          isOpen={modalEncerrarAberto}
+          onClose={() => setModalEncerrarAberto(false)}
+          onSucesso={handleEncerramentoSucesso}
+          ticketAtual={activeTicket}
+        />
+      )}
+
+      {/* Modal: Vincular Cliente */}
+      {activeTicket && (
+        <VincularClienteModal
+          isOpen={modalVincularClienteAberto}
+          onClose={() => setModalVincularClienteAberto(false)}
+          onSucesso={handleVinculacaoSucesso}
+          ticketAtual={activeTicket}
+        />
+      )}
     </div>
   );
 }

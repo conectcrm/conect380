@@ -8,14 +8,18 @@ interface LocationState {
   userId: string;
   email: string;
   nome: string;
+  senhaTemporaria?: string;
 }
 
 const TrocarSenhaPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as LocationState;
+  const state = location.state as LocationState | undefined;
+  const nomeUsuario = state?.nome ?? 'Usuário';
+  const emailUsuario = state?.email ?? '';
+  const senhaTemporariaRecebida = state?.senhaTemporaria?.trim() || '';
 
-  const [senhaAntiga, setSenhaAntiga] = useState('');
+  const [senhaAntiga, setSenhaAntiga] = useState(() => senhaTemporariaRecebida);
   const [senhaNova, setSenhaNova] = useState('');
   const [senhaConfirmacao, setSenhaConfirmacao] = useState('');
   const [mostrarSenhaAntiga, setMostrarSenhaAntiga] = useState(false);
@@ -23,6 +27,12 @@ const TrocarSenhaPage: React.FC = () => {
   const [mostrarSenhaConfirmacao, setMostrarSenhaConfirmacao] = useState(false);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (senhaTemporariaRecebida) {
+      setSenhaAntiga(senhaTemporariaRecebida);
+    }
+  }, [senhaTemporariaRecebida]);
 
   // Validações em tempo real
   const validacoes = {
@@ -65,7 +75,7 @@ const TrocarSenhaPage: React.FC = () => {
           navigate('/login', {
             state: {
               message: 'Senha alterada! Faça login com sua nova senha.',
-              email: state.email,
+              email: emailUsuario,
             }
           });
         }, 2000);
@@ -114,7 +124,7 @@ const TrocarSenhaPage: React.FC = () => {
             Trocar Senha
           </h1>
           <p className="text-gray-600">
-            Olá, <strong>{state.nome}</strong>! Este é seu primeiro acesso.
+            Olá, <strong>{nomeUsuario}</strong>! Este é seu primeiro acesso.
           </p>
           <p className="text-sm text-gray-500 mt-1">
             Por segurança, troque sua senha temporária.
@@ -131,29 +141,59 @@ const TrocarSenhaPage: React.FC = () => {
 
         {/* Formulário */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Senha Antiga */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Senha Temporária
-            </label>
-            <div className="relative">
-              <input
-                type={mostrarSenhaAntiga ? 'text' : 'password'}
-                value={senhaAntiga}
-                onChange={(e) => setSenhaAntiga(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-12"
-                placeholder="Digite a senha temporária"
-                disabled={loading}
-              />
+          {/* Senha Temporária */}
+          {senhaTemporariaRecebida ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-900 font-medium">
+                Sua senha temporária foi aplicada automaticamente para concluir a troca.
+              </p>
               <button
                 type="button"
                 onClick={() => setMostrarSenhaAntiga(!mostrarSenhaAntiga)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700"
               >
-                {mostrarSenhaAntiga ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                {mostrarSenhaAntiga ? (
+                  <>
+                    <EyeOff className="h-4 w-4" />
+                    Ocultar senha temporária
+                  </>
+                ) : (
+                  <>
+                    <Eye className="h-4 w-4" />
+                    Mostrar senha temporária
+                  </>
+                )}
               </button>
+              {mostrarSenhaAntiga && (
+                <div className="mt-2 px-3 py-2 bg-white border border-blue-200 rounded-md font-mono text-sm text-blue-900">
+                  {senhaAntiga}
+                </div>
+              )}
             </div>
-          </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Senha Temporária
+              </label>
+              <div className="relative">
+                <input
+                  type={mostrarSenhaAntiga ? 'text' : 'password'}
+                  value={senhaAntiga}
+                  onChange={(e) => setSenhaAntiga(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-12"
+                  placeholder="Digite a senha temporária"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarSenhaAntiga(!mostrarSenhaAntiga)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  {mostrarSenhaAntiga ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Nova Senha */}
           <div>
@@ -187,7 +227,7 @@ const TrocarSenhaPage: React.FC = () => {
                 )
               )}
               <p className={`text-xs ${senhaNova.length === 0 ? 'text-gray-500' :
-                  validacoes.tamanhoMinimo ? 'text-green-600' : 'text-red-600'
+                validacoes.tamanhoMinimo ? 'text-green-600' : 'text-red-600'
                 }`}>
                 Mínimo de 6 caracteres
               </p>
@@ -237,8 +277,8 @@ const TrocarSenhaPage: React.FC = () => {
             type="submit"
             disabled={!formularioValido || loading}
             className={`w-full py-3 rounded-lg font-semibold transition-all ${formularioValido && !loading
-                ? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              ? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
           >
             {loading ? 'Alterando senha...' : 'Trocar Senha'}

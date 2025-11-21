@@ -30,7 +30,7 @@ export enum StatusCanal {
   ERRO = 'erro',
 }
 
-@Entity('atendimento_canais')  // ✅ Nome correto da tabela
+@Entity('atendimento_canais') // ✅ Nome correto da tabela
 @Index(['empresaId', 'tipo'])
 @Index(['empresaId', 'status'])
 export class Canal {
@@ -39,7 +39,7 @@ export class Canal {
 
   @Column({
     type: 'uuid',
-    name: 'empresa_id',  // ✅ Nome correto no banco: empresa_id (snake_case)
+    name: 'empresa_id', // ✅ Nome correto no banco: empresa_id (snake_case)
   })
   empresaId: string;
 
@@ -62,7 +62,7 @@ export class Canal {
   @Column({
     type: 'varchar',
     length: 50,
-    name: 'provedor',  // ✅ CORRIGIDO: banco usa 'provedor' em português
+    name: 'provedor', // ✅ CORRIGIDO: banco usa 'provedor' em português
     comment: 'whatsapp_business_api, twilio, telegram_bot_api, sendgrid, meta_graph_api',
   })
   provider: string;
@@ -77,7 +77,7 @@ export class Canal {
   @Column({
     type: 'jsonb',
     nullable: true,
-    name: 'config',  // ✅ Mapear para coluna 'config' no banco
+    name: 'config', // ✅ Mapear para coluna 'config' no banco
     comment: 'Configurações específicas do provider (tokens, credenciais, etc)',
   })
   configuracao: Record<string, any>;
@@ -103,13 +103,6 @@ export class Canal {
     default: false,
   })
   ativo: boolean;
-
-  @Column({
-    type: 'integer',
-    nullable: true,
-    name: 'chatwoot_inbox_id',
-  })
-  chatwootInboxId: number;
 
   @Column({
     type: 'jsonb',
@@ -223,12 +216,12 @@ export class Canal {
   // tickets: Ticket[];
 
   @CreateDateColumn({
-    name: 'created_at',  // ✅ Snake case correto
+    name: 'created_at', // ✅ Snake case correto
   })
   createdAt: Date;
 
   @UpdateDateColumn({
-    name: 'updated_at',  // ✅ Snake case correto
+    name: 'updated_at', // ✅ Snake case correto
   })
   updatedAt: Date;
 

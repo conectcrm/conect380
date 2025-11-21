@@ -1,6 +1,11 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Filter, ChevronDown } from 'lucide-react';
 import { useAccessibility } from '../../hooks/useAccessibility';
+
+export interface FilterOption {
+  value: string;
+  label: string;
+}
 
 interface ResponsiveFiltersProps {
   filtros: {
@@ -8,16 +13,69 @@ interface ResponsiveFiltersProps {
     vendedor: string;
     regiao: string;
   };
-  setFiltros: (filtros: any) => void;
+  onChange: (filtros: ResponsiveFiltersProps['filtros']) => void;
+  periodOptions: FilterOption[];
+  vendedorOptions: FilterOption[];
+  regiaoOptions: FilterOption[];
+  disabled?: boolean;
+  loading?: boolean;
 }
 
 export const ResponsiveFilters: React.FC<ResponsiveFiltersProps> = ({
   filtros,
-  setFiltros
+  onChange,
+  periodOptions = [],
+  vendedorOptions = [],
+  regiaoOptions = [],
+  disabled = false,
+  loading = false
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const { announceToScreenReader } = useAccessibility({ announceChanges: true });
   const filtersId = React.useId();
+
+  const effectivePeriodOptions = useMemo(() => (
+    periodOptions.length > 0 ? periodOptions : [
+      { value: 'semanal', label: 'Esta semana' },
+      { value: 'mensal', label: 'Este mês' },
+      { value: 'trimestral', label: 'Último trimestre' },
+      { value: 'semestral', label: 'Último semestre' },
+      { value: 'anual', label: 'Ano atual' }
+    ]
+  ), [periodOptions]);
+
+  const effectiveVendedorOptions = useMemo(() => {
+    if (vendedorOptions.length === 0) {
+      return [
+        { value: 'Todos', label: 'Todos os vendedores' }
+      ];
+    }
+
+    const hasTodos = vendedorOptions.some(option => option.value === 'Todos');
+    return hasTodos
+      ? vendedorOptions
+      : [{ value: 'Todos', label: 'Todos os vendedores' }, ...vendedorOptions];
+  }, [vendedorOptions]);
+
+  const effectiveRegiaoOptions = useMemo(() => {
+    if (regiaoOptions.length === 0) {
+      return [
+        { value: 'Todas', label: 'Todas as regiões' },
+        { value: 'Norte', label: 'Norte' },
+        { value: 'Nordeste', label: 'Nordeste' },
+        { value: 'Centro-Oeste', label: 'Centro-Oeste' },
+        { value: 'Sudeste', label: 'Sudeste' },
+        { value: 'Sul', label: 'Sul' }
+      ];
+    }
+
+    const hasTodas = regiaoOptions.some(option => option.value === 'Todas');
+    return hasTodas
+      ? regiaoOptions
+      : [{ value: 'Todas', label: 'Todas as regiões' }, ...regiaoOptions];
+  }, [regiaoOptions]);
+
+  const isDisabled = disabled || loading;
 
   const handleToggleExpand = () => {
     const newState = !isExpanded;
@@ -28,8 +86,26 @@ export const ResponsiveFilters: React.FC<ResponsiveFiltersProps> = ({
     );
   };
 
+  const handleSelectChange = (key: keyof ResponsiveFiltersProps['filtros']) => (
+    event: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    const updated = {
+      ...filtros,
+      [key]: event.target.value
+    };
+    onChange(updated);
+  };
+
+  const renderOptions = (options: FilterOption[]) => (
+    options.map(option => (
+      <option key={option.value} value={option.value}>
+        {option.label}
+      </option>
+    ))
+  );
+
   return (
-    <section 
+    <section
       className="bg-white rounded-lg shadow-sm border mb-4 sm:mb-6"
       aria-label="Filtros do dashboard"
     >
@@ -46,28 +122,25 @@ export const ResponsiveFilters: React.FC<ResponsiveFiltersProps> = ({
             <Filter className="w-4 h-4 text-gray-500" aria-hidden="true" />
             <span className="text-sm font-medium text-gray-700">Filtros</span>
           </div>
-          <ChevronDown 
-            className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${
-              isExpanded ? 'rotate-180' : ''
-            }`} 
+          <ChevronDown
+            className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''
+              }`}
           />
         </button>
-        
+
         {isExpanded && (
           <div className="px-4 pb-4 space-y-3 border-t border-gray-100">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Período
               </label>
-              <select 
+              <select
                 value={filtros.periodo}
-                onChange={(e) => setFiltros({...filtros, periodo: e.target.value})}
+                onChange={handleSelectChange('periodo')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                disabled={isDisabled}
               >
-                <option value="2025">2025</option>
-                <option value="2024">2024</option>
-                <option value="ultimo_mes">Último mês</option>
-                <option value="ultimo_trimestre">Último trimestre</option>
+                {renderOptions(effectivePeriodOptions)}
               </select>
             </div>
 
@@ -75,15 +148,13 @@ export const ResponsiveFilters: React.FC<ResponsiveFiltersProps> = ({
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Vendedor
               </label>
-              <select 
+              <select
                 value={filtros.vendedor}
-                onChange={(e) => setFiltros({...filtros, vendedor: e.target.value})}
+                onChange={handleSelectChange('vendedor')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                disabled={isDisabled}
               >
-                <option value="Todos">Todos os vendedores</option>
-                <option value="João Silva">João Silva</option>
-                <option value="Maria Santos">Maria Santos</option>
-                <option value="Pedro Costa">Pedro Costa</option>
+                {renderOptions(effectiveVendedorOptions)}
               </select>
             </div>
 
@@ -91,17 +162,13 @@ export const ResponsiveFilters: React.FC<ResponsiveFiltersProps> = ({
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Região
               </label>
-              <select 
+              <select
                 value={filtros.regiao}
-                onChange={(e) => setFiltros({...filtros, regiao: e.target.value})}
+                onChange={handleSelectChange('regiao')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                disabled={isDisabled}
               >
-                <option value="Todas">Todas as regiões</option>
-                <option value="Norte">Norte</option>
-                <option value="Sul">Sul</option>
-                <option value="Sudeste">Sudeste</option>
-                <option value="Centro-Oeste">Centro-Oeste</option>
-                <option value="Nordeste">Nordeste</option>
+                {renderOptions(effectiveRegiaoOptions)}
               </select>
             </div>
           </div>
@@ -112,43 +179,35 @@ export const ResponsiveFilters: React.FC<ResponsiveFiltersProps> = ({
       <div className="hidden sm:block p-4">
         <div className="flex flex-wrap gap-4 items-center">
           <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-gray-500" />
+            <Filter className="w-4 h-4 text-gray-500" aria-hidden="true" />
             <span className="text-sm font-medium text-gray-700">Filtros</span>
           </div>
-          
-          <select 
+
+          <select
             value={filtros.periodo}
-            onChange={(e) => setFiltros({...filtros, periodo: e.target.value})}
+            onChange={handleSelectChange('periodo')}
             className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            disabled={isDisabled}
           >
-            <option value="2025">2025</option>
-            <option value="2024">2024</option>
-            <option value="ultimo_mes">Último mês</option>
-            <option value="ultimo_trimestre">Último trimestre</option>
+            {renderOptions(effectivePeriodOptions)}
           </select>
-          
-          <select 
+
+          <select
             value={filtros.vendedor}
-            onChange={(e) => setFiltros({...filtros, vendedor: e.target.value})}
+            onChange={handleSelectChange('vendedor')}
             className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            disabled={isDisabled}
           >
-            <option value="Todos">Todos os vendedores</option>
-            <option value="João Silva">João Silva</option>
-            <option value="Maria Santos">Maria Santos</option>
-            <option value="Pedro Costa">Pedro Costa</option>
+            {renderOptions(effectiveVendedorOptions)}
           </select>
-          
-          <select 
+
+          <select
             value={filtros.regiao}
-            onChange={(e) => setFiltros({...filtros, regiao: e.target.value})}
+            onChange={handleSelectChange('regiao')}
             className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            disabled={isDisabled}
           >
-            <option value="Todas">Todas as regiões</option>
-            <option value="Norte">Norte</option>
-            <option value="Sul">Sul</option>
-            <option value="Sudeste">Sudeste</option>
-            <option value="Centro-Oeste">Centro-Oeste</option>
-            <option value="Nordeste">Nordeste</option>
+            {renderOptions(effectiveRegiaoOptions)}
           </select>
         </div>
       </div>

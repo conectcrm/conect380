@@ -90,6 +90,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           userId: trocarSenhaData.userId,
           email: trocarSenhaData.email,
           nome: trocarSenhaData.nome,
+          senhaTemporaria: password,
         };
         throw error;
       }

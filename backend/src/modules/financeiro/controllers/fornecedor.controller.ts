@@ -1,4 +1,19 @@
-import { Controller, Get, Post, Put, Delete, Patch, Body, Param, Query, UseGuards, Request, HttpStatus, HttpException, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Patch,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Request,
+  HttpStatus,
+  HttpException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { FornecedorService } from '../services/fornecedor.service';
 import { CreateFornecedorDto, UpdateFornecedorDto } from '../dto/fornecedor.dto';
@@ -6,7 +21,7 @@ import { FornecedorRemovalResponse } from '../dto/fornecedor-response.dto';
 
 @Controller('fornecedores')
 export class FornecedorController {
-  constructor(private readonly fornecedorService: FornecedorService) { }
+  constructor(private readonly fornecedorService: FornecedorService) {}
 
   // Endpoint de teste temporário sem autenticação (deve vir antes do POST genérico)
   @Post('test')
@@ -68,7 +83,11 @@ export class FornecedorController {
 
   @Put(':id')
   @UseGuards(JwtAuthGuard)
-  async update(@Param('id') id: string, @Body() updateFornecedorDto: UpdateFornecedorDto, @Request() req) {
+  async update(
+    @Param('id') id: string,
+    @Body() updateFornecedorDto: UpdateFornecedorDto,
+    @Request() req,
+  ) {
     const empresaId = req.user.empresa_id;
     return await this.fornecedorService.update(id, updateFornecedorDto, empresaId);
   }
@@ -83,7 +102,7 @@ export class FornecedorController {
 
       return {
         success: true,
-        message: '✅ Fornecedor excluído com sucesso!'
+        message: '✅ Fornecedor excluído com sucesso!',
       };
     } catch (error) {
       // Se é um erro de dependência, retornar resposta estruturada
@@ -95,8 +114,8 @@ export class FornecedorController {
           alternative: {
             action: 'desativar',
             endpoint: `/fornecedores/${id}/desativar`,
-            description: 'Desativar fornecedor mantendo o histórico'
-          }
+            description: 'Desativar fornecedor mantendo o histórico',
+          },
         };
       }
 
@@ -112,7 +131,7 @@ export class FornecedorController {
     const fornecedor = await this.fornecedorService.desativar(id, empresaId);
     return {
       message: 'Fornecedor desativado com sucesso',
-      fornecedor
+      fornecedor,
     };
   }
 
@@ -127,13 +146,13 @@ export class FornecedorController {
       return {
         success: true,
         message: 'Histórico de contas pagas removido com sucesso',
-        data: result
+        data: result,
       };
     } catch (error) {
       throw new BadRequestException({
         success: false,
         message: error.message || 'Erro ao limpar histórico de contas pagas',
-        error: error.code || 'CLEANUP_ERROR'
+        error: error.code || 'CLEANUP_ERROR',
       });
     }
   }

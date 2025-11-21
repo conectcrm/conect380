@@ -1,4 +1,14 @@
-import { Controller, Post, Body, Get, Param, Query, HttpStatus, HttpException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  Query,
+  HttpStatus,
+  HttpException,
+  Put,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { EmpresasService } from './empresas.service';
 import { CreateEmpresaDto, VerificarEmailDto } from './dto/empresas.dto';
@@ -14,17 +24,20 @@ export class EmpresasController {
   @ApiResponse({ status: 400, description: 'Dados inválidos' })
   @ApiResponse({ status: 409, description: 'Empresa já existe' })
   async registrarEmpresa(@Body() createEmpresaDto: CreateEmpresaDto) {
+    process.stdout.write('\n🎯 [CONTROLLER] POST /empresas/registro chamado\n');
+    process.stdout.write(`📦 [CONTROLLER] Plano: ${createEmpresaDto.plano}\n`);
+
     try {
       const empresa = await this.empresasService.registrarEmpresa(createEmpresaDto);
       return {
         success: true,
         message: 'Empresa registrada com sucesso. Verifique seu email para ativar a conta.',
-        data: empresa
+        data: empresa,
       };
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro interno do servidor',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -36,13 +49,10 @@ export class EmpresasController {
       const disponivel = await this.empresasService.verificarCNPJDisponivel(cnpj);
       return {
         disponivel,
-        message: disponivel ? 'CNPJ disponível' : 'CNPJ já cadastrado'
+        message: disponivel ? 'CNPJ disponível' : 'CNPJ já cadastrado',
       };
     } catch (error) {
-      throw new HttpException(
-        'Erro ao verificar CNPJ',
-        HttpStatus.INTERNAL_SERVER_ERROR
-      );
+      throw new HttpException('Erro ao verificar CNPJ', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -53,13 +63,10 @@ export class EmpresasController {
       const disponivel = await this.empresasService.verificarEmailDisponivel(email);
       return {
         disponivel,
-        message: disponivel ? 'Email disponível' : 'Email já cadastrado'
+        message: disponivel ? 'Email disponível' : 'Email já cadastrado',
       };
     } catch (error) {
-      throw new HttpException(
-        'Erro ao verificar email',
-        HttpStatus.INTERNAL_SERVER_ERROR
-      );
+      throw new HttpException('Erro ao verificar email', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -71,12 +78,12 @@ export class EmpresasController {
       return {
         success: true,
         message: 'Email verificado com sucesso!',
-        data: resultado
+        data: resultado,
       };
     } catch (error) {
       throw new HttpException(
         error.message || 'Token inválido ou expirado',
-        HttpStatus.BAD_REQUEST
+        HttpStatus.BAD_REQUEST,
       );
     }
   }
@@ -88,13 +95,10 @@ export class EmpresasController {
       await this.empresasService.reenviarEmailAtivacao(body.email);
       return {
         success: true,
-        message: 'Email de ativação reenviado com sucesso!'
+        message: 'Email de ativação reenviado com sucesso!',
       };
     } catch (error) {
-      throw new HttpException(
-        error.message || 'Erro ao reenviar email',
-        HttpStatus.BAD_REQUEST
-      );
+      throw new HttpException(error.message || 'Erro ao reenviar email', HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -110,7 +114,42 @@ export class EmpresasController {
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao buscar empresa',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Obter empresa por ID' })
+  async obterEmpresaPorId(@Param('id') id: string) {
+    try {
+      const empresa = await this.empresasService.obterPorId(id);
+      if (!empresa) {
+        throw new HttpException('Empresa não encontrada', HttpStatus.NOT_FOUND);
+      }
+      return empresa;
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Erro ao buscar empresa',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Atualizar dados da empresa' })
+  async atualizarEmpresa(@Param('id') id: string, @Body() updateData: Partial<CreateEmpresaDto>) {
+    try {
+      const empresa = await this.empresasService.atualizarEmpresa(id, updateData);
+      return {
+        success: true,
+        message: 'Empresa atualizada com sucesso',
+        data: empresa,
+      };
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Erro ao atualizar empresa',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -122,10 +161,7 @@ export class EmpresasController {
       const planos = await this.empresasService.listarPlanos();
       return planos;
     } catch (error) {
-      throw new HttpException(
-        'Erro ao listar planos',
-        HttpStatus.INTERNAL_SERVER_ERROR
-      );
+      throw new HttpException('Erro ao listar planos', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -138,7 +174,7 @@ export class EmpresasController {
     } catch (error) {
       throw new HttpException(
         'Erro ao verificar status da empresa',
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -167,7 +203,7 @@ export class MinhasEmpresasController {
             logradouro: 'Rua Exemplo, 123',
             cidade: 'São Paulo',
             estado: 'SP',
-            cep: '01234-567'
+            cep: '01234-567',
           },
           plano: 'premium',
           status: 'ativa',
@@ -175,20 +211,17 @@ export class MinhasEmpresasController {
           configuracoes: {
             whatsapp: true,
             email: true,
-            sms: false
-          }
-        }
+            sms: false,
+          },
+        },
       ];
 
       return {
         success: true,
-        empresas: empresasMock
+        empresas: empresasMock,
       };
     } catch (error) {
-      throw new HttpException(
-        'Erro ao buscar empresas',
-        HttpStatus.INTERNAL_SERVER_ERROR
-      );
+      throw new HttpException('Erro ao buscar empresas', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 }

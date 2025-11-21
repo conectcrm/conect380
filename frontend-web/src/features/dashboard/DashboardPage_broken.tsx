@@ -4,7 +4,6 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { KPICard } from '../../components/common/KPICard';
 import { ResponsiveFilters } from '../../components/common/ResponsiveFilters';
 import ColorPaletteSelector from '../../components/common/ColorPaletteSelector';
-import ChatwootQuickAccess from '../../components/chatwoot/ChatwootQuickAccess';
 import { useDashboard } from '../../hooks/useDashboard';
 import {
   VendasChart,
@@ -70,7 +69,7 @@ const DashboardPage: React.FC = () => {
   if (error && !data.kpis) {
     return (
       <div className="p-6">
-        <div 
+        <div
           className="rounded-xl p-6 border border-red-200 bg-red-50"
         >
           <div className="flex items-center gap-3 mb-4">
@@ -125,7 +124,7 @@ const DashboardPage: React.FC = () => {
               className="p-1 rounded-full hover:bg-gray-100 transition-colors"
               title="Atualizar dados"
             >
-              <RefreshCw 
+              <RefreshCw
                 className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
                 style={{ color: currentPalette.colors.textSecondary }}
               />
@@ -330,10 +329,10 @@ const DashboardPage: React.FC = () => {
                   )}
                   <span
                     className="text-sm font-bold"
-                    style={{ 
-                      color: data.kpis.faturamentoTotal.variacao >= 0 
-                        ? currentPalette.colors.success 
-                        : currentPalette.colors.error 
+                    style={{
+                      color: data.kpis.faturamentoTotal.variacao >= 0
+                        ? currentPalette.colors.success
+                        : currentPalette.colors.error
                     }}
                   >
                     {data.kpis.faturamentoTotal.variacao >= 0 ? '+' : ''}{data.kpis.faturamentoTotal.variacao}% {data.kpis.faturamentoTotal.periodo}
@@ -354,10 +353,10 @@ const DashboardPage: React.FC = () => {
                     </span>
                     <span
                       className="text-xs font-bold"
-                      style={{ 
+                      style={{
                         color: (data.kpis.faturamentoTotal.valor / data.kpis.faturamentoTotal.meta) >= 1
-                          ? currentPalette.colors.success 
-                          : currentPalette.colors.primary 
+                          ? currentPalette.colors.success
+                          : currentPalette.colors.primary
                       }}
                     >
                       {Math.round((data.kpis.faturamentoTotal.valor / data.kpis.faturamentoTotal.meta) * 100)}%
@@ -372,7 +371,7 @@ const DashboardPage: React.FC = () => {
                       style={{
                         width: `${Math.min((data.kpis.faturamentoTotal.valor / data.kpis.faturamentoTotal.meta) * 100, 100)}%`,
                         backgroundColor: (data.kpis.faturamentoTotal.valor / data.kpis.faturamentoTotal.meta) >= 1
-                          ? currentPalette.colors.success 
+                          ? currentPalette.colors.success
                           : currentPalette.colors.primary
                       }}
                     />
@@ -436,10 +435,10 @@ const DashboardPage: React.FC = () => {
                   )}
                   <span
                     className="text-sm font-bold"
-                    style={{ 
-                      color: data.kpis.ticketMedio.variacao >= 0 
-                        ? currentPalette.colors.primary 
-                        : currentPalette.colors.error 
+                    style={{
+                      color: data.kpis.ticketMedio.variacao >= 0
+                        ? currentPalette.colors.primary
+                        : currentPalette.colors.error
                     }}
                   >
                     {data.kpis.ticketMedio.variacao >= 0 ? '+' : ''}{data.kpis.ticketMedio.variacao}% {data.kpis.ticketMedio.periodo}
@@ -498,10 +497,10 @@ const DashboardPage: React.FC = () => {
                   )}
                   <span
                     className="text-sm font-bold"
-                    style={{ 
-                      color: data.kpis.vendasFechadas.variacao >= 0 
-                        ? currentPalette.colors.success 
-                        : currentPalette.colors.error 
+                    style={{
+                      color: data.kpis.vendasFechadas.variacao >= 0
+                        ? currentPalette.colors.success
+                        : currentPalette.colors.error
                     }}
                   >
                     {data.kpis.vendasFechadas.variacao >= 0 ? '+' : ''}{data.kpis.vendasFechadas.variacao}% {data.kpis.vendasFechadas.periodo}
@@ -599,326 +598,326 @@ const DashboardPage: React.FC = () => {
           </div>
 
           <select
-                className="px-4 py-2 border rounded-lg text-sm bg-white transition-all"
-                style={{
-                  borderColor: currentPalette.colors.border,
-                  color: currentPalette.colors.text
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = currentPalette.colors.primary;
-                  e.target.style.boxShadow = `0 0 0 2px ${currentPalette.colors.primaryLight}`;
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = currentPalette.colors.border;
-                  e.target.style.boxShadow = 'none';
-                }}
-              >
-                <option value="mensal">{t('dashboard.currentMonth')}</option>
-                <option value="trimestral">{t('dashboard.quarter')}</option>
-                <option value="semestral">{t('dashboard.semester')}</option>
-                <option value="anual">{t('dashboard.fullYear')}</option>
-              </select>
-
-              <select
-                className="px-4 py-2 border rounded-lg text-sm bg-white transition-all"
-                style={{
-                  borderColor: currentPalette.colors.border,
-                  color: currentPalette.colors.text
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = currentPalette.colors.primary;
-                  e.target.style.boxShadow = `0 0 0 2px ${currentPalette.colors.primaryLight}`;
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = currentPalette.colors.border;
-                  e.target.style.boxShadow = 'none';
-                }}
-              >
-                <option value="todos">{t('dashboard.allSellers')}</option>
-                <option value="carlos">Carlos Mendes</option>
-                <option value="fernanda">Fernanda Lima</option>
-                <option value="ricardo">Ricardo Torres</option>
-                <option value="juliana">Juliana Costa</option>
-              </select>
-
-              <select
-                className="px-4 py-2 border rounded-lg text-sm bg-white transition-all"
-                style={{
-                  borderColor: currentPalette.colors.border,
-                  color: currentPalette.colors.text
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = currentPalette.colors.primary;
-                  e.target.style.boxShadow = `0 0 0 2px ${currentPalette.colors.primaryLight}`;
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = currentPalette.colors.border;
-                  e.target.style.boxShadow = 'none';
-                }}
-              >
-                <option value="todas">{t('dashboard.allRegions')}</option>
-                <option value="sudeste">{t('dashboard.southeastRegion')}</option>
-                <option value="sul">{t('dashboard.southRegion')}</option>
-                <option value="nordeste">{t('dashboard.northeastRegion')}</option>
-                <option value="norte">{t('dashboard.northRegion')}</option>
-                <option value="centro">{t('dashboard.centerwestRegion')}</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Métricas Principais de Vendas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-            <div
-              className="rounded-xl p-6 border shadow-sm hover:shadow-md transition-all"
-              style={{
-                backgroundColor: currentPalette.colors.background,
-                borderColor: currentPalette.colors.border
-              }}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <h3
-                  className="text-sm font-bold uppercase tracking-wide"
-                  style={{ color: currentPalette.colors.textSecondary }}
-                >
-                  {t('dashboard.totalRevenue')}
-                </h3>
-                <div
-                  className="p-2 rounded-full"
-                  style={{ backgroundColor: currentPalette.colors.neutralLight }}
-                >
-                  <DollarSign
-                    className="w-6 h-6"
-                    style={{ color: currentPalette.colors.neutral }}
-                  />
-                </div>
-              </div>
-              <div
-                className="text-4xl font-black mb-2"
-                style={{ color: currentPalette.colors.text }}
-              >
-                R$ 487.650
-              </div>
-              <div className="flex items-center gap-2">
-                <ArrowUp
-                  className="w-5 h-5"
-                  style={{ color: currentPalette.colors.success }}
-                />
-                <span
-                  className="text-sm font-bold"
-                  style={{ color: currentPalette.colors.success }}
-                >
-                  +24% vs mês anterior
-                </span>
-              </div>
-              <div
-                className="mt-3 text-xs"
-                style={{ color: currentPalette.colors.textSecondary }}
-              >
-                Meta: R$ 450.000 (108%)
-              </div>
-            </div>
-
-            <div
-              className="rounded-xl p-6 border shadow-sm hover:shadow-md transition-all"
-              style={{
-                backgroundColor: currentPalette.colors.background,
-                borderColor: currentPalette.colors.border
-              }}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <h3
-                  className="text-sm font-bold uppercase tracking-wide"
-                  style={{ color: currentPalette.colors.textSecondary }}
-                >
-                  {t('dashboard.averageTicket')}
-                </h3>
-                <div
-                  className="p-2 rounded-full"
-                  style={{ backgroundColor: currentPalette.colors.primaryLight }}
-                >
-                  <Target
-                    className="w-6 h-6"
-                    style={{ color: currentPalette.colors.primary }}
-                  />
-                </div>
-              </div>
-              <div
-                className="text-3xl font-black mb-2"
-                style={{ color: currentPalette.colors.text }}
-              >
-                R$ 23.420
-              </div>
-              <div className="flex items-center gap-2">
-                <ArrowUp
-                  className="w-5 h-5"
-                  style={{ color: currentPalette.colors.primary }}
-                />
-                <span
-                  className="text-sm font-bold"
-                  style={{ color: currentPalette.colors.primary }}
-                >
-                  +8.7% vs meta
-                </span>
-              </div>
-              <div
-                className="mt-3 text-xs"
-                style={{ color: currentPalette.colors.textSecondary }}
-              >
-                Crescimento consistente
-              </div>
-            </div>
-
-            <div
-              className="rounded-xl p-6 border shadow-sm hover:shadow-md transition-all"
-              style={{
-                backgroundColor: currentPalette.colors.background,
-                borderColor: currentPalette.colors.border
-              }}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <h3
-                  className="text-sm font-bold uppercase tracking-wide"
-                  style={{ color: currentPalette.colors.textSecondary }}
-                >
-                  {t('dashboard.closedSales')}
-                </h3>
-                <div
-                  className="p-2 rounded-full"
-                  style={{ backgroundColor: currentPalette.colors.neutralLight }}
-                >
-                  <CheckSquare
-                    className="w-6 h-6"
-                    style={{ color: currentPalette.colors.neutral }}
-                  />
-                </div>
-              </div>
-              <div
-                className="text-3xl font-black mb-2"
-                style={{ color: currentPalette.colors.text }}
-              >
-                34
-              </div>
-              <div className="flex items-center gap-2">
-                <ArrowUp
-                  className="w-5 h-5"
-                  style={{ color: currentPalette.colors.success }}
-                />
-                <span
-                  className="text-sm font-bold"
-                  style={{ color: currentPalette.colors.success }}
-                >
-                  +18 este mês
-                </span>
-              </div>
-              <div
-                className="mt-3 text-xs"
-                style={{ color: currentPalette.colors.textSecondary }}
-              >
-                Melhor mês do ano!
-              </div>
-            </div>
-
-            <div
-              className="rounded-xl p-6 border shadow-sm hover:shadow-md transition-all"
-              style={{
-                backgroundColor: currentPalette.colors.background,
-                borderColor: currentPalette.colors.border
-              }}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <h3
-                  className="text-sm font-bold uppercase tracking-wide"
-                  style={{ color: currentPalette.colors.textSecondary }}
-                >
-                  {t('dashboard.inNegotiation')}
-                </h3>
-                <div
-                  className="p-2 rounded-full"
-                  style={{ backgroundColor: currentPalette.colors.neutralLight }}
-                >
-                  <Clock
-                    className="w-6 h-6"
-                    style={{ color: currentPalette.colors.neutral }}
-                  />
-                </div>
-              </div>
-              <div
-                className="text-3xl font-black mb-2"
-                style={{ color: currentPalette.colors.text }}
-              >
-                R$ 285.400
-              </div>
-              <div className="flex items-center gap-2">
-                <span
-                  className="text-sm font-bold"
-                  style={{ color: currentPalette.colors.textSecondary }}
-                >
-                  22 propostas ativas
-                </span>
-              </div>
-              <div
-                className="mt-3 text-xs"
-                style={{ color: currentPalette.colors.textSecondary }}
-              >
-                Pipeline forte
-              </div>
-            </div>
-          </div>
-
-          {/* Barra de Progresso da Meta */}
-          <div
-            className="mt-6 rounded-lg p-4 border"
+            className="px-4 py-2 border rounded-lg text-sm bg-white transition-all"
             style={{
-              backgroundColor: currentPalette.colors.background,
-              borderColor: currentPalette.colors.border
+              borderColor: currentPalette.colors.border,
+              color: currentPalette.colors.text
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = currentPalette.colors.primary;
+              e.target.style.boxShadow = `0 0 0 2px ${currentPalette.colors.primaryLight}`;
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = currentPalette.colors.border;
+              e.target.style.boxShadow = 'none';
             }}
           >
-            <div className="flex justify-between items-center mb-2">
-              <span
-                className="text-sm font-bold"
-                style={{ color: currentPalette.colors.text }}
-              >
-                Meta Mensal (R$ 450.000)
-              </span>
-              <span
-                className="text-lg font-black"
-                style={{ color: currentPalette.colors.text }}
-              >
-                108%
-              </span>
-            </div>
-            <div
-              className="w-full rounded-full h-3"
-              style={{ backgroundColor: currentPalette.colors.neutralLight }}
-            >
-              <div
-                className="h-3 rounded-full transition-all duration-1000"
-                style={{
-                  width: '100%',
-                  background: `linear-gradient(to right, ${currentPalette.colors.primary}, ${currentPalette.colors.primaryDark})`
-                }}
-              >
-                <div
-                  className="h-3 rounded-full"
-                  style={{
-                    width: '8%',
-                    background: `linear-gradient(to right, ${currentPalette.colors.accent}, ${currentPalette.colors.primary})`
-                  }}
-                ></div>
-              </div>
-            </div>
-            <div
-              className="text-xs mt-1 font-medium"
+            <option value="mensal">{t('dashboard.currentMonth')}</option>
+            <option value="trimestral">{t('dashboard.quarter')}</option>
+            <option value="semestral">{t('dashboard.semester')}</option>
+            <option value="anual">{t('dashboard.fullYear')}</option>
+          </select>
+
+          <select
+            className="px-4 py-2 border rounded-lg text-sm bg-white transition-all"
+            style={{
+              borderColor: currentPalette.colors.border,
+              color: currentPalette.colors.text
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = currentPalette.colors.primary;
+              e.target.style.boxShadow = `0 0 0 2px ${currentPalette.colors.primaryLight}`;
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = currentPalette.colors.border;
+              e.target.style.boxShadow = 'none';
+            }}
+          >
+            <option value="todos">{t('dashboard.allSellers')}</option>
+            <option value="carlos">Carlos Mendes</option>
+            <option value="fernanda">Fernanda Lima</option>
+            <option value="ricardo">Ricardo Torres</option>
+            <option value="juliana">Juliana Costa</option>
+          </select>
+
+          <select
+            className="px-4 py-2 border rounded-lg text-sm bg-white transition-all"
+            style={{
+              borderColor: currentPalette.colors.border,
+              color: currentPalette.colors.text
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = currentPalette.colors.primary;
+              e.target.style.boxShadow = `0 0 0 2px ${currentPalette.colors.primaryLight}`;
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = currentPalette.colors.border;
+              e.target.style.boxShadow = 'none';
+            }}
+          >
+            <option value="todas">{t('dashboard.allRegions')}</option>
+            <option value="sudeste">{t('dashboard.southeastRegion')}</option>
+            <option value="sul">{t('dashboard.southRegion')}</option>
+            <option value="nordeste">{t('dashboard.northeastRegion')}</option>
+            <option value="norte">{t('dashboard.northRegion')}</option>
+            <option value="centro">{t('dashboard.centerwestRegion')}</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Métricas Principais de Vendas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        <div
+          className="rounded-xl p-6 border shadow-sm hover:shadow-md transition-all"
+          style={{
+            backgroundColor: currentPalette.colors.background,
+            borderColor: currentPalette.colors.border
+          }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h3
+              className="text-sm font-bold uppercase tracking-wide"
               style={{ color: currentPalette.colors.textSecondary }}
             >
-              Meta superada! Parabéns à equipe!
+              {t('dashboard.totalRevenue')}
+            </h3>
+            <div
+              className="p-2 rounded-full"
+              style={{ backgroundColor: currentPalette.colors.neutralLight }}
+            >
+              <DollarSign
+                className="w-6 h-6"
+                style={{ color: currentPalette.colors.neutral }}
+              />
             </div>
+          </div>
+          <div
+            className="text-4xl font-black mb-2"
+            style={{ color: currentPalette.colors.text }}
+          >
+            R$ 487.650
+          </div>
+          <div className="flex items-center gap-2">
+            <ArrowUp
+              className="w-5 h-5"
+              style={{ color: currentPalette.colors.success }}
+            />
+            <span
+              className="text-sm font-bold"
+              style={{ color: currentPalette.colors.success }}
+            >
+              +24% vs mês anterior
+            </span>
+          </div>
+          <div
+            className="mt-3 text-xs"
+            style={{ color: currentPalette.colors.textSecondary }}
+          >
+            Meta: R$ 450.000 (108%)
+          </div>
+        </div>
+
+        <div
+          className="rounded-xl p-6 border shadow-sm hover:shadow-md transition-all"
+          style={{
+            backgroundColor: currentPalette.colors.background,
+            borderColor: currentPalette.colors.border
+          }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h3
+              className="text-sm font-bold uppercase tracking-wide"
+              style={{ color: currentPalette.colors.textSecondary }}
+            >
+              {t('dashboard.averageTicket')}
+            </h3>
+            <div
+              className="p-2 rounded-full"
+              style={{ backgroundColor: currentPalette.colors.primaryLight }}
+            >
+              <Target
+                className="w-6 h-6"
+                style={{ color: currentPalette.colors.primary }}
+              />
+            </div>
+          </div>
+          <div
+            className="text-3xl font-black mb-2"
+            style={{ color: currentPalette.colors.text }}
+          >
+            R$ 23.420
+          </div>
+          <div className="flex items-center gap-2">
+            <ArrowUp
+              className="w-5 h-5"
+              style={{ color: currentPalette.colors.primary }}
+            />
+            <span
+              className="text-sm font-bold"
+              style={{ color: currentPalette.colors.primary }}
+            >
+              +8.7% vs meta
+            </span>
+          </div>
+          <div
+            className="mt-3 text-xs"
+            style={{ color: currentPalette.colors.textSecondary }}
+          >
+            Crescimento consistente
+          </div>
+        </div>
+
+        <div
+          className="rounded-xl p-6 border shadow-sm hover:shadow-md transition-all"
+          style={{
+            backgroundColor: currentPalette.colors.background,
+            borderColor: currentPalette.colors.border
+          }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h3
+              className="text-sm font-bold uppercase tracking-wide"
+              style={{ color: currentPalette.colors.textSecondary }}
+            >
+              {t('dashboard.closedSales')}
+            </h3>
+            <div
+              className="p-2 rounded-full"
+              style={{ backgroundColor: currentPalette.colors.neutralLight }}
+            >
+              <CheckSquare
+                className="w-6 h-6"
+                style={{ color: currentPalette.colors.neutral }}
+              />
+            </div>
+          </div>
+          <div
+            className="text-3xl font-black mb-2"
+            style={{ color: currentPalette.colors.text }}
+          >
+            34
+          </div>
+          <div className="flex items-center gap-2">
+            <ArrowUp
+              className="w-5 h-5"
+              style={{ color: currentPalette.colors.success }}
+            />
+            <span
+              className="text-sm font-bold"
+              style={{ color: currentPalette.colors.success }}
+            >
+              +18 este mês
+            </span>
+          </div>
+          <div
+            className="mt-3 text-xs"
+            style={{ color: currentPalette.colors.textSecondary }}
+          >
+            Melhor mês do ano!
+          </div>
+        </div>
+
+        <div
+          className="rounded-xl p-6 border shadow-sm hover:shadow-md transition-all"
+          style={{
+            backgroundColor: currentPalette.colors.background,
+            borderColor: currentPalette.colors.border
+          }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h3
+              className="text-sm font-bold uppercase tracking-wide"
+              style={{ color: currentPalette.colors.textSecondary }}
+            >
+              {t('dashboard.inNegotiation')}
+            </h3>
+            <div
+              className="p-2 rounded-full"
+              style={{ backgroundColor: currentPalette.colors.neutralLight }}
+            >
+              <Clock
+                className="w-6 h-6"
+                style={{ color: currentPalette.colors.neutral }}
+              />
+            </div>
+          </div>
+          <div
+            className="text-3xl font-black mb-2"
+            style={{ color: currentPalette.colors.text }}
+          >
+            R$ 285.400
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className="text-sm font-bold"
+              style={{ color: currentPalette.colors.textSecondary }}
+            >
+              22 propostas ativas
+            </span>
+          </div>
+          <div
+            className="mt-3 text-xs"
+            style={{ color: currentPalette.colors.textSecondary }}
+          >
+            Pipeline forte
           </div>
         </div>
       </div>
 
-      {/* KPIs Cards Reformulados - SEM DUPLICAÇÃO */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+      {/* Barra de Progresso da Meta */}
+      <div
+        className="mt-6 rounded-lg p-4 border"
+        style={{
+          backgroundColor: currentPalette.colors.background,
+          borderColor: currentPalette.colors.border
+        }}
+      >
+        <div className="flex justify-between items-center mb-2">
+          <span
+            className="text-sm font-bold"
+            style={{ color: currentPalette.colors.text }}
+          >
+            Meta Mensal (R$ 450.000)
+          </span>
+          <span
+            className="text-lg font-black"
+            style={{ color: currentPalette.colors.text }}
+          >
+            108%
+          </span>
+        </div>
+        <div
+          className="w-full rounded-full h-3"
+          style={{ backgroundColor: currentPalette.colors.neutralLight }}
+        >
+          <div
+            className="h-3 rounded-full transition-all duration-1000"
+            style={{
+              width: '100%',
+              background: `linear-gradient(to right, ${currentPalette.colors.primary}, ${currentPalette.colors.primaryDark})`
+            }}
+          >
+            <div
+              className="h-3 rounded-full"
+              style={{
+                width: '8%',
+                background: `linear-gradient(to right, ${currentPalette.colors.accent}, ${currentPalette.colors.primary})`
+              }}
+            ></div>
+          </div>
+        </div>
+        <div
+          className="text-xs mt-1 font-medium"
+          style={{ color: currentPalette.colors.textSecondary }}
+        >
+          Meta superada! Parabéns à equipe!
+        </div>
+      </div>
+    </div>
+      </div >
+
+  {/* KPIs Cards Reformulados - SEM DUPLICAÇÃO */ }
+  < div className = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8" >
         <KPICard
           title={t('dashboard.newClients')}
           value={dashboardData.kpis.totalClientes}
@@ -970,41 +969,41 @@ const DashboardPage: React.FC = () => {
           isLoading={loading}
           color="green"
         />
-      </div>
+      </div >
 
-      {/* Área de Gráficos Reais - Layout Responsivo */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
-        {/* Gráfico de Vendas vs Meta */}
-        <VendasChart />
+  {/* Área de Gráficos Reais - Layout Responsivo */ }
+  < div className = "grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8" >
+    {/* Gráfico de Vendas vs Meta */ }
+    < VendasChart />
 
-        {/* Gráfico de Status das Propostas */}
-        <PropostasChart />
-      </div>
+    {/* Gráfico de Status das Propostas */ }
+    < PropostasChart />
+      </div >
 
-      {/* Segunda linha de gráficos */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
-        {/* Funil de Vendas */}
-        <FunnelChart />
+  {/* Segunda linha de gráficos */ }
+  < div className = "grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8" >
+    {/* Funil de Vendas */ }
+    < FunnelChart />
 
-        {/* Performance dos Vendedores */}
-        <div className="xl:col-span-2">
-          <VendedoresChart />
-        </div>
-      </div>
+    {/* Performance dos Vendedores */ }
+    < div className = "xl:col-span-2" >
+      <VendedoresChart />
+        </div >
+      </div >
 
-      {/* Gráfico de atividades */}
-      <div className="mb-8">
-        <AtividadesChart />
-      </div>
-      {/* Seção de Análises e Status - Layout Responsivo */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
-        {/* Status das Propostas - Gráfico Circular */}
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-          <PropostasChart />
-        </div>
+  {/* Gráfico de atividades */ }
+  < div className = "mb-8" >
+    <AtividadesChart />
+      </div >
+  {/* Seção de Análises e Status - Layout Responsivo */ }
+  < div className = "grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6" >
+    {/* Status das Propostas - Gráfico Circular */ }
+    < div className = "bg-white p-4 sm:p-6 rounded-lg shadow-sm" >
+      <PropostasChart />
+        </div >
 
-        {/* Ações Rápidas Melhoradas */}
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
+  {/* Ações Rápidas Melhoradas */ }
+  < div className = "bg-white p-4 sm:p-6 rounded-lg shadow-sm" >
           <h3 className="text-lg font-semibold mb-4">{t('dashboard.quickActions')}</h3>
 
           <div className="space-y-3">
@@ -1052,82 +1051,73 @@ const DashboardPage: React.FC = () => {
               <ChevronRight className="w-4 h-4 text-gray-400" />
             </button>
           </div>
+        </div >
+
+  {/* Análise de Performance Compacta Melhorada */ }
+  < div className = "bg-white p-4 sm:p-6 rounded-lg shadow-sm" >
+    <h3 className="text-lg font-semibold mb-4">{t('dashboard.performance')}</h3>
+
+{/* Métricas Principais */ }
+<div className="grid grid-cols-2 gap-3 mb-4">
+  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-3 rounded-lg border border-gray-200">
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-xs text-gray-600 font-medium">Ticket Médio</p>
+        <p className="text-lg font-bold text-gray-700">R$ 18.750</p>
+        <p className="text-xs text-blue-600">+12% vs mês anterior</p>
+      </div>
+      <TrendingUp className="w-6 h-6 text-gray-500" />
+    </div>
+  </div>
+
+  <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-lg border border-blue-200">
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-xs text-blue-600 font-medium">Ciclo Médio</p>
+        <p className="text-lg font-bold text-blue-700">12 dias</p>
+        <p className="text-xs text-blue-600">-3 dias vs meta</p>
+      </div>
+      <Clock className="w-6 h-6 text-blue-500" />
+    </div>
+  </div>
+</div>
+
+{/* Progresso por Etapa */ }
+<div className="space-y-3">
+  <h4 className="text-sm font-semibold text-gray-700">Progresso por Etapa</h4>
+  {[
+    { etapa: 'Prospecção', valor: 45, meta: 50, cor: 'bg-gray-500' },
+    { etapa: 'Qualificação', valor: 32, meta: 40, cor: 'bg-gray-600' },
+    { etapa: 'Proposta', valor: 28, meta: 30, cor: 'bg-blue-500' },
+    { etapa: 'Fechamento', valor: 15, meta: 20, cor: 'bg-blue-600' }
+  ].map((item, index) => (
+    <div key={index} className="space-y-1">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${item.cor}`}></div>
+          <span className="text-xs font-medium text-gray-700">{item.etapa}</span>
         </div>
-
-        {/* Análise de Performance Compacta Melhorada */}
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-          <h3 className="text-lg font-semibold mb-4">{t('dashboard.performance')}</h3>
-
-          {/* Métricas Principais */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-3 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-gray-600 font-medium">Ticket Médio</p>
-                  <p className="text-lg font-bold text-gray-700">R$ 18.750</p>
-                  <p className="text-xs text-blue-600">+12% vs mês anterior</p>
-                </div>
-                <TrendingUp className="w-6 h-6 text-gray-500" />
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-lg border border-blue-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-blue-600 font-medium">Ciclo Médio</p>
-                  <p className="text-lg font-bold text-blue-700">12 dias</p>
-                  <p className="text-xs text-blue-600">-3 dias vs meta</p>
-                </div>
-                <Clock className="w-6 h-6 text-blue-500" />
-              </div>
-            </div>
-          </div>
-
-          {/* Progresso por Etapa */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-gray-700">Progresso por Etapa</h4>
-            {[
-              { etapa: 'Prospecção', valor: 45, meta: 50, cor: 'bg-gray-500' },
-              { etapa: 'Qualificação', valor: 32, meta: 40, cor: 'bg-gray-600' },
-              { etapa: 'Proposta', valor: 28, meta: 30, cor: 'bg-blue-500' },
-              { etapa: 'Fechamento', valor: 15, meta: 20, cor: 'bg-blue-600' }
-            ].map((item, index) => (
-              <div key={index} className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${item.cor}`}></div>
-                    <span className="text-xs font-medium text-gray-700">{item.etapa}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs font-medium text-gray-900">{item.valor}</span>
-                    <span className="text-xs text-gray-500">/{item.meta}</span>
-                  </div>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-1.5">
-                  <div
-                    className={`h-1.5 rounded-full ${item.cor} transition-all duration-500`}
-                    style={{ width: `${(item.valor / item.meta) * 100}%` }}
-                  ></div>
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="flex items-center gap-1">
+          <span className="text-xs font-medium text-gray-900">{item.valor}</span>
+          <span className="text-xs text-gray-500">/{item.meta}</span>
         </div>
       </div>
+      <div className="w-full bg-gray-200 rounded-full h-1.5">
+        <div
+          className={`h-1.5 rounded-full ${item.cor} transition-all duration-500`}
+          style={{ width: `${(item.valor / item.meta) * 100}%` }}
+        ></div>
+      </div>
+    </div>
+  ))}
+</div>
+        </div >
+      </div >
 
-      {/* Segunda linha de widgets */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-        {/* Chatwoot Quick Access */}
-        <div className="xl:col-span-1">
-          <ChatwootQuickAccess
-            size="medium"
-            showStats={true}
-            className="h-full"
-          />
-        </div>
-
-        {/* Tabela de Propostas Recentes */}
-        <div className="lg:col-span-2 xl:col-span-2 bg-white p-6 rounded-lg shadow-sm">
+  {/* Segunda linha de widgets */ }
+  < div className = "grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6" >
+    {/* Tabela de Propostas Recentes */ }
+    < div className = "lg:col-span-2 xl:col-span-2 bg-white p-6 rounded-lg shadow-sm" >
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">{t('dashboard.recentProposals')}</h3>
             <button className="text-sm text-blue-600 hover:underline">Ver todas</button>
@@ -1174,10 +1164,10 @@ const DashboardPage: React.FC = () => {
               </tbody>
             </table>
           </div>
-        </div>
+        </div >
 
-        {/* Ranking de Vendedores */}
-        <div className="bg-white p-6 rounded-lg shadow-sm">
+  {/* Ranking de Vendedores */ }
+  < div className = "bg-white p-6 rounded-lg shadow-sm" >
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">{t('dashboard.topSellers')}</h3>
             <button className="text-sm text-blue-600 hover:underline">Ver ranking</button>
@@ -1210,13 +1200,13 @@ const DashboardPage: React.FC = () => {
               </div>
             ))}
           </div>
-        </div>
-      </div>
+        </div >
+      </div >
 
-      {/* Terceira linha - Alertas e Atividades */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        {/* Alertas e Notificações */}
-        <div className="bg-white p-6 rounded-lg shadow-sm">
+  {/* Terceira linha - Alertas e Atividades */ }
+  < div className = "grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6" >
+    {/* Alertas e Notificações */ }
+    < div className = "bg-white p-6 rounded-lg shadow-sm" >
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-orange-500" />
@@ -1250,10 +1240,10 @@ const DashboardPage: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div >
 
-        {/* Atividades Recentes */}
-        <div className="bg-white p-6 rounded-lg shadow-sm">
+  {/* Atividades Recentes */ }
+  < div className = "bg-white p-6 rounded-lg shadow-sm" >
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <Activity className="w-5 h-5 text-gray-600" />
@@ -1309,17 +1299,19 @@ const DashboardPage: React.FC = () => {
               </div>
             ))}
           </div>
-        </div>
-      </div>
+        </div >
+      </div >
 
-      {/* Modal de Seleção de Paleta */}
-      {showPaletteSelector && (
-        <ColorPaletteSelector
-          showAsModal={true}
-          onClose={() => setShowPaletteSelector(false)}
-        />
-      )}
-    </div>
+  {/* Modal de Seleção de Paleta */ }
+{
+  showPaletteSelector && (
+    <ColorPaletteSelector
+      showAsModal={true}
+      onClose={() => setShowPaletteSelector(false)}
+    />
+  )
+}
+    </div >
   );
 };
 

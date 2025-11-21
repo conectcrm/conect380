@@ -29,7 +29,7 @@ export class MercadoPagoService {
         options: {
           timeout: 5000,
           idempotencyKey: 'DEV',
-        }
+        },
       });
 
       this.customerApi = new Customer(this.mercadoPago);
@@ -55,8 +55,8 @@ export class MercadoPagoService {
           date_registered: new Date().toISOString(),
           description: `Cliente ConectCRM - ${customerData.email}`,
           default_address: customerData.address ? customerData.address.street_name : undefined,
-          default_card: undefined
-        }
+          default_card: undefined,
+        },
       });
 
       this.logger.log(`Cliente criado: ${customer.id}`);
@@ -88,7 +88,7 @@ export class MercadoPagoService {
             email: preferenceData.payer.email,
             phone: preferenceData.payer.phone,
             identification: preferenceData.payer.identification,
-            address: preferenceData.payer.address
+            address: preferenceData.payer.address,
           },
           back_urls: preferenceData.back_urls,
           auto_return: preferenceData.auto_return,
@@ -102,9 +102,9 @@ export class MercadoPagoService {
           date_of_expiration: preferenceData.expiration_date_to,
           metadata: {
             origem: 'ConectCRM',
-            timestamp: new Date().toISOString()
-          }
-        }
+            timestamp: new Date().toISOString(),
+          },
+        },
       });
 
       this.logger.log(`Preferência criada: ${preference.id}`);
@@ -126,7 +126,7 @@ export class MercadoPagoService {
             email: paymentData.payer.email,
             first_name: paymentData.payer.first_name,
             last_name: paymentData.payer.last_name,
-            identification: paymentData.payer.identification
+            identification: paymentData.payer.identification,
           },
           external_reference: paymentData.external_reference,
           notification_url: paymentData.notification_url,
@@ -134,9 +134,9 @@ export class MercadoPagoService {
           metadata: {
             origem: 'ConectCRM',
             tipo: 'PIX',
-            timestamp: new Date().toISOString()
-          }
-        }
+            timestamp: new Date().toISOString(),
+          },
+        },
       });
 
       this.logger.log(`Pagamento PIX criado: ${payment.id}`);
@@ -159,7 +159,7 @@ export class MercadoPagoService {
           issuer_id: paymentData.issuer_id,
           payer: {
             email: paymentData.payer.email,
-            identification: paymentData.payer.identification
+            identification: paymentData.payer.identification,
           },
           external_reference: paymentData.external_reference,
           notification_url: paymentData.notification_url,
@@ -168,9 +168,9 @@ export class MercadoPagoService {
             origem: 'ConectCRM',
             tipo: 'Cartão',
             parcelas: paymentData.installments,
-            timestamp: new Date().toISOString()
-          }
-        }
+            timestamp: new Date().toISOString(),
+          },
+        },
       });
 
       this.logger.log(`Pagamento com cartão criado: ${payment.id}`);
@@ -198,19 +198,21 @@ export class MercadoPagoService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`
+          Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`,
         },
         body: JSON.stringify({
           amount: amount,
           metadata: {
             origem: 'ConectCRM',
-            timestamp: new Date().toISOString()
-          }
-        })
+            timestamp: new Date().toISOString(),
+          },
+        }),
       });
 
       const refund = await response.json();
-      this.logger.log(`Estorno criado para pagamento ${paymentId}: ${refund.id || 'ID não disponível'}`);
+      this.logger.log(
+        `Estorno criado para pagamento ${paymentId}: ${refund.id || 'ID não disponível'}`,
+      );
       return refund;
     } catch (error) {
       this.logger.error('Erro ao estornar pagamento:', error);
@@ -218,7 +220,11 @@ export class MercadoPagoService {
     }
   }
 
-  async validateWebhookSignature(body: any, signature: string, requestId: string): Promise<boolean> {
+  async validateWebhookSignature(
+    body: any,
+    signature: string,
+    requestId: string,
+  ): Promise<boolean> {
     try {
       const webhookSecret = this.configService.get<string>('MERCADO_PAGO_WEBHOOK_SECRET');
 
@@ -229,8 +235,8 @@ export class MercadoPagoService {
 
       // Extrair timestamp e hash da assinatura
       const signatureParts = signature.split(',');
-      const timestamp = signatureParts.find(part => part.startsWith('ts='))?.split('=')[1];
-      const hash = signatureParts.find(part => part.startsWith('v1='))?.split('=')[1];
+      const timestamp = signatureParts.find((part) => part.startsWith('ts='))?.split('=')[1];
+      const hash = signatureParts.find((part) => part.startsWith('v1='))?.split('=')[1];
 
       if (!timestamp || !hash) {
         return false;
@@ -397,30 +403,30 @@ export class MercadoPagoService {
             name: 'PIX',
             payment_type_id: 'bank_transfer',
             status: 'active',
-            secure_thumbnail: 'https://img.icons8.com/color/96/000000/pix.png'
+            secure_thumbnail: 'https://img.icons8.com/color/96/000000/pix.png',
           },
           {
             id: 'visa',
             name: 'Visa',
             payment_type_id: 'credit_card',
             status: 'active',
-            secure_thumbnail: 'https://img.icons8.com/color/96/000000/visa.png'
+            secure_thumbnail: 'https://img.icons8.com/color/96/000000/visa.png',
           },
           {
             id: 'master',
             name: 'Mastercard',
             payment_type_id: 'credit_card',
             status: 'active',
-            secure_thumbnail: 'https://img.icons8.com/color/96/000000/mastercard.png'
+            secure_thumbnail: 'https://img.icons8.com/color/96/000000/mastercard.png',
           },
           {
             id: 'bolbradesco',
             name: 'Boleto Bancário',
             payment_type_id: 'ticket',
             status: 'active',
-            secure_thumbnail: 'https://img.icons8.com/color/96/000000/bank.png'
-          }
-        ]
+            secure_thumbnail: 'https://img.icons8.com/color/96/000000/bank.png',
+          },
+        ],
       };
     } catch (error) {
       this.logger.error('Erro ao buscar métodos de pagamento:', error);
@@ -450,7 +456,7 @@ export class MercadoPagoService {
           recommended_message: `${i}x de R$ ${installmentAmount.toFixed(2)}${i > 6 ? ` (com juros)` : ` sem juros`}`,
           installment_amount: installmentAmount,
           total_amount: totalAmount,
-          payment_method_option_id: paymentMethodId
+          payment_method_option_id: paymentMethodId,
         });
       }
 

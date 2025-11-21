@@ -13,12 +13,14 @@ export interface AnalyticsQueryDto {
 export class AnalyticsController {
   private readonly logger = new Logger(AnalyticsController.name);
 
-  constructor(private readonly analyticsService: AnalyticsService) { }
+  constructor(private readonly analyticsService: AnalyticsService) {}
 
   @Get('dashboard')
   async getDashboardData(@Query() query: AnalyticsQueryDto) {
     try {
-      this.logger.log(`Buscando dados do dashboard - Período: ${query.periodo}, Vendedor: ${query.vendedor}`);
+      this.logger.log(
+        `Buscando dados do dashboard - Período: ${query.periodo}, Vendedor: ${query.vendedor}`,
+      );
 
       const data = await this.analyticsService.getDashboardData(query);
       return data;
@@ -26,7 +28,7 @@ export class AnalyticsController {
       this.logger.error('Erro ao buscar dados do dashboard:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -39,7 +41,7 @@ export class AnalyticsController {
       this.logger.error('Erro ao buscar funil de conversão:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -52,7 +54,7 @@ export class AnalyticsController {
       this.logger.error('Erro ao buscar performance de vendedores:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -65,7 +67,7 @@ export class AnalyticsController {
       this.logger.error('Erro ao buscar evolução temporal:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -78,7 +80,7 @@ export class AnalyticsController {
       this.logger.error('Erro ao buscar tempo médio por etapas:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -91,7 +93,7 @@ export class AnalyticsController {
       this.logger.error('Erro ao buscar distribuição de valores:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -104,7 +106,7 @@ export class AnalyticsController {
       this.logger.error('Erro ao buscar previsão de fechamento:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -117,18 +119,17 @@ export class AnalyticsController {
       this.logger.error('Erro ao buscar alertas de gestão:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
 
   @Get('export')
-  async exportarRelatorio(
-    @Query() query: AnalyticsQueryDto,
-    @Res() res: Response
-  ) {
+  async exportarRelatorio(@Query() query: AnalyticsQueryDto, @Res() res: Response) {
     try {
-      this.logger.log(`Exportando relatório - Período: ${query.periodo}, Vendedor: ${query.vendedor}`);
+      this.logger.log(
+        `Exportando relatório - Período: ${query.periodo}, Vendedor: ${query.vendedor}`,
+      );
 
       const buffer = await this.analyticsService.exportarRelatorio(query);
 
@@ -137,7 +138,7 @@ export class AnalyticsController {
       res.set({
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="${filename}"`,
-        'Content-Length': buffer.length.toString()
+        'Content-Length': buffer.length.toString(),
       });
 
       res.send(buffer);
@@ -145,7 +146,7 @@ export class AnalyticsController {
       this.logger.error('Erro ao exportar relatório:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -158,7 +159,7 @@ export class AnalyticsController {
       this.logger.error('Erro ao buscar KPIs em tempo real:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -171,7 +172,7 @@ export class AnalyticsController {
       this.logger.error('Erro ao buscar progresso das metas:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }

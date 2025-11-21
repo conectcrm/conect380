@@ -23,7 +23,7 @@ export const ModalNovaPropostaSimple: React.FC<ModalNovaPropostaSimpleProps> = (
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl w-[calc(100%-2rem)] sm:w-[400px] md:w-[450px] lg:w-[500px] xl:w-[500px] max-w-[600px] overflow-hidden">
         {/* Header do Modal */}
         <div className="bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white p-4">
           <div className="flex items-center justify-between">

@@ -101,7 +101,8 @@ export const useContextoCliente = (
     if (autoLoad && (clienteId || telefone)) {
       carregarContexto();
     }
-  }, [autoLoad, clienteId, telefone, carregarContexto]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLoad, clienteId, telefone]); // ✅ Removido carregarContexto para evitar loop
 
   return {
     contexto,

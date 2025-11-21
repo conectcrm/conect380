@@ -9,13 +9,15 @@ export interface PropostaDto {
   updatedAt: string;
   source?: string;
   observacoes?: string;
-  vendedor?: string | {
-    id: string;
-    nome: string;
-    email: string;
-    tipo: string;
-    ativo: boolean;
-  };
+  vendedor?:
+    | string
+    | {
+        id: string;
+        nome: string;
+        email: string;
+        tipo: string;
+        ativo: boolean;
+      };
   formaPagamento?: string;
   validadeDias?: number;
 }
@@ -25,13 +27,15 @@ export interface CriarPropostaDto {
   cliente: string;
   valor: number;
   observacoes?: string;
-  vendedor?: string | {
-    id: string;
-    nome: string;
-    email: string;
-    tipo: string;
-    ativo: boolean;
-  };
+  vendedor?:
+    | string
+    | {
+        id: string;
+        nome: string;
+        email: string;
+        tipo: string;
+        ativo: boolean;
+      };
   formaPagamento?: string;
   validadeDias?: number;
 }

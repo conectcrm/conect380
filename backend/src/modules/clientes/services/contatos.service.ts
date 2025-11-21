@@ -15,7 +15,7 @@ export class ContatosService {
     private contatoRepository: Repository<Contato>,
     @InjectRepository(Cliente)
     private clienteRepository: Repository<Cliente>,
-  ) { }
+  ) {}
 
   /**
    * Lista TODOS os contatos da empresa
@@ -36,9 +36,7 @@ export class ContatosService {
       contatosDaEmpresa.map((contato) => this.garantirTelefoneNormalizado(contato)),
     );
 
-    return contatosNormalizados.map(
-      (contato) => new ResponseContatoDto(contato),
-    );
+    return contatosNormalizados.map((contato) => new ResponseContatoDto(contato));
   }
 
   /**
@@ -64,9 +62,7 @@ export class ContatosService {
       contatos.map((contato) => this.garantirTelefoneNormalizado(contato)),
     );
 
-    return contatosNormalizados.map(
-      (contato) => new ResponseContatoDto(contato),
-    );
+    return contatosNormalizados.map((contato) => new ResponseContatoDto(contato));
   }
 
   /**
@@ -227,10 +223,9 @@ export class ContatosService {
       .createQueryBuilder('contato')
       .where('contato.clienteId = :clienteId', { clienteId })
       .andWhere('contato.ativo = TRUE')
-      .andWhere(
-        "regexp_replace(contato.telefone, '\\D', '', 'g') = :telefone",
-        { telefone: telefoneDigitos },
-      );
+      .andWhere("regexp_replace(contato.telefone, '\\D', '', 'g') = :telefone", {
+        telefone: telefoneDigitos,
+      });
 
     if (contatoIdIgnorar) {
       query.andWhere('contato.id != :contatoIdIgnorar', {
@@ -241,9 +236,7 @@ export class ContatosService {
     const contatoExistente = await query.getOne();
 
     if (contatoExistente) {
-      throw new BadRequestException(
-        'Já existe um contato com este telefone para este cliente',
-      );
+      throw new BadRequestException('Já existe um contato com este telefone para este cliente');
     }
   }
 

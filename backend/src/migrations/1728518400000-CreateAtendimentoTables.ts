@@ -7,22 +7,21 @@ export class CreateAtendimentoTables1728518400000 implements MigrationInterface 
     // 1. Tabela de Canais de Atendimento
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS atendimento_canais (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        empresa_id UUID NOT NULL,
-        
-        -- Identificação
-        nome VARCHAR(100) NOT NULL,
-        tipo VARCHAR(50) NOT NULL,
-        
-        -- Integração
-        provedor VARCHAR(50) NOT NULL DEFAULT 'chatwoot',
-        chatwoot_inbox_id INTEGER,
-        config JSONB,
-        
-        -- Status
-        ativo BOOLEAN DEFAULT TRUE,
-        status VARCHAR(20) DEFAULT 'conectado',
-        ultima_sincronizacao TIMESTAMP,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    empresa_id UUID NOT NULL,
+
+    -- Identificação
+    nome VARCHAR(100) NOT NULL,
+    tipo VARCHAR(50) NOT NULL,
+
+    -- Integração
+    provedor VARCHAR(50) NOT NULL DEFAULT 'whatsapp_business_api',
+    config JSONB,
+
+    -- Status
+    ativo BOOLEAN DEFAULT TRUE,
+    status VARCHAR(20) DEFAULT 'conectado',
+    ultima_sincronizacao TIMESTAMP,
         
         -- Configurações
         horario_atendimento JSONB,
@@ -704,7 +703,9 @@ export class CreateAtendimentoTables1728518400000 implements MigrationInterface 
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Remover trigger e função
-    await queryRunner.query(`DROP TRIGGER IF EXISTS atendimento_tickets_numero_trigger ON atendimento_tickets`);
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS atendimento_tickets_numero_trigger ON atendimento_tickets`,
+    );
     await queryRunner.query(`DROP FUNCTION IF EXISTS atendimento_tickets_numero_seq()`);
 
     // Remover tabelas na ordem reversa (dependências primeiro)

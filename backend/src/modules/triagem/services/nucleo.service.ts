@@ -1,17 +1,8 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { NucleoAtendimento } from '../entities/nucleo-atendimento.entity';
-import {
-  CreateNucleoDto,
-  UpdateNucleoDto,
-  FilterNucleoDto,
-} from '../dto';
+import { CreateNucleoDto, UpdateNucleoDto, FilterNucleoDto } from '../dto';
 import { HorarioUtil } from '../utils/horario.util';
 
 @Injectable()
@@ -26,13 +17,8 @@ export class NucleoService {
   /**
    * Cria um novo núcleo de atendimento
    */
-  async create(
-    empresaId: string,
-    createNucleoDto: CreateNucleoDto,
-  ): Promise<NucleoAtendimento> {
-    this.logger.log(
-      `Criando núcleo "${createNucleoDto.nome}" para empresa ${empresaId}`,
-    );
+  async create(empresaId: string, createNucleoDto: CreateNucleoDto): Promise<NucleoAtendimento> {
+    this.logger.log(`Criando núcleo "${createNucleoDto.nome}" para empresa ${empresaId}`);
 
     // Validar atendentes (verificar se existem)
     // TODO: Validar IDs dos atendentes no banco
@@ -65,19 +51,11 @@ export class NucleoService {
   /**
    * Busca todos os núcleos com filtros opcionais
    */
-  async findAll(
-    empresaId: string,
-    filters?: FilterNucleoDto,
-  ): Promise<NucleoAtendimento[]> {
+  async findAll(empresaId: string, filters?: FilterNucleoDto): Promise<NucleoAtendimento[]> {
     try {
-      console.log('[DEBUG NUCLEO] ========== INICIO findAll ==========');
-      console.log('[DEBUG NUCLEO] empresaId recebido:', empresaId);
-      console.log('[DEBUG NUCLEO] typeof empresaId:', typeof empresaId);
-
       const query = this.nucleoRepository
         .createQueryBuilder('nucleo')
         .where('nucleo.empresaId = :empresaId', { empresaId })
-        // .leftJoinAndSelect('nucleo.supervisor', 'supervisor') // Comentado temporariamente
         .orderBy('nucleo.prioridade', 'ASC')
         .addOrderBy('nucleo.nome', 'ASC');
 
@@ -108,10 +86,6 @@ export class NucleoService {
           visivelNoBot: filters.visivelNoBot,
         });
       }
-
-      console.log('[DEBUG NUCLEO] SQL gerado:', query.getSql());
-      console.log('[DEBUG NUCLEO] Parametros:', query.getParameters());
-      console.log('[DEBUG NUCLEO] Executando query...');
 
       const result = await query.getMany();
 
@@ -161,17 +135,25 @@ export class NucleoService {
     if (updateNucleoDto.cor) nucleo.cor = updateNucleoDto.cor;
     if (updateNucleoDto.icone) nucleo.icone = updateNucleoDto.icone;
     if (updateNucleoDto.ativo !== undefined) nucleo.ativo = updateNucleoDto.ativo;
-    if (updateNucleoDto.visivelNoBot !== undefined) nucleo.visivelNoBot = updateNucleoDto.visivelNoBot;
+    if (updateNucleoDto.visivelNoBot !== undefined)
+      nucleo.visivelNoBot = updateNucleoDto.visivelNoBot;
     if (updateNucleoDto.prioridade) nucleo.prioridade = updateNucleoDto.prioridade;
-    if (updateNucleoDto.tipoDistribuicao) nucleo.tipoDistribuicao = updateNucleoDto.tipoDistribuicao;
+    if (updateNucleoDto.tipoDistribuicao)
+      nucleo.tipoDistribuicao = updateNucleoDto.tipoDistribuicao;
     if (updateNucleoDto.atendentesIds) nucleo.atendentesIds = updateNucleoDto.atendentesIds;
     if (updateNucleoDto.supervisorId) nucleo.supervisorId = updateNucleoDto.supervisorId;
-    if (updateNucleoDto.capacidadeMaxima) nucleo.capacidadeMaximaTickets = updateNucleoDto.capacidadeMaxima;
-    if (updateNucleoDto.slaRespostaMinutos) nucleo.slaRespostaMinutos = updateNucleoDto.slaRespostaMinutos;
-    if (updateNucleoDto.slaResolucaoHoras) nucleo.slaResolucaoHoras = updateNucleoDto.slaResolucaoHoras;
-    if (updateNucleoDto.horarioFuncionamento) nucleo.horarioFuncionamento = updateNucleoDto.horarioFuncionamento as any;
-    if (updateNucleoDto.mensagemBoasVindas) nucleo.mensagemBoasVindas = updateNucleoDto.mensagemBoasVindas;
-    if (updateNucleoDto.mensagemForaHorario) nucleo.mensagemForaHorario = updateNucleoDto.mensagemForaHorario;
+    if (updateNucleoDto.capacidadeMaxima)
+      nucleo.capacidadeMaximaTickets = updateNucleoDto.capacidadeMaxima;
+    if (updateNucleoDto.slaRespostaMinutos)
+      nucleo.slaRespostaMinutos = updateNucleoDto.slaRespostaMinutos;
+    if (updateNucleoDto.slaResolucaoHoras)
+      nucleo.slaResolucaoHoras = updateNucleoDto.slaResolucaoHoras;
+    if (updateNucleoDto.horarioFuncionamento)
+      nucleo.horarioFuncionamento = updateNucleoDto.horarioFuncionamento as any;
+    if (updateNucleoDto.mensagemBoasVindas)
+      nucleo.mensagemBoasVindas = updateNucleoDto.mensagemBoasVindas;
+    if (updateNucleoDto.mensagemForaHorario)
+      nucleo.mensagemForaHorario = updateNucleoDto.mensagemForaHorario;
     const updated = await this.nucleoRepository.save(nucleo);
 
     this.logger.log(`Núcleo ${id} atualizado`);
@@ -277,13 +259,15 @@ export class NucleoService {
     empresaId: string,
     canal: string, // Parâmetro mantido por compatibilidade de API, mas não usado
   ): Promise<NucleoAtendimento[]> {
-    return this.nucleoRepository
-      .createQueryBuilder('nucleo')
-      .where('nucleo.empresaId = :empresaId', { empresaId })
-      .andWhere('nucleo.ativo = true')
-      // Removido filtro por canais - propriedade não existe na tabela nucleos_atendimento
-      .orderBy('nucleo.prioridade', 'ASC')
-      .getMany();
+    return (
+      this.nucleoRepository
+        .createQueryBuilder('nucleo')
+        .where('nucleo.empresaId = :empresaId', { empresaId })
+        .andWhere('nucleo.ativo = true')
+        // Removido filtro por canais - propriedade não existe na tabela nucleos_atendimento
+        .orderBy('nucleo.prioridade', 'ASC')
+        .getMany()
+    );
   }
 
   /**
@@ -304,7 +288,10 @@ export class NucleoService {
       .getMany();
 
     console.log('🔍 [NUCLEO DEBUG] Núcleos encontrados:', nucleos.length);
-    console.log('🔍 [NUCLEO DEBUG] Núcleos:', nucleos.map(n => ({ id: n.id, nome: n.nome, empresaId: n.empresaId })));
+    console.log(
+      '🔍 [NUCLEO DEBUG] Núcleos:',
+      nucleos.map((n) => ({ id: n.id, nome: n.nome, empresaId: n.empresaId })),
+    );
 
     // Para cada núcleo, buscar departamentos visíveis e verificar horário
     console.log('🔍 [NUCLEO DEBUG] Processando núcleos e verificando disponibilidade...');
@@ -326,18 +313,9 @@ export class NucleoService {
           motivo: verificacaoHorario.motivoFechado,
         });
 
-        // Buscar departamentos
-        const departamentos = await this.nucleoRepository.manager
-          .getRepository('departamentos')
-          .createQueryBuilder('dep')
-          .where('dep.nucleoId = :nucleoId', { nucleoId: nucleo.id })
-          .andWhere('dep.ativo = true')
-          .andWhere('dep.visivelNoBot = true')
-          .orderBy('dep.ordem', 'ASC')
-          .addOrderBy('dep.nome', 'ASC')
-          .getMany();
-
-        console.log('🔍 [NUCLEO DEBUG] Departamentos encontrados para', nucleo.nome, ':', departamentos.length);
+        // ✅ ATUALIZADO: Núcleos agora são a estrutura principal (não mais departamentos)
+        // Núcleos substituíram os departamentos na nova arquitetura
+        console.log('✅ [NUCLEO DEBUG] Núcleo processado:', nucleo.nome);
 
         return {
           id: nucleo.id,
@@ -351,27 +329,23 @@ export class NucleoService {
           disponivel: verificacaoHorario.estaAberto,
           motivoIndisponivel: verificacaoHorario.motivoFechado,
           proximaAbertura: verificacaoHorario.proximaAbertura,
-          atendentesIds: nucleo.atendentesIds || [], // 🆕 IDs dos atendentes do núcleo
-          departamentos: departamentos.map((dep: any) => ({
-            id: dep.id,
-            nome: dep.nome,
-            descricao: dep.descricao,
-            cor: dep.cor,
-            icone: dep.icone,
-          })),
+          atendentesIds: nucleo.atendentesIds || [], // IDs dos atendentes do núcleo
+          // ✅ REMOVIDO: Não há mais departamentos - núcleos são a entidade principal
+          departamentos: [], // Array vazio para compatibilidade com código legado
         };
       }),
     );
 
     console.log('🔍 [NUCLEO DEBUG] Total de núcleos processados:', resultado.length);
-    console.log('🔍 [NUCLEO DEBUG] Núcleos disponíveis:', resultado.filter(n => n.disponivel).length);
-    console.log('🔍 [NUCLEO DEBUG] Núcleos com departamentos:', resultado.filter(n => n.departamentos.length > 0).length);
+    console.log(
+      '🔍 [NUCLEO DEBUG] Núcleos disponíveis:',
+      resultado.filter((n) => n.disponivel).length,
+    );
 
-    // Retornar TODOS os núcleos (disponíveis e indisponíveis)
-    // O FlowEngine decidirá como apresentá-los
-    const filtrados = resultado.filter(nucleo => nucleo.departamentos.length > 0);
-    console.log('🔍 [NUCLEO DEBUG] Retornando:', filtrados.length, 'núcleos');
+    // ✅ ATUALIZADO: Retornar TODOS os núcleos visíveis no bot (não filtrar por departamentos)
+    // Na nova arquitetura, os núcleos são a entidade principal
+    console.log('✅ [NUCLEO DEBUG] Retornando todos os', resultado.length, 'núcleos visíveis');
 
-    return filtrados;
+    return resultado;
   }
 }

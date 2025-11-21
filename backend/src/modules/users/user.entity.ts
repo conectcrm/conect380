@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Empresa } from '../../empresas/entities/empresa.entity';
 
 export enum UserRole {
@@ -59,6 +67,9 @@ export class User {
   @Column({ default: true })
   ativo: boolean;
 
+  @Column({ default: false })
+  deve_trocar_senha: boolean;
+
   @Column({ type: 'enum', enum: StatusAtendente, nullable: true })
   status_atendente: StatusAtendente;
 
@@ -77,7 +88,7 @@ export class User {
   @UpdateDateColumn()
   updated_at: Date;
 
-  @ManyToOne(() => Empresa, empresa => empresa.usuarios)
+  @ManyToOne(() => Empresa, (empresa) => empresa.usuarios)
   @JoinColumn({ name: 'empresa_id' })
   empresa: Empresa;
 }

@@ -7,7 +7,7 @@ import {
   Body,
   Param,
   Query,
-  UseGuards
+  UseGuards,
 } from '@nestjs/common';
 import { AssinaturasService } from './assinaturas.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -16,7 +16,7 @@ import { CriarAssinaturaDto } from './dto/criar-assinatura.dto';
 @Controller('assinaturas')
 @UseGuards(JwtAuthGuard)
 export class AssinaturasController {
-  constructor(private readonly assinaturasService: AssinaturasService) { }
+  constructor(private readonly assinaturasService: AssinaturasService) {}
 
   @Get()
   async listar(@Query('status') status?: 'ativa' | 'cancelada' | 'suspensa' | 'pendente') {
@@ -41,16 +41,13 @@ export class AssinaturasController {
   @Patch('empresa/:empresaId/plano')
   async alterarPlano(
     @Param('empresaId') empresaId: string,
-    @Body('novoPlanoId') novoPlanoId: string
+    @Body('novoPlanoId') novoPlanoId: string,
   ) {
     return this.assinaturasService.alterarPlano(empresaId, novoPlanoId);
   }
 
   @Patch('empresa/:empresaId/cancelar')
-  async cancelar(
-    @Param('empresaId') empresaId: string,
-    @Body('dataFim') dataFim?: string
-  ) {
+  async cancelar(@Param('empresaId') empresaId: string, @Body('dataFim') dataFim?: string) {
     const dataFimParsed = dataFim ? new Date(dataFim) : undefined;
     return this.assinaturasService.cancelar(empresaId, dataFimParsed);
   }
@@ -68,11 +65,12 @@ export class AssinaturasController {
   @Patch('empresa/:empresaId/contadores')
   async atualizarContadores(
     @Param('empresaId') empresaId: string,
-    @Body() dados: {
+    @Body()
+    dados: {
       usuariosAtivos?: number;
       clientesCadastrados?: number;
       storageUtilizado?: number;
-    }
+    },
   ) {
     return this.assinaturasService.atualizarContadores(empresaId, dados);
   }
@@ -84,7 +82,7 @@ export class AssinaturasController {
     return {
       success: true,
       permiteCall,
-      message: permiteCall ? 'Chamada API registrada' : 'Limite de chamadas API excedido'
+      message: permiteCall ? 'Chamada API registrada' : 'Limite de chamadas API excedido',
     };
   }
 }

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { scrollToTop } from '../hooks/useScrollToTop';
+import { scrollToTop } from '../../hooks/useScrollToTop';
 
 /**
  * Demonstração do comportamento de scroll automático

@@ -215,54 +215,95 @@ export const mockHistorico: HistoricoAtendimento[] = [
 export const mockDemandas: Demanda[] = [
   {
     id: 'd1',
-    tipo: 'Suporte Técnico',
+    empresaId: 'empresa-demo',
+    titulo: 'Problema com login',
     descricao: 'Problema com login no sistema',
+    tipo: 'suporte',
+    prioridade: 'alta',
     status: 'em_andamento',
-    dataAbertura: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+    autorId: 'a1',
+    autor: {
+      id: 'a1',
+      username: 'ana.costa',
+      nome: 'Ana Costa',
+      foto: 'https://i.pravatar.cc/150?img=47'
+    },
+    dataAbertura: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString()
   },
   {
     id: 'd2',
-    tipo: 'Financeiro',
+    empresaId: 'empresa-demo',
+    titulo: 'Ajuste de fatura',
     descricao: 'Ajuste de fatura - valor incorreto',
+    tipo: 'financeira',
+    prioridade: 'media',
     status: 'concluida',
-    dataAbertura: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-    dataConclusao: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+    autorId: 'a2',
+    autor: {
+      id: 'a2',
+      username: 'pedro.souza',
+      nome: 'Pedro Souza',
+      foto: 'https://i.pravatar.cc/150?img=51'
+    },
+    dataAbertura: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    dataConclusao: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
   }
 ];
 
 export const mockNotas: NotaCliente[] = [
   {
     id: 'n1',
+    empresaId: 'empresa-demo',
+    autorId: 'a1',
     conteudo: 'Cliente VIP - sempre priorizar atendimento. Responsável por contrato de R$ 50k/mês.',
     autor: {
       id: 'a1',
+      username: 'ana.costa',
       nome: 'Ana Costa',
       foto: 'https://i.pravatar.cc/150?img=47'
     },
-    dataCriacao: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+    createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString(),
+    dataCriacao: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+    dataEdicao: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString(),
     importante: true
   },
   {
     id: 'n2',
+    empresaId: 'empresa-demo',
+    autorId: 'a2',
     conteudo: 'Prefere contato por WhatsApp. Evitar ligações antes das 10h.',
     autor: {
       id: 'a2',
+      username: 'pedro.souza',
       nome: 'Pedro Souza',
       foto: 'https://i.pravatar.cc/150?img=51'
     },
-    dataCriacao: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
+    dataCriacao: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    dataEdicao: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
     importante: false
   },
   {
     id: 'n3',
+    empresaId: 'empresa-demo',
+    autorId: 'a1',
     conteudo: 'Teve problema com entrega em setembro/2024. Compensado com desconto de 15% na renovação.',
     autor: {
       id: 'a1',
+      username: 'ana.costa',
       nome: 'Ana Costa',
       foto: 'https://i.pravatar.cc/150?img=47'
     },
-    dataCriacao: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-    dataEdicao: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    dataCriacao: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    dataEdicao: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     importante: false
   }
 ];

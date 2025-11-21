@@ -77,6 +77,7 @@ const LoginPage: React.FC = () => {
             userId: error.data.userId,
             email: error.data.email,
             nome: error.data.nome,
+            senhaTemporaria: error.data.senhaTemporaria || password,
           }
         });
         return;
@@ -106,11 +107,11 @@ const LoginPage: React.FC = () => {
             <div className="flex items-center justify-center mb-6">
               <ConectCRMLogoFinal size="2xl" variant="full" />
             </div>
-            <h2 className="text-4xl font-bold mb-4">
+            <h2 className="text-fluid-3xl font-bold mb-4">
               Transforme seus<br />
               <span className="text-[#DEEFE7]">negócios digitais</span>
             </h2>
-            <p className="text-xl text-[#DEEFE7] mb-8">
+            <p className="text-fluid-lg text-[#DEEFE7] mb-8">
               O CRM mais completo e intuitivo do mercado brasileiro
             </p>
           </div>
@@ -136,15 +137,15 @@ const LoginPage: React.FC = () => {
           {/* Stats */}
           <div className="mt-12 grid grid-cols-3 gap-8">
             <div className="text-center">
-              <div className="text-3xl font-bold text-white">5000+</div>
+              <div className="text-fluid-2xl font-bold text-white">5000+</div>
               <div className="text-sm text-[#DEEFE7]">Empresas</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-white">99.9%</div>
+              <div className="text-fluid-2xl font-bold text-white">99.9%</div>
               <div className="text-sm text-[#DEEFE7]">Uptime</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-white">24/7</div>
+              <div className="text-fluid-2xl font-bold text-white">24/7</div>
               <div className="text-sm text-[#DEEFE7]">Suporte</div>
             </div>
           </div>
@@ -163,7 +164,7 @@ const LoginPage: React.FC = () => {
 
           {/* Form Header */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-[#002333] mb-2">
+            <h1 className="text-fluid-2xl font-bold text-[#002333] mb-2">
               Bem-vindo de volta!
             </h1>
             <p className="text-[#B4BEC9]">
@@ -240,7 +241,7 @@ const LoginPage: React.FC = () => {
                 </label>
                 <button
                   type="button"
-                  onClick={() => {/* TODO: Implementar recuperação de senha */ }}
+                  onClick={() => navigate('/esqueci-minha-senha')}
                   className="text-sm font-medium text-[#159A9C] hover:text-[#0F7B7D] transition-colors"
                 >
                   Esqueci minha senha

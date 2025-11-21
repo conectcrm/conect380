@@ -8,15 +8,15 @@ const ContasPagar: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm border p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center">
-              <CreditCard className="w-6 h-6 text-white" />
+            <div className="w-12 h-12 bg-[#159A9C]/10 rounded-xl flex items-center justify-center">
+              <CreditCard className="w-6 h-6 text-[#159A9C]" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Contas a Pagar</h1>
               <p className="text-gray-600">Controle de pagamentos e fornecedores</p>
             </div>
           </div>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
+          <button className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm font-medium">
             <Plus className="w-4 h-4" />
             Nova Conta
           </button>
@@ -39,50 +39,50 @@ const ContasPagar: React.FC = () => {
 
       {/* Cards de Resumo */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-sm border">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#DEEFE7]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total a Pagar</p>
-              <p className="text-2xl font-bold text-gray-900">R$ 87.650,00</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Total a Pagar</p>
+              <p className="text-3xl font-bold text-[#002333] mt-2">R$ 87.650,00</p>
             </div>
-            <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-              <CreditCard className="w-6 h-6 text-red-600" />
+            <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+              <CreditCard className="w-6 h-6 text-[#159A9C]" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#DEEFE7]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Vencido</p>
-              <p className="text-2xl font-bold text-red-600">R$ 12.300,00</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Vencido</p>
+              <p className="text-3xl font-bold text-[#002333] mt-2">R$ 12.300,00</p>
             </div>
-            <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+            <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center shadow-sm">
               <AlertCircle className="w-6 h-6 text-red-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#DEEFE7]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Hoje</p>
-              <p className="text-2xl font-bold text-orange-600">R$ 8.500,00</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Hoje</p>
+              <p className="text-3xl font-bold text-[#002333] mt-2">R$ 8.500,00</p>
             </div>
-            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-              <CreditCard className="w-6 h-6 text-orange-600" />
+            <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
+              <CreditCard className="w-6 h-6 text-yellow-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#DEEFE7]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Próximos 30 dias</p>
-              <p className="text-2xl font-bold text-blue-600">R$ 66.850,00</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Próximos 30 dias</p>
+              <p className="text-3xl font-bold text-[#002333] mt-2">R$ 66.850,00</p>
             </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <CreditCard className="w-6 h-6 text-blue-600" />
+            <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+              <CreditCard className="w-6 h-6 text-[#159A9C]" />
             </div>
           </div>
         </div>
@@ -159,8 +159,8 @@ const ContasPagar: React.FC = () => {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button className="text-blue-600 hover:text-blue-900 mr-4">Editar</button>
-                  <button className="text-green-600 hover:text-green-900">Pagar</button>
+                  <button className="text-[#159A9C] hover:text-[#0F7B7D] mr-4">Editar</button>
+                  <button className="text-[#159A9C] hover:text-[#0F7B7D]">Pagar</button>
                 </td>
               </tr>
               <tr>
@@ -183,8 +183,8 @@ const ContasPagar: React.FC = () => {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button className="text-blue-600 hover:text-blue-900 mr-4">Editar</button>
-                  <button className="text-green-600 hover:text-green-900">Pagar</button>
+                  <button className="text-[#159A9C] hover:text-[#0F7B7D] mr-4">Editar</button>
+                  <button className="text-[#159A9C] hover:text-[#0F7B7D]">Pagar</button>
                 </td>
               </tr>
               {/* Mais linhas... */}

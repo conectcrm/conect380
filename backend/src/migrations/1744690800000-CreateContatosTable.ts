@@ -2,7 +2,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Migration para criar tabela de contatos vinculados a clientes
- * 
+ *
  * Permite que um Cliente (empresa) tenha múltiplos Contatos (funcionários)
  * vinculados, facilitando o atendimento e identificação de quem está falando
  * durante o atendimento.

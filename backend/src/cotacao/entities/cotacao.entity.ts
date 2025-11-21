@@ -8,7 +8,7 @@ import {
   ManyToOne,
   JoinColumn,
   OneToMany,
-  Index
+  Index,
 } from 'typeorm';
 import { Cliente } from '../../modules/clientes/cliente.entity';
 import { Fornecedor } from '../../modules/financeiro/entities/fornecedor.entity';
@@ -19,19 +19,20 @@ import { AnexoCotacao } from './anexo-cotacao.entity';
 export enum StatusCotacao {
   RASCUNHO = 'rascunho',
   ENVIADA = 'enviada',
+  PENDENTE = 'pendente', // Aguardando aprovação
   EM_ANALISE = 'em_analise',
   APROVADA = 'aprovada',
   REJEITADA = 'rejeitada',
   VENCIDA = 'vencida',
   CONVERTIDA = 'convertida',
-  CANCELADA = 'cancelada'
+  CANCELADA = 'cancelada',
 }
 
 export enum PrioridadeCotacao {
   BAIXA = 'baixa',
   MEDIA = 'media',
   ALTA = 'alta',
-  URGENTE = 'urgente'
+  URGENTE = 'urgente',
 }
 
 export enum OrigemCotacao {
@@ -40,7 +41,7 @@ export enum OrigemCotacao {
   EMAIL = 'email',
   TELEFONE = 'telefone',
   WHATSAPP = 'whatsapp',
-  INDICACAO = 'indicacao'
+  INDICACAO = 'indicacao',
 }
 
 @Entity('cotacoes')
@@ -66,21 +67,21 @@ export class Cotacao {
   @Column({
     type: 'enum',
     enum: StatusCotacao,
-    default: StatusCotacao.RASCUNHO
+    default: StatusCotacao.RASCUNHO,
   })
   status: StatusCotacao;
 
   @Column({
     type: 'enum',
     enum: PrioridadeCotacao,
-    default: PrioridadeCotacao.MEDIA
+    default: PrioridadeCotacao.MEDIA,
   })
   prioridade: PrioridadeCotacao;
 
   @Column({
     type: 'enum',
     enum: OrigemCotacao,
-    default: OrigemCotacao.MANUAL
+    default: OrigemCotacao.MANUAL,
   })
   origem: OrigemCotacao;
 
@@ -120,10 +121,26 @@ export class Cotacao {
   @JoinColumn({ name: 'responsavel_id' })
   responsavel: User;
 
-  @OneToMany(() => ItemCotacao, item => item.cotacao, { cascade: true })
+  @Column({ name: 'aprovador_id', nullable: true })
+  aprovadorId: string;
+
+  @ManyToOne(() => User, { eager: false })
+  @JoinColumn({ name: 'aprovador_id' })
+  aprovador: User;
+
+  @Column({ name: 'data_aprovacao', type: 'timestamp', nullable: true })
+  dataAprovacao: Date;
+
+  @Column({ name: 'status_aprovacao', type: 'varchar', length: 20, nullable: true })
+  statusAprovacao: string; // 'aprovado' | 'reprovado'
+
+  @Column({ name: 'justificativa_aprovacao', type: 'text', nullable: true })
+  justificativaAprovacao: string;
+
+  @OneToMany(() => ItemCotacao, (item) => item.cotacao, { cascade: true })
   itens: ItemCotacao[];
 
-  @OneToMany(() => AnexoCotacao, anexo => anexo.cotacao, { cascade: true })
+  @OneToMany(() => AnexoCotacao, (anexo) => anexo.cotacao, { cascade: true })
   anexos: AnexoCotacao[];
 
   // Campos de controle
@@ -156,9 +173,6 @@ export class Cotacao {
   // Campos de status específicos
   @Column({ type: 'timestamp', nullable: true, name: 'data_envio' })
   dataEnvio: Date;
-
-  @Column({ type: 'timestamp', nullable: true, name: 'data_aprovacao' })
-  dataAprovacao: Date;
 
   @Column({ type: 'timestamp', nullable: true, name: 'data_rejeicao' })
   dataRejeicao: Date;
@@ -213,8 +227,12 @@ export class Cotacao {
 
   // Método para verificar se está vencida
   get isVencida(): boolean {
-    return this.prazoResposta < new Date() &&
-      ![StatusCotacao.APROVADA, StatusCotacao.CONVERTIDA, StatusCotacao.CANCELADA].includes(this.status);
+    return (
+      this.prazoResposta < new Date() &&
+      ![StatusCotacao.APROVADA, StatusCotacao.CONVERTIDA, StatusCotacao.CANCELADA].includes(
+        this.status,
+      )
+    );
   }
 
   // Método para calcular dias restantes

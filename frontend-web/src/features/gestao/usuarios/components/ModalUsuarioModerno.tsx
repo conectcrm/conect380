@@ -8,13 +8,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { 
-  X, 
-  User, 
-  Mail, 
-  Phone, 
-  Shield, 
-  Save, 
+import {
+  X,
+  User,
+  Mail,
+  Phone,
+  Shield,
+  Save,
   Loader2,
   Eye,
   EyeOff,
@@ -40,7 +40,7 @@ import { ConfirmationModal } from '../../../../components/common/ConfirmationMod
 const formatarTelefone = (value: string): string => {
   // Remove todos os caracteres não numéricos
   const numeros = value.replace(/\D/g, '');
-  
+
   // Aplica a formatação baseada no número de dígitos
   if (numeros.length <= 2) {
     return `(${numeros}`;
@@ -56,15 +56,15 @@ const formatarTelefone = (value: string): string => {
 
 const validarTelefone = (telefone: string): boolean => {
   if (!telefone) return true; // Campo opcional
-  
+
   // Remove formatação
   const numeros = telefone.replace(/\D/g, '');
-  
+
   // Verifica se tem 10 (fixo) ou 11 (celular) dígitos
   if (numeros.length !== 10 && numeros.length !== 11) {
     return false;
   }
-  
+
   // Verifica DDD válido (códigos de área brasileiros)
   const ddd = parseInt(numeros.slice(0, 2));
   const dddsValidos = [
@@ -96,16 +96,16 @@ const validarTelefone = (telefone: string): boolean => {
     96, // AP
     98, 99 // MA
   ];
-  
+
   if (!dddsValidos.includes(ddd)) {
     return false;
   }
-  
+
   // Para celular (11 dígitos), o primeiro dígito deve ser 9
   if (numeros.length === 11 && numeros[2] !== '9') {
     return false;
   }
-  
+
   return true;
 };
 
@@ -116,23 +116,23 @@ const schemaBase = {
     .min(2, 'Nome deve ter pelo menos 2 caracteres')
     .max(100, 'Nome deve ter no máximo 100 caracteres')
     .matches(/^[a-zA-ZÀ-ÿ\s]+$/, 'Nome deve conter apenas letras e espaços'),
-  
+
   email: yup.string()
     .required('Email é obrigatório')
     .email('Email deve ter um formato válido')
     .max(255, 'Email deve ter no máximo 255 caracteres'),
-  
+
   telefone: yup.string()
     .nullable()
     .transform(value => value || null)
-    .test('telefone-valido', 'Telefone deve ter um formato válido (10 ou 11 dígitos com DDD válido)', function(value) {
+    .test('telefone-valido', 'Telefone deve ter um formato válido (10 ou 11 dígitos com DDD válido)', function (value) {
       return validarTelefone(value || '');
     }),
-  
+
   role: yup.string()
     .required('Perfil é obrigatório')
     .oneOf(Object.values(UserRole), 'Perfil inválido'),
-  
+
   ativo: yup.boolean().required()
 };
 
@@ -150,15 +150,15 @@ const schemaEdicao = yup.object().shape({
   senha: yup.string()
     .nullable()
     .transform(value => value || null)
-    .test('senha-opcional', 'Senha deve ter pelo menos 6 caracteres', function(value) {
+    .test('senha-opcional', 'Senha deve ter pelo menos 6 caracteres', function (value) {
       if (!value) return true; // Se não há valor, é válido (campo opcional)
       return value.length >= 6;
     })
-    .test('senha-max', 'Senha deve ter no máximo 50 caracteres', function(value) {
+    .test('senha-max', 'Senha deve ter no máximo 50 caracteres', function (value) {
       if (!value) return true;
       return value.length <= 50;
     })
-    .test('senha-formato', 'Senha deve conter pelo menos: 1 letra minúscula, 1 maiúscula e 1 número', function(value) {
+    .test('senha-formato', 'Senha deve conter pelo menos: 1 letra minúscula, 1 maiúscula e 1 número', function (value) {
       if (!value) return true;
       return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(value);
     })
@@ -284,7 +284,7 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
         e.preventDefault();
         handleClose();
       }
-      
+
       // Ctrl+Enter para salvar
       if (e.ctrlKey && e.key === 'Enter') {
         e.preventDefault();
@@ -304,7 +304,7 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
 
     try {
       let dados: NovoUsuario | AtualizarUsuario;
-      
+
       if (isEdit) {
         dados = {
           id: usuario!.id,
@@ -347,7 +347,7 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
   // Função para avaliar força da senha
   const getPasswordStrength = (password: string) => {
     if (!password) return { strength: 0, label: '', color: '' };
-    
+
     let strength = 0;
     let label = '';
     let color = '';
@@ -383,14 +383,14 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto">
       {/* Overlay */}
       <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center">
-        <div 
-          className="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity backdrop-blur-sm" 
-          onClick={handleClose} 
+        <div
+          className="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity backdrop-blur-sm"
+          onClick={handleClose}
         />
 
         {/* Modal Container - Paisagem */}
-        <div className="inline-block w-full max-w-4xl bg-white rounded-2xl shadow-2xl transform transition-all align-middle">
-          
+        <div className="inline-block w-[calc(100%-2rem)] sm:w-[700px] md:w-[800px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] bg-white rounded-2xl shadow-2xl transform transition-all align-middle">
+
           {/* Header */}
           <div className="bg-gradient-to-r from-[#159A9C] to-[#0f7b7d] px-8 py-6 rounded-t-2xl">
             <div className="flex items-center justify-between">
@@ -407,7 +407,7 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                   </p>
                 </div>
               </div>
-              
+
               <button
                 onClick={handleClose}
                 className="p-2 text-white hover:bg-white hover:bg-opacity-20 rounded-xl transition-colors"
@@ -419,10 +419,10 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
 
           {/* Content */}
           <form onSubmit={handleSubmit(onFormSubmit)} className="p-8">
-            
+
             {/* Grid Layout - 2 colunas */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              
+
               {/* Coluna Esquerda - Informações Básicas */}
               <div className="space-y-6">
                 <div className="flex items-center space-x-2 pb-3 border-b border-gray-200">
@@ -445,11 +445,10 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                           {...field}
                           type="text"
                           placeholder="Digite o nome completo"
-                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 ${
-                            errors.nome 
-                              ? 'border-red-300 bg-red-50' 
+                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 ${errors.nome
+                              ? 'border-red-300 bg-red-50'
                               : 'border-gray-200 hover:border-gray-300'
-                          }`}
+                            }`}
                         />
                       </div>
                     )}
@@ -477,11 +476,10 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                           {...field}
                           type="email"
                           placeholder="usuario@empresa.com"
-                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 ${
-                            errors.email 
-                              ? 'border-red-300 bg-red-50' 
+                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 ${errors.email
+                              ? 'border-red-300 bg-red-50'
                               : 'border-gray-200 hover:border-gray-300'
-                          }`}
+                            }`}
                         />
                       </div>
                     )}
@@ -516,11 +514,10 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                           }}
                           placeholder="(11) 99999-9999"
                           maxLength={15}
-                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 ${
-                            errors.telefone 
-                              ? 'border-red-300 bg-red-50' 
+                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 ${errors.telefone
+                              ? 'border-red-300 bg-red-50'
                               : 'border-gray-200 hover:border-gray-300'
-                          }`}
+                            }`}
                         />
                       </div>
                     )}
@@ -563,11 +560,10 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                           type={showSenha ? 'text' : 'password'}
                           placeholder={isEdit ? 'Digite uma nova senha (opcional)' : 'Digite uma senha segura'}
                           autoComplete="new-password"
-                          className={`w-full pl-12 pr-12 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 ${
-                            errors.senha 
-                              ? 'border-red-300 bg-red-50' 
+                          className={`w-full pl-12 pr-12 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 ${errors.senha
+                              ? 'border-red-300 bg-red-50'
                               : 'border-gray-200 hover:border-gray-300'
-                          }`}
+                            }`}
                         />
                         <button
                           type="button"
@@ -579,7 +575,7 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                       </div>
                     )}
                   />
-                  
+
                   {/* Indicador de força da senha */}
                   {watchedSenha && (
                     <div className="mt-2">
@@ -590,11 +586,10 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className={`h-2 rounded-full transition-all duration-300 ${
-                            passwordStrength.strength <= 2 ? 'bg-red-500' :
-                            passwordStrength.strength <= 4 ? 'bg-yellow-500' : 'bg-green-500'
-                          }`}
+                        <div
+                          className={`h-2 rounded-full transition-all duration-300 ${passwordStrength.strength <= 2 ? 'bg-red-500' :
+                              passwordStrength.strength <= 4 ? 'bg-yellow-500' : 'bg-green-500'
+                            }`}
                           style={{ width: `${(passwordStrength.strength / 6) * 100}%` }}
                         />
                       </div>
@@ -625,11 +620,10 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                         <Shield className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                         <select
                           {...field}
-                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 appearance-none bg-white ${
-                            errors.role 
-                              ? 'border-red-300 bg-red-50' 
+                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 appearance-none bg-white ${errors.role
+                              ? 'border-red-300 bg-red-50'
                               : 'border-gray-200 hover:border-gray-300'
-                          }`}
+                            }`}
                         >
                           {Object.entries(ROLE_LABELS).map(([value, label]) => (
                             <option key={value} value={value}>
@@ -646,7 +640,7 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                       <span className="text-sm">{errors.role.message}</span>
                     </div>
                   )}
-                  
+
                   {/* Descrição do perfil selecionado */}
                   <div className="mt-3 p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center space-x-2 mb-1">
@@ -684,15 +678,13 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                             ref={ref}
                             className="sr-only"
                           />
-                          <div 
+                          <div
                             onClick={() => onChange(!value)}
-                            className={`w-12 h-6 rounded-full cursor-pointer flex items-center transition-colors duration-200 ${
-                              value ? 'bg-[#159A9C]' : 'bg-gray-300'
-                            }`}
+                            className={`w-12 h-6 rounded-full cursor-pointer flex items-center transition-colors duration-200 ${value ? 'bg-[#159A9C]' : 'bg-gray-300'
+                              }`}
                           >
-                            <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
-                              value ? 'translate-x-6' : 'translate-x-1'
-                            }`} />
+                            <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-200 ${value ? 'translate-x-6' : 'translate-x-1'
+                              }`} />
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -712,7 +704,7 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                     )}
                   />
                   <p className="mt-2 text-xs text-gray-500">
-                    {watch('ativo') 
+                    {watch('ativo')
                       ? 'O usuário poderá fazer login e acessar o sistema normalmente.'
                       : 'O usuário não poderá fazer login até que seja reativado.'
                     }
@@ -749,7 +741,7 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                 >
                   Cancelar
                 </button>
-                
+
                 <button
                   type="submit"
                   disabled={!isValid || isSubmitting}
@@ -772,7 +764,7 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
           </form>
         </div>
       </div>
-      
+
       {/* Modal de Confirmação */}
       <ConfirmationModal confirmationState={confirmationState} />
     </div>

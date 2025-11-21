@@ -7,20 +7,16 @@ export class PdfController {
   constructor(private readonly pdfService: PdfService) {}
 
   @Post('gerar/:tipo')
-  async gerarPdf(
-    @Param('tipo') tipo: string,
-    @Body() dadosProposta: any,
-    @Res() res: Response,
-  ) {
+  async gerarPdf(@Param('tipo') tipo: string, @Body() dadosProposta: any, @Res() res: Response) {
     try {
       const tiposPermitidos = ['comercial', 'simples'];
-      
+
       if (!tiposPermitidos.includes(tipo)) {
         throw new BadRequestException('Tipo de template não suportado');
       }
 
       const pdfBuffer = await this.pdfService.gerarProposta(tipo, dadosProposta);
-      
+
       res.set({
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="proposta-${dadosProposta.numeroProposta || 'draft'}.pdf"`,
@@ -34,20 +30,16 @@ export class PdfController {
   }
 
   @Post('preview/:tipo')
-  async previewHtml(
-    @Param('tipo') tipo: string,
-    @Body() dadosProposta: any,
-    @Res() res: Response,
-  ) {
+  async previewHtml(@Param('tipo') tipo: string, @Body() dadosProposta: any, @Res() res: Response) {
     try {
       const tiposPermitidos = ['comercial', 'simples'];
-      
+
       if (!tiposPermitidos.includes(tipo)) {
         throw new BadRequestException('Tipo de template não suportado');
       }
 
       const html = await this.pdfService.gerarHtml(tipo, dadosProposta);
-      
+
       res.set({
         'Content-Type': 'text/html',
       });
@@ -66,15 +58,15 @@ export class PdfController {
           id: 'comercial',
           nome: 'Proposta Comercial Completa',
           descricao: 'Template detalhado com todas as seções e informações',
-          preview: '/propostas/pdf/preview/comercial'
+          preview: '/propostas/pdf/preview/comercial',
         },
         {
           id: 'simples',
           nome: 'Proposta Simples',
           descricao: 'Template simplificado para propostas rápidas',
-          preview: '/propostas/pdf/preview/simples'
-        }
-      ]
+          preview: '/propostas/pdf/preview/simples',
+        },
+      ],
     };
   }
 }

@@ -59,10 +59,17 @@ export function useWhatsApp(options: UseWhatsAppOptions) {
       setLoading(true);
       setErro(null);
 
-      const ticketsCarregados = await atendimentoService.listarTickets(empresaId, filtros);
+      // ✅ CORREÇÃO: Se não passar filtros de status, incluir apenas tickets ativos (ABERTO, EM_ATENDIMENTO, AGUARDANDO)
+      // Isso garante que tickets recém-criados apareçam após reload, mas evita carregar todos os históricos fechados
+      const filtrosComStatus = {
+        ...filtros,
+        status: filtros?.status || ['ABERTO', 'EM_ATENDIMENTO', 'AGUARDANDO']
+      };
+
+      const ticketsCarregados = await atendimentoService.listarTickets(empresaId, filtrosComStatus);
       setTickets(ticketsCarregados);
 
-      console.log('[WhatsApp] Tickets carregados:', ticketsCarregados.length);
+      console.log('[WhatsApp] Tickets carregados:', ticketsCarregados.length, 'com filtros:', filtrosComStatus);
     } catch (error: any) {
       console.error('[WhatsApp] Erro ao carregar tickets:', error);
       setErro(error.message || 'Erro ao carregar tickets');

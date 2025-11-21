@@ -191,8 +191,7 @@ const NovaPropostaPage: React.FC = () => {
           ativo: vendedor.ativo
         }));
 
-        setVendedores(vendedoresFormatados);
-        console.log(`👥 ${vendedoresFormatados.length} vendedores carregados para nova proposta`);
+  setVendedores(vendedoresFormatados);
       } catch (error) {
         console.error('❌ Erro ao carregar vendedores:', error);
         setVendedores([]);
@@ -233,8 +232,7 @@ const NovaPropostaPage: React.FC = () => {
           tipoPessoa: cliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica'
         }));
 
-        setClientes(clientesFormatados);
-        console.log('✅ Clientes carregados:', clientesFormatados.length);
+  setClientes(clientesFormatados);
       } catch (error) {
         console.error('❌ Erro ao carregar clientes:', error);
         toastNotify.error('Erro ao carregar clientes. Usando dados de exemplo.');
@@ -1284,17 +1282,6 @@ const NovaPropostaPage: React.FC = () => {
                   <button
                     type="submit"
                     disabled={!isValid || isGeneratingPDF}
-                    onClick={() => {
-                      console.log('🔘 Botão clicado');
-                      console.log('📊 Estado atual:', {
-                        isValid,
-                        isGeneratingPDF,
-                        clienteSelecionado: clienteSelecionado?.nome,
-                        produtos: watchedProdutos?.length,
-                        combos: watchedCombos?.length,
-                        errors
-                      });
-                    }}
                     className="w-full px-4 py-3 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center font-medium transition-all"
                   >
                     {isGeneratingPDF ? (
@@ -1313,7 +1300,6 @@ const NovaPropostaPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      console.log('🧹 Limpando formulário...');
                       reset();
                       setClienteSelecionado(null);
                       setBuscarCliente('');
@@ -1332,18 +1318,13 @@ const NovaPropostaPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      console.log('🔍 Debug - Verificando erros...');
-                      console.log('❌ Erros atuais:', errors);
-                      console.log('📋 Dados do formulário:', watch());
-                      console.log('✅ Formulário válido:', isValid);
-
                       // Exibir erros específicos
                       if (Object.keys(errors).length > 0) {
-                        Object.entries(errors).forEach(([field, error]) => {
-                          console.log(`❌ Campo ${field}: ${error?.message}`);
-                        });
+                        const fieldMessages = Object.entries(errors)
+                          .map(([field, error]) => `${field}: ${error?.message || 'Erro não identificado'}`)
+                          .join('\n');
 
-                        toastNotify.error(`Encontrados ${Object.keys(errors).length} erro(s) no formulário. Verifique o console.`);
+                        toastNotify.error(`Encontrados ${Object.keys(errors).length} erro(s):\n${fieldMessages}`);
                       } else {
                         toastNotify.success('Nenhum erro encontrado no formulário!');
                       }

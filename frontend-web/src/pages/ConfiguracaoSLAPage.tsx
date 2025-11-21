@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Clock, Plus, Edit2, Trash2, Search, X, 
-  Settings, AlertCircle, CheckCircle, Bell 
+import {
+  Clock, Plus, Edit2, Trash2, Search, X,
+  Settings, AlertCircle, CheckCircle, Bell
 } from 'lucide-react';
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
-import slaService, { 
-  SlaConfig, 
-  CreateSlaConfigDto, 
+import slaService, {
+  SlaConfig,
+  CreateSlaConfigDto,
   UpdateSlaConfigDto,
-  HorarioFuncionamento 
+  HorarioFuncionamento
 } from '../services/slaService';
 
 const ConfiguracaoSLAPage: React.FC = () => {
@@ -67,7 +67,7 @@ const ConfiguracaoSLAPage: React.FC = () => {
     const matchNome = config.nome.toLowerCase().includes(searchTerm.toLowerCase());
     const matchPrioridade = filterPrioridade === 'todas' || config.prioridade === filterPrioridade;
     const matchCanal = filterCanal === 'todos' || config.canal === filterCanal;
-    const matchAtivo = filterAtivo === 'todos' || 
+    const matchAtivo = filterAtivo === 'todos' ||
       (filterAtivo === 'ativo' ? config.ativo : !config.ativo);
     return matchNome && matchPrioridade && matchCanal && matchAtivo;
   });
@@ -161,6 +161,9 @@ const ConfiguracaoSLAPage: React.FC = () => {
         horariosFuncionamento: horariosFuncionamento,
       };
 
+      // Log para debugging
+      console.log('📤 Enviando DTO para backend:', JSON.stringify(dto, null, 2));
+
       if (editingConfig) {
         await slaService.atualizarConfig(editingConfig.id, dto as UpdateSlaConfigDto);
       } else {
@@ -171,7 +174,16 @@ const ConfiguracaoSLAPage: React.FC = () => {
       carregarConfigs();
     } catch (err: unknown) {
       console.error('Erro ao salvar configuração SLA:', err);
-      alert(err instanceof Error ? err.message : 'Erro ao salvar configuração SLA');
+      // Extrair mensagem de erro do backend
+      const errorMessage = (err as any)?.response?.data?.message ||
+        (err instanceof Error ? err.message : 'Erro ao salvar configuração SLA');
+
+      // Se for um array de mensagens, juntar em uma string
+      const finalMessage = Array.isArray(errorMessage)
+        ? errorMessage.join('\n')
+        : errorMessage;
+
+      alert(finalMessage);
     }
   };
 
@@ -217,9 +229,9 @@ const ConfiguracaoSLAPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header com BackToNucleus */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus 
-          nucleusName="Atendimento" 
-          nucleusPath="/nuclei/atendimento" 
+        <BackToNucleus
+          nucleusName="Atendimento"
+          nucleusPath="/nuclei/atendimento"
         />
       </div>
 
@@ -381,7 +393,7 @@ const ConfiguracaoSLAPage: React.FC = () => {
                 {configs.length === 0 ? 'Nenhuma configuração cadastrada' : 'Nenhuma configuração encontrada'}
               </h3>
               <p className="text-[#002333]/70 mb-6">
-                {configs.length === 0 
+                {configs.length === 0
                   ? 'Crie sua primeira configuração de SLA para começar'
                   : 'Tente ajustar os filtros de busca'}
               </p>

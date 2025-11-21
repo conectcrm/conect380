@@ -18,6 +18,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Ticket, Mensagem } from '../types';
 import { normalizarMensagemPayload } from '../services/atendimentoService';
+import { useAtendimentoStore } from '../../../../stores/atendimentoStore';
 
 interface WebSocketEvents {
   onNovoTicket?: (ticket: Ticket) => void;
@@ -65,6 +66,11 @@ export const useWebSocket = (
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 🏪 Actions da Store Zustand
+  const adicionarMensagemStore = useAtendimentoStore((state) => state.adicionarMensagem);
+  const atualizarTicketStore = useAtendimentoStore((state) => state.atualizarTicket);
+  const adicionarTicketStore = useAtendimentoStore((state) => state.adicionarTicket);
 
   // Conectar ao WebSocket
   const connect = useCallback(() => {
@@ -177,27 +183,60 @@ export const useWebSocket = (
       // Eventos de negócio
       socket.on('novo_ticket', (ticket: Ticket) => {
         if (DEBUG) console.log('📨 Novo ticket recebido:', ticket);
+
+        // 🏪 Atualizar store diretamente
+        adicionarTicketStore(ticket);
+
+        // 🔔 Callback opcional para notificações/UI
         events.onNovoTicket?.(ticket);
       });
 
       socket.on('nova_mensagem', (mensagem: Mensagem) => {
         if (DEBUG) console.log('💬 Nova mensagem recebida:', mensagem);
         const mensagemNormalizada = normalizarMensagemPayload(mensagem);
+
+        // 🏪 Atualizar store diretamente
+        if (mensagemNormalizada.ticketId) {
+          adicionarMensagemStore(mensagemNormalizada.ticketId, mensagemNormalizada);
+        }
+
+        // 🔔 Callback opcional para notificações/UI
         events.onNovaMensagem?.(mensagemNormalizada);
       });
 
       socket.on('ticket_atualizado', (ticket: Ticket) => {
         if (DEBUG) console.log('🔄 Ticket atualizado:', ticket);
+
+        // 🏪 Atualizar store diretamente
+        if (ticket.id) {
+          atualizarTicketStore(ticket.id, ticket);
+        }
+
+        // 🔔 Callback opcional para notificações/UI
         events.onTicketAtualizado?.(ticket);
       });
 
       socket.on('ticket_transferido', (data: any) => {
         if (DEBUG) console.log('🔀 Ticket transferido:', data);
+
+        // 🏪 Atualizar store diretamente
+        if (data.ticket?.id) {
+          atualizarTicketStore(data.ticket.id, data.ticket);
+        }
+
+        // 🔔 Callback opcional para notificações/UI
         events.onTicketTransferido?.(data);
       });
 
       socket.on('ticket_encerrado', (ticket: Ticket) => {
         if (DEBUG) console.log('✅ Ticket encerrado:', ticket);
+
+        // 🏪 Atualizar store diretamente
+        if (ticket.id) {
+          atualizarTicketStore(ticket.id, { ...ticket, status: 'fechado' });
+        }
+
+        // 🔔 Callback opcional para notificações/UI
         events.onTicketEncerrado?.(ticket);
       });
 

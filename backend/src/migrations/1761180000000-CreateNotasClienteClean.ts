@@ -1,7 +1,7 @@
-import { MigrationInterface, QueryRunner, Table, TableForeignKey } from "typeorm";
+import { MigrationInterface, QueryRunner, Table, TableForeignKey } from 'typeorm';
 
 export class CreateNotasClienteClean1761180000000 implements MigrationInterface {
-  name = 'CreateNotasClienteClean1761180000000'
+  name = 'CreateNotasClienteClean1761180000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Criar tabela atendimento_notas_cliente

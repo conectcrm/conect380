@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { User, X } from 'lucide-react';
 import { AtendimentosSidebar } from './components/AtendimentosSidebar';
 import { ChatArea } from './components/ChatArea';
@@ -10,7 +10,9 @@ import { EncerrarAtendimentoModal, EncerramentoData } from './modals/EncerrarAte
 import { EditarContatoModal, ContatoEditado } from './modals/EditarContatoModal';
 import { VincularClienteModal } from './modals/VincularClienteModal';
 import { AbrirDemandaModal, NovaDemanda } from './modals/AbrirDemandaModal';
-import { Mensagem, NotaCliente, Demanda, StatusAtendimento, Ticket, CanalTipo } from './types';
+import { SelecionarFilaModal } from '../../../components/chat/SelecionarFilaModal';
+import { FilaIndicator } from '../../../components/chat/FilaIndicator';
+import { Mensagem, NotaCliente, Demanda, StatusAtendimentoType, Ticket, CanalTipo } from './types';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useSidebar } from '../../../contexts/SidebarContext';
 import { useAtendimentos } from './hooks/useAtendimentos';
@@ -18,12 +20,16 @@ import { useMensagens } from './hooks/useMensagens';
 import { useHistoricoCliente } from './hooks/useHistoricoCliente';
 import { useContextoCliente } from './hooks/useContextoCliente';
 import { useWebSocket } from './hooks/useWebSocket';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'; // 🆕 Atalhos de teclado
 import { useToast } from './contexts/ToastContext';
+import { useNotificacoesDesktop } from '../../../hooks/useNotificacoesDesktop'; // 🆕 Notificações desktop
 import { useNotas } from '../../../hooks/useNotas'; // ✅ Hook real de notas
 import { useDemandas } from '../../../hooks/useDemandas'; // ✅ Hook real de demandas
+import { useAuth } from '../../../hooks/useAuth';
 import { atendimentoService } from './services/atendimentoService'; // ✅ Service para atualizar contato e vincular cliente
 import { resolveAvatarUrl } from '../../../utils/avatar';
 import { resolverNomeExibicao } from './utils';
+import { useAtendimentoStore } from '../../../stores/atendimentoStore'; // 🆕 STORE ZUSTAND
 
 const DEBUG = false; // ✅ Desabilitado após resolução do problema de tempo real
 
@@ -115,6 +121,46 @@ export const ChatOmnichannel: React.FC = () => {
   const { currentPalette } = useTheme();
   const { sidebarCollapsed } = useSidebar();
   const { showToast } = useToast();
+  const { user } = useAuth();
+
+  // 🆕 Hook de notificações desktop
+  const {
+    permissao: permissaoNotificacoes,
+    suportado: notificacoesSuportadas,
+    solicitarPermissao,
+    mostrarNotificacao: exibirNotificacaoDesktop,
+  } = useNotificacoesDesktop();
+
+  // 🆕 ZUSTAND STORE - Estado centralizado
+  const {
+    // Estado tickets
+    tickets: ticketsStore,
+    ticketSelecionado: ticketSelecionadoStore,
+    ticketsLoading: ticketsLoadingStore,
+    ticketsError,
+    // Ações tickets
+    setTickets: setTicketsStore,
+    selecionarTicket: selecionarTicketStore,
+    adicionarTicket: adicionarTicketStore,
+    atualizarTicket: atualizarTicketStore,
+    removerTicket: removerTicketStore,
+    setTicketsLoading,
+    setTicketsError,
+    // Estado mensagens
+    mensagens: mensagensStore,
+    mensagensLoading: mensagensLoadingStore,
+    mensagensError,
+    // Ações mensagens
+    setMensagens: setMensagensStore,
+    adicionarMensagem: adicionarMensagemStore,
+    setMensagensLoading,
+    setMensagensError,
+    // Cliente
+    clienteSelecionado,
+    setClienteSelecionado,
+    historicoCliente,
+    setHistoricoCliente,
+  } = useAtendimentoStore();
 
   const [popupNotifications, setPopupNotifications] = useState<PopupNotificationItem[]>([]);
   const popupTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -159,10 +205,17 @@ export const ChatOmnichannel: React.FC = () => {
         audioContextRef.current = audioCtx;
       }
 
+      // ✅ CORREÇÃO: Só tentar reproduzir se AudioContext estiver em estado válido
+      // Evita erro "AudioContext was not allowed to start" antes de interação do usuário
       if (audioCtx.state === 'suspended') {
-        audioCtx.resume().catch(() => undefined);
+        // Tentar resumir, mas não criar som se falhar (usuário ainda não interagiu)
+        audioCtx.resume().catch(() => {
+          if (DEBUG) console.log('AudioContext ainda suspenso - aguardando interação do usuário');
+        });
+        return; // Não criar som enquanto suspended
       }
 
+      // Se chegou aqui, contexto está 'running' e podemos criar som
       const oscillator = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
 
@@ -445,10 +498,11 @@ export const ChatOmnichannel: React.FC = () => {
     totaisPorStatus
   } = useAtendimentos({
     autoRefresh: false, // WebSocket já cuida dos updates como nas principais plataformas
-    filtroInicial: { status: 'aberto' }
+    filtroInicial: { status: 'aberto' },
+    atendenteAtualId: user?.id ?? null,
   });
 
-  const [tabAtiva, setTabAtiva] = useState<StatusAtendimento>(filtros.status || 'aberto');
+  const [tabAtiva, setTabAtiva] = useState<StatusAtendimentoType>(filtros.status || 'aberto');
 
   useEffect(() => {
     if (filtros.status && filtros.status !== tabAtiva) {
@@ -456,7 +510,7 @@ export const ChatOmnichannel: React.FC = () => {
     }
   }, [filtros.status, tabAtiva]);
 
-  const handleChangeTab = useCallback((status: StatusAtendimento) => {
+  const handleChangeTab = useCallback((status: StatusAtendimentoType) => {
     setTabAtiva(prev => (prev === status ? prev : status));
     setFiltros(prev => {
       if (prev.status === status && (prev.page ?? 1) === 1) {
@@ -486,12 +540,23 @@ export const ChatOmnichannel: React.FC = () => {
     ticketId: ticketSelecionado?.id || null
   });
 
+  // 🔧 MEMOIZAÇÃO: Estabiliza clienteId/telefone para evitar loops nos hooks abaixo
+  const clienteIdEstavel = useMemo(
+    () => ticketSelecionado?.contato?.clienteVinculado?.id || null,
+    [ticketSelecionado?.contato?.clienteVinculado?.id]
+  );
+
+  const telefoneEstavel = useMemo(
+    () => ticketSelecionado?.contato?.telefone || null,
+    [ticketSelecionado?.contato?.telefone]
+  );
+
   // 🆕 Hooks do backend real - HISTÓRICO DO CLIENTE
   const {
     historico,
     loading: loadingHistorico
   } = useHistoricoCliente({
-    clienteId: ticketSelecionado?.contato?.clienteVinculado?.id || null,
+    clienteId: clienteIdEstavel,
     autoLoad: true
   });
 
@@ -500,8 +565,8 @@ export const ChatOmnichannel: React.FC = () => {
     contexto,
     loading: loadingContexto
   } = useContextoCliente({
-    clienteId: ticketSelecionado?.contato?.clienteVinculado?.id || null,
-    telefone: ticketSelecionado?.contato?.telefone || null,
+    clienteId: clienteIdEstavel,
+    telefone: telefoneEstavel,
     autoLoad: true
   });
 
@@ -512,54 +577,22 @@ export const ChatOmnichannel: React.FC = () => {
     }
   }, [selecionarTicket, isMobile]);
 
-  // 🔧 REFS ESTÁVEIS PARA WEBSOCKET - Evita loop infinito de reconexões
+  // 🔧 REFS ESTÁVEIS PARA WEBSOCKET - Apenas para popups/notificações
   type WebsocketCallbacks = {
-    recarregarTickets: () => void;
-    recarregarMensagens: () => void;
-    adicionarMensagemRecebida: (mensagem: Mensagem) => void;
-    atualizarTicketLocal: (ticketId: string, updates: any) => void;
     mostrarPopupMensagem: (mensagem: Mensagem) => void;
     mostrarPopupNovoTicket: (ticket: Ticket | any) => void;
-    sincronizarTicketRealtime: (ticket: any) => Ticket | null;
-    ticketAtualId: string | null;
   };
 
   const websocketCallbacksRef = useRef<WebsocketCallbacks>({
-    recarregarTickets: () => { },
-    recarregarMensagens: () => { },
-    adicionarMensagemRecebida: () => { },
-    atualizarTicketLocal: () => { },
     mostrarPopupMensagem: () => { },
     mostrarPopupNovoTicket: () => { },
-    sincronizarTicketRealtime: () => null,
-    ticketAtualId: null,
   });
 
-  // Atualizar refs quando funções ou ticket mudarem
+  // Atualizar refs quando funções mudarem
   useEffect(() => {
     const chatVisivel = Boolean(ticketSelecionado) && (!isMobile || mobileView === 'chat');
 
     websocketCallbacksRef.current = {
-      recarregarTickets: () => {
-        if (DEBUG) console.log('🔄 Recarregando tickets via WebSocket...');
-        recarregarTickets();
-      },
-      recarregarMensagens: () => {
-        if (DEBUG) console.log('🔄 Recarregando mensagens via WebSocket...');
-        recarregarMensagens();
-      },
-      adicionarMensagemRecebida: (mensagem: Mensagem) => {
-        if (DEBUG) console.log('📩 Adicionando mensagem via WebSocket...');
-        adicionarMensagemRecebida(mensagem);
-      },
-      atualizarTicketLocal: (ticketId: string, updates: any) => {
-        if (DEBUG) console.log('🔄 Atualizando ticket localmente (sem reload)...');
-        atualizarTicketLocal(ticketId, updates);
-      },
-      sincronizarTicketRealtime: (ticket: any) => {
-        if (DEBUG) console.log('🔄 Sincronizando ticket em tempo real...', ticket);
-        return syncTicketRealtime(ticket);
-      },
       mostrarPopupMensagem: (mensagem: Mensagem) => {
         if (!mensagem) {
           return;
@@ -645,14 +678,8 @@ export const ChatOmnichannel: React.FC = () => {
 
         registerTicketNotification(ticketId);
       },
-      ticketAtualId: ticketSelecionado?.id || null,
     };
   }, [
-    recarregarTickets,
-    recarregarMensagens,
-    adicionarMensagemRecebida,
-    atualizarTicketLocal,
-    syncTicketRealtime,
     ticketSelecionado,
     tickets,
     isMobile,
@@ -667,94 +694,79 @@ export const ChatOmnichannel: React.FC = () => {
     tabAtiva
   ]);
 
+  // 🆕 Solicitar permissão de notificações desktop ao montar
+  useEffect(() => {
+    if (notificacoesSuportadas && permissaoNotificacoes === 'default') {
+      // Aguardar 3 segundos para não ser intrusivo
+      const timer = setTimeout(() => {
+        solicitarPermissao();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notificacoesSuportadas, permissaoNotificacoes, solicitarPermissao]);
+
   // 🆕 Hooks do backend real - WEBSOCKET TEMPO REAL
+  // ✅ STORE ZUSTAND: WebSocket já atualiza store diretamente em useWebSocket.ts
+  // Callbacks aqui são APENAS para notificações/UI (popups, toasts)
   const { connected: wsConnected, entrarNoTicket, sairDoTicket } = useWebSocket({
-    enabled: true,  // ✅ RE-HABILITADO com callbacks estáveis
+    enabled: true,
     autoConnect: true,
     events: {
-      // ✅ Callbacks estáveis usando refs (não mudam a cada render)
+      // 🔔 APENAS notificação popup (store já foi atualizada pelo hook)
       onNovoTicket: (ticket: any) => {
-        if (DEBUG) console.log('📨 Novo ticket recebido via WebSocket', ticket);
-        const ticketSincronizado = websocketCallbacksRef.current.sincronizarTicketRealtime(ticket);
+        if (DEBUG) console.log('📨 Novo ticket - mostrando popup');
+        websocketCallbacksRef.current.mostrarPopupNovoTicket(ticket);
 
-        if (!ticketSincronizado) {
-          websocketCallbacksRef.current.recarregarTickets();
+        // 🆕 Notificação desktop se janela não está focada
+        if (document.hidden && permissaoNotificacoes === 'granted') {
+          exibirNotificacaoDesktop({
+            titulo: 'Novo Atendimento',
+            corpo: `${ticket.contatoNome || 'Cliente'} via ${ticket.canal || 'Chat'}`,
+            tag: `ticket-${ticket.id}`,
+            requireInteraction: true,
+            onClick: () => {
+              window.focus();
+              selecionarTicketStore(ticket.id);
+            },
+          });
         }
-
-        websocketCallbacksRef.current.mostrarPopupNovoTicket(ticketSincronizado || ticket);
       },
 
+      // 🔔 APENAS notificação popup (store já foi atualizada pelo hook)
       onNovaMensagem: (mensagem: any) => {
-        if (DEBUG) console.log('💬 Nova mensagem via WebSocket:', mensagem);
-
-        // 🔥 OTIMIZAÇÃO 1: Adicionar mensagem diretamente ao chat atual (sem reload)
-        if (mensagem.ticketId === websocketCallbacksRef.current.ticketAtualId) {
-          websocketCallbacksRef.current.adicionarMensagemRecebida(mensagem);
-        }
-
-        // 🔥 OTIMIZAÇÃO 2: Atualizar apenas o ticket afetado na sidebar (sem reload total)
-        websocketCallbacksRef.current.atualizarTicketLocal(mensagem.ticketId, {
-          ultimaMensagemEm: mensagem.timestamp || new Date().toISOString(),
-          // Outras propriedades que podem ser atualizadas:
-          // mensagensNaoLidas: ticket.mensagensNaoLidas + 1,
-        });
-
+        if (DEBUG) console.log('💬 Nova mensagem - mostrando popup');
         websocketCallbacksRef.current.mostrarPopupMensagem(mensagem);
+
+        // 🆕 Notificação desktop se janela não está focada e mensagem é do cliente
+        if (document.hidden && permissaoNotificacoes === 'granted' && mensagem.remetente !== 'atendente') {
+          const conteudoPreview = mensagem.conteudo?.substring(0, 100) || 'Nova mensagem recebida';
+          exibirNotificacaoDesktop({
+            titulo: `Nova mensagem de ${mensagem.remetenteNome || 'Cliente'}`,
+            corpo: conteudoPreview,
+            tag: `msg-${mensagem.id}`,
+            onClick: () => {
+              window.focus();
+              if (mensagem.ticketId) {
+                selecionarTicketStore(mensagem.ticketId);
+              }
+            },
+          });
+        }
       },
 
+      // ℹ️ Ticket atualizado - store já sincronizada, sem callback necessário
       onTicketAtualizado: (ticket: any) => {
-        if (DEBUG) console.log('🔄 Ticket atualizado via WebSocket:', ticket);
-
-        const ticketSincronizado = websocketCallbacksRef.current.sincronizarTicketRealtime(ticket);
-
-        if (!ticketSincronizado) {
-          websocketCallbacksRef.current.atualizarTicketLocal(ticket.id, ticket);
-        }
-
-        const precisaRecarregarMensagens = Boolean(
-          (ticketSincronizado as any)?.recarregarMensagens || (ticket as any)?.recarregarMensagens
-        );
-
-        if (
-          (ticketSincronizado?.id || ticket.id) === websocketCallbacksRef.current.ticketAtualId &&
-          precisaRecarregarMensagens
-        ) {
-          websocketCallbacksRef.current.recarregarMensagens();
-        }
+        if (DEBUG) console.log('🔄 Ticket atualizado via store');
       },
 
+      // ℹ️ Transferência - store já sincronizada, sem callback necessário
       onTicketTransferido: (data: any) => {
-        if (DEBUG) console.log('👤 Ticket transferido via WebSocket:', data);
-
-        const { ticket, novoAtendente } = data;
-
-        const ticketReferencia = ticket || data?.ticket || null;
-        const ticketSincronizado = ticketReferencia
-          ? websocketCallbacksRef.current.sincronizarTicketRealtime(ticketReferencia)
-          : null;
-
-        if (!ticketSincronizado) {
-          websocketCallbacksRef.current.atualizarTicketLocal(ticket?.id || data.ticketId, {
-            atendenteId: novoAtendente?.id || data.novoAtendenteId,
-            status: 'EM_ATENDIMENTO',
-            updatedAt: new Date().toISOString(),
-          });
-        }
+        if (DEBUG) console.log('👤 Ticket transferido via store');
       },
 
+      // ℹ️ Encerramento - store já sincronizada, sem callback necessário
       onTicketEncerrado: (ticket: any) => {
-        if (DEBUG) console.log('🏁 Ticket encerrado via WebSocket:', ticket);
-
-        const ticketSincronizado = websocketCallbacksRef.current.sincronizarTicketRealtime(ticket);
-
-        if (!ticketSincronizado) {
-          websocketCallbacksRef.current.atualizarTicketLocal(ticket.id || ticket.ticketId, {
-            status: 'RESOLVIDO',
-            dataFechamento: ticket.dataFechamento || new Date().toISOString(),
-            dataResolucao: ticket.dataResolucao || new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          });
-        }
+        if (DEBUG) console.log('🏁 Ticket encerrado via store');
       },
     }
   });
@@ -833,6 +845,7 @@ export const ChatOmnichannel: React.FC = () => {
   const [modalEditarContato, setModalEditarContato] = useState(false);
   const [modalVincularCliente, setModalVincularCliente] = useState(false);
   const [modalAbrirDemanda, setModalAbrirDemanda] = useState(false);
+  const [modalSelecionarFila, setModalSelecionarFila] = useState(false);
 
   // Variáveis derivadas
   const ticketAtual = ticketSelecionado;
@@ -945,6 +958,49 @@ export const ChatOmnichannel: React.FC = () => {
       showToast('error', 'Erro ao encerrar atendimento. Tente novamente.');
     }
   }, [ticketSelecionado, encerrarTicket, showToast]);
+
+  // 🆕 NOVO: Mudar status do ticket diretamente
+  const handleMudarStatus = useCallback(async (novoStatus: StatusAtendimentoType) => {
+    if (!ticketSelecionado) return;
+
+    try {
+      // Se for resolver, abre modal de encerramento
+      if (novoStatus === 'resolvido') {
+        handleEncerrar();
+        return;
+      }
+
+      // Se for fechar, também abre modal
+      if (novoStatus === 'fechado') {
+        handleEncerrar();
+        return;
+      }
+
+      // Para outros status, atualiza direto via API
+      await atendimentoService.atualizarStatusTicket(ticketSelecionado.id, novoStatus);
+
+      // Atualizar ticket local
+      atualizarTicketLocal(ticketSelecionado.id, { status: novoStatus });
+
+      showToast('success', `Status alterado para "${novoStatus}" com sucesso!`);
+    } catch (error) {
+      console.error('Erro ao mudar status:', error);
+      showToast('error', 'Erro ao alterar status. Tente novamente.');
+    }
+  }, [ticketSelecionado, handleEncerrar, atualizarTicketLocal, showToast]);
+
+  // ⌨️ ATALHOS DE TECLADO para agilizar atendimento
+  const algumModalAberto = modalNovoAtendimento || modalTransferir || modalEncerrar ||
+    modalEditarContato || modalVincularCliente || modalAbrirDemanda;
+
+  useKeyboardShortcuts({
+    ticketSelecionado: ticketSelecionado ? {
+      id: ticketSelecionado.id,
+      status: ticketSelecionado.status,
+    } : null,
+    onMudarStatus: handleMudarStatus,
+    modalAberto: algumModalAberto,
+  });
 
   const handleLigar = useCallback(() => {
     if (!ticketSelecionado) return;
@@ -1086,6 +1142,60 @@ export const ChatOmnichannel: React.FC = () => {
     }
   }, [deletarNota, showToast]);
 
+  // 🆕 Handlers para Sistema de Filas
+  const handleSelecionarFila = useCallback(() => {
+    if (!ticketSelecionado) return;
+    setModalSelecionarFila(true);
+  }, [ticketSelecionado]);
+
+  const handleFilaSelecionada = useCallback(async (fila: any, atendenteId: string) => {
+    if (!ticketSelecionado) return;
+
+    try {
+      console.log('🎯 Fila selecionada:', { filaId: fila.id, atendenteId });
+
+      // Atualizar ticket com fila e atendente
+      await atendimentoService.atualizarTicket(ticketSelecionado.id, {
+        filaId: fila.id,
+        atendenteId,
+      });
+
+      // Recarregar dados do ticket para garantir sincronização completa
+      await recarregarTickets();
+
+      setModalSelecionarFila(false);
+      showToast('success', 'Fila atribuída com sucesso!');
+    } catch (error) {
+      console.error('❌ Erro ao atribuir fila:', error);
+      showToast('error', 'Erro ao atribuir fila. Tente novamente.');
+    }
+  }, [ticketSelecionado, recarregarTickets, showToast]);
+
+  const handleRemoverFila = useCallback(async () => {
+    if (!ticketSelecionado) return;
+
+    try {
+      console.log('🗑️ Removendo fila do ticket');
+
+      // Remover fila do ticket
+      await atendimentoService.atualizarTicket(ticketSelecionado.id, {
+        filaId: null,
+      });
+
+      // Atualizar ticket local
+      atualizarTicketLocal(ticketSelecionado.id, {
+        filaId: null,
+      });
+
+      await recarregarTickets();
+
+      showToast('success', 'Fila removida com sucesso!');
+    } catch (error) {
+      console.error('❌ Erro ao remover fila:', error);
+      showToast('error', 'Erro ao remover fila. Tente novamente.');
+    }
+  }, [ticketSelecionado, atualizarTicketLocal, recarregarTickets, showToast]);
+
   // Handlers específicos para controle responsivo
   const handleToggleClientePanel = useCallback(() => {
     if (isTablet) {
@@ -1143,6 +1253,9 @@ export const ChatOmnichannel: React.FC = () => {
             onTransferir={handleTransferir}
             onEncerrar={handleEncerrar}
             onLigar={handleLigar}
+            onMudarStatus={handleMudarStatus}
+            onSelecionarFila={handleSelecionarFila}
+            onRemoverFila={handleRemoverFila}
             theme={currentPalette}
             loading={loadingMensagens}
             enviandoMensagem={enviandoMensagem}
@@ -1230,6 +1343,9 @@ export const ChatOmnichannel: React.FC = () => {
                 onTransferir={handleTransferir}
                 onEncerrar={handleEncerrar}
                 onLigar={handleLigar}
+                onMudarStatus={handleMudarStatus}
+                onSelecionarFila={handleSelecionarFila}
+                onRemoverFila={handleRemoverFila}
                 theme={currentPalette}
                 loading={loadingMensagens}
                 enviandoMensagem={enviandoMensagem}
@@ -1346,6 +1462,9 @@ export const ChatOmnichannel: React.FC = () => {
               onTransferir={handleTransferir}
               onEncerrar={handleEncerrar}
               onLigar={handleLigar}
+              onMudarStatus={handleMudarStatus}
+              onSelecionarFila={handleSelecionarFila}
+              onRemoverFila={handleRemoverFila}
               theme={currentPalette}
               loading={loadingMensagens}
               enviandoMensagem={enviandoMensagem}
@@ -1426,6 +1545,13 @@ export const ChatOmnichannel: React.FC = () => {
         onClose={() => setModalAbrirDemanda(false)}
         onConfirm={handleConfirmarNovaDemanda}
         ticketAtual={ticketSelecionado}
+      />
+
+      <SelecionarFilaModal
+        isOpen={modalSelecionarFila}
+        onClose={() => setModalSelecionarFila(false)}
+        ticketId={ticketSelecionado?.id || ''}
+        onFilaSelecionada={handleFilaSelecionada}
       />
     </div>
   );

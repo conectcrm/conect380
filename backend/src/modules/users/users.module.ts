@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { MulterModule } from '@nestjs/platform-express';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './user.entity';
 import { UserActivity } from './entities/user-activity.entity';
@@ -10,9 +11,9 @@ import { UserActivitiesService } from './services/user-activities.service';
 import { UserActivitiesController } from './user-activities.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Empresa, UserActivity])],
+  imports: [TypeOrmModule.forFeature([User, Empresa, UserActivity]), MulterModule.register({})],
   providers: [UsersService, UserActivitiesService],
   controllers: [UsersController, UsersDebugController, UserActivitiesController],
-  exports: [UsersService, UserActivitiesService],
+  exports: [UsersService, UserActivitiesService, TypeOrmModule],
 })
-export class UsersModule {}
+export class UsersModule { }

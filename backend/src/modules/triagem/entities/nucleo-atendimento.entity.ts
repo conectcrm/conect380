@@ -109,7 +109,7 @@ export class NucleoAtendimento {
     type: 'varchar',
     length: 30,
     default: 'round_robin',
-    name: 'tipo_distribuicao'
+    name: 'tipo_distribuicao',
   })
   tipoDistribuicao: TipoDistribuicao;
 

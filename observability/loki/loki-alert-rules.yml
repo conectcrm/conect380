@@ -1,0 +1,262 @@
+# Loki Alert Rules - ConectCRM
+# Regras de alerta baseadas em logs (complementam as métricas do Prometheus)
+
+groups:
+  # ========================================
+  # GRUPO 1: Erros Críticos em Logs
+  # ========================================
+  - name: log_errors
+    interval: 1m
+    rules:
+      # Alerta 1: Taxa de erros elevada nos logs
+      - alert: HighLogErrorRate
+        expr: |
+          sum(rate({job="conectcrm-backend", level="error"}[5m])) > 1
+        for: 3m
+        labels:
+          severity: warning
+          component: logs
+          type: log-based
+        annotations:
+          summary: "Taxa elevada de erros nos logs"
+          description: "Mais de 1 erro/segundo detectado nos logs do backend"
+          query: '{job="conectcrm-backend", level="error"}'
+
+      # Alerta 2: Erro crítico detectado (CRITICAL level)
+      - alert: CriticalLogDetected
+        expr: |
+          sum(rate({job="conectcrm-backend", level="critical"}[1m])) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: logs
+          type: log-based
+        annotations:
+          summary: "⚠️ Log com nível CRITICAL detectado"
+          description: "Logs críticos foram registrados - requer atenção imediata"
+          query: '{job="conectcrm-backend", level="critical"}'
+          runbook: "Verificar logs com: {job=\"conectcrm-backend\", level=\"critical\"} | json"
+
+      # Alerta 3: Múltiplos erros da mesma exception
+      - alert: RepeatedExceptionPattern
+        expr: |
+          sum(count_over_time({job="conectcrm-backend", level="error"} |= "Exception" [10m])) > 20
+        for: 5m
+        labels:
+          severity: warning
+          component: logs
+          type: log-based
+        annotations:
+          summary: "Padrão de exception repetida detectado"
+          description: "Mais de 20 exceptions nos últimos 10 minutos"
+          query: '{job="conectcrm-backend", level="error"} |= "Exception"'
+
+  # ========================================
+  # GRUPO 2: Erros de Banco de Dados
+  # ========================================
+  - name: database_errors
+    interval: 1m
+    rules:
+      # Alerta 4: Erros de conexão com PostgreSQL
+      - alert: DatabaseConnectionErrors
+        expr: |
+          sum(count_over_time({job="conectcrm-backend"} |~ "(?i)(connection.*refused|ECONNREFUSED|could not connect)" [5m])) > 5
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+          type: log-based
+        annotations:
+          summary: "🔴 Erros de conexão com banco de dados"
+          description: "Detectados erros de conexão com PostgreSQL nos logs"
+          query: '{job="conectcrm-backend"} |~ "(?i)(connection.*refused|ECONNREFUSED|could not connect)"'
+          action: "Verificar status do PostgreSQL e pool de conexões"
+
+      # Alerta 5: Query timeouts
+      - alert: DatabaseQueryTimeouts
+        expr: |
+          sum(count_over_time({job="conectcrm-backend"} |~ "(?i)(query.*timeout|statement timeout|QueryTimeoutError)" [10m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+          type: log-based
+        annotations:
+          summary: "Queries com timeout no banco de dados"
+          description: "Mais de 10 query timeouts detectados em 10 minutos"
+          query: '{job="conectcrm-backend"} |~ "(?i)(query.*timeout|statement timeout)"'
+
+      # Alerta 6: Deadlock detectado
+      - alert: DatabaseDeadlock
+        expr: |
+          sum(count_over_time({job="conectcrm-backend"} |~ "(?i)deadlock" [5m])) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+          type: log-based
+        annotations:
+          summary: "⚠️ Deadlock detectado no banco de dados"
+          description: "Deadlock entre transações no PostgreSQL"
+          query: '{job="conectcrm-backend"} |~ "(?i)deadlock"'
+          runbook: "Analisar queries concorrentes e otimizar índices"
+
+  # ========================================
+  # GRUPO 3: Autenticação e Segurança
+  # ========================================
+  - name: security_logs
+    interval: 1m
+    rules:
+      # Alerta 7: Múltiplas tentativas de login falhadas
+      - alert: MultipleFailedLogins
+        expr: |
+          sum(count_over_time({job="conectcrm-backend"} |~ "(?i)(failed.*login|unauthorized|authentication.*failed)" [5m])) > 20
+        for: 3m
+        labels:
+          severity: warning
+          component: security
+          type: log-based
+        annotations:
+          summary: "Múltiplas tentativas de login falhadas"
+          description: "Mais de 20 falhas de autenticação em 5 minutos - possível ataque"
+          query: '{job="conectcrm-backend"} |~ "(?i)(failed.*login|unauthorized|authentication.*failed)"'
+          action: "Verificar IPs suspeitos e considerar bloqueio temporário"
+
+      # Alerta 8: Token JWT inválido/expirado em excesso
+      - alert: HighJWTTokenErrors
+        expr: |
+          sum(count_over_time({job="conectcrm-backend"} |~ "(?i)(jwt.*invalid|jwt.*expired|token.*expired)" [10m])) > 50
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+          type: log-based
+        annotations:
+          summary: "Alto volume de erros de token JWT"
+          description: "Mais de 50 tokens inválidos/expirados em 10 minutos"
+          query: '{job="conectcrm-backend"} |~ "(?i)(jwt.*invalid|jwt.*expired|token.*expired)"'
+
+  # ========================================
+  # GRUPO 4: APIs e Integrações Externas
+  # ========================================
+  - name: external_apis
+    interval: 1m
+    rules:
+      # Alerta 9: Falhas na integração WhatsApp
+      - alert: WhatsAppIntegrationErrors
+        expr: |
+          sum(count_over_time({job="conectcrm-backend"} |~ "(?i)(whatsapp.*error|wwebjs.*error)" [10m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: whatsapp
+          type: log-based
+        annotations:
+          summary: "Erros na integração com WhatsApp"
+          description: "Múltiplos erros detectados na API do WhatsApp"
+          query: '{job="conectcrm-backend"} |~ "(?i)(whatsapp.*error|wwebjs.*error)"'
+
+      # Alerta 10: Falhas em APIs externas (OpenAI, Stripe, etc)
+      - alert: ExternalAPIErrors
+        expr: |
+          sum(count_over_time({job="conectcrm-backend"} |~ "(?i)(external.*api.*error|api.*request.*failed|http.*5\\d\\d)" [10m])) > 20
+        for: 5m
+        labels:
+          severity: warning
+          component: integrations
+          type: log-based
+        annotations:
+          summary: "Erros em integrações com APIs externas"
+          description: "Alto volume de falhas em requisições para APIs externas"
+          query: '{job="conectcrm-backend"} |~ "(?i)(external.*api.*error|api.*request.*failed)"'
+
+  # ========================================
+  # GRUPO 5: Performance e Resource Exhaustion
+  # ========================================
+  - name: resource_exhaustion
+    interval: 1m
+    rules:
+      # Alerta 11: Memória heap próxima do limite
+      - alert: MemoryHeapNearLimit
+        expr: |
+          sum(count_over_time({job="conectcrm-backend"} |~ "(?i)(heap.*limit|out of memory|ENOMEM)" [5m])) > 3
+        for: 2m
+        labels:
+          severity: critical
+          component: memory
+          type: log-based
+        annotations:
+          summary: "⚠️ Memória heap próxima do limite"
+          description: "Logs indicando problemas de memória no Node.js"
+          query: '{job="conectcrm-backend"} |~ "(?i)(heap.*limit|out of memory|ENOMEM)"'
+          action: "Reiniciar backend e investigar memory leaks"
+
+      # Alerta 12: File descriptors esgotados
+      - alert: FileDescriptorExhaustion
+        expr: |
+          sum(count_over_time({job="conectcrm-backend"} |~ "(?i)(too many open files|EMFILE)" [5m])) > 5
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+          type: log-based
+        annotations:
+          summary: "File descriptors esgotados"
+          description: "Sistema atingiu limite de arquivos abertos"
+          query: '{job="conectcrm-backend"} |~ "(?i)(too many open files|EMFILE)"'
+
+  # ========================================
+  # GRUPO 6: Business Logic Errors
+  # ========================================
+  - name: business_errors
+    interval: 1m
+    rules:
+      # Alerta 13: Erros no processamento de tickets
+      - alert: TicketProcessingErrors
+        expr: |
+          sum(count_over_time({job="conectcrm-backend", context="TicketService"} |= "error" [10m])) > 15
+        for: 5m
+        labels:
+          severity: warning
+          component: tickets
+          type: log-based
+        annotations:
+          summary: "Erros no processamento de tickets"
+          description: "Múltiplos erros no TicketService detectados"
+          query: '{job="conectcrm-backend", context="TicketService"} |= "error"'
+
+      # Alerta 14: Erros no processamento de pagamentos
+      - alert: PaymentProcessingErrors
+        expr: |
+          sum(count_over_time({job="conectcrm-backend"} |~ "(?i)(payment.*failed|stripe.*error|transaction.*error)" [15m])) > 5
+        for: 5m
+        labels:
+          severity: critical
+          component: payments
+          type: log-based
+        annotations:
+          summary: "🔴 Erros no processamento de pagamentos"
+          description: "Falhas críticas detectadas no fluxo de pagamentos"
+          query: '{job="conectcrm-backend"} |~ "(?i)(payment.*failed|stripe.*error|transaction.*error)"'
+          action: "Verificar integração com Stripe e validar transações"
+
+  # ========================================
+  # GRUPO 7: Correlação com Traces (OpenTelemetry)
+  # ========================================
+  - name: trace_correlation
+    interval: 2m
+    rules:
+      # Alerta 15: Traces com alta taxa de erros
+      - alert: HighErrorTraceRate
+        expr: |
+          sum(rate({job="conectcrm-backend"} | json | error!="" [10m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          component: tracing
+          type: log-based
+        annotations:
+          summary: "Alta taxa de erros com trace_id"
+          description: "Logs com trace_id indicam múltiplas falhas em spans"
+          query: '{job="conectcrm-backend"} | json | error!="" | line_format "trace_id={{.trace_id}}"'
+          dashboard: "http://localhost:3002/d/logs-centralizados"

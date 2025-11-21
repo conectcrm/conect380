@@ -1,7 +1,7 @@
-import { MigrationInterface, QueryRunner, Table, TableForeignKey } from "typeorm";
+import { MigrationInterface, QueryRunner, Table, TableForeignKey } from 'typeorm';
 
 export class CreateDemandasClean1761180100000 implements MigrationInterface {
-  name = 'CreateDemandasClean1761180100000'
+  name = 'CreateDemandasClean1761180100000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Criar tabela atendimento_demandas
@@ -52,7 +52,8 @@ export class CreateDemandasClean1761180100000 implements MigrationInterface {
             type: 'varchar',
             length: '50',
             default: "'outros'",
-            comment: 'Tipo da demanda: tecnica, comercial, financeira, suporte, reclamacao, solicitacao, outros',
+            comment:
+              'Tipo da demanda: tecnica, comercial, financeira, suporte, reclamacao, solicitacao, outros',
           },
           {
             name: 'prioridade',
@@ -144,9 +145,7 @@ export class CreateDemandasClean1761180100000 implements MigrationInterface {
     await queryRunner.query(
       `CREATE INDEX "idx_demandas_prioridade" ON "atendimento_demandas" ("prioridade")`,
     );
-    await queryRunner.query(
-      `CREATE INDEX "idx_demandas_tipo" ON "atendimento_demandas" ("tipo")`,
-    );
+    await queryRunner.query(`CREATE INDEX "idx_demandas_tipo" ON "atendimento_demandas" ("tipo")`);
     await queryRunner.query(
       `CREATE INDEX "idx_demandas_responsavel_id" ON "atendimento_demandas" ("responsavel_id")`,
     );

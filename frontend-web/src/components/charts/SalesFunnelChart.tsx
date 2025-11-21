@@ -22,11 +22,14 @@ export const SalesFunnelChart: React.FC<SalesFunnelProps> = ({
   data = defaultData,
   isLoading = false
 }) => {
-  const maxValue = Math.max(...data.map(item => item.value));
+  // Guard: Se data for undefined/null/vazio, usar defaultData
+  const safeData = (data && data.length > 0) ? data : defaultData;
+
+  const maxValue = Math.max(...safeData.map(item => item.value));
 
   if (isLoading) {
     return (
-      <div 
+      <div
         className="bg-white rounded-xl shadow-sm border p-6"
         role="status"
         aria-label="Carregando funil de vendas"
@@ -46,7 +49,7 @@ export const SalesFunnelChart: React.FC<SalesFunnelProps> = ({
   }
 
   return (
-    <div 
+    <div
       className="bg-white rounded-xl shadow-sm border p-6"
       role="region"
       aria-label="Funil de vendas - Conversão por etapa"
@@ -56,12 +59,12 @@ export const SalesFunnelChart: React.FC<SalesFunnelProps> = ({
       </h3>
 
       <div className="space-y-4" role="list" aria-label="Etapas do funil de vendas">
-        {data.map((item, index) => {
+        {safeData.map((item, index) => {
           const percentage = (item.value / maxValue) * 100;
-          const conversionRate = index > 0 ? ((item.value / data[index - 1].value) * 100).toFixed(1) : '100.0';
-          
+          const conversionRate = index > 0 ? ((item.value / safeData[index - 1].value) * 100).toFixed(1) : '100.0';
+
           return (
-            <div 
+            <div
               key={item.stage}
               className="group"
               role="listitem"
@@ -69,7 +72,7 @@ export const SalesFunnelChart: React.FC<SalesFunnelProps> = ({
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-3">
-                  <div 
+                  <div
                     className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: item.color }}
                     aria-hidden="true"
@@ -89,9 +92,9 @@ export const SalesFunnelChart: React.FC<SalesFunnelProps> = ({
                   )}
                 </div>
               </div>
-              
+
               <div className="relative">
-                <div 
+                <div
                   className="h-8 bg-gray-100 rounded-lg overflow-hidden"
                   role="progressbar"
                   aria-valuenow={item.value}
@@ -107,10 +110,10 @@ export const SalesFunnelChart: React.FC<SalesFunnelProps> = ({
                     }}
                   ></div>
                 </div>
-                
+
                 {/* Números dentro da barra */}
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span 
+                  <span
                     className="text-sm font-medium text-white drop-shadow-sm"
                     aria-hidden="true"
                   >
@@ -128,7 +131,7 @@ export const SalesFunnelChart: React.FC<SalesFunnelProps> = ({
         <h4 className="text-sm font-semibold text-gray-900 mb-4">
           Status das Propostas
         </h4>
-        
+
         <div className="flex items-center justify-center">
           <div className="relative w-32 h-32">
             <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
@@ -176,7 +179,7 @@ export const SalesFunnelChart: React.FC<SalesFunnelProps> = ({
             </div>
           </div>
         </div>
-        
+
         <div className="mt-4 space-y-2">
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center space-x-2">
@@ -213,8 +216,8 @@ export const SalesFunnelChart: React.FC<SalesFunnelProps> = ({
           </tr>
         </thead>
         <tbody>
-          {data.map((item, index) => {
-            const conversionRate = index > 0 ? ((item.value / data[index - 1].value) * 100).toFixed(1) : '100.0';
+          {safeData.map((item, index) => {
+            const conversionRate = index > 0 ? ((item.value / safeData[index - 1].value) * 100).toFixed(1) : '100.0';
             return (
               <tr key={item.stage}>
                 <td>{item.stage}</td>

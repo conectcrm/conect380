@@ -220,9 +220,9 @@ export default function FaturamentoPage() {
         title: 'Total de Faturas',
         value: dashboardCards.totalFaturas,
         icon: FileText,
-        color: 'text-blue-600',
-        gradient: 'from-blue-100 to-blue-200',
-        description: '📊 Visão geral',
+        color: 'text-[#159A9C]',
+        gradient: '',
+        description: 'Visão geral de todas as faturas cadastradas',
         isActive: cardsConfigurados.includes('totalFaturas')
       },
       {
@@ -231,8 +231,8 @@ export default function FaturamentoPage() {
         value: dashboardCards.faturasPagas,
         icon: CheckCircle,
         color: 'text-green-600',
-        gradient: 'from-green-100 to-green-200',
-        description: '✅ Finalizadas',
+        gradient: '',
+        description: 'Faturas finalizadas e quitadas',
         isActive: cardsConfigurados.includes('faturasPagas')
       },
       {
@@ -241,8 +241,8 @@ export default function FaturamentoPage() {
         value: dashboardCards.faturasVencidas,
         icon: AlertCircle,
         color: 'text-red-600',
-        gradient: 'from-red-100 to-red-200',
-        description: '⚠️ Atrasadas',
+        gradient: '',
+        description: 'Faturas atrasadas que requerem atenção',
         isActive: cardsConfigurados.includes('faturasVencidas')
       },
       {
@@ -253,9 +253,9 @@ export default function FaturamentoPage() {
           maximumFractionDigits: 2
         })}`,
         icon: Clock,
-        color: 'text-orange-600',
-        gradient: 'from-orange-100 to-orange-200',
-        description: '⏳ A receber',
+        color: 'text-yellow-600',
+        gradient: '',
+        description: 'Valor total aguardando recebimento',
         isActive: cardsConfigurados.includes('valorTotalPendente')
       },
       {
@@ -267,8 +267,8 @@ export default function FaturamentoPage() {
         })}`,
         icon: DollarSign,
         color: 'text-green-600',
-        gradient: 'from-green-100 to-green-200',
-        description: '💰 Recebido',
+        gradient: '',
+        description: 'Total de valores já recebidos',
         isActive: cardsConfigurados.includes('valorTotalPago')
       },
       {
@@ -276,9 +276,9 @@ export default function FaturamentoPage() {
         title: 'Faturas do Mês',
         value: dashboardCards.faturasDoMes,
         icon: Calendar,
-        color: 'text-purple-600',
-        gradient: 'from-purple-100 to-purple-200',
-        description: '📅 Este mês',
+        color: 'text-[#159A9C]',
+        gradient: '',
+        description: 'Faturas emitidas no mês atual',
         isActive: cardsConfigurados.includes('faturasDoMes')
       }
     ];
@@ -849,7 +849,7 @@ export default function FaturamentoPage() {
               />
               <button
                 onClick={() => setModalConfigurarCardsAberto(true)}
-                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium"
                 title="Configurar Cards"
               >
                 <Settings className="w-4 h-4" />
@@ -857,9 +857,9 @@ export default function FaturamentoPage() {
               </button>
               <button
                 onClick={abrirModalCriacao}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium"
               >
-                <Plus className="w-5 h-5" />
+                <Plus className="w-4 h-4" />
                 Nova Fatura
               </button>
             </div>
@@ -967,8 +967,8 @@ export default function FaturamentoPage() {
         {/* Conteúdo baseado na visão ativa */}
         {visaoAtiva === 'dashboard' && (
           <div>
-            {/* Cards do Dashboard */}
-            <div className={`grid gap-6 mb-6 ${obterClasseGrid(cardsConfigurados.length)}`}>
+            {/* Cards do Dashboard (KPI Cards - Padrão Crevasse) */}
+            <div className={`grid gap-6 mb-8 ${obterClasseGrid(cardsConfigurados.length)}`}>
               {carregando ? (
                 // Skeleton para cards do dashboard
                 Array.from({ length: 6 }).map((_, index) => (
@@ -981,15 +981,15 @@ export default function FaturamentoPage() {
                     const IconComponent = card.icon;
                     const numeroCards = cardsConfigurados.length;
                     return (
-                      <div key={card.id} className={`bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-shadow duration-300 ${obterClassesCard(numeroCards)}`}>
-                        <div className="flex items-center justify-between">
+                      <div key={card.id} className={`p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF] ${obterClassesCard(numeroCards)}`}>
+                        <div className="flex items-start justify-between">
                           <div>
-                            <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">{card.title}</p>
-                            <p className={`${numeroCards <= 2 ? 'text-4xl' : 'text-3xl'} font-bold mt-2 ${card.color}`}>{card.value}</p>
-                            <p className="text-xs text-gray-400 mt-1">{card.description}</p>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">{card.title}</p>
+                            <p className={`${numeroCards <= 2 ? 'text-4xl' : 'text-3xl'} font-bold mt-2 text-[#002333]`}>{card.value}</p>
+                            <p className="text-sm text-[#002333]/70 mt-3">{card.description.replace(/[📊✅⚠️⏳💰📅]/g, '').trim()}</p>
                           </div>
-                          <div className={`${numeroCards <= 2 ? 'p-5' : 'p-4'} bg-gradient-to-br ${card.gradient} rounded-xl`}>
-                            <IconComponent className={`${numeroCards <= 2 ? 'w-10 h-10' : 'w-8 h-8'} ${card.color}`} />
+                          <div className={`${numeroCards <= 2 ? 'h-14 w-14' : 'h-12 w-12'} rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm flex-shrink-0`}>
+                            <IconComponent className={`${numeroCards <= 2 ? 'h-7 w-7' : 'h-6 w-6'} text-[#159A9C]`} />
                           </div>
                         </div>
                       </div>
@@ -1184,7 +1184,7 @@ export default function FaturamentoPage() {
                     <button
                       onClick={() => handleAcaoMassa('enviar-email')}
                       disabled={processandoAcaoMassa}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-4 py-2 bg-[#159A9C] text-white rounded-lg text-sm hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                     >
                       <Send className="w-4 h-4" />
                       Enviar por Email
@@ -1192,7 +1192,7 @@ export default function FaturamentoPage() {
                     <button
                       onClick={() => handleAcaoMassa('baixar-pdfs')}
                       disabled={processandoAcaoMassa}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-4 py-2 bg-[#159A9C] text-white rounded-lg text-sm hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                     >
                       <Download className="w-4 h-4" />
                       Baixar PDFs
@@ -1200,7 +1200,7 @@ export default function FaturamentoPage() {
                     <button
                       onClick={() => handleAcaoMassa('gerar-cobranca')}
                       disabled={processandoAcaoMassa}
-                      className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm hover:bg-orange-700 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-4 py-2 bg-[#159A9C] text-white rounded-lg text-sm hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                     >
                       <AlertCircle className="w-4 h-4" />
                       Gerar Cobrança
@@ -1208,7 +1208,7 @@ export default function FaturamentoPage() {
                     <button
                       onClick={() => handleAcaoMassa('exportar')}
                       disabled={processandoAcaoMassa}
-                      className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-4 py-2 bg-[#159A9C] text-white rounded-lg text-sm hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                     >
                       <FileText className="w-4 h-4" />
                       Exportar
@@ -1216,7 +1216,7 @@ export default function FaturamentoPage() {
                     <button
                       onClick={() => handleAcaoMassa('excluir')}
                       disabled={processandoAcaoMassa}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                     >
                       <Trash2 className="w-4 h-4" />
                       Excluir
@@ -1244,7 +1244,7 @@ export default function FaturamentoPage() {
                   <div className="flex items-center justify-center gap-3">
                     <button
                       onClick={abrirModalCriacao}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg inline-flex items-center gap-2"
+                      className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg inline-flex items-center gap-2 text-sm font-medium"
                       aria-label="Criar primeira fatura"
                     >
                       <Plus className="w-4 h-4" />
@@ -1252,7 +1252,7 @@ export default function FaturamentoPage() {
                     </button>
                     <button
                       onClick={() => refetch()}
-                      className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg inline-flex items-center gap-2"
+                      className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg inline-flex items-center gap-2 text-sm font-medium"
                       aria-label="Tentar novamente"
                     >
                       <Activity className="w-4 h-4" />
@@ -1366,16 +1366,16 @@ export default function FaturamentoPage() {
                               {/* Número da Fatura */}
                               <div className="col-span-2 flex items-center">
                                 <div className={`w-8 h-8 bg-gradient-to-br ${fatura.status === StatusFatura.PAGA
-                                    ? 'from-emerald-100 to-emerald-200 shadow-emerald-200'
-                                    : isVencida
-                                      ? 'from-red-100 to-red-200 shadow-red-200'
-                                      : 'from-blue-100 to-blue-200 shadow-blue-200'
+                                  ? 'from-emerald-100 to-emerald-200 shadow-emerald-200'
+                                  : isVencida
+                                    ? 'from-red-100 to-red-200 shadow-red-200'
+                                    : 'from-blue-100 to-blue-200 shadow-blue-200'
                                   } rounded-xl flex items-center justify-center mr-3 shadow-md transition-all group-hover:shadow-lg group-hover:scale-105`}>
                                   <FileText className={`w-4 h-4 ${fatura.status === StatusFatura.PAGA
-                                      ? 'text-emerald-600'
-                                      : isVencida
-                                        ? 'text-red-600'
-                                        : 'text-blue-600'
+                                    ? 'text-emerald-600'
+                                    : isVencida
+                                      ? 'text-red-600'
+                                      : 'text-blue-600'
                                     }`} />
                                 </div>
                                 <div>
@@ -1436,10 +1436,10 @@ export default function FaturamentoPage() {
                               <div className="col-span-2 flex items-center">
                                 <div>
                                   <div className={`text-sm font-medium tabular-nums ${isVencida
-                                      ? 'text-red-600'
-                                      : diasVencimento <= 7 && diasVencimento > 0 && fatura.status === StatusFatura.PENDENTE
-                                        ? 'text-yellow-600'
-                                        : 'text-gray-900'
+                                    ? 'text-red-600'
+                                    : diasVencimento <= 7 && diasVencimento > 0 && fatura.status === StatusFatura.PENDENTE
+                                      ? 'text-yellow-600'
+                                      : 'text-gray-900'
                                     } group-hover:text-blue-700 transition-colors`}>
                                     {dataVencimento.toLocaleDateString('pt-BR', {
                                       day: '2-digit',
@@ -1486,7 +1486,7 @@ export default function FaturamentoPage() {
                                   {/* Ações principais sempre visíveis */}
                                   <button
                                     onClick={() => abrirModalDetalhes(fatura)}
-                                    className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-all duration-200 border border-blue-200 hover:border-blue-300 shadow-sm hover:shadow-md transform hover:scale-105"
+                                    className="p-2 text-[#159A9C] hover:text-[#0F7B7D] hover:bg-[#159A9C]/10 rounded-lg transition-all duration-200 border border-[#159A9C] hover:border-[#0F7B7D] shadow-sm hover:shadow-md"
                                     title="Ver Detalhes"
                                   >
                                     <Eye className="w-3 h-3" />
@@ -1495,7 +1495,7 @@ export default function FaturamentoPage() {
                                   {fatura.status !== StatusFatura.PAGA && fatura.status !== StatusFatura.CANCELADA && (
                                     <button
                                       onClick={() => abrirModalEdicao(fatura)}
-                                      className="p-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-all duration-200 border border-green-200 hover:border-green-300 shadow-sm hover:shadow-md transform hover:scale-105"
+                                      className="p-2 text-[#159A9C] hover:text-[#0F7B7D] hover:bg-[#159A9C]/10 rounded-lg transition-all duration-200 border border-[#159A9C] hover:border-[#0F7B7D] shadow-sm hover:shadow-md"
                                       title="Editar Fatura"
                                     >
                                       <Edit3 className="w-3 h-3" />
@@ -1505,7 +1505,7 @@ export default function FaturamentoPage() {
                                   {/* Menu dropdown para ações secundárias */}
                                   <div className="relative group/menu">
                                     <button
-                                      className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-all duration-200 border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md transform hover:scale-105"
+                                      className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-all duration-200 border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md"
                                       title="Mais ações"
                                     >
                                       <MoreVertical className="w-3 h-3" />
@@ -1732,7 +1732,7 @@ export default function FaturamentoPage() {
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => abrirModalDetalhes(fatura)}
-                                className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-all duration-200 flex items-center gap-2 border border-blue-200 hover:border-blue-300 shadow-sm hover:shadow-md"
+                                className="px-4 py-2 text-sm text-[#159A9C] hover:text-[#0F7B7D] hover:bg-[#159A9C]/10 rounded-lg transition-all duration-200 flex items-center gap-2 border border-[#159A9C] hover:border-[#0F7B7D] shadow-sm hover:shadow-md font-medium"
                               >
                                 <Eye className="w-4 h-4" />
                                 Ver
@@ -1740,7 +1740,7 @@ export default function FaturamentoPage() {
                               {fatura.status !== StatusFatura.PAGA && fatura.status !== StatusFatura.CANCELADA && (
                                 <button
                                   onClick={() => abrirModalEdicao(fatura)}
-                                  className="px-4 py-2 text-sm text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-all duration-200 flex items-center gap-2 border border-green-200 hover:border-green-300 shadow-sm hover:shadow-md"
+                                  className="px-4 py-2 text-sm text-[#159A9C] hover:text-[#0F7B7D] hover:bg-[#159A9C]/10 rounded-lg transition-all duration-200 flex items-center gap-2 border border-[#159A9C] hover:border-[#0F7B7D] shadow-sm hover:shadow-md font-medium"
                                 >
                                   <Edit3 className="w-4 h-4" />
                                   Editar
@@ -1749,7 +1749,7 @@ export default function FaturamentoPage() {
                               {fatura.status !== StatusFatura.PAGA && (
                                 <button
                                   onClick={() => abrirModalPagamentos(fatura)}
-                                  className="px-4 py-2 text-sm text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-all duration-200 flex items-center gap-2 border border-emerald-200 hover:border-emerald-300 shadow-sm hover:shadow-md"
+                                  className="px-4 py-2 text-sm bg-[#159A9C] hover:bg-[#0F7B7D] text-white rounded-lg transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md font-medium"
                                 >
                                   <DollarSign className="w-4 h-4" />
                                   Pagar

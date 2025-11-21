@@ -6,19 +6,16 @@ import { AssinaturaDigitalService } from './services/assinatura-digital.service'
 import { PdfContratoService } from './services/pdf-contrato.service';
 import { Contrato } from './entities/contrato.entity';
 import { AssinaturaContrato } from './entities/assinatura-contrato.entity';
+import { Proposta } from '../propostas/proposta.entity';
 import { PropostasModule } from '../propostas/propostas.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Contrato, AssinaturaContrato]),
+    TypeOrmModule.forFeature([Contrato, AssinaturaContrato, Proposta]),
     PropostasModule, // Para acessar o EmailIntegradoService
   ],
   controllers: [ContratosController],
-  providers: [
-    ContratosService,
-    AssinaturaDigitalService,
-    PdfContratoService,
-  ],
+  providers: [ContratosService, AssinaturaDigitalService, PdfContratoService],
   exports: [
     ContratosService,
     AssinaturaDigitalService,
