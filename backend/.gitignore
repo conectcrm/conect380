@@ -26,6 +26,8 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
+.env.production
+.env.production.local
 
 # Build
 /dist
