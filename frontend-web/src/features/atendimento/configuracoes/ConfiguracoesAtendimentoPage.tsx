@@ -1,25 +1,14 @@
 import React, { useState } from 'react';
-import {
-  Settings,
-  Target,
-  Users,
-  UserCog,
-  Tag,
-  Workflow,
-  Clock
-} from 'lucide-react';
+import { Settings, Target, Tag, Workflow } from 'lucide-react';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 
 // Tabs
 import { NucleosTab } from './tabs/NucleosTab';
-import { EquipesTab } from './tabs/EquipesTab';
-import { AtendentesTab } from './tabs/AtendentesTab';
 import { TagsTab } from './tabs/TagsTab';
 import { FluxosTab } from './tabs/FluxosTab';
 import { GeralTab } from './tabs/GeralTab';
-import { FechamentoAutomaticoTab } from './tabs/FechamentoAutomaticoTab';
 
-type TabId = 'nucleos' | 'equipes' | 'atendentes' | 'tags' | 'fluxos' | 'fechamento' | 'geral';
+type TabId = 'geral' | 'nucleos' | 'tags' | 'fluxos';
 
 interface Tab {
   id: TabId;
@@ -30,53 +19,35 @@ interface Tab {
 
 const tabs: Tab[] = [
   {
+    id: 'geral',
+    label: 'Geral',
+    icon: Settings,
+    description: 'Configurações gerais do módulo de atendimento',
+  },
+  {
     id: 'nucleos',
     label: 'Núcleos',
     icon: Target,
-    description: 'Gerencie os núcleos de atendimento e suas configurações'
-  },
-  {
-    id: 'equipes',
-    label: 'Equipes',
-    icon: Users,
-    description: 'Organize e gerencie equipes de atendimento'
-  },
-  {
-    id: 'atendentes',
-    label: 'Atendentes',
-    icon: UserCog,
-    description: 'Cadastre e gerencie atendentes do sistema'
+    description: 'Gerencie os núcleos de atendimento e suas configurações',
   },
   {
     id: 'tags',
     label: 'Tags',
     icon: Tag,
-    description: 'Categorize tickets com tags flexíveis (substitui departamentos)'
+    description: 'Categorize tickets com tags flexíveis (substitui departamentos)',
   },
   {
     id: 'fluxos',
     label: 'Fluxos',
     icon: Workflow,
-    description: 'Configure fluxos de triagem e automação'
-  },
-  {
-    id: 'fechamento',
-    label: 'Fechamento Automático',
-    icon: Clock,
-    description: 'Configure fechamento automático por inatividade'
-  },
-  {
-    id: 'geral',
-    label: 'Geral',
-    icon: Settings,
-    description: 'Configurações gerais do módulo de atendimento'
+    description: 'Configure fluxos de triagem e automação',
   },
 ];
 
 const ConfiguracoesAtendimentoPage: React.FC = () => {
-  // Obter tab da URL ou usar 'nucleos' como padrão
+  // Obter tab da URL ou usar 'geral' como padrão
   const urlParams = new URLSearchParams(window.location.search);
-  const initialTab = (urlParams.get('tab') as TabId) || 'nucleos';
+  const initialTab = (urlParams.get('tab') as TabId) || 'geral';
 
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
 
@@ -89,35 +60,26 @@ const ConfiguracoesAtendimentoPage: React.FC = () => {
 
   const renderTabContent = () => {
     switch (activeTab) {
+      case 'geral':
+        return <GeralTab />;
       case 'nucleos':
         return <NucleosTab />;
-      case 'equipes':
-        return <EquipesTab />;
-      case 'atendentes':
-        return <AtendentesTab />;
       case 'tags':
         return <TagsTab />;
       case 'fluxos':
         return <FluxosTab />;
-      case 'fechamento':
-        return <FechamentoAutomaticoTab />;
-      case 'geral':
-        return <GeralTab />;
       default:
-        return <NucleosTab />;
+        return <GeralTab />;
     }
   };
 
-  const activeTabData = tabs.find(t => t.id === activeTab);
+  const activeTabData = tabs.find((t) => t.id === activeTab);
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header com BackToNucleus */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusName="Atendimento"
-          nucleusPath="/atendimento"
-        />
+        <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
       </div>
 
       {/* Container Principal */}
@@ -153,15 +115,18 @@ const ConfiguracoesAtendimentoPage: React.FC = () => {
                       className={`
                         group relative min-w-0 flex-1 overflow-hidden py-4 px-4 text-center text-sm font-medium
                         hover:bg-gray-50 focus:z-10 transition-all duration-200
-                        ${isActive
-                          ? 'text-[#159A9C] border-b-2 border-[#159A9C]'
-                          : 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent'
+                        ${
+                          isActive
+                            ? 'text-[#159A9C] border-b-2 border-[#159A9C]'
+                            : 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent'
                         }
                       `}
                       aria-current={isActive ? 'page' : undefined}
                     >
                       <div className="flex items-center justify-center space-x-2">
-                        <Icon className={`h-5 w-5 ${isActive ? 'text-[#159A9C]' : 'text-gray-400'}`} />
+                        <Icon
+                          className={`h-5 w-5 ${isActive ? 'text-[#159A9C]' : 'text-gray-400'}`}
+                        />
                         <span className="hidden sm:inline">{tab.label}</span>
                       </div>
                     </button>
@@ -182,9 +147,7 @@ const ConfiguracoesAtendimentoPage: React.FC = () => {
           </div>
 
           {/* Conteúdo da Tab Ativa */}
-          <div className="transition-all duration-200">
-            {renderTabContent()}
-          </div>
+          <div className="transition-all duration-200">{renderTabContent()}</div>
         </div>
       </div>
     </div>
