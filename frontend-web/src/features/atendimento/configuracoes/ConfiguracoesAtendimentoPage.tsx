@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Target, Tag, Workflow } from 'lucide-react';
+import { Settings, Target, Tag, Workflow, MessageSquare } from 'lucide-react';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 
 // Tabs
@@ -7,8 +7,9 @@ import { NucleosTab } from './tabs/NucleosTab';
 import { TagsTab } from './tabs/TagsTab';
 import { FluxosTab } from './tabs/FluxosTab';
 import { GeralTab } from './tabs/GeralTab';
+import { CanaisTab } from './tabs/CanaisTab';
 
-type TabId = 'geral' | 'nucleos' | 'tags' | 'fluxos';
+type TabId = 'geral' | 'nucleos' | 'tags' | 'fluxos' | 'canais';
 
 interface Tab {
   id: TabId;
@@ -42,6 +43,12 @@ const tabs: Tab[] = [
     icon: Workflow,
     description: 'Configure fluxos de triagem e automação',
   },
+  {
+    id: 'canais',
+    label: 'Canais',
+    icon: MessageSquare,
+    description: 'Configure canais de comunicação (WhatsApp, Email, Chat, Webhooks)',
+  },
 ];
 
 const ConfiguracoesAtendimentoPage: React.FC = () => {
@@ -68,6 +75,8 @@ const ConfiguracoesAtendimentoPage: React.FC = () => {
         return <TagsTab />;
       case 'fluxos':
         return <FluxosTab />;
+      case 'canais':
+        return <CanaisTab />;
       default:
         return <GeralTab />;
     }
