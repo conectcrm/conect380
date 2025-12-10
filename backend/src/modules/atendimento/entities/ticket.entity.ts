@@ -16,11 +16,10 @@ import { Fila } from './fila.entity';
 import { Tag } from './tag.entity';
 
 export enum StatusTicket {
-  ABERTO = 'ABERTO',
+  FILA = 'FILA',
   EM_ATENDIMENTO = 'EM_ATENDIMENTO',
-  AGUARDANDO = 'AGUARDANDO',
-  RESOLVIDO = 'RESOLVIDO',
-  FECHADO = 'FECHADO',
+  ENVIO_ATIVO = 'ENVIO_ATIVO',
+  ENCERRADO = 'ENCERRADO',
 }
 
 export enum PrioridadeTicket {
@@ -28,6 +27,19 @@ export enum PrioridadeTicket {
   MEDIA = 'MEDIA',
   ALTA = 'ALTA',
   URGENTE = 'URGENTE',
+}
+
+export enum SeveridadeTicket {
+  BAIXA = 'BAIXA',
+  MEDIA = 'MEDIA',
+  ALTA = 'ALTA',
+  CRITICA = 'CRITICA',
+}
+
+export enum NivelAtendimentoTicket {
+  N1 = 'N1',
+  N2 = 'N2',
+  N3 = 'N3',
 }
 
 export enum OrigemTicket {
@@ -43,6 +55,8 @@ export enum OrigemTicket {
 @Index(['empresaId'])
 @Index(['status'])
 @Index(['atendenteId'])
+@Index(['severity'])
+@Index(['assignedLevel'])
 export class Ticket {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -53,11 +67,29 @@ export class Ticket {
   @Column({ type: 'varchar', length: 255, nullable: true })
   assunto: string;
 
-  @Column({ type: 'varchar', length: 20, default: 'ABERTO' })
-  status: string;
+  @Column({ type: 'varchar', length: 20, default: StatusTicket.FILA })
+  status: StatusTicket;
 
-  @Column({ type: 'varchar', length: 20, default: 'MEDIA' })
-  prioridade: string;
+  @Column({ type: 'varchar', length: 20, default: PrioridadeTicket.MEDIA })
+  prioridade: PrioridadeTicket;
+
+  @Column({ type: 'varchar', length: 20, name: 'severity', nullable: true, default: SeveridadeTicket.MEDIA })
+  severity?: SeveridadeTicket;
+
+  @Column({ type: 'varchar', length: 10, name: 'assigned_level', default: NivelAtendimentoTicket.N1 })
+  assignedLevel: NivelAtendimentoTicket;
+
+  @Column({ type: 'varchar', length: 255, name: 'escalation_reason', nullable: true })
+  escalationReason?: string;
+
+  @Column({ type: 'timestamp', name: 'escalation_at', nullable: true })
+  escalationAt?: Date;
+
+  @Column({ type: 'integer', name: 'sla_target_minutes', nullable: true })
+  slaTargetMinutes?: number;
+
+  @Column({ type: 'timestamp', name: 'sla_expires_at', nullable: true })
+  slaExpiresAt?: Date;
 
   @Column({ type: 'uuid', name: 'canal_id', nullable: true })
   canalId: string;

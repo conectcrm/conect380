@@ -1,6 +1,6 @@
 /**
  * 🎨 Utilitários de Status - Visual e Lógica
- * 
+ *
  * Gerencia cores, ícones, labels e transições de estado dos tickets
  */
 
@@ -22,46 +22,38 @@ export interface StatusConfig {
  * Mapeamento completo de todos os status
  */
 export const STATUS_CONFIG: Record<StatusAtendimentoType, StatusConfig> = {
-  aberto: {
-    label: 'Aberto',
+  fila: {
+    label: 'Fila',
     color: 'text-blue-700',
     bgColor: 'bg-blue-100',
-    icon: '🆕',
-    description: 'Ticket novo aguardando atribuição',
-    allowedTransitions: ['em_atendimento', 'fechado']
+    icon: '📋',
+    description: 'Ticket aguardando atendimento na fila',
+    allowedTransitions: ['em_atendimento', 'envio_ativo', 'encerrado'],
   },
   em_atendimento: {
     label: 'Em Atendimento',
     color: 'text-green-700',
     bgColor: 'bg-green-100',
     icon: '💬',
-    description: 'Atendente trabalhando no ticket',
-    allowedTransitions: ['aguardando', 'resolvido', 'aberto']
+    description: 'Conversação ativa com o cliente',
+    allowedTransitions: ['envio_ativo', 'encerrado', 'fila'],
   },
-  aguardando: {
-    label: 'Aguardando',
-    color: 'text-yellow-700',
-    bgColor: 'bg-yellow-100',
-    icon: '⏳',
-    description: 'Aguardando resposta do cliente ou informações',
-    allowedTransitions: ['em_atendimento', 'resolvido', 'fechado']
-  },
-  resolvido: {
-    label: 'Resolvido',
+  envio_ativo: {
+    label: 'Envio Ativo',
     color: 'text-purple-700',
     bgColor: 'bg-purple-100',
-    icon: '✅',
-    description: 'Problema resolvido, aguardando confirmação',
-    allowedTransitions: ['fechado', 'aberto'] // Pode reabrir se cliente reclamar
+    icon: '📤',
+    description: 'Empresa iniciando contato proativo',
+    allowedTransitions: ['em_atendimento', 'encerrado', 'fila'],
   },
-  fechado: {
-    label: 'Fechado',
+  encerrado: {
+    label: 'Encerrado',
     color: 'text-gray-700',
     bgColor: 'bg-gray-100',
-    icon: '🔒',
-    description: 'Ticket arquivado e finalizado',
-    allowedTransitions: ['aberto'] // Só pode reabrir
-  }
+    icon: '✅',
+    description: 'Ticket finalizado',
+    allowedTransitions: ['fila'], // Pode reabrir
+  },
 };
 
 /**
@@ -76,7 +68,7 @@ export const getStatusConfig = (status: StatusAtendimentoType): StatusConfig => 
  */
 export const isTransitionAllowed = (
   from: StatusAtendimentoType,
-  to: StatusAtendimentoType
+  to: StatusAtendimentoType,
 ): boolean => {
   const config = STATUS_CONFIG[from];
   return config.allowedTransitions.includes(to);
@@ -86,7 +78,7 @@ export const isTransitionAllowed = (
  * Obter próximas ações disponíveis para um status
  */
 export const getAvailableActions = (
-  currentStatus: StatusAtendimentoType
+  currentStatus: StatusAtendimentoType,
 ): Array<{
   status: StatusAtendimentoType;
   label: string;
@@ -95,41 +87,39 @@ export const getAvailableActions = (
 }> => {
   const transitions = STATUS_CONFIG[currentStatus].allowedTransitions;
 
-  const actionMap: Record<StatusAtendimentoType, {
-    label: string;
-    buttonLabel: string;
-    variant: 'primary' | 'secondary' | 'success' | 'warning' | 'danger';
-  }> = {
-    aberto: {
+  const actionMap: Record<
+    StatusAtendimentoType,
+    {
+      label: string;
+      buttonLabel: string;
+      variant: 'primary' | 'secondary' | 'success' | 'warning' | 'danger';
+    }
+  > = {
+    fila: {
       label: 'Assumir ticket',
       buttonLabel: 'Assumir',
-      variant: 'primary'
+      variant: 'primary',
     },
     em_atendimento: {
       label: 'Marcar em atendimento',
       buttonLabel: 'Em Atendimento',
-      variant: 'success'
+      variant: 'success',
     },
-    aguardando: {
-      label: 'Colocar em espera',
-      buttonLabel: 'Aguardar Cliente',
-      variant: 'warning'
+    envio_ativo: {
+      label: 'Iniciar contato proativo',
+      buttonLabel: 'Envio Ativo',
+      variant: 'warning',
     },
-    resolvido: {
-      label: 'Marcar como resolvido',
-      buttonLabel: 'Resolver',
-      variant: 'success'
+    encerrado: {
+      label: 'Encerrar ticket',
+      buttonLabel: 'Encerrar',
+      variant: 'secondary',
     },
-    fechado: {
-      label: 'Fechar ticket',
-      buttonLabel: 'Fechar',
-      variant: 'secondary'
-    }
   };
 
-  return transitions.map(status => ({
+  return transitions.map((status) => ({
     status,
-    ...actionMap[status]
+    ...actionMap[status],
   }));
 };
 
@@ -150,7 +140,7 @@ export const renderStatusBadge = (
     showIcon?: boolean;
     size?: 'sm' | 'md' | 'lg';
     className?: string;
-  }
+  },
 ): { classes: string; icon: string; label: string } => {
   const { showIcon = true, size = 'md', className = '' } = options || {};
   const config = getStatusConfig(status);
@@ -158,12 +148,12 @@ export const renderStatusBadge = (
   const sizeClasses = {
     sm: 'px-1.5 py-0.5 text-[10px]',
     md: 'px-2 py-1 text-xs',
-    lg: 'px-3 py-1.5 text-sm'
+    lg: 'px-3 py-1.5 text-sm',
   };
 
   return {
     classes: `inline-flex items-center gap-1 rounded-full font-medium ${config.bgColor} ${config.color} ${sizeClasses[size]} ${className}`,
     icon: showIcon ? config.icon : '',
-    label: config.label
+    label: config.label,
   };
 };

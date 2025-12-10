@@ -5,20 +5,18 @@ export type CanalTipo = 'whatsapp' | 'telegram' | 'email' | 'chat' | 'telefone';
 // ✅ MELHORADO: Enum alinhado 1:1 com backend (StatusTicket)
 // Mapeamento direto: frontend (minúsculo) ↔ backend (MAIÚSCULO)
 export enum StatusAtendimento {
-  ABERTO = 'aberto',
+  FILA = 'fila',
   EM_ATENDIMENTO = 'em_atendimento',
-  AGUARDANDO = 'aguardando',
-  RESOLVIDO = 'resolvido',
-  FECHADO = 'fechado',
+  ENVIO_ATIVO = 'envio_ativo',
+  ENCERRADO = 'encerrado',
 }
 
 // Type helper para compatibilidade
 export type StatusAtendimentoType =
-  | 'aberto'
+  | 'fila'
   | 'em_atendimento'
-  | 'aguardando'
-  | 'resolvido'
-  | 'fechado';
+  | 'envio_ativo'
+  | 'encerrado';
 
 export type StatusMensagem = 'enviando' | 'enviado' | 'entregue' | 'lido';
 
@@ -105,7 +103,14 @@ export interface Demanda {
   empresaId: string;
   titulo: string;
   descricao?: string;
-  tipo: 'tecnica' | 'comercial' | 'financeira' | 'suporte' | 'reclamacao' | 'solicitacao' | 'outros';
+  tipo:
+  | 'tecnica'
+  | 'comercial'
+  | 'financeira'
+  | 'suporte'
+  | 'reclamacao'
+  | 'solicitacao'
+  | 'outros';
   prioridade: 'baixa' | 'media' | 'alta' | 'urgente';
   status: 'aberta' | 'em_andamento' | 'aguardando' | 'concluida' | 'cancelada';
   dataAbertura?: string;

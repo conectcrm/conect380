@@ -30,7 +30,7 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
   loading = false,
   tabAtiva,
   onChangeTab,
-  contagemPorStatus
+  contagemPorStatus,
 }) => {
   const [busca, setBusca] = useState('');
   const [contadores, setContadores] = useState<Record<string, number>>({});
@@ -39,10 +39,10 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
   useEffect(() => {
     const interval = setInterval(() => {
       const novosContadores: Record<string, number> = {};
-      tickets.forEach(ticket => {
-        if (ticket.status === 'aberto') {
+      tickets.forEach((ticket) => {
+        if (ticket.status === 'fila' && ticket.tempoUltimaMensagem) {
           const segundosDecorridos = Math.floor(
-            (Date.now() - ticket.tempoUltimaMensagem.getTime()) / 1000
+            (Date.now() - ticket.tempoUltimaMensagem.getTime()) / 1000,
           );
           novosContadores[ticket.id] = ticket.tempoAtendimento + segundosDecorridos;
         }
@@ -53,14 +53,26 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
     return () => clearInterval(interval);
   }, [tickets]);
 
-  const ticketsFiltrados = tickets.filter(ticket => {
+  // 🔧 Deduplica tickets por ID antes de filtrar (evita chaves duplicadas no React)
+  const ticketsUnicos = useMemo(() => {
+    const ticketsMap = new Map<string, Ticket>();
+    tickets.forEach(ticket => {
+      if (!ticketsMap.has(ticket.id)) {
+        ticketsMap.set(ticket.id, ticket);
+      }
+    });
+    return Array.from(ticketsMap.values());
+  }, [tickets]);
+
+  const ticketsFiltrados = ticketsUnicos.filter((ticket) => {
     // 🔧 Normalizar status para comparação (backend retorna MAIÚSCULO, frontend usa minúsculo)
     const ticketStatus = (ticket.status || '').toLowerCase();
     const matchStatus = ticketStatus === tabAtiva;
 
     // 🎯 Buscar pelo nome de exibição (prioriza cliente vinculado)
     const nomeExibicao = resolverNomeExibicao(ticket.contato);
-    const matchBusca = busca === '' ||
+    const matchBusca =
+      busca === '' ||
       nomeExibicao.toLowerCase().includes(busca.toLowerCase()) ||
       ticket.numero.toLowerCase().includes(busca.toLowerCase()) ||
       ticket.ultimaMensagem.toLowerCase().includes(busca.toLowerCase());
@@ -73,17 +85,20 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
     if (!DEBUG) return;
 
     console.log('🎫 [AtendimentosSidebar] Total de tickets recebidos:', tickets.length);
-    console.log('🎫 [AtendimentosSidebar] Tickets recebidos:', tickets.map(t => ({
-      id: t.id.substring(0, 8),
-      numero: t.numero,
-      status: t.status,
-      contato: t.contato.nome,
-      telefone: t.contato.telefone
-    })));
+    console.log(
+      '🎫 [AtendimentosSidebar] Tickets recebidos:',
+      tickets.map((t) => ({
+        id: t.id.substring(0, 8),
+        numero: t.numero,
+        status: t.status,
+        contato: t.contato.nome,
+        telefone: t.contato.telefone,
+      })),
+    );
     console.log('📊 [AtendimentosSidebar] Tab ativa:', tabAtiva);
 
     // Calcular filtrados apenas para log (não usar ticketsFiltrados como dependência)
-    const ticketsParaTab = tickets.filter(ticket => {
+    const ticketsParaTab = tickets.filter((ticket) => {
       const ticketStatus = (ticket.status || '').toLowerCase();
       return ticketStatus === tabAtiva;
     });
@@ -92,9 +107,13 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
     // 🔍 DEBUG adicional: Por que não filtra?
     if (tickets.length > 0 && ticketsParaTab.length === 0) {
       console.log('❌ [AtendimentosSidebar] PROBLEMA NO FILTRO!');
-      tickets.forEach(t => {
-        console.log(`   Ticket ${t.numero}: status="${t.status}" (${typeof t.status}) vs tabAtiva="${tabAtiva}" (${typeof tabAtiva})`);
-        console.log(`   Match? ${t.status === tabAtiva} | Lowercase match? ${t.status?.toLowerCase() === tabAtiva}`);
+      tickets.forEach((t) => {
+        console.log(
+          `   Ticket ${t.numero}: status="${t.status}" (${typeof t.status}) vs tabAtiva="${tabAtiva}" (${typeof tabAtiva})`,
+        );
+        console.log(
+          `   Match? ${t.status === tabAtiva} | Lowercase match? ${t.status?.toLowerCase() === tabAtiva}`,
+        );
       });
     }
   }, [tickets, tabAtiva]); // ✅ Removido ticketsFiltrados das dependências
@@ -113,7 +132,9 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
     }
   };
 
-  const formatarTempoUltimaMensagem = (data: Date): string => {
+  const formatarTempoUltimaMensagem = (data?: Date): string => {
+    if (!data) return '--';
+
     const agora = new Date();
     const diff = agora.getTime() - data.getTime();
     const minutos = Math.floor(diff / 60000);
@@ -126,20 +147,41 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
     return `${dias}d`;
   };
 
-  const contagemFallback = useMemo(() => ({
-    aberto: tickets.filter(t => (t.status || '').toLowerCase() === 'aberto').length,
-    em_atendimento: tickets.filter(t => (t.status || '').toLowerCase() === 'em_atendimento' || (t.status || '').toLowerCase() === 'em atendimento').length,
-    aguardando: tickets.filter(t => (t.status || '').toLowerCase() === 'aguardando').length,
-    resolvido: tickets.filter(t => (t.status || '').toLowerCase() === 'resolvido').length,
-    fechado: tickets.filter(t => (t.status || '').toLowerCase() === 'fechado').length,
-  }), [tickets]);
+  const contagemFallback = useMemo(
+    () => ({
+      fila: ticketsUnicos.filter((t) => (t.status || '').toLowerCase() === 'fila').length,
+      em_atendimento: ticketsUnicos.filter(
+        (t) =>
+          (t.status || '').toLowerCase() === 'em_atendimento' ||
+          (t.status || '').toLowerCase() === 'em atendimento',
+      ).length,
+      envio_ativo: ticketsUnicos.filter((t) => (t.status || '').toLowerCase() === 'envio_ativo').length,
+      encerrado: ticketsUnicos.filter((t) => (t.status || '').toLowerCase() === 'encerrado').length,
+    }),
+    [ticketsUnicos],
+  );
 
   const tabs: { value: StatusAtendimentoType; label: string; count: number }[] = [
-    { value: 'aberto', label: 'Aberto', count: contagemPorStatus?.aberto ?? contagemFallback.aberto },
-    { value: 'em_atendimento', label: 'Em Atendimento', count: contagemPorStatus?.em_atendimento ?? contagemFallback.em_atendimento },
-    { value: 'aguardando', label: 'Aguardando', count: contagemPorStatus?.aguardando ?? contagemFallback.aguardando },
-    { value: 'resolvido', label: 'Resolvido', count: contagemPorStatus?.resolvido ?? contagemFallback.resolvido },
-    { value: 'fechado', label: 'Fechado', count: contagemPorStatus?.fechado ?? contagemFallback.fechado }
+    {
+      value: 'fila',
+      label: 'Fila',
+      count: contagemPorStatus?.fila ?? contagemFallback.fila,
+    },
+    {
+      value: 'em_atendimento',
+      label: 'Em Atendimento',
+      count: contagemPorStatus?.em_atendimento ?? contagemFallback.em_atendimento,
+    },
+    {
+      value: 'envio_ativo',
+      label: 'Envio Ativo',
+      count: contagemPorStatus?.envio_ativo ?? contagemFallback.envio_ativo,
+    },
+    {
+      value: 'encerrado',
+      label: 'Encerrado',
+      count: contagemPorStatus?.encerrado ?? contagemFallback.encerrado,
+    },
   ];
 
   return (
@@ -147,23 +189,23 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
       {/* Header com Tabs */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex space-x-1 mb-4">
-          {tabs.map(tab => (
+          {tabs.map((tab) => (
             <button
               key={tab.value}
               onClick={() => onChangeTab(tab.value)}
               style={{
                 backgroundColor: tabAtiva === tab.value ? theme.colors.primary : '',
-                color: tabAtiva === tab.value ? '#FFFFFF' : ''
+                color: tabAtiva === tab.value ? '#FFFFFF' : '',
               }}
-              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${tabAtiva === tab.value
-                ? 'shadow-md'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${tabAtiva === tab.value ? 'shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
             >
               {tab.label}
               {tab.count > 0 && (
-                <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${tabAtiva === tab.value ? 'bg-white/20' : 'bg-gray-300'
-                  }`}>
+                <span
+                  className={`ml-2 px-2 py-0.5 rounded-full text-xs ${tabAtiva === tab.value ? 'bg-white/20' : 'bg-gray-300'
+                    }`}
+                >
                   {tab.count}
                 </span>
               )}
@@ -194,7 +236,7 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
             <p className="text-center">Nenhum atendimento encontrado</p>
           </div>
         ) : (
-          ticketsFiltrados.map(ticket => {
+          ticketsFiltrados.map((ticket) => {
             const IconeCanal = getIconeCanal(ticket.canal);
             const tempoAtendimento = contadores[ticket.id] || ticket.tempoAtendimento;
             const isAtivo = ticketSelecionado === ticket.id;
@@ -207,7 +249,7 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
                 style={{
                   backgroundColor: isAtivo ? theme.colors.primaryLight : '',
                   borderLeftColor: isAtivo ? theme.colors.primary : '',
-                  borderLeftWidth: isAtivo ? '4px' : ''
+                  borderLeftWidth: isAtivo ? '4px' : '',
                 }}
                 className={`flex items-center gap-2.5 px-3 py-2.5 border-b border-gray-100 cursor-pointer transition-all ${isAtivo ? '' : 'hover:bg-gray-50'
                   }`}
@@ -215,17 +257,26 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
                 {/* Foto do Contato - Compacta */}
                 <div className="relative flex-shrink-0">
                   <img
-                    src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(resolverNomeExibicao(ticket.contato))}&background=random`}
+                    src={
+                      avatarUrl ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(resolverNomeExibicao(ticket.contato))}&background=random`
+                    }
                     alt={resolverNomeExibicao(ticket.contato)}
                     className="w-10 h-10 rounded-full object-cover"
                   />
                   {/* Ícone do Canal */}
-                  <div className={`absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full flex items-center justify-center ${ticket.canal === 'whatsapp' ? 'bg-green-500' :
-                    ticket.canal === 'telegram' ? 'bg-blue-400' :
-                      ticket.canal === 'email' ? 'bg-red-500' :
-                        ticket.canal === 'chat' ? 'bg-purple-500' :
-                          'bg-gray-500'
-                    }`}>
+                  <div
+                    className={`absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full flex items-center justify-center ${ticket.canal === 'whatsapp'
+                      ? 'bg-green-500'
+                      : ticket.canal === 'telegram'
+                        ? 'bg-blue-400'
+                        : ticket.canal === 'email'
+                          ? 'bg-red-500'
+                          : ticket.canal === 'chat'
+                            ? 'bg-purple-500'
+                            : 'bg-gray-500'
+                      }`}
+                  >
                     <IconeCanal className="w-2.5 h-2.5 text-white" />
                   </div>
                   {/* Status Online */}
@@ -263,26 +314,28 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
                       <span className="text-[10px] font-medium text-gray-500 flex-shrink-0">
                         #{ticket.numero}
                       </span>
-                      {ticket.tags && ticket.tags.slice(0, 1).map(tag => (
-                        <span
-                          key={tag}
-                          className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] rounded truncate max-w-[60px]"
-                          title={tag}
-                        >
-                          {tag}
-                        </span>
-                      ))}
+                      {ticket.tags &&
+                        ticket.tags.slice(0, 1).map((tag) => (
+                          <span
+                            key={tag}
+                            className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] rounded truncate max-w-[60px]"
+                            title={tag}
+                          >
+                            {tag}
+                          </span>
+                        ))}
                       {ticket.tags && ticket.tags.length > 1 && (
-                        <span className="text-[10px] text-gray-400">
-                          +{ticket.tags.length - 1}
-                        </span>
+                        <span className="text-[10px] text-gray-400">+{ticket.tags.length - 1}</span>
                       )}
                     </div>
 
                     {/* Badge de Status + Tempo de Atendimento */}
                     <div className="flex items-center gap-1 flex-shrink-0">
                       {(() => {
-                        const badge = renderStatusBadge(ticket.status, { size: 'sm', showIcon: true });
+                        const badge = renderStatusBadge(ticket.status, {
+                          size: 'sm',
+                          showIcon: true,
+                        });
                         return (
                           <span className={badge.classes} title={badge.label}>
                             {badge.icon}
@@ -293,9 +346,7 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
                       {ticket.status === 'aberto' && (
                         <div className="flex items-center gap-0.5 text-[10px] text-gray-500">
                           <Clock className="w-3 h-3" />
-                          <span className="font-mono">
-                            {formatarTempo(tempoAtendimento)}
-                          </span>
+                          <span className="font-mono">{formatarTempo(tempoAtendimento)}</span>
                         </div>
                       )}
                     </div>
@@ -313,10 +364,10 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
           onClick={onNovoAtendimento}
           style={{
             backgroundColor: theme.colors.primary,
-            color: '#FFFFFF'
+            color: '#FFFFFF',
           }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.colors.primaryHover}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme.colors.primary}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = theme.colors.primaryHover)}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = theme.colors.primary)}
           className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-colors shadow-md hover:shadow-lg"
         >
           <Plus className="w-5 h-5" />

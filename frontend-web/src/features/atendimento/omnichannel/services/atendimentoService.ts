@@ -1,6 +1,6 @@
 /**
  * 💬 Atendimento Service - Comunicação com API
- * 
+ *
  * Gerencia todas as operações relacionadas ao atendimento omnichannel:
  * - Conversações (tickets)
  * - Mensagens
@@ -9,7 +9,7 @@
  * - Encerramentos
  */
 
-import { api } from '../../../../services/api';
+import { api, API_BASE_URL } from '../../../../services/api';
 import {
   Ticket,
   Mensagem,
@@ -18,23 +18,13 @@ import {
   StatusAtendimentoType,
   Demanda,
   NotaCliente,
-  HistoricoAtendimento
+  HistoricoAtendimento,
 } from '../types';
-import {
-  NovoAtendimentoData
-} from '../modals/NovoAtendimentoModal';
-import {
-  TransferenciaData
-} from '../modals/TransferirAtendimentoModal';
-import {
-  EncerramentoData
-} from '../modals/EncerrarAtendimentoModal';
-import {
-  ContatoEditado
-} from '../modals/EditarContatoModal';
-import {
-  NovaDemanda
-} from '../modals/AbrirDemandaModal';
+import { NovoAtendimentoData } from '../modals/NovoAtendimentoModal';
+import { TransferenciaData } from '../modals/TransferirAtendimentoModal';
+import { EncerramentoData } from '../modals/EncerrarAtendimentoModal';
+import { ContatoEditado } from '../modals/EditarContatoModal';
+import { NovaDemanda } from '../modals/AbrirDemandaModal';
 import { resolveAvatarUrl } from '../../../../utils/avatar';
 
 export interface CanalAtendimento {
@@ -54,8 +44,6 @@ export interface ContatoResumo {
   clienteId?: string | null;
   clienteNome?: string | null;
 }
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 const normalizarString = (valor?: string | null): string | undefined => {
   if (!valor) {
@@ -135,15 +123,23 @@ export const normalizarMidiaUrl = (valor?: string | null): string | null => {
     const urlNormalizada = new URL(urlBruta, API_BASE_URL);
     return urlNormalizada.toString();
   } catch (error) {
-    console.warn('⚠️ [AtendimentoService] Não foi possível normalizar URL de mídia:', urlBruta, error);
+    console.warn(
+      '⚠️ [AtendimentoService] Não foi possível normalizar URL de mídia:',
+      urlBruta,
+      error,
+    );
     return urlBruta;
   }
 };
 
 export const normalizarMensagemPayload = (mensagem: Mensagem): Mensagem => {
   const anexosNormalizados = (mensagem.anexos || []).map((anexo) => {
-    const urlPrincipal = normalizarMidiaUrl(anexo.url ?? anexo.downloadUrl ?? anexo.originalUrl ?? null);
-    const urlDownload = normalizarMidiaUrl(anexo.downloadUrl ?? anexo.url ?? anexo.originalUrl ?? null);
+    const urlPrincipal = normalizarMidiaUrl(
+      anexo.url ?? anexo.downloadUrl ?? anexo.originalUrl ?? null,
+    );
+    const urlDownload = normalizarMidiaUrl(
+      anexo.downloadUrl ?? anexo.url ?? anexo.originalUrl ?? null,
+    );
 
     return {
       ...anexo,
@@ -159,8 +155,13 @@ export const normalizarMensagemPayload = (mensagem: Mensagem): Mensagem => {
   const audioNormalizado = mensagem.audio
     ? {
       ...mensagem.audio,
-      url: normalizarMidiaUrl(mensagem.audio.url ?? mensagem.audio.downloadUrl ?? null) || mensagem.audio.url,
-      downloadUrl: normalizarMidiaUrl(mensagem.audio.downloadUrl ?? mensagem.audio.url ?? null) || mensagem.audio.downloadUrl || null,
+      url:
+        normalizarMidiaUrl(mensagem.audio.url ?? mensagem.audio.downloadUrl ?? null) ||
+        mensagem.audio.url,
+      downloadUrl:
+        normalizarMidiaUrl(mensagem.audio.downloadUrl ?? mensagem.audio.url ?? null) ||
+        mensagem.audio.downloadUrl ||
+        null,
       tipo: mensagem.audio.tipo ?? null,
       duracao: mensagem.audio.duracao ?? null,
       nome: mensagem.audio.nome ?? null,
@@ -264,14 +265,16 @@ class AtendimentoService {
       const response = await api.get<any>(`${this.baseUrl}/canais`);
       const data = response.data?.data ?? response.data ?? [];
 
-      return (Array.isArray(data) ? data : []).map((item: any): CanalAtendimento => ({
-        id: item.id,
-        nome: item.nome || item.tipo?.toUpperCase() || 'Canal',
-        tipo: normalizarCanalTipo(item.tipo || 'chat'),
-        origem: item.origem || item.tipo?.toString().toUpperCase() || undefined,
-        ativo: item.ativo ?? true,
-        configuracao: item.configuracao ?? null,
-      }));
+      return (Array.isArray(data) ? data : []).map(
+        (item: any): CanalAtendimento => ({
+          id: item.id,
+          nome: item.nome || item.tipo?.toUpperCase() || 'Canal',
+          tipo: normalizarCanalTipo(item.tipo || 'chat'),
+          origem: item.origem || item.tipo?.toString().toUpperCase() || undefined,
+          ativo: item.ativo ?? true,
+          configuracao: item.configuracao ?? null,
+        }),
+      );
     } catch (error) {
       console.error('❌ Erro ao listar canais:', error);
       throw error;
@@ -286,14 +289,16 @@ class AtendimentoService {
       const response = await api.get<any>('/api/crm/contatos');
       const data = response.data?.data ?? response.data ?? [];
 
-      return (Array.isArray(data) ? data : []).map((item: any): ContatoResumo => ({
-        id: item.id,
-        nome: item.nome || 'Contato sem nome',
-        telefone: normalizarString(item.telefone) ?? undefined,
-        email: normalizarString(item.email) ?? undefined,
-        clienteId: item.clienteId || item.cliente_id || item.cliente?.id || null,
-        clienteNome: item.clienteNome || item.cliente_nome || item.cliente?.nome || null,
-      }));
+      return (Array.isArray(data) ? data : []).map(
+        (item: any): ContatoResumo => ({
+          id: item.id,
+          nome: item.nome || 'Contato sem nome',
+          telefone: normalizarString(item.telefone) ?? undefined,
+          email: normalizarString(item.email) ?? undefined,
+          clienteId: item.clienteId || item.cliente_id || item.cliente?.id || null,
+          clienteNome: item.clienteNome || item.cliente_nome || item.cliente?.nome || null,
+        }),
+      );
     } catch (error) {
       console.error('❌ Erro ao listar contatos:', error);
       throw error;
@@ -307,7 +312,15 @@ class AtendimentoService {
    */
   async listarTickets(params: ListarTicketsParams = {}): Promise<ListarTicketsResponse> {
     try {
-      const response = await api.get<ListarTicketsResponse>(`${this.baseUrl}/tickets`, { params });
+      // Converter status para UPPERCASE (backend espera enum em maiúsculo)
+      const paramsBackend = {
+        ...params,
+        status: params.status ? params.status.toUpperCase() : undefined,
+      };
+      
+      const response = await api.get<ListarTicketsResponse>(`${this.baseUrl}/tickets`, { 
+        params: paramsBackend 
+      });
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao listar tickets:', error);
@@ -331,22 +344,26 @@ class AtendimentoService {
         ...ticket,
         numero: ticket.numero, // ✅ Garantir que numero seja preservado
         contato: {
-          telefone: contatoBackend.telefone || ticket.contatoTelefone || ticket.contato_telefone || '',
+          telefone:
+            contatoBackend.telefone || ticket.contatoTelefone || ticket.contato_telefone || '',
           nome: contatoBackend.nome || ticket.contatoNome || ticket.contato_nome || 'Sem nome',
           email: contatoBackend.email || ticket.contatoEmail || ticket.contato_email || '',
-          foto: resolveAvatarUrl(contatoBackend.foto || ticket.contatoFoto || ticket.contato_foto || null),
-          online: typeof contatoBackend.online === 'boolean'
-            ? contatoBackend.online
-            : Boolean(ticket.contatoOnline ?? ticket.contato_online ?? false),
+          foto: resolveAvatarUrl(
+            contatoBackend.foto || ticket.contatoFoto || ticket.contato_foto || null,
+          ),
+          online:
+            typeof contatoBackend.online === 'boolean'
+              ? contatoBackend.online
+              : Boolean(ticket.contatoOnline ?? ticket.contato_online ?? false),
           clienteVinculado: contatoBackend.clienteVinculado || null,
         },
         canal: ticket.canal || {
           id: ticket.canalId || ticket.canal_id || '',
           nome: 'Canal desconhecido',
-          tipo: 'whatsapp' as any
+          tipo: 'whatsapp' as any,
         },
         ultimaMensagem: ticket.ultimaMensagem || 'Sem mensagens',
-        tempoAtendimento: ticket.tempoAtendimento || 0
+        tempoAtendimento: ticket.tempoAtendimento || 0,
       };
 
       return {
@@ -354,7 +371,7 @@ class AtendimentoService {
         atendente: ticketTransformado.atendente
           ? {
             ...ticketTransformado.atendente,
-            foto: resolveAvatarUrl(ticketTransformado.atendente.foto || null)
+            foto: resolveAvatarUrl(ticketTransformado.atendente.foto || null),
           }
           : ticketTransformado.atendente,
       };
@@ -457,12 +474,12 @@ class AtendimentoService {
    */
   async transferirTicket(
     ticketId: string,
-    dados: TransferenciaData
+    dados: TransferenciaData,
   ): Promise<TransferirTicketResponse> {
     try {
       const response = await api.post<TransferirTicketResponse>(
         `${this.baseUrl}/tickets/${ticketId}/transferir`,
-        dados
+        dados,
       );
       console.log('✅ Ticket transferido:', response.data);
       return response.data;
@@ -475,14 +492,11 @@ class AtendimentoService {
   /**
    * Encerra um ticket
    */
-  async encerrarTicket(
-    ticketId: string,
-    dados: EncerramentoData
-  ): Promise<EncerrarTicketResponse> {
+  async encerrarTicket(ticketId: string, dados: EncerramentoData): Promise<EncerrarTicketResponse> {
     try {
       const response = await api.post<EncerrarTicketResponse>(
         `${this.baseUrl}/tickets/${ticketId}/encerrar`,
-        dados
+        dados,
       );
       return response.data;
     } catch (error) {
@@ -511,12 +525,12 @@ class AtendimentoService {
    */
   async atualizarStatusTicket(
     ticketId: string,
-    novoStatus: StatusAtendimentoType
+    novoStatus: StatusAtendimentoType,
   ): Promise<Ticket> {
     try {
       const response = await api.patch<Ticket>(
         `${this.baseUrl}/tickets/${ticketId}/status`,
-        { status: novoStatus.toUpperCase() } // Backend espera UPPERCASE
+        { status: novoStatus.toUpperCase() }, // Backend espera UPPERCASE
       );
       console.log('✅ Status do ticket atualizado:', response.data);
       return response.data;
@@ -532,13 +546,10 @@ class AtendimentoService {
    */
   async atualizarTicket(
     ticketId: string,
-    dados: Partial<{ filaId?: string | null; atendenteId?: string | null;[key: string]: any }>
+    dados: Partial<{ filaId?: string | null; atendenteId?: string | null;[key: string]: any }>,
   ): Promise<Ticket> {
     try {
-      const response = await api.patch<Ticket>(
-        `${this.baseUrl}/tickets/${ticketId}`,
-        dados
-      );
+      const response = await api.patch<Ticket>(`${this.baseUrl}/tickets/${ticketId}`, dados);
       console.log('✅ Ticket atualizado:', response.data);
       return response.data;
     } catch (error) {
@@ -554,11 +565,12 @@ class AtendimentoService {
    */
   async listarMensagens(params: ListarMensagensParams): Promise<ListarMensagensResponse> {
     try {
-      const response = await api.get<ListarMensagensResponse>(
-        `${this.baseUrl}/mensagens`,
-        { params: { ticketId: params.ticketId, page: params.page, limit: params.limit } }
+      const response = await api.get<ListarMensagensResponse>(`${this.baseUrl}/mensagens`, {
+        params: { ticketId: params.ticketId, page: params.page, limit: params.limit },
+      });
+      const mensagensNormalizadas = response.data.data.map((mensagem: Mensagem) =>
+        normalizarMensagemPayload(mensagem),
       );
-      const mensagensNormalizadas = response.data.data.map((mensagem: Mensagem) => normalizarMensagemPayload(mensagem));
 
       return {
         ...response.data,
@@ -577,8 +589,6 @@ class AtendimentoService {
     try {
       // ✅ Se NÃO tem anexos nem áudio, usar JSON puro (mais confiável)
       if (!params.anexos?.length && !params.audio) {
-        console.log('📤 Enviando mensagem como JSON:', params.conteudo);
-
         const response = await api.post<any>(
           `${this.baseUrl}/tickets/${params.ticketId}/mensagens`,
           { conteudo: params.conteudo }, // JSON simples
@@ -586,16 +596,14 @@ class AtendimentoService {
             headers: {
               'Content-Type': 'application/json',
             },
-          }
+          },
         );
 
         const mensagem = response.data.data || response.data;
-        console.log('✅ Mensagem enviada:', mensagem);
         return normalizarMensagemPayload(mensagem);
       }
 
       // ✅ Se TEM anexos ou áudio, usar FormData
-      console.log('📤 Enviando mensagem como FormData (com anexos)');
 
       const formData = new FormData();
       formData.append('conteudo', params.conteudo ?? '');
@@ -631,7 +639,7 @@ class AtendimentoService {
 
       const response = await api.post<any>(
         `${this.baseUrl}/tickets/${params.ticketId}/mensagens`,
-        formData
+        formData,
       );
 
       const mensagem = response.data.data || response.data;
@@ -708,7 +716,7 @@ class AtendimentoService {
     try {
       const response = await api.post<Contato>(
         `${this.baseUrl}/contatos/${contatoId}/vincular-cliente`,
-        { clienteId }
+        { clienteId },
       );
       console.log('✅ Cliente vinculado ao contato:', response.data);
       return response.data;
@@ -741,7 +749,7 @@ class AtendimentoService {
   async buscarHistorico(contatoId: string): Promise<HistoricoAtendimento[]> {
     try {
       const response = await api.get<HistoricoAtendimento[]>(
-        `${this.baseUrl}/contatos/${contatoId}/historico`
+        `${this.baseUrl}/contatos/${contatoId}/historico`,
       );
       return response.data;
     } catch (error) {
@@ -759,7 +767,7 @@ class AtendimentoService {
     try {
       const response = await api.post<Demanda>(
         `${this.baseUrl}/tickets/${ticketId}/demandas`,
-        dados
+        dados,
       );
       console.log('✅ Demanda criada:', response.data);
       return response.data;
@@ -774,9 +782,7 @@ class AtendimentoService {
    */
   async listarDemandas(contatoId: string): Promise<Demanda[]> {
     try {
-      const response = await api.get<Demanda[]>(
-        `${this.baseUrl}/contatos/${contatoId}/demandas`
-      );
+      const response = await api.get<Demanda[]>(`${this.baseUrl}/contatos/${contatoId}/demandas`);
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao listar demandas:', error);
@@ -791,10 +797,10 @@ class AtendimentoService {
    */
   async criarNota(ticketId: string, conteudo: string, importante: boolean): Promise<NotaCliente> {
     try {
-      const response = await api.post<NotaCliente>(
-        `${this.baseUrl}/tickets/${ticketId}/notas`,
-        { conteudo, importante }
-      );
+      const response = await api.post<NotaCliente>(`${this.baseUrl}/tickets/${ticketId}/notas`, {
+        conteudo,
+        importante,
+      });
       console.log('✅ Nota criada:', response.data);
       return response.data;
     } catch (error) {
@@ -808,9 +814,7 @@ class AtendimentoService {
    */
   async listarNotas(contatoId: string): Promise<NotaCliente[]> {
     try {
-      const response = await api.get<NotaCliente[]>(
-        `${this.baseUrl}/contatos/${contatoId}/notas`
-      );
+      const response = await api.get<NotaCliente[]>(`${this.baseUrl}/contatos/${contatoId}/notas`);
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao listar notas:', error);
@@ -836,13 +840,15 @@ class AtendimentoService {
   /**
    * Lista atendentes disponíveis para transferência
    */
-  async listarAtendentes(): Promise<Array<{
-    id: string;
-    nome: string;
-    foto?: string;
-    status: 'online' | 'ocupado' | 'offline';
-    atendimentosAtivos: number;
-  }>> {
+  async listarAtendentes(): Promise<
+    Array<{
+      id: string;
+      nome: string;
+      foto?: string;
+      status: 'online' | 'ocupado' | 'offline';
+      atendimentosAtivos: number;
+    }>
+  > {
     try {
       const response = await api.get(`${this.baseUrl}/atendentes`);
       return response.data;
@@ -857,12 +863,14 @@ class AtendimentoService {
   /**
    * Lista templates de mensagem
    */
-  async listarTemplates(): Promise<Array<{
-    id: string;
-    titulo: string;
-    conteudo: string;
-    categoria: string;
-  }>> {
+  async listarTemplates(): Promise<
+    Array<{
+      id: string;
+      titulo: string;
+      conteudo: string;
+      categoria: string;
+    }>
+  > {
     try {
       const response = await api.get(`${this.baseUrl}/templates`);
       return response.data;
@@ -900,16 +908,11 @@ class AtendimentoService {
    */
   async buscarHistoricoCliente(clienteId: string): Promise<HistoricoAtendimento[]> {
     try {
-      console.log('📜 Buscando histórico do cliente:', clienteId);
-      const response = await api.get<any>(
-        `/api/atendimento/clientes/${clienteId}/historico`
-      );
+      const response = await api.get<any>(`/api/atendimento/clientes/${clienteId}/historico`);
 
       // ✅ CORREÇÃO: Backend retorna { propostas, faturas, tickets }, não array direto
       const historico = response.data;
       const tickets = historico?.tickets || [];
-
-      console.log('✅ Histórico carregado:', tickets.length, 'atendimentos');
 
       // Transformar tickets do backend para formato do frontend
       return tickets.map((t: any) => ({
@@ -959,9 +962,7 @@ class AtendimentoService {
     }>;
   }> {
     try {
-      const response = await api.get(
-        `/api/atendimento/clientes/${clienteId}/contexto`
-      );
+      const response = await api.get(`/api/atendimento/clientes/${clienteId}/contexto`);
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao buscar contexto do cliente:', error);
@@ -1015,9 +1016,7 @@ class AtendimentoService {
     }>;
   }> {
     try {
-      const response = await api.get(
-        `/api/atendimento/clientes/por-telefone/${telefone}/contexto`
-      );
+      const response = await api.get(`/api/atendimento/clientes/por-telefone/${telefone}/contexto`);
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao buscar contexto por telefone:', error);
