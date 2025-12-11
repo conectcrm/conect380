@@ -18,16 +18,19 @@ import {
 import { Ticket } from '../entities/ticket.entity';
 import { Canal, TipoCanal } from '../entities/canal.entity';
 import { WhatsAppSenderService } from './whatsapp-sender.service';
+import { WhatsAppConfigService } from './whatsapp-config.service'; // 🔐 NOVO - Config centralizada
 import { EmailSenderService } from './email-sender.service';
 import { AtendimentoGateway } from '../gateways/atendimento.gateway';
 
 const resolvedFfmpegPath =
   typeof ffmpegStatic === 'string' ? ffmpegStatic : (ffmpegStatic as { path?: string })?.path;
 
+const logger = new Logger('MensagemService');
+
 if (resolvedFfmpegPath) {
   ffmpeg.setFfmpegPath(resolvedFfmpegPath);
 } else {
-  console.warn(
+  logger.warn(
     '⚠️ ffmpeg-static não forneceu caminho válido. Certifique-se de ter o binário do FFmpeg disponível.',
   );
 }
@@ -76,6 +79,7 @@ export class MensagemService {
     @InjectRepository(Canal)
     private canalRepository: Repository<Canal>,
     private whatsappSenderService: WhatsAppSenderService,
+    private whatsappConfigService: WhatsAppConfigService, // 🔐 NOVO - Config centralizada
     private emailSenderService: EmailSenderService,
     private atendimentoGateway: AtendimentoGateway,
   ) { }
@@ -404,13 +408,27 @@ export class MensagemService {
           }
         }
 
-        if (!authToken) {
-          authToken = process.env.WHATSAPP_ACCESS_TOKEN;
+        // 🔐 Buscar credenciais do banco de dados (fonte única de verdade)
+        if (!authToken && ticket?.empresaId) {
+          try {
+            const credentials = await this.whatsappConfigService.getCredentials(ticket.empresaId);
+            if (credentials) {
+              authToken = credentials.accessToken;
+              this.logger.log(`✅ Token WhatsApp obtido do banco de dados`);
+            }
+          } catch (error) {
+            this.logger.warn(
+              `⚠️ Erro ao buscar config WhatsApp do banco: ${error instanceof Error ? error.message : error}`,
+            );
+          }
         }
 
         if (!authToken) {
           this.logger.error(`❌ Token do WhatsApp não encontrado para baixar mídia`);
-          throw new Error('Token do WhatsApp não configurado');
+          this.logger.error(`   Empresa ID: ${ticket?.empresaId || 'não encontrado'}`);
+          throw new Error(
+            'Token do WhatsApp não configurado. Configure na tela de Integrações.'
+          );
         }
 
         let tipoMidia: 'audio' | 'image' | 'video' | 'document' = 'audio';
@@ -751,6 +769,19 @@ export class MensagemService {
       anexos,
       audio,
     };
+  }
+
+  /**
+   * Atualiza o identificador externo (ex.: WAMID do provedor) para uma mensagem já salva
+   */
+  async atualizarIdExterno(mensagemId: string, idExterno: string): Promise<void> {
+    const resultado = await this.mensagemRepository.update({ id: mensagemId }, { idExterno });
+
+    if (!resultado.affected) {
+      throw new NotFoundException(`Mensagem ${mensagemId} não encontrada para atualizar idExterno`);
+    }
+
+    this.logger.log(`🔗 idExterno atualizado para mensagem ${mensagemId}: ${idExterno}`);
   }
 
   /**

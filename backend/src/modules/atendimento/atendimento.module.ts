@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
 import { JwtModule } from '@nestjs/jwt';
@@ -24,6 +25,7 @@ import { AtendenteSkill } from './entities/atendente-skill.entity'; // ✅ Skill
 import { DistribuicaoLog } from './entities/distribuicao-log.entity'; // ✅ Logs de auditoria
 import { SlaConfig } from './entities/sla-config.entity'; // ✅ SLA Tracking - Configurações
 import { SlaEventLog } from './entities/sla-event-log.entity'; // ✅ SLA Tracking - Logs de eventos
+import { DlqReprocessAudit } from './entities/dlq-reprocess-audit.entity'; // ✅ Auditoria de reprocessamentos DLQ
 import { Cliente } from '../clientes/cliente.entity'; // ✅ SPRINT 1 - Para contexto e busca
 import { Contato } from '../clientes/contato.entity'; // ✅ Para status online
 import { User } from '../users/user.entity'; // ✅ Para auto-criação de usuários ao criar atendente
@@ -56,6 +58,7 @@ import { DistribuicaoAvancadaController } from './controllers/distribuicao-avanc
 import { TagsController } from './controllers/tags.controller'; // ✅ Sistema de Tags (gestão de tags)
 import { MessageTemplateController } from './controllers/message-template.controller'; // ✅ Templates de Mensagens
 import { SlaController } from './controllers/sla.controller'; // ✅ SLA Tracking
+import { DlqController } from './controllers/dlq.controller'; // ✅ Reprocessamento de DLQ
 
 // Services
 import { AtendenteService } from './services/atendente.service'; // ✅ Gestão de Atendentes (auto-cria User)
@@ -65,6 +68,7 @@ import { WhatsAppWebhookService } from './services/whatsapp-webhook.service'; //
 import { ValidacaoIntegracoesService } from './services/validacao-integracoes.service'; // ✅ Novo - Validação de credenciais
 import { AIResponseService } from './services/ai-response.service'; // ✅ Novo - IA para respostas
 import { WhatsAppSenderService } from './services/whatsapp-sender.service'; // ✅ Novo - Envio WhatsApp
+import { WhatsAppConfigService } from './services/whatsapp-config.service'; // 🔐 NOVO - Config centralizada WhatsApp
 import { EmailSenderService } from './services/email-sender.service'; // ✅ NOVO - Envio E-mail
 import { WhatsAppInteractiveService } from './services/whatsapp-interactive.service'; // ✅ Novo - Botões interativos
 import { TicketService } from './services/ticket.service'; // ✅ Novo - Gestão de Tickets
@@ -79,11 +83,18 @@ import { DistribuicaoAvancadaService } from './services/distribuicao-avancada.se
 import { TagsService } from './services/tags.service'; // ✅ Sistema de Tags (CRUD de tags)
 import { MessageTemplateService } from './services/message-template.service'; // ✅ Templates de Mensagens
 import { SlaService } from './services/sla.service'; // ✅ SLA Tracking
+import { SlaMonitorMinimoService } from './services/sla-monitor-minimo.service'; // ✅ SLA mínimo (cron)
 import { AnalyticsService } from './services/analytics.service'; // ✅ Dashboard Analytics
+import { WhatsAppWebhookProcessor } from './processors/whatsapp-webhook.processor';
+import { WebhookIdempotencyService } from './services/webhook-idempotency.service';
+import { QueueMetricsService } from './services/queue-metrics.service';
+import { MessagesOutProcessor } from './processors/messages-out.processor';
+import { DlqReprocessService } from './services/dlq-reprocess.service'; // ✅ Reprocessamento de DLQ
 
 // Gateway
 import { AtendimentoGateway } from './gateways/atendimento.gateway';
 import { TriagemModule } from '../triagem/triagem.module';
+import { NotificationModule } from '../../notifications/notification.module';
 
 @Module({
   imports: [
@@ -115,6 +126,7 @@ import { TriagemModule } from '../triagem/triagem.module';
       MessageTemplate, // ✅ Templates de Mensagens
       SlaConfig, // ✅ SLA Tracking - Configurações
       SlaEventLog, // ✅ SLA Tracking - Logs de eventos
+      DlqReprocessAudit, // ✅ Auditoria de reprocessamentos DLQ
       // AtendenteFila,
       // Historico,
       // Template,
@@ -124,19 +136,77 @@ import { TriagemModule } from '../triagem/triagem.module';
       // AIMetrica,
     ]),
 
-    // Bull Queues - Temporariamente desabilitado
-    /*BullModule.registerQueue(
-      { name: 'webhooks' },
-      { name: 'ai-analysis' },
-      { name: 'messages' },
-      { name: 'notifications' },
-    ),*/
+    // Bull Queues - reativadas com opções padrão de resiliência
+    BullModule.registerQueue(
+      {
+        name: 'webhooks-in',
+        defaultJobOptions: {
+          attempts: 5,
+          backoff: { type: 'exponential', delay: 1000 },
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      },
+      {
+        name: 'messages-out',
+        defaultJobOptions: {
+          attempts: 5,
+          backoff: { type: 'exponential', delay: 1000 },
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      },
+      {
+        name: 'notifications',
+        defaultJobOptions: {
+          attempts: 5,
+          backoff: { type: 'exponential', delay: 5000 },
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      },
+      {
+        name: 'notifications-dlq',
+        defaultJobOptions: {
+          attempts: 1,
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      },
+      {
+        name: 'ai-analysis',
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      },
+      {
+        name: 'webhooks-in-dlq',
+        defaultJobOptions: {
+          attempts: 1,
+          removeOnComplete: false,
+          removeOnFail: false,
+        },
+      },
+      {
+        name: 'messages-out-dlq',
+        defaultJobOptions: {
+          attempts: 1,
+          removeOnComplete: false,
+          removeOnFail: false,
+        },
+      },
+    ),
 
     // JWT para WebSocket (usando mesma secret do módulo de autenticação)
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'seu_jwt_secret_super_seguro_aqui_2024',
       signOptions: { expiresIn: '24h' },
     }),
+    HttpModule,
+    NotificationModule,
     forwardRef(() => TriagemModule),
   ],
 
@@ -163,6 +233,7 @@ import { TriagemModule } from '../triagem/triagem.module';
     AnalyticsController, // ✅ Dashboard Analytics (REST API)
     ContextoClienteController, // ✅ SPRINT 1 - Contexto Cliente
     BuscaGlobalController, // ✅ SPRINT 1 - Busca Global
+    DlqController, // ✅ Reprocessamento de DLQs
   ],
 
   providers: [
@@ -182,6 +253,8 @@ import { TriagemModule } from '../triagem/triagem.module';
     AIResponseService, // ✅ Novo
     // Service Envio de Mensagens WhatsApp
     WhatsAppSenderService, // ✅ Novo
+    // Service Configuração Centralizada WhatsApp
+    WhatsAppConfigService, // 🔐 NOVO - Fonte única de verdade para credenciais WhatsApp
     // Service Envio de E-mails
     EmailSenderService, // ✅ NOVO - SendGrid/SES/SMTP
     // Service Mensagens Interativas WhatsApp (botões e listas)
@@ -206,8 +279,14 @@ import { TriagemModule } from '../triagem/triagem.module';
     MessageTemplateService, // ✅ CRUD de templates + substituição de variáveis
     // Sistema de SLA
     SlaService, // ✅ SLA Tracking - Cálculos, métricas, alertas
+    SlaMonitorMinimoService, // ✅ SLA mínimo - monitor de deadlines
     // Sistema de Analytics
     AnalyticsService, // ✅ Dashboard Analytics - Métricas agregadas e tendências
+    WhatsAppWebhookProcessor, // ✅ Processamento assíncrono de webhooks WhatsApp
+    MessagesOutProcessor, // ✅ Processamento assíncrono de outbound WhatsApp
+    WebhookIdempotencyService, // ✅ Idempotência de webhooks
+    QueueMetricsService, // ✅ Métricas + DLQ das filas
+    DlqReprocessService, // ✅ Serviço para reprocessar DLQs
   ],
 
   exports: [
