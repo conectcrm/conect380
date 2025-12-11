@@ -1,6 +1,6 @@
 /**
  * 💬 useMensagens - Hook para gerenciar mensagens do chat
- * 
+ *
  * Funcionalidades:
  * - Carregar mensagens
  * - Enviar mensagem (texto/áudio/arquivos)
@@ -18,7 +18,7 @@ import {
   useAtendimentoStore,
   getMensagensDoTicket,
   isTicketLoadingMensagens,
-  getMensagensError
+  getMensagensError,
 } from '../../../../stores/atendimentoStore';
 
 const DEBUG = false; // ✅ Desabilitado após resolução do problema de tempo real
@@ -27,6 +27,7 @@ interface UseMensagensOptions {
   ticketId: string | null;
   autoScroll?: boolean;
   pageSize?: number;
+  onUploadProgress?: (progress: number) => void; // 🔄 NOVO: Callback de progresso de upload
 }
 
 interface UseMensagensReturn {
@@ -51,9 +52,7 @@ interface UseMensagensReturn {
   mensagensRef: React.RefObject<HTMLDivElement>;
 }
 
-export const useMensagens = (
-  options: UseMensagensOptions
-): UseMensagensReturn => {
+export const useMensagens = (options: UseMensagensOptions): UseMensagensReturn => {
   const { ticketId, autoScroll = true, pageSize = 50 } = options;
 
   // ===== ESTADO (usando Zustand Store para mensagens) =====
@@ -79,43 +78,47 @@ export const useMensagens = (
   const ultimaMensagemRef = useRef<string | null>(null);
 
   // ===== CARREGAR MENSAGENS =====
-  const carregarMensagens = useCallback(async (pagina: number = 1, append: boolean = false) => {
-    if (!ticketId) {
-      setMensagensStore(ticketId || 'empty', []);
-      return;
-    }
-
-    setMensagensLoading(ticketId, true);
-    setMensagensError(ticketId, null);
-
-    try {
-      const response = await atendimentoService.listarMensagens({
-        ticketId,
-        page: pagina,
-        limit: pageSize
-      });
-
-      if (append) {
-        // Adicionar mensagens antigas (paginação)
-        const mensagensAtuais = getMensagensDoTicket(ticketId);
-        setMensagensStore(ticketId, [...response.data, ...mensagensAtuais]);
-      } else {
-        // Substituir mensagens (refresh)
-        setMensagensStore(ticketId, response.data);
+  const carregarMensagens = useCallback(
+    async (pagina: number = 1, append: boolean = false) => {
+      if (!ticketId) {
+        setMensagensStore(ticketId || 'empty', []);
+        return;
       }
 
-      setTemMais(response.data.length === pageSize);
-      setPaginaAtual(pagina);
+      setMensagensLoading(ticketId, true);
+      setMensagensError(ticketId, null);
 
-      if (DEBUG) console.log(`✅ ${response.data.length} mensagens carregadas (página ${pagina})`);
-    } catch (err: any) {
-      const mensagemErro = err.response?.data?.message || 'Erro ao carregar mensagens';
-      setMensagensError(ticketId, mensagemErro);
-      console.error('❌ Erro ao carregar mensagens:', err);
-    } finally {
-      setMensagensLoading(ticketId, false);
-    }
-  }, [ticketId, pageSize, setMensagensStore, setMensagensLoading, setMensagensError]);
+      try {
+        const response = await atendimentoService.listarMensagens({
+          ticketId,
+          page: pagina,
+          limit: pageSize,
+        });
+
+        if (append) {
+          // Adicionar mensagens antigas (paginação)
+          const mensagensAtuais = getMensagensDoTicket(ticketId);
+          setMensagensStore(ticketId, [...response.data, ...mensagensAtuais]);
+        } else {
+          // Substituir mensagens (refresh)
+          setMensagensStore(ticketId, response.data);
+        }
+
+        setTemMais(response.data.length === pageSize);
+        setPaginaAtual(pagina);
+
+        if (DEBUG)
+          console.log(`✅ ${response.data.length} mensagens carregadas (página ${pagina})`);
+      } catch (err: any) {
+        const mensagemErro = err.response?.data?.message || 'Erro ao carregar mensagens';
+        setMensagensError(ticketId, mensagemErro);
+        console.error('❌ Erro ao carregar mensagens:', err);
+      } finally {
+        setMensagensLoading(ticketId, false);
+      }
+    },
+    [ticketId, pageSize, setMensagensStore, setMensagensLoading, setMensagensError],
+  );
 
   // ===== CARREGAR MAIS (SCROLL INFINITO) =====
   const carregarMais = useCallback(async () => {
@@ -125,100 +128,110 @@ export const useMensagens = (
   }, [temMais, loading, paginaAtual, carregarMensagens]);
 
   // ===== ENVIAR MENSAGEM =====
-  const enviarMensagem = useCallback(async (conteudo: string) => {
-    if (!ticketId || !conteudo.trim()) return;
+  const enviarMensagem = useCallback(
+    async (conteudo: string) => {
+      if (!ticketId || !conteudo.trim()) return;
 
-    setEnviando(true);
+      setEnviando(true);
 
-    try {
-      const novaMensagem = await atendimentoService.enviarMensagem({
-        ticketId,
-        conteudo: conteudo.trim()
-      });
+      try {
+        const novaMensagem = await atendimentoService.enviarMensagem({
+          ticketId,
+          conteudo: conteudo.trim(),
+        });
 
-      // 🔥 NÃO adicionar otimisticamente - WebSocket cuidará disso
-      // Evita duplicatas (mensagem aparecerá via WebSocket)
-      if (DEBUG) console.log('✅ Mensagem enviada, aguardando WebSocket...');
-    } catch (err: any) {
-      const mensagemErro = err.response?.data?.message || 'Erro ao enviar mensagem';
-      if (ticketId) setMensagensError(ticketId, mensagemErro);
-      console.error('❌ Erro ao enviar mensagem:', err);
-      throw err;
-    } finally {
-      setEnviando(false);
-    }
-  }, [ticketId, setMensagensError]);
+        // 🔥 NÃO adicionar otimisticamente - WebSocket cuidará disso
+        // Evita duplicatas (mensagem aparecerá via WebSocket)
+        if (DEBUG) console.log('✅ Mensagem enviada, aguardando WebSocket...');
+      } catch (err: any) {
+        const mensagemErro = err.response?.data?.message || 'Erro ao enviar mensagem';
+        if (ticketId) setMensagensError(ticketId, mensagemErro);
+        console.error('❌ Erro ao enviar mensagem:', err);
+        throw err;
+      } finally {
+        setEnviando(false);
+      }
+    },
+    [ticketId, setMensagensError],
+  );
 
   // ===== ENVIAR MENSAGEM COM ANEXOS =====
-  const enviarMensagemComAnexos = useCallback(async (
-    conteudo: string,
-    arquivos: File[]
-  ) => {
-    if (!ticketId || (!conteudo.trim() && arquivos.length === 0)) return;
+  const enviarMensagemComAnexos = useCallback(
+    async (conteudo: string, arquivos: File[]) => {
+      if (!ticketId || (!conteudo.trim() && arquivos.length === 0)) return;
 
-    setEnviando(true);
+      setEnviando(true);
 
-    try {
-      const novaMensagem = await atendimentoService.enviarMensagem({
-        ticketId,
-        conteudo: conteudo.trim() || '📎 Anexo',
-        anexos: arquivos
-      });
+      try {
+        const novaMensagem = await atendimentoService.enviarMensagem({
+          ticketId,
+          conteudo: conteudo.trim() || '📎 Anexo',
+          anexos: arquivos,
+          onUploadProgress: options?.onUploadProgress, // 🔄 NOVO: Passar callback de progresso
+        });
 
-      // 🔥 NÃO adicionar otimisticamente - WebSocket cuidará disso
-      if (DEBUG) console.log('✅ Mensagem com anexos enviada, aguardando WebSocket...');
-    } catch (err: any) {
-      const mensagemErro = err.response?.data?.message || 'Erro ao enviar mensagem';
-      if (ticketId) setMensagensError(ticketId, mensagemErro);
-      console.error('❌ Erro ao enviar mensagem com anexos:', err);
-      throw err;
-    } finally {
-      setEnviando(false);
-    }
-  }, [ticketId, setMensagensError]);
+        // 🔥 NÃO adicionar otimisticamente - WebSocket cuidará disso
+        if (DEBUG) console.log('✅ Mensagem com anexos enviada, aguardando WebSocket...');
+      } catch (err: any) {
+        const mensagemErro = err.response?.data?.message || 'Erro ao enviar mensagem';
+        if (ticketId) setMensagensError(ticketId, mensagemErro);
+        console.error('❌ Erro ao enviar mensagem com anexos:', err);
+        throw err;
+      } finally {
+        setEnviando(false);
+      }
+    },
+    [ticketId, setMensagensError, options?.onUploadProgress],
+  );
 
   // ===== ENVIAR ÁUDIO =====
-  const enviarAudio = useCallback(async (audioBlob: Blob, duracao: number) => {
-    if (!ticketId) return;
+  const enviarAudio = useCallback(
+    async (audioBlob: Blob, duracao: number) => {
+      if (!ticketId) return;
 
-    setEnviando(true);
+      setEnviando(true);
 
-    try {
-      const novaMensagem = await atendimentoService.enviarMensagem({
-        ticketId,
-        conteudo: '',
-        audio: { blob: audioBlob, duracao }
-      });
+      try {
+        const novaMensagem = await atendimentoService.enviarMensagem({
+          ticketId,
+          conteudo: '',
+          audio: { blob: audioBlob, duracao },
+        });
 
-      // 🔥 NÃO adicionar otimisticamente - WebSocket cuidará disso
-      if (DEBUG) console.log('✅ Áudio enviado, aguardando WebSocket...');
-    } catch (err: any) {
-      const mensagemErro = err.response?.data?.message || 'Erro ao enviar áudio';
-      if (ticketId) setMensagensError(ticketId, mensagemErro);
-      console.error('❌ Erro ao enviar áudio:', err);
-      throw err;
-    } finally {
-      setEnviando(false);
-    }
-  }, [ticketId, setMensagensError]);
+        // 🔥 NÃO adicionar otimisticamente - WebSocket cuidará disso
+        if (DEBUG) console.log('✅ Áudio enviado, aguardando WebSocket...');
+      } catch (err: any) {
+        const mensagemErro = err.response?.data?.message || 'Erro ao enviar áudio';
+        if (ticketId) setMensagensError(ticketId, mensagemErro);
+        console.error('❌ Erro ao enviar áudio:', err);
+        throw err;
+      } finally {
+        setEnviando(false);
+      }
+    },
+    [ticketId, setMensagensError],
+  );
 
   // ===== MARCAR COMO LIDAS =====
-  const marcarComoLidas = useCallback(async (mensagemIds: string[]) => {
-    if (!ticketId || mensagemIds.length === 0) return;
+  const marcarComoLidas = useCallback(
+    async (mensagemIds: string[]) => {
+      if (!ticketId || mensagemIds.length === 0) return;
 
-    try {
-      await atendimentoService.marcarComoLidas(ticketId, mensagemIds);
+      try {
+        await atendimentoService.marcarComoLidas(ticketId, mensagemIds);
 
-      // Atualizar mensagens na store
-      mensagemIds.forEach(mensagemId => {
-        atualizarMensagem(ticketId, mensagemId, { status: 'lido' as StatusMensagem });
-      });
+        // Atualizar mensagens na store
+        mensagemIds.forEach((mensagemId) => {
+          atualizarMensagem(ticketId, mensagemId, { status: 'lido' as StatusMensagem });
+        });
 
-      if (DEBUG) console.log(`✅ ${mensagemIds.length} mensagens marcadas como lidas`);
-    } catch (err: any) {
-      console.error('❌ Erro ao marcar mensagens como lidas:', err);
-    }
-  }, [ticketId, atualizarMensagem]);
+        if (DEBUG) console.log(`✅ ${mensagemIds.length} mensagens marcadas como lidas`);
+      } catch (err: any) {
+        console.error('❌ Erro ao marcar mensagens como lidas:', err);
+      }
+    },
+    [ticketId, atualizarMensagem],
+  );
 
   // ===== RECARREGAR =====
   const recarregar = useCallback(async () => {
@@ -226,14 +239,17 @@ export const useMensagens = (
   }, [carregarMensagens]);
 
   // ===== ADICIONAR MENSAGEM RECEBIDA (WEBSOCKET) =====
-  const adicionarMensagemRecebida = useCallback((mensagem: Mensagem) => {
-    if (!ticketId) return;
+  const adicionarMensagemRecebida = useCallback(
+    (mensagem: Mensagem) => {
+      if (!ticketId) return;
 
-    if (DEBUG) console.log('📩 Adicionando mensagem recebida via WebSocket:', mensagem);
+      if (DEBUG) console.log('📩 Adicionando mensagem recebida via WebSocket:', mensagem);
 
-    // Usar a função da store que já tem deduplicação embutida
-    adicionarMensagemStore(ticketId, mensagem);
-  }, [ticketId, adicionarMensagemStore]);
+      // Usar a função da store que já tem deduplicação embutida
+      adicionarMensagemStore(ticketId, mensagem);
+    },
+    [ticketId, adicionarMensagemStore],
+  );
 
   // ===== SCROLL AUTOMÁTICO =====
   const scrollParaFinal = useCallback(() => {
@@ -242,7 +258,7 @@ export const useMensagens = (
     setTimeout(() => {
       mensagensRef.current?.scrollTo({
         top: mensagensRef.current.scrollHeight,
-        behavior: 'smooth'
+        behavior: 'smooth',
       });
     }, 100);
   }, [autoScroll]);
@@ -280,11 +296,8 @@ export const useMensagens = (
 
     // Buscar mensagens do cliente que não foram lidas
     const mensagensNaoLidas = mensagens
-      .filter(msg =>
-        msg.remetente.tipo === 'cliente' &&
-        msg.status !== 'lido'
-      )
-      .map(msg => msg.id);
+      .filter((msg) => msg.remetente.tipo === 'cliente' && msg.status !== 'lido')
+      .map((msg) => msg.id);
 
     if (mensagensNaoLidas.length > 0) {
       // Marcar após 2 segundos de visualização

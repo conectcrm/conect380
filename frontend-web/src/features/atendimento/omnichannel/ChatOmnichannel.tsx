@@ -1,9 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { User, X } from 'lucide-react';
 import { AtendimentosSidebar } from './components/AtendimentosSidebar';
 import { ChatArea } from './components/ChatArea';
 import { ClientePanel } from './components/ClientePanel';
-import { PopupNotifications, PopupNotificationItem } from './components/PopupNotifications';
 import { NovoAtendimentoModal, NovoAtendimentoData } from './modals/NovoAtendimentoModal';
 import { TransferirAtendimentoModal, TransferenciaData } from './modals/TransferirAtendimentoModal';
 import { EncerrarAtendimentoModal, EncerramentoData } from './modals/EncerrarAtendimentoModal';
@@ -11,7 +9,6 @@ import { EditarContatoModal, ContatoEditado } from './modals/EditarContatoModal'
 import { VincularClienteModal } from './modals/VincularClienteModal';
 import { AbrirDemandaModal, NovaDemanda } from './modals/AbrirDemandaModal';
 import { SelecionarFilaModal } from '../../../components/chat/SelecionarFilaModal';
-import { FilaIndicator } from '../../../components/chat/FilaIndicator';
 import { Mensagem, NotaCliente, Demanda, StatusAtendimentoType, Ticket, CanalTipo } from './types';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useSidebar } from '../../../contexts/SidebarContext';
@@ -20,18 +17,16 @@ import { useMensagens } from './hooks/useMensagens';
 import { useHistoricoCliente } from './hooks/useHistoricoCliente';
 import { useContextoCliente } from './hooks/useContextoCliente';
 import { useWebSocket } from './hooks/useWebSocket';
-import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'; // 🆕 Atalhos de teclado
-import { useToast } from './contexts/ToastContext';
-import { useNotificacoesDesktop } from '../../../hooks/useNotificacoesDesktop'; // 🆕 Notificações desktop
-import { useNotas } from '../../../hooks/useNotas'; // ✅ Hook real de notas
-import { useDemandas } from '../../../hooks/useDemandas'; // ✅ Hook real de demandas
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import toast from 'react-hot-toast'; // ✅ Notificações simplificadas com toast
+import { useNotas } from '../../../hooks/useNotas';
+import { useDemandas } from '../../../hooks/useDemandas';
 import { useAuth } from '../../../hooks/useAuth';
-import { atendimentoService } from './services/atendimentoService'; // ✅ Service para atualizar contato e vincular cliente
+import { atendimentoService } from './services/atendimentoService';
+import { useAtendimentoStore } from '../../../stores/atendimentoStore';
+import { useNotificacoesDesktop } from '../../../hooks/useNotificacoesDesktop';
+import { PopupNotifications, PopupNotificationItem } from './components/PopupNotifications';
 import { resolveAvatarUrl } from '../../../utils/avatar';
-import { resolverNomeExibicao } from './utils';
-import { useAtendimentoStore } from '../../../stores/atendimentoStore'; // 🆕 STORE ZUSTAND
-
-const DEBUG = false; // ✅ Desabilitado após resolução do problema de tempo real
 
 const MAX_NOTIFICATION_PREVIEW = 140;
 
@@ -76,6 +71,9 @@ const gerarResumoNovoTicket = (ticket: any): string => {
   return 'Um cliente está aguardando atendimento.';
 };
 
+// Flag simples para logs de debug locais
+const DEBUG = process.env.NODE_ENV === 'development';
+
 const normalizarCanalNotificacao = (valor: unknown): CanalTipo => {
   if (typeof valor === 'string') {
     const canal = valor.toLowerCase();
@@ -90,7 +88,7 @@ const normalizarCanalNotificacao = (valor: unknown): CanalTipo => {
       (valor as any).nome ||
       (valor as any).canal ||
       (valor as any).canalTipo ||
-      (valor as any).canal_tipo
+      (valor as any).canal_tipo,
     );
   }
 
@@ -99,15 +97,15 @@ const normalizarCanalNotificacao = (valor: unknown): CanalTipo => {
 
 /**
  * ChatOmnichannel - Componente principal do chat omnichannel
- * 
+ *
  * Layout de 3 colunas:
  * 1. Sidebar Esquerda: Lista de atendimentos com tabs (Aberto/Resolvido/Retornos)
  * 2. Área Central: Chat com mensagens, header e input
  * 3. Painel Direito: Informações do cliente e demandas
- * 
+ *
  * TEMA: Integrado com ThemeContext do CRM
  * RESPONSIVE: Adapta larguras quando sidebar global está expandida/colapsada
- * 
+ *
  * INTEGRAÇÃO BACKEND:
  * - ✅ Tickets: 100% integrado (listar, criar, transferir, encerrar)
  * - ✅ Mensagens: 100% integrado (listar, enviar texto/áudio/anexos)
@@ -120,8 +118,13 @@ const normalizarCanalNotificacao = (valor: unknown): CanalTipo => {
 export const ChatOmnichannel: React.FC = () => {
   const { currentPalette } = useTheme();
   const { sidebarCollapsed } = useSidebar();
-  const { showToast } = useToast();
   const { user } = useAuth();
+
+  // ✅ Responsividade básica: evita crash quando usado em SSR/tests
+  const isMobile = typeof window !== 'undefined'
+    ? window.matchMedia('(max-width: 1024px)').matches
+    : false;
+  const mobileView: 'chat' = 'chat';
 
   // 🆕 Hook de notificações desktop
   const {
@@ -130,6 +133,55 @@ export const ChatOmnichannel: React.FC = () => {
     solicitarPermissao,
     mostrarNotificacao: exibirNotificacaoDesktop,
   } = useNotificacoesDesktop();
+
+  // Popup notifications (overlay): guarda ids para deduplicar
+  const [popupNotifications, setPopupNotifications] = useState<PopupNotificationItem[]>([]);
+  const messageNotificationIds = useRef<Set<string>>(new Set());
+  const ticketNotificationIds = useRef<Set<string>>(new Set());
+
+  const addPopupNotification = useCallback(
+    (notification: Omit<PopupNotificationItem, 'id' | 'createdAt'> & { id?: string }) => {
+      const id =
+        notification.id ||
+        `popup-${notification.type}-${notification.ticketId || notification.messageId || Date.now()}`;
+
+      setPopupNotifications((prev) => {
+        if (prev.some((item) => item.id === id)) return prev;
+        const item: PopupNotificationItem = {
+          ...notification,
+          id,
+          createdAt: new Date(),
+        };
+        // mantém ordem mais recente primeiro e limita crescimento
+        return [item, ...prev].slice(0, 8);
+      });
+    },
+    [],
+  );
+
+  const dismissPopupNotification = useCallback((id: string) => {
+    setPopupNotifications((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
+  const hasMessageNotification = useCallback((messageId?: string | null) => {
+    if (!messageId) return false;
+    return messageNotificationIds.current.has(messageId);
+  }, []);
+
+  const registerMessageNotification = useCallback((messageId?: string | null) => {
+    if (!messageId) return;
+    messageNotificationIds.current.add(messageId);
+  }, []);
+
+  const hasTicketNotification = useCallback((ticketId?: string | null) => {
+    if (!ticketId) return false;
+    return ticketNotificationIds.current.has(ticketId);
+  }, []);
+
+  const registerTicketNotification = useCallback((ticketId?: string | null) => {
+    if (!ticketId) return;
+    ticketNotificationIds.current.add(ticketId);
+  }, []);
 
   // 🆕 ZUSTAND STORE - Estado centralizado
   const {
@@ -162,326 +214,7 @@ export const ChatOmnichannel: React.FC = () => {
     setHistoricoCliente,
   } = useAtendimentoStore();
 
-  const [popupNotifications, setPopupNotifications] = useState<PopupNotificationItem[]>([]);
-  const popupTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const notifiedMessagesSetRef = useRef<Set<string>>(new Set());
-  const notifiedMessagesQueueRef = useRef<string[]>([]);
-  const notifiedTicketsSetRef = useRef<Set<string>>(new Set());
-  const notifiedTicketsQueueRef = useRef<string[]>([]);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const browserPermissionPendingRef = useRef(false);
-  const browserNotificationsRef = useRef<Record<string, Notification>>({});
-
-  const removePopupNotification = useCallback((id: string) => {
-    setPopupNotifications(prev => prev.filter(notification => notification.id !== id));
-
-    const timeoutId = popupTimeoutsRef.current[id];
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-      delete popupTimeoutsRef.current[id];
-    }
-
-    const browserNotification = browserNotificationsRef.current[id];
-    if (browserNotification) {
-      browserNotification.close();
-      delete browserNotificationsRef.current[id];
-    }
-  }, []);
-
-  const playPopupSound = useCallback(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContextCtor) {
-      return;
-    }
-
-    try {
-      let audioCtx = audioContextRef.current;
-      if (!audioCtx) {
-        audioCtx = new AudioContextCtor();
-        audioContextRef.current = audioCtx;
-      }
-
-      // ✅ CORREÇÃO: Só tentar reproduzir se AudioContext estiver em estado válido
-      // Evita erro "AudioContext was not allowed to start" antes de interação do usuário
-      if (audioCtx.state === 'suspended') {
-        // Tentar resumir, mas não criar som se falhar (usuário ainda não interagiu)
-        audioCtx.resume().catch(() => {
-          if (DEBUG) console.log('AudioContext ainda suspenso - aguardando interação do usuário');
-        });
-        return; // Não criar som enquanto suspended
-      }
-
-      // Se chegou aqui, contexto está 'running' e podemos criar som
-      const oscillator = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-
-      const now = audioCtx.currentTime;
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(660, now);
-      oscillator.frequency.exponentialRampToValueAtTime(880, now + 0.2);
-
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.04, now + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
-
-      oscillator.connect(gain);
-      gain.connect(audioCtx.destination);
-
-      oscillator.start(now);
-      oscillator.stop(now + 0.65);
-    } catch (error) {
-      if (DEBUG) console.warn('Não foi possível reproduzir som da notificação:', error);
-    }
-  }, []);
-
-  const showBrowserNotification = useCallback((notification: PopupNotificationItem) => {
-    if (typeof window === 'undefined' || typeof document === 'undefined') {
-      return;
-    }
-
-    if (!('Notification' in window)) {
-      return;
-    }
-
-    if (!document.hidden) {
-      return;
-    }
-
-    const trigger = () => {
-      try {
-        const brandName = 'ConectCRM';
-        const appOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-        const defaultIcon = `${appOrigin}/logo192.png`;
-        const browserNotification = new Notification(
-          `${brandName} • ${notification.title}`,
-          {
-            body: notification.message,
-            icon: notification.avatarUrl || defaultIcon,
-            badge: `${appOrigin}/favicon.ico`,
-            tag: notification.ticketId ? `ticket-${notification.ticketId}` : notification.id,
-            data: {
-              ticketId: notification.ticketId,
-              type: notification.type,
-            },
-          }
-        );
-
-        browserNotification.onclick = () => {
-          window.focus();
-          notification.onClick?.();
-          browserNotification.close();
-        };
-
-        browserNotification.onclose = () => {
-          delete browserNotificationsRef.current[notification.id];
-        };
-
-        browserNotificationsRef.current[notification.id] = browserNotification;
-      } catch (error) {
-        if (DEBUG) {
-          console.warn('Falha ao exibir notificação do navegador:', error);
-        }
-      }
-    };
-
-    const permission = Notification.permission;
-    if (permission === 'granted') {
-      trigger();
-      return;
-    }
-
-    if (permission === 'default' && !browserPermissionPendingRef.current) {
-      browserPermissionPendingRef.current = true;
-      Notification.requestPermission().then(result => {
-        browserPermissionPendingRef.current = false;
-        if (result === 'granted') {
-          trigger();
-        }
-      }).catch(() => {
-        browserPermissionPendingRef.current = false;
-      });
-    }
-  }, []);
-
-  const addPopupNotification = useCallback((
-    notification: Omit<PopupNotificationItem, 'id' | 'createdAt' | 'onClick'> & {
-      duration?: number;
-      onClick?: (id: string) => void;
-    }
-  ) => {
-    const id = `popup-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const createdAt = new Date();
-
-    const finalNotification: PopupNotificationItem = {
-      ...notification,
-      id,
-      createdAt,
-      onClick: () => {
-        if (notification.onClick) {
-          notification.onClick(id);
-        }
-        removePopupNotification(id);
-      }
-    };
-
-    setPopupNotifications(prev => {
-      const sanitized = prev.filter(existing => {
-        const sameTicket = notification.ticketId && existing.ticketId === notification.ticketId;
-        const sameType = existing.type === notification.type;
-
-        if (sameTicket && sameType) {
-          const timeoutId = popupTimeoutsRef.current[existing.id];
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-            delete popupTimeoutsRef.current[existing.id];
-          }
-          return false;
-        }
-
-        return true;
-      });
-
-      const next = [...sanitized, finalNotification];
-
-      if (next.length > 4) {
-        const excess = next.length - 4;
-        const toRemove = next.slice(0, excess);
-        toRemove.forEach(item => {
-          const timeoutId = popupTimeoutsRef.current[item.id];
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-            delete popupTimeoutsRef.current[item.id];
-          }
-        });
-
-        return next.slice(excess);
-      }
-
-      return next;
-    });
-
-    const timeoutId = setTimeout(() => {
-      removePopupNotification(id);
-    }, notification.duration ?? 8000);
-
-    popupTimeoutsRef.current[id] = timeoutId;
-    playPopupSound();
-    showBrowserNotification(finalNotification);
-
-    return id;
-  }, [removePopupNotification, playPopupSound, showBrowserNotification]);
-
-  const hasMessageNotification = useCallback((messageId?: string) => {
-    if (!messageId) {
-      return false;
-    }
-
-    return notifiedMessagesSetRef.current.has(messageId);
-  }, []);
-
-  const registerMessageNotification = useCallback((messageId?: string) => {
-    if (!messageId) {
-      return;
-    }
-
-    if (notifiedMessagesSetRef.current.has(messageId)) {
-      return;
-    }
-
-    notifiedMessagesSetRef.current.add(messageId);
-    notifiedMessagesQueueRef.current.push(messageId);
-
-    if (notifiedMessagesQueueRef.current.length > 50) {
-      const removed = notifiedMessagesQueueRef.current.shift();
-      if (removed) {
-        notifiedMessagesSetRef.current.delete(removed);
-      }
-    }
-  }, []);
-
-  const hasTicketNotification = useCallback((ticketId?: string) => {
-    if (!ticketId) {
-      return false;
-    }
-
-    return notifiedTicketsSetRef.current.has(ticketId);
-  }, []);
-
-  const registerTicketNotification = useCallback((ticketId?: string) => {
-    if (!ticketId) {
-      return;
-    }
-
-    if (notifiedTicketsSetRef.current.has(ticketId)) {
-      return;
-    }
-
-    notifiedTicketsSetRef.current.add(ticketId);
-    notifiedTicketsQueueRef.current.push(ticketId);
-
-    if (notifiedTicketsQueueRef.current.length > 50) {
-      const removed = notifiedTicketsQueueRef.current.shift();
-      if (removed) {
-        notifiedTicketsSetRef.current.delete(removed);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      Object.values(popupTimeoutsRef.current).forEach(timeoutId => {
-        clearTimeout(timeoutId);
-      });
-
-      popupTimeoutsRef.current = {};
-
-      Object.values(browserNotificationsRef.current).forEach(notification => {
-        notification.close();
-      });
-      browserNotificationsRef.current = {};
-
-      if (audioContextRef.current) {
-        audioContextRef.current.close().catch(() => undefined);
-        audioContextRef.current = null;
-      }
-    };
-  }, []);
-
-  // Estados para controle responsivo
-  const [clientePanelAberto, setClientePanelAberto] = useState(false);
-  const [mobileView, setMobileView] = useState<'tickets' | 'chat' | 'cliente'>('tickets');
-  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
-
-  // Detectar mudanças no tamanho da tela
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowWidth(window.innerWidth);
-
-      // Auto-fechar cliente panel em breakpoints menores
-      if (window.innerWidth < 1280) {
-        setClientePanelAberto(false);
-      }
-
-      // Reset para view de tickets no mobile quando redimensiona
-      if (window.innerWidth < 768 && mobileView !== 'tickets') {
-        setMobileView('tickets');
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [mobileView]);
-
-  // Breakpoints responsivos
-  const isDesktop = windowWidth >= 1280;
-  const isTablet = windowWidth >= 768 && windowWidth < 1280;
-  const isMobile = windowWidth < 768;
-
-  // Hooks do backend real - TICKETS
+  // ✅ HOOKS DO BACKEND REAL - TICKETS
   const {
     tickets,
     ticketSelecionado,
@@ -495,14 +228,25 @@ export const ChatOmnichannel: React.FC = () => {
     loading: loadingTickets,
     filtros,
     setFiltros,
-    totaisPorStatus
+    totaisPorStatus,
   } = useAtendimentos({
     autoRefresh: false, // WebSocket já cuida dos updates como nas principais plataformas
-    filtroInicial: { status: 'aberto' },
+    filtroInicial: { status: 'fila' },
     atendenteAtualId: user?.id ?? null,
   });
 
-  const [tabAtiva, setTabAtiva] = useState<StatusAtendimentoType>(filtros.status || 'aberto');
+  // ✅ Função de seleção simplificada (sem lógica mobile específica - Tailwind cuida disso)
+  const handleSelecionarTicket = useCallback(
+    (ticketId: string) => {
+      selecionarTicket(ticketId);
+    },
+    [selecionarTicket],
+  );
+
+  const [tabAtiva, setTabAtiva] = useState<StatusAtendimentoType>(filtros.status || 'fila');
+
+  // 🔄 Estado para progress bar de upload
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   useEffect(() => {
     if (filtros.status && filtros.status !== tabAtiva) {
@@ -510,20 +254,23 @@ export const ChatOmnichannel: React.FC = () => {
     }
   }, [filtros.status, tabAtiva]);
 
-  const handleChangeTab = useCallback((status: StatusAtendimentoType) => {
-    setTabAtiva(prev => (prev === status ? prev : status));
-    setFiltros(prev => {
-      if (prev.status === status && (prev.page ?? 1) === 1) {
-        return prev;
-      }
+  const handleChangeTab = useCallback(
+    (status: StatusAtendimentoType) => {
+      setTabAtiva((prev) => (prev === status ? prev : status));
+      setFiltros((prev) => {
+        if (prev.status === status && (prev.page ?? 1) === 1) {
+          return prev;
+        }
 
-      return {
-        ...prev,
-        status,
-        page: 1,
-      };
-    });
-  }, [setFiltros]);
+        return {
+          ...prev,
+          status,
+          page: 1,
+        };
+      });
+    },
+    [setFiltros],
+  );
 
   // Hooks do backend real - MENSAGENS
   const {
@@ -535,47 +282,35 @@ export const ChatOmnichannel: React.FC = () => {
     recarregar: recarregarMensagens,
     adicionarMensagemRecebida, // 🔥 NOVA: para WebSocket
     loading: loadingMensagens,
-    enviando: enviandoMensagem
+    enviando: enviandoMensagem,
   } = useMensagens({
-    ticketId: ticketSelecionado?.id || null
+    ticketId: ticketSelecionado?.id || null,
+    onUploadProgress: setUploadProgress, // 🔄 NOVO: Callback de progresso
   });
 
   // 🔧 MEMOIZAÇÃO: Estabiliza clienteId/telefone para evitar loops nos hooks abaixo
   const clienteIdEstavel = useMemo(
     () => ticketSelecionado?.contato?.clienteVinculado?.id || null,
-    [ticketSelecionado?.contato?.clienteVinculado?.id]
+    [ticketSelecionado?.contato?.clienteVinculado?.id],
   );
 
   const telefoneEstavel = useMemo(
     () => ticketSelecionado?.contato?.telefone || null,
-    [ticketSelecionado?.contato?.telefone]
+    [ticketSelecionado?.contato?.telefone],
   );
 
   // 🆕 Hooks do backend real - HISTÓRICO DO CLIENTE
-  const {
-    historico,
-    loading: loadingHistorico
-  } = useHistoricoCliente({
+  const { historico, loading: loadingHistorico } = useHistoricoCliente({
     clienteId: clienteIdEstavel,
-    autoLoad: true
+    autoLoad: true,
   });
 
   // 🆕 Hooks do backend real - CONTEXTO DO CLIENTE
-  const {
-    contexto,
-    loading: loadingContexto
-  } = useContextoCliente({
+  const { contexto, loading: loadingContexto } = useContextoCliente({
     clienteId: clienteIdEstavel,
     telefone: telefoneEstavel,
-    autoLoad: true
+    autoLoad: true,
   });
-
-  const handleSelecionarTicketResponsivo = useCallback((ticketId: string) => {
-    selecionarTicket(ticketId);
-    if (isMobile) {
-      setMobileView('chat');
-    }
-  }, [selecionarTicket, isMobile]);
 
   // 🔧 REFS ESTÁVEIS PARA WEBSOCKET - Apenas para popups/notificações
   type WebsocketCallbacks = {
@@ -623,12 +358,14 @@ export const ChatOmnichannel: React.FC = () => {
           return;
         }
 
-        const ticketAlvo = tickets.find(item => item.id === mensagem.ticketId);
+        const ticketAlvo = tickets.find((item) => item.id === mensagem.ticketId);
         // 🎯 Usar nome do cliente vinculado se disponível
         const titulo = ticketAlvo?.contato
           ? resolverNomeExibicao(ticketAlvo.contato)
-          : (mensagem.remetente?.nome || 'Cliente');
-        const avatarUrl = resolveAvatarUrl(ticketAlvo?.contato?.foto || mensagem.remetente?.foto || null) || undefined;
+          : mensagem.remetente?.nome || 'Cliente';
+        const avatarUrl =
+          resolveAvatarUrl(ticketAlvo?.contato?.foto || mensagem.remetente?.foto || null) ||
+          undefined;
         const canal = ticketAlvo?.canal || normalizarCanalNotificacao((mensagem as any)?.canal);
 
         addPopupNotification({
@@ -640,11 +377,11 @@ export const ChatOmnichannel: React.FC = () => {
           avatarUrl,
           canal,
           onClick: () => {
-            if (tabAtiva !== 'aberto') {
-              handleChangeTab('aberto');
+            if (tabAtiva !== 'fila') {
+              handleChangeTab('fila');
             }
-            handleSelecionarTicketResponsivo(mensagem.ticketId);
-          }
+            handleSelecionarTicket(mensagem.ticketId);
+          },
         });
 
         registerMessageNotification(mensagemId);
@@ -657,9 +394,18 @@ export const ChatOmnichannel: React.FC = () => {
 
         const contato = ticket?.contato || {};
         // 🎯 Usar nome do cliente vinculado se disponível
-        const titulo = contato.clienteVinculado?.nome || contato.nome || ticket?.contatoNome || ticket?.contato_nome || 'Novo atendimento';
-        const avatarUrl = resolveAvatarUrl(contato.foto || ticket?.contatoFoto || ticket?.contato_foto || null) || undefined;
-        const canal = normalizarCanalNotificacao(ticket?.canal ?? ticket?.canalTipo ?? ticket?.canal_tipo);
+        const titulo =
+          contato.clienteVinculado?.nome ||
+          contato.nome ||
+          ticket?.contatoNome ||
+          ticket?.contato_nome ||
+          'Novo atendimento';
+        const avatarUrl =
+          resolveAvatarUrl(contato.foto || ticket?.contatoFoto || ticket?.contato_foto || null) ||
+          undefined;
+        const canal = normalizarCanalNotificacao(
+          ticket?.canal ?? ticket?.canalTipo ?? ticket?.canal_tipo,
+        );
 
         addPopupNotification({
           type: 'novo-ticket',
@@ -669,11 +415,11 @@ export const ChatOmnichannel: React.FC = () => {
           avatarUrl,
           canal,
           onClick: () => {
-            if (tabAtiva !== 'aberto') {
-              handleChangeTab('aberto');
+            if (tabAtiva !== 'fila') {
+              handleChangeTab('fila');
             }
-            handleSelecionarTicketResponsivo(ticketId);
-          }
+            handleSelecionarTicket(ticketId);
+          },
         });
 
         registerTicketNotification(ticketId);
@@ -689,9 +435,9 @@ export const ChatOmnichannel: React.FC = () => {
     registerMessageNotification,
     hasTicketNotification,
     registerTicketNotification,
-    handleSelecionarTicketResponsivo,
+    handleSelecionarTicket,
     handleChangeTab,
-    tabAtiva
+    tabAtiva,
   ]);
 
   // 🆕 Solicitar permissão de notificações desktop ao montar
@@ -705,10 +451,19 @@ export const ChatOmnichannel: React.FC = () => {
     }
   }, [notificacoesSuportadas, permissaoNotificacoes, solicitarPermissao]);
 
+  // 🆕 Estado de digitação
+  const [usuarioDigitandoNome, setUsuarioDigitandoNome] = useState<string | null>(null);
+  const digitandoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // 🆕 Hooks do backend real - WEBSOCKET TEMPO REAL
   // ✅ STORE ZUSTAND: WebSocket já atualiza store diretamente em useWebSocket.ts
   // Callbacks aqui são APENAS para notificações/UI (popups, toasts)
-  const { connected: wsConnected, entrarNoTicket, sairDoTicket } = useWebSocket({
+  const {
+    connected: wsConnected,
+    entrarNoTicket,
+    sairDoTicket,
+    emitirDigitando,
+  } = useWebSocket({
     enabled: true,
     autoConnect: true,
     events: {
@@ -738,7 +493,11 @@ export const ChatOmnichannel: React.FC = () => {
         websocketCallbacksRef.current.mostrarPopupMensagem(mensagem);
 
         // 🆕 Notificação desktop se janela não está focada e mensagem é do cliente
-        if (document.hidden && permissaoNotificacoes === 'granted' && mensagem.remetente !== 'atendente') {
+        if (
+          document.hidden &&
+          permissaoNotificacoes === 'granted' &&
+          mensagem.remetente !== 'atendente'
+        ) {
           const conteudoPreview = mensagem.conteudo?.substring(0, 100) || 'Nova mensagem recebida';
           exibirNotificacaoDesktop({
             titulo: `Nova mensagem de ${mensagem.remetenteNome || 'Cliente'}`,
@@ -768,7 +527,25 @@ export const ChatOmnichannel: React.FC = () => {
       onTicketEncerrado: (ticket: any) => {
         if (DEBUG) console.log('🏁 Ticket encerrado via store');
       },
-    }
+
+      // 🆕 NOVO: Callback para usuário digitando
+      onUsuarioDigitando: (data: { ticketId: string; usuarioId: string; usuarioNome: string }) => {
+        // Só mostra indicador se for o ticket atual E usuário diferente do atual
+        if (data.ticketId === ticketSelecionado?.id && data.usuarioId !== user?.id) {
+          setUsuarioDigitandoNome(data.usuarioNome);
+
+          // Limpar timeout anterior
+          if (digitandoTimeoutRef.current) {
+            clearTimeout(digitandoTimeoutRef.current);
+          }
+
+          // Remover indicador após 3 segundos de inatividade
+          digitandoTimeoutRef.current = setTimeout(() => {
+            setUsuarioDigitandoNome(null);
+          }, 3000);
+        }
+      },
+    },
   });
 
   // 🔥 NOVO: Entrar/sair da sala WebSocket quando ticket muda
@@ -784,6 +561,15 @@ export const ChatOmnichannel: React.FC = () => {
       sairDoTicket(ticketSelecionado.id);
     };
   }, [ticketSelecionado?.id, wsConnected, entrarNoTicket, sairDoTicket]);
+
+  // 🆕 Limpar timeout de digitação ao desmontar
+  useEffect(() => {
+    return () => {
+      if (digitandoTimeoutRef.current) {
+        clearTimeout(digitandoTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // ✅ Hook de notas (dados reais do backend)
   const {
@@ -852,152 +638,173 @@ export const ChatOmnichannel: React.FC = () => {
   const mensagensDoTicket = mensagens;
 
   // Handlers
-  const handleSelecionarTicket = useCallback((ticketId: string) => {
-    selecionarTicket(ticketId);
-  }, [selecionarTicket]);
-
   const handleNovoAtendimento = useCallback(() => {
     setModalNovoAtendimento(true);
   }, []);
 
-  const handleConfirmarNovoAtendimento = useCallback(async (dados: NovoAtendimentoData) => {
-    try {
-      const novoTicket = await criarTicket(dados);
+  const handleConfirmarNovoAtendimento = useCallback(
+    async (dados: NovoAtendimentoData) => {
+      try {
+        const novoTicket = await criarTicket(dados);
 
-      // Seleciona o novo ticket
-      selecionarTicket(novoTicket.id);
-      setModalNovoAtendimento(false);
-      showToast('success', 'Atendimento criado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao criar ticket:', error);
-      showToast('error', 'Erro ao criar atendimento. Tente novamente.');
-    }
-  }, [criarTicket, selecionarTicket, showToast]);
-
-  const handleEnviarMensagem = useCallback(async (conteudo: string, anexos: File[] = []) => {
-    if (!ticketSelecionado) return;
-
-    const texto = conteudo.trim();
-    const possuiAnexos = anexos.length > 0;
-
-    if (!texto && !possuiAnexos) {
-      return;
-    }
-
-    try {
-      if (possuiAnexos) {
-        await enviarMensagemComAnexos(texto, anexos);
-      } else {
-        await enviarMensagem(texto);
+        // Seleciona o novo ticket
+        selecionarTicket(novoTicket.id);
+        setModalNovoAtendimento(false);
+        toast.success('Atendimento criado com sucesso!');
+      } catch (error) {
+        console.error('Erro ao criar ticket:', error);
+        toast.error('Erro ao criar atendimento. Tente novamente.');
       }
-    } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
-      showToast('error', 'Erro ao enviar mensagem. Tente novamente.');
-    }
-  }, [ticketSelecionado, enviarMensagem, enviarMensagemComAnexos, showToast]);
+    },
+    [criarTicket, selecionarTicket],
+  );
+
+  const handleEnviarMensagem = useCallback(
+    async (conteudo: string, anexos: File[] = []) => {
+      if (!ticketSelecionado) return;
+
+      const texto = conteudo.trim();
+      const possuiAnexos = anexos.length > 0;
+
+      if (!texto && !possuiAnexos) {
+        return;
+      }
+
+      try {
+        if (possuiAnexos) {
+          await enviarMensagemComAnexos(texto, anexos);
+        } else {
+          await enviarMensagem(texto);
+        }
+      } catch (error) {
+        console.error('Erro ao enviar mensagem:', error);
+        toast.error('Erro ao enviar mensagem. Tente novamente.');
+      }
+    },
+    [ticketSelecionado, enviarMensagem, enviarMensagemComAnexos],
+  );
 
   const handleTransferir = useCallback(() => {
     if (!ticketSelecionado) return;
     if (ticketSelecionado.status === 'resolvido') {
-      showToast('info', 'Este atendimento já está resolvido.');
+      toast('Este atendimento já está resolvido.');
       return;
     }
 
     setModalTransferir(true);
-  }, [ticketSelecionado, showToast]);
+  }, [ticketSelecionado]);
 
-  const handleEnviarAudio = useCallback(async (audio: Blob, duracao: number) => {
-    if (!ticketSelecionado) return;
+  const handleEnviarAudio = useCallback(
+    async (audio: Blob, duracao: number) => {
+      if (!ticketSelecionado) return;
 
-    try {
-      await enviarAudio(audio, duracao);
-    } catch (error) {
-      console.error('Erro ao enviar áudio:', error);
-      showToast('error', 'Erro ao enviar áudio. Tente novamente.');
-    }
-  }, [ticketSelecionado, enviarAudio, showToast]);
+      try {
+        await enviarAudio(audio, duracao);
+      } catch (error) {
+        console.error('Erro ao enviar áudio:', error);
+        toast.error('Erro ao enviar áudio. Tente novamente.');
+      }
+    },
+    [ticketSelecionado, enviarAudio],
+  );
 
-  const handleConfirmarTransferencia = useCallback(async (dados: TransferenciaData) => {
-    if (!ticketSelecionado) return;
+  const handleConfirmarTransferencia = useCallback(
+    async (dados: TransferenciaData) => {
+      if (!ticketSelecionado) return;
 
-    try {
-      await transferirTicket(ticketSelecionado.id, dados);
-      setModalTransferir(false);
-      showToast('success', 'Atendimento transferido com sucesso!');
-    } catch (error) {
-      console.error('Erro ao transferir ticket:', error);
-      showToast('error', 'Erro ao transferir atendimento. Tente novamente.');
-    }
-  }, [ticketSelecionado, transferirTicket, showToast]);
+      try {
+        await transferirTicket(ticketSelecionado.id, dados);
+        setModalTransferir(false);
+        toast.success('Atendimento transferido com sucesso!');
+      } catch (error) {
+        console.error('Erro ao transferir ticket:', error);
+        toast.error('Erro ao transferir atendimento. Tente novamente.');
+      }
+    },
+    [ticketSelecionado, transferirTicket],
+  );
 
   const handleEncerrar = useCallback(() => {
     if (!ticketSelecionado) return;
     if (ticketSelecionado.status === 'resolvido') {
-      showToast('info', 'Este atendimento já está resolvido.');
+      toast('Este atendimento já está resolvido.');
       return;
     }
 
     setModalEncerrar(true);
-  }, [ticketSelecionado, showToast]);
+  }, [ticketSelecionado]);
 
-  const handleConfirmarEncerramento = useCallback(async (dados: EncerramentoData) => {
-    if (!ticketSelecionado) return;
+  const handleConfirmarEncerramento = useCallback(
+    async (dados: EncerramentoData) => {
+      if (!ticketSelecionado) return;
 
-    try {
-      await encerrarTicket(ticketSelecionado.id, {
-        motivo: dados.motivo as any,
-        observacoes: dados.observacoes,
-        criarFollowUp: dados.criarFollowUp,
-        dataFollowUp: dados.dataFollowUp,
-        solicitarAvaliacao: dados.solicitarAvaliacao
-      });
-      setModalEncerrar(false);
-      showToast('success', 'Atendimento encerrado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao encerrar ticket:', error);
-      showToast('error', 'Erro ao encerrar atendimento. Tente novamente.');
-    }
-  }, [ticketSelecionado, encerrarTicket, showToast]);
+      try {
+        await encerrarTicket(ticketSelecionado.id, {
+          motivo: dados.motivo as any,
+          observacoes: dados.observacoes,
+          criarFollowUp: dados.criarFollowUp,
+          dataFollowUp: dados.dataFollowUp,
+          solicitarAvaliacao: dados.solicitarAvaliacao,
+        });
+        setModalEncerrar(false);
+        toast.success('Atendimento encerrado com sucesso!');
+      } catch (error) {
+        console.error('Erro ao encerrar ticket:', error);
+        toast.error('Erro ao encerrar atendimento. Tente novamente.');
+      }
+    },
+    [ticketSelecionado, encerrarTicket],
+  );
 
   // 🆕 NOVO: Mudar status do ticket diretamente
-  const handleMudarStatus = useCallback(async (novoStatus: StatusAtendimentoType) => {
-    if (!ticketSelecionado) return;
+  const handleMudarStatus = useCallback(
+    async (novoStatus: StatusAtendimentoType) => {
+      if (!ticketSelecionado) return;
 
-    try {
-      // Se for resolver, abre modal de encerramento
-      if (novoStatus === 'resolvido') {
-        handleEncerrar();
-        return;
+      try {
+        // Se for resolver, abre modal de encerramento
+        if (novoStatus === 'resolvido') {
+          handleEncerrar();
+          return;
+        }
+
+        // Se for fechar, também abre modal
+        if (novoStatus === 'fechado') {
+          handleEncerrar();
+          return;
+        }
+
+        // Para outros status, atualiza direto via API
+        await atendimentoService.atualizarStatusTicket(ticketSelecionado.id, novoStatus);
+
+        // Atualizar ticket local
+        atualizarTicketLocal(ticketSelecionado.id, { status: novoStatus });
+
+        toast.success(`Status alterado para "${novoStatus}" com sucesso!`);
+      } catch (error) {
+        console.error('Erro ao mudar status:', error);
+        toast.error('Erro ao alterar status. Tente novamente.');
       }
-
-      // Se for fechar, também abre modal
-      if (novoStatus === 'fechado') {
-        handleEncerrar();
-        return;
-      }
-
-      // Para outros status, atualiza direto via API
-      await atendimentoService.atualizarStatusTicket(ticketSelecionado.id, novoStatus);
-
-      // Atualizar ticket local
-      atualizarTicketLocal(ticketSelecionado.id, { status: novoStatus });
-
-      showToast('success', `Status alterado para "${novoStatus}" com sucesso!`);
-    } catch (error) {
-      console.error('Erro ao mudar status:', error);
-      showToast('error', 'Erro ao alterar status. Tente novamente.');
-    }
-  }, [ticketSelecionado, handleEncerrar, atualizarTicketLocal, showToast]);
+    },
+    [ticketSelecionado, handleEncerrar, atualizarTicketLocal],
+  );
 
   // ⌨️ ATALHOS DE TECLADO para agilizar atendimento
-  const algumModalAberto = modalNovoAtendimento || modalTransferir || modalEncerrar ||
-    modalEditarContato || modalVincularCliente || modalAbrirDemanda;
+  const algumModalAberto =
+    modalNovoAtendimento ||
+    modalTransferir ||
+    modalEncerrar ||
+    modalEditarContato ||
+    modalVincularCliente ||
+    modalAbrirDemanda;
 
   useKeyboardShortcuts({
-    ticketSelecionado: ticketSelecionado ? {
-      id: ticketSelecionado.id,
-      status: ticketSelecionado.status,
-    } : null,
+    ticketSelecionado: ticketSelecionado
+      ? {
+        id: ticketSelecionado.id,
+        status: ticketSelecionado.status,
+      }
+      : null,
     onMudarStatus: handleMudarStatus,
     modalAberto: algumModalAberto,
   });
@@ -1012,135 +819,159 @@ export const ChatOmnichannel: React.FC = () => {
     setModalEditarContato(true);
   }, []);
 
-  const handleConfirmarEdicaoContato = useCallback(async (dados: ContatoEditado) => {
-    if (!ticketSelecionado?.contato?.id) return;
+  const handleConfirmarEdicaoContato = useCallback(
+    async (dados: ContatoEditado) => {
+      if (!ticketSelecionado?.contato?.id) return;
 
-    try {
-      console.log('📝 Atualizando contato:', dados);
+      try {
+        console.log('📝 Atualizando contato:', dados);
 
-      const contatoAtualizado = await atendimentoService.atualizarContato(
-        ticketSelecionado.contato.id,
-        dados
-      );
+        const contatoAtualizado = await atendimentoService.atualizarContato(
+          ticketSelecionado.contato.id,
+          dados,
+        );
 
-      // Atualizar ticket local com novo contato
-      atualizarTicketLocal(ticketSelecionado.id, {
-        contato: contatoAtualizado
-      });
+        // Atualizar ticket local com novo contato
+        atualizarTicketLocal(ticketSelecionado.id, {
+          contato: contatoAtualizado,
+        });
 
-      showToast('success', 'Contato atualizado com sucesso!');
-      setModalEditarContato(false);
-    } catch (error) {
-      console.error('❌ Erro ao atualizar contato:', error);
-      showToast('error', 'Erro ao atualizar contato');
-    }
-  }, [ticketSelecionado, atualizarTicketLocal, showToast]);
+        toast.success('Contato atualizado com sucesso!');
+        setModalEditarContato(false);
+      } catch (error) {
+        console.error('❌ Erro ao atualizar contato:', error);
+        toast.error('Erro ao atualizar contato');
+      }
+    },
+    [ticketSelecionado, atualizarTicketLocal],
+  );
 
   const handleVincularCliente = useCallback(() => {
     setModalVincularCliente(true);
   }, []);
 
-  const handleConfirmarVinculoCliente = useCallback(async (clienteId: string) => {
-    if (!ticketSelecionado?.contato?.id) return;
+  const handleConfirmarVinculoCliente = useCallback(
+    async (clienteId: string) => {
+      if (!ticketSelecionado?.contato?.id) return;
 
-    try {
-      console.log('🔗 Vinculando cliente:', clienteId);
+      try {
+        console.log('🔗 Vinculando cliente:', clienteId);
 
-      const contatoAtualizado = await atendimentoService.vincularCliente(
-        ticketSelecionado.contato.id,
-        clienteId
-      );
+        const contatoAtualizado = await atendimentoService.vincularCliente(
+          ticketSelecionado.contato.id,
+          clienteId,
+        );
 
-      // Atualizar ticket local com novo contato vinculado
-      atualizarTicketLocal(ticketSelecionado.id, {
-        contato: contatoAtualizado
-      });
+        // Atualizar ticket local com novo contato vinculado
+        atualizarTicketLocal(ticketSelecionado.id, {
+          contato: contatoAtualizado,
+        });
 
-      showToast('success', 'Cliente vinculado com sucesso!');
-      setModalVincularCliente(false);
-    } catch (error) {
-      console.error('❌ Erro ao vincular cliente:', error);
-      showToast('error', 'Erro ao vincular cliente');
-    }
-  }, [ticketSelecionado, atualizarTicketLocal, showToast]);
+        toast.success('Cliente vinculado com sucesso!');
+        setModalVincularCliente(false);
+      } catch (error) {
+        console.error('❌ Erro ao vincular cliente:', error);
+        toast.error('Erro ao vincular cliente');
+      }
+    },
+    [ticketSelecionado, atualizarTicketLocal],
+  );
 
   const handleAbrirDemanda = useCallback(() => {
     setModalAbrirDemanda(true);
   }, []);
 
-  const handleConfirmarNovaDemanda = useCallback(async (dados: NovaDemanda) => {
-    if (!ticketSelecionado) return;
+  const handleConfirmarNovaDemanda = useCallback(
+    async (dados: NovaDemanda) => {
+      if (!ticketSelecionado) return;
 
-    try {
-      const clienteId = contexto?.cliente?.id;
-      const ticketId = ticketSelecionado.id;
-      const telefone = ticketSelecionado.contato?.telefone;
+      try {
+        const clienteId = contexto?.cliente?.id;
+        const ticketId = ticketSelecionado.id;
+        const telefone = ticketSelecionado.contato?.telefone;
 
-      // Mapear tipo da modal para tipo do backend
-      const tipoMapping: Record<string, 'tecnica' | 'comercial' | 'financeira' | 'suporte' | 'reclamacao' | 'solicitacao' | 'outros'> = {
-        'bug': 'tecnica',
-        'feature': 'comercial',
-        'suporte': 'suporte',
-        'melhoria': 'solicitacao'
-      };
+        // Mapear tipo da modal para tipo do backend
+        const tipoMapping: Record<
+          string,
+          | 'tecnica'
+          | 'comercial'
+          | 'financeira'
+          | 'suporte'
+          | 'reclamacao'
+          | 'solicitacao'
+          | 'outros'
+        > = {
+          bug: 'tecnica',
+          feature: 'comercial',
+          suporte: 'suporte',
+          melhoria: 'solicitacao',
+        };
 
-      // ✅ Criar demanda no backend
-      const novaDemanda = await criarDemanda({
-        clienteId,
-        ticketId,
-        contatoTelefone: telefone,
-        titulo: dados.titulo,
-        descricao: dados.descricao,
-        tipo: tipoMapping[dados.tipo] || 'outros',
-        prioridade: dados.prioridade,
-        status: 'aberta',
-        dataVencimento: dados.prazo?.toISOString(),
-        responsavelId: dados.responsavelId,
-      });
+        // ✅ Criar demanda no backend
+        const novaDemanda = await criarDemanda({
+          clienteId,
+          ticketId,
+          contatoTelefone: telefone,
+          titulo: dados.titulo,
+          descricao: dados.descricao,
+          tipo: tipoMapping[dados.tipo] || 'outros',
+          prioridade: dados.prioridade,
+          status: 'aberta',
+          dataVencimento: dados.prazo?.toISOString(),
+          responsavelId: dados.responsavelId,
+        });
 
-      if (novaDemanda) {
-        showToast('success', 'Demanda criada com sucesso!', 2000);
+        if (novaDemanda) {
+          toast.success('Demanda criada com sucesso!', 2000);
+        }
+      } catch (error) {
+        console.error('❌ Erro ao criar demanda:', error);
+        toast.error('Erro ao criar demanda. Tente novamente.');
       }
-    } catch (error) {
-      console.error('❌ Erro ao criar demanda:', error);
-      showToast('error', 'Erro ao criar demanda. Tente novamente.');
-    }
-  }, [ticketSelecionado, contexto, criarDemanda, showToast]);
+    },
+    [ticketSelecionado, contexto, criarDemanda],
+  );
 
-  const handleAdicionarNota = useCallback(async (conteudo: string, importante: boolean) => {
-    if (!ticketSelecionado) return;
+  const handleAdicionarNota = useCallback(
+    async (conteudo: string, importante: boolean) => {
+      if (!ticketSelecionado) return;
 
-    try {
-      const clienteId = contexto?.cliente?.id;
-      const ticketId = ticketSelecionado.id;
-      const telefone = ticketSelecionado.contato?.telefone;
+      try {
+        const clienteId = contexto?.cliente?.id;
+        const ticketId = ticketSelecionado.id;
+        const telefone = ticketSelecionado.contato?.telefone;
 
-      // ✅ Criar nota no backend
-      await criarNota({
-        clienteId,
-        ticketId,
-        contatoTelefone: telefone,
-        conteudo,
-        importante,
-      });
+        // ✅ Criar nota no backend
+        await criarNota({
+          clienteId,
+          ticketId,
+          contatoTelefone: telefone,
+          conteudo,
+          importante,
+        });
 
-      showToast('success', 'Nota adicionada com sucesso!', 2000);
-    } catch (error) {
-      console.error('❌ Erro ao adicionar nota:', error);
-      showToast('error', 'Erro ao adicionar nota. Tente novamente.');
-    }
-  }, [ticketSelecionado, contexto, criarNota, showToast]);
+        toast.success('Nota adicionada com sucesso!', 2000);
+      } catch (error) {
+        console.error('❌ Erro ao adicionar nota:', error);
+        toast.error('Erro ao adicionar nota. Tente novamente.');
+      }
+    },
+    [ticketSelecionado, contexto, criarNota],
+  );
 
-  const handleExcluirNota = useCallback(async (notaId: string) => {
-    try {
-      // ✅ Deletar nota no backend
-      await deletarNota(notaId);
-      showToast('success', 'Nota excluída com sucesso!', 2000);
-    } catch (error) {
-      console.error('❌ Erro ao excluir nota:', error);
-      showToast('error', 'Erro ao excluir nota. Tente novamente.');
-    }
-  }, [deletarNota, showToast]);
+  const handleExcluirNota = useCallback(
+    async (notaId: string) => {
+      try {
+        // ✅ Deletar nota no backend
+        await deletarNota(notaId);
+        toast.success('Nota excluída com sucesso!', 2000);
+      } catch (error) {
+        console.error('❌ Erro ao excluir nota:', error);
+        toast.error('Erro ao excluir nota. Tente novamente.');
+      }
+    },
+    [deletarNota],
+  );
 
   // 🆕 Handlers para Sistema de Filas
   const handleSelecionarFila = useCallback(() => {
@@ -1148,28 +979,31 @@ export const ChatOmnichannel: React.FC = () => {
     setModalSelecionarFila(true);
   }, [ticketSelecionado]);
 
-  const handleFilaSelecionada = useCallback(async (fila: any, atendenteId: string) => {
-    if (!ticketSelecionado) return;
+  const handleFilaSelecionada = useCallback(
+    async (fila: any, atendenteId: string) => {
+      if (!ticketSelecionado) return;
 
-    try {
-      console.log('🎯 Fila selecionada:', { filaId: fila.id, atendenteId });
+      try {
+        console.log('🎯 Fila selecionada:', { filaId: fila.id, atendenteId });
 
-      // Atualizar ticket com fila e atendente
-      await atendimentoService.atualizarTicket(ticketSelecionado.id, {
-        filaId: fila.id,
-        atendenteId,
-      });
+        // Atualizar ticket com fila e atendente
+        await atendimentoService.atualizarTicket(ticketSelecionado.id, {
+          filaId: fila.id,
+          atendenteId,
+        });
 
-      // Recarregar dados do ticket para garantir sincronização completa
-      await recarregarTickets();
+        // Recarregar dados do ticket para garantir sincronização completa
+        await recarregarTickets();
 
-      setModalSelecionarFila(false);
-      showToast('success', 'Fila atribuída com sucesso!');
-    } catch (error) {
-      console.error('❌ Erro ao atribuir fila:', error);
-      showToast('error', 'Erro ao atribuir fila. Tente novamente.');
-    }
-  }, [ticketSelecionado, recarregarTickets, showToast]);
+        setModalSelecionarFila(false);
+        toast.success('Fila atribuída com sucesso!');
+      } catch (error) {
+        console.error('❌ Erro ao atribuir fila:', error);
+        toast.error('Erro ao atribuir fila. Tente novamente.');
+      }
+    },
+    [ticketSelecionado, recarregarTickets],
+  );
 
   const handleRemoverFila = useCallback(async () => {
     if (!ticketSelecionado) return;
@@ -1189,259 +1023,25 @@ export const ChatOmnichannel: React.FC = () => {
 
       await recarregarTickets();
 
-      showToast('success', 'Fila removida com sucesso!');
+      toast.success('Fila removida com sucesso!');
     } catch (error) {
       console.error('❌ Erro ao remover fila:', error);
-      showToast('error', 'Erro ao remover fila. Tente novamente.');
+      toast.error('Erro ao remover fila. Tente novamente.');
     }
-  }, [ticketSelecionado, atualizarTicketLocal, recarregarTickets, showToast]);
+  }, [ticketSelecionado, atualizarTicketLocal, recarregarTickets]);
 
-  // Handlers específicos para controle responsivo
-  const handleToggleClientePanel = useCallback(() => {
-    if (isTablet) {
-      setClientePanelAberto(prev => !prev);
-    }
-  }, [isTablet]);
+  // ✅ LAYOUT RESPONSIVO SIMPLIFICADO (Grid Tailwind Nativo)
+  return (
+    <div className="h-full bg-gray-50 overflow-hidden">
+      {/* Grid Responsivo: Mobile (1 col) | Tablet (2 cols) | Desktop (3 cols) */}
+      <div className="h-full grid grid-cols-1 lg:grid-cols-[320px_1fr] xl:grid-cols-[340px_1fr_320px] gap-0">
 
-  const handleMobileViewChange = useCallback((view: 'tickets' | 'chat' | 'cliente') => {
-    setMobileView(view);
-  }, []);
-
-  // Renderização de layouts por breakpoint
-  const renderDesktopLayout = () => (
-    <div className="chat-layout-responsive">
-      {/* Coluna 1: Lista de Atendimentos */}
-      <div className="sidebar-responsive">
-        <AtendimentosSidebar
-          tickets={tickets}
-          ticketSelecionado={ticketSelecionado?.id || ''}
-          onSelecionarTicket={handleSelecionarTicketResponsivo}
-          onNovoAtendimento={handleNovoAtendimento}
-          theme={currentPalette}
-          loading={loadingTickets}
-          tabAtiva={tabAtiva}
-          onChangeTab={handleChangeTab}
-          contagemPorStatus={totaisPorStatus}
-        />
-      </div>
-
-      {/* Coluna 2: Área Central do Chat */}
-      <div className="chat-area-responsive">
-        {!ticketSelecionado ? (
-          // Estado vazio - Nenhum ticket selecionado
-          <div className="flex items-center justify-center h-full bg-white">
-            <div className="text-center px-4">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                </svg>
-              </div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                Nenhum atendimento selecionado
-              </h2>
-              <p className="text-gray-600 text-sm">
-                Selecione um atendimento na lista à esquerda ou crie um novo
-              </p>
-            </div>
-          </div>
-        ) : (
-          <ChatArea
-            ticket={ticketSelecionado}
-            mensagens={mensagensDoTicket}
-            onEnviarMensagem={handleEnviarMensagem}
-            onEnviarAudio={handleEnviarAudio}
-            onTransferir={handleTransferir}
-            onEncerrar={handleEncerrar}
-            onLigar={handleLigar}
-            onMudarStatus={handleMudarStatus}
-            onSelecionarFila={handleSelecionarFila}
-            onRemoverFila={handleRemoverFila}
-            theme={currentPalette}
-            loading={loadingMensagens}
-            enviandoMensagem={enviandoMensagem}
-          />
-        )}
-      </div>
-
-      {/* Coluna 3: Painel do Cliente */}
-      {ticketSelecionado && (
-        <div className="cliente-panel-responsive">
-          <ClientePanel
-            contato={ticketSelecionado.contato}
-            historico={historico || []}
-            demandas={demandas || []}
-            notas={notas || []}
-            onEditarContato={handleEditarContato}
-            onVincularCliente={handleVincularCliente}
-            onAbrirDemanda={handleAbrirDemanda}
-            onAdicionarNota={handleAdicionarNota}
-            onExcluirNota={handleExcluirNota}
-            theme={currentPalette}
-          />
-        </div>
-      )}
-    </div>
-  );
-
-  const renderTabletLayout = () => (
-    <div className="chat-layout-responsive">
-      {/* Coluna 1: Lista de Atendimentos */}
-      <div className="sidebar-responsive">
-        <AtendimentosSidebar
-          tickets={tickets}
-          ticketSelecionado={ticketSelecionado?.id || ''}
-          onSelecionarTicket={handleSelecionarTicketResponsivo}
-          onNovoAtendimento={handleNovoAtendimento}
-          theme={currentPalette}
-          loading={loadingTickets}
-          tabAtiva={tabAtiva}
-          onChangeTab={handleChangeTab}
-          contagemPorStatus={totaisPorStatus}
-        />
-      </div>
-
-      {/* Coluna 2: Área Central do Chat com botão para abrir cliente */}
-      <div className="chat-area-responsive">
-        {!ticketSelecionado ? (
-          <div className="flex items-center justify-center h-full bg-white">
-            <div className="text-center px-4">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                </svg>
-              </div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                Nenhum atendimento selecionado
-              </h2>
-              <p className="text-gray-600 text-sm">
-                Selecione um atendimento na lista à esquerda
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="h-full flex flex-col">
-            {/* Header com botão do cliente */}
-            <div className="flex items-center justify-between p-4 bg-white border-b border-gray-200">
-              <h3 className="font-semibold text-gray-900">
-                Chat - {ticketSelecionado.contato.nome}
-              </h3>
-              <button
-                onClick={handleToggleClientePanel}
-                className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
-              >
-                <User className="w-4 h-4" />
-                Informações do Cliente
-              </button>
-            </div>
-
-            <div className="flex-1">
-              <ChatArea
-                ticket={ticketSelecionado}
-                mensagens={mensagensDoTicket}
-                onEnviarMensagem={handleEnviarMensagem}
-                onEnviarAudio={handleEnviarAudio}
-                onTransferir={handleTransferir}
-                onEncerrar={handleEncerrar}
-                onLigar={handleLigar}
-                onMudarStatus={handleMudarStatus}
-                onSelecionarFila={handleSelecionarFila}
-                onRemoverFila={handleRemoverFila}
-                theme={currentPalette}
-                loading={loadingMensagens}
-                enviandoMensagem={enviandoMensagem}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Drawer do Cliente Panel */}
-      {ticketSelecionado && (
-        <>
-          <div
-            className={`cliente-panel-overlay ${clientePanelAberto ? 'open' : ''}`}
-            onClick={() => setClientePanelAberto(false)}
-          />
-          <div className={`cliente-panel-drawer ${clientePanelAberto ? 'open' : ''}`}>
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h3 className="font-semibold text-gray-900">Informações do Cliente</h3>
-              <button
-                onClick={() => setClientePanelAberto(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <ClientePanel
-                contato={ticketSelecionado.contato}
-                historico={historico || []}
-                demandas={demandas || []}
-                notas={notas || []}
-                onEditarContato={handleEditarContato}
-                onVincularCliente={handleVincularCliente}
-                onAbrirDemanda={handleAbrirDemanda}
-                onAdicionarNota={handleAdicionarNota}
-                onExcluirNota={handleExcluirNota}
-                theme={currentPalette}
-              />
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-
-  const renderMobileLayout = () => (
-    <div className="h-full flex flex-col">
-      {/* Navegação em Tabs */}
-      <div className="mobile-chat-tabs">
-        <button
-          className={`mobile-chat-tab ${mobileView === 'tickets' ? 'active' : ''}`}
-          onClick={() => handleMobileViewChange('tickets')}
-          style={{
-            borderBottomColor: mobileView === 'tickets' ? currentPalette.colors.primary : 'transparent',
-            color: mobileView === 'tickets' ? currentPalette.colors.primary : '#6b7280'
-          }}
-        >
-          Atendimentos
-        </button>
-
-        {ticketSelecionado && (
-          <button
-            className={`mobile-chat-tab ${mobileView === 'chat' ? 'active' : ''}`}
-            onClick={() => handleMobileViewChange('chat')}
-            style={{
-              borderBottomColor: mobileView === 'chat' ? currentPalette.colors.primary : 'transparent',
-              color: mobileView === 'chat' ? currentPalette.colors.primary : '#6b7280'
-            }}
-          >
-            Chat
-          </button>
-        )}
-
-        {ticketSelecionado && (
-          <button
-            className={`mobile-chat-tab ${mobileView === 'cliente' ? 'active' : ''}`}
-            onClick={() => handleMobileViewChange('cliente')}
-            style={{
-              borderBottomColor: mobileView === 'cliente' ? currentPalette.colors.primary : 'transparent',
-              color: mobileView === 'cliente' ? currentPalette.colors.primary : '#6b7280'
-            }}
-          >
-            Cliente
-          </button>
-        )}
-      </div>
-
-      {/* Conteúdo das Tabs */}
-      <div className="flex-1 overflow-hidden">
-        {/* Tab Atendimentos */}
-        <div className={`mobile-content-panels ${mobileView === 'tickets' ? 'active' : ''}`}>
+        {/* COLUNA 1: Sidebar - Hidden no mobile */}
+        <div className="hidden lg:flex flex-col overflow-y-auto border-r bg-white">
           <AtendimentosSidebar
             tickets={tickets}
             ticketSelecionado={ticketSelecionado?.id || ''}
-            onSelecionarTicket={handleSelecionarTicketResponsivo}
+            onSelecionarTicket={selecionarTicket}
             onNovoAtendimento={handleNovoAtendimento}
             theme={currentPalette}
             loading={loadingTickets}
@@ -1451,9 +1051,35 @@ export const ChatOmnichannel: React.FC = () => {
           />
         </div>
 
-        {/* Tab Chat */}
-        {ticketSelecionado && (
-          <div className={`mobile-content-panels ${mobileView === 'chat' ? 'active' : ''}`}>
+        {/* COLUNA 2: Chat Area - Sempre visível */}
+        <div className="flex flex-col h-full overflow-hidden bg-gray-50">
+          {!ticketSelecionado ? (
+            <div className="flex items-center justify-center h-full bg-white">
+              <div className="text-center px-4 max-w-md">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg
+                    className="w-8 h-8 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+                    />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                  Nenhum atendimento selecionado
+                </h2>
+                <p className="text-sm text-gray-600">
+                  Selecione um atendimento na lista à esquerda ou crie um novo
+                </p>
+              </div>
+            </div>
+          ) : (
             <ChatArea
               ticket={ticketSelecionado}
               mensagens={mensagensDoTicket}
@@ -1465,16 +1091,19 @@ export const ChatOmnichannel: React.FC = () => {
               onMudarStatus={handleMudarStatus}
               onSelecionarFila={handleSelecionarFila}
               onRemoverFila={handleRemoverFila}
+              onEmitirDigitando={() => emitirDigitando(ticketSelecionado.id)}
+              usuarioDigitandoNome={usuarioDigitandoNome}
+              uploadProgress={uploadProgress}
               theme={currentPalette}
               loading={loadingMensagens}
               enviandoMensagem={enviandoMensagem}
             />
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* Tab Cliente */}
+        {/* COLUNA 3: Cliente Panel - Hidden no tablet/mobile */}
         {ticketSelecionado && (
-          <div className={`mobile-content-panels ${mobileView === 'cliente' ? 'active' : ''}`}>
+          <div className="hidden xl:flex flex-col overflow-y-auto border-l bg-white">
             <ClientePanel
               contato={ticketSelecionado.contato}
               historico={historico || []}
@@ -1490,20 +1119,6 @@ export const ChatOmnichannel: React.FC = () => {
           </div>
         )}
       </div>
-    </div>
-  );
-
-  // ✅ RENDERIZAÇÃO RESPONSIVA COMPLETA
-  return (
-    <div className="layout-transition h-full bg-gray-100 overflow-hidden">
-      {isDesktop && renderDesktopLayout()}
-      {isTablet && renderTabletLayout()}
-      {isMobile && renderMobileLayout()}
-
-      <PopupNotifications
-        notifications={popupNotifications}
-        onDismiss={removePopupNotification}
-      />
 
       {/* Modais */}
       <NovoAtendimentoModal
@@ -1553,8 +1168,15 @@ export const ChatOmnichannel: React.FC = () => {
         ticketId={ticketSelecionado?.id || ''}
         onFilaSelecionada={handleFilaSelecionada}
       />
+
+      {/* Popup de notificações rápidas */}
+      <PopupNotifications
+        notifications={popupNotifications}
+        onDismiss={dismissPopupNotification}
+      />
     </div>
   );
 };
 
 export default ChatOmnichannel;
+

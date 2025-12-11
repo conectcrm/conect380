@@ -217,6 +217,7 @@ export interface EnviarMensagemParams {
     blob: Blob;
     duracao: number;
   };
+  onUploadProgress?: (progress: number) => void; // 🆕 Callback para progress bar
 }
 
 export interface TransferirTicketResponse {
@@ -317,9 +318,9 @@ class AtendimentoService {
         ...params,
         status: params.status ? params.status.toUpperCase() : undefined,
       };
-      
-      const response = await api.get<ListarTicketsResponse>(`${this.baseUrl}/tickets`, { 
-        params: paramsBackend 
+
+      const response = await api.get<ListarTicketsResponse>(`${this.baseUrl}/tickets`, {
+        params: paramsBackend
       });
       return response.data;
     } catch (error) {
@@ -640,6 +641,16 @@ class AtendimentoService {
       const response = await api.post<any>(
         `${this.baseUrl}/tickets/${params.ticketId}/mensagens`,
         formData,
+        {
+          onUploadProgress: (progressEvent) => {
+            if (progressEvent.total && params.onUploadProgress) {
+              const percentCompleted = Math.round(
+                (progressEvent.loaded * 100) / progressEvent.total
+              );
+              params.onUploadProgress(percentCompleted);
+            }
+          },
+        },
       );
 
       const mensagem = response.data.data || response.data;

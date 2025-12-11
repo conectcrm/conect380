@@ -18,14 +18,22 @@ import {
   Download,
   Users,
   FileText,
-  Zap
+  Zap,
 } from 'lucide-react';
 import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 import { Ticket, Mensagem, StatusAtendimentoType } from '../types';
-import { getIconeCanal, formatarTempoAtendimento, formatarHorarioMensagem, copiarParaClipboard, resolverNomeExibicao } from '../utils';
+import {
+  getIconeCanal,
+  formatarTempoAtendimento,
+  formatarHorarioMensagem,
+  copiarParaClipboard,
+  resolverNomeExibicao,
+} from '../utils';
 import { ThemePalette } from '../../../../contexts/ThemeContext';
 import { FilaIndicator } from '../../../../components/chat/FilaIndicator';
-import messageTemplateService, { MessageTemplate } from '../../../../services/messageTemplateService';
+import messageTemplateService, {
+  MessageTemplate,
+} from '../../../../services/messageTemplateService';
 import { FileUpload } from '../../../../components/chat/FileUpload';
 import { UploadArea } from '../../components/UploadArea'; // 🆕 Upload moderno com drag & drop
 import { RespostasRapidas } from '../../../../components/chat/RespostasRapidas';
@@ -95,12 +103,20 @@ interface AudioPlayerProps {
   ehCliente: boolean;
 }
 
-const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, downloadUrl, duracao, nome, ehCliente }) => {
+const AudioPlayer: React.FC<AudioPlayerProps> = ({
+  url,
+  downloadUrl,
+  duracao,
+  nome,
+  ehCliente,
+}) => {
   const [reproduzindo, setReproduzindo] = useState(false);
   const [progresso, setProgresso] = useState(0);
   const [tempoAtual, setTempoAtual] = useState(0);
   const [velocidade, setVelocidade] = useState(1);
-  const [duracaoTotal, setDuracaoTotal] = useState<number | undefined>(() => normalizarDuracao(duracao));
+  const [duracaoTotal, setDuracaoTotal] = useState<number | undefined>(() =>
+    normalizarDuracao(duracao),
+  );
 
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -141,7 +157,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, downloadUrl, duracao, no
       console.error('❌ [AudioPlayer] Erro ao carregar áudio:', {
         url: audio.src,
         errorCode: audio.error?.code,
-        errorMessage: audio.error?.message
+        errorMessage: audio.error?.message,
       });
     };
 
@@ -186,7 +202,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, downloadUrl, duracao, no
         console.error('❌ [AudioPlayer] Erro ao reproduzir:', {
           error: err.name,
           message: err.message,
-          url: audio.src
+          url: audio.src,
         });
       });
       setReproduzindo(true);
@@ -217,24 +233,23 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, downloadUrl, duracao, no
   };
 
   const duracaoSegura = duracaoTotal ?? normalizarDuracao(audioRef.current?.duration);
-  const tempoRestante = duracaoSegura !== undefined ? Math.max(duracaoSegura - tempoAtual, 0) : undefined;
+  const tempoRestante =
+    duracaoSegura !== undefined ? Math.max(duracaoSegura - tempoAtual, 0) : undefined;
   const tempoParaExibir = tempoRestante ?? duracaoSegura;
 
   const progressoNormalizado = duracaoSegura ? progresso : 0;
 
   return (
-    <div className={`flex items-center gap-3 w-full max-w-sm p-2 rounded-lg transition-all ${ehCliente
-      ? 'bg-gray-50/50'
-      : 'bg-black/5'
-      }`}>
+    <div
+      className={`flex items-center gap-3 w-full max-w-sm p-2 rounded-lg transition-all ${ehCliente ? 'bg-gray-50/50' : 'bg-black/5'
+        }`}
+    >
       {/* Ícone de Microfone ou Ondas de Áudio */}
-      <div className={`flex-shrink-0 transition-all ${ehCliente ? 'text-gray-600' : 'text-white/90'
-        } ${reproduzindo ? 'scale-110' : 'scale-100'}`}>
-        {reproduzindo ? (
-          <AudioWaves ehCliente={ehCliente} />
-        ) : (
-          <Mic className="w-5 h-5" />
-        )}
+      <div
+        className={`flex-shrink-0 transition-all ${ehCliente ? 'text-gray-600' : 'text-white/90'
+          } ${reproduzindo ? 'scale-110' : 'scale-100'}`}
+      >
+        {reproduzindo ? <AudioWaves ehCliente={ehCliente} /> : <Mic className="w-5 h-5" />}
       </div>
 
       {/* Botão Play/Pause - MAIOR E MAIS DESTACADO */}
@@ -329,6 +344,9 @@ interface ChatAreaProps {
   onMudarStatus?: (novoStatus: StatusAtendimentoType) => Promise<void>; // 🆕 NOVO
   onSelecionarFila?: () => void; // 🆕 Sistema de Filas
   onRemoverFila?: () => void; // 🆕 Sistema de Filas
+  onEmitirDigitando?: () => void; // 🆕 NOVO - Indicador de digitação
+  usuarioDigitandoNome?: string | null; // 🆕 NOVO - Nome do usuário digitando
+  uploadProgress?: number; // 🔄 NOVO - Progresso de upload (0-100)
   theme: ThemePalette;
   estaDigitando?: boolean;
   loading?: boolean;
@@ -346,10 +364,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onMudarStatus, // 🆕 NOVO
   onSelecionarFila, // 🆕 Sistema de Filas
   onRemoverFila, // 🆕 Sistema de Filas
+  onEmitirDigitando, // 🆕 NOVO - Indicador de digitação
+  usuarioDigitandoNome, // 🆕 NOVO - Nome do usuário digitando
+  uploadProgress = 0, // 🔄 NOVO - Progresso de upload
   theme,
   estaDigitando = false,
   loading = false,
-  enviandoMensagem = false
+  enviandoMensagem = false,
 }) => {
   const { user } = useAuth();
   const [mensagemAtual, setMensagemAtual] = useState('');
@@ -377,6 +398,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const emojiPickerRef = useRef<HTMLDivElement>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null); // 🆕 Ref do container para verificar scroll
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -385,12 +407,51 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const audioMimeTypeRef = useRef<string>('audio/webm');
   const descartarGravacaoRef = useRef(false);
-  const podeResponder = (ticket.status || '').toLowerCase() !== 'resolvido';
+  const digitacaoTimeoutRef = useRef<NodeJS.Timeout | null>(null); // 🆕 NOVO - Debounce digitação
 
-  // Auto-scroll para última mensagem
+  // ✅ REGRA: Só pode responder se NÃO estiver na fila ou encerrado
+  // Tickets na fila precisam ser assumidos primeiro!
+  const statusAtual = (ticket.status || '').toLowerCase();
+  const podeResponder = statusAtual !== 'fila' && statusAtual !== 'encerrado';
+
+  // 🎯 Função de scroll inteligente
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  }, []);
+
+  // 🎯 Auto-scroll inteligente para última mensagem
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [mensagens]);
+    if (mensagens.length === 0) return;
+
+    // Verificar se é a primeira carga deste ticket (scroll instantâneo)
+    const isPrimeiraRenderizacao = mensagens.length > 0 && !messagesContainerRef.current?.scrollTop;
+
+    if (isPrimeiraRenderizacao) {
+      // Primeira carga: scroll instantâneo
+      scrollToBottom('auto');
+      return;
+    }
+
+    // Para novas mensagens: verificar se usuário está próximo do final
+    if (messagesContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+      const distanciaDoFinal = scrollHeight - scrollTop - clientHeight;
+      const isNearBottom = distanciaDoFinal < 150; // 150px de tolerância
+
+      // Só rolar se usuário já estava próximo do final (não interromper leitura)
+      if (isNearBottom) {
+        scrollToBottom('smooth');
+      }
+    } else {
+      // Fallback: se ref não disponível, rolar sempre
+      scrollToBottom('smooth');
+    }
+  }, [mensagens, scrollToBottom]);
+
+  // 🎯 Scroll para baixo ao trocar de ticket
+  useEffect(() => {
+    scrollToBottom('auto');
+  }, [ticket.id, scrollToBottom]);
 
   // Contador de tempo em tempo real
   useEffect(() => {
@@ -403,7 +464,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
 
     const interval = setInterval(() => {
-      setTempoAtendimento(prev => prev + 1);
+      setTempoAtendimento((prev) => prev + 1);
     }, 1000);
 
     return () => clearInterval(interval);
@@ -435,9 +496,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   // Carregar templates ao montar o componente
   useEffect(() => {
     const empresaId = user?.empresa?.id || 'empresa-default';
-    messageTemplateService.listar(empresaId, true)
-      .then(data => setTemplates(Array.isArray(data) ? data : []))
-      .catch(err => console.error('Erro ao carregar templates:', err));
+    messageTemplateService
+      .listar(empresaId, true)
+      .then((data) => setTemplates(Array.isArray(data) ? data : []))
+      .catch((err) => console.error('Erro ao carregar templates:', err));
   }, []);
 
   // Detectar comando /atalho e mostrar autocomplete
@@ -446,8 +508,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
     if (texto.startsWith('/') && texto.length > 1) {
       const comando = texto.substring(1).toLowerCase();
-      const sugestoes = templates.filter(t =>
-        t.atalho && t.atalho.toLowerCase().startsWith(comando)
+      const sugestoes = templates.filter(
+        (t) => t.atalho && t.atalho.toLowerCase().startsWith(comando),
       );
       setAutocompleteTemplates(sugestoes);
       setMostrarAutocomplete(sugestoes.length > 0);
@@ -500,15 +562,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <div className={audioClasses}>
             {/* Label discreto "Mensagem de voz" apenas se não houver texto */}
             {!texto && (
-              <div className={`flex items-center gap-1.5 mb-2 ${ehCliente ? 'text-gray-500' : 'text-white/70'
-                }`}>
+              <div
+                className={`flex items-center gap-1.5 mb-2 ${ehCliente ? 'text-gray-500' : 'text-white/70'
+                  }`}
+              >
                 <Mic className="w-3.5 h-3.5" />
                 <span className="text-xs font-medium">Mensagem de voz</span>
               </div>
             )}
             <AudioPlayer
               url={audio.url}
-              downloadUrl={audio.downloadUrl}  // ⚡ Passar downloadUrl (backend proxy)
+              downloadUrl={audio.downloadUrl} // ⚡ Passar downloadUrl (backend proxy)
               duracao={audio.duracao}
               nome={audio.nome}
               ehCliente={ehCliente}
@@ -659,7 +723,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       // Processar template (substituir variáveis)
       const conteudoProcessado = messageTemplateService.substituirVariaveisLocal(
         template.conteudo,
-        dados
+        dados,
       );
 
       setMensagemAtual(conteudoProcessado);
@@ -762,10 +826,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   // ✅ NOVOS: Click-outside para fechar emoji picker
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        emojiPickerRef.current &&
-        !emojiPickerRef.current.contains(event.target as Node)
-      ) {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
         setMostrarEmojiPicker(false);
       }
     };
@@ -775,6 +836,37 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [mostrarEmojiPicker]);
+
+  // 🆕 NOVO: Handler para mudança de mensagem com emissão de digitação (debounce 1s)
+  const handleMensagemChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const novoValor = e.target.value;
+    setMensagemAtual(novoValor);
+
+    // Emitir evento de digitação com debounce (só envia 1x a cada 1 segundo)
+    if (onEmitirDigitando && podeResponder && novoValor.trim()) {
+      // Limpar timeout anterior
+      if (digitacaoTimeoutRef.current) {
+        clearTimeout(digitacaoTimeoutRef.current);
+      }
+
+      // Emitir imediatamente (será debounced no backend se necessário)
+      onEmitirDigitando();
+
+      // Agendar próxima emissão (evitar spam)
+      digitacaoTimeoutRef.current = setTimeout(() => {
+        digitacaoTimeoutRef.current = null;
+      }, 1000);
+    }
+  };
+
+  // Limpar timeout ao desmontar
+  useEffect(() => {
+    return () => {
+      if (digitacaoTimeoutRef.current) {
+        clearTimeout(digitacaoTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleToggleGravador = () => {
     if (!podeResponder || enviandoMensagem) {
@@ -810,14 +902,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       streamRef.current = stream;
       let recorder: MediaRecorder;
 
-      const mimePreferencias = [
-        'audio/ogg;codecs=opus',
-        'audio/webm;codecs=opus',
-        'audio/webm'
-      ];
+      const mimePreferencias = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/webm'];
 
       const mimeSuportado = mimePreferencias.find((tipo) => {
-        return typeof MediaRecorder !== 'undefined' && typeof MediaRecorder.isTypeSupported === 'function'
+        return typeof MediaRecorder !== 'undefined' &&
+          typeof MediaRecorder.isTypeSupported === 'function'
           ? MediaRecorder.isTypeSupported(tipo)
           : false;
       });
@@ -854,7 +943,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           }
           return;
         }
-        const blob = new Blob(audioChunksRef.current, { type: audioMimeTypeRef.current || 'audio/webm' });
+        const blob = new Blob(audioChunksRef.current, {
+          type: audioMimeTypeRef.current || 'audio/webm',
+        });
         setAudioBlob(blob);
         const url = URL.createObjectURL(blob);
         setAudioUrl(url);
@@ -941,7 +1032,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <div className="flex items-center gap-3">
             <div className="relative">
               <img
-                src={ticket.contato?.foto || `https://ui-avatars.com/api/?name=${encodeURIComponent(resolverNomeExibicao(ticket.contato))}&background=random`}
+                src={
+                  ticket.contato?.foto ||
+                  `https://ui-avatars.com/api/?name=${encodeURIComponent(resolverNomeExibicao(ticket.contato))}&background=random`
+                }
                 alt={resolverNomeExibicao(ticket.contato)}
                 className="w-12 h-12 rounded-full object-cover"
               />
@@ -952,17 +1046,29 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="font-semibold text-gray-900">{resolverNomeExibicao(ticket.contato)}</h2>
-                <div className={`p-1.5 rounded-full ${ticket.canal === 'whatsapp' ? 'bg-green-100' :
-                  ticket.canal === 'telegram' ? 'bg-blue-100' :
-                    ticket.canal === 'email' ? 'bg-red-100' :
-                      'bg-gray-100'
-                  }`}>
-                  <IconeCanal className={`w-3 h-3 ${ticket.canal === 'whatsapp' ? 'text-green-600' :
-                    ticket.canal === 'telegram' ? 'text-blue-600' :
-                      ticket.canal === 'email' ? 'text-red-600' :
-                        'text-gray-600'
-                    }`} />
+                <h2 className="font-semibold text-gray-900">
+                  {resolverNomeExibicao(ticket.contato)}
+                </h2>
+                <div
+                  className={`p-1.5 rounded-full ${ticket.canal === 'whatsapp'
+                    ? 'bg-green-100'
+                    : ticket.canal === 'telegram'
+                      ? 'bg-blue-100'
+                      : ticket.canal === 'email'
+                        ? 'bg-red-100'
+                        : 'bg-gray-100'
+                    }`}
+                >
+                  <IconeCanal
+                    className={`w-3 h-3 ${ticket.canal === 'whatsapp'
+                      ? 'text-green-600'
+                      : ticket.canal === 'telegram'
+                        ? 'text-blue-600'
+                        : ticket.canal === 'email'
+                          ? 'text-red-600'
+                          : 'text-gray-600'
+                      }`}
+                  />
                 </div>
               </div>
               <p className="text-sm text-gray-500">
@@ -1038,9 +1144,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <button
               onClick={podeResponder ? onEncerrar : undefined}
               disabled={!podeResponder}
-              className={`p-2 rounded-lg transition-colors ${podeResponder
-                ? 'hover:bg-red-50 text-red-600'
-                : 'text-gray-400 cursor-not-allowed'
+              className={`p-2 rounded-lg transition-colors ${podeResponder ? 'hover:bg-red-50 text-red-600' : 'text-gray-400 cursor-not-allowed'
                 }`}
               title={podeResponder ? 'Encerrar atendimento' : 'Atendimento resolvido'}
             >
@@ -1076,91 +1180,160 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       </div>
 
       {/* Área de Mensagens */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 bg-gray-50">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto px-6 py-4 space-y-4 bg-gray-50"
+      >
         {loading && mensagens.length === 0 ? (
           <div className="text-sm text-gray-500 text-center py-6">Carregando mensagens...</div>
-        ) : mensagens.map((mensagem, index) => {
-          const ehCliente = mensagem.remetente.tipo === 'cliente';
-          const mostrarFoto = index === 0 ||
-            mensagens[index - 1].remetente.id !== mensagem.remetente.id;
+        ) : (
+          mensagens.map((mensagem, index) => {
+            const ehCliente = mensagem.remetente.tipo === 'cliente';
+            const mostrarFoto =
+              index === 0 || mensagens[index - 1].remetente.id !== mensagem.remetente.id;
 
-          return (
-            <div
-              key={mensagem.id}
-              className={`flex gap-3 ${ehCliente ? 'justify-start' : 'justify-end'}`}
-            >
-              {/* Foto (somente para mensagens do cliente) */}
-              {ehCliente && (
-                <div className="flex-shrink-0">
-                  {mostrarFoto ? (
+            return (
+              <div
+                key={mensagem.id}
+                className={`flex gap-3 ${ehCliente ? 'justify-start' : 'justify-end'}`}
+              >
+                {/* Foto (somente para mensagens do cliente) */}
+                {ehCliente && (
+                  <div className="flex-shrink-0">
+                    {mostrarFoto ? (
+                      <img
+                        src={
+                          mensagem.remetente.foto ||
+                          `https://ui-avatars.com/api/?name=${encodeURIComponent(mensagem.remetente.nome)}&background=random`
+                        }
+                        alt={mensagem.remetente.nome}
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-8 h-8" /> // Espaço vazio para alinhamento
+                    )}
+                  </div>
+                )}
+
+                {/* Balão da Mensagem */}
+                <div className={`max-w-md ${ehCliente ? '' : 'flex flex-col items-end'}`}>
+                  {mostrarFoto && (
+                    <span className="text-xs text-gray-500 mb-1 px-1">
+                      {mensagem.remetente.nome}
+                    </span>
+                  )}
+
+                  <div
+                    className={`rounded-2xl px-4 py-2.5 shadow-sm transition-shadow hover:shadow-md ${ehCliente ? 'bg-white border border-gray-200' : ''
+                      }`}
+                    style={
+                      !ehCliente
+                        ? {
+                          backgroundColor: theme.colors.primaryLight,
+                          border: `1px solid ${theme.colors.borderLight}`,
+                        }
+                        : {}
+                    }
+                  >
+                    {renderConteudoMensagem(mensagem, ehCliente)}
+
+                    {/* Timestamp e Status */}
+                    <div className="flex items-center gap-1 mt-1.5 justify-end text-gray-500">
+                      <span className="text-xs font-medium">
+                        {formatarHorarioMensagem(mensagem.timestamp)}
+                      </span>
+                      {!ehCliente && (
+                        <span style={{ color: theme.colors.primary }}>
+                          {renderIconeStatus(mensagem.status)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Foto do atendente (direita) */}
+                {!ehCliente && mostrarFoto && (
+                  <div className="flex-shrink-0">
                     <img
-                      src={mensagem.remetente.foto || `https://ui-avatars.com/api/?name=${encodeURIComponent(mensagem.remetente.nome)}&background=random`}
+                      src={
+                        mensagem.remetente.foto ||
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(mensagem.remetente.nome)}&background=random`
+                      }
                       alt={mensagem.remetente.nome}
                       className="w-8 h-8 rounded-full object-cover"
                     />
-                  ) : (
-                    <div className="w-8 h-8" /> // Espaço vazio para alinhamento
-                  )}
-                </div>
-              )}
-
-              {/* Balão da Mensagem */}
-              <div className={`max-w-md ${ehCliente ? '' : 'flex flex-col items-end'}`}>
-                {mostrarFoto && (
-                  <span className="text-xs text-gray-500 mb-1 px-1">
-                    {mensagem.remetente.nome}
-                  </span>
-                )}
-
-                <div
-                  className={`rounded-2xl px-4 py-2.5 shadow-sm transition-shadow hover:shadow-md ${ehCliente
-                    ? 'bg-white border border-gray-200'
-                    : ''
-                    }`}
-                  style={!ehCliente ? {
-                    backgroundColor: theme.colors.primaryLight,
-                    border: `1px solid ${theme.colors.borderLight}`
-                  } : {}}
-                >
-                  {renderConteudoMensagem(mensagem, ehCliente)}
-
-                  {/* Timestamp e Status */}
-                  <div className="flex items-center gap-1 mt-1.5 justify-end text-gray-500">
-                    <span className="text-xs font-medium">
-                      {formatarHorarioMensagem(mensagem.timestamp)}
-                    </span>
-                    {!ehCliente && (
-                      <span style={{ color: theme.colors.primary }}>
-                        {renderIconeStatus(mensagem.status)}
-                      </span>
-                    )}
                   </div>
+                )}
+              </div>
+            );
+          })
+        )}
+        <div ref={messagesEndRef} />
+
+        {/* 🆕 Indicador de digitação melhorado */}
+        {usuarioDigitandoNome && (
+          <div className="flex items-start gap-3 px-4 py-2 animate-fadeIn">
+            <div className="flex-shrink-0">
+              <img
+                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(usuarioDigitandoNome)}&background=random`}
+                alt={usuarioDigitandoNome}
+                className="w-8 h-8 rounded-full object-cover"
+              />
+            </div>
+            <div className="bg-gray-100 rounded-2xl rounded-tl-none px-4 py-3 max-w-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-600 font-medium">{usuarioDigitandoNome}</span>
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                 </div>
               </div>
-
-              {/* Foto do atendente (direita) */}
-              {!ehCliente && mostrarFoto && (
-                <div className="flex-shrink-0">
-                  <img
-                    src={mensagem.remetente.foto || `https://ui-avatars.com/api/?name=${encodeURIComponent(mensagem.remetente.nome)}&background=random`}
-                    alt={mensagem.remetente.nome}
-                    className="w-8 h-8 rounded-full object-cover"
-                  />
-                </div>
-              )}
             </div>
-          );
-        })}
-        <div ref={messagesEndRef} />
-        {estaDigitando && (
-          <div className="flex items-center gap-2 text-xs text-gray-400 italic">
-            <span>{ticket.contato?.nome || 'Cliente'} está digitando...</span>
           </div>
         )}
       </div>
 
       {/* Input de Mensagem */}
       <div className="bg-white border-t border-gray-200 px-6 py-4">
+        {/* ⚠️ Aviso quando ticket está na fila */}
+        {statusAtual === 'fila' && (
+          <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+            <Clock className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-blue-900 mb-1">
+                Ticket aguardando atendimento
+              </p>
+              <p className="text-xs text-blue-700">
+                Para responder, você precisa assumir este atendimento primeiro.
+              </p>
+            </div>
+            {onMudarStatus && (
+              <button
+                onClick={() => onMudarStatus('em_atendimento')}
+                className="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Assumir Agora
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ⚠️ Aviso quando ticket está encerrado */}
+        {statusAtual === 'encerrado' && (
+          <div className="mb-4 bg-gray-50 border border-gray-200 rounded-lg p-4 flex items-start gap-3">
+            <CheckCheck className="w-5 h-5 text-gray-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-900 mb-1">
+                Atendimento encerrado
+              </p>
+              <p className="text-xs text-gray-700">
+                Este ticket foi finalizado. Para continuar, reabra o atendimento.
+              </p>
+            </div>
+          </div>
+        )}
+
         <input
           ref={fileInputRef}
           type="file"
@@ -1175,7 +1348,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <div className="mb-4 bg-gray-100 rounded-lg border border-gray-200 p-3 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-gray-700">
-                {arquivosAnexados.length} arquivo{arquivosAnexados.length > 1 ? 's' : ''} selecionado{arquivosAnexados.length > 1 ? 's' : ''}
+                {arquivosAnexados.length} arquivo{arquivosAnexados.length > 1 ? 's' : ''}{' '}
+                selecionado{arquivosAnexados.length > 1 ? 's' : ''}
               </span>
               <button
                 type="button"
@@ -1198,8 +1372,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   className="flex items-center justify-between bg-white rounded-md px-3 py-2 border border-gray-200"
                 >
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-800 break-all">{arquivo.name}</span>
-                    <span className="text-xs text-gray-500">{formatarTamanhoArquivo(arquivo.size)}</span>
+                    <span className="text-sm font-medium text-gray-800 break-all">
+                      {arquivo.name}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {formatarTamanhoArquivo(arquivo.size)}
+                    </span>
                   </div>
                   <button
                     type="button"
@@ -1214,7 +1392,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </ul>
 
             <p className="text-xs text-gray-500">
-              Tamanho máximo de 15MB por arquivo • Tipos suportados: imagens, vídeos, áudios e documentos
+              Tamanho máximo de 15MB por arquivo • Tipos suportados: imagens, vídeos, áudios e
+              documentos
             </p>
           </div>
         )}
@@ -1222,9 +1401,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         {gravadorAberto && (
           <div className="mb-4 bg-gray-100 rounded-lg border border-gray-200 p-3">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">
-                Gravação de áudio
-              </span>
+              <span className="text-sm font-medium text-gray-700">Gravação de áudio</span>
               <button
                 type="button"
                 className="text-xs text-gray-500 hover:text-gray-700"
@@ -1235,17 +1412,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
 
             <div className="flex items-center gap-2 mb-3">
-              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${gravando ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
-                {gravando ? 'Gravando...' : audioBlob ? 'Pronto para enviar' : 'Aguardando gravação'}
+              <span
+                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${gravando ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}
+              >
+                {gravando
+                  ? 'Gravando...'
+                  : audioBlob
+                    ? 'Pronto para enviar'
+                    : 'Aguardando gravação'}
               </span>
-              <span className="text-sm font-mono text-gray-700">{formatarDuracaoAudio(duracaoAudio)}</span>
+              <span className="text-sm font-mono text-gray-700">
+                {formatarDuracaoAudio(duracaoAudio)}
+              </span>
             </div>
 
-            {erroAudio && (
-              <div className="mb-3 text-xs text-red-600">
-                {erroAudio}
-              </div>
-            )}
+            {erroAudio && <div className="mb-3 text-xs text-red-600">{erroAudio}</div>}
 
             {audioBlob && audioUrl && (
               <audio controls src={audioUrl} className="w-full mb-3">
@@ -1295,14 +1476,35 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
         )}
 
-        {erroUpload && (
-          <div className="mb-3 text-xs text-red-600">
-            {erroUpload}
+        {erroUpload && <div className="mb-3 text-xs text-red-600">{erroUpload}</div>}
+
+        {/* 🔄 Progress Bar de Upload */}
+        {uploadProgress > 0 && uploadProgress < 100 && (
+          <div className="mx-6 mb-3">
+            <div className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Paperclip className="w-4 h-4 text-[#159A9C]" />
+                  <span className="text-sm font-medium text-gray-700">
+                    Enviando arquivo...
+                  </span>
+                </div>
+                <span className="text-sm font-mono font-medium text-[#159A9C]">
+                  {uploadProgress}%
+                </span>
+              </div>
+              <div className="w-full h-2 bg-[#DEEFE7] rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[#159A9C] transition-all duration-300 ease-out"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
           </div>
         )}
 
         <div className="flex items-end gap-3">
-          {/* ✅ NOVO: Botão Respostas Rápidas (Modal Completo) */}
+          {/* ✅ Botão Respostas Rápidas (Modal Completo) */}
           <button
             type="button"
             onClick={() => setMostrarRespostasRapidasModal(true)}
@@ -1313,26 +1515,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <Zap className="w-5 h-5" />
           </button>
 
-          {/* Botão Template (mantido para compatibilidade) */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setMostrarTemplates(!mostrarTemplates)}
-              className={`p-2 rounded-lg transition-colors flex-shrink-0 ${podeResponder ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed'}`}
-              disabled={!podeResponder || enviandoMensagem}
-              title="Templates de Mensagens"
-            >
-              <FileText className="w-5 h-5 text-[#9333EA]" />
-            </button>
-
-            {/* Dropdown de Templates */}
+          {/* Autocomplete ao digitar / - mantido oculto */}
+          <div className="relative hidden">
+            {/* Dropdown de Templates - removido, usar modal de Respostas Rápidas */}
             {mostrarTemplates && templates.length > 0 && (
               <div className="absolute bottom-full left-0 mb-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto z-50">
                 <div className="p-3 border-b bg-gray-50">
                   <p className="text-sm font-semibold text-[#002333]">Selecione um template</p>
                 </div>
                 <div className="p-2">
-                  {templates.map(template => (
+                  {templates.map((template) => (
                     <button
                       key={template.id}
                       onClick={() => handleSelecionarTemplate(template)}
@@ -1366,12 +1558,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             {mostrarAutocomplete && autocompleteTemplates.length > 0 && (
               <div className="absolute bottom-full left-0 mb-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto z-50">
                 <div className="p-2 border-b bg-gray-50">
-                  <p className="text-xs text-[#B4BEC9]">
-                    Sugestões de atalhos
-                  </p>
+                  <p className="text-xs text-[#B4BEC9]">Sugestões de atalhos</p>
                 </div>
                 <div className="p-1">
-                  {autocompleteTemplates.map(template => (
+                  {autocompleteTemplates.map((template) => (
                     <button
                       key={template.id}
                       onClick={() => handleSelecionarTemplateAutocomplete(template)}
@@ -1409,9 +1599,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <textarea
               ref={textareaRef}
               value={mensagemAtual}
-              onChange={(e) => setMensagemAtual(e.target.value)}
+              onChange={handleMensagemChange}
               onKeyPress={handleKeyPress}
-              placeholder={podeResponder ? 'Digite sua mensagem...' : 'Ticket resolvido. Abra um novo atendimento para responder.'}
+              placeholder={
+                podeResponder
+                  ? 'Digite sua mensagem...'
+                  : 'Ticket resolvido. Abra um novo atendimento para responder.'
+              }
               rows={1}
               style={{ borderColor: theme.colors.border }}
               onFocus={(e) => {
@@ -1427,7 +1621,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             />
 
             {/* ✅ MODIFICADO: Botão Emoji com Picker */}
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2" ref={emojiPickerRef}>
+            <div
+              className="absolute right-3 top-1/2 transform -translate-y-1/2"
+              ref={emojiPickerRef}
+            >
               <button
                 type="button"
                 onClick={() => setMostrarEmojiPicker(!mostrarEmojiPicker)}
@@ -1461,10 +1658,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               onClick={() => void handleEnviar()}
               style={{
                 backgroundColor: theme.colors.primary,
-                color: '#FFFFFF'
+                color: '#FFFFFF',
               }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.colors.primaryHover}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme.colors.primary}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = theme.colors.primaryHover)
+              }
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = theme.colors.primary)}
               className={`p-3 rounded-lg transition-colors flex-shrink-0 shadow-md hover:shadow-lg ${enviandoMensagem ? 'opacity-70 cursor-not-allowed' : ''}`}
               disabled={enviandoMensagem}
             >
@@ -1512,7 +1711,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <div className="px-6 pb-2">
               <div className="flex items-center gap-3">
                 <div className="flex-1 border-t border-gray-200"></div>
-                <span className="text-xs text-gray-400 font-medium">OU USE O MÉTODO TRADICIONAL</span>
+                <span className="text-xs text-gray-400 font-medium">
+                  OU USE O MÉTODO TRADICIONAL
+                </span>
                 <div className="flex-1 border-t border-gray-200"></div>
               </div>
             </div>
