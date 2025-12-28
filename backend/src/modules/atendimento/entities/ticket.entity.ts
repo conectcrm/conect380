@@ -14,7 +14,7 @@ import {
 
 import { Fila } from './fila.entity';
 import { Tag } from './tag.entity';
-import { User } from '../../usuarios/entities/user.entity';
+import { User } from '../../users/user.entity';
 
 export enum StatusTicket {
   FILA = 'FILA',
