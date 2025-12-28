@@ -67,13 +67,44 @@ autor?: User;
 
 ---
 
-## 🔄 Próximas Etapas (Parte 2/3)
+## ✅ Concluído (Parte 2/3)
 
-### 3. Service e Controller
-- [ ] Atualizar `TicketService` para lidar com novos campos
-- [ ] Adicionar validações de negócio (ex: tipo obrigatório se tem descrição)
-- [ ] Atualizar métodos `create()` e `update()` para popular relações User
-- [ ] Adicionar filtros por `tipo` no método `findAll()`
+### 3. Service e Controller Atualizados
+**Arquivos**: 
+- `backend/src/modules/atendimento/services/ticket.service.ts`
+- `backend/src/modules/atendimento/controllers/ticket.controller.ts`
+
+✅ **TicketService.criar()**: 
+- Suporta todos os 7 novos campos opcionais
+- Conversão automática de `data_vencimento` (string → Date)
+- Mantém compatibilidade com código existente
+
+✅ **TicketService.atualizar()**:
+- Parâmetros expandidos para aceitar novos campos
+- Tratamento especial para `data_vencimento` (conversão de tipo)
+- Permite atualização parcial de qualquer campo
+
+✅ **TicketService.listar()**:
+- Novo filtro `tipo?: TipoTicket` adicionado
+- Query: `GET /tickets?tipo=demanda` funciona
+- Interface `FiltrarTicketsDto` atualizada
+
+✅ **TicketService.buscarPorId()**:
+- Relations `['autor', 'responsavel']` populadas automaticamente
+- Frontend recebe objetos User completos (nome, email, etc)
+
+✅ **TicketController.listar()**:
+- Parâmetro `@Query('tipo')` adicionado
+- Log inclui tipo filtrado
+- Documentação JSDoc atualizada
+
+✅ **TicketController.atualizarTicket()**:
+- Body types expandidos para aceitar novos campos
+- Documentação JSDoc completa com estrutura do payload
+
+---
+
+## 🔄 Próximas Etapas (Parte 3/3)
 
 ### 4. Deprecar Demanda Service
 - [ ] Adicionar decorator `@deprecated` em `DemandaService`
@@ -89,7 +120,7 @@ autor?: User;
 
 ---
 
-## ⏭️ Próximas Etapas (Parte 3/3 - Após Migration SQL)
+## ⏭️ Próximas Etapas (Após Migration SQL)
 
 ### 6. Migration SQL
 - [ ] **EXECUTAR** `migration-unificacao-tickets.sql` no banco
@@ -105,11 +136,11 @@ autor?: User;
 
 ## 📊 Progresso Sprint 1
 
-**Concluído**: 2/7 tarefas (28.6%)
+**Concluído**: 3/7 tarefas (42.9%)
 
 - [x] 1. Entity Ticket expandida
 - [x] 2. DTOs atualizados
-- [ ] 3. Service e Controller
+- [x] 3. Service e Controller atualizados
 - [ ] 4. Deprecar Demanda Service
 - [ ] 5. Testes unitários
 - [ ] 6. Executar Migration SQL
@@ -137,10 +168,10 @@ autor?: User;
 - ✅ Relações User são opcionais (não obriga preenchimento)
 
 ### Próximos Commits
-1. **Commit atual**: Entity + DTOs atualizados
-2. **Próximo commit**: Service + Controller + Testes
-3. **Commit final**: Deprecation + Feature Flag
+1. ~~Commit 1: Entity + DTOs atualizados~~ ✅ Concluído (26d69ca)
+2. **Commit 2: Service + Controller atualizados** ✅ Concluído (próximo)
+3. **Commit 3**: Deprecation + Testes + Feature Flag
 
 ---
 
-**Última atualização**: 28/12/2025 (Sprint 1 - Parte 1/3 concluída)
+**Última atualização**: 28/12/2025 (Sprint 1 - Parte 2/3 concluída)

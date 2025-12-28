@@ -19,7 +19,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { TicketService } from '../services/ticket.service';
 import { MensagemService } from '../services/mensagem.service';
-import { StatusTicket, PrioridadeTicket } from '../entities/ticket.entity';
+import { StatusTicket, PrioridadeTicket, TipoTicket } from '../entities/ticket.entity';
+import { EscalarTicketDto, DesescalarTicketDto, ReatribuirTicketDto } from '../dto/ticket.dto';
 
 /**
  * Controller REST para gerenciamento de tickets
@@ -40,10 +41,13 @@ export class TicketController {
    * GET /api/atendimento/tickets
    * Lista tickets com filtros opcionais
    * 🔐 SEGURANÇA: empresa_id extraído do JWT (não do query param)
+   * 🆕 UNIFICAÇÃO: Suporta filtro por tipo (demanda, problema, solicitacao, etc)
    *
    * Query params:
    * - status: string | string[] (opcional)
    * - canalId: string (opcional)
+   * - atendenteId: string (opcional) - filtra tickets de um atendente específico
+   * - tipo: TipoTicket (opcional) - filtra por tipo (demanda, problema, solicitacao, etc)
    * - limite: number (opcional, padrão: 50)
    * - pagina: number (opcional, padrão: 1)
    */
@@ -52,13 +56,15 @@ export class TicketController {
     @Request() req,
     @Query('status') status?: string | string[],
     @Query('canalId') canalId?: string,
+    @Query('atendenteId') atendenteId?: string,
+    @Query('tipo') tipo?: TipoTicket,
     @Query('limite') limite?: string,
     @Query('pagina') pagina?: string,
   ) {
     // 🔐 SEGURANÇA: empresa_id vem do JWT, não pode ser manipulado
     const empresaId = req.user.empresa_id;
 
-    this.logger.log(`📋 [GET /tickets] empresaId=${empresaId} user=${req.user.email} status=${status}`);
+    this.logger.log(`📋 [GET /tickets] empresaId=${empresaId} user=${req.user.email} status=${status} tipo=${tipo || 'todos'}`);
 
     if (!empresaId) {
       throw new HttpException('Usuário não possui empresa associada', HttpStatus.FORBIDDEN);
@@ -80,6 +86,8 @@ export class TicketController {
         empresaId,
         status: statusArray,
         canalId,
+        atendenteId,
+        tipo, // 🆕 Passar filtro de tipo para o service
         limite: limite ? parseInt(limite, 10) : undefined,
         pagina: pagina ? parseInt(pagina, 10) : undefined,
       });
@@ -203,6 +211,69 @@ export class TicketController {
   }
 
   /**
+   * PUT /api/atendimento/tickets/:id
+   * Atualiza campos gerais do ticket (atendenteId, filaId, etc)
+   * 🆕 Suporta campos da unificação Tickets+Demandas
+   *
+   * Body: {
+   *   atendenteId?: string,
+   *   filaId?: string,
+   *   cliente_id?: string,
+   *   titulo?: string,
+   *   descricao?: string,
+   *   tipo?: TipoTicket,
+   *   data_vencimento?: string,
+   *   responsavel_id?: string,
+   *   autor_id?: string
+   * }
+   */
+  @Patch(':id')
+  async atualizarTicket(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() dados: Partial<{
+      atendenteId?: string;
+      filaId?: string;
+      cliente_id?: string;
+      titulo?: string;
+      descricao?: string;
+      tipo?: TipoTicket;
+      data_vencimento?: string;
+      responsavel_id?: string;
+      autor_id?: string;
+      [key: string]: any;
+    }>,
+  ) {
+    const empresaId = req.user.empresa_id;
+
+    this.logger.log(
+      `📝 [PATCH /tickets/${id}] empresaId=${empresaId} dados=${JSON.stringify(dados)}`,
+    );
+
+    try {
+      const ticket = await this.ticketService.atualizar(id, empresaId, dados);
+
+      this.logger.log(`✅ Ticket atualizado: ${id}`);
+
+      return {
+        success: true,
+        data: ticket,
+        message: 'Ticket atualizado com sucesso',
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erro ao atualizar ticket: ${error.message}`);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao atualizar ticket',
+          erro: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
    * PATCH /api/atendimento/tickets/:id/atribuir
    * Atribui ticket a um atendente
    *
@@ -317,6 +388,95 @@ export class TicketController {
           erro: error.message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * POST /api/atendimento/tickets/:id/escalar
+   * Escalona ticket para nível N1/N2/N3
+   */
+  @Post(':id/escalar')
+  async escalar(@Param('id') id: string, @Body() dados: EscalarTicketDto) {
+    this.logger.log(`⬆️ [POST /tickets/${id}/escalar] level=${dados?.level} reason=${dados?.reason}`);
+
+    try {
+      const ticket = await this.ticketService.escalar(id, dados);
+
+      return {
+        success: true,
+        data: ticket,
+        message: 'Ticket escalonado com sucesso',
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erro ao escalonar ticket: ${error.message}`);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao escalonar ticket',
+          erro: error.message,
+        },
+        error instanceof HttpException ? error.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * POST /api/atendimento/tickets/:id/desescalar
+   * Remove escalonamento (retorna para N1)
+   */
+  @Post(':id/desescalar')
+  async desescalar(@Param('id') id: string, @Body() dados: DesescalarTicketDto) {
+    this.logger.log(`⬇️ [POST /tickets/${id}/desescalar]`);
+
+    try {
+      const ticket = await this.ticketService.desescalar(id, dados);
+
+      return {
+        success: true,
+        data: ticket,
+        message: 'Ticket desescalonado com sucesso',
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erro ao desescalonar ticket: ${error.message}`);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao desescalonar ticket',
+          erro: error.message,
+        },
+        error instanceof HttpException ? error.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * PATCH /api/atendimento/tickets/:id/reatribuir
+   * Reatribui ticket para fila/atendente e/ou ajusta nível/severidade
+   */
+  @Patch(':id/reatribuir')
+  async reatribuir(@Param('id') id: string, @Body() dados: ReatribuirTicketDto) {
+    this.logger.log(
+      `📌 [PATCH /tickets/${id}/reatribuir] fila=${dados?.filaId || '-'} atendente=${dados?.atendenteId || '-'}`,
+    );
+
+    try {
+      const ticket = await this.ticketService.reatribuir(id, dados);
+
+      return {
+        success: true,
+        data: ticket,
+        message: 'Ticket reatribuído com sucesso',
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erro ao reatribuir ticket: ${error.message}`);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao reatribuir ticket',
+          erro: error.message,
+        },
+        error instanceof HttpException ? error.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -461,9 +621,17 @@ export class TicketController {
       const mensagem = await this.mensagemService.enviar(dadosCompletos, arquivos);
       this.logger.log(`✅ Mensagem enviada para ticket ${ticketId}`);
 
+      // Formatar resposta para o frontend de chat (remetente/anexos/audio normalizados)
+      const ticket = await this.ticketService.buscarPorId(ticketId).catch(() => null);
+      const mensagemFormatada = this.mensagemService.formatarMensagemParaFrontend(mensagem, {
+        fotoContato: ticket?.contatoFoto || null,
+        status: 'enviado',
+        atendenteId: ticket?.atendenteId || null,
+      });
+
       return {
         success: true,
-        data: mensagem,
+        data: mensagemFormatada,
       };
     } catch (error) {
       this.logger.error(`❌ Erro ao enviar mensagem: ${error.message}`);

@@ -5,10 +5,20 @@ import {
   Inject,
   forwardRef,
   BadRequestException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Brackets, Not } from 'typeorm';
-import { Ticket, StatusTicket, PrioridadeTicket, OrigemTicket } from '../entities/ticket.entity';
+import {
+  Ticket,
+  StatusTicket,
+  TipoTicket,
+  PrioridadeTicket,
+  OrigemTicket,
+  SeveridadeTicket,
+  NivelAtendimentoTicket,
+} from '../entities/ticket.entity';
 import { Mensagem, RemetenteMensagem } from '../entities/mensagem.entity';
 import { SessaoTriagem, ResultadoSessao } from '../../triagem/entities/sessao-triagem.entity';
 import { Evento, TipoEvento } from '../../eventos/evento.entity';
@@ -23,6 +33,9 @@ import {
   gerarMensagemErroTransicao,
   obterDescricaoTransicao,
 } from '../utils/status-validator';
+import { notifyByPolicy } from '../../../notifications/channel-notifier';
+import { ChannelPolicyKey } from '../../../notifications/channel-policy';
+import { NotificationChannelsService } from '../../../notifications/notification-channels.service';
 // 🔍 OpenTelemetry imports
 import { trace, context, SpanStatusCode } from '@opentelemetry/api';
 import { withSpan, addAttributes, recordException } from '../../../common/tracing/tracing.helpers';
@@ -68,6 +81,7 @@ export interface FiltrarTicketsDto {
   filaId?: string;
   atendenteId?: string;
   prioridade?: string;
+  tipo?: TipoTicket; // 🆕 Filtro para unificação Tickets+Demandas
   limite?: number;
   pagina?: number;
 }
@@ -94,7 +108,12 @@ export class TicketService {
     private readonly mensagemService: MensagemService,
     @Inject(forwardRef(() => AtribuicaoService))
     private readonly atribuicaoService: AtribuicaoService,
+    private readonly notificationChannels: NotificationChannelsService,
   ) { }
+
+  private readonly highPriorityPolicy: ChannelPolicyKey = 'ticket-priority-high';
+  private readonly escalationPolicy: ChannelPolicyKey = 'ticket-escalation';
+  private readonly adminAlertPhone = process.env.NOTIFICATIONS_ADMIN_PHONE?.trim();
 
   /**
    * Busca contato completo com relação cliente pelo telefone
@@ -144,6 +163,102 @@ export class TicketService {
     }
   }
 
+  private isHighPriority(prioridade?: string | null): boolean {
+    if (!prioridade) return false;
+    const normalized = prioridade.toString().toUpperCase();
+    return normalized === PrioridadeTicket.ALTA || normalized === PrioridadeTicket.URGENTE;
+  }
+
+  private getAdminPhone(): string | undefined {
+    const raw = this.adminAlertPhone;
+    if (!raw) return undefined;
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length < 10 || digits.length > 15) return undefined;
+    return raw;
+  }
+
+  private async tentarNotificarPrioridadeAlta(ticket: Ticket): Promise<void> {
+    try {
+      if (!this.isHighPriority(ticket?.prioridade)) return;
+
+      const phone = this.getAdminPhone();
+      if (!phone) {
+        this.logger.debug('[Ticket] NOTIFICATIONS_ADMIN_PHONE ausente; alerta externo não enviado');
+        return;
+      }
+
+      const numero = ticket.numero ? `#${ticket.numero}` : ticket.id?.slice(0, 8) || 'ticket';
+      const assunto = ticket.assunto || 'Ticket prioritário';
+      const message = `Ticket ${numero} prioridade ${ticket.prioridade}: ${assunto}`.slice(0, 280);
+
+      await notifyByPolicy({
+        policyKey: this.escalationPolicy,
+        channels: this.notificationChannels,
+        logger: this.logger,
+        targets: { phone },
+        message,
+        context: {
+          source: 'ticket-priority-high',
+          ticketId: ticket.id,
+          prioridade: ticket.prioridade,
+          numero: ticket.numero,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao notificar prioridade alta do ticket ${ticket?.id || 'desconhecido'}: ${error?.message || error}`,
+      );
+    }
+  }
+
+  private async notificarEscalacao(ticket: Ticket, level: NivelAtendimentoTicket, reason: string): Promise<void> {
+    try {
+      const phone = this.getAdminPhone();
+      if (!phone) {
+        this.logger.debug('[Ticket] NOTIFICATIONS_ADMIN_PHONE ausente; alerta de escalonamento não enviado');
+        return;
+      }
+
+      const numero = ticket.numero ? `#${ticket.numero}` : ticket.id?.slice(0, 8) || 'ticket';
+      const assunto = ticket.assunto || 'Ticket escalonado';
+      const message = `Ticket ${numero} escalonado para ${level}: ${assunto} (motivo: ${reason})`.slice(0, 280);
+
+      await notifyByPolicy({
+        policyKey: this.highPriorityPolicy,
+        channels: this.notificationChannels,
+        logger: this.logger,
+        targets: { phone },
+        message,
+        context: {
+          source: 'ticket-escalation',
+          ticketId: ticket.id,
+          level,
+          reason,
+          numero: ticket.numero,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao notificar escalonamento do ticket ${ticket?.id || 'desconhecido'}: ${error?.message || error}`,
+      );
+    }
+  }
+
+  private resolverSlaExpiration(slaTargetMinutes?: number, slaExpiresAt?: Date | string | null): Date | undefined {
+    if (slaTargetMinutes && slaTargetMinutes > 0) {
+      return new Date(Date.now() + slaTargetMinutes * 60 * 1000);
+    }
+
+    if (slaExpiresAt) {
+      const data = new Date(slaExpiresAt);
+      if (!Number.isNaN(data.getTime())) {
+        return data;
+      }
+    }
+
+    return undefined;
+  }
+
   private calcularTempoAtendimento(ticket: Ticket): number {
     if (!ticket?.data_abertura) {
       return 0;
@@ -157,14 +272,14 @@ export class TicketService {
     const statusNormalizado =
       typeof ticket.status === 'string' ? ticket.status.toUpperCase() : undefined;
 
-    const status = (statusNormalizado as StatusTicket) || StatusTicket.ABERTO;
-    const encerrado = status === StatusTicket.RESOLVIDO || status === StatusTicket.FECHADO;
+    const status = (statusNormalizado as StatusTicket) || StatusTicket.FILA;
+    const encerrado = status === StatusTicket.ENCERRADO;
 
     let fimMs: number | undefined;
 
     if (encerrado) {
       const candidatos: (Date | null | undefined)[] =
-        status === StatusTicket.FECHADO
+        status === StatusTicket.ENCERRADO
           ? [ticket.data_fechamento, ticket.data_resolucao]
           : [ticket.data_resolucao, ticket.data_fechamento];
 
@@ -214,7 +329,7 @@ export class TicketService {
           empresaId: dados.empresaId,
           canalId: dados.canalId,
           contatoTelefone: dados.clienteNumero,
-          status: In([StatusTicket.ABERTO, StatusTicket.EM_ATENDIMENTO, StatusTicket.AGUARDANDO]),
+          status: In([StatusTicket.FILA, StatusTicket.EM_ATENDIMENTO, StatusTicket.ENVIO_ATIVO]),
         },
         order: { createdAt: 'DESC' },
       });
@@ -229,7 +344,7 @@ export class TicketService {
             empresaId: dados.empresaId,
             canalId: dados.canalId,
             contatoTelefone: dados.clienteNumero,
-            status: Not(In([StatusTicket.FECHADO, StatusTicket.RESOLVIDO])),
+            status: Not(In([StatusTicket.ENCERRADO, StatusTicket.ENCERRADO])),
           },
           order: { createdAt: 'DESC' },
         });
@@ -264,7 +379,7 @@ export class TicketService {
           contatoNome: dados.clienteNome || dados.clienteNumero,
           contatoFoto: dados.clienteFoto || null,
           assunto: dados.assunto || 'Novo atendimento via WhatsApp',
-          status: StatusTicket.ABERTO,
+          status: StatusTicket.FILA,
           prioridade: PrioridadeTicket.MEDIA,
           data_abertura: new Date(),
           ultima_mensagem_em: new Date(),
@@ -301,6 +416,8 @@ export class TicketService {
         // 🔔 Notificar sidebar em tempo real sobre novo ticket
         this.atendimentoGateway.notificarNovoTicket(ticket);
         this.atendimentoGateway.notificarStatusTicket(ticket.id, ticket.status, ticket);
+
+        void this.tentarNotificarPrioridadeAlta(ticket);
       } else {
         // 3. Se já existe, atualizar última interação
         addAttributes(span, { 'ticket.action': 'update' });
@@ -480,6 +597,7 @@ export class TicketService {
 
   /**
    * Busca ticket por ID
+   * 🆕 Popula relações User (autor, responsavel) para unificação
    */
   async buscarPorId(id: string, empresaId?: string): Promise<Ticket> {
     const where: any = { id };
@@ -489,8 +607,9 @@ export class TicketService {
 
     const ticket = await this.ticketRepository.findOne({
       where,
+      relations: ['autor', 'responsavel'], // 🆕 Carregar relações User
       // Removido relations temporariamente - relações não definidas na entity
-      // relations: ['canal', 'atendente', 'fila'],
+      // relations: ['canal', 'atendente', 'fila', 'autor', 'responsavel'],
     });
 
     if (!ticket) {
@@ -558,7 +677,7 @@ export class TicketService {
       // ✅ Se status NÃO foi especificado, excluir apenas tickets FECHADOS
       // Isso garante que tickets novos (ABERTO, EM_ATENDIMENTO, AGUARDANDO, etc) apareçam
       queryBuilder.andWhere('ticket.status != :statusFechado', {
-        statusFechado: StatusTicket.FECHADO,
+        statusFechado: StatusTicket.ENCERRADO,
       });
     }
 
@@ -579,6 +698,13 @@ export class TicketService {
     if (filtros.prioridade) {
       queryBuilder.andWhere('ticket.prioridade = :prioridade', {
         prioridade: filtros.prioridade,
+      });
+    }
+
+    // 🆕 Filtro por tipo (suporte à unificação Tickets+Demandas)
+    if (filtros.tipo) {
+      queryBuilder.andWhere('ticket.tipo = :tipo', {
+        tipo: filtros.tipo,
       });
     }
 
@@ -665,6 +791,7 @@ export class TicketService {
 
   /**
    * Cria um novo ticket manualmente
+   * 🆕 Suporta campos da unificação Tickets+Demandas
    */
   async criar(dados: CriarTicketDto): Promise<Ticket> {
     this.logger.log(`➕ Criando ticket para: ${dados.clienteNome || dados.clienteNumero}`);
@@ -676,10 +803,18 @@ export class TicketService {
       contatoNome: dados.clienteNome || dados.clienteNumero,
       contatoFoto: dados.clienteFoto || null,
       assunto: dados.assunto || 'Novo ticket',
-      status: StatusTicket.ABERTO,
+      status: StatusTicket.FILA,
       prioridade: (dados.prioridade as any) || PrioridadeTicket.MEDIA,
       data_abertura: new Date(),
       ultima_mensagem_em: new Date(),
+      // 🆕 Campos da unificação Tickets+Demandas
+      cliente_id: dados.cliente_id || null,
+      titulo: dados.titulo || null,
+      descricao: dados.descricao || null,
+      tipo: dados.tipo || null,
+      data_vencimento: dados.data_vencimento ? new Date(dados.data_vencimento) : null,
+      responsavel_id: dados.responsavel_id || null,
+      autor_id: dados.autor_id || null,
     });
 
     const ticketSalvo = await this.ticketRepository.save(ticket);
@@ -700,6 +835,8 @@ export class TicketService {
     }
 
     this.logger.log(`✅ Ticket criado: ${ticketSalvo.id} (Número: ${ticketSalvo.numero})`);
+
+    void this.tentarNotificarPrioridadeAlta(ticketSalvo);
 
     return ticketSalvo;
   }
@@ -770,7 +907,7 @@ export class TicketService {
     );
 
     // Verificar se estava ABERTO e vai para EM_ATENDIMENTO
-    const primeiraAtribuicao = ticket.status === StatusTicket.ABERTO && !ticket.atendenteId;
+    const primeiraAtribuicao = ticket.status === StatusTicket.FILA && !ticket.atendenteId;
 
     ticket.atendenteId = atendenteId;
     ticket.status = StatusTicket.EM_ATENDIMENTO;
@@ -839,6 +976,63 @@ export class TicketService {
   }
 
   /**
+   * Atualiza campos gerais do ticket (atendenteId, filaId, etc)
+   * 🆕 Suporta atualização de campos da unificação Tickets+Demandas
+   */
+  async atualizar(
+    ticketId: string,
+    empresaId: string,
+    dados: Partial<{
+      atendenteId?: string;
+      filaId?: string;
+      cliente_id?: string;
+      titulo?: string;
+      descricao?: string;
+      tipo?: TipoTicket;
+      data_vencimento?: string | Date;
+      responsavel_id?: string;
+      autor_id?: string;
+      [key: string]: any;
+    }>,
+  ): Promise<Ticket> {
+    const ticket = await this.ticketRepository.findOne({
+      where: { id: ticketId, empresaId },
+    });
+
+    if (!ticket) {
+      throw new HttpException('Ticket não encontrado', HttpStatus.NOT_FOUND);
+    }
+
+    // 🆕 Tratamento especial para data_vencimento (string → Date)
+    if (dados.data_vencimento) {
+      dados.data_vencimento = new Date(dados.data_vencimento);
+    }
+
+    // Atualizar campos
+    Object.assign(ticket, dados);
+
+    const ticketAtualizado = await this.ticketRepository.save(ticket);
+    this.logger.log(`✅ Ticket ${ticketId} atualizado com ${JSON.stringify(dados)}`);
+
+    // 🔔 Notificar via WebSocket
+    try {
+      await Promise.resolve(
+        this.atendimentoGateway.notificarStatusTicket(
+          ticketAtualizado.id,
+          ticketAtualizado.status,
+          ticketAtualizado,
+        ),
+      );
+    } catch (wsError) {
+      this.logger.warn(
+        `⚠️ Erro ao notificar WebSocket: ${wsError instanceof Error ? wsError.message : wsError}`,
+      );
+    }
+
+    return ticketAtualizado;
+  }
+
+  /**
    * Atualiza status do ticket com validação de transições
    */
   async atualizarStatus(ticketId: string, status: StatusTicket): Promise<Ticket> {
@@ -861,17 +1055,17 @@ export class TicketService {
     ticket.status = status;
 
     // Se resolvendo, registrar data
-    if (status === StatusTicket.RESOLVIDO && !ticket.data_resolucao) {
+    if (status === StatusTicket.ENCERRADO && !ticket.data_resolucao) {
       ticket.data_resolucao = new Date();
     }
 
     // Se fechando, registrar data
-    if (status === StatusTicket.FECHADO && !ticket.data_fechamento) {
+    if (status === StatusTicket.ENCERRADO && !ticket.data_fechamento) {
       ticket.data_fechamento = new Date();
     }
 
     // Se reabrindo, limpar datas
-    if (status === StatusTicket.ABERTO && statusAtual === StatusTicket.FECHADO) {
+    if (status === StatusTicket.FILA && statusAtual === StatusTicket.ENCERRADO) {
       ticket.data_resolucao = null;
       ticket.data_fechamento = null;
       this.logger.log(`♻️ Ticket ${ticketId} reaberto - datas zeradas`);
@@ -908,6 +1102,8 @@ export class TicketService {
 
     const ticketAtualizado = await this.ticketRepository.save(ticket);
     this.logger.log(`🔥 Prioridade do ticket ${ticketId} atualizada para ${prioridade}`);
+
+    void this.tentarNotificarPrioridadeAlta(ticketAtualizado);
 
     return ticketAtualizado;
   }
@@ -955,9 +1151,109 @@ export class TicketService {
     return await this.ticketRepository.count({
       where: {
         atendenteId: atendenteId,
-        status: In([StatusTicket.ABERTO, StatusTicket.EM_ATENDIMENTO, StatusTicket.AGUARDANDO]),
+        status: In([StatusTicket.FILA, StatusTicket.EM_ATENDIMENTO, StatusTicket.ENVIO_ATIVO]),
       },
     });
+  }
+
+  async escalar(
+    ticketId: string,
+    dados: { level: NivelAtendimentoTicket; reason: string; slaTargetMinutes?: number; slaExpiresAt?: Date },
+  ): Promise<Ticket> {
+    const ticket = await this.buscarPorId(ticketId);
+
+    if (!dados?.level) {
+      throw new BadRequestException('Nível de escalonamento é obrigatório');
+    }
+
+    if (ticket.assignedLevel === dados.level) {
+      throw new BadRequestException('Ticket já está no nível informado');
+    }
+
+    ticket.assignedLevel = dados.level;
+    ticket.escalationReason = dados.reason;
+    ticket.escalationAt = new Date();
+
+    if (dados.slaTargetMinutes || dados.slaExpiresAt) {
+      ticket.slaTargetMinutes = dados.slaTargetMinutes ?? ticket.slaTargetMinutes;
+      ticket.slaExpiresAt = this.resolverSlaExpiration(dados.slaTargetMinutes, dados.slaExpiresAt) ?? ticket.slaExpiresAt;
+    }
+
+    const salvo = await this.ticketRepository.save(ticket);
+
+    try {
+      await Promise.resolve(
+        this.atendimentoGateway.notificarStatusTicket(
+          salvo.id,
+          salvo.status,
+          salvo,
+        ),
+      );
+    } catch (error) {
+      this.logger.error(`⚠️ Erro ao notificar websocket após escalonamento: ${error?.message || error}`);
+    }
+
+    void this.notificarEscalacao(salvo, dados.level, dados.reason);
+    if (this.isHighPriority(salvo.prioridade)) {
+      void this.tentarNotificarPrioridadeAlta(salvo);
+    }
+
+    return salvo;
+  }
+
+  async desescalar(ticketId: string, dados?: { reason?: string }): Promise<Ticket> {
+    const ticket = await this.buscarPorId(ticketId);
+
+    ticket.assignedLevel = NivelAtendimentoTicket.N1;
+    ticket.escalationReason = dados?.reason || null;
+    ticket.escalationAt = null;
+
+    const salvo = await this.ticketRepository.save(ticket);
+
+    try {
+      await Promise.resolve(this.atendimentoGateway.notificarStatusTicket(salvo.id, salvo.status, salvo));
+    } catch (error) {
+      this.logger.error(`⚠️ Erro ao notificar websocket após desescalada: ${error?.message || error}`);
+    }
+
+    return salvo;
+  }
+
+  async reatribuir(ticketId: string, dados: {
+    filaId?: string;
+    atendenteId?: string;
+    assignedLevel?: NivelAtendimentoTicket;
+    severity?: SeveridadeTicket;
+  }): Promise<Ticket> {
+    if (!dados.filaId && !dados.atendenteId && !dados.assignedLevel && !dados.severity) {
+      throw new BadRequestException('Informe pelo menos filaId, atendenteId, assignedLevel ou severity');
+    }
+
+    const ticket = await this.buscarPorId(ticketId);
+
+    if (dados.filaId) {
+      ticket.filaId = dados.filaId;
+    }
+    if (dados.atendenteId) {
+      ticket.atendenteId = dados.atendenteId;
+      ticket.status = StatusTicket.EM_ATENDIMENTO;
+    }
+    if (dados.assignedLevel) {
+      ticket.assignedLevel = dados.assignedLevel;
+    }
+    if (dados.severity) {
+      ticket.severity = dados.severity;
+    }
+
+    const salvo = await this.ticketRepository.save(ticket);
+
+    try {
+      await Promise.resolve(this.atendimentoGateway.notificarStatusTicket(salvo.id, salvo.status, salvo));
+    } catch (error) {
+      this.logger.error(`⚠️ Erro ao notificar websocket após reatribuição: ${error?.message || error}`);
+    }
+
+    return salvo;
   }
 
   /**
@@ -1101,12 +1397,12 @@ export class TicketService {
     const ticket = await this.buscarPorId(ticketId);
 
     // Verificar se está encerrado
-    if (ticket.status !== StatusTicket.RESOLVIDO && ticket.status !== StatusTicket.FECHADO) {
+    if (ticket.status !== StatusTicket.ENCERRADO) {
       throw new Error('Ticket não está encerrado');
     }
 
     // Reabrir
-    ticket.status = StatusTicket.ABERTO;
+    ticket.status = StatusTicket.FILA;
     ticket.data_resolucao = null;
     ticket.data_fechamento = null;
 
@@ -1157,7 +1453,7 @@ export class TicketService {
   private definirStatusEncerramento(motivo?: string): StatusTicket {
     const valor = (motivo || '').toLowerCase();
     if (valor === 'resolvido') {
-      return StatusTicket.RESOLVIDO;
+      return StatusTicket.ENCERRADO;
     }
 
     // Aceita variações que podem vir do frontend
@@ -1171,10 +1467,10 @@ export class TicketService {
     ]);
 
     if (motivosFechamento.has(valor)) {
-      return StatusTicket.FECHADO;
+      return StatusTicket.ENCERRADO;
     }
 
-    return StatusTicket.RESOLVIDO;
+    return StatusTicket.ENCERRADO;
   }
 
   private async criarFollowUpCasoNecessario(ticket: Ticket, dados: any) {
@@ -1343,7 +1639,7 @@ export class TicketService {
   }
 
   private definirResultadoSessao(statusTicket: string): ResultadoSessao {
-    if (statusTicket === StatusTicket.RESOLVIDO) {
+    if (statusTicket === StatusTicket.ENCERRADO) {
       return 'transferido_humano';
     }
     return 'ticket_criado';
