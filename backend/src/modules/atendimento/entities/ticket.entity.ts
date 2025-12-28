@@ -14,12 +14,18 @@ import {
 
 import { Fila } from './fila.entity';
 import { Tag } from './tag.entity';
+import { User } from '../../usuarios/entities/user.entity';
 
 export enum StatusTicket {
   FILA = 'FILA',
   EM_ATENDIMENTO = 'EM_ATENDIMENTO',
   ENVIO_ATIVO = 'ENVIO_ATIVO',
   ENCERRADO = 'ENCERRADO',
+  // Novos status para unificação com Demandas (Sprint 1)
+  AGUARDANDO_CLIENTE = 'AGUARDANDO_CLIENTE',
+  AGUARDANDO_INTERNO = 'AGUARDANDO_INTERNO',
+  CONCLUIDO = 'CONCLUIDO',
+  CANCELADO = 'CANCELADO',
 }
 
 export enum PrioridadeTicket {
@@ -49,6 +55,17 @@ export enum OrigemTicket {
   SMS = 'SMS',
   WEBCHAT = 'WEBCHAT',
   API = 'API',
+}
+
+// Novo enum para tipos de ticket (unificação com Demandas - Sprint 1)
+export enum TipoTicket {
+  TECNICA = 'tecnica',
+  COMERCIAL = 'comercial',
+  FINANCEIRA = 'financeira',
+  SUPORTE = 'suporte',
+  RECLAMACAO = 'reclamacao',
+  SOLICITACAO = 'solicitacao',
+  OUTROS = 'outros',
 }
 
 @Entity('atendimento_tickets')
@@ -106,6 +123,43 @@ export class Ticket {
 
   @Column({ type: 'uuid', name: 'empresa_id' })
   empresaId: string;
+
+  // ========================================
+  // NOVOS CAMPOS - Sprint 1 (Unificação Ticket + Demanda)
+  // ========================================
+
+  @Column({ type: 'uuid', name: 'cliente_id', nullable: true })
+  clienteId?: string;
+
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  titulo?: string;
+
+  @Column({ type: 'text', nullable: true })
+  descricao?: string;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  tipo?: TipoTicket;
+
+  @Column({ type: 'timestamp', name: 'data_vencimento', nullable: true })
+  dataVencimento?: Date;
+
+  @Column({ type: 'uuid', name: 'responsavel_id', nullable: true })
+  responsavelId?: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'responsavel_id' })
+  responsavel?: User;
+
+  @Column({ type: 'uuid', name: 'autor_id', nullable: true })
+  autorId?: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'autor_id' })
+  autor?: User;
+
+  // ========================================
+  // FIM DOS NOVOS CAMPOS
+  // ========================================
 
   @Column({ type: 'uuid', name: 'departamento_id', nullable: true })
   departamentoId: string | null;
