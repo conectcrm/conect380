@@ -37,7 +37,10 @@ import messageTemplateService, {
 import { FileUpload } from '../../../../components/chat/FileUpload';
 import { UploadArea } from '../../components/UploadArea'; // 🆕 Upload moderno com drag & drop
 import { RespostasRapidas } from '../../../../components/chat/RespostasRapidas';
+import { TemplateSelector } from './TemplateSelector'; // ✅ SPRINT 2 - Templates Rápidos
+import { templateMensagemService } from '../../../../services/templateMensagemService'; // ✅ SPRINT 2
 import { useAuth } from '../../../../hooks/useAuth';
+import TransferenciaModal from './TransferenciaModal'; // ✅ SPRINT 2 - Transferência de Tickets
 
 const DURACAO_AUDIO_DESCONHECIDA = '--:--';
 
@@ -391,11 +394,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [autocompleteTemplates, setAutocompleteTemplates] = useState<MessageTemplate[]>([]);
   const [mostrarAutocomplete, setMostrarAutocomplete] = useState(false);
 
+  // ✅ SPRINT 2: Estados para Templates Rápidos
+  const [templatesRapidos, setTemplatesRapidos] = useState<any[]>([]);
+  const [mostrarTemplatesRapidos, setMostrarTemplatesRapidos] = useState(false);
+
   // ✅ NOVOS: Estados para Emoji, FileUpload e Respostas Rápidas
   const [mostrarEmojiPicker, setMostrarEmojiPicker] = useState(false);
   const [mostrarFileUploadModal, setMostrarFileUploadModal] = useState(false);
   const [mostrarRespostasRapidasModal, setMostrarRespostasRapidasModal] = useState(false);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+
+  // ✅ SPRINT 2: Estado para Modal de Transferência
+  const [mostrarTransferenciaModal, setMostrarTransferenciaModal] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null); // 🆕 Ref do container para verificar scroll
@@ -493,14 +503,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     };
   }, []);
 
-  // Carregar templates ao montar o componente
+  // ✅ SPRINT 2: Carregar templates rápidos ao montar o componente
   useEffect(() => {
-    const empresaId = user?.empresa?.id || 'empresa-default';
-    messageTemplateService
-      .listar(empresaId, true)
-      .then((data) => setTemplates(Array.isArray(data) ? data : []))
-      .catch((err) => console.error('Erro ao carregar templates:', err));
-  }, []);
+    const empresaId = user?.empresa?.id || '11111111-1111-1111-1111-111111111111';
+    templateMensagemService
+      .listar(empresaId)
+      .then((data) => {
+        setTemplatesRapidos(data);
+      })
+      .catch((err) => console.error('Erro ao carregar templates rápidos:', err));
+  }, [user]);
 
   // Detectar comando /atalho e mostrar autocomplete
   useEffect(() => {
@@ -842,6 +854,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     const novoValor = e.target.value;
     setMensagemAtual(novoValor);
 
+    // ✅ SPRINT 2: Detectar "/" para mostrar templates rápidos
+    if (novoValor.startsWith('/') && templatesRapidos.length > 0) {
+      setMostrarTemplatesRapidos(true);
+    } else if (mostrarTemplatesRapidos) {
+      setMostrarTemplatesRapidos(false);
+    }
+
     // Emitir evento de digitação com debounce (só envia 1x a cada 1 segundo)
     if (onEmitirDigitando && podeResponder && novoValor.trim()) {
       // Limpar timeout anterior
@@ -1039,7 +1058,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 alt={resolverNomeExibicao(ticket.contato)}
                 className="w-12 h-12 rounded-full object-cover"
               />
-              {ticket.contato.online && (
+              {ticket.contato?.online && (
                 <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
               )}
             </div>
@@ -1070,10 +1089,34 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       }`}
                   />
                 </div>
+                {/* Sprint 2: Badge de tipo do ticket */}
+                {ticket.tipo && (
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                    ticket.tipo === 'comercial' ? 'bg-green-100 text-green-700' :
+                    ticket.tipo === 'tecnica' ? 'bg-blue-100 text-blue-700' :
+                    ticket.tipo === 'suporte' ? 'bg-purple-100 text-purple-700' :
+                    ticket.tipo === 'financeira' ? 'bg-yellow-100 text-yellow-700' :
+                    ticket.tipo === 'reclamacao' ? 'bg-red-100 text-red-700' :
+                    'bg-gray-100 text-gray-700'
+                  }`}>
+                    {ticket.tipo.charAt(0).toUpperCase() + ticket.tipo.slice(1)}
+                  </span>
+                )}
               </div>
-              <p className="text-sm text-gray-500">
-                {ticket.contato?.online ? 'Online' : 'Offline'}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-gray-500">
+                  {ticket.contato?.online ? 'Online' : 'Offline'}
+                </p>
+                {/* Sprint 2: Título do ticket (se preenchido) */}
+                {ticket.titulo && (
+                  <>
+                    <span className="text-gray-300">•</span>
+                    <p className="text-sm text-gray-600 font-medium max-w-md truncate" title={ticket.titulo}>
+                      {ticket.titulo}
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1129,7 +1172,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
             {/* Botão Transferir - Apenas ícone */}
             <button
-              onClick={podeResponder ? onTransferir : undefined}
+              onClick={() => podeResponder && setMostrarTransferenciaModal(true)}
               disabled={!podeResponder}
               className={`p-2 rounded-lg transition-colors ${podeResponder
                 ? 'hover:bg-blue-50 text-blue-600'
@@ -1596,6 +1639,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
           {/* Campo de Texto */}
           <div className="flex-1 relative">
+            {/* ✅ SPRINT 2: Template Selector */}
+            {mostrarTemplatesRapidos && templatesRapidos.length > 0 && (
+              <TemplateSelector
+                templates={templatesRapidos}
+                onSelect={(conteudo) => {
+                  setMensagemAtual(conteudo);
+                  setMostrarTemplatesRapidos(false);
+                  textareaRef.current?.focus();
+                }}
+                onClose={() => setMostrarTemplatesRapidos(false)}
+                searchTerm={mensagemAtual}
+              />
+            )}
+
             <textarea
               ref={textareaRef}
               value={mensagemAtual}
@@ -1603,7 +1660,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               onKeyPress={handleKeyPress}
               placeholder={
                 podeResponder
-                  ? 'Digite sua mensagem...'
+                  ? 'Digite sua mensagem... (use / para templates rápidos)'
                   : 'Ticket resolvido. Abra um novo atendimento para responder.'
               }
               rows={1}
@@ -1750,6 +1807,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ✅ SPRINT 2: Modal de Transferência de Tickets */}
+      {mostrarTransferenciaModal && (
+        <TransferenciaModal
+          ticket={ticket}
+          onClose={() => setMostrarTransferenciaModal(false)}
+          onSuccess={(ticketAtualizado) => {
+            setMostrarTransferenciaModal(false);
+            // Callback opcional para atualizar a lista de tickets após transferência
+            if (onTransferir) {
+              onTransferir();
+            }
+          }}
+        />
       )}
     </div>
   );

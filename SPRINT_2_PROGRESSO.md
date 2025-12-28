@@ -92,10 +92,10 @@ Após a conclusão do Sprint 1 (backend 100%), agora vamos atualizar o frontend 
 
 ### Fase 3: Componentes (4-5h)
 
-- [ ] **3.1** - Atualizar `ChatOmnichannel.tsx`
-  - Exibir campo `titulo` (se preenchido) em vez de `assunto`
-  - Mostrar badge de `tipo` do ticket
-  - Campo `responsavel` no header
+- [x] **3.1** - Atualizar `ChatArea.tsx` (header do chat) ✅
+  - Exibir campo `titulo` (se preenchido) ao lado do status online/offline
+  - Mostrar badge de `tipo` do ticket (cores por categoria)
+  - Layout responsivo com truncate para títulos longos
 
 - [ ] **3.2** - Criar componente `FiltroTipoTicket`
   - Select com opções de TipoTicket
@@ -143,12 +143,12 @@ Após a conclusão do Sprint 1 (backend 100%), agora vamos atualizar o frontend 
 
 ## 📊 Progresso Sprint 2
 
-**Concluído**: 6/19 tarefas (31.6%)
+**Concluído**: 7/19 tarefas (36.8%)
 
 **Fases**:
 - [x] Fase 1: Types & Interfaces (4/4) ← **100% COMPLETO** ✅
 - [x] Fase 2: Services (2/3) ← **67% COMPLETO**
-- [ ] Fase 3: Componentes (0/3)
+- [ ] Fase 3: Componentes (1/3) ← **33% INICIADO**
 - [ ] Fase 4: Páginas & Rotas (0/3)
 - [ ] Fase 5: Testes & Validação (0/4)
 
