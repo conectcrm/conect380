@@ -1,7 +1,8 @@
 # Sprint 1 - Backend: Expansão da Entity Ticket
 
-**Status**: 🟢 EM ANDAMENTO  
+**Status**: 🟢 85.7% CONCLUÍDO (6/7 tarefas)  
 **Início**: 28/12/2025  
+**Última Atualização**: 28/12/2025 15:52  
 **Duração Estimada**: 2 semanas  
 **Objetivo**: Preparar código backend TypeScript para unificação Ticket + Demanda
 
@@ -170,10 +171,39 @@ describe('TicketService - Unificação Tickets + Demandas (Sprint 1)')
 
 ## ⏭️ Próximas Etapas (Após Migration SQL)
 
-### 6. Migration SQL
-- [ ] **EXECUTAR** `migration-unificacao-tickets.sql` no banco
-- [ ] **VALIDAR** que as 2 demandas foram migradas corretamente
-- [ ] **VERIFICAR** que os 30 tickets originais permanecem intactos
+### ✅ 6. Migration SQL - **CONCLUÍDA** (28/12/2025 15:52)
+
+**Executado**: Migration SQL com versão corrigida (sem dependência de sequence)
+
+**Resultado**:
+- ✅ **2 demandas** migradas para `atendimento_tickets`
+- ✅ **30 tickets** originais preservados intactos
+- ✅ **32 tickets** totais no banco (30 + 2)
+- ✅ Campos populados: `tipo='suporte'`, `status`, `prioridade`, `titulo`, `descricao`, `cliente_id`, `responsavel_id`, `autor_id`, `data_vencimento`
+- ✅ Números sequenciais gerados automaticamente (61, 62) via trigger
+
+**Tickets Migrados**:
+```sql
+numero | titulo                 | tipo    | status          | prioridade | criado
+-------|------------------------|---------|-----------------|------------|----------------
+61     | Demanda do ticket #56  | suporte | EM_ATENDIMENTO  | MEDIA      | 23/12/2025 19:28
+62     | problemas no desktop   | suporte | FILA            | MEDIA      | 24/12/2025 12:54
+```
+
+**Query de Validação**:
+```sql
+SELECT COUNT(*) as total_tickets, 
+       COUNT(tipo) as com_tipo, 
+       COUNT(*) - COUNT(tipo) as sem_tipo 
+FROM atendimento_tickets;
+-- Resultado: 32 total | 2 com tipo | 30 sem tipo ✅
+```
+
+**Observações**:
+- Migration SQL original tinha bug (assumia sequence inexistente)
+- Executado comando INSERT direto com cast de enums correto
+- Trigger `atendimento_tickets_numero_trigger` gerou números automaticamente
+- Backup `backup_pre_unificacao_20251228.sql` disponível para rollback
 
 ### 7. Feature Flag
 - [ ] Adicionar variável `.env`: `USE_UNIFIED_TICKETS=true`
@@ -184,14 +214,14 @@ describe('TicketService - Unificação Tickets + Demandas (Sprint 1)')
 
 ## 📊 Progresso Sprint 1
 
-**Concluído**: 5/7 tarefas (71.4%)
+**Concluído**: 6/7 tarefas (85.7%)
 
 - [x] 1. Entity Ticket expandida
 - [x] 2. DTOs atualizados
 - [x] 3. Service e Controller atualizados
 - [x] 4. Deprecar Demanda Service
 - [x] 5. Testes unitários
-- [ ] 6. Executar Migration SQL
+- [x] 6. Executar Migration SQL ← **CONCLUÍDO AGORA**
 - [ ] 7. Feature Flag
 
 ---
