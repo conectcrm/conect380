@@ -69,15 +69,21 @@ Após a conclusão do Sprint 1 (backend 100%), agora vamos atualizar o frontend 
 - [x] **1.3** - Atualizar `StatusTicket` com novos valores ✅
   - Adicionar: FILA, AGUARDANDO_CLIENTE, AGUARDANDO_INTERNO, CONCLUIDO, CANCELADO, ENCERRADO
 
-- [ ] **1.4** - Deprecar `interface Demanda` (demandaService.ts)
-  - Adicionar JSDoc @deprecated
-  - Type alias: `export type Demanda = Ticket & { tipo: TipoTicket }`
+- [x] **1.4** - Deprecar `interface Demanda` (demandaService.ts) ✅
+  - JSDoc @deprecated em interface e classe ✅
+  - console.warn() em todos os métodos principais ✅
+  - Documentação de migração completa ✅
 
 ### Fase 2: Services (3-4h)
 
 - [x] **2.1** - Atualizar `ticketService.listar()` com filtro tipo ✅
   - Adicionar parâmetros opcionais: tipo, responsavelId, autorId em TicketFiltros
   - Query: `GET /tickets?tipo=suporte` funcionando
+
+- [x] **2.2** - Deprecar `demandaService` ✅
+  - Todos os métodos marcados como @deprecated
+  - console.warn() em 7 métodos principais
+  - Período de transição documentado
 
 - [ ] **2.3** - Deprecar `demandaService`
   - Redirecionar métodos para `ticketService`
@@ -137,11 +143,11 @@ Após a conclusão do Sprint 1 (backend 100%), agora vamos atualizar o frontend 
 
 ## 📊 Progresso Sprint 2
 
-**Concluído**: 4/19 tarefas (21%)
+**Concluído**: 6/19 tarefas (31.6%)
 
 **Fases**:
-- [x] Fase 1: Types & Interfaces (3/4) ← 75% concluído
-- [ ] Fase 2: Services (1/3) ← 33% iniciado
+- [x] Fase 1: Types & Interfaces (4/4) ← **100% COMPLETO** ✅
+- [x] Fase 2: Services (2/3) ← **67% COMPLETO**
 - [ ] Fase 3: Componentes (0/3)
 - [ ] Fase 4: Páginas & Rotas (0/3)
 - [ ] Fase 5: Testes & Validação (0/4)
