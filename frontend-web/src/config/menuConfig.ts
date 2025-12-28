@@ -1,4 +1,5 @@
 import {
+  type LucideIcon,
   Home,
   Users,
   Settings,
@@ -9,35 +10,31 @@ import {
   Building2,
   TrendingUp,
   Target,
-  Headphones,
   BarChart3,
+  BarChart,
   FileText,
   Shield,
   Database,
   UserCog,
   Archive,
   Phone,
-  Monitor,
   Zap,
-  Activity,
-  PieChart,
   LineChart,
   Receipt,
   Calculator,
   Wallet,
-  CreditCard as CreditCardIcon,
-  GitBranch,
-  Workflow,
   Mail,
   Shuffle,
   Clock,
-  CheckCircle
+  CheckCircle,
+  Calendar,
+  ClipboardList,
 } from 'lucide-react';
 
 export interface MenuConfig {
   id: string;
   title: string;
-  icon: React.ComponentType<any>;
+  icon: LucideIcon;
   href?: string;
   color: 'blue' | 'green' | 'purple' | 'orange' | 'red';
   badge?: string;
@@ -55,7 +52,7 @@ export const menuConfig: MenuConfig[] = [
     icon: Home,
     href: '/dashboard',
     color: 'blue',
-    section: 'Visão Geral'
+    section: 'Visão Geral',
   },
   {
     id: 'atendimento',
@@ -67,60 +64,40 @@ export const menuConfig: MenuConfig[] = [
     section: 'Operações',
     children: [
       {
-        id: 'atendimento-central',
-        title: 'Central de Atendimentos',
-        icon: Headphones,
-        href: '/atendimento/central',
-        color: 'purple'
-      },
-      {
-        id: 'atendimento-chat',
+        id: 'atendimento-inbox',
         title: 'Chat',
         icon: MessageSquare,
-        href: '/atendimento/chat',
-        color: 'purple'
+        href: '/atendimento/inbox',
+        color: 'purple',
       },
       {
-        id: 'atendimento-filas',
-        title: 'Gestão de Filas',
+        id: 'atendimento-automacoes',
+        title: 'Automações',
+        icon: Zap,
+        href: '/atendimento/automacoes',
+        color: 'purple',
+      },
+      {
+        id: 'atendimento-equipe',
+        title: 'Equipe',
         icon: Users,
-        href: '/nuclei/atendimento/filas',
-        color: 'purple'
+        href: '/atendimento/equipe',
+        color: 'purple',
       },
       {
-        id: 'atendimento-templates',
-        title: 'Templates de Mensagens',
-        icon: FileText,
-        href: '/nuclei/atendimento/templates',
-        color: 'purple'
+        // Sprint 2: Demandas agora usam modelo unificado Ticket (tipo='suporte')
+        id: 'atendimento-demandas',
+        title: 'Demandas',
+        icon: ClipboardList,
+        href: '/nuclei/atendimento/demandas',
+        color: 'purple',
       },
       {
-        id: 'atendimento-sla',
-        title: 'SLA Dashboard',
-        icon: Clock,
-        href: '/nuclei/atendimento/sla/dashboard',
-        color: 'purple'
-      },
-      {
-        id: 'atendimento-distribuicao',
-        title: 'Distribuição Dashboard',
-        icon: Shuffle,
-        href: '/nuclei/atendimento/distribuicao/dashboard',
-        color: 'purple'
-      },
-      {
-        id: 'atendimento-fechamento-automatico',
-        title: 'Fechamento Automático',
-        icon: Clock,
-        href: '/atendimento/fechamento-automatico',
-        color: 'purple'
-      },
-      {
-        id: 'atendimento-dashboard-analytics',
-        title: 'Dashboard Analytics',
+        id: 'atendimento-analytics',
+        title: 'Analytics',
         icon: BarChart3,
-        href: '/atendimento/dashboard-analytics',
-        color: 'purple'
+        href: '/atendimento/analytics',
+        color: 'purple',
       },
       {
         id: 'atendimento-configuracoes',
@@ -128,38 +105,8 @@ export const menuConfig: MenuConfig[] = [
         icon: Settings,
         href: '/atendimento/configuracoes',
         color: 'purple',
-        children: [
-          {
-            id: 'atendimento-configuracoes-geral',
-            title: 'Geral',
-            icon: Settings,
-            href: '/atendimento/configuracoes',
-            color: 'purple'
-          },
-          {
-            id: 'atendimento-configuracoes-sla',
-            title: 'SLA',
-            icon: Clock,
-            href: '/nuclei/atendimento/sla/configuracoes',
-            color: 'purple'
-          },
-          {
-            id: 'atendimento-configuracoes-distribuicao',
-            title: 'Distribuição',
-            icon: Shuffle,
-            href: '/nuclei/atendimento/distribuicao/configuracao',
-            color: 'purple'
-          },
-          {
-            id: 'atendimento-configuracoes-skills',
-            title: 'Skills',
-            icon: Target,
-            href: '/nuclei/atendimento/distribuicao/skills',
-            color: 'purple'
-          }
-        ]
-      }
-    ]
+      },
+    ],
   },
   {
     id: 'comercial',
@@ -175,21 +122,37 @@ export const menuConfig: MenuConfig[] = [
         title: 'Clientes',
         icon: Users,
         href: '/clientes',
-        color: 'blue'
+        color: 'blue',
       },
       {
         id: 'comercial-contatos',
         title: 'Contatos',
         icon: Phone,
         href: '/contatos',
-        color: 'blue'
+        color: 'blue',
       },
       {
         id: 'comercial-leads',
         title: 'Leads',
         icon: Target,
         href: '/leads',
-        color: 'blue'
+        color: 'blue',
+      },
+      {
+        id: 'comercial-interacoes',
+        title: 'Interações',
+        icon: MessageSquare,
+        href: '/interacoes',
+        color: 'blue',
+        requiredModule: 'CRM',
+      },
+      {
+        id: 'comercial-agenda',
+        title: 'Agenda',
+        icon: Calendar,
+        href: '/agenda',
+        color: 'blue',
+        requiredModule: 'CRM',
       },
       {
         id: 'comercial-pipeline',
@@ -197,7 +160,7 @@ export const menuConfig: MenuConfig[] = [
         icon: TrendingUp,
         href: '/pipeline',
         color: 'blue',
-        badge: 'Completo'
+        badge: 'Completo',
       },
       {
         id: 'comercial-propostas',
@@ -205,7 +168,7 @@ export const menuConfig: MenuConfig[] = [
         icon: FileText,
         href: '/propostas',
         color: 'blue',
-        requiredModule: 'VENDAS'
+        requiredModule: 'VENDAS',
       },
       {
         id: 'comercial-cotacoes',
@@ -213,7 +176,7 @@ export const menuConfig: MenuConfig[] = [
         icon: Calculator,
         href: '/cotacoes',
         color: 'blue',
-        requiredModule: 'VENDAS'
+        requiredModule: 'VENDAS',
       },
       {
         id: 'comercial-aprovacoes',
@@ -222,7 +185,7 @@ export const menuConfig: MenuConfig[] = [
         href: '/aprovacoes/pendentes',
         color: 'blue',
         requiredModule: 'VENDAS',
-        badge: 'dynamic' // Badge será atualizado dinamicamente
+        badge: 'dynamic', // Badge será atualizado dinamicamente
       },
       {
         id: 'comercial-produtos',
@@ -230,7 +193,7 @@ export const menuConfig: MenuConfig[] = [
         icon: ShoppingBag,
         href: '/produtos',
         color: 'blue',
-        requiredModule: 'VENDAS'
+        requiredModule: 'VENDAS',
       },
       {
         id: 'comercial-combos',
@@ -238,9 +201,9 @@ export const menuConfig: MenuConfig[] = [
         icon: Archive,
         href: '/combos',
         color: 'blue',
-        requiredModule: 'VENDAS'
-      }
-    ]
+        requiredModule: 'VENDAS',
+      },
+    ],
   },
   {
     id: 'financeiro',
@@ -256,37 +219,37 @@ export const menuConfig: MenuConfig[] = [
         title: 'Faturamento',
         icon: Receipt,
         href: '/faturamento',
-        color: 'orange'
+        color: 'orange',
       },
       {
         id: 'financeiro-contas-receber',
         title: 'Contas a Receber',
         icon: TrendingUp,
         href: '/financeiro/contas-receber',
-        color: 'orange'
+        color: 'orange',
       },
       {
         id: 'financeiro-contas-pagar',
         title: 'Contas a Pagar',
         icon: Calculator,
         href: '/financeiro/contas-pagar',
-        color: 'orange'
+        color: 'orange',
       },
       {
         id: 'financeiro-fluxo-caixa',
         title: 'Fluxo de Caixa',
         icon: LineChart,
         href: '/financeiro/fluxo-caixa',
-        color: 'orange'
+        color: 'orange',
       },
       {
         id: 'financeiro-fornecedores',
         title: 'Fornecedores',
         icon: Building2,
         href: '/financeiro/fornecedores',
-        color: 'orange'
-      }
-    ]
+        color: 'orange',
+      },
+    ],
   },
   {
     id: 'billing',
@@ -302,121 +265,30 @@ export const menuConfig: MenuConfig[] = [
         title: 'Assinaturas',
         icon: Zap,
         href: '/billing/assinaturas',
-        color: 'green'
+        color: 'green',
       },
       {
         id: 'billing-planos',
         title: 'Planos',
         icon: Archive,
         href: '/billing/planos',
-        color: 'green'
+        color: 'green',
       },
       {
         id: 'billing-faturas',
         title: 'Faturas',
         icon: Receipt,
         href: '/billing/faturas',
-        color: 'green'
+        color: 'green',
       },
       {
         id: 'billing-pagamentos',
         title: 'Pagamentos',
         icon: Wallet,
         href: '/billing/pagamentos',
-        color: 'green'
-      }
-    ]
-  },
-  {
-    id: 'relatorios',
-    title: 'Relatórios',
-    icon: BarChart3,
-    href: '/relatorios',
-    color: 'blue',
-    section: 'Visão Geral',
-    children: [
-      {
-        id: 'relatorios-atendimento',
-        title: 'Atendimento',
-        icon: Headphones,
-        href: '/relatorios/atendimento',
-        color: 'purple',
-        requiredModule: 'ATENDIMENTO'
-      },
-      {
-        id: 'relatorios-crm',
-        title: 'CRM',
-        icon: Users,
-        href: '/relatorios/crm',
-        color: 'blue',
-        requiredModule: 'CRM'
-      },
-      {
-        id: 'relatorios-vendas',
-        title: 'Vendas',
-        icon: ShoppingBag,
-        href: '/relatorios/vendas',
         color: 'green',
-        requiredModule: 'VENDAS'
       },
-      {
-        id: 'relatorios-financeiro',
-        title: 'Financeiro',
-        icon: DollarSign,
-        href: '/relatorios/financeiro',
-        color: 'orange',
-        requiredModule: 'FINANCEIRO'
-      },
-      {
-        id: 'relatorios-analytics',
-        title: 'Analytics Gerais',
-        icon: PieChart,
-        href: '/relatorios/analytics',
-        color: 'blue',
-        adminOnly: true,
-        requiredModule: 'ADMINISTRACAO'
-      }
-    ]
-  },
-  {
-    id: 'supervisao',
-    title: 'Supervisão',
-    icon: Monitor,
-    href: '/supervisao',
-    color: 'purple',
-    adminOnly: true,
-    section: 'Visão Geral',
-    children: [
-      {
-        id: 'supervisao-atendimento',
-        title: 'Atendimento',
-        icon: Headphones,
-        href: '/atendimento/supervisao',
-        color: 'purple',
-        requiredModule: 'ATENDIMENTO'
-      },
-      {
-        id: 'supervisao-equipes',
-        title: 'Equipes',
-        icon: Users,
-        href: '/supervisao/equipes',
-        color: 'purple'
-      },
-      {
-        id: 'supervisao-performance',
-        title: 'Performance',
-        icon: TrendingUp,
-        href: '/supervisao/performance',
-        color: 'purple'
-      },
-      {
-        id: 'supervisao-auditoria',
-        title: 'Auditoria',
-        icon: Shield,
-        href: '/supervisao/auditoria',
-        color: 'purple'
-      }
-    ]
+    ],
   },
   {
     id: 'configuracoes',
@@ -431,92 +303,99 @@ export const menuConfig: MenuConfig[] = [
         title: 'Sistema & Preferências',
         icon: Settings,
         href: '/configuracoes/sistema',
-        color: 'purple'
+        color: 'purple',
       },
       {
         id: 'configuracoes-empresa',
         title: 'Empresa',
         icon: Building2,
         href: '/nuclei/configuracoes/empresa',
-        color: 'purple'
+        color: 'purple',
       },
       {
         id: 'configuracoes-usuarios',
         title: 'Usuários',
         icon: UserCog,
         href: '/nuclei/configuracoes/usuarios',
-        color: 'purple'
+        color: 'purple',
       },
       {
         id: 'configuracoes-metas',
         title: 'Metas Comerciais',
         icon: Target,
-        href: '/configuracoes/metas',
-        color: 'purple'
+        href: '/nuclei/configuracoes/metas',
+        color: 'purple',
       },
       {
         id: 'configuracoes-email',
         title: 'E-mail',
         icon: Mail,
-        href: '/configuracoes/email',
-        color: 'purple'
+        href: '/nuclei/configuracoes/email',
+        color: 'purple',
       },
       {
         id: 'configuracoes-integracoes',
         title: 'Integrações',
         icon: Zap,
         href: '/nuclei/configuracoes/integracoes',
-        color: 'purple'
+        color: 'purple',
       },
       {
         id: 'configuracoes-backup',
         title: 'Backup & Sincronização',
         icon: Database,
         href: '/sistema/backup',
-        color: 'purple'
+        color: 'purple',
       },
       {
         id: 'configuracoes-seguranca',
         title: 'Segurança',
         icon: Shield,
         href: '/configuracoes/seguranca',
-        color: 'purple'
-      }
-    ]
+        color: 'purple',
+      },
+    ],
   },
   {
     id: 'administracao',
-    title: 'Administração',
+    title: 'Administrativo',
     icon: Building2,
     href: '/nuclei/administracao',
     color: 'blue',
     adminOnly: true,
-    requiredModule: 'ADMINISTRACAO', // ⚡ Requer licença de Administração (Enterprise)
+    // ✅ SEM requiredModule - Sempre disponível para admins
     section: 'Administração',
     children: [
       {
+        id: 'admin-console',
+        title: 'Dashboard Executivo',
+        icon: BarChart,
+        href: '/admin/console',
+        color: 'blue',
+      },
+      {
         id: 'admin-empresas',
         title: 'Gestão de Empresas',
-        icon: Building2,
+        icon: Users,
         href: '/admin/empresas',
-        color: 'blue'
+        color: 'blue',
       },
       {
         id: 'admin-usuarios',
         title: 'Usuários do Sistema',
         icon: Users,
         href: '/admin/usuarios',
-        color: 'blue'
+        color: 'blue',
       },
       {
         id: 'admin-sistema',
         title: 'Sistema',
         icon: Settings,
         href: '/admin/sistema',
-        color: 'blue'
-      }
-    ]
-  }
+        color: 'blue',
+      },
+    ],
+  },
 ];
 
 /**
