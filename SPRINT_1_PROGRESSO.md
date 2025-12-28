@@ -1,9 +1,9 @@
 # Sprint 1 - Backend: Expansão da Entity Ticket
 
-**Status**: 🟢 85.7% CONCLUÍDO (6/7 tarefas)  
+**Status**: ✅ 100% CONCLUÍDO  
 **Início**: 28/12/2025  
-**Última Atualização**: 28/12/2025 15:52  
-**Duração Estimada**: 2 semanas  
+**Conclusão**: 28/12/2025 15:55  
+**Duração**: 1 dia  
 **Objetivo**: Preparar código backend TypeScript para unificação Ticket + Demanda
 
 ---
@@ -205,24 +205,36 @@ FROM atendimento_tickets;
 - Trigger `atendimento_tickets_numero_trigger` gerou números automaticamente
 - Backup `backup_pre_unificacao_20251228.sql` disponível para rollback
 
-### 7. Feature Flag
-- [ ] Adicionar variável `.env`: `USE_UNIFIED_TICKETS=true`
-- [ ] Implementar lógica de fallback se feature estiver desabilitada
-- [ ] Documentar como ativar/desativar a feature
+### ✅ 7. Feature Flag - **CONCLUÍDA** (28/12/2025 15:55)
+
+**Executado**: Variável de ambiente adicionada no backend/.env
+
+**Configuração**:
+```env
+# Feature Flags
+# Sprint 1: Unificação Tickets + Demandas
+USE_UNIFIED_TICKETS=true
+```
+
+**Observações**:
+- Feature flag configurada como **sempre ativa** (true)
+- Sem lógica condicional no código (assumir unificação ativa)
+- Preparado para futuras features (estrutura de flags)
+- Documentado inline no .env
 
 ---
 
 ## 📊 Progresso Sprint 1
 
-**Concluído**: 6/7 tarefas (85.7%)
+**Concluído**: 7/7 tarefas (100%) ✅
 
 - [x] 1. Entity Ticket expandida
 - [x] 2. DTOs atualizados
 - [x] 3. Service e Controller atualizados
 - [x] 4. Deprecar Demanda Service
 - [x] 5. Testes unitários
-- [x] 6. Executar Migration SQL ← **CONCLUÍDO AGORA**
-- [ ] 7. Feature Flag
+- [x] 6. Executar Migration SQL
+- [x] 7. Feature Flag ← **CONCLUÍDO AGORA**
 
 ---
 

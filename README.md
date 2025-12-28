@@ -1,4 +1,4 @@
-# 🚀 ConectSuite - Sistema CRM Omnichannel
+# 🚀 ConectCRM - Suite All-in-One para PMEs
 
 <div align="center">
 
@@ -9,13 +9,13 @@
 ![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?logo=postgresql&logoColor=white)
 
-**Sistema CRM Multi-tenant com WhatsApp, Triagem Inteligente e Atendimento Omnichannel**
+**Suite CRM Multi-tenant que integra CRM, Vendas, Atendimento Omnichannel e Gestão Financeira**
 
+[Visão do Sistema](VISAO_SISTEMA_2025.md) •
 [Documentação](#-documentação) •
 [Instalação](#-instalação) •
 [Stack](#-stack-tecnológico) •
-[Features](#-funcionalidades) •
-[Deploy](#-deploy)
+[Deploy](#-deploy-com-docker)
 
 </div>
 
@@ -23,78 +23,111 @@
 
 ## 📋 Sobre o Projeto
 
-ConectSuite é um **sistema CRM completo** desenvolvido para gestão profissional de atendimento ao cliente, com foco em:
+ConectCRM é uma **suite CRM all-in-one** desenvolvida para PMEs brasileiras, que integra nativamente:
 
-- 💬 **Atendimento em tempo real** via WhatsApp Business API
-- 🤖 **Triagem inteligente** com IA (Anthropic Claude)
-- 🏢 **Multi-tenant** com isolamento total de dados (RLS)
-- 📊 **Gestão comercial e financeira** integrada
-- 🎨 **Interface moderna** e responsiva
+- 🎯 **CRM & Pipeline de Vendas** - Oportunidades, propostas, forecast
+- 💬 **Atendimento Omnichannel** - WhatsApp, Email, Chat em tempo real
+- 💰 **Gestão Financeira** - Faturas, cobranças, Mercado Pago integrado
+- 📄 **Contratos** - Geração automática, templates, assinaturas
+- 🤖 **Bot de Triagem Inteligente** - IA (Anthropic Claude) para classificação
+- 🏢 **Multi-tenant** - Isolamento total de dados (RLS)
+- 📊 **Analytics** - Dashboards, relatórios, métricas de vendas e atendimento
+
+### 💡 Por que ConectCRM?
+
+**Substitua 5-7 ferramentas** (Zendesk + HubSpot + Pipedrive + ContaAzul + Vindi) por uma **suite integrada**:
+
+```
+❌ Stack Fragmentado:          ✅ ConectCRM All-in-One:
+├─ Zendesk: R$ 299/mês         ├─ Atendimento omnichannel
+├─ HubSpot: R$ 399/mês         ├─ CRM & Pipeline completo  
+├─ Pipedrive: R$ 199/mês       ├─ Gestão financeira
+├─ ContaAzul: R$ 299/mês       ├─ Cobranças (Mercado Pago)
+├─ Vindi: R$ 149/mês           ├─ Contratos e propostas
+└─ Total: R$ 1.345/mês         └─ Total: R$ 297/mês
+   + 8h/semana integrando         (Economia: 78%)
+```
+
+📖 **Leia mais**: [VISAO_SISTEMA_2025.md](VISAO_SISTEMA_2025.md) - Posicionamento completo e diferenciais
 
 ---
 
-## ✨ Funcionalidades
+## ✨ Módulos do Sistema
 
-### 💬 Atendimento Omnichannel
+### 1️⃣ Módulo CRM & Vendas
 
-- **Chat em tempo real** com WebSocket
-- **Integração WhatsApp Business API** nativa
-- **Player de áudio** para mensagens de voz
-- **Gestão de tickets** com atribuições automáticas
-- **Status online/offline** dos atendentes
-- **Transferência de atendimentos** entre agentes
-- **Foto de perfil** dos contatos (sincronizada com WhatsApp)
-- **🆕 Sistema de Filas Inteligente**
-  - 3 estratégias de distribuição (Round-Robin, Menor Carga, Por Prioridade)
-  - Auto-distribuição configurável
-  - Gestão de capacidade por atendente
-  - Métricas em tempo real
-  - Integração visual no ChatOmnichannel
-- **🆕 Fechamento automático por inatividade** (configurável por empresa)
-  - Timeout personalizável (minutos/horas/dias)
-  - Aviso antes de fechar (opcional)
-  - Mensagens customizáveis
-  - Filtro por status (AGUARDANDO, EM_ATENDIMENTO)
-  - Monitoramento automático a cada 5 minutos
+- **Pipeline Visual (Kanban)** - Gestão de oportunidades com drag & drop
+- **Propostas Comerciais** - Geração automática (PDF) com templates
+- **Cotações e Orçamentos** - Sistema completo de precificação
+- **Gestão de Leads** - Captura, qualificação e conversão
+- **Catálogo de Produtos** - Produtos e fornecedores integrados
+- **Forecast de Receita** - Previsão de vendas por etapa
+- **Métricas de Vendas** - Dashboard executivo com KPIs
 
-### 🤖 Triagem Inteligente com IA
+### 2️⃣ Módulo Atendimento Omnichannel
 
-- **Bot conversacional** configurável
-- **Editor visual de fluxos** (drag & drop)
-- **7 tipos de blocos**:
-  - 🎯 Menu (opções interativas)
-  - 💬 Mensagem (texto/mídia)
-  - ❓ Pergunta (coleta de dados)
-  - 🔀 Condição (lógica IF/ELSE)
-  - ⚡ Ação (webhook/integração)
-  - 🏁 Início/Fim
-- **Integração IA** (Anthropic Claude) para respostas contextuais
-- **Versionamento de fluxos** com histórico
-- **Preview WhatsApp** em tempo real
-- **Sistema de logs** completo
+- **Chat Real-time (WebSocket)** - Atendimento em tempo real
+- **WhatsApp Business API** - Integração nativa com botões interativos
+- **Email** - Canal de atendimento (roadmap Q1 2026)
+- **Gestão de Tickets** - SLA, priorização, escalonamento
+- **Sistema de Filas Inteligente** - 3 estratégias de distribuição automática
+- **Bot de Triagem** - Classificação automática com IA
+- **Transferências** - Entre atendentes, equipes e núcleos
+- **Player de Áudio** - Mensagens de voz do WhatsApp
+- **Status de Presença** - Online/offline/ausente dos atendentes
+- **Fechamento Automático** - Por inatividade (configurável)
 
-### 🏢 Gestão de Estrutura
+### 3️⃣ Módulo Financeiro
 
-- **Núcleos de atendimento** dinâmicos
-- **Departamentos** com drag & drop
-- **Equipes e atribuições** complexas
-- **Matriz de atribuições** (Atendente ↔ Equipe ↔ Núcleo)
-- **Gestão de atendentes** com permissões
+- **Gestão de Faturas** - Criação, emissão, controle de pagamentos
+- **Integração Mercado Pago** - Boleto, PIX, cartão de crédito
+- **Integração Stripe** - Pagamentos internacionais
+- **Notas Fiscais** - NFe/NFSe (roadmap)
+- **Controle de Recebíveis** - Acompanhamento de cobranças
+- **Relatórios Financeiros** - Fluxo de caixa, inadimplência
+- **Cobranças Automáticas** - Recorrência e renovação
 
-### 📊 Comercial
+### 4️⃣ Módulo Contratos
 
-- Gestão de **clientes e contatos**
-- **Cotações e propostas**
-- **Oportunidades** com pipeline visual (Kanban)
-- **Produtos e fornecedores**
-- Funil de vendas
+- **Geração Automática (PDF)** - Templates customizáveis
+- **Versionamento** - Histórico completo de alterações
+- **Assinatura Eletrônica** - Integração com plataformas (roadmap)
+- **Renovação Automática** - Contratos recorrentes
+- **Templates Brasileiros** - Modelos prontos para PMEs
 
-### 💰 Financeiro
+### 5️⃣ Módulo Gestão de Clientes
 
-- Gestão de **faturas**
-- Integração **Stripe** para pagamentos
-- Controle de recebimentos
-- Relatórios financeiros
+- **Cadastro Completo (PF/PJ)** - CNPJ, CPF, documentos
+- **Múltiplos Contatos** - Por empresa/cliente
+- **Timeline 360°** - Histórico unificado (tickets + vendas + faturas)
+- **Tags e Segmentação** - Organização por categorias
+- **Documentos e Anexos** - Repositório centralizado
+- **Sincronização WhatsApp** - Foto de perfil automática
+
+### 6️⃣ Bot de Triagem Inteligente
+
+- **Editor Visual de Fluxos** - Drag & drop sem código
+- **7 Tipos de Blocos** - Menu, Mensagem, Pergunta, Condição, Ação, Início, Fim
+- **Botões Interativos WhatsApp** - Reply buttons e list messages
+- **IA (Anthropic Claude)** - Classificação inteligente de intenções
+- **Versionamento** - Histórico completo de fluxos
+- **Preview WhatsApp** - Teste em tempo real
+- **Logs Completos** - Auditoria de conversas
+
+### 7️⃣ Módulo Calendário & Agenda
+
+- **Agendamentos** - Reuniões e follow-ups
+- **Sincronização Google Calendar** - Integração nativa
+- **Notificações Automáticas** - Lembretes por email/WhatsApp
+- **Agenda de Equipe** - Visualização compartilhada
+
+### 8️⃣ Módulo Analytics & Relatórios
+
+- **Dashboard Executivo** - Visão geral da empresa
+- **Métricas de Vendas** - Pipeline, taxa de conversão, ticket médio
+- **Métricas de Atendimento** - SLA, tempo médio, satisfação
+- **Forecast** - Previsão de receita e demanda
+- **Relatórios Customizados** - Exportação CSV/PDF (roadmap)
 
 ---
 
@@ -141,10 +174,12 @@ Let's Encrypt (SSL/HTTPS)
 
 ### Pré-requisitos
 
-- Node.js 18+ e npm
+- Node.js 22.16+ e npm 10+ (frontend usa `craco start` com `NODE_OPTIONS=--max_old_space_size=4096`)
 - PostgreSQL 14+
 - Redis 6+
 - Docker & Docker Compose (opcional)
+
+> Observação: o backend compila com Node 18+, mas mantenha 22.16+ também nele para evitar diferenças de runtime entre os pacotes.
 
 ### 1. Clone o Repositório
 
@@ -230,29 +265,28 @@ Consulte [DEPLOY.md](.production/DEPLOY.md) para detalhes.
 
 ## 📊 Migrations
 
-O sistema possui **11 migrations** implementadas:
+O backend mantém **dezenas de migrations** (50+ arquivos versionados em `backend/src/migrations`, revisado em 01/12/2025). Sempre consulte o estado real antes de executar comandos:
 
 ```bash
-# Ver migrations
+# Listar migrations
 npm run migration:show
 
 # Criar nova migration
 npm run migration:generate -- src/migrations/NomeMigration
 
-# Executar migrations
+# Executar/Reverter
 npm run migration:run
-
-# Reverter última migration
 npm run migration:revert
 ```
 
-**Migrations Principais**:
-1. `CreateDepartamentos` - Estrutura de departamentos
-2. `CreateTriagemLogsTable` - Logs de triagem
-3. `EnableRowLevelSecurity` - Isolamento multi-tenant (RLS)
-4. `CreateTriagemBotNucleosTables` - Sistema de triagem
-5. `CreateEquipesAtribuicoesTables` - Equipes e atribuições
-6. `AddHistoricoVersoesFluxo` - Versionamento de fluxos
+### Blocos principais
+
+- **Base multi-tenant**: `1700000000000-InitialSchema`, `1730476887000-EnableRowLevelSecurity`, `1762212773553-AddPhase1ConfigFields`
+- **Atendimento e filas**: `1736380000000-CreateSistemaFilas`, `1762531500000-CreateDistribuicaoAutomaticaTables`, `1762962000000-CreateLeadsTable`
+- **Segurança e credenciais**: `1760816700000-AddPrimeiraSenhaToUsersSimple`, `1762216500000-AddDeveTrocarSenhaFlagToUsers`, `1762220000000-CreatePasswordResetTokens`
+- **Comercial e financeiro**: `1763062900000-AddEmpresaIdToContratosEFaturas`, `1763275000000-AddEmpresaIdToPagamentos`, `1774300000000-CreatePagamentosGatewayTables`
+
+> Para um panorama completo e justificativas de cada etapa, consulte `CONSOLIDACAO_VALIDACAO_MIGRATIONS_01DEZ2025.md`.
 
 ---
 
@@ -294,9 +328,17 @@ ANTHROPIC_API_KEY=sk-ant-api03-...
 
 # Database
 DATABASE_PASSWORD=senha_forte
+
+# Feature Flags (Sprint 1 - Unificação Tickets+Demandas)
+USE_UNIFIED_TICKETS=true  # Ativar modelo unificado de tickets
 ```
 
 ⚠️ **NUNCA** commite o arquivo `.env`!
+
+### E-mail (pipeline oficial)
+
+- O envio de e-mails agora passa pela fila `notifications` (`send-email` via `notifications.processor.ts`).
+- O servidor legado `backend/email-server.js` e o `package-email.json` foram removidos; use apenas a fila. Se houver fluxo antigo, migre para o producer `enqueueSendEmail`.
 
 ---
 
@@ -334,26 +376,28 @@ npm run cypress:open
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Como contribuir
 - [DESIGN_GUIDELINES.md](frontend-web/DESIGN_GUIDELINES.md) - Design system
 - [.github/copilot-instructions.md](.github/copilot-instructions.md) - GitHub Copilot config
+- [docs/CREDENCIAIS_PADRAO.md](docs/CREDENCIAIS_PADRAO.md) - Credenciais padrão para ambientes locais
 
 ### Guias Técnicos
 
-- [GUIA_GESTAO_NUCLEOS_WHATSAPP.md](GUIA_GESTAO_NUCLEOS_WHATSAPP.md) - Gestão de núcleos
-- [GUIA_CRIAR_FLUXO_WHATSAPP.md](GUIA_CRIAR_FLUXO_WHATSAPP.md) - Criar fluxos
+- [GUIA_GESTAO_NUCLEOS_WHATSAPP.md](docs/handbook/GUIA_GESTAO_NUCLEOS_WHATSAPP.md) - Gestão de núcleos
+- [GUIA_CRIAR_FLUXO_WHATSAPP.md](docs/handbook/GUIA_CRIAR_FLUXO_WHATSAPP.md) - Criar fluxos
 - [MANUAL_CONSTRUTOR_VISUAL.md](MANUAL_CONSTRUTOR_VISUAL.md) - Editor visual
-- [GUIA_TOKEN_WHATSAPP.md](GUIA_TOKEN_WHATSAPP.md) - Configurar WhatsApp
+- [GUIA_TOKEN_WHATSAPP.md](docs/handbook/GUIA_TOKEN_WHATSAPP.md) - Configurar WhatsApp
 - [QUICKSTART_TESTE_INATIVIDADE.md](QUICKSTART_TESTE_INATIVIDADE.md) - 🆕 Teste de fechamento automático
+- [DLQ_REPROCESSAMENTO.md](backend/DLQ_REPROCESSAMENTO.md) - Reprocessar DLQs (webhooks/messages/notifications)
 
 ### Sistema de Fechamento Automático
 
-- [CONSOLIDACAO_FECHAMENTO_AUTOMATICO.md](CONSOLIDACAO_FECHAMENTO_AUTOMATICO.md) - Arquitetura completa
-- [TESTE_FECHAMENTO_AUTOMATICO.md](TESTE_FECHAMENTO_AUTOMATICO.md) - Guia detalhado de testes
-- [STATUS_FECHAMENTO_AUTOMATICO.md](STATUS_FECHAMENTO_AUTOMATICO.md) - Status da implementação
+- [CONSOLIDACAO_FECHAMENTO_AUTOMATICO.md](docs/archive/2025/CONSOLIDACAO_FECHAMENTO_AUTOMATICO.md) - Arquitetura completa
+- [TESTE_FECHAMENTO_AUTOMATICO.md](docs/runbooks/TESTE_FECHAMENTO_AUTOMATICO.md) - Guia detalhado de testes
+- [STATUS_FECHAMENTO_AUTOMATICO.md](docs/archive/2025/STATUS_FECHAMENTO_AUTOMATICO.md) - Status da implementação
 - [scripts/test-inactivity-system.ps1](scripts/test-inactivity-system.ps1) - Script automatizado de teste
 - [scripts/test-inactivity-queries.sql](scripts/test-inactivity-queries.sql) - Queries SQL úteis
 
 ### Referências
 
-- 📊 [ANALISE_MODULOS_SISTEMA.md](ANALISE_MODULOS_SISTEMA.md) - Arquitetura
+- 📊 [ANALISE_MODULOS_SISTEMA.md](docs/archive/2025/ANALISE_MODULOS_SISTEMA.md) - Arquitetura
 - 🏗️ [CONSOLIDACAO_*.md](.) - Histórico de implementações
 - 📝 [docs/](docs/) - Documentação técnica completa
 
@@ -398,7 +442,7 @@ npm run cypress:open
   - Comandos prontos para copiar e executar
   - Seções: Crítico, Auth, Chat, WebSocket, WhatsApp, DB, Docker, Performance
 
-- **[ROADMAP_MELHORIAS.md](ROADMAP_MELHORIAS.md)** - Planejamento de melhorias futuras
+- **[ROADMAP_MELHORIAS.md](docs/handbook/ROADMAP_MELHORIAS.md)** - Planejamento de melhorias futuras
   - 47 melhorias identificadas e priorizadas
   - Organizado por: Segurança, Performance, Features, Docs
   - Sugestão de sprints para implementação
@@ -423,22 +467,22 @@ npm run cypress:open
 
 ### 🔧 Desenvolvimento Backend
 
-- **[STATUS_BACKEND_ATENDIMENTO.md](STATUS_BACKEND_ATENDIMENTO.md)** - Status do módulo de atendimento
+- **[STATUS_BACKEND_ATENDIMENTO.md](docs/archive/2025/STATUS_BACKEND_ATENDIMENTO.md)** - Status do módulo de atendimento
 - **[BACKEND_INTEGRATION_README.md](BACKEND_INTEGRATION_README.md)** - Integração com APIs
 - **[docs/relatorio-vulnerabilidades.md](docs/relatorio-vulnerabilidades.md)** - Segurança
 
 ### 🚀 Deploy e Produção
 
 - **[PRODUCTION_READY.md](PRODUCTION_READY.md)** - Checklist de produção
-- **[SPRINT_1_COMPLETO_MULTITENANT.md](SPRINT_1_COMPLETO_MULTITENANT.md)** - Deploy AWS EC2
+- **[SPRINT_1_COMPLETO_MULTITENANT.md](docs/archive/2025/SPRINT_1_COMPLETO_MULTITENANT.md)** - Deploy AWS EC2
 - **[docs/RELATORIO_FINAL.md](docs/RELATORIO_FINAL.md)** - Lições aprendidas
 
 ### 📖 Documentação de Features
 
-- **[SISTEMA_WHATSAPP_CONCLUIDO.md](SISTEMA_WHATSAPP_CONCLUIDO.md)** - Integração WhatsApp
+- **[SISTEMA_WHATSAPP_CONCLUIDO.md](docs/archive/2025/SISTEMA_WHATSAPP_CONCLUIDO.md)** - Integração WhatsApp
 - **[CHAT_REALTIME_README.md](CHAT_REALTIME_README.md)** - WebSocket e tempo real
-- **[CONSOLIDACAO_CONSTRUTOR_VISUAL.md](CONSOLIDACAO_CONSTRUTOR_VISUAL.md)** - Editor de fluxos
-- **[MISSAO_CUMPRIDA_ATENDIMENTO.md](MISSAO_CUMPRIDA_ATENDIMENTO.md)** - Sistema de atendimento completo
+- **[CONSOLIDACAO_CONSTRUTOR_VISUAL.md](docs/archive/2025/CONSOLIDACAO_CONSTRUTOR_VISUAL.md)** - Editor de fluxos
+- **[MISSAO_CUMPRIDA_ATENDIMENTO.md](docs/archive/2025/MISSAO_CUMPRIDA_ATENDIMENTO.md)** - Sistema de atendimento completo
 
 ### 🧪 Testes
 
@@ -464,7 +508,7 @@ Consulte [CONTRIBUTING.md](CONTRIBUTING.md) para detalhes sobre:
 
 **📖 Antes de contribuir**:
 - Leia [TROUBLESHOOTING_GUIDE.md](TROUBLESHOOTING_GUIDE.md) se encontrar problemas
-- Consulte [ROADMAP_MELHORIAS.md](ROADMAP_MELHORIAS.md) para ver melhorias planejadas
+- Consulte [ROADMAP_MELHORIAS.md](docs/handbook/ROADMAP_MELHORIAS.md) para ver melhorias planejadas
 - Verifique [frontend-web/DESIGN_GUIDELINES.md](frontend-web/DESIGN_GUIDELINES.md) para padrões de UI
 
 ---
