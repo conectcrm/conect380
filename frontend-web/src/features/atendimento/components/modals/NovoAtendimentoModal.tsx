@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Phone, MessageCircle, Mail, User, Building2, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '../../../../hooks/useAuth';
 import { api } from '../../../../services/api';
+import { TipoTicket, tipoTicketLabels } from '../../../../services/ticketsService';
 
 // ===== INTERFACES =====
 
@@ -29,6 +30,10 @@ export interface NovoAtendimentoData {
   contatoEmail?: string;
   assunto?: string;
   prioridade: 'baixa' | 'media' | 'alta' | 'urgente';
+  // Sprint 2: Campos unificação Tickets
+  tipo?: TipoTicket;
+  titulo?: string;
+  descricao?: string;
 }
 
 interface NovoAtendimentoModalProps {
@@ -84,14 +89,15 @@ export function NovoAtendimentoModal({ isOpen, onClose, onSucesso }: NovoAtendim
         params: { empresaId },
       });
 
-      const canaisAtivos = (response.data?.data || response.data || [])
-        .filter((c: CanalAtendimento) => c.ativo);
+      const canaisAtivos = (response.data?.data || response.data || []).filter(
+        (c: CanalAtendimento) => c.ativo,
+      );
 
       setCanais(canaisAtivos);
 
       // Selecionar primeiro canal automaticamente
       if (canaisAtivos.length > 0) {
-        setFormData(prev => ({ ...prev, canalId: canaisAtivos[0].id }));
+        setFormData((prev) => ({ ...prev, canalId: canaisAtivos[0].id }));
       }
     } catch (error) {
       console.error('❌ Erro ao carregar canais:', error);
@@ -146,7 +152,7 @@ export function NovoAtendimentoModal({ isOpen, onClose, onSucesso }: NovoAtendim
   const handleSelecionarContato = (contato: Contato) => {
     setContatoSelecionado(contato);
     setBuscaContato(contato.nome);
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       contatoId: contato.id,
       contatoNome: undefined,
@@ -161,7 +167,7 @@ export function NovoAtendimentoModal({ isOpen, onClose, onSucesso }: NovoAtendim
     setModoNovoContato(true);
     setContatoSelecionado(null);
     setBuscaContato('');
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       contatoId: undefined,
     }));
@@ -205,6 +211,10 @@ export function NovoAtendimentoModal({ isOpen, onClose, onSucesso }: NovoAtendim
         assunto: formData.assunto || 'Novo atendimento',
         prioridade: formData.prioridade,
         empresaId,
+        // Sprint 2: Campos unificação
+        tipo: formData.tipo,
+        titulo: formData.titulo,
+        descricao: formData.descricao,
       };
 
       // Se contato existente
@@ -231,9 +241,8 @@ export function NovoAtendimentoModal({ isOpen, onClose, onSucesso }: NovoAtendim
       handleClose();
     } catch (error: any) {
       console.error('❌ Erro ao criar ticket:', error);
-      const mensagemErro = error.response?.data?.message ||
-        error.response?.data?.error ||
-        'Erro ao criar atendimento';
+      const mensagemErro =
+        error.response?.data?.message || error.response?.data?.error || 'Erro ao criar atendimento';
       setErro(mensagemErro);
     } finally {
       setLoading(false);
@@ -301,16 +310,19 @@ export function NovoAtendimentoModal({ isOpen, onClose, onSucesso }: NovoAtendim
                   <button
                     key={canal.id}
                     type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, canalId: canal.id }))}
-                    className={`p-4 rounded-lg border-2 transition-all text-left ${formData.canalId === canal.id
-                      ? 'border-[#159A9C] bg-[#159A9C]/5'
-                      : 'border-gray-200 hover:border-[#159A9C]/50'
-                      }`}
+                    onClick={() => setFormData((prev) => ({ ...prev, canalId: canal.id }))}
+                    className={`p-4 rounded-lg border-2 transition-all text-left ${
+                      formData.canalId === canal.id
+                        ? 'border-[#159A9C] bg-[#159A9C]/5'
+                        : 'border-gray-200 hover:border-[#159A9C]/50'
+                    }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
                       {canal.tipo === 'whatsapp' && <Phone className="h-5 w-5 text-green-600" />}
                       {canal.tipo === 'email' && <Mail className="h-5 w-5 text-blue-600" />}
-                      {canal.tipo === 'chat' && <MessageCircle className="h-5 w-5 text-purple-600" />}
+                      {canal.tipo === 'chat' && (
+                        <MessageCircle className="h-5 w-5 text-purple-600" />
+                      )}
                       {canal.tipo === 'telefone' && <Phone className="h-5 w-5 text-orange-600" />}
                       <span className="font-medium text-sm text-[#002333]">{canal.nome}</span>
                     </div>
@@ -324,9 +336,7 @@ export function NovoAtendimentoModal({ isOpen, onClose, onSucesso }: NovoAtendim
           {/* Busca de Contato */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-[#002333]">
-                Contato *
-              </label>
+              <label className="block text-sm font-medium text-[#002333]">Contato *</label>
               {!modoNovoContato && (
                 <button
                   type="button"
@@ -385,7 +395,9 @@ export function NovoAtendimentoModal({ isOpen, onClose, onSucesso }: NovoAtendim
                       <div>
                         <div className="font-medium text-[#002333]">{contatoSelecionado.nome}</div>
                         <div className="text-sm text-gray-600 mt-1">
-                          {contatoSelecionado.telefone && <span>{contatoSelecionado.telefone}</span>}
+                          {contatoSelecionado.telefone && (
+                            <span>{contatoSelecionado.telefone}</span>
+                          )}
                           {contatoSelecionado.telefone && contatoSelecionado.email && ' • '}
                           {contatoSelecionado.email && <span>{contatoSelecionado.email}</span>}
                         </div>
@@ -395,7 +407,7 @@ export function NovoAtendimentoModal({ isOpen, onClose, onSucesso }: NovoAtendim
                         onClick={() => {
                           setContatoSelecionado(null);
                           setBuscaContato('');
-                          setFormData(prev => ({ ...prev, contatoId: undefined }));
+                          setFormData((prev) => ({ ...prev, contatoId: undefined }));
                         }}
                         className="p-1 hover:bg-white rounded transition-colors"
                       >
@@ -414,7 +426,7 @@ export function NovoAtendimentoModal({ isOpen, onClose, onSucesso }: NovoAtendim
                     type="button"
                     onClick={() => {
                       setModoNovoContato(false);
-                      setFormData(prev => ({
+                      setFormData((prev) => ({
                         ...prev,
                         contatoNome: undefined,
                         contatoTelefone: undefined,
@@ -430,7 +442,9 @@ export function NovoAtendimentoModal({ isOpen, onClose, onSucesso }: NovoAtendim
                 <input
                   type="text"
                   value={formData.contatoNome || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, contatoNome: e.target.value }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, contatoNome: e.target.value }))
+                  }
                   placeholder="Nome completo *"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                 />
@@ -438,7 +452,9 @@ export function NovoAtendimentoModal({ isOpen, onClose, onSucesso }: NovoAtendim
                 <input
                   type="tel"
                   value={formData.contatoTelefone || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, contatoTelefone: e.target.value }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, contatoTelefone: e.target.value }))
+                  }
                   placeholder="Telefone (ex: 11999999999)"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                 />
@@ -446,7 +462,9 @@ export function NovoAtendimentoModal({ isOpen, onClose, onSucesso }: NovoAtendim
                 <input
                   type="email"
                   value={formData.contatoEmail || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, contatoEmail: e.target.value }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, contatoEmail: e.target.value }))
+                  }
                   placeholder="E-mail"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                 />
@@ -464,32 +482,96 @@ export function NovoAtendimentoModal({ isOpen, onClose, onSucesso }: NovoAtendim
             <input
               type="text"
               value={formData.assunto || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, assunto: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, assunto: e.target.value }))}
               placeholder="Breve descrição do motivo do contato..."
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
             />
           </div>
 
-          {/* Prioridade */}
+          {/* Sprint 2: Tipo do Ticket */}
           <div>
             <label className="block text-sm font-medium text-[#002333] mb-2">
-              Prioridade
+              Tipo (opcional)
             </label>
+            <select
+              value={formData.tipo || ''}
+              onChange={(e) => setFormData((prev) => ({ ...prev, tipo: e.target.value as TipoTicket }))}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent bg-white"
+            >
+              <option value="">Selecione um tipo...</option>
+              {(Object.keys(tipoTicketLabels) as TipoTicket[]).map((tipo) => (
+                <option key={tipo} value={tipo}>
+                  {tipoTicketLabels[tipo]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Sprint 2: Título */}
+          <div>
+            <label className="block text-sm font-medium text-[#002333] mb-2">
+              Título (opcional)
+            </label>
+            <input
+              type="text"
+              value={formData.titulo || ''}
+              onChange={(e) => setFormData((prev) => ({ ...prev, titulo: e.target.value }))}
+              placeholder="Título resumido do ticket..."
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+            />
+          </div>
+
+          {/* Sprint 2: Descrição */}
+          <div>
+            <label className="block text-sm font-medium text-[#002333] mb-2">
+              Descrição (opcional)
+            </label>
+            <textarea
+              value={formData.descricao || ''}
+              onChange={(e) => setFormData((prev) => ({ ...prev, descricao: e.target.value }))}
+              placeholder="Descrição detalhada do problema ou solicitação..."
+              rows={3}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent resize-none"
+            />
+          </div>
+
+          {/* Prioridade */
+          <div>
+            <label className="block text-sm font-medium text-[#002333] mb-2">Prioridade</label>
             <div className="grid grid-cols-4 gap-3">
               {[
-                { valor: 'baixa', label: 'Baixa', cor: 'bg-gray-100 text-gray-700 border-gray-300' },
-                { valor: 'media', label: 'Média', cor: 'bg-blue-100 text-blue-700 border-blue-300' },
-                { valor: 'alta', label: 'Alta', cor: 'bg-orange-100 text-orange-700 border-orange-300' },
-                { valor: 'urgente', label: 'Urgente', cor: 'bg-red-100 text-red-700 border-red-300' },
+                {
+                  valor: 'baixa',
+                  label: 'Baixa',
+                  cor: 'bg-gray-100 text-gray-700 border-gray-300',
+                },
+                {
+                  valor: 'media',
+                  label: 'Média',
+                  cor: 'bg-blue-100 text-blue-700 border-blue-300',
+                },
+                {
+                  valor: 'alta',
+                  label: 'Alta',
+                  cor: 'bg-orange-100 text-orange-700 border-orange-300',
+                },
+                {
+                  valor: 'urgente',
+                  label: 'Urgente',
+                  cor: 'bg-red-100 text-red-700 border-red-300',
+                },
               ].map((prioridade) => (
                 <button
                   key={prioridade.valor}
                   type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, prioridade: prioridade.valor as any }))}
-                  className={`px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium ${formData.prioridade === prioridade.valor
-                    ? prioridade.cor + ' ring-2 ring-offset-2'
-                    : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                    }`}
+                  onClick={() =>
+                    setFormData((prev) => ({ ...prev, prioridade: prioridade.valor as any }))
+                  }
+                  className={`px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium ${
+                    formData.prioridade === prioridade.valor
+                      ? prioridade.cor + ' ring-2 ring-offset-2'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}
                 >
                   {prioridade.label}
                 </button>

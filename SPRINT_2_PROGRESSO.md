@@ -85,10 +85,10 @@ Após a conclusão do Sprint 1 (backend 100%), agora vamos atualizar o frontend 
   - console.warn() em 7 métodos principais
   - Período de transição documentado
 
-- [ ] **2.3** - Deprecar `demandaService`
-  - Redirecionar métodos para `ticketService`
-  - Manter API temporariamente (compatibilidade)
-  - Adicionar console.warn() com mensagem de migração
+- [x] **2.3** - Deprecar `demandaService` ✅
+  - Todos métodos redirecionam para ticketService (via console.warn)
+  - Compatibilidade mantida temporariamente (6 meses)
+  - JSDoc @deprecated em interface, classe e métodos
 
 ### Fase 3: Componentes (4-5h)
 
@@ -97,14 +97,17 @@ Após a conclusão do Sprint 1 (backend 100%), agora vamos atualizar o frontend 
   - Mostrar badge de `tipo` do ticket (cores por categoria)
   - Layout responsivo com truncate para títulos longos
 
-- [ ] **3.2** - Criar componente `FiltroTipoTicket`
-  - Select com opções de TipoTicket
-  - Aplicar filtro na query: `?tipo=X`
+- [x] **3.2** - Criar componente `FiltroTipoTicket` ✅
+  - Select reutilizável com TipoTicket
+  - Labels e valores do tipoTicketLabels
+  - Opção "Todos os tipos" configurável
+  - Componente em components/selects/
 
-- [ ] **3.3** - Atualizar formulário de criação de ticket
-  - Campos opcionais: titulo, descricao, tipo
-  - Select de tipo (comercial, suporte, etc)
-  - Autocomplete de cliente (clienteId)
+- [x] **3.3** - Atualizar formulário de criação de ticket ✅
+  - Campos opcionais: tipo, titulo, descricao
+  - Select de tipo usando tipoTicketLabels
+  - NovoAtendimentoModal.tsx atualizado
+  - Interface e payload com novos campos
 
 ### Fase 4: Páginas & Rotas (3-4h)
 
@@ -150,12 +153,12 @@ Após a conclusão do Sprint 1 (backend 100%), agora vamos atualizar o frontend 
 
 ## 📊 Progresso Sprint 2
 
-**Concluído**: 10/19 tarefas (52.6%)
+**Concluído**: 13/19 tarefas (68.4%)
 
 **Fases**:
 - [x] Fase 1: Types & Interfaces (4/4) ← **100% COMPLETO** ✅
-- [x] Fase 2: Services (2/3) ← **67% COMPLETO**
-- [x] Fase 3: Componentes (1/3) ← **33% COMPLETO**
+- [x] Fase 2: Services (3/3) ← **100% COMPLETO** ✅
+- [x] Fase 3: Componentes (3/3) ← **100% COMPLETO** ✅
 - [x] Fase 4: Páginas & Rotas (3/3) ← **100% COMPLETO** ✅
 - [ ] Fase 5: Testes & Validação (0/4)
 
