@@ -106,11 +106,31 @@ autor?: User;
 
 ## 🔄 Próximas Etapas (Parte 3/3)
 
-### 4. Deprecar Demanda Service
-- [ ] Adicionar decorator `@deprecated` em `DemandaService`
-- [ ] Adicionar comentários JSDoc explicando a migração
-- [ ] Criar wrapper methods que redirecionam para TicketService
-- [ ] Adicionar warnings em logs quando DemandaService for usado
+### 4. Deprecar Demanda Service ✅ CONCLUÍDO
+**Arquivo**: `backend/src/modules/atendimento/services/demanda.service.ts`
+
+✅ **JSDoc @deprecated Adicionado**:
+- Documentação completa explicando motivo da deprecação
+- Referência ao TicketService como alternativa
+- Instruções de migração para desenvolvedores
+- Cronograma de remoção (Sprint 2-3)
+
+✅ **Warnings Adicionados**:
+- `criar()`: Log warning alertando sobre migração
+- `listarTodas()`: Log warning com exemplo de uso TicketService
+- `atualizar()`: Log warning indicando alternativa
+- `converterTicketEmDemanda()`: Log warning (feature será removida)
+
+✅ **Documentação de Migração**:
+```typescript
+// ❌ Antigo (deprecated)
+await demandaService.criar(dto, autorId, empresaId);
+
+// ✅ Novo (recomendado)
+await ticketService.criar({ ...dto, tipo: 'demanda', autor_id: autorId });
+```
+
+---
 
 ### 5. Testes Unitários
 - [ ] `ticket.service.spec.ts`: Testar criação com novos campos
@@ -136,12 +156,12 @@ autor?: User;
 
 ## 📊 Progresso Sprint 1
 
-**Concluído**: 3/7 tarefas (42.9%)
+**Concluído**: 4/7 tarefas (57.1%)
 
 - [x] 1. Entity Ticket expandida
 - [x] 2. DTOs atualizados
 - [x] 3. Service e Controller atualizados
-- [ ] 4. Deprecar Demanda Service
+- [x] 4. Deprecar Demanda Service
 - [ ] 5. Testes unitários
 - [ ] 6. Executar Migration SQL
 - [ ] 7. Feature Flag
@@ -169,9 +189,10 @@ autor?: User;
 
 ### Próximos Commits
 1. ~~Commit 1: Entity + DTOs atualizados~~ ✅ Concluído (26d69ca)
-2. **Commit 2: Service + Controller atualizados** ✅ Concluído (próximo)
-3. **Commit 3**: Deprecation + Testes + Feature Flag
+2. ~~Commit 2: Service + Controller atualizados~~ ✅ Concluído (b6c26df)
+3. **Commit 3: DemandaService deprecado** ✅ Concluído (próximo)
+4. **Commit 4**: Testes unitários + Feature Flag
 
 ---
 
-**Última atualização**: 28/12/2025 (Sprint 1 - Parte 2/3 concluída)
+**Última atualização**: 28/12/2025 (Sprint 1 - 57.1% concluída - Deprecation implementada)
