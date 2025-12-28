@@ -1,35 +1,123 @@
-import axios from 'axios';
-import { StatusTicket, PrioridadeTicket } from '../types/ticket';
+import api from './api';
+import { getErrorMessage } from '../utils/errorHandling';
+import {
+  StatusTicket,
+  PrioridadeTicket,
+  SeveridadeTicket,
+  NivelAtendimentoTicket,
+} from '../types/ticket';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+type ApiListResponse<T> = {
+  success: boolean;
+  data: T;
+  total?: number;
+  pagina?: number;
+  limite?: number;
+};
+
+export type StatusTicketApi = 'ABERTO' | 'EM_ATENDIMENTO' | 'AGUARDANDO' | 'RESOLVIDO' | 'FECHADO' | 'FILA' | 'AGUARDANDO_CLIENTE' | 'AGUARDANDO_INTERNO' | 'CONCLUIDO' | 'CANCELADO' | 'ENCERRADO';
+export type PrioridadeTicketApi = 'BAIXA' | 'MEDIA' | 'ALTA' | 'URGENTE';
+export type SeveridadeTicketApi = 'BAIXA' | 'MEDIA' | 'ALTA' | 'CRITICA';
+export type NivelAtendimentoTicketApi = 'N1' | 'N2' | 'N3';
+
+/**
+ * Tipo do ticket - Sprint 1: Unificação Tickets + Demandas
+ */
+export type TipoTicket = 'tecnica' | 'comercial' | 'financeira' | 'suporte' | 'reclamacao' | 'solicitacao' | 'outros';
+
+/**
+ * Labels para exibição dos tipos de ticket
+ */
+export const tipoTicketLabels: Record<TipoTicket, string> = {
+  tecnica: 'Técnica',
+  comercial: 'Comercial',
+  financeira: 'Financeira',
+  suporte: 'Suporte',
+  reclamacao: 'Reclamação',
+  solicitacao: 'Solicitação',
+  outros: 'Outros'
+};
+
+/**
+ * Cores para badges de tipo de ticket
+ */
+export const tipoTicketColors: Record<TipoTicket, string> = {
+  tecnica: 'blue',
+  comercial: 'green',
+  financeira: 'yellow',
+  suporte: 'purple',
+  reclamacao: 'red',
+  solicitacao: 'cyan',
+  outros: 'gray'
+};
+
+export
 
 /**
  * Interface para filtros ao listar tickets
+ * Sprint 1: Adicionado filtro por tipo
  */
 export interface TicketFiltros {
   empresaId: string;
   status?: string | string[];
   canalId?: string;
+  prioridade?: PrioridadeTicket | PrioridadeTicketApi;
+  severity?: SeveridadeTicket | SeveridadeTicketApi;
+  assignedLevel?: NivelAtendimentoTicket | NivelAtendimentoTicketApi;
+  filaId?: string;
+  atendenteId?: string;
+  contatoId?: string;
+  busca?: string;
   limite?: number;
   pagina?: number;
+  /** Filtrar por tipo de ticket (Sprint 1: Unificação) */
+  tipo?: TipoTicket;
+  /** Filtrar por responsável (Sprint 1) */
+  responsavelId?: string;
+  /** Filtrar por autor (Sprint 1) */
+  autorId?: string;
 }
 
 /**
  * Interface do ticket retornado pela API
+ * Sprint 1: Unificação Tickets + Demandas - 7 novos campos adicionados
  */
 export interface Ticket {
   id: string;
   numero: number;
   assunto?: string;
-  status: StatusTicket;
-  prioridade: PrioridadeTicket;
+  status: StatusTicketApi | StatusTicket;
+  prioridade: PrioridadeTicketApi | PrioridadeTicket;
+  severity: SeveridadeTicketApi;
+  assignedLevel: NivelAtendimentoTicketApi;
+  escalationReason?: string;
+  escalationAt?: string;
+  slaTargetMinutes?: number;
+  slaExpiresAt?: string;
   canalId: string;
+  filaId?: string;
   clienteId: string;
   atendenteId?: string;
   mensagensNaoLidas: number;
   ultimaMensagemEm?: string;
   createdAt: string;
   updatedAt: string;
+  empresaId?: string;
+
+  // === Campos Novos - Sprint 1: Unificação Tickets + Demandas ===
+  /** Título do ticket (alternativa ao assunto) */
+  titulo?: string;
+  /** Descrição completa do ticket */
+  descricao?: string;
+  /** Tipo do ticket (técnica, comercial, suporte, etc) */
+  tipo?: TipoTicket;
+  /** Data de vencimento/prazo do ticket */
+  dataVencimento?: string;
+  /** ID do usuário responsável pelo ticket */
+  responsavelId?: string;
+  /** ID do usuário que criou o ticket */
+  autorId?: string;
+  // === Fim Campos Novos ===
 
   // Relacionamentos (se incluídos)
   cliente?: {
@@ -47,6 +135,18 @@ export interface Ticket {
     id: string;
     nome: string;
     tipo: string;
+  };
+  /** Usuário responsável pelo ticket (Sprint 1) */
+  responsavel?: {
+    id: string;
+    nome: string;
+    avatar?: string;
+  };
+  /** Usuário que criou o ticket (Sprint 1) */
+  autor?: {
+    id: string;
+    nome: string;
+    avatar?: string;
   };
 }
 
@@ -91,20 +191,84 @@ export interface AtribuirAtendenteDto {
   atendenteId: string;
 }
 
+export interface EscalarTicketDto {
+  level: NivelAtendimentoTicket | NivelAtendimentoTicketApi;
+  reason: string;
+  slaTargetMinutes?: number;
+  slaExpiresAt?: string | Date;
+}
+
+export interface DesescalarTicketDto {
+  reason?: string;
+}
+
+export interface ReatribuirTicketDto {
+  filaId?: string;
+  atendenteId?: string;
+  assignedLevel?: NivelAtendimentoTicket | NivelAtendimentoTicketApi;
+  severity?: SeveridadeTicket | SeveridadeTicketApi;
+}
+
+const normalizarStatusParaApi = (status?: string | StatusTicket): StatusTicketApi | undefined => {
+  if (!status) return undefined;
+  const valor = status.toString().toLowerCase();
+  const mapa: Record<string, StatusTicketApi> = {
+    aguardando: 'AGUARDANDO',
+    pendente: 'AGUARDANDO',
+    em_atendimento: 'EM_ATENDIMENTO',
+    resolvido: 'RESOLVIDO',
+    fechado: 'FECHADO',
+    aberto: 'AGUARDANDO',
+  };
+  return mapa[valor] ?? undefined;
+};
+
+const normalizarPrioridadeParaApi = (
+  prioridade?: PrioridadeTicket | PrioridadeTicketApi,
+): PrioridadeTicketApi | undefined => {
+  if (!prioridade) return undefined;
+  const valor = prioridade.toString().toLowerCase();
+  const mapa: Record<string, PrioridadeTicketApi> = {
+    baixa: 'BAIXA',
+    normal: 'MEDIA',
+    media: 'MEDIA',
+    alta: 'ALTA',
+    urgente: 'URGENTE',
+  };
+  return mapa[valor] ?? undefined;
+};
+
+const normalizarSeveridadeParaApi = (
+  severidade?: SeveridadeTicket | SeveridadeTicketApi,
+): SeveridadeTicketApi | undefined => {
+  if (!severidade) return undefined;
+  const valor = severidade.toString().toLowerCase();
+  const mapa: Record<string, SeveridadeTicketApi> = {
+    baixa: 'BAIXA',
+    media: 'MEDIA',
+    alta: 'ALTA',
+    critica: 'CRITICA',
+  };
+  return mapa[valor] ?? undefined;
+};
+
+const normalizarNivelParaApi = (
+  nivel?: NivelAtendimentoTicket | NivelAtendimentoTicketApi,
+): NivelAtendimentoTicketApi | undefined => {
+  if (!nivel) return undefined;
+  const valor = nivel.toString().toLowerCase();
+  const mapa: Record<string, NivelAtendimentoTicketApi> = {
+    n1: 'N1',
+    n2: 'N2',
+    n3: 'N3',
+  };
+  return mapa[valor] ?? undefined;
+};
+
 /**
  * Service para interagir com a API de tickets
  */
 class TicketsService {
-  private getAuthHeaders() {
-    const token = localStorage.getItem('token');
-    return {
-      headers: {
-        Authorization: token ? `Bearer ${token}` : '',
-        'Content-Type': 'application/json',
-      },
-    };
-  }
-
   /**
    * Lista tickets com filtros opcionais
    */
@@ -113,16 +277,58 @@ class TicketsService {
       const params = new URLSearchParams();
       params.append('empresaId', filtros.empresaId);
 
-      if (filtros.status) {
-        if (Array.isArray(filtros.status)) {
-          filtros.status.forEach(s => params.append('status', s));
-        } else {
-          params.append('status', filtros.status);
-        }
+      const statusArray = Array.isArray(filtros.status) ? filtros.status : filtros.status ? [filtros.status] : [];
+      statusArray
+        .map((s) => normalizarStatusParaApi(s))
+        .filter((s): s is StatusTicketApi => Boolean(s))
+        .forEach((s) => params.append('status', s));
+
+      const prioridade = normalizarPrioridadeParaApi(filtros.prioridade);
+      if (prioridade) {
+        params.append('prioridade', prioridade);
+      }
+
+      const severity = normalizarSeveridadeParaApi(filtros.severity);
+      if (severity) {
+        params.append('severity', severity);
+      }
+
+      const assignedLevel = normalizarNivelParaApi(filtros.assignedLevel);
+      if (assignedLevel) {
+        params.append('assignedLevel', assignedLevel);
       }
 
       if (filtros.canalId) {
         params.append('canalId', filtros.canalId);
+      }
+
+      if (filtros.filaId) {
+        params.append('filaId', filtros.filaId);
+      }
+
+      if (filtros.atendenteId) {
+        params.append('atendenteId', filtros.atendenteId);
+      }
+
+      if (filtros.contatoId) {
+        params.append('contatoId', filtros.contatoId);
+      }
+
+      if (filtros.busca) {
+        params.append('busca', filtros.busca);
+      }
+
+      // Sprint 1: Filtros novos (tipo, responsavelId, autorId)
+      if (filtros.tipo) {
+        params.append('tipo', filtros.tipo);
+      }
+
+      if (filtros.responsavelId) {
+        params.append('responsavelId', filtros.responsavelId);
+      }
+
+      if (filtros.autorId) {
+        params.append('autorId', filtros.autorId);
       }
 
       if (filtros.limite) {
@@ -133,16 +339,22 @@ class TicketsService {
         params.append('pagina', filtros.pagina.toString());
       }
 
-      const response = await axios.get<ListarTicketsResposta>(
-        `${API_URL}/api/atendimento/tickets?${params.toString()}`,
-        this.getAuthHeaders()
-      );
+      const response = await api.get<ApiListResponse<Ticket[]>>('/api/atendimento/tickets', {
+        params: Object.fromEntries(params),
+      });
 
-      console.log('✅ Tickets listados:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('❌ Erro ao listar tickets:', error);
-      throw error;
+      const data = response.data?.data ?? [];
+
+      return {
+        success: response.data?.success ?? true,
+        data,
+        total: response.data?.total ?? data.length,
+        pagina: response.data?.pagina ?? filtros.pagina ?? 1,
+        limite: response.data?.limite ?? filtros.limite ?? data.length,
+      };
+    } catch (err: unknown) {
+      console.error('❌ Erro ao listar tickets:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao listar tickets'));
     }
   }
 
@@ -151,16 +363,26 @@ class TicketsService {
    */
   async buscar(ticketId: string, empresaId: string): Promise<BuscarTicketResposta> {
     try {
-      const response = await axios.get<BuscarTicketResposta>(
-        `${API_URL}/api/atendimento/tickets/${ticketId}?empresaId=${empresaId}`,
-        this.getAuthHeaders()
+      const response = await api.get<ApiListResponse<Ticket>>(
+        `/api/atendimento/tickets/${ticketId}`,
+        {
+          params: { empresaId },
+        },
       );
 
-      console.log('✅ Ticket encontrado:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('❌ Erro ao buscar ticket:', error);
-      throw error;
+      const ticket = response.data?.data;
+
+      if (!ticket) {
+        throw new Error('Ticket não encontrado');
+      }
+
+      return {
+        success: response.data?.success ?? true,
+        data: ticket,
+      };
+    } catch (err: unknown) {
+      console.error('❌ Erro ao buscar ticket:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao buscar ticket'));
     }
   }
 
@@ -170,20 +392,36 @@ class TicketsService {
   async atualizarStatus(
     ticketId: string,
     empresaId: string,
-    dados: AtualizarStatusDto
+    dados: AtualizarStatusDto,
   ): Promise<BuscarTicketResposta> {
     try {
-      const response = await axios.patch<BuscarTicketResposta>(
-        `${API_URL}/api/atendimento/tickets/${ticketId}/status?empresaId=${empresaId}`,
-        dados,
-        this.getAuthHeaders()
+      const statusApi = normalizarStatusParaApi(dados.status);
+      if (!statusApi) {
+        throw new Error('Status inválido');
+      }
+
+      const response = await api.patch<ApiListResponse<Ticket>>(
+        `/api/atendimento/tickets/${ticketId}/status`,
+        {
+          ...dados,
+          status: statusApi,
+          empresaId,
+        },
       );
 
-      console.log('✅ Status do ticket atualizado:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('❌ Erro ao atualizar status do ticket:', error);
-      throw error;
+      const ticket = response.data?.data;
+
+      if (!ticket) {
+        throw new Error('Resposta inválida ao atualizar status');
+      }
+
+      return {
+        success: response.data?.success ?? true,
+        data: ticket,
+      };
+    } catch (err: unknown) {
+      console.error('❌ Erro ao atualizar status do ticket:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao atualizar status do ticket'));
     }
   }
 
@@ -193,20 +431,36 @@ class TicketsService {
   async atualizarPrioridade(
     ticketId: string,
     empresaId: string,
-    dados: AtualizarPrioridadeDto
+    dados: AtualizarPrioridadeDto,
   ): Promise<BuscarTicketResposta> {
     try {
-      const response = await axios.patch<BuscarTicketResposta>(
-        `${API_URL}/api/atendimento/tickets/${ticketId}/prioridade?empresaId=${empresaId}`,
-        dados,
-        this.getAuthHeaders()
+      const prioridadeApi = normalizarPrioridadeParaApi(dados.prioridade);
+      if (!prioridadeApi) {
+        throw new Error('Prioridade inválida');
+      }
+
+      const response = await api.patch<ApiListResponse<Ticket>>(
+        `/api/atendimento/tickets/${ticketId}/prioridade`,
+        {
+          ...dados,
+          prioridade: prioridadeApi,
+          empresaId,
+        },
       );
 
-      console.log('✅ Prioridade do ticket atualizada:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('❌ Erro ao atualizar prioridade do ticket:', error);
-      throw error;
+      const ticket = response.data?.data;
+
+      if (!ticket) {
+        throw new Error('Resposta inválida ao atualizar prioridade');
+      }
+
+      return {
+        success: response.data?.success ?? true,
+        data: ticket,
+      };
+    } catch (err: unknown) {
+      console.error('❌ Erro ao atualizar prioridade do ticket:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao atualizar prioridade do ticket'));
     }
   }
 
@@ -216,20 +470,157 @@ class TicketsService {
   async atribuirAtendente(
     ticketId: string,
     empresaId: string,
-    dados: AtribuirAtendenteDto
+    dados: AtribuirAtendenteDto,
   ): Promise<BuscarTicketResposta> {
     try {
-      const response = await axios.patch<BuscarTicketResposta>(
-        `${API_URL}/api/atendimento/tickets/${ticketId}/atribuir?empresaId=${empresaId}`,
-        dados,
-        this.getAuthHeaders()
+      const response = await api.patch<ApiListResponse<Ticket>>(
+        `/api/atendimento/tickets/${ticketId}/atribuir`,
+        {
+          ...dados,
+          empresaId,
+        },
       );
 
-      console.log('✅ Atendente atribuído ao ticket:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('❌ Erro ao atribuir atendente ao ticket:', error);
-      throw error;
+      const ticket = response.data?.data;
+
+      if (!ticket) {
+        throw new Error('Resposta inválida ao atribuir atendente');
+      }
+
+      return {
+        success: response.data?.success ?? true,
+        data: ticket,
+      };
+    } catch (err: unknown) {
+      console.error('❌ Erro ao atribuir atendente ao ticket:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao atribuir atendente ao ticket'));
+    }
+  }
+
+  async escalar(
+    ticketId: string,
+    empresaId: string,
+    dados: EscalarTicketDto,
+  ): Promise<BuscarTicketResposta> {
+    try {
+      const response = await api.post<ApiListResponse<Ticket>>(
+        `/api/atendimento/tickets/${ticketId}/escalar`,
+        {
+          ...dados,
+          level: normalizarNivelParaApi(dados.level),
+          slaExpiresAt: dados.slaExpiresAt ? new Date(dados.slaExpiresAt).toISOString() : undefined,
+          empresaId,
+        },
+      );
+
+      const ticket = response.data?.data;
+
+      if (!ticket) {
+        throw new Error('Resposta inválida ao escalonar ticket');
+      }
+
+      return {
+        success: response.data?.success ?? true,
+        data: ticket,
+      };
+    } catch (err: unknown) {
+      console.error('❌ Erro ao escalonar ticket:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao escalonar ticket'));
+    }
+  }
+
+  async desescalar(
+    ticketId: string,
+    empresaId: string,
+    dados: DesescalarTicketDto,
+  ): Promise<BuscarTicketResposta> {
+    try {
+      const response = await api.post<ApiListResponse<Ticket>>(
+        `/api/atendimento/tickets/${ticketId}/desescalar`,
+        {
+          ...dados,
+          empresaId,
+        },
+      );
+
+      const ticket = response.data?.data;
+
+      if (!ticket) {
+        throw new Error('Resposta inválida ao desescalonar ticket');
+      }
+
+      return {
+        success: response.data?.success ?? true,
+        data: ticket,
+      };
+    } catch (err: unknown) {
+      console.error('❌ Erro ao desescalonar ticket:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao desescalonar ticket'));
+    }
+  }
+
+  async reatribuir(
+    ticketId: string,
+    empresaId: string,
+    dados: ReatribuirTicketDto,
+  ): Promise<BuscarTicketResposta> {
+    try {
+      const response = await api.patch<ApiListResponse<Ticket>>(
+        `/api/atendimento/tickets/${ticketId}/reatribuir`,
+        {
+          ...dados,
+          assignedLevel: normalizarNivelParaApi(dados.assignedLevel),
+          severity: normalizarSeveridadeParaApi(dados.severity),
+          empresaId,
+        },
+      );
+
+      const ticket = response.data?.data;
+
+      if (!ticket) {
+        throw new Error('Resposta inválida ao reatribuir ticket');
+      }
+
+      return {
+        success: response.data?.success ?? true,
+        data: ticket,
+      };
+    } catch (err: unknown) {
+      console.error('❌ Erro ao reatribuir ticket:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao reatribuir ticket'));
+    }
+  }
+
+  /**
+   * Transfere um ticket para outro atendente
+   */
+  async transferir(
+    ticketId: string,
+    dados: {
+      atendenteId: string;
+      motivo: string;
+      notaInterna?: string;
+    },
+  ): Promise<BuscarTicketResposta> {
+    try {
+      const response = await api.post<ApiListResponse<Ticket>>(
+        `/api/atendimento/tickets/${ticketId}/transferir`,
+        dados,
+      );
+
+      const ticket = response.data?.data;
+
+      if (!ticket) {
+        throw new Error('Resposta inválida ao transferir ticket');
+      }
+
+      return {
+        success: response.data?.success ?? true,
+        data: ticket,
+      };
+    } catch (err: unknown) {
+      console.error('❌ Erro ao transferir ticket:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao transferir ticket'));
     }
   }
 }
