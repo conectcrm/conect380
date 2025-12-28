@@ -132,11 +132,39 @@ await ticketService.criar({ ...dto, tipo: 'demanda', autor_id: autorId });
 
 ---
 
-### 5. Testes Unitários
-- [ ] `ticket.service.spec.ts`: Testar criação com novos campos
-- [ ] Testar relações User (autor e responsavel)
-- [ ] Testar enum TipoTicket
-- [ ] Testar novos status (AGUARDANDO_CLIENTE, CONCLUIDO, etc)
+### 5. Testes Unitários ✅ CONCLUÍDO
+**Arquivo**: `backend/src/modules/atendimento/services/ticket.service.spec.ts`
+
+✅ **Novos Testes Adicionados (11 testes)**:
+```typescript
+describe('TicketService - Unificação Tickets + Demandas (Sprint 1)')
+```
+
+✅ **Teste 1 - criar() com novos campos**:
+- ✅ Criar ticket com tipo "demanda" e 7 campos opcionais
+- ✅ Criar ticket sem campos opcionais (compatibilidade retroativa)
+
+✅ **Teste 2 - atualizar() com novos campos**:
+- ✅ Atualizar ticket incluindo conversão data_vencimento (string → Date)
+- ✅ Atualização parcial (apenas alguns campos)
+
+✅ **Teste 3 - listar() com filtro tipo**:
+- ✅ Filtrar tickets por tipo "demanda"
+- ✅ Listar todos os tipos quando não especificado
+
+✅ **Teste 4 - buscarPorId() com relações User**:
+- ✅ Popular relações autor e responsavel (User)
+- ✅ Funcionar quando autor/responsavel são null
+
+✅ **Teste 5 - Novos status**:
+- ✅ Transição para AGUARDANDO_CLIENTE
+- ✅ Registrar data de conclusão ao mudar para ENCERRADO
+
+✅ **Correções em Testes Existentes**:
+- Substituído `StatusTicket.RESOLVIDO` → `StatusTicket.ENCERRADO`
+- Substituído `StatusTicket.FECHADO` → `StatusTicket.ENCERRADO`
+- Substituído `StatusTicket.ABERTO` → `StatusTicket.FILA`
+- Ajustado imports para incluir `TipoTicket`
 
 ---
 
@@ -156,13 +184,13 @@ await ticketService.criar({ ...dto, tipo: 'demanda', autor_id: autorId });
 
 ## 📊 Progresso Sprint 1
 
-**Concluído**: 4/7 tarefas (57.1%)
+**Concluído**: 5/7 tarefas (71.4%)
 
 - [x] 1. Entity Ticket expandida
 - [x] 2. DTOs atualizados
 - [x] 3. Service e Controller atualizados
 - [x] 4. Deprecar Demanda Service
-- [ ] 5. Testes unitários
+- [x] 5. Testes unitários
 - [ ] 6. Executar Migration SQL
 - [ ] 7. Feature Flag
 
@@ -191,8 +219,9 @@ await ticketService.criar({ ...dto, tipo: 'demanda', autor_id: autorId });
 1. ~~Commit 1: Entity + DTOs atualizados~~ ✅ Concluído (26d69ca)
 2. ~~Commit 2: Service + Controller atualizados~~ ✅ Concluído (b6c26df)
 3. **Commit 3: DemandaService deprecado** ✅ Concluído (próximo)
-4. **Commit 4**: Testes unitários + Feature Flag
+4. **Commit 4: Testes unitários completos** ✅ Concluído (próximo)
+5. **Commit 5**: Feature Flag + Migration SQL (se aprovado)
 
 ---
 
-**Última atualização**: 28/12/2025 (Sprint 1 - 57.1% concluída - Deprecation implementada)
+**Última atualização**: 28/12/2025 (Sprint 1 - 71.4% concluída - Testes implementados)
