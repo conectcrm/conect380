@@ -1,0 +1,157 @@
+============================================================================
+­ƒöì AUDITORIA PR├ë-MIGRATION: Tickets vs Demandas
+============================================================================
+
+­ƒôè 1. CONTAGEM TOTAL DE REGISTROS
+------------------------------------
+             tipo             | total 
+------------------------------+-------
+ Tickets                      |    30
+ Demandas                     |     2
+ TOTAL ESPERADO P├ôS-MIGRATION |    32
+(3 linhas)
+
+
+­ƒôè 2. DISTRIBUI├ç├âO DE STATUS - TICKETS
+----------------------------------------
+     status     | quantidade | percentual 
+----------------+------------+------------
+ ENCERRADO      |         29 |      96.67
+ EM_ATENDIMENTO |          1 |       3.33
+(2 linhas)
+
+
+­ƒôè 3. DISTRIBUI├ç├âO DE STATUS - DEMANDAS
+-----------------------------------------
+    status    | quantidade | percentual 
+--------------+------------+------------
+ aberta       |          1 |      50.00
+ em_andamento |          1 |      50.00
+(2 linhas)
+
+
+­ƒôè 4. DISTRIBUI├ç├âO DE PRIORIDADE - TICKETS
+--------------------------------------------
+ prioridade | quantidade | percentual 
+------------+------------+------------
+ ALTA       |          1 |       3.33
+ MEDIA      |         29 |      96.67
+(2 linhas)
+
+
+­ƒôè 5. DISTRIBUI├ç├âO DE PRIORIDADE - DEMANDAS (lowercase)
+---------------------------------------------------------
+ prioridade | quantidade | percentual 
+------------+------------+------------
+ media      |          2 |     100.00
+(1 linha)
+
+
+­ƒôè 6. DISTRIBUI├ç├âO DE TIPO - DEMANDAS
+---------------------------------------
+  tipo   | quantidade | percentual 
+---------+------------+------------
+ suporte |          2 |     100.00
+(1 linha)
+
+
+­ƒôè 7. DEMANDAS VINCULADAS A TICKETS (Foreign Key)
+----------------------------------------------------
+          tipo          | quantidade 
+------------------------+------------
+ Demandas COM ticket_id |          2
+ Demandas SEM ticket_id |          0
+(2 linhas)
+
+
+­ƒôè 8. TICKETS SEM ASSUNTO (nulls que precisam ser preenchidos)
+-----------------------------------------------------------------
+            tipo            | quantidade 
+----------------------------+------------
+ Tickets COM assunto        |         30
+ Tickets SEM assunto (NULL) |          0
+(2 linhas)
+
+
+ÔÜá´©Å  ATEN├ç├âO: Tickets sem assunto ser├úo preenchidos com "Sem t├¡tulo" antes da migration!
+
+­ƒôè 9. TICKETS POR FILA (Top 10)
+---------------------------------
+    fila    | total_tickets 
+------------+---------------
+ (Sem fila) |            30
+(1 linha)
+
+
+­ƒôè 10. TICKETS POR CANAL (Top 10)
+-----------------------------------
+psql:queries-auditoria.sql:197: ERROR:  invalid input value for enum atendimento_canais_tipo_enum: "(Sem canal)"
+LINHA 2:   COALESCE(c.tipo, '(Sem canal)') AS canal_tipo,
+                            ^
+
+­ƒôè 11. DEMANDAS POR CLIENTE (Top 10 clientes com mais demandas)
+------------------------------------------------------------------
+    cliente    | total_demandas 
+---------------+----------------
+ (Sem cliente) |              2
+(1 linha)
+
+
+­ƒôè 12. DEMANDAS POR RESPONS├üVEL (Top 10 usu├írios)
+----------------------------------------------------
+      responsavel      | total_demandas 
+-----------------------+----------------
+ Administrador Sistema |              2
+(1 linha)
+
+
+­ƒôè 13. TICKETS COM TAGS
+------------------------
+
+psql:queries-auditoria.sql:246: ERROR:  column "ticket_id" does not exist
+LINHA 3:   COUNT(DISTINCT ticket_id) AS quantidade
+                          ^
+DICA:  Perhaps you meant to reference the column "ticket_tags.ticketId".
+­ƒôè 14. ESTAT├ìSTICAS DE DATAS - TICKETS
+----------------------------------------
+psql:queries-auditoria.sql:269: ERROR:  UNION types date and text cannot be matched
+LINHA 13:   COUNT(*)::TEXT AS data
+            ^
+
+­ƒôè 15. ESTAT├ìSTICAS DE DATAS - DEMANDAS
+-----------------------------------------
+psql:queries-auditoria.sql:292: ERROR:  UNION types date and text cannot be matched
+LINHA 13:   COUNT(*)::TEXT AS data
+            ^
+
+­ƒôè 16. VERIFICAR INTEGRIDADE REFERENCIAL
+------------------------------------------
+Demandas com ticket_id inv├ílido (FK quebrada):
+ demanda_id | titulo | ticket_invalido 
+------------+--------+-----------------
+(0 linha)
+
+
+ÔÜá´©Å  Se houver registros acima, corrigir ANTES da migration!
+
+============================================================================
+­ƒôï RESUMO FINAL DA AUDITORIA
+============================================================================
+ entidade | total | mais_antigo | mais_recente 
+----------+-------+-------------+--------------
+ Tickets  |    30 | 2025-12-09  | 2025-12-24
+ Demandas |     2 | 2025-12-23  | 2025-12-24
+(2 linhas)
+
+
+Ô£à Auditoria conclu├¡da!
+­ƒôü Salvar este output: auditoria-resultados.txt
+­ƒôà Data:  || NOW()::DATE;
+
+­ƒÄ» Pr├│ximos passos:
+  1. Revisar output para identificar problemas
+  2. Criar backup do banco de dados
+  3. Criar git tag: pre-unificacao-tickets
+  4. Escrever script de migration SQL
+
+============================================================================
