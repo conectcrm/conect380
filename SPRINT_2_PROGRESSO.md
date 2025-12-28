@@ -108,10 +108,14 @@ Após a conclusão do Sprint 1 (backend 100%), agora vamos atualizar o frontend 
 
 ### Fase 4: Páginas & Rotas (3-4h)
 
-- [ ] **4.1** - Atualizar `DemandasPage.tsx`
-  - Renomear para `TicketsDemandasPage.tsx`?
-  - Query: `ticketService.listar({ tipo: 'demanda' })`
-  - Manter UI igual (KPI cards, lista, etc)
+- [x] **4.1** - Atualizar `DemandasPage.tsx` ✅
+  - Migrado para usar ticketService.listar({ tipo: 'suporte' })
+  - Interfaces: Demanda[] → Ticket[]
+  - Filtros atualizados: tipo, status, prioridade
+  - Campos corrigidos: user.empresa.id, ticket.tipo, ticket.titulo
+  - Removidos campos obsoletos: telefone, ticketId
+  - Badges usando tipoTicketLabels e tipoTicketColors
+  - Compatibilidade com status antigos mantida
 
 - [ ] **4.2** - Criar redirect em `App.tsx`
   - `/demandas` → `/tickets?tipo=demanda`
@@ -143,13 +147,13 @@ Após a conclusão do Sprint 1 (backend 100%), agora vamos atualizar o frontend 
 
 ## 📊 Progresso Sprint 2
 
-**Concluído**: 7/19 tarefas (36.8%)
+**Concluído**: 8/19 tarefas (42.1%)
 
 **Fases**:
 - [x] Fase 1: Types & Interfaces (4/4) ← **100% COMPLETO** ✅
 - [x] Fase 2: Services (2/3) ← **67% COMPLETO**
-- [ ] Fase 3: Componentes (1/3) ← **33% INICIADO**
-- [ ] Fase 4: Páginas & Rotas (0/3)
+- [x] Fase 3: Componentes (1/3) ← **33% COMPLETO**
+- [ ] Fase 4: Páginas & Rotas (1/3) ← **33% INICIADO**
 - [ ] Fase 5: Testes & Validação (0/4)
 
 ---
