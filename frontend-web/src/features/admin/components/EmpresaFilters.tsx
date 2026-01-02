@@ -1,12 +1,5 @@
 import React from 'react';
-import {
-  Search,
-  Filter,
-  X,
-  Building2,
-  Calendar,
-  DollarSign
-} from 'lucide-react';
+import { Search, Filter, X, Building2, Calendar, DollarSign } from 'lucide-react';
 
 interface FilterState {
   search: string;
@@ -29,7 +22,7 @@ export const EmpresaFilters: React.FC<EmpresaFiltersProps> = ({
   filters,
   onFiltersChange,
   totalEmpresas,
-  empresasFiltradas
+  empresasFiltradas,
 }) => {
   const [showAdvanced, setShowAdvanced] = React.useState(false);
 
@@ -37,28 +30,28 @@ export const EmpresaFilters: React.FC<EmpresaFiltersProps> = ({
     { value: 'ativa', label: 'Ativa', color: 'bg-green-100 text-green-800' },
     { value: 'trial', label: 'Trial', color: 'bg-blue-100 text-blue-800' },
     { value: 'suspensa', label: 'Suspensa', color: 'bg-yellow-100 text-yellow-800' },
-    { value: 'inativa', label: 'Inativa', color: 'bg-red-100 text-red-800' }
+    { value: 'inativa', label: 'Inativa', color: 'bg-red-100 text-red-800' },
   ];
 
   const planoOptions = [
     { value: 'starter', label: 'Starter', color: 'bg-blue-100 text-blue-800' },
     { value: 'professional', label: 'Professional', color: 'bg-purple-100 text-purple-800' },
-    { value: 'enterprise', label: 'Enterprise', color: 'bg-orange-100 text-orange-800' }
+    { value: 'enterprise', label: 'Enterprise', color: 'bg-orange-100 text-orange-800' },
   ];
 
   const updateFilter = (key: keyof FilterState, value: any) => {
     onFiltersChange({
       ...filters,
-      [key]: value
+      [key]: value,
     });
   };
 
   const toggleArrayFilter = (key: 'status' | 'plano', value: string) => {
     const currentArray = filters[key];
     const newArray = currentArray.includes(value)
-      ? currentArray.filter(item => item !== value)
+      ? currentArray.filter((item) => item !== value)
       : [...currentArray, value];
-    
+
     updateFilter(key, newArray);
   };
 
@@ -70,7 +63,7 @@ export const EmpresaFilters: React.FC<EmpresaFiltersProps> = ({
       dataInicio: '',
       dataFim: '',
       valorMin: '',
-      valorMax: ''
+      valorMax: '',
     });
     setShowAdvanced(false);
   };
@@ -106,10 +99,8 @@ export const EmpresaFilters: React.FC<EmpresaFiltersProps> = ({
 
         <div className="flex items-center space-x-4">
           <div className="text-sm text-gray-600">
-            <span className="font-semibold text-[#159A9C]">{empresasFiltradas}</span>
-            {' '}de{' '}
-            <span className="font-semibold">{totalEmpresas}</span>
-            {' '}empresas
+            <span className="font-semibold text-[#159A9C]">{empresasFiltradas}</span> de{' '}
+            <span className="font-semibold">{totalEmpresas}</span> empresas
           </div>
 
           <button
@@ -136,9 +127,7 @@ export const EmpresaFilters: React.FC<EmpresaFiltersProps> = ({
       <div className="space-y-4">
         {/* Status */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Status
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
           <div className="flex flex-wrap gap-2">
             {statusOptions.map((option) => (
               <button
@@ -158,9 +147,7 @@ export const EmpresaFilters: React.FC<EmpresaFiltersProps> = ({
 
         {/* Planos */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Planos
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Planos</label>
           <div className="flex flex-wrap gap-2">
             {planoOptions.map((option) => (
               <button
@@ -182,9 +169,7 @@ export const EmpresaFilters: React.FC<EmpresaFiltersProps> = ({
       {/* Filtros avançados */}
       {showAdvanced && (
         <div className="mt-6 pt-6 border-t border-gray-200 space-y-4">
-          <h4 className="text-sm font-semibold text-gray-900 mb-4">
-            Filtros Avançados
-          </h4>
+          <h4 className="text-sm font-semibold text-gray-900 mb-4">Filtros Avançados</h4>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Período de cadastro */}
@@ -279,31 +264,37 @@ export const EmpresaFilters: React.FC<EmpresaFiltersProps> = ({
         <div className="mt-4 pt-4 border-t border-gray-200">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-gray-600 font-medium">Filtros ativos:</span>
-            
+
             {filters.search && (
               <span className="px-2 py-1 bg-[#159A9C] text-white text-xs rounded-full">
                 Busca: "{filters.search}"
               </span>
             )}
-            
-            {filters.status.map(status => (
-              <span key={status} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                Status: {statusOptions.find(s => s.value === status)?.label}
+
+            {filters.status.map((status) => (
+              <span
+                key={status}
+                className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full"
+              >
+                Status: {statusOptions.find((s) => s.value === status)?.label}
               </span>
             ))}
-            
-            {filters.plano.map(plano => (
-              <span key={plano} className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
-                Plano: {planoOptions.find(p => p.value === plano)?.label}
+
+            {filters.plano.map((plano) => (
+              <span
+                key={plano}
+                className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full"
+              >
+                Plano: {planoOptions.find((p) => p.value === plano)?.label}
               </span>
             ))}
-            
+
             {(filters.dataInicio || filters.dataFim) && (
               <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
                 Período: {filters.dataInicio || '...'} até {filters.dataFim || '...'}
               </span>
             )}
-            
+
             {(filters.valorMin || filters.valorMax) && (
               <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
                 Valor: R$ {filters.valorMin || '0'} - R$ {filters.valorMax || '∞'}

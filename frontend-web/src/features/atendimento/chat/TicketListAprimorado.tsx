@@ -41,7 +41,7 @@ export function TicketListAprimorado({
   onTicketSelect,
   filters,
   onFiltersChange,
-  onClearFilters
+  onClearFilters,
 }: TicketListAprimoradoProps) {
   // Filtrar e ordenar tickets
   const ticketsFiltrados = useMemo(() => {
@@ -76,7 +76,10 @@ export function TicketListAprimorado({
     filtered.sort((a, b) => {
       switch (filters.ordenacao) {
         case 'recente':
-          return new Date(b.atualizadoEm || b.criadoEm).getTime() - new Date(a.atualizadoEm || a.criadoEm).getTime();
+          return (
+            new Date(b.atualizadoEm || b.criadoEm).getTime() -
+            new Date(a.atualizadoEm || a.criadoEm).getTime()
+          );
 
         case 'antigo':
           return new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime();
@@ -87,7 +90,10 @@ export function TicketListAprimorado({
           const prioB = prioridadeOrdem[b.prioridade as keyof typeof prioridadeOrdem] || 0;
           if (prioB !== prioA) return prioB - prioA;
           // Se mesma prioridade, ordenar por data
-          return new Date(b.atualizadoEm || b.criadoEm).getTime() - new Date(a.atualizadoEm || a.criadoEm).getTime();
+          return (
+            new Date(b.atualizadoEm || b.criadoEm).getTime() -
+            new Date(a.atualizadoEm || a.criadoEm).getTime()
+          );
 
         default:
           return 0;
@@ -154,11 +160,7 @@ export function TicketListAprimorado({
       <TicketStats tickets={tickets} />
 
       {/* Filtros */}
-      <TicketFilters
-        filters={filters}
-        onChange={onFiltersChange}
-        onClearFilters={onClearFilters}
-      />
+      <TicketFilters filters={filters} onChange={onFiltersChange} onClearFilters={onClearFilters} />
 
       {/* Header da Lista */}
       <div className="px-4 py-2 bg-gray-50 border-b flex items-center justify-between">
@@ -178,12 +180,7 @@ export function TicketListAprimorado({
       <div className="flex-1 overflow-y-auto">
         {ticketsFiltrados.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-400 p-6">
-            <svg
-              className="w-16 h-16 mb-3"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
+            <svg className="w-16 h-16 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -193,7 +190,9 @@ export function TicketListAprimorado({
             </svg>
             <p className="text-sm font-medium mb-1">Nenhum ticket encontrado</p>
             <p className="text-xs text-center">
-              Tente ajustar os filtros ou buscar<br />por outros critérios
+              Tente ajustar os filtros ou buscar
+              <br />
+              por outros critérios
             </p>
           </div>
         ) : (
@@ -202,10 +201,11 @@ export function TicketListAprimorado({
               <button
                 key={ticket.id}
                 onClick={() => onTicketSelect(ticket.id)}
-                className={`w-full p-4 text-left hover:bg-gray-50 transition-colors relative ${activeTicketId === ticket.id
+                className={`w-full p-4 text-left hover:bg-gray-50 transition-colors relative ${
+                  activeTicketId === ticket.id
                     ? 'bg-blue-50 border-l-4 border-l-blue-600'
                     : 'border-l-4 border-l-transparent'
-                  }`}
+                }`}
               >
                 {/* Header do Card */}
                 <div className="flex items-start justify-between mb-2">
@@ -238,7 +238,9 @@ export function TicketListAprimorado({
                   {/* Tempo */}
                   <div className="flex items-center gap-1 text-gray-400 ml-2">
                     <Clock className="w-3 h-3" />
-                    <span className="text-xs">{formatarData(ticket.atualizadoEm || ticket.criadoEm)}</span>
+                    <span className="text-xs">
+                      {formatarData(ticket.atualizadoEm || ticket.criadoEm)}
+                    </span>
                   </div>
                 </div>
 
@@ -269,15 +271,14 @@ export function TicketListAprimorado({
                   {/* Status */}
                   <span
                     className={`px-2 py-0.5 rounded-md text-xs font-medium border ${getStatusColor(
-                      ticket.status
+                      ticket.status,
                     )}`}
                   >
                     {ticket.status === 'aberto' && '📬'}
                     {ticket.status === 'em_atendimento' && '💬'}
                     {ticket.status === 'aguardando' && '⏸️'}
                     {ticket.status === 'resolvido' && '✅'}
-                    {ticket.status === 'fechado' && '🔒'}
-                    {' '}
+                    {ticket.status === 'fechado' && '🔒'}{' '}
                     <span className="capitalize">{ticket.status.replace('_', ' ')}</span>
                   </span>
 

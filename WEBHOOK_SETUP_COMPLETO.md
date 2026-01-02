@@ -55,7 +55,7 @@ Os endpoints de triagem estão protegidos por JWT, mas você pode:
 1. POST http://localhost:3001/auth/login
    ```json
    {
-     "email": "admin@conectcrm.com",
+     "email": "admin@conectsuite.com.br",
      "senha": "admin123"
    }
    ```
@@ -168,7 +168,7 @@ cd frontend-web
 npm start
 ```
 - Acesse http://localhost:3000
-- Login: admin@conectcrm.com / admin123
+- Login: admin@conectsuite.com.br / admin123
 - Navegue para "Atendimento" → "Núcleos de Atendimento"
 - Teste criar/editar/deletar núcleos
 

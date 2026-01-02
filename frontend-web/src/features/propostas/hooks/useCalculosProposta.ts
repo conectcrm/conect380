@@ -26,7 +26,7 @@ interface TotaisProposta {
 export const useCalculosProposta = (
   produtos: ProdutoProposta[] = [],
   descontoGlobal: number = 0,
-  percentualImpostos: number = 0
+  percentualImpostos: number = 0,
 ) => {
   const totais = useMemo((): TotaisProposta => {
     // Calcular subtotal de todos os produtos
@@ -50,24 +50,28 @@ export const useCalculosProposta = (
       subtotal,
       desconto,
       impostos,
-      total
+      total,
     };
   }, [produtos, descontoGlobal, percentualImpostos]);
 
-  const calcularSubtotalProduto = (produto: Produto, quantidade: number, desconto: number = 0): number => {
+  const calcularSubtotalProduto = (
+    produto: Produto,
+    quantidade: number,
+    desconto: number = 0,
+  ): number => {
     const subtotalSemDesconto = produto.preco * quantidade;
     const valorDesconto = subtotalSemDesconto * (desconto / 100);
     return subtotalSemDesconto - valorDesconto;
   };
 
   const validarProdutos = (): boolean => {
-    return produtos.length > 0 && produtos.every(p => p.quantidade > 0);
+    return produtos.length > 0 && produtos.every((p) => p.quantidade > 0);
   };
 
   return {
     totais,
     calcularSubtotalProduto,
     validarProdutos,
-    possuiProdutos: produtos.length > 0
+    possuiProdutos: produtos.length > 0,
   };
 };

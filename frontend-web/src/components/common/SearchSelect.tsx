@@ -29,15 +29,15 @@ export default function SearchSelect({
   value,
   onChange,
   onSearch,
-  placeholder = "Buscar...",
+  placeholder = 'Buscar...',
   label,
   required = false,
   loading = false,
   disabled = false,
   icon = 'user',
-  emptyMessage = "Nenhum item encontrado",
-  className = "",
-  error
+  emptyMessage = 'Nenhum item encontrado',
+  className = '',
+  error,
 }: SearchSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,10 +68,11 @@ export default function SearchSelect({
     }
 
     const query = searchQuery.toLowerCase();
-    const filtered = options.filter(option =>
-      option.label.toLowerCase().includes(query) ||
-      option.subtitle?.toLowerCase().includes(query) ||
-      option.extra?.toLowerCase().includes(query)
+    const filtered = options.filter(
+      (option) =>
+        option.label.toLowerCase().includes(query) ||
+        option.subtitle?.toLowerCase().includes(query) ||
+        option.extra?.toLowerCase().includes(query),
     );
     setFilteredOptions(filtered);
   }, [options, searchQuery]);
@@ -138,7 +139,7 @@ export default function SearchSelect({
 
         <input
           type="text"
-          value={isOpen ? searchQuery : (value?.label || '')}
+          value={isOpen ? searchQuery : value?.label || ''}
           onChange={handleSearchChange}
           onFocus={handleInputFocus}
           placeholder={value ? value.label : placeholder}
@@ -148,9 +149,7 @@ export default function SearchSelect({
 
         {/* Botões laterais */}
         <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
-          {loading && (
-            <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
-          )}
+          {loading && <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />}
 
           {value && !disabled && (
             <button
@@ -168,7 +167,9 @@ export default function SearchSelect({
               className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
               type="button"
             >
-              <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown
+                className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+              />
             </button>
           )}
         </div>
@@ -197,19 +198,11 @@ export default function SearchSelect({
                 >
                   <div className="flex items-center">
                     <div className="flex-1">
-                      <div className="text-sm font-medium text-gray-900">
-                        {option.label}
-                      </div>
+                      <div className="text-sm font-medium text-gray-900">{option.label}</div>
                       {option.subtitle && (
-                        <div className="text-sm text-gray-500">
-                          {option.subtitle}
-                        </div>
+                        <div className="text-sm text-gray-500">{option.subtitle}</div>
                       )}
-                      {option.extra && (
-                        <div className="text-xs text-gray-400">
-                          {option.extra}
-                        </div>
-                      )}
+                      {option.extra && <div className="text-xs text-gray-400">{option.extra}</div>}
                     </div>
                   </div>
                 </button>
@@ -219,9 +212,7 @@ export default function SearchSelect({
         </div>
       )}
 
-      {error && (
-        <p className="mt-1 text-sm text-red-600">{error}</p>
-      )}
+      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
     </div>
   );
 }

@@ -51,9 +51,7 @@ const ModalAprovarCotacao: React.FC<ModalAprovarCotacaoProps> = ({
       <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-[#DEEFE7]">
-          <h2 className="text-2xl font-bold text-[#002333]">
-            Avaliar Cotação
-          </h2>
+          <h2 className="text-2xl font-bold text-[#002333]">Avaliar Cotação</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-[#DEEFE7] rounded-lg transition-colors"
@@ -97,9 +95,7 @@ const ModalAprovarCotacao: React.FC<ModalAprovarCotacaoProps> = ({
         {/* Ações */}
         {!acao && (
           <div className="p-6 space-y-4">
-            <p className="text-[#002333] font-medium">
-              Escolha uma ação para esta cotação:
-            </p>
+            <p className="text-[#002333] font-medium">Escolha uma ação para esta cotação:</p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button
@@ -108,9 +104,7 @@ const ModalAprovarCotacao: React.FC<ModalAprovarCotacaoProps> = ({
               >
                 <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-3 group-hover:scale-110 transition-transform" />
                 <p className="text-lg font-bold text-[#002333]">Aprovar</p>
-                <p className="text-sm text-[#002333]/60 mt-1">
-                  Autorizar esta cotação
-                </p>
+                <p className="text-sm text-[#002333]/60 mt-1">Autorizar esta cotação</p>
               </button>
 
               <button
@@ -119,9 +113,7 @@ const ModalAprovarCotacao: React.FC<ModalAprovarCotacaoProps> = ({
               >
                 <XCircle className="h-12 w-12 text-red-600 mx-auto mb-3 group-hover:scale-110 transition-transform" />
                 <p className="text-lg font-bold text-[#002333]">Reprovar</p>
-                <p className="text-sm text-[#002333]/60 mt-1">
-                  Rejeitar esta cotação
-                </p>
+                <p className="text-sm text-[#002333]/60 mt-1">Rejeitar esta cotação</p>
               </button>
             </div>
           </div>
@@ -176,12 +168,15 @@ const ModalAprovarCotacao: React.FC<ModalAprovarCotacaoProps> = ({
               <button
                 onClick={handleSubmit}
                 disabled={loading || (acao === 'reprovar' && !justificativa.trim())}
-                className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${acao === 'aprovar'
+                className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                  acao === 'aprovar'
                     ? 'bg-green-600 text-white hover:bg-green-700 disabled:bg-green-300'
                     : 'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300'
-                  } disabled:cursor-not-allowed`}
+                } disabled:cursor-not-allowed`}
               >
-                {loading ? 'Processando...' : `Confirmar ${acao === 'aprovar' ? 'Aprovação' : 'Reprovação'}`}
+                {loading
+                  ? 'Processando...'
+                  : `Confirmar ${acao === 'aprovar' ? 'Aprovação' : 'Reprovação'}`}
               </button>
             </div>
           </div>

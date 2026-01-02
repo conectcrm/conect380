@@ -7,7 +7,7 @@ import { useTicketFilters } from './TicketFilters';
 /**
  * Componente de exemplo mostrando como integrar os novos componentes
  * de atendimento criados na FASE 2.
- * 
+ *
  * Este arquivo serve como referência de implementação e pode ser adaptado
  * para o layout específico do seu sistema.
  */
@@ -89,7 +89,9 @@ const TICKETS_EXEMPLO = [
 
 export const AtendimentoChatExample: React.FC = () => {
   // Estado do ticket ativo
-  const [activeTicketId, setActiveTicketId] = useState<string | null>(TICKETS_EXEMPLO[0]?.id || null);
+  const [activeTicketId, setActiveTicketId] = useState<string | null>(
+    TICKETS_EXEMPLO[0]?.id || null,
+  );
 
   // Estado do painel de contexto
   const [contextoAberto, setContextoAberto] = useState(true);
@@ -98,7 +100,7 @@ export const AtendimentoChatExample: React.FC = () => {
   const { filters, setFilters, clearFilters } = useTicketFilters();
 
   // Ticket selecionado
-  const activeTicket = TICKETS_EXEMPLO.find(t => t.id === activeTicketId) || null;
+  const activeTicket = TICKETS_EXEMPLO.find((t) => t.id === activeTicketId) || null;
 
   // Handlers
   const handleStatusChange = (status: string) => {
@@ -148,9 +150,7 @@ export const AtendimentoChatExample: React.FC = () => {
                 <div className="text-center text-gray-500 py-12">
                   <p className="text-lg mb-2">Chat com {activeTicket.contatoNome}</p>
                   <p className="text-sm">Ticket #{activeTicket.numero}</p>
-                  <p className="text-xs text-gray-400 mt-4">
-                    💡 As mensagens aparecerão aqui
-                  </p>
+                  <p className="text-xs text-gray-400 mt-4">💡 As mensagens aparecerão aqui</p>
                 </div>
               ) : (
                 <div className="text-center text-gray-400 py-12">

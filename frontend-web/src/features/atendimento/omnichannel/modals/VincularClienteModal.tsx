@@ -17,7 +17,7 @@ export const VincularClienteModal: React.FC<VincularClienteModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  contatoAtual
+  contatoAtual,
 }) => {
   const { currentPalette } = useTheme();
   const [busca, setBusca] = useState('');
@@ -27,14 +27,13 @@ export const VincularClienteModal: React.FC<VincularClienteModalProps> = ({
   const clientesMock = [
     { id: '1', nome: 'Empresa ABC Ltda', cnpj: '12.345.678/0001-90', contatos: 5 },
     { id: '2', nome: 'XYZ Comércio', cnpj: '98.765.432/0001-10', contatos: 3 },
-    { id: '3', nome: 'Tech Solutions', cnpj: '11.222.333/0001-44', contatos: 8 }
+    { id: '3', nome: 'Tech Solutions', cnpj: '11.222.333/0001-44', contatos: 8 },
   ];
 
   const clientesFiltrados = busca
-    ? clientesMock.filter(c =>
-      c.nome.toLowerCase().includes(busca.toLowerCase()) ||
-      c.cnpj.includes(busca)
-    )
+    ? clientesMock.filter(
+        (c) => c.nome.toLowerCase().includes(busca.toLowerCase()) || c.cnpj.includes(busca),
+      )
     : clientesMock;
 
   const handleConfirmar = () => {
@@ -99,23 +98,38 @@ export const VincularClienteModal: React.FC<VincularClienteModalProps> = ({
                 <button
                   key={cliente.id}
                   onClick={() => setClienteSelecionado(cliente)}
-                  className={`w-full px-4 py-3 rounded-lg transition-all text-left ${clienteSelecionado?.id === cliente.id
-                    ? 'border-2 shadow-md'
-                    : 'border border-gray-200 hover:border-gray-300'
-                    }`}
+                  className={`w-full px-4 py-3 rounded-lg transition-all text-left ${
+                    clienteSelecionado?.id === cliente.id
+                      ? 'border-2 shadow-md'
+                      : 'border border-gray-200 hover:border-gray-300'
+                  }`}
                   style={{
-                    borderColor: clienteSelecionado?.id === cliente.id ? currentPalette.colors.primary : undefined,
-                    backgroundColor: clienteSelecionado?.id === cliente.id ? `${currentPalette.colors.primary}10` : undefined
+                    borderColor:
+                      clienteSelecionado?.id === cliente.id
+                        ? currentPalette.colors.primary
+                        : undefined,
+                    backgroundColor:
+                      clienteSelecionado?.id === cliente.id
+                        ? `${currentPalette.colors.primary}10`
+                        : undefined,
                   }}
                 >
                   <div className="flex items-center gap-3">
-                    <Building2 className="w-8 h-8" style={{ color: currentPalette.colors.primary }} />
+                    <Building2
+                      className="w-8 h-8"
+                      style={{ color: currentPalette.colors.primary }}
+                    />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-900">{cliente.nome}</p>
-                      <p className="text-xs text-gray-500">{cliente.cnpj} • {cliente.contatos} contatos</p>
+                      <p className="text-xs text-gray-500">
+                        {cliente.cnpj} • {cliente.contatos} contatos
+                      </p>
                     </div>
                     {clienteSelecionado?.id === cliente.id && (
-                      <CheckCircle className="w-5 h-5" style={{ color: currentPalette.colors.primary }} />
+                      <CheckCircle
+                        className="w-5 h-5"
+                        style={{ color: currentPalette.colors.primary }}
+                      />
                     )}
                   </div>
                 </button>

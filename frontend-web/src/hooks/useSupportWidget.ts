@@ -22,7 +22,7 @@ export const useSupportWidget = (): UseSupportWidgetReturn => {
     hasNewMessage: false,
     unreadCount: 0,
     isAgentOnline: true,
-    averageResponseTime: '2 min'
+    averageResponseTime: '2 min',
   });
 
   // Simular status do agente (pode ser conectado via WebSocket)
@@ -32,20 +32,20 @@ export const useSupportWidget = (): UseSupportWidgetReturn => {
       const now = new Date();
       const hour = now.getHours();
       const isBusinessHours = hour >= 8 && hour <= 18;
-      
-      setState(prev => ({
+
+      setState((prev) => ({
         ...prev,
         isAgentOnline: isBusinessHours,
-        averageResponseTime: isBusinessHours ? '2 min' : '15 min'
+        averageResponseTime: isBusinessHours ? '2 min' : '15 min',
       }));
     };
 
     // Verificar status inicial
     checkAgentStatus();
-    
+
     // Verificar a cada 5 minutos
     const interval = setInterval(checkAgentStatus, 5 * 60 * 1000);
-    
+
     return () => clearInterval(interval);
   }, []);
 
@@ -56,77 +56,77 @@ export const useSupportWidget = (): UseSupportWidgetReturn => {
     const simulateNewMessage = () => {
       // 30% de chance de receber uma "nova mensagem" a cada 2 minutos
       if (Math.random() > 0.7) {
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           hasNewMessage: true,
-          unreadCount: prev.unreadCount + 1
+          unreadCount: prev.unreadCount + 1,
         }));
 
         // Remover a notificação após 15 segundos se não for vista
         setTimeout(() => {
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
-            hasNewMessage: false
+            hasNewMessage: false,
           }));
         }, 15000);
       }
     };
 
     const interval = setInterval(simulateNewMessage, 2 * 60 * 1000); // A cada 2 minutos
-    
+
     return () => clearInterval(interval);
   }, [state.isOpen]);
 
   const toggleWidget = useCallback(() => {
-    setState(prev => {
+    setState((prev) => {
       const newIsOpen = !prev.isOpen;
-      
+
       // Se estiver abrindo, marcar mensagens como lidas
       if (newIsOpen) {
         return {
           ...prev,
           isOpen: newIsOpen,
           hasNewMessage: false,
-          unreadCount: 0
+          unreadCount: 0,
         };
       }
-      
+
       return {
         ...prev,
-        isOpen: newIsOpen
+        isOpen: newIsOpen,
       };
     });
   }, []);
 
   const openWidget = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       isOpen: true,
       hasNewMessage: false,
-      unreadCount: 0
+      unreadCount: 0,
     }));
   }, []);
 
   const closeWidget = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
-      isOpen: false
+      isOpen: false,
     }));
   }, []);
 
   const markMessagesAsRead = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       hasNewMessage: false,
-      unreadCount: 0
+      unreadCount: 0,
     }));
   }, []);
 
   const triggerNewMessage = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       hasNewMessage: true,
-      unreadCount: prev.unreadCount + 1
+      unreadCount: prev.unreadCount + 1,
     }));
   }, []);
 
@@ -136,6 +136,6 @@ export const useSupportWidget = (): UseSupportWidgetReturn => {
     openWidget,
     closeWidget,
     markMessagesAsRead,
-    triggerNewMessage
+    triggerNewMessage,
   };
 };

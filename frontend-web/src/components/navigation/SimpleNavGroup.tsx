@@ -20,11 +20,11 @@ interface SimpleNavGroupProps {
 const getColorClasses = (color: string, active: boolean = false) => {
   // Paleta Crevasse aplicada ao sistema
   const crevassePalette = {
-    primary: '#159A9C',      // Teal principal
+    primary: '#159A9C', // Teal principal
     primaryLight: '#DEEFE7', // Verde claro
-    neutral: '#B4BEC9',      // Cinza azulado
-    dark: '#002333',         // Azul escuro
-    white: '#FFFFFF'         // Branco
+    neutral: '#B4BEC9', // Cinza azulado
+    dark: '#002333', // Azul escuro
+    white: '#FFFFFF', // Branco
   };
 
   const baseClasses = {
@@ -33,36 +33,36 @@ const getColorClasses = (color: string, active: boolean = false) => {
       active: active ? 'bg-[#DEEFE7] border-r-2 border-[#159A9C]' : '',
       text: active ? 'text-[#002333]' : 'text-[#002333]',
       icon: active ? 'text-[#159A9C]' : 'text-[#B4BEC9]',
-      badge: 'bg-[#159A9C]'
+      badge: 'bg-[#159A9C]',
     },
     green: {
       hover: 'hover:bg-[#DEEFE7]',
       active: active ? 'bg-[#DEEFE7] border-r-2 border-[#159A9C]' : '',
       text: active ? 'text-[#002333]' : 'text-[#002333]',
       icon: active ? 'text-[#159A9C]' : 'text-[#B4BEC9]',
-      badge: 'bg-[#159A9C]'
+      badge: 'bg-[#159A9C]',
     },
     orange: {
       hover: 'hover:bg-[#DEEFE7]',
       active: active ? 'bg-[#DEEFE7] border-r-2 border-[#159A9C]' : '',
       text: active ? 'text-[#002333]' : 'text-[#002333]',
       icon: active ? 'text-[#159A9C]' : 'text-[#B4BEC9]',
-      badge: 'bg-[#159A9C]'
+      badge: 'bg-[#159A9C]',
     },
     purple: {
       hover: 'hover:bg-[#DEEFE7]',
       active: active ? 'bg-[#DEEFE7] border-r-2 border-[#159A9C]' : '',
       text: active ? 'text-[#002333]' : 'text-[#002333]',
       icon: active ? 'text-[#159A9C]' : 'text-[#B4BEC9]',
-      badge: 'bg-[#159A9C]'
+      badge: 'bg-[#159A9C]',
     },
     red: {
       hover: 'hover:bg-[#DEEFE7]',
       active: active ? 'bg-[#DEEFE7] border-r-2 border-[#159A9C]' : '',
       text: active ? 'text-[#002333]' : 'text-[#002333]',
       icon: active ? 'text-[#159A9C]' : 'text-[#B4BEC9]',
-      badge: 'bg-[#159A9C]'
-    }
+      badge: 'bg-[#159A9C]',
+    },
   };
 
   return baseClasses[color as keyof typeof baseClasses] || baseClasses.blue;
@@ -100,9 +100,7 @@ const SimpleNavGroup: React.FC<SimpleNavGroupProps> = ({ nuclei, sidebarCollapse
                 <div className="flex items-center min-w-0 flex-1">
                   <Icon className="menu-icon-improved" />
                   <div className="flex-1 min-w-0">
-                    <div className="menu-text-improved">
-                      {nucleus.title}
-                    </div>
+                    <div className="menu-text-improved">{nucleus.title}</div>
                   </div>
                 </div>
 

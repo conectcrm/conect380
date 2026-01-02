@@ -1,7 +1,22 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useWebSocket } from './useWebSocket';
+import { resolveSocketBaseUrl } from '../utils/network';
 
-const WEBSOCKET_URL = process.env.REACT_APP_WEBSOCKET_URL || 'http://localhost:3001/atendimento';
+const SOCKET_BASE_URL = resolveSocketBaseUrl({
+  envUrl: process.env.REACT_APP_WEBSOCKET_URL || process.env.REACT_APP_WS_URL,
+  onEnvIgnored: ({ envUrl, currentHost }) => {
+    console.warn(
+      '⚠️ [Chat] Ignorando URL de WebSocket local em acesso via rede:',
+      envUrl,
+      '→ host atual',
+      currentHost,
+    );
+  },
+});
+
+const WEBSOCKET_URL = SOCKET_BASE_URL.endsWith('/')
+  ? `${SOCKET_BASE_URL}atendimento`
+  : `${SOCKET_BASE_URL}/atendimento`;
 
 interface Mensagem {
   id: string;
@@ -51,16 +66,11 @@ export function useChat(options: UseChatOptions) {
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [atendentesOnline, setAtendentesOnline] = useState<Atendente[]>([]);
-  const [digitando, setDigitando] = useState<{ ticketId: string; usuarioNome?: string } | null>(null);
+  const [digitando, setDigitando] = useState<{ ticketId: string; usuarioNome?: string } | null>(
+    null,
+  );
 
-  const {
-    connected,
-    connecting,
-    error,
-    emit,
-    on,
-    off,
-  } = useWebSocket({
+  const { connected, connecting, error, emit, on, off } = useWebSocket({
     url: WEBSOCKET_URL,
     token,
     autoConnect: true,
@@ -80,27 +90,39 @@ export function useChat(options: UseChatOptions) {
   });
 
   // Entrar na sala de um ticket
-  const entrarTicket = useCallback((id: string) => {
-    emit('ticket:entrar', { ticketId: id });
-    console.log('[Chat] Entrando no ticket:', id);
-  }, [emit]);
+  const entrarTicket = useCallback(
+    (id: string) => {
+      emit('ticket:entrar', { ticketId: id });
+      console.log('[Chat] Entrando no ticket:', id);
+    },
+    [emit],
+  );
 
   // Sair da sala de um ticket
-  const sairTicket = useCallback((id: string) => {
-    emit('ticket:sair', { ticketId: id });
-    console.log('[Chat] Saindo do ticket:', id);
-  }, [emit]);
+  const sairTicket = useCallback(
+    (id: string) => {
+      emit('ticket:sair', { ticketId: id });
+      console.log('[Chat] Saindo do ticket:', id);
+    },
+    [emit],
+  );
 
   // Emitir evento "digitando"
-  const emitirDigitando = useCallback((id: string) => {
-    emit('mensagem:digitando', { ticketId: id });
-  }, [emit]);
+  const emitirDigitando = useCallback(
+    (id: string) => {
+      emit('mensagem:digitando', { ticketId: id });
+    },
+    [emit],
+  );
 
   // Alterar status do atendente
-  const alterarStatus = useCallback((status: 'online' | 'ocupado' | 'ausente' | 'offline') => {
-    emit('atendente:status', { status });
-    console.log('[Chat] Status alterado para:', status);
-  }, [emit]);
+  const alterarStatus = useCallback(
+    (status: 'online' | 'ocupado' | 'ausente' | 'offline') => {
+      emit('atendente:status', { status });
+      console.log('[Chat] Status alterado para:', status);
+    },
+    [emit],
+  );
 
   // Listeners de eventos
   useEffect(() => {
@@ -114,12 +136,15 @@ export function useChat(options: UseChatOptions) {
     });
 
     // Alguém está digitando
-    const unsubDigitando = on('mensagem:digitando', (data: { ticketId: string; usuarioNome?: string }) => {
-      console.log('[Chat] Digitando:', data);
-      setDigitando(data);
-      // Limpar após 3 segundos
-      setTimeout(() => setDigitando(null), 3000);
-    });
+    const unsubDigitando = on(
+      'mensagem:digitando',
+      (data: { ticketId: string; usuarioNome?: string }) => {
+        console.log('[Chat] Digitando:', data);
+        setDigitando(data);
+        // Limpar após 3 segundos
+        setTimeout(() => setDigitando(null), 3000);
+      },
+    );
 
     // Mensagem não atribuída
     const unsubNaoAtribuida = on('mensagem:nao-atribuida', (data: any) => {
@@ -143,9 +168,7 @@ export function useChat(options: UseChatOptions) {
     // Ticket atualizado
     const unsubTicketAtualizado = on('ticket:atualizado', (data: any) => {
       console.log('[Chat] Ticket atualizado:', data);
-      setTickets((prev) =>
-        prev.map((t) => (t.id === data.ticketId ? { ...t, ...data } : t))
-      );
+      setTickets((prev) => prev.map((t) => (t.id === data.ticketId ? { ...t, ...data } : t)));
       onTicketAtualizado?.(data);
     });
 
@@ -158,7 +181,10 @@ export function useChat(options: UseChatOptions) {
     // Atendente online
     const unsubAtendenteOnline = on('atendente:online', (data: Atendente) => {
       console.log('[Chat] Atendente online:', data);
-      setAtendentesOnline((prev) => [...prev.filter((a) => a.atendenteId !== data.atendenteId), data]);
+      setAtendentesOnline((prev) => [
+        ...prev.filter((a) => a.atendenteId !== data.atendenteId),
+        data,
+      ]);
     });
 
     // Atendente offline
@@ -171,7 +197,7 @@ export function useChat(options: UseChatOptions) {
     const unsubAtendenteStatus = on('atendente:status', (data: Atendente) => {
       console.log('[Chat] Status do atendente:', data);
       setAtendentesOnline((prev) =>
-        prev.map((a) => (a.atendenteId === data.atendenteId ? { ...a, status: data.status } : a))
+        prev.map((a) => (a.atendenteId === data.atendenteId ? { ...a, status: data.status } : a)),
       );
     });
 

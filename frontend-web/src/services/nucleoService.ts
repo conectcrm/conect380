@@ -1,10 +1,6 @@
 import api from './api';
 
-export type TipoDistribuicao =
-  | 'round_robin'
-  | 'load_balancing'
-  | 'skill_based'
-  | 'manual';
+export type TipoDistribuicao = 'round_robin' | 'load_balancing' | 'skill_based' | 'manual';
 
 export interface Nucleo {
   id: string;

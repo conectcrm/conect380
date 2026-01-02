@@ -89,8 +89,8 @@ const DashboardDistribuicaoPage: React.FC = () => {
     const labels: Record<AlgoritmoDistribuicao, string> = {
       'round-robin': 'Round-Robin',
       'menor-carga': 'Menor Carga',
-      'skills': 'Skills',
-      'hibrido': 'Híbrido',
+      skills: 'Skills',
+      hibrido: 'Híbrido',
     };
     return labels[algoritmo];
   };
@@ -99,8 +99,8 @@ const DashboardDistribuicaoPage: React.FC = () => {
     const colors: Record<AlgoritmoDistribuicao, string> = {
       'round-robin': 'bg-blue-500',
       'menor-carga': 'bg-green-500',
-      'skills': 'bg-purple-500',
-      'hibrido': 'bg-[#159A9C]',
+      skills: 'bg-purple-500',
+      hibrido: 'bg-[#159A9C]',
     };
     return colors[algoritmo];
   };
@@ -186,9 +186,7 @@ const DashboardDistribuicaoPage: React.FC = () => {
                   <p className="mt-2 text-3xl font-bold text-[#002333]">
                     {loading ? '...' : metricas?.distribuicoesRecentes.toLocaleString('pt-BR') || 0}
                   </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    Distribuições nas últimas 24h
-                  </p>
+                  <p className="mt-3 text-sm text-[#002333]/70">Distribuições nas últimas 24h</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-blue-500/10 flex items-center justify-center shadow-sm">
                   <Activity className="h-6 w-6 text-blue-600" />
@@ -206,9 +204,7 @@ const DashboardDistribuicaoPage: React.FC = () => {
                   <p className="mt-2 text-3xl font-bold text-[#002333]">
                     {loading ? '...' : metricas?.totalRealocacoes.toLocaleString('pt-BR') || 0}
                   </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    Tickets realocados manualmente
-                  </p>
+                  <p className="mt-3 text-sm text-[#002333]/70">Tickets realocados manualmente</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
                   <TrendingUp className="h-6 w-6 text-yellow-600" />
@@ -228,14 +224,12 @@ const DashboardDistribuicaoPage: React.FC = () => {
                       ? '...'
                       : metricas
                         ? `${calcularPorcentagem(
-                          metricas.totalRealocacoes,
-                          metricas.totalDistribuicoes,
-                        )}%`
+                            metricas.totalRealocacoes,
+                            metricas.totalDistribuicoes,
+                          )}%`
                         : '0%'}
                   </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    Percentual de realocações
-                  </p>
+                  <p className="mt-3 text-sm text-[#002333]/70">Percentual de realocações</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-purple-500/10 flex items-center justify-center shadow-sm">
                   <Users className="h-6 w-6 text-purple-600" />
@@ -256,9 +250,7 @@ const DashboardDistribuicaoPage: React.FC = () => {
                   <p className="mt-2 text-3xl font-bold text-[#002333]">
                     {loading ? '...' : `${metricsPerformance?.cache.taxaHitPct.toFixed(1) || 0}%`}
                   </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    Taxa de acerto do cache
-                  </p>
+                  <p className="mt-3 text-sm text-[#002333]/70">Taxa de acerto do cache</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
                   <Activity className="h-6 w-6 text-green-600" />
@@ -274,11 +266,11 @@ const DashboardDistribuicaoPage: React.FC = () => {
                     Tempo Médio
                   </p>
                   <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {loading ? '...' : `${metricsPerformance?.performance.tempoMedioMs.toFixed(0) || 0}ms`}
+                    {loading
+                      ? '...'
+                      : `${metricsPerformance?.performance.tempoMedioMs.toFixed(0) || 0}ms`}
                   </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    Tempo médio de distribuição
-                  </p>
+                  <p className="mt-3 text-sm text-[#002333]/70">Tempo médio de distribuição</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-blue-500/10 flex items-center justify-center shadow-sm">
                   <Clock className="h-6 w-6 text-blue-600" />
@@ -294,11 +286,11 @@ const DashboardDistribuicaoPage: React.FC = () => {
                     Taxa de Sucesso
                   </p>
                   <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {loading ? '...' : `${metricsPerformance?.distribuicoes.taxaSucessoPct.toFixed(1) || 0}%`}
+                    {loading
+                      ? '...'
+                      : `${metricsPerformance?.distribuicoes.taxaSucessoPct.toFixed(1) || 0}%`}
                   </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    Distribuições bem-sucedidas
-                  </p>
+                  <p className="mt-3 text-sm text-[#002333]/70">Distribuições bem-sucedidas</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
                   <TrendingUp className="h-6 w-6 text-green-600" />
@@ -317,7 +309,7 @@ const DashboardDistribuicaoPage: React.FC = () => {
                     {loading
                       ? '...'
                       : (metricsPerformance?.cache.configsCacheadas || 0) +
-                      (metricsPerformance?.cache.skillsCacheadas || 0)}
+                        (metricsPerformance?.cache.skillsCacheadas || 0)}
                   </p>
                   <p className="mt-3 text-sm text-[#002333]/70">
                     Configs ({metricsPerformance?.cache.configsCacheadas || 0}) + Skills (
@@ -435,14 +427,15 @@ const DashboardDistribuicaoPage: React.FC = () => {
                           </td>
                           <td className="py-3 px-4">
                             <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${log.algoritmo === 'round-robin'
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                log.algoritmo === 'round-robin'
                                   ? 'bg-blue-500/10 text-blue-600'
                                   : log.algoritmo === 'menor-carga'
                                     ? 'bg-green-500/10 text-green-600'
                                     : log.algoritmo === 'skills'
                                       ? 'bg-purple-500/10 text-purple-600'
                                       : 'bg-[#159A9C]/10 text-[#159A9C]'
-                                }`}
+                              }`}
                             >
                               {getAlgoritmoLabel(log.algoritmo)}
                             </span>

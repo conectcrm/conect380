@@ -3,8 +3,17 @@ import { useI18n } from '../../contexts/I18nContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { KPICard } from '../../components/common/KPICard';
 import {
-  HeadphonesIcon, MessageSquare, Clock, CheckSquare, Star,
-  Users, Phone, Mail, AlertTriangle, TrendingUp, ArrowUp
+  HeadphonesIcon,
+  MessageSquare,
+  Clock,
+  CheckSquare,
+  Star,
+  Users,
+  Phone,
+  Mail,
+  AlertTriangle,
+  TrendingUp,
+  ArrowUp,
 } from 'lucide-react';
 
 const SuporteDashboard: React.FC = () => {
@@ -17,14 +26,14 @@ const SuporteDashboard: React.FC = () => {
       abertos: 18,
       resolvidos: 142,
       pendentes: 7,
-      satisfacao: 4.6
+      satisfacao: 4.6,
     },
     atendimento: {
       tempoMedio: 12,
       primeiroContato: 3,
       resolucao: 24,
-      sla: 96.5
-    }
+      sla: 96.5,
+    },
   };
 
   return (
@@ -38,17 +47,19 @@ const SuporteDashboard: React.FC = () => {
                 <HeadphonesIcon className="h-8 w-8 mr-3 text-indigo-600" />
                 Dashboard de Suporte
               </h1>
-              <p className="mt-2 text-indigo-700">
-                Atendimento ao cliente e gestão de tickets
-              </p>
+              <p className="mt-2 text-indigo-700">Atendimento ao cliente e gestão de tickets</p>
             </div>
             <div className="mt-4 sm:mt-0 flex items-center space-x-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-indigo-900">{suporteData.tickets.abertos}</div>
+                <div className="text-2xl font-bold text-indigo-900">
+                  {suporteData.tickets.abertos}
+                </div>
                 <div className="text-sm text-indigo-600">Tickets Abertos</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-indigo-900">{suporteData.tickets.satisfacao}</div>
+                <div className="text-2xl font-bold text-indigo-900">
+                  {suporteData.tickets.satisfacao}
+                </div>
                 <div className="text-sm text-indigo-600">Satisfação</div>
               </div>
             </div>
@@ -64,7 +75,7 @@ const SuporteDashboard: React.FC = () => {
             trend={{
               value: 12,
               isPositive: true,
-              label: "vs semana anterior"
+              label: 'vs semana anterior',
             }}
           />
 
@@ -75,7 +86,7 @@ const SuporteDashboard: React.FC = () => {
             trend={{
               value: 5,
               isPositive: false,
-              label: "vs semana anterior"
+              label: 'vs semana anterior',
             }}
           />
 
@@ -86,7 +97,7 @@ const SuporteDashboard: React.FC = () => {
             trend={{
               value: 0.2,
               isPositive: true,
-              label: "vs mês anterior"
+              label: 'vs mês anterior',
             }}
           />
 
@@ -97,7 +108,7 @@ const SuporteDashboard: React.FC = () => {
             trend={{
               value: 2,
               isPositive: true,
-              label: "vs mês anterior"
+              label: 'vs mês anterior',
             }}
           />
         </div>
@@ -112,8 +123,8 @@ const SuporteDashboard: React.FC = () => {
             Este dashboard será expandido com funcionalidades completas de atendimento ao cliente.
           </p>
           <div className="text-sm text-gray-500">
-            Funcionalidades planejadas: Chat ao vivo, Base de conhecimento,
-            Análise de satisfação, Relatórios de performance
+            Funcionalidades planejadas: Chat ao vivo, Base de conhecimento, Análise de satisfação,
+            Relatórios de performance
           </div>
         </div>
       </div>

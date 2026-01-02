@@ -1,0 +1,90 @@
+# ========================================================
+# 📊 Observability Stack - Prometheus + Grafana + Jaeger
+# ========================================================
+#
+# Stack completa para observabilidade:
+# - Prometheus: Coleta e armazena métricas
+# - Grafana: Visualização de métricas e dashboards
+# - Jaeger: Distributed tracing
+#
+# Uso:
+#   docker-compose -f docker-compose.observability.yml up -d
+#
+# Acessos:
+#   Grafana:    http://localhost:3000 (admin/admin)
+#   Prometheus: http://localhost:9090
+#   Jaeger UI:  http://localhost:16686
+
+version: '3.8'
+
+services:
+  # ========================================
+  # PROMETHEUS - Coleta de Métricas
+  # ========================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: conectcrm-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - conectcrm-network
+    restart: unless-stopped
+
+  # ========================================
+  # GRAFANA - Visualização de Métricas
+  # ========================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: conectcrm-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - conectcrm-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # ========================================
+  # JAEGER - Distributed Tracing
+  # ========================================
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: conectcrm-jaeger
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "14268:14268" # HTTP collector
+      - "6831:6831/udp" # UDP collector (thrift compact)
+      - "6832:6832/udp" # UDP collector (thrift binary)
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - conectcrm-network
+    restart: unless-stopped
+
+networks:
+  conectcrm-network:
+    driver: bridge
+
+volumes:
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local

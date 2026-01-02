@@ -52,7 +52,9 @@ const ModalAcaoLote: React.FC<ModalAcaoLoteProps> = ({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className={`px-6 py-4 border-b bg-${corPrincipal}-50 flex items-center justify-between`}>
+        <div
+          className={`px-6 py-4 border-b bg-${corPrincipal}-50 flex items-center justify-between`}
+        >
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg bg-${corPrincipal}-100`}>
               <Icone className={`h-6 w-6 text-${corPrincipal}-600`} />
@@ -71,7 +73,9 @@ const ModalAcaoLote: React.FC<ModalAcaoLoteProps> = ({
         {/* Conteúdo */}
         <div className="p-6 space-y-6">
           {/* Alerta */}
-          <div className={`p-4 rounded-lg bg-${corPrincipal}-50 border border-${corPrincipal}-200 flex items-start gap-3`}>
+          <div
+            className={`p-4 rounded-lg bg-${corPrincipal}-50 border border-${corPrincipal}-200 flex items-start gap-3`}
+          >
             <AlertCircle className={`h-5 w-5 text-${corPrincipal}-600 flex-shrink-0 mt-0.5`} />
             <div>
               <p className="text-sm font-semibold text-[#002333] mb-1">
@@ -112,9 +116,7 @@ const ModalAcaoLote: React.FC<ModalAcaoLoteProps> = ({
               disabled={processando}
               className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-${corPrincipal}-500 focus:border-${corPrincipal}-500 disabled:opacity-50 disabled:cursor-not-allowed resize-none`}
             />
-            <p className="text-xs text-gray-500 mt-1">
-              {justificativa.length} / 1000 caracteres
-            </p>
+            <p className="text-xs text-gray-500 mt-1">{justificativa.length} / 1000 caracteres</p>
           </div>
 
           {/* Mensagem de Erro */}

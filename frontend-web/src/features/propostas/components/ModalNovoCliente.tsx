@@ -48,21 +48,52 @@ const clienteSchema = yup.object({
   cidade: yup.string(),
   estado: yup.string(),
   cep: yup.string(),
-  observacoes: yup.string().max(500, 'Observações não podem ter mais de 500 caracteres')
+  observacoes: yup.string().max(500, 'Observações não podem ter mais de 500 caracteres'),
 });
 
 const estados = [
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG',
-  'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+  'AC',
+  'AL',
+  'AP',
+  'AM',
+  'BA',
+  'CE',
+  'DF',
+  'ES',
+  'GO',
+  'MA',
+  'MT',
+  'MS',
+  'MG',
+  'PA',
+  'PB',
+  'PR',
+  'PE',
+  'PI',
+  'RJ',
+  'RN',
+  'RS',
+  'RO',
+  'RR',
+  'SC',
+  'SP',
+  'SE',
+  'TO',
 ];
 
 export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
   isOpen,
   onClose,
   onClienteCriado,
-  isLoading = false
+  isLoading = false,
 }) => {
-  const { control, handleSubmit, watch, reset, formState: { errors } } = useForm<ClienteFormData>({
+  const {
+    control,
+    handleSubmit,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm<ClienteFormData>({
     resolver: yupResolver(clienteSchema),
     defaultValues: {
       nome: '',
@@ -74,8 +105,8 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
       cidade: '',
       estado: '',
       cep: '',
-      observacoes: ''
-    }
+      observacoes: '',
+    },
   });
 
   const tipoPessoa = watch('tipoPessoa');
@@ -92,13 +123,12 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
         cidade: data.cidade,
         estado: data.estado,
         cep: data.cep,
-        tipoPessoa: data.tipoPessoa
+        tipoPessoa: data.tipoPessoa,
       };
 
       onClienteCriado(novoCliente);
       reset();
       onClose();
-
     } catch (error) {
       console.error('Erro ao criar cliente:', error);
       toast.error('Erro ao criar cliente. Tente novamente.');
@@ -121,10 +151,7 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
               <p className="text-sm text-gray-600">Adicione um novo cliente à proposta</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X className="h-6 w-6" />
           </button>
         </div>
@@ -133,9 +160,7 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
           {/* Tipo de Pessoa */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Tipo de Pessoa
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-3">Tipo de Pessoa</label>
             <div className="flex space-x-4">
               <Controller
                 name="tipoPessoa"
@@ -172,7 +197,6 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
 
           {/* Grid de campos */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
             {/* Nome */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -186,13 +210,13 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
                     {...field}
                     type="text"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder={tipoPessoa === 'fisica' ? 'Digite o nome completo' : 'Digite a razão social'}
+                    placeholder={
+                      tipoPessoa === 'fisica' ? 'Digite o nome completo' : 'Digite a razão social'
+                    }
                   />
                 )}
               />
-              {errors.nome && (
-                <p className="text-red-500 text-sm mt-1">{errors.nome.message}</p>
-              )}
+              {errors.nome && <p className="text-red-500 text-sm mt-1">{errors.nome.message}</p>}
             </div>
 
             {/* Documento */}
@@ -219,9 +243,7 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
               <Controller
                 name="email"
                 control={control}
@@ -237,16 +259,12 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
                   </div>
                 )}
               />
-              {errors.email && (
-                <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>
-              )}
+              {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>}
             </div>
 
             {/* Telefone */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Telefone *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Telefone *</label>
               <Controller
                 name="telefone"
                 control={control}
@@ -269,9 +287,7 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
 
             {/* Endereço */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Endereço
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Endereço</label>
               <Controller
                 name="endereco"
                 control={control}
@@ -291,9 +307,7 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
 
             {/* Cidade */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Cidade
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
               <Controller
                 name="cidade"
                 control={control}
@@ -310,9 +324,7 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
 
             {/* Estado */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Estado
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
               <Controller
                 name="estado"
                 control={control}
@@ -334,9 +346,7 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
 
             {/* CEP */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                CEP
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
               <Controller
                 name="cep"
                 control={control}
@@ -353,9 +363,7 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
 
             {/* Observações */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Observações
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
               <Controller
                 name="observacoes"
                 control={control}

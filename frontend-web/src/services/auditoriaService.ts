@@ -68,7 +68,7 @@ class AuditoriaService {
         userAgent: navigator.userAgent,
         timestamp: config.timestamp,
         sessionId: this.getSessionId(),
-        metadata: config.metadata
+        metadata: config.metadata,
       };
 
       // Adicionar à queue
@@ -78,7 +78,6 @@ class AuditoriaService {
       if (this.auditQueue.length >= this.BATCH_SIZE) {
         await this.flushAuditQueue();
       }
-
     } catch (error) {
       console.error('Erro ao auditar ação:', error);
       // Não bloquear a operação principal por erro de auditoria
@@ -95,21 +94,21 @@ class AuditoriaService {
       metadata: {
         success,
         reason,
-        loginTime: new Date().toISOString()
-      }
+        loginTime: new Date().toISOString(),
+      },
     });
   }
 
   async auditarLogout(userId: string): Promise<void> {
     await this.auditarAcao({
       action: 'LOGOUT',
-      entityType: 'USER_SESSION', 
+      entityType: 'USER_SESSION',
       entityId: userId,
       userId,
       timestamp: new Date(),
       metadata: {
-        logoutTime: new Date().toISOString()
-      }
+        logoutTime: new Date().toISOString(),
+      },
     });
   }
 
@@ -118,7 +117,7 @@ class AuditoriaService {
     entityType: string,
     formato: string,
     quantidade: number,
-    filtros?: Record<string, any>
+    filtros?: Record<string, any>,
   ): Promise<void> {
     await this.auditarAcao({
       action: 'EXPORT',
@@ -130,8 +129,8 @@ class AuditoriaService {
         formato,
         quantidade,
         filtros,
-        exportTime: new Date().toISOString()
-      }
+        exportTime: new Date().toISOString(),
+      },
     });
   }
 
@@ -139,11 +138,11 @@ class AuditoriaService {
     userId: string,
     entityType: string,
     entityId: string,
-    accessType: 'VIEW' | 'LIST' | 'SEARCH' = 'VIEW'
+    accessType: 'VIEW' | 'LIST' | 'SEARCH' = 'VIEW',
   ): Promise<void> {
     // Só auditar leituras de dados sensíveis
     const sensitiveEntities = ['USER', 'FINANCIAL', 'CLIENTE', 'CONTRATO'];
-    
+
     if (sensitiveEntities.includes(entityType.toUpperCase())) {
       await this.auditarAcao({
         action: 'READ',
@@ -153,8 +152,8 @@ class AuditoriaService {
         timestamp: new Date(),
         metadata: {
           accessType,
-          accessTime: new Date().toISOString()
-        }
+          accessTime: new Date().toISOString(),
+        },
       });
     }
   }
@@ -168,12 +167,11 @@ class AuditoriaService {
 
     try {
       const batch = this.auditQueue.splice(0, this.BATCH_SIZE);
-      
-      await this.sendAuditBatch(batch);
 
+      await this.sendAuditBatch(batch);
     } catch (error) {
       console.error('Erro ao processar batch de auditoria:', error);
-      
+
       // Recolocar itens na queue em caso de erro
       this.auditQueue.unshift(...this.auditQueue);
     } finally {
@@ -187,15 +185,14 @@ class AuditoriaService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
+          Authorization: `Bearer ${this.getAuthToken()}`,
         },
-        body: JSON.stringify({ logs })
+        body: JSON.stringify({ logs }),
       });
 
       if (!response.ok) {
         throw new Error(`Erro HTTP: ${response.status}`);
       }
-
     } catch (error) {
       // Tentar fallback para logs individuais
       for (const log of logs) {
@@ -213,9 +210,9 @@ class AuditoriaService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.getAuthToken()}`
+        Authorization: `Bearer ${this.getAuthToken()}`,
       },
-      body: JSON.stringify(log)
+      body: JSON.stringify(log),
     });
   }
 
@@ -244,7 +241,7 @@ class AuditoriaService {
 
   private extractNewValues(changes?: Record<string, any>): Record<string, any> | undefined {
     if (!changes) return undefined;
-    
+
     // Extrair apenas os novos valores (assumindo que changes contém { field: newValue })
     return changes;
   }
@@ -261,7 +258,7 @@ class AuditoriaService {
     limit?: number;
   }): Promise<{ logs: AuditLog[]; total: number }> {
     const queryParams = new URLSearchParams();
-    
+
     Object.entries(filtros).forEach(([key, value]) => {
       if (value !== undefined) {
         queryParams.append(key, value.toString());
@@ -270,8 +267,8 @@ class AuditoriaService {
 
     const response = await fetch(`/api/auditoria?${queryParams}`, {
       headers: {
-        'Authorization': `Bearer ${this.getAuthToken()}`
-      }
+        Authorization: `Bearer ${this.getAuthToken()}`,
+      },
     });
 
     return response.json();
@@ -289,9 +286,9 @@ class AuditoriaService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.getAuthToken()}`
+        Authorization: `Bearer ${this.getAuthToken()}`,
       },
-      body: JSON.stringify(filtros)
+      body: JSON.stringify(filtros),
     });
 
     return response.blob();
@@ -306,7 +303,11 @@ export async function auditarAcao(config: AuditConfig): Promise<void> {
   return auditoriaService.auditarAcao(config);
 }
 
-export async function auditarLogin(userId: string, success: boolean, reason?: string): Promise<void> {
+export async function auditarLogin(
+  userId: string,
+  success: boolean,
+  reason?: string,
+): Promise<void> {
   return auditoriaService.auditarLogin(userId, success, reason);
 }
 
@@ -319,7 +320,7 @@ export async function auditarExportacao(
   entityType: string,
   formato: string,
   quantidade: number,
-  filtros?: Record<string, any>
+  filtros?: Record<string, any>,
 ): Promise<void> {
   return auditoriaService.auditarExportacao(userId, entityType, formato, quantidade, filtros);
 }
@@ -328,7 +329,7 @@ export async function auditarLeitura(
   userId: string,
   entityType: string,
   entityId: string,
-  accessType: 'VIEW' | 'LIST' | 'SEARCH' = 'VIEW'
+  accessType: 'VIEW' | 'LIST' | 'SEARCH' = 'VIEW',
 ): Promise<void> {
   return auditoriaService.auditarLeitura(userId, entityType, entityId, accessType);
 }

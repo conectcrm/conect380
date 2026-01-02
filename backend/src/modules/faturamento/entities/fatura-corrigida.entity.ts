@@ -14,6 +14,7 @@ import { User } from '../../users/user.entity';
 import { Cliente } from '../../clientes/cliente.entity';
 import { ItemFatura } from './item-fatura.entity';
 import { Pagamento } from './pagamento.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 export enum StatusFatura {
   PENDENTE = 'pendente',
@@ -47,6 +48,13 @@ export enum FormaPagamento {
 export class Fatura {
   @PrimaryGeneratedColumn()
   id: number;
+
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column({ unique: true })
   numero: string;

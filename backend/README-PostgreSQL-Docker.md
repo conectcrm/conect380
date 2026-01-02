@@ -28,7 +28,7 @@ docker-compose down
 
 **pgAdmin (Interface Web):**
 - URL: http://localhost:5050
-- Email: `admin@conectcrm.com`
+- Email: `admin@conectsuite.com.br`
 - Senha: `admin123`
 
 ### 🛠️ Scripts Úteis

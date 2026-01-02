@@ -25,60 +25,60 @@ const TIPOS_CONFIGURACAO: Record<string, TipoConfig> = {
     label: 'Produto',
     cor: 'text-gray-600',
     corFundo: 'bg-gray-100',
-    descricao: 'Produto físico'
+    descricao: 'Produto físico',
   },
   servico: {
     icon: Wrench,
     label: 'Serviço',
     cor: 'text-blue-600',
     corFundo: 'bg-blue-100',
-    descricao: 'Serviço prestado'
+    descricao: 'Serviço prestado',
   },
   licenca: {
     icon: Shield,
     label: 'Licença',
     cor: 'text-purple-600',
     corFundo: 'bg-purple-100',
-    descricao: 'Software - Licença'
+    descricao: 'Software - Licença',
   },
   modulo: {
     icon: Monitor,
     label: 'Módulo',
     cor: 'text-indigo-600',
     corFundo: 'bg-indigo-100',
-    descricao: 'Software - Módulo'
+    descricao: 'Software - Módulo',
   },
   aplicativo: {
     icon: Smartphone,
     label: 'Aplicativo',
     cor: 'text-green-600',
     corFundo: 'bg-green-100',
-    descricao: 'Software - Aplicativo'
-  }
+    descricao: 'Software - Aplicativo',
+  },
 };
 
 const TAMANHOS = {
   sm: {
     badge: 'px-2 py-1 text-xs',
     icon: 'w-3 h-3',
-    gap: 'gap-1'
+    gap: 'gap-1',
   },
   md: {
     badge: 'px-3 py-1 text-sm',
     icon: 'w-4 h-4',
-    gap: 'gap-1.5'
+    gap: 'gap-1.5',
   },
   lg: {
     badge: 'px-4 py-2 text-base',
     icon: 'w-5 h-5',
-    gap: 'gap-2'
-  }
+    gap: 'gap-2',
+  },
 };
 
 export const BadgeProdutoSoftware: React.FC<BadgeProdutoSoftwareProps> = ({
   tipoItem,
   tamanho = 'md',
-  showLabel = true
+  showLabel = true,
 }) => {
   const config = TIPOS_CONFIGURACAO[tipoItem] || TIPOS_CONFIGURACAO.produto;
   const tamanhoConfig = TAMANHOS[tamanho];
@@ -98,13 +98,9 @@ export const BadgeProdutoSoftware: React.FC<BadgeProdutoSoftwareProps> = ({
       title={config.descricao}
     >
       <IconComponent className={tamanhoConfig.icon} />
-      {showLabel && (
-        <span>{config.label}</span>
-      )}
+      {showLabel && <span>{config.label}</span>}
       {isSoftware && (
-        <span className="ml-1 text-xs bg-purple-200 text-purple-700 px-1 rounded">
-          SW
-        </span>
+        <span className="ml-1 text-xs bg-purple-200 text-purple-700 px-1 rounded">SW</span>
       )}
     </span>
   );
@@ -114,11 +110,11 @@ export const BadgeProdutoSoftware: React.FC<BadgeProdutoSoftwareProps> = ({
 export const useTipoProdutoInfo = (tipoItem: string) => {
   const config = TIPOS_CONFIGURACAO[tipoItem] || TIPOS_CONFIGURACAO.produto;
   const isSoftware = ['licenca', 'modulo', 'aplicativo'].includes(tipoItem);
-  
+
   return {
     ...config,
     isSoftware,
-    categoria: isSoftware ? 'Software' : 'Físico'
+    categoria: isSoftware ? 'Software' : 'Físico',
   };
 };
 
@@ -150,7 +146,7 @@ interface ItemProdutoProps {
 
 const ItemProduto: React.FC<ItemProdutoProps> = ({ produto, onProdutoClick }) => {
   const { isSoftware } = useTipoProdutoInfo(produto.tipoItem);
-  
+
   return (
     <div
       key={produto.id}
@@ -179,19 +175,18 @@ const ItemProduto: React.FC<ItemProdutoProps> = ({ produto, onProdutoClick }) =>
             )}
           </div>
         </div>
-        
+
         {produto.precoUnitario && (
           <div className="text-right">
             <p className="font-semibold text-gray-900">
-              R$ {produto.precoUnitario.toLocaleString('pt-BR', {
+              R${' '}
+              {produto.precoUnitario.toLocaleString('pt-BR', {
                 minimumFractionDigits: 2,
-                maximumFractionDigits: 2
+                maximumFractionDigits: 2,
               })}
             </p>
             {isSoftware && produto.periodicidadeLicenca && (
-              <p className="text-xs text-gray-500">
-                por {produto.periodicidadeLicenca}
-              </p>
+              <p className="text-xs text-gray-500">por {produto.periodicidadeLicenca}</p>
             )}
           </div>
         )}
@@ -202,16 +197,12 @@ const ItemProduto: React.FC<ItemProdutoProps> = ({ produto, onProdutoClick }) =>
 
 export const ListaProdutosBadges: React.FC<ListaProdutosBadgesProps> = ({
   produtos,
-  onProdutoClick
+  onProdutoClick,
 }) => {
   return (
     <div className="space-y-2">
       {produtos.map((produto) => (
-        <ItemProduto
-          key={produto.id}
-          produto={produto}
-          onProdutoClick={onProdutoClick}
-        />
+        <ItemProduto key={produto.id} produto={produto} onProdutoClick={onProdutoClick} />
       ))}
     </div>
   );

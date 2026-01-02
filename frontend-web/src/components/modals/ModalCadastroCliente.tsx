@@ -18,33 +18,8 @@ import {
   Clock,
   Eye,
   EyeOff,
-  Loader2
+  Loader2,
 } from 'lucide-react';
-
-// Interface para os dados do formulário
-interface ClienteFormData {
-  // Dados Básicos
-  nome: string;
-  email: string;
-  telefone: string;
-  tipo: 'pessoa_fisica' | 'pessoa_juridica';
-  cpf?: string;
-  cnpj?: string;
-  status: 'cliente' | 'lead' | 'prospect' | 'inativo';
-
-  // Endereço
-  cep: string;
-  logradouro: string;
-  numero: string;
-  complemento?: string;
-  bairro: string;
-  cidade: string;
-  estado: string;
-
-  // Observações e Tags
-  tags: string[];
-  observacoes?: string;
-}
 
 // Função para validar CPF
 const validarCPF = (cpf: string): boolean => {
@@ -110,31 +85,29 @@ const clienteSchema = yup.object({
     .required('Tipo de cliente é obrigatório')
     .oneOf(['pessoa_fisica', 'pessoa_juridica'], 'Tipo deve ser Pessoa Física ou Jurídica'),
 
-  cpf: yup
-    .string()
-    .when('tipo', {
-      is: 'pessoa_fisica',
-      then: (schema) => schema
+  cpf: yup.string().when('tipo', {
+    is: 'pessoa_fisica',
+    then: (schema) =>
+      schema
         .required('CPF é obrigatório para Pessoa Física')
         .test('cpf-valido', 'CPF inválido', (value) => {
           if (!value) return false;
           return validarCPF(value);
         }),
-      otherwise: (schema) => schema.notRequired()
-    }),
+    otherwise: (schema) => schema.notRequired(),
+  }),
 
-  cnpj: yup
-    .string()
-    .when('tipo', {
-      is: 'pessoa_juridica',
-      then: (schema) => schema
+  cnpj: yup.string().when('tipo', {
+    is: 'pessoa_juridica',
+    then: (schema) =>
+      schema
         .required('CNPJ é obrigatório para Pessoa Jurídica')
         .test('cnpj-valido', 'CNPJ inválido', (value) => {
           if (!value) return false;
           return validarCNPJ(value);
         }),
-      otherwise: (schema) => schema.notRequired()
-    }),
+    otherwise: (schema) => schema.notRequired(),
+  }),
 
   status: yup
     .string()
@@ -157,9 +130,7 @@ const clienteSchema = yup.object({
     .required('Número é obrigatório')
     .max(10, 'Número deve ter no máximo 10 caracteres'),
 
-  complemento: yup
-    .string()
-    .max(100, 'Complemento deve ter no máximo 100 caracteres'),
+  complemento: yup.string().max(100, 'Complemento deve ter no máximo 100 caracteres'),
 
   bairro: yup
     .string()
@@ -177,14 +148,9 @@ const clienteSchema = yup.object({
     .length(2, 'Estado deve ter 2 caracteres (ex: SP)'),
 
   // Observações e Tags - Opcionais
-  tags: yup
-    .array()
-    .of(yup.string())
-    .max(10, 'Máximo de 10 tags permitidas'),
+  tags: yup.array().of(yup.string()).max(10, 'Máximo de 10 tags permitidas'),
 
-  observacoes: yup
-    .string()
-    .max(1000, 'Observações deve ter no máximo 1000 caracteres')
+  observacoes: yup.string().max(1000, 'Observações deve ter no máximo 1000 caracteres'),
 });
 
 interface ModalCadastroClienteProps {
@@ -200,7 +166,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
   onClose,
   onSave,
   cliente,
-  isLoading = false
+  isLoading = false,
 }) => {
   // Hook de internacionalização
   const { t } = useI18n();
@@ -209,8 +175,18 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
   const [isLoadingCep, setIsLoadingCep] = useState(false);
   const [tagInput, setTagInput] = useState('');
   const [tagsDisponiveis] = useState([
-    'VIP', 'Premium', 'Corporativo', 'Startup', 'SMB', 'Enterprise',
-    'Freelancer', 'Consultor', 'Agência', 'E-commerce', 'SaaS', 'Fintech'
+    'VIP',
+    'Premium',
+    'Corporativo',
+    'Startup',
+    'SMB',
+    'Enterprise',
+    'Freelancer',
+    'Consultor',
+    'Agência',
+    'E-commerce',
+    'SaaS',
+    'Fintech',
   ]);
   const [showStatusPanel, setShowStatusPanel] = useState(true);
 
@@ -222,7 +198,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
     setValue,
     watch,
     reset,
-    trigger
+    trigger,
   } = useForm<ClienteFormData>({
     resolver: yupResolver(clienteSchema),
     mode: 'onChange', // Validação em tempo real
@@ -242,8 +218,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
       cidade: '',
       estado: '',
       tags: [],
-      observacoes: ''
-    }
+      observacoes: '',
+    },
   });
 
   // Observar mudanças nos campos
@@ -273,7 +249,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
           cidade: cliente.cidade || '',
           estado: cliente.estado || '',
           tags: cliente.tags || [],
-          observacoes: cliente.observacoes || ''
+          observacoes: cliente.observacoes || '',
         });
       } else {
         // Modo criação
@@ -293,7 +269,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
           cidade: '',
           estado: '',
           tags: [],
-          observacoes: ''
+          observacoes: '',
         });
       }
     }
@@ -342,7 +318,10 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
 
   // Função para remover tag
   const removerTag = (tagParaRemover: string) => {
-    setValue('tags', watchedTags.filter(tag => tag !== tagParaRemover));
+    setValue(
+      'tags',
+      watchedTags.filter((tag) => tag !== tagParaRemover),
+    );
   };
 
   // Função para formatar telefone
@@ -377,7 +356,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
     try {
       // Mostrar toast de carregamento
       const loadingToast = toast.loading(
-        cliente ? 'Atualizando cliente...' : 'Cadastrando cliente...'
+        cliente ? 'Atualizando cliente...' : 'Cadastrando cliente...',
       );
 
       // Preparar dados para envio
@@ -386,14 +365,17 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
         email: data.email,
         telefone: data.telefone.replace(/\D/g, ''), // Remove formatação
         tipo: data.tipo,
-        documento: data.tipo === 'pessoa_fisica' ? data.cpf?.replace(/\D/g, '') : data.cnpj?.replace(/\D/g, ''),
+        documento:
+          data.tipo === 'pessoa_fisica'
+            ? data.cpf?.replace(/\D/g, '')
+            : data.cnpj?.replace(/\D/g, ''),
         status: data.status,
         cep: data.cep.replace(/\D/g, ''), // Remove formatação
         endereco: `${data.logradouro}, ${data.numero}${data.complemento ? ', ' + data.complemento : ''}, ${data.bairro}`,
         cidade: data.cidade,
         estado: data.estado,
         tags: data.tags,
-        observacoes: data.observacoes || ''
+        observacoes: data.observacoes || '',
       };
 
       await onSave(clienteData);
@@ -401,14 +383,12 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
       // Remover toast de carregamento e mostrar sucesso
       toast.dismiss(loadingToast);
       toast.success(
-        cliente
-          ? 'Cliente atualizado com sucesso!'
-          : 'Cliente cadastrado com sucesso!',
+        cliente ? 'Cliente atualizado com sucesso!' : 'Cliente cadastrado com sucesso!',
         {
           duration: 4000,
           position: 'top-right',
           icon: '✅',
-        }
+        },
       );
     } catch (error) {
       console.error('Erro ao salvar cliente:', error);
@@ -422,7 +402,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
           duration: 5000,
           position: 'top-right',
           icon: '❌',
-        }
+        },
       );
     }
   };
@@ -430,8 +410,17 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
   // Função para contar campos válidos
   const contarCamposValidos = () => {
     const camposObrigatorios = [
-      'nome', 'email', 'telefone', 'tipo', 'status',
-      'cep', 'logradouro', 'numero', 'bairro', 'cidade', 'estado'
+      'nome',
+      'email',
+      'telefone',
+      'tipo',
+      'status',
+      'cep',
+      'logradouro',
+      'numero',
+      'bairro',
+      'cidade',
+      'estado',
     ];
 
     // Adicionar CPF ou CNPJ dependendo do tipo
@@ -442,8 +431,11 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
     }
 
     let validosCount = 0;
-    camposObrigatorios.forEach(campo => {
-      if (touchedFields[campo as keyof ClienteFormData] && !errors[campo as keyof ClienteFormData]) {
+    camposObrigatorios.forEach((campo) => {
+      if (
+        touchedFields[campo as keyof ClienteFormData] &&
+        !errors[campo as keyof ClienteFormData]
+      ) {
         validosCount++;
       }
     });
@@ -456,53 +448,45 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen p-4 bg-black bg-opacity-50">
-        <div className="relative w-[calc(100%-2rem)] sm:w-[700px] md:w-[900px] lg:w-[1100px] xl:w-[1300px] max-w-[1600px] bg-white rounded-xl shadow-2xl">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center justify-center w-10 h-10 bg-[#DEEFE7] rounded-lg">
-                <User className="w-5 h-5 text-[#159A9C]" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-[#002333]">
-                  {cliente ? 'Editar Cliente' : 'Novo Cliente'}
-                </h2>
-                <p className="text-sm text-[#B4BEC9]">
-                  Preencha os dados do cliente abaixo
-                </p>
-              </div>
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/60 overflow-y-auto py-6 px-4">
+      <div className="relative w-full max-w-5xl bg-white rounded-xl shadow-2xl flex flex-col max-h-full sm:max-h-[90vh] overflow-hidden">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 shrink-0">
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center justify-center w-10 h-10 bg-[#DEEFE7] rounded-lg">
+              <User className="w-5 h-5 text-[#159A9C]" />
             </div>
-
-            <div className="flex items-center space-x-4">
-              {/* Toggle Status Panel */}
-              <button
-                type="button"
-                onClick={() => setShowStatusPanel(!showStatusPanel)}
-                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                title={showStatusPanel ? 'Ocultar painel de status' : 'Mostrar painel de status'}
-              >
-                {showStatusPanel ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
-
-              <button
-                onClick={onClose}
-                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+            <div>
+              <h2 className="text-xl font-bold text-[#002333]">
+                {cliente ? 'Editar Cliente' : 'Novo Cliente'}
+              </h2>
+              <p className="text-sm text-[#B4BEC9]">Preencha os dados do cliente abaixo</p>
             </div>
           </div>
 
-          {/* Content */}
-          <div className="flex">
-            {/* Form Content */}
-            <div className={`${showStatusPanel ? 'w-3/4' : 'w-full'} p-6`}>
+          <div className="flex items-center space-x-4">
+            <button
+              type="button"
+              onClick={() => setShowStatusPanel(!showStatusPanel)}
+              className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+              title={showStatusPanel ? 'Ocultar painel de status' : 'Mostrar painel de status'}
+            >
+              {showStatusPanel ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+            </button>
+
+            <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex flex-1 min-h-0 flex-col lg:flex-row overflow-hidden">
+            <div
+              className={`flex-1 min-h-0 p-6 overflow-y-auto overscroll-y-contain touch-pan-y ${showStatusPanel ? 'lg:pr-4' : ''}`}
+            >
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                 {/* Layout em 3 colunas */}
-                <div className="grid grid-cols-3 gap-8">
-
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
                   {/* COLUNA 1: DADOS BÁSICOS */}
                   <div className="space-y-4">
                     <div className="border-b border-gray-200 pb-2 mb-4">
@@ -687,9 +671,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
 
                     {/* CEP */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        CEP *
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">CEP *</label>
                       <div className="relative">
                         <input
                           {...register('cep')}
@@ -737,7 +719,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                     </div>
 
                     {/* Número e Complemento */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Número *
@@ -791,8 +773,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                     </div>
 
                     {/* Cidade e Estado */}
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="col-span-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="sm:col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Cidade *
                         </label>
@@ -900,17 +882,20 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                       <div className="mt-2">
                         <p className="text-xs text-gray-500 mb-2">Sugestões:</p>
                         <div className="flex flex-wrap gap-1">
-                          {tagsDisponiveis.filter(tag => !watchedTags.includes(tag)).slice(0, 6).map((tag) => (
-                            <button
-                              key={tag}
-                              type="button"
-                              onClick={() => adicionarTag(tag)}
-                              disabled={watchedTags.length >= 10}
-                              className="px-2 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            >
-                              {tag}
-                            </button>
-                          ))}
+                          {tagsDisponiveis
+                            .filter((tag) => !watchedTags.includes(tag))
+                            .slice(0, 6)
+                            .map((tag) => (
+                              <button
+                                key={tag}
+                                type="button"
+                                onClick={() => adicionarTag(tag)}
+                                disabled={watchedTags.length >= 10}
+                                className="px-2 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              >
+                                {tag}
+                              </button>
+                            ))}
                         </div>
                       </div>
                     </div>
@@ -938,16 +923,16 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                 </div>
 
                 {/* Footer com botões */}
-                <div className="flex justify-between items-center pt-6 border-t border-gray-200">
-                  <div className="text-sm text-gray-500">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pt-6 border-t border-gray-200">
+                  <div className="text-sm text-gray-500 text-center sm:text-left">
                     {t('form.requiredFields')}
                   </div>
 
-                  <div className="flex space-x-3">
+                  <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                     <button
                       type="button"
                       onClick={onClose}
-                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       {t('common.cancel')}
                     </button>
@@ -955,7 +940,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                     <button
                       type="submit"
                       disabled={!isValid || isLoading}
-                      className={`px-6 py-2 rounded-lg font-medium transition-all flex items-center space-x-2 ${isValid && !isLoading
+                      className={`w-full sm:w-auto px-6 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${isValid && !isLoading
                         ? 'bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white hover:shadow-lg'
                         : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         }`}
@@ -966,8 +951,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                           ? 'Criando cliente...'
                           : cliente
                             ? 'Salvar Alterações'
-                            : 'Criar Cliente'
-                        }
+                            : 'Criar Cliente'}
                       </span>
                     </button>
                   </div>
@@ -977,8 +961,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
 
             {/* Status Panel (sidebar) */}
             {showStatusPanel && (
-              <div className="w-1/4 bg-gray-50 border-l border-gray-200 p-6">
-                <div className="sticky top-6">
+              <div className="w-full lg:w-72 bg-gray-50 border-t border-gray-200 lg:border-t-0 lg:border-l p-6 overflow-y-auto overscroll-y-contain touch-pan-y min-h-0">
+                <div className="lg:sticky lg:top-6">
                   <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center">
                     <CheckCircle className="w-5 h-5 mr-2 text-[#159A9C]" />
                     Status do Formulário
@@ -988,7 +972,9 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                   <div className="mb-4">
                     <div className="flex justify-between text-sm text-gray-600 mb-1">
                       <span>Progresso</span>
-                      <span>{validosCount}/{totalCount}</span>
+                      <span>
+                        {validosCount}/{totalCount}
+                      </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
@@ -1000,8 +986,10 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
 
                   {/* Validação geral */}
                   <div className="space-y-3">
-                    <div className={`flex items-center space-x-2 p-2 rounded-lg ${isValid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                      }`}>
+                    <div
+                      className={`flex items-center space-x-2 p-2 rounded-lg ${isValid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                        }`}
+                    >
                       {isValid ? (
                         <CheckCircle className="w-4 h-4" />
                       ) : (
@@ -1022,14 +1010,17 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                       { key: 'email', label: 'E-mail' },
                       { key: 'telefone', label: 'Telefone' },
                       { key: 'tipo', label: 'Tipo' },
-                      { key: watchedTipo === 'pessoa_fisica' ? 'cpf' : 'cnpj', label: watchedTipo === 'pessoa_fisica' ? 'CPF' : 'CNPJ' },
+                      {
+                        key: watchedTipo === 'pessoa_fisica' ? 'cpf' : 'cnpj',
+                        label: watchedTipo === 'pessoa_fisica' ? 'CPF' : 'CNPJ',
+                      },
                       { key: 'status', label: 'Status' },
                       { key: 'cep', label: 'CEP' },
                       { key: 'logradouro', label: 'Logradouro' },
                       { key: 'numero', label: 'Número' },
                       { key: 'bairro', label: 'Bairro' },
                       { key: 'cidade', label: 'Cidade' },
-                      { key: 'estado', label: 'Estado' }
+                      { key: 'estado', label: 'Estado' },
                     ].map(({ key, label }) => {
                       const hasError = !!errors[key as keyof ClienteFormData];
                       const isTouched = touchedFields[key as keyof ClienteFormData];
@@ -1044,8 +1035,14 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                           ) : (
                             <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
                           )}
-                          <span className={`${isFieldValid ? 'text-green-700' : hasError ? 'text-red-700' : 'text-gray-600'
-                            }`}>
+                          <span
+                            className={`${isFieldValid
+                              ? 'text-green-700'
+                              : hasError
+                                ? 'text-red-700'
+                                : 'text-gray-600'
+                              }`}
+                          >
                             {label}
                           </span>
                         </div>

@@ -3,7 +3,10 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 @Entity('sla_event_logs')
 export class SlaEventLog {
@@ -41,6 +44,10 @@ export class SlaEventLog {
 
   @Column({ type: 'uuid' })
   empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresaId' })
+  empresa: Empresa;
 
   @CreateDateColumn()
   createdAt: Date;

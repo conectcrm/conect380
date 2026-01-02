@@ -8,10 +8,10 @@ interface BackToNucleusProps {
   color?: 'blue' | 'green' | 'orange' | 'purple' | 'red';
 }
 
-const BackToNucleus: React.FC<BackToNucleusProps> = ({ 
-  nucleusName, 
-  nucleusHref, 
-  color = 'blue' 
+const BackToNucleus: React.FC<BackToNucleusProps> = ({
+  nucleusName,
+  nucleusHref,
+  color = 'blue',
 }) => {
   const navigate = useNavigate();
 
@@ -22,13 +22,13 @@ const BackToNucleus: React.FC<BackToNucleusProps> = ({
   const getColorClasses = (color: string) => {
     // Usando a paleta Crevasse para todas as cores
     const colors = {
-      blue: 'from-[#159A9C] to-[#0F7B7D]',      // Teal gradient
-      green: 'from-[#159A9C] to-[#0F7B7D]',     // Teal gradient
-      orange: 'from-[#159A9C] to-[#0F7B7D]',    // Teal gradient
-      purple: 'from-[#159A9C] to-[#0F7B7D]',    // Teal gradient
-      red: 'from-[#159A9C] to-[#0F7B7D]'        // Teal gradient
+      blue: 'from-[#159A9C] to-[#0F7B7D]', // Teal gradient
+      green: 'from-[#159A9C] to-[#0F7B7D]', // Teal gradient
+      orange: 'from-[#159A9C] to-[#0F7B7D]', // Teal gradient
+      purple: 'from-[#159A9C] to-[#0F7B7D]', // Teal gradient
+      red: 'from-[#159A9C] to-[#0F7B7D]', // Teal gradient
     };
-    
+
     return colors[color as keyof typeof colors] || colors.blue;
   };
 

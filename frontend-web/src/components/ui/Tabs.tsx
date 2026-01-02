@@ -28,7 +28,7 @@ const TabsContext = React.createContext<{
   setActiveTab: (value: string) => void;
 }>({
   activeTab: '',
-  setActiveTab: () => {}
+  setActiveTab: () => {},
 });
 
 export const Tabs: React.FC<TabsProps> = ({ defaultValue = '', children, className = '' }) => {
@@ -36,19 +36,13 @@ export const Tabs: React.FC<TabsProps> = ({ defaultValue = '', children, classNa
 
   return (
     <TabsContext.Provider value={{ activeTab, setActiveTab }}>
-      <div className={className}>
-        {children}
-      </div>
+      <div className={className}>{children}</div>
     </TabsContext.Provider>
   );
 };
 
 export const TabsList: React.FC<TabsListProps> = ({ children, className = '' }) => {
-  return (
-    <div className={`flex border-b border-gray-200 ${className}`}>
-      {children}
-    </div>
-  );
+  return <div className={`flex border-b border-gray-200 ${className}`}>{children}</div>;
 };
 
 export const TabsTrigger: React.FC<TabsTriggerProps> = ({ value, children, className = '' }) => {
@@ -71,14 +65,10 @@ export const TabsTrigger: React.FC<TabsTriggerProps> = ({ value, children, class
 
 export const TabsContent: React.FC<TabsContentProps> = ({ value, children, className = '' }) => {
   const { activeTab } = React.useContext(TabsContext);
-  
+
   if (activeTab !== value) {
     return null;
   }
 
-  return (
-    <div className={`mt-4 ${className}`}>
-      {children}
-    </div>
-  );
+  return <div className={`mt-4 ${className}`}>{children}</div>;
 };

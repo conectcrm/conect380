@@ -13,7 +13,7 @@ import {
   Check,
   X,
   DollarSign,
-  Settings
+  Settings,
 } from 'lucide-react';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import { ModalCadastroProduto } from '../../components/modals/ModalCadastroProdutoLandscape';
@@ -62,18 +62,18 @@ const statusConfig = {
   ativo: {
     label: 'Ativo',
     color: 'bg-[#DEEFE7] text-[#0F7B7D] border-[#159A9C]/40',
-    icon: Check
+    icon: Check,
   },
   inativo: {
     label: 'Inativo',
     color: 'bg-white text-[#B4BEC9] border-[#B4BEC9]',
-    icon: X
+    icon: X,
   },
   descontinuado: {
     label: 'Descontinuado',
     color: 'bg-[#B4BEC9]/40 text-[#002333] border-[#B4BEC9]',
-    icon: AlertTriangle
-  }
+    icon: AlertTriangle,
+  },
 };
 
 const ProdutosPage: React.FC = () => {
@@ -86,7 +86,7 @@ const ProdutosPage: React.FC = () => {
     produtosAtivos: 0,
     vendasMes: 0,
     valorTotal: 0,
-    estoquesBaixos: 0
+    estoquesBaixos: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -97,7 +97,9 @@ const ProdutosPage: React.FC = () => {
 
   // Estados para o modal de cadastro
   const [showModalAvancado, setShowModalAvancado] = useState(false);
-  const [produtoParaEditar, setProdutoParaEditar] = useState<ProdutoFormData & { produtoId?: string } | null>(null);
+  const [produtoParaEditar, setProdutoParaEditar] = useState<
+    (ProdutoFormData & { produtoId?: string }) | null
+  >(null);
   const [isLoadingSave, setIsLoadingSave] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -131,8 +133,9 @@ const ProdutosPage: React.FC = () => {
 
   // Filtrar produtos
   const produtosFiltrados = useMemo(() => {
-    return produtos.filter(produto => {
-      const matchesSearch = produto.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    return produtos.filter((produto) => {
+      const matchesSearch =
+        produto.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
         produto.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
         produto.fornecedor.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -143,7 +146,10 @@ const ProdutosPage: React.FC = () => {
     });
   }, [produtos, searchTerm, statusFilter, categoriaFilter]);
 
-  const categorias = useMemo(() => Array.from(new Set(produtos.map(produto => produto.categoria))), [produtos]);
+  const categorias = useMemo(
+    () => Array.from(new Set(produtos.map((produto) => produto.categoria))),
+    [produtos],
+  );
 
   const handleExport = useCallback(async () => {
     if (produtosFiltrados.length === 0) {
@@ -168,7 +174,7 @@ const ProdutosPage: React.FC = () => {
         'Vendas (Mês)',
         'Vendas (Total)',
         'Criado em',
-        'Atualizado em'
+        'Atualizado em',
       ];
 
       const sanitize = (value: unknown) => {
@@ -184,26 +190,27 @@ const ProdutosPage: React.FC = () => {
         return text.includes('"') ? text.split('"').join('""') : text;
       };
 
-      const formatNumber = (value: number | null | undefined) => (
-        typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : ''
-      );
+      const formatNumber = (value: number | null | undefined) =>
+        typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : '';
 
-      const rows = produtosFiltrados.map((produto) => ([
-        produto.nome,
-        produto.sku,
-        produto.categoria,
-        statusConfig[produto.status]?.label ?? produto.status,
-        formatNumber(produto.preco),
-        formatNumber(produto.custoUnitario),
-        produto.estoque.atual,
-        produto.estoque.minimo,
-        produto.estoque.maximo,
-        produto.fornecedor,
-        produto.vendas.mes,
-        produto.vendas.total,
-        produto.criadoEm,
-        produto.atualizadoEm
-      ].map(sanitize)));
+      const rows = produtosFiltrados.map((produto) =>
+        [
+          produto.nome,
+          produto.sku,
+          produto.categoria,
+          statusConfig[produto.status]?.label ?? produto.status,
+          formatNumber(produto.preco),
+          formatNumber(produto.custoUnitario),
+          produto.estoque.atual,
+          produto.estoque.minimo,
+          produto.estoque.maximo,
+          produto.fornecedor,
+          produto.vendas.mes,
+          produto.vendas.total,
+          produto.criadoEm,
+          produto.atualizadoEm,
+        ].map(sanitize),
+      );
 
       const csvContent = [headers, ...rows]
         .map((row) => row.map((cell) => `"${cell}"`).join(';'))
@@ -231,7 +238,7 @@ const ProdutosPage: React.FC = () => {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -280,7 +287,7 @@ const ProdutosPage: React.FC = () => {
       status: produto.status === 'ativo',
       descricao: produto.descricao,
       tags: [],
-      variacoes: []
+      variacoes: [],
     });
     setShowModalAvancado(true);
   };
@@ -332,7 +339,6 @@ const ProdutosPage: React.FC = () => {
 
       setShowModalAvancado(false);
       setProdutoParaEditar(null);
-
     } catch (error) {
       console.error('Erro ao salvar produto:', error);
       toast.error('Erro ao salvar produto');
@@ -342,44 +348,47 @@ const ProdutosPage: React.FC = () => {
     }
   };
 
-  const statCards = useMemo(() => ([
-    {
-      key: 'total-produtos',
-      label: 'Total de Produtos',
-      value: estatisticas.totalProdutos,
-      description: 'Itens cadastrados no catálogo',
-      iconWrapper: 'bg-[#159A9C]',
-      iconColor: 'text-white',
-      Icon: Package
-    },
-    {
-      key: 'produtos-ativos',
-      label: 'Produtos Ativos',
-      value: estatisticas.produtosAtivos,
-      description: 'Disponíveis para venda',
-      iconWrapper: 'bg-[#0F7B7D]',
-      iconColor: 'text-white',
-      Icon: Check
-    },
-    {
-      key: 'faturamento',
-      label: 'Faturamento Total',
-      value: formatCurrency(estatisticas.valorTotal),
-      description: 'Receita acumulada',
-      iconWrapper: 'bg-[#002333]',
-      iconColor: 'text-white',
-      Icon: DollarSign
-    },
-    {
-      key: 'estoques-baixos',
-      label: 'Estoques Baixos',
-      value: estatisticas.estoquesBaixos,
-      description: 'Itens exigindo reposição',
-      iconWrapper: 'bg-white border border-[#B4BEC9]',
-      iconColor: 'text-[#002333]',
-      Icon: AlertTriangle
-    }
-  ]), [estatisticas]);
+  const statCards = useMemo(
+    () => [
+      {
+        key: 'total-produtos',
+        label: 'Total de Produtos',
+        value: estatisticas.totalProdutos,
+        description: 'Itens cadastrados no catálogo',
+        iconWrapper: 'bg-[#159A9C]',
+        iconColor: 'text-white',
+        Icon: Package,
+      },
+      {
+        key: 'produtos-ativos',
+        label: 'Produtos Ativos',
+        value: estatisticas.produtosAtivos,
+        description: 'Disponíveis para venda',
+        iconWrapper: 'bg-[#0F7B7D]',
+        iconColor: 'text-white',
+        Icon: Check,
+      },
+      {
+        key: 'faturamento',
+        label: 'Faturamento Total',
+        value: formatCurrency(estatisticas.valorTotal),
+        description: 'Receita acumulada',
+        iconWrapper: 'bg-[#002333]',
+        iconColor: 'text-white',
+        Icon: DollarSign,
+      },
+      {
+        key: 'estoques-baixos',
+        label: 'Estoques Baixos',
+        value: estatisticas.estoquesBaixos,
+        description: 'Itens exigindo reposição',
+        iconWrapper: 'bg-white border border-[#B4BEC9]',
+        iconColor: 'text-[#002333]',
+        Icon: AlertTriangle,
+      },
+    ],
+    [estatisticas],
+  );
 
   if (isLoading) {
     return (
@@ -396,10 +405,7 @@ const ProdutosPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header Padronizado */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusName="Produtos"
-          nucleusPath="/nuclei/produtos"
-        />
+        <BackToNucleus nucleusName="Produtos" nucleusPath="/nuclei/produtos" />
       </div>
 
       <div className="p-6">
@@ -455,11 +461,15 @@ const ProdutosPage: React.FC = () => {
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-sm font-medium text-[#002333]/70 uppercase tracking-wide">{label}</p>
+                    <p className="text-sm font-medium text-[#002333]/70 uppercase tracking-wide">
+                      {label}
+                    </p>
                     <p className="mt-2 text-3xl font-bold text-[#002333]">{value}</p>
                     <p className="mt-3 text-xs text-[#002333]/70">{description}</p>
                   </div>
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-inner ${iconWrapper}`}>
+                  <div
+                    className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-inner ${iconWrapper}`}
+                  >
                     <Icon className={`w-6 h-6 ${iconColor}`} />
                   </div>
                 </div>
@@ -501,8 +511,10 @@ const ProdutosPage: React.FC = () => {
                   className="px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C]/40 focus:border-[#159A9C] text-[#002333]"
                 >
                   <option value="todas">Todas as Categorias</option>
-                  {categorias.map(categoria => (
-                    <option key={categoria} value={categoria}>{categoria}</option>
+                  {categorias.map((categoria) => (
+                    <option key={categoria} value={categoria}>
+                      {categoria}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -557,13 +569,13 @@ const ProdutosPage: React.FC = () => {
                             <div className="text-sm font-semibold text-[#002333]">
                               {produto.nome}
                             </div>
-                            <div className="text-xs text-[#002333]/70">
-                              SKU: {produto.sku}
-                            </div>
+                            <div className="text-xs text-[#002333]/70">SKU: {produto.sku}</div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-[#002333] font-medium">{produto.categoria}</span>
+                          <span className="text-sm text-[#002333] font-medium">
+                            {produto.categoria}
+                          </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-[#002333] font-semibold">
@@ -588,7 +600,9 @@ const ProdutosPage: React.FC = () => {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusInfo.color}`}>
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusInfo.color}`}
+                          >
                             <StatusIcon className="w-3 h-3 mr-1" />
                             {statusInfo.label}
                           </span>
@@ -633,12 +647,13 @@ const ProdutosPage: React.FC = () => {
               {produtosFiltrados.length === 0 && (
                 <div className="text-center py-12">
                   <Package className="mx-auto h-12 w-12 text-[#B4BEC9]" />
-                  <h3 className="mt-2 text-sm font-semibold text-[#002333]">Nenhum produto encontrado</h3>
+                  <h3 className="mt-2 text-sm font-semibold text-[#002333]">
+                    Nenhum produto encontrado
+                  </h3>
                   <p className="mt-1 text-sm text-[#002333]/70">
                     {produtos.length === 0
                       ? 'Comece criando seu primeiro produto.'
-                      : 'Tente ajustar os filtros ou termos de busca.'
-                    }
+                      : 'Tente ajustar os filtros ou termos de busca.'}
                   </p>
                 </div>
               )}
@@ -653,9 +668,7 @@ const ProdutosPage: React.FC = () => {
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-96 overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
-                <h3 className="text-lg font-semibold text-[#002333]">
-                  Detalhes do Produto
-                </h3>
+                <h3 className="text-lg font-semibold text-[#002333]">Detalhes do Produto</h3>
                 <button
                   onClick={closeModal}
                   className="text-[#B4BEC9] hover:text-[#002333] transition-colors"
@@ -684,11 +697,15 @@ const ProdutosPage: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h4 className="text-sm font-semibold text-[#002333]">Preço</h4>
-                    <p className="text-sm text-[#002333]/70">{formatCurrency(selectedProduto.preco)}</p>
+                    <p className="text-sm text-[#002333]/70">
+                      {formatCurrency(selectedProduto.preco)}
+                    </p>
                   </div>
                   <div>
                     <h4 className="text-sm font-semibold text-[#002333]">Custo</h4>
-                    <p className="text-sm text-[#002333]/70">{formatCurrency(selectedProduto.custoUnitario)}</p>
+                    <p className="text-sm text-[#002333]/70">
+                      {formatCurrency(selectedProduto.custoUnitario)}
+                    </p>
                   </div>
                 </div>
 
@@ -696,26 +713,31 @@ const ProdutosPage: React.FC = () => {
                   <div>
                     <h4 className="text-sm font-semibold text-[#002333]">Estoque</h4>
                     <p className="text-sm text-[#002333]/70">
-                      Atual: {selectedProduto.estoque.atual} |
-                      Mínimo: {selectedProduto.estoque.minimo} |
-                      Máximo: {selectedProduto.estoque.maximo}
+                      Atual: {selectedProduto.estoque.atual} | Mínimo:{' '}
+                      {selectedProduto.estoque.minimo} | Máximo: {selectedProduto.estoque.maximo}
                     </p>
                   </div>
                 )}
 
                 <div>
                   <h4 className="text-sm font-semibold text-[#002333]">Descrição</h4>
-                  <p className="text-sm text-[#002333]/70">{selectedProduto.descricao || 'Sem descrição'}</p>
+                  <p className="text-sm text-[#002333]/70">
+                    {selectedProduto.descricao || 'Sem descrição'}
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h4 className="text-sm font-semibold text-[#002333]">Criado em</h4>
-                    <p className="text-sm text-[#002333]/70">{formatDate(selectedProduto.criadoEm)}</p>
+                    <p className="text-sm text-[#002333]/70">
+                      {formatDate(selectedProduto.criadoEm)}
+                    </p>
                   </div>
                   <div>
                     <h4 className="text-sm font-semibold text-[#002333]">Atualizado em</h4>
-                    <p className="text-sm text-[#002333]/70">{formatDate(selectedProduto.atualizadoEm)}</p>
+                    <p className="text-sm text-[#002333]/70">
+                      {formatDate(selectedProduto.atualizadoEm)}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -752,7 +774,8 @@ const ProdutosPage: React.FC = () => {
               </div>
 
               <p className="text-sm text-[#002333] mb-6">
-                Tem certeza que deseja excluir o produto <strong>"{produtoParaExcluir.nome}"</strong>?
+                Tem certeza que deseja excluir o produto{' '}
+                <strong>"{produtoParaExcluir.nome}"</strong>?
               </p>
 
               <div className="flex justify-end space-x-3">

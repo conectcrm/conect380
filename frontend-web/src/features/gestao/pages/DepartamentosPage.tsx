@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { departamentoService } from '../../../services/departamentoService';
-import { Departamento, FilterDepartamentoDto, TIPOS_DISTRIBUICAO } from '../../../types/departamentoTypes';
+import {
+  Departamento,
+  FilterDepartamentoDto,
+  TIPOS_DISTRIBUICAO,
+} from '../../../types/departamentoTypes';
 import ModalCadastroDepartamento from '../../../components/modals/ModalCadastroDepartamento';
 import { useNucleos } from '../../../hooks/useNucleos';
 import {
@@ -18,7 +22,7 @@ import {
   Target,
   Building2,
   CheckCircle,
-  XCircle
+  XCircle,
 } from 'lucide-react';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 import toast from 'react-hot-toast';
@@ -44,7 +48,7 @@ function DepartamentosPage() {
     totalDepartamentos: 0,
     departamentosAtivos: 0,
     totalAtendentes: 0,
-    departamentosInativos: 0
+    departamentosInativos: 0,
   });
 
   // Hook para carregar núcleos da API (apenas ativos, com opção "Todos")
@@ -52,20 +56,20 @@ function DepartamentosPage() {
     nucleos: nucleosDisponiveisRaw,
     loading: loadingNucleos,
     error: erroNucleos,
-    recarregar: recarregarNucleos
+    recarregar: recarregarNucleos,
   } = useNucleos({
     apenasAtivos: true,
-    incluirTodos: true
+    incluirTodos: true,
   });
 
   const nucleosDisponiveis = useMemo(
     () => (Array.isArray(nucleosDisponiveisRaw) ? nucleosDisponiveisRaw : []),
-    [nucleosDisponiveisRaw]
+    [nucleosDisponiveisRaw],
   );
 
   const nucleosFiltrados = useMemo(
     () => nucleosDisponiveis.filter((nucleo) => nucleo?.id !== 'todos'),
-    [nucleosDisponiveis]
+    [nucleosDisponiveis],
   );
 
   useEffect(() => {
@@ -96,18 +100,18 @@ function DepartamentosPage() {
   };
 
   const calcularDashboard = (departamentos: Departamento[]) => {
-    const ativos = departamentos.filter(d => d.ativo).length;
-    const inativos = departamentos.filter(d => !d.ativo).length;
+    const ativos = departamentos.filter((d) => d.ativo).length;
+    const inativos = departamentos.filter((d) => !d.ativo).length;
     const totalAtendentes = departamentos.reduce(
       (acc, d) => acc + (d.atendentesIds?.length || 0),
-      0
+      0,
     );
 
     setDashboardCards({
       totalDepartamentos: departamentos.length,
       departamentosAtivos: ativos,
       totalAtendentes,
-      departamentosInativos: inativos
+      departamentosInativos: inativos,
     });
   };
 
@@ -156,15 +160,13 @@ function DepartamentosPage() {
   };
 
   const toggleSelecionarDepartamento = (id: string) => {
-    setDepartamentosSelecionados(prev =>
-      prev.includes(id)
-        ? prev.filter(item => item !== id)
-        : [...prev, id]
+    setDepartamentosSelecionados((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
   };
 
   const selecionarTodos = () => {
-    setDepartamentosSelecionados(departamentos.map(d => d.id));
+    setDepartamentosSelecionados(departamentos.map((d) => d.id));
   };
 
   const deselecionarTodos = () => {
@@ -178,7 +180,7 @@ function DepartamentosPage() {
   };
 
   const getTipoDistribuicaoLabel = (tipo: string) => {
-    const found = TIPOS_DISTRIBUICAO.find(t => t.value === tipo);
+    const found = TIPOS_DISTRIBUICAO.find((t) => t.value === tipo);
     return found?.label || tipo;
   };
 
@@ -189,10 +191,7 @@ function DepartamentosPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusName="Configurações"
-          nucleusPath="/nuclei/configuracoes"
-        />
+        <BackToNucleus nucleusName="Configurações" nucleusPath="/nuclei/configuracoes" />
       </div>
 
       <div className="p-6">
@@ -210,7 +209,9 @@ function DepartamentosPage() {
                     )}
                   </h1>
                   <p className="mt-2 text-[#B4BEC9]">
-                    {carregando ? 'Carregando departamentos...' : `Gerencie seus ${dashboardCards.totalDepartamentos} departamentos por núcleo`}
+                    {carregando
+                      ? 'Carregando departamentos...'
+                      : `Gerencie seus ${dashboardCards.totalDepartamentos} departamentos por núcleo`}
                   </p>
                 </div>
                 <div className="mt-4 sm:mt-0 flex items-center gap-3">
@@ -231,8 +232,12 @@ function DepartamentosPage() {
             <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Total</p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.totalDepartamentos}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                    Total
+                  </p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">
+                    {dashboardCards.totalDepartamentos}
+                  </p>
                   <p className="text-sm text-[#002333]/70 mt-3">📊 Departamentos</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
@@ -244,8 +249,12 @@ function DepartamentosPage() {
             <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Ativos</p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.departamentosAtivos}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                    Ativos
+                  </p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">
+                    {dashboardCards.departamentosAtivos}
+                  </p>
                   <p className="text-sm text-[#002333]/70 mt-3">✅ Em operação</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
@@ -257,8 +266,12 @@ function DepartamentosPage() {
             <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Atendentes</p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.totalAtendentes}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                    Atendentes
+                  </p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">
+                    {dashboardCards.totalAtendentes}
+                  </p>
                   <p className="text-sm text-[#002333]/70 mt-3">👥 Total alocados</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
@@ -270,8 +283,12 @@ function DepartamentosPage() {
             <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Inativos</p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.departamentosInativos}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                    Inativos
+                  </p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">
+                    {dashboardCards.departamentosInativos}
+                  </p>
                   <p className="text-sm text-[#002333]/70 mt-3">⏸️ Pausados</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-gray-500/10 flex items-center justify-center shadow-sm">
@@ -309,7 +326,7 @@ function DepartamentosPage() {
                   <option value="todos">
                     {loadingNucleos ? 'Carregando núcleos...' : 'Todos os Núcleos'}
                   </option>
-                  {nucleosFiltrados.map(nucleo => (
+                  {nucleosFiltrados.map((nucleo) => (
                     <option key={nucleo.id} value={nucleo.id}>
                       {nucleo.nome}
                     </option>
@@ -373,9 +390,13 @@ function DepartamentosPage() {
             ) : departamentosFiltrados.length === 0 ? (
               <div className="text-center py-12">
                 <Building2 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum departamento encontrado</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Nenhum departamento encontrado
+                </h3>
                 <p className="text-gray-500 mb-4">
-                  {busca ? 'Tente ajustar os filtros de busca' : 'Comece criando seu primeiro departamento'}
+                  {busca
+                    ? 'Tente ajustar os filtros de busca'
+                    : 'Comece criando seu primeiro departamento'}
                 </p>
                 {!busca && (
                   <button
@@ -390,10 +411,7 @@ function DepartamentosPage() {
             ) : (
               <div className="divide-y divide-gray-200">
                 {departamentosFiltrados.map((departamento) => (
-                  <div
-                    key={departamento.id}
-                    className="p-6 hover:bg-gray-50 transition-colors"
-                  >
+                  <div key={departamento.id} className="p-6 hover:bg-gray-50 transition-colors">
                     <div className="flex items-start justify-between">
                       {/* Checkbox e Informações */}
                       <div className="flex items-start flex-1">
@@ -410,10 +428,7 @@ function DepartamentosPage() {
                               className="w-12 h-12 rounded-lg flex items-center justify-center"
                               style={{ backgroundColor: `${departamento.cor}20` }}
                             >
-                              <Briefcase
-                                className="w-6 h-6"
-                                style={{ color: departamento.cor }}
-                              />
+                              <Briefcase className="w-6 h-6" style={{ color: departamento.cor }} />
                             </div>
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
@@ -487,11 +502,14 @@ function DepartamentosPage() {
                       {/* Ações */}
                       <div className="flex items-center gap-2 ml-4">
                         <button
-                          onClick={() => alterarStatusDepartamento(departamento.id, !departamento.ativo)}
-                          className={`p-2 rounded-lg transition-colors ${departamento.ativo
-                            ? 'text-gray-600 hover:bg-gray-100'
-                            : 'text-green-600 hover:bg-green-50'
-                            }`}
+                          onClick={() =>
+                            alterarStatusDepartamento(departamento.id, !departamento.ativo)
+                          }
+                          className={`p-2 rounded-lg transition-colors ${
+                            departamento.ativo
+                              ? 'text-gray-600 hover:bg-gray-100'
+                              : 'text-green-600 hover:bg-green-50'
+                          }`}
                           title={departamento.ativo ? 'Desativar' : 'Ativar'}
                         >
                           {departamento.ativo ? (

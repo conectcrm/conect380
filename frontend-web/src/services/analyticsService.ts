@@ -1,7 +1,7 @@
 import axios from 'axios';
+import { API_BASE_URL } from './api';
 
 // Base URL da API (ajustar conforme ambiente)
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 // Interface para métricas do dashboard
 export interface DashboardMetrics {
@@ -48,7 +48,7 @@ export interface PontoTendencia {
 /**
  * Service para Analytics e Dashboard de Atendimento
  * Comunicação com backend para buscar métricas e estatísticas
- * 
+ *
  * @author ConectCRM
  * @date 2025-11-18
  */

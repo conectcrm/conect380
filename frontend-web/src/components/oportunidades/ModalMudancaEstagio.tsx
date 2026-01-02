@@ -21,7 +21,7 @@ const MOTIVOS_MUDANCA = [
   { value: 'solicitacao_cliente', label: '🔄 Solicitação do cliente' },
   { value: 'ajuste_estrategia', label: '⚠️ Ajuste de estratégia' },
   { value: 'aprovacao_interna', label: '🎯 Aprovação interna obtida' },
-  { value: 'outro', label: '📝 Outro motivo' }
+  { value: 'outro', label: '📝 Outro motivo' },
 ];
 
 // Mapeamento de estágios para nomes legíveis
@@ -30,7 +30,7 @@ const ESTAGIOS_LABELS: Record<EstagioOportunidade, string> = {
   [EstagioOportunidade.QUALIFICACAO]: 'Qualificação',
   [EstagioOportunidade.PROPOSTA]: 'Proposta',
   [EstagioOportunidade.NEGOCIACAO]: 'Negociação',
-  [EstagioOportunidade.FECHAMENTO]: 'Fechamento'
+  [EstagioOportunidade.FECHAMENTO]: 'Fechamento',
 };
 
 const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
@@ -40,7 +40,7 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
   estagioOrigem,
   estagioDestino,
   tituloOportunidade,
-  loading = false
+  loading = false,
 }) => {
   const [motivo, setMotivo] = useState('');
   const [comentario, setComentario] = useState('');
@@ -57,14 +57,15 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
   const handleConfirmar = () => {
     if (!motivo) return;
 
-    const motivoFinal = mostrarOutroMotivo && comentario
-      ? comentario
-      : MOTIVOS_MUDANCA.find(m => m.value === motivo)?.label || motivo;
+    const motivoFinal =
+      mostrarOutroMotivo && comentario
+        ? comentario
+        : MOTIVOS_MUDANCA.find((m) => m.value === motivo)?.label || motivo;
 
     onConfirm(
       motivoFinal,
       mostrarOutroMotivo ? '' : comentario,
-      proximaAcao ? new Date(proximaAcao) : undefined
+      proximaAcao ? new Date(proximaAcao) : undefined,
     );
   };
 
@@ -82,9 +83,7 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
               </div>
               <div>
                 <h2 className="text-2xl font-bold">Mudança de Estágio</h2>
-                <p className="text-white/80 text-sm mt-1">
-                  Registre o motivo desta movimentação
-                </p>
+                <p className="text-white/80 text-sm mt-1">Registre o motivo desta movimentação</p>
               </div>
             </div>
             <button
@@ -159,9 +158,7 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
                 className="w-full pl-11 pr-4 py-2.5 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm resize-none disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
-            <p className="mt-1 text-xs text-[#002333]/60">
-              {comentario.length}/500 caracteres
-            </p>
+            <p className="mt-1 text-xs text-[#002333]/60">{comentario.length}/500 caracteres</p>
           </div>
 
           {/* Próxima Ação (opcional) */}
@@ -190,8 +187,8 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
           {/* Info sobre histórico */}
           <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
             <p className="text-xs text-blue-800">
-              <strong>💡 Histórico:</strong> Esta movimentação será registrada automaticamente
-              no histórico de atividades da oportunidade com data, hora e seu usuário.
+              <strong>💡 Histórico:</strong> Esta movimentação será registrada automaticamente no
+              histórico de atividades da oportunidade com data, hora e seu usuário.
             </p>
           </div>
         </div>

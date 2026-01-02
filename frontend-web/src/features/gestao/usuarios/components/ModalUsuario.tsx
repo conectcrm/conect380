@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Usuario, NovoUsuario, AtualizarUsuario, UserRole, ROLE_LABELS } from '../../../../types/usuarios/index';
+import {
+  Usuario,
+  NovoUsuario,
+  AtualizarUsuario,
+  UserRole,
+  ROLE_LABELS,
+} from '../../../../types/usuarios/index';
 import { X, User, Mail, Phone, Shield, Save, Loader } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -11,12 +17,14 @@ interface ModalUsuarioProps {
   onSubmit: (dados: NovoUsuario | AtualizarUsuario) => Promise<Usuario | null>;
 }
 
+const ROLE_OPTIONS = Object.entries(ROLE_LABELS).filter(([value]) => value !== UserRole.SUPERADMIN);
+
 export const ModalUsuario: React.FC<ModalUsuarioProps> = ({
   usuario,
   isOpen,
   onClose,
   onSuccess,
-  onSubmit
+  onSubmit,
 }) => {
   // Importa o contexto de autenticação para obter o usuário logado
   // @ts-ignore
@@ -27,7 +35,7 @@ export const ModalUsuario: React.FC<ModalUsuarioProps> = ({
     senha: '',
     telefone: '',
     role: UserRole.USER,
-    ativo: true
+    ativo: true,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSenha, setShowSenha] = useState(false);
@@ -37,7 +45,7 @@ export const ModalUsuario: React.FC<ModalUsuarioProps> = ({
     if (isOpen) {
       // Reset estado da senha para maior segurança
       setShowSenha(false);
-      
+
       if (usuario) {
         setFormData({
           nome: usuario.nome,
@@ -45,7 +53,7 @@ export const ModalUsuario: React.FC<ModalUsuarioProps> = ({
           senha: '',
           telefone: usuario.telefone || '',
           role: usuario.role,
-          ativo: usuario.ativo
+          ativo: usuario.ativo,
         });
       } else {
         setFormData({
@@ -54,7 +62,7 @@ export const ModalUsuario: React.FC<ModalUsuarioProps> = ({
           senha: '',
           telefone: '',
           role: UserRole.USER,
-          ativo: true
+          ativo: true,
         });
       }
     }
@@ -62,7 +70,7 @@ export const ModalUsuario: React.FC<ModalUsuarioProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.nome.trim() || !formData.email.trim()) {
       toast.error('Nome e email são obrigatórios');
       return;
@@ -77,7 +85,7 @@ export const ModalUsuario: React.FC<ModalUsuarioProps> = ({
 
     try {
       let dados: NovoUsuario | AtualizarUsuario;
-      
+
       if (isEdit) {
         dados = {
           id: usuario!.id,
@@ -85,7 +93,7 @@ export const ModalUsuario: React.FC<ModalUsuarioProps> = ({
           email: formData.email,
           telefone: formData.telefone || undefined,
           role: formData.role,
-          ativo: formData.ativo
+          ativo: formData.ativo,
         };
       } else {
         dados = {
@@ -95,7 +103,7 @@ export const ModalUsuario: React.FC<ModalUsuarioProps> = ({
           telefone: formData.telefone || undefined,
           role: formData.role,
           empresa_id: user?.empresa?.id || '',
-          ativo: formData.ativo
+          ativo: formData.ativo,
         };
       }
 
@@ -112,9 +120,9 @@ export const ModalUsuario: React.FC<ModalUsuarioProps> = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
     }));
   };
 
@@ -123,7 +131,10 @@ export const ModalUsuario: React.FC<ModalUsuarioProps> = ({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose} />
+        <div
+          className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+          onClick={onClose}
+        />
 
         <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
           <div className="flex items-center justify-between mb-6">
@@ -144,9 +155,7 @@ export const ModalUsuario: React.FC<ModalUsuarioProps> = ({
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Nome */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nome *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
               <input
                 type="text"
                 name="nome"
@@ -160,9 +169,7 @@ export const ModalUsuario: React.FC<ModalUsuarioProps> = ({
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
@@ -180,9 +187,7 @@ export const ModalUsuario: React.FC<ModalUsuarioProps> = ({
             {/* Senha (apenas para novos usuários) */}
             {!isEdit && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Senha *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Senha *</label>
                 <input
                   type={showSenha ? 'text' : 'password'}
                   name="senha"
@@ -209,9 +214,7 @@ export const ModalUsuario: React.FC<ModalUsuarioProps> = ({
 
             {/* Telefone */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Telefone
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
@@ -227,9 +230,7 @@ export const ModalUsuario: React.FC<ModalUsuarioProps> = ({
 
             {/* Perfil */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Perfil *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Perfil *</label>
               <div className="relative">
                 <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <select
@@ -239,7 +240,12 @@ export const ModalUsuario: React.FC<ModalUsuarioProps> = ({
                   className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C]"
                   required
                 >
-                  {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                  {usuario?.role === UserRole.SUPERADMIN && (
+                    <option value={UserRole.SUPERADMIN}>
+                      {ROLE_LABELS[UserRole.SUPERADMIN]}
+                    </option>
+                  )}
+                  {ROLE_OPTIONS.map(([value, label]) => (
                     <option key={value} value={value}>
                       {label}
                     </option>

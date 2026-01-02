@@ -20,7 +20,7 @@ import {
   Users,
   Building,
   Target,
-  Activity
+  Activity,
 } from 'lucide-react';
 
 const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
@@ -30,30 +30,70 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
   const [newActivity, setNewActivity] = useState({
     type: 'note',
     description: '',
-    date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split('T')[0],
   });
 
   const tabs = [
     { id: 'details', label: 'Detalhes', icon: FileText },
     { id: 'activities', label: 'Atividades', icon: Activity },
     { id: 'timeline', label: 'Timeline', icon: Clock },
-    { id: 'documents', label: 'Documentos', icon: FileText }
+    { id: 'documents', label: 'Documentos', icon: FileText },
   ];
 
   const stageOptions = [
-    { value: 'leads', label: 'Leads', badgeClasses: 'bg-[#DEEFE7] text-[#002333] border border-[#B4BEC9]' },
-    { value: 'qualification', label: 'Qualificação', badgeClasses: 'bg-[#159A9C]/10 text-[#0F7B7D] border border-[#159A9C]/40' },
-    { value: 'proposal', label: 'Proposta', badgeClasses: 'bg-white text-[#002333] border border-[#B4BEC9]' },
-    { value: 'negotiation', label: 'Negociação', badgeClasses: 'bg-[#DEEFE7] text-[#0F7B7D] border border-[#159A9C]/40' },
-    { value: 'closing', label: 'Fechamento', badgeClasses: 'bg-[#159A9C] text-white border border-transparent' },
-    { value: 'won', label: 'Ganho', badgeClasses: 'bg-[#0F7B7D] text-white border border-transparent' },
-    { value: 'lost', label: 'Perdido', badgeClasses: 'bg-[#B4BEC9]/40 text-[#002333] border border-[#B4BEC9]' }
+    {
+      value: 'leads',
+      label: 'Leads',
+      badgeClasses: 'bg-[#DEEFE7] text-[#002333] border border-[#B4BEC9]',
+    },
+    {
+      value: 'qualification',
+      label: 'Qualificação',
+      badgeClasses: 'bg-[#159A9C]/10 text-[#0F7B7D] border border-[#159A9C]/40',
+    },
+    {
+      value: 'proposal',
+      label: 'Proposta',
+      badgeClasses: 'bg-white text-[#002333] border border-[#B4BEC9]',
+    },
+    {
+      value: 'negotiation',
+      label: 'Negociação',
+      badgeClasses: 'bg-[#DEEFE7] text-[#0F7B7D] border border-[#159A9C]/40',
+    },
+    {
+      value: 'closing',
+      label: 'Fechamento',
+      badgeClasses: 'bg-[#159A9C] text-white border border-transparent',
+    },
+    {
+      value: 'won',
+      label: 'Ganho',
+      badgeClasses: 'bg-[#0F7B7D] text-white border border-transparent',
+    },
+    {
+      value: 'lost',
+      label: 'Perdido',
+      badgeClasses: 'bg-[#B4BEC9]/40 text-[#002333] border border-[#B4BEC9]',
+    },
   ];
 
   const priorityOptions = [
-    { value: 'low', label: 'Baixa', badgeClasses: 'bg-[#DEEFE7] text-[#0F7B7D] border border-[#159A9C]/40' },
-    { value: 'medium', label: 'Média', badgeClasses: 'bg-white text-[#002333] border border-[#B4BEC9]' },
-    { value: 'high', label: 'Alta', badgeClasses: 'bg-[#159A9C] text-white border border-transparent' }
+    {
+      value: 'low',
+      label: 'Baixa',
+      badgeClasses: 'bg-[#DEEFE7] text-[#0F7B7D] border border-[#159A9C]/40',
+    },
+    {
+      value: 'medium',
+      label: 'Média',
+      badgeClasses: 'bg-white text-[#002333] border border-[#B4BEC9]',
+    },
+    {
+      value: 'high',
+      label: 'Alta',
+      badgeClasses: 'bg-[#159A9C] text-white border border-transparent',
+    },
   ];
 
   const activityTypes = [
@@ -61,7 +101,7 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
     { value: 'email', label: 'Email', icon: Mail },
     { value: 'meeting', label: 'Reunião', icon: Users },
     { value: 'note', label: 'Nota', icon: MessageSquare },
-    { value: 'task', label: 'Tarefa', icon: CheckCircle }
+    { value: 'task', label: 'Tarefa', icon: CheckCircle },
   ];
 
   const handleSave = () => {
@@ -75,13 +115,13 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
     const activity = {
       ...newActivity,
       id: Date.now().toString(),
-      date: new Date().toISOString()
+      date: new Date().toISOString(),
     };
 
     const updatedOpportunity = {
       ...editData,
       activities: [activity, ...(editData.activities || [])],
-      lastActivity: new Date().toISOString().split('T')[0]
+      lastActivity: new Date().toISOString().split('T')[0],
     };
 
     setEditData(updatedOpportunity);
@@ -89,19 +129,19 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
     setNewActivity({
       type: 'note',
       description: '',
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
     });
   };
 
   const getActivityIcon = (type) => {
-    const activityType = activityTypes.find(t => t.value === type);
+    const activityType = activityTypes.find((t) => t.value === type);
     return activityType ? activityType.icon : MessageSquare;
   };
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -110,12 +150,12 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
   };
 
   const getPriorityBadgeClasses = (priority) => {
-    const option = priorityOptions.find(p => p.value === priority);
+    const option = priorityOptions.find((p) => p.value === priority);
     return option ? option.badgeClasses : 'bg-[#DEEFE7] text-[#002333] border border-[#B4BEC9]';
   };
 
   const getStageBadgeClasses = (stage) => {
-    const option = stageOptions.find(s => s.value === stage);
+    const option = stageOptions.find((s) => s.value === stage);
     return option ? option.badgeClasses : 'bg-[#DEEFE7] text-[#002333] border border-[#B4BEC9]';
   };
 
@@ -186,16 +226,17 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
 
         {/* Tabs */}
         <div className="flex border-b border-[#DEEFE7] bg-[#DEEFE7] px-2">
-          {tabs.map(tab => {
+          {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors rounded-t-lg ${activeTab === tab.id
+                className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors rounded-t-lg ${
+                  activeTab === tab.id
                     ? 'bg-white text-[#159A9C] border border-[#DEEFE7] border-b-0 shadow-sm'
                     : 'text-[#002333]/60 hover:text-[#002333]'
-                  }`}
+                }`}
               >
                 <Icon className="w-4 h-4" />
                 {tab.label}
@@ -211,7 +252,9 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
               {/* Informações Principais */}
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-semibold text-[#002333] mb-4">Informações Principais</h3>
+                  <h3 className="text-lg font-semibold text-[#002333] mb-4">
+                    Informações Principais
+                  </h3>
 
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -220,7 +263,9 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                         <input
                           type="number"
                           value={editData.value}
-                          onChange={(e) => setEditData({ ...editData, value: parseFloat(e.target.value) || 0 })}
+                          onChange={(e) =>
+                            setEditData({ ...editData, value: parseFloat(e.target.value) || 0 })
+                          }
                           className="border border-[#B4BEC9] rounded-lg px-3 py-2 w-48 text-right text-[#002333] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                         />
                       ) : (
@@ -238,7 +283,9 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                           min="0"
                           max="100"
                           value={editData.probability}
-                          onChange={(e) => setEditData({ ...editData, probability: parseInt(e.target.value) })}
+                          onChange={(e) =>
+                            setEditData({ ...editData, probability: parseInt(e.target.value) })
+                          }
                           className="w-32"
                         />
                       ) : (
@@ -262,7 +309,7 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                           onChange={(e) => setEditData({ ...editData, stage: e.target.value })}
                           className="border border-[#B4BEC9] rounded-lg px-3 py-2 text-[#002333] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                         >
-                          {stageOptions.map(option => (
+                          {stageOptions.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
                             </option>
@@ -272,7 +319,7 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                         <span
                           className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStageBadgeClasses(opportunity.stage)}`}
                         >
-                          {stageOptions.find(s => s.value === opportunity.stage)?.label}
+                          {stageOptions.find((s) => s.value === opportunity.stage)?.label}
                         </span>
                       )}
                     </div>
@@ -285,7 +332,7 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                           onChange={(e) => setEditData({ ...editData, priority: e.target.value })}
                           className="border border-[#B4BEC9] rounded-lg px-3 py-2 text-[#002333] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                         >
-                          {priorityOptions.map(option => (
+                          {priorityOptions.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
                             </option>
@@ -295,7 +342,7 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                         <span
                           className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getPriorityBadgeClasses(opportunity.priority)}`}
                         >
-                          {priorityOptions.find(p => p.value === opportunity.priority)?.label}
+                          {priorityOptions.find((p) => p.value === opportunity.priority)?.label}
                         </span>
                       )}
                     </div>
@@ -311,7 +358,9 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                       <Calendar className="w-5 h-5 text-[#B4BEC9]" />
                       <div>
                         <p className="text-sm text-[#002333]/70">Data de Criação</p>
-                        <p className="font-medium text-[#002333]">{formatDate(opportunity.createdDate)}</p>
+                        <p className="font-medium text-[#002333]">
+                          {formatDate(opportunity.createdDate)}
+                        </p>
                       </div>
                     </div>
 
@@ -323,11 +372,15 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                           <input
                             type="date"
                             value={editData.expectedCloseDate}
-                            onChange={(e) => setEditData({ ...editData, expectedCloseDate: e.target.value })}
+                            onChange={(e) =>
+                              setEditData({ ...editData, expectedCloseDate: e.target.value })
+                            }
                             className="border border-[#B4BEC9] rounded-lg px-3 py-1 text-[#002333] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                           />
                         ) : (
-                          <p className="font-medium text-[#002333]">{formatDate(opportunity.expectedCloseDate)}</p>
+                          <p className="font-medium text-[#002333]">
+                            {formatDate(opportunity.expectedCloseDate)}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -338,7 +391,9 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
               {/* Informações do Cliente */}
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-semibold text-[#002333] mb-4">Informações do Cliente</h3>
+                  <h3 className="text-lg font-semibold text-[#002333] mb-4">
+                    Informações do Cliente
+                  </h3>
 
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
@@ -365,7 +420,9 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                         {isEditing ? (
                           <select
                             value={editData.assignedTo}
-                            onChange={(e) => setEditData({ ...editData, assignedTo: e.target.value })}
+                            onChange={(e) =>
+                              setEditData({ ...editData, assignedTo: e.target.value })
+                            }
                             className="border border-[#B4BEC9] rounded-lg px-3 py-2 w-full text-[#002333] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                           >
                             <option value="Ana Silva">Ana Silva</option>
@@ -406,7 +463,7 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                 <div>
                   <h3 className="text-lg font-semibold text-[#002333] mb-4">Tags</h3>
                   <div className="flex flex-wrap gap-2">
-                    {opportunity.tags?.map(tag => (
+                    {opportunity.tags?.map((tag) => (
                       <span
                         key={tag}
                         className="px-3 py-1 bg-[#159A9C] text-white rounded-full text-sm"
@@ -438,7 +495,7 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                     onChange={(e) => setNewActivity({ ...newActivity, type: e.target.value })}
                     className="border border-[#B4BEC9] rounded-lg px-3 py-2 text-[#002333] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                   >
-                    {activityTypes.map(type => (
+                    {activityTypes.map((type) => (
                       <option key={type.value} value={type.value}>
                         {type.label}
                       </option>
@@ -470,20 +527,25 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
 
               {/* Lista de Atividades */}
               <div>
-                <h3 className="text-lg font-semibold text-[#002333] mb-4">Histórico de Atividades</h3>
+                <h3 className="text-lg font-semibold text-[#002333] mb-4">
+                  Histórico de Atividades
+                </h3>
 
                 <div className="space-y-4">
-                  {(editData.activities || []).map(activity => {
+                  {(editData.activities || []).map((activity) => {
                     const Icon = getActivityIcon(activity.type);
                     return (
-                      <div key={activity.id || activity.date} className="flex gap-4 p-4 bg-white border border-[#DEEFE7] rounded-lg">
+                      <div
+                        key={activity.id || activity.date}
+                        className="flex gap-4 p-4 bg-white border border-[#DEEFE7] rounded-lg"
+                      >
                         <div className="p-2 bg-[#DEEFE7] rounded-lg">
                           <Icon className="w-5 h-5 text-[#002333]/70" />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="font-medium text-[#002333]">
-                              {activityTypes.find(t => t.value === activity.type)?.label}
+                              {activityTypes.find((t) => t.value === activity.type)?.label}
                             </h4>
                             <span className="text-sm text-[#002333]/60">
                               {formatDate(activity.date)}
@@ -520,7 +582,9 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                     </div>
                     <div className="flex-1 pt-2">
                       <h4 className="font-medium text-[#002333]">Oportunidade Criada</h4>
-                      <p className="text-sm text-[#002333]/70">{formatDate(opportunity.createdDate)}</p>
+                      <p className="text-sm text-[#002333]/70">
+                        {formatDate(opportunity.createdDate)}
+                      </p>
                     </div>
                   </div>
 
@@ -545,7 +609,9 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
                     </div>
                     <div className="flex-1 pt-2">
                       <h4 className="font-medium text-[#002333]">Fechamento Esperado</h4>
-                      <p className="text-sm text-[#002333]/70">{formatDate(opportunity.expectedCloseDate)}</p>
+                      <p className="text-sm text-[#002333]/70">
+                        {formatDate(opportunity.expectedCloseDate)}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -566,7 +632,9 @@ const OpportunityModal = ({ opportunity, onClose, onUpdate }) => {
               <div className="text-center py-12 text-[#002333]/60">
                 <FileText className="w-12 h-12 text-[#B4BEC9] mx-auto mb-4" />
                 <p>Nenhum documento anexado ainda.</p>
-                <p className="text-sm">Clique em "Adicionar Documento" para fazer upload de arquivos.</p>
+                <p className="text-sm">
+                  Clique em "Adicionar Documento" para fazer upload de arquivos.
+                </p>
               </div>
             </div>
           )}

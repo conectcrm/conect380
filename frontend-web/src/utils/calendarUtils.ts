@@ -1,9 +1,12 @@
 import { CalendarEvent, CalendarDay } from '../types/calendar';
 
 // Utilitários para formatação de datas
-export const formatDate = (date: Date, format: 'short' | 'long' | 'time' | 'datetime' = 'short'): string => {
+export const formatDate = (
+  date: Date,
+  format: 'short' | 'long' | 'time' | 'datetime' = 'short',
+): string => {
   const options: Intl.DateTimeFormatOptions = {};
-  
+
   switch (format) {
     case 'short':
       options.day = '2-digit';
@@ -28,7 +31,7 @@ export const formatDate = (date: Date, format: 'short' | 'long' | 'time' | 'date
       options.minute = '2-digit';
       break;
   }
-  
+
   return date.toLocaleDateString('pt-BR', options);
 };
 
@@ -37,54 +40,54 @@ export const generateCalendarDays = (date: Date, events: CalendarEvent[]): Calen
   const year = date.getFullYear();
   const month = date.getMonth();
   const today = new Date();
-  
+
   // Primeiro dia do mês
   const firstDay = new Date(year, month, 1);
   // Último dia do mês
   const lastDay = new Date(year, month + 1, 0);
-  
+
   // Primeiro dia da semana (domingo = 0)
   const startDate = new Date(firstDay);
   startDate.setDate(startDate.getDate() - firstDay.getDay());
-  
+
   // Último dia da semana
   const endDate = new Date(lastDay);
   endDate.setDate(endDate.getDate() + (6 - lastDay.getDay()));
-  
+
   const days: CalendarDay[] = [];
   const currentDate = new Date(startDate);
-  
+
   while (currentDate <= endDate) {
-    const dayEvents = events.filter(event => 
-      isSameDay(event.start, currentDate)
-    );
-    
+    const dayEvents = events.filter((event) => isSameDay(event.start, currentDate));
+
     days.push({
       date: new Date(currentDate),
       isCurrentMonth: currentDate.getMonth() === month,
       isToday: isSameDay(currentDate, today),
       isWeekend: currentDate.getDay() === 0 || currentDate.getDay() === 6,
-      events: dayEvents
+      events: dayEvents,
     });
-    
+
     currentDate.setDate(currentDate.getDate() + 1);
   }
-  
+
   return days;
 };
 
 // Verificar se duas datas são do mesmo dia
 export const isSameDay = (date1: Date, date2: Date): boolean => {
-  return date1.getFullYear() === date2.getFullYear() &&
-         date1.getMonth() === date2.getMonth() &&
-         date1.getDate() === date2.getDate();
+  return (
+    date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate()
+  );
 };
 
 // Gerar semana atual
 export const generateWeekDays = (date: Date): Date[] => {
   const startOfWeek = new Date(date);
   startOfWeek.setDate(date.getDate() - date.getDay());
-  
+
   return Array.from({ length: 7 }, (_, i) => {
     const day = new Date(startOfWeek);
     day.setDate(startOfWeek.getDate() + i);
@@ -108,11 +111,11 @@ export const generateTimeSlots = (): string[] => {
 export const hasEventConflict = (
   newEvent: { start: Date; end: Date },
   existingEvents: CalendarEvent[],
-  excludeEventId?: string
+  excludeEventId?: string,
 ): boolean => {
-  return existingEvents.some(event => {
+  return existingEvents.some((event) => {
     if (excludeEventId && event.id === excludeEventId) return false;
-    
+
     return (
       (newEvent.start >= event.start && newEvent.start < event.end) ||
       (newEvent.end > event.start && newEvent.end <= event.end) ||
@@ -126,36 +129,36 @@ export const calculateEventPosition = (
   event: CalendarEvent,
   containerHeight: number,
   startHour: number = 8,
-  endHour: number = 20
+  endHour: number = 20,
 ): { top: number; height: number } => {
   const totalMinutes = (endHour - startHour) * 60;
   const minutesPerPixel = containerHeight / totalMinutes;
-  
+
   const eventStartMinutes = (event.start.getHours() - startHour) * 60 + event.start.getMinutes();
   const eventDurationMinutes = (event.end.getTime() - event.start.getTime()) / (1000 * 60);
-  
+
   return {
     top: Math.max(0, eventStartMinutes * minutesPerPixel),
-    height: Math.max(20, eventDurationMinutes * minutesPerPixel)
+    height: Math.max(20, eventDurationMinutes * minutesPerPixel),
   };
 };
 
 // Agrupar eventos por coluna para evitar sobreposição
 export const organizeEventColumns = (events: CalendarEvent[]): CalendarEvent[][] => {
   if (events.length === 0) return [];
-  
+
   // Ordenar eventos por horário de início
   const sortedEvents = [...events].sort((a, b) => a.start.getTime() - b.start.getTime());
-  
+
   const columns: CalendarEvent[][] = [];
-  
-  sortedEvents.forEach(event => {
+
+  sortedEvents.forEach((event) => {
     // Encontrar primeira coluna onde o evento cabe
-    let columnIndex = columns.findIndex(column => {
+    let columnIndex = columns.findIndex((column) => {
       const lastEventInColumn = column[column.length - 1];
       return lastEventInColumn.end <= event.start;
     });
-    
+
     // Se não encontrou coluna, criar nova
     if (columnIndex === -1) {
       columns.push([event]);
@@ -163,7 +166,7 @@ export const organizeEventColumns = (events: CalendarEvent[]): CalendarEvent[][]
       columns[columnIndex].push(event);
     }
   });
-  
+
   return columns;
 };
 
@@ -174,8 +177,8 @@ export const getMonthName = (date: Date): string => {
 
 // Obter nome do dia da semana
 export const getDayName = (date: Date, format: 'short' | 'long' = 'long'): string => {
-  return date.toLocaleDateString('pt-BR', { 
-    weekday: format === 'short' ? 'short' : 'long' 
+  return date.toLocaleDateString('pt-BR', {
+    weekday: format === 'short' ? 'short' : 'long',
   });
 };
 

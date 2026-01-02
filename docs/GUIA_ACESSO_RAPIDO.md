@@ -148,7 +148,7 @@ http://localhost:3000/suporte
    ```
    http://localhost:3000/login
    ```
-   - Email: `admin@conectcrm.com` (exemplo)
+   - Email: `admin@conectsuite.com.br` (exemplo)
    - Senha: `admin123` (exemplo)
 
 2. **Navegue para Suporte**:
@@ -332,7 +332,7 @@ const response = await fetch('http://localhost:3001/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    email: 'admin@conectcrm.com',
+    email: 'admin@conectsuite.com.br',
     senha: 'admin123'
   })
 });

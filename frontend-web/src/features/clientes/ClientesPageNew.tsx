@@ -2,17 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { useI18n } from '../../contexts/I18nContext';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import ClienteModal from '../../components/modals/ClienteModal';
-import { clientesService, Cliente, ClienteFilters, PaginatedClientes } from '../../services/clientesService';
-import { 
-  Users, 
+import {
+  clientesService,
+  Cliente,
+  ClienteFilters,
+  PaginatedClientes,
+} from '../../services/clientesService';
+import {
+  Users,
   User,
-  Plus, 
-  Search, 
-  Filter, 
-  Download, 
-  Eye, 
-  Edit, 
-  Trash2, 
+  Plus,
+  Search,
+  Filter,
+  Download,
+  Eye,
+  Edit,
+  Trash2,
   MoreVertical,
   Phone,
   Mail,
@@ -22,7 +27,7 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
-  Loader2
+  Loader2,
 } from 'lucide-react';
 
 // Dados mock para fallback
@@ -38,10 +43,10 @@ const mockClientes: Cliente[] = [
     status: 'cliente',
     tipo: 'pessoa_juridica',
     tags: ['Premium', 'VIP'],
-    created_at: '2024-01-10'
+    created_at: '2024-01-10',
   },
   {
-    id: '2', 
+    id: '2',
     nome: 'Maria Santos Oliveira',
     email: 'maria@startup.com',
     telefone: '(11) 88888-8888',
@@ -51,7 +56,7 @@ const mockClientes: Cliente[] = [
     status: 'prospect',
     tipo: 'pessoa_juridica',
     tags: ['Startup', 'Tech'],
-    created_at: '2024-01-08'
+    created_at: '2024-01-08',
   },
   {
     id: '3',
@@ -64,8 +69,8 @@ const mockClientes: Cliente[] = [
     status: 'inativo',
     tipo: 'pessoa_fisica',
     tags: ['Freelancer'],
-    created_at: '2024-01-01'
-  }
+    created_at: '2024-01-01',
+  },
 ];
 
 const ClientesPage: React.FC = () => {
@@ -79,7 +84,7 @@ const ClientesPage: React.FC = () => {
     status: '',
     tipo: '',
     sortBy: 'created_at',
-    sortOrder: 'DESC'
+    sortOrder: 'DESC',
   });
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -89,7 +94,7 @@ const ClientesPage: React.FC = () => {
     total: 0,
     ativos: 0,
     prospects: 0,
-    leads: 0
+    leads: 0,
   });
 
   // Carregar clientes
@@ -108,7 +113,7 @@ const ClientesPage: React.FC = () => {
         total: mockClientes.length,
         page: 1,
         limit: 10,
-        totalPages: 1
+        totalPages: 1,
       });
     } finally {
       setIsLoading(false);
@@ -124,9 +129,9 @@ const ClientesPage: React.FC = () => {
       console.error('Erro ao carregar estatísticas:', error);
       // Calcular estatísticas dos dados locais como fallback
       const total = clientes.length;
-      const ativos = clientes.filter(c => c.status === 'cliente').length;
-      const prospects = clientes.filter(c => c.status === 'prospect').length;
-      const leads = clientes.filter(c => c.status === 'lead').length;
+      const ativos = clientes.filter((c) => c.status === 'cliente').length;
+      const prospects = clientes.filter((c) => c.status === 'prospect').length;
+      const leads = clientes.filter((c) => c.status === 'lead').length;
       setEstatisticas({ total, ativos, prospects, leads });
     }
   };
@@ -143,26 +148,28 @@ const ClientesPage: React.FC = () => {
 
   // Handlers para filtros
   const handleSearchChange = (value: string) => {
-    setFilters(prev => ({ ...prev, search: value, page: 1 }));
+    setFilters((prev) => ({ ...prev, search: value, page: 1 }));
   };
 
   const handleStatusChange = (status: string) => {
-    setFilters(prev => ({ ...prev, status: status === 'todos' ? '' : status, page: 1 }));
+    setFilters((prev) => ({ ...prev, status: status === 'todos' ? '' : status, page: 1 }));
   };
 
   const handleTipoChange = (tipo: string) => {
-    setFilters(prev => ({ ...prev, tipo: tipo === 'todos' ? '' : tipo, page: 1 }));
+    setFilters((prev) => ({ ...prev, tipo: tipo === 'todos' ? '' : tipo, page: 1 }));
   };
 
   const handlePageChange = (page: number) => {
-    setFilters(prev => ({ ...prev, page }));
+    setFilters((prev) => ({ ...prev, page }));
   };
 
   // Handler para salvar cliente (criar/editar)
-  const handleSaveCliente = async (clienteData: Omit<Cliente, 'id' | 'created_at' | 'updated_at'>) => {
+  const handleSaveCliente = async (
+    clienteData: Omit<Cliente, 'id' | 'created_at' | 'updated_at'>,
+  ) => {
     try {
       setIsModalLoading(true);
-      
+
       if (selectedCliente) {
         // Editar cliente existente
         await clientesService.updateCliente(selectedCliente.id!, clienteData);
@@ -170,10 +177,10 @@ const ClientesPage: React.FC = () => {
         // Criar novo cliente
         await clientesService.createCliente(clienteData);
       }
-      
+
       // Recarregar a lista
       await loadClientes();
-      
+
       // Fechar modal
       setShowCreateModal(false);
       setSelectedCliente(null);
@@ -224,31 +231,37 @@ const ClientesPage: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'cliente': return 'bg-green-100 text-green-800 border-green-200';
-      case 'prospect': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'lead': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'inativo': return 'bg-gray-100 text-gray-800 border-gray-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'cliente':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'prospect':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'lead':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'inativo':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'cliente': return 'Cliente';
-      case 'prospect': return 'Prospect';
-      case 'lead': return 'Lead';
-      case 'inativo': return 'Inativo';
-      default: return status;
+      case 'cliente':
+        return 'Cliente';
+      case 'prospect':
+        return 'Prospect';
+      case 'lead':
+        return 'Lead';
+      case 'inativo':
+        return 'Inativo';
+      default:
+        return status;
     }
   };
 
   return (
     <div className="min-h-screen bg-[#DEEFE7]">
-      <BackToNucleus 
-        nucleusName="CRM" 
-        nucleusPath="/nuclei/crm"
-        currentModuleName="Clientes"
-      />
+      <BackToNucleus nucleusName="CRM" nucleusPath="/nuclei/crm" currentModuleName="Clientes" />
       <div className="p-6">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -257,14 +270,14 @@ const ClientesPage: React.FC = () => {
               <p className="mt-2 text-[#B4BEC9]">Gerencie seus clientes e contatos</p>
             </div>
             <div className="mt-4 sm:mt-0 flex gap-3">
-              <button 
+              <button
                 onClick={handleExportClientes}
                 className="px-4 py-2 border border-[#B4BEC9] rounded-lg hover:bg-[#DEEFE7] flex items-center gap-2 text-sm text-[#002333] transition-colors"
               >
                 <Download className="w-4 h-4" />
                 Exportar
               </button>
-              <button 
+              <button
                 onClick={() => {
                   setSelectedCliente(null);
                   setShowCreateModal(true);
@@ -290,7 +303,7 @@ const ClientesPage: React.FC = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white p-4 rounded-lg border border-[#DEEFE7] shadow-sm">
               <div className="flex items-center">
                 <div className="p-2 bg-green-100 rounded-lg">
@@ -373,7 +386,7 @@ const ClientesPage: React.FC = () => {
               value={`${filters.sortBy}-${filters.sortOrder}`}
               onChange={(e) => {
                 const [sortBy, sortOrder] = e.target.value.split('-');
-                setFilters(prev => ({ ...prev, sortBy, sortOrder: sortOrder as 'ASC' | 'DESC' }));
+                setFilters((prev) => ({ ...prev, sortBy, sortOrder: sortOrder as 'ASC' | 'DESC' }));
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
             >
@@ -445,7 +458,9 @@ const ClientesPage: React.FC = () => {
                               </div>
                             </div>
                             <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">{cliente.nome}</div>
+                              <div className="text-sm font-medium text-gray-900">
+                                {cliente.nome}
+                              </div>
                               {cliente.empresa && (
                                 <div className="text-sm text-gray-500">{cliente.empresa}</div>
                               )}
@@ -464,12 +479,16 @@ const ClientesPage: React.FC = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(cliente.status)}`}>
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(cliente.status)}`}
+                          >
                             {getStatusText(cliente.status)}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {cliente.created_at ? new Date(cliente.created_at).toLocaleDateString('pt-BR') : '-'}
+                          {cliente.created_at
+                            ? new Date(cliente.created_at).toLocaleDateString('pt-BR')
+                            : '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center justify-end space-x-2">
@@ -507,7 +526,11 @@ const ClientesPage: React.FC = () => {
                       Anterior
                     </button>
                     <button
-                      onClick={() => handlePageChange(Math.min(clientesData.totalPages, (clientesData.page || 1) + 1))}
+                      onClick={() =>
+                        handlePageChange(
+                          Math.min(clientesData.totalPages, (clientesData.page || 1) + 1),
+                        )
+                      }
                       disabled={!clientesData.page || clientesData.page === clientesData.totalPages}
                       className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -523,22 +546,26 @@ const ClientesPage: React.FC = () => {
                         </span>{' '}
                         até{' '}
                         <span className="font-medium">
-                          {Math.min((clientesData.page || 1) * (clientesData.limit || 10), clientesData.total)}
+                          {Math.min(
+                            (clientesData.page || 1) * (clientesData.limit || 10),
+                            clientesData.total,
+                          )}
                         </span>{' '}
-                        de{' '}
-                        <span className="font-medium">{clientesData.total}</span> resultados
+                        de <span className="font-medium">{clientesData.total}</span> resultados
                       </p>
                     </div>
                     <div>
                       <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
                         <button
-                          onClick={() => handlePageChange(Math.max(1, (clientesData.page || 1) - 1))}
+                          onClick={() =>
+                            handlePageChange(Math.max(1, (clientesData.page || 1) - 1))
+                          }
                           disabled={!clientesData.page || clientesData.page === 1}
                           className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <ChevronLeft className="h-5 w-5" />
                         </button>
-                        
+
                         {/* Números das páginas */}
                         {Array.from({ length: Math.min(5, clientesData.totalPages) }, (_, i) => {
                           const page = i + 1;
@@ -559,8 +586,14 @@ const ClientesPage: React.FC = () => {
                         })}
 
                         <button
-                          onClick={() => handlePageChange(Math.min(clientesData.totalPages, (clientesData.page || 1) + 1))}
-                          disabled={!clientesData.page || clientesData.page === clientesData.totalPages}
+                          onClick={() =>
+                            handlePageChange(
+                              Math.min(clientesData.totalPages, (clientesData.page || 1) + 1),
+                            )
+                          }
+                          disabled={
+                            !clientesData.page || clientesData.page === clientesData.totalPages
+                          }
                           className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <ChevronRight className="h-5 w-5" />

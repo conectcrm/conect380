@@ -15,7 +15,7 @@ export const safeGetBoundingClientRect = (element: Element | null): DOMRect => {
       right: 0,
       bottom: 0,
       left: 0,
-      toJSON: () => ({})
+      toJSON: () => ({}),
     } as DOMRect;
   }
 
@@ -32,7 +32,7 @@ export const safeGetBoundingClientRect = (element: Element | null): DOMRect => {
       right: 0,
       bottom: 0,
       left: 0,
-      toJSON: () => ({})
+      toJSON: () => ({}),
     } as DOMRect;
   }
 };
@@ -41,36 +41,33 @@ export const safeGetWindowDimensions = () => {
   if (typeof window === 'undefined') {
     return {
       innerWidth: 1920,
-      innerHeight: 1080
+      innerHeight: 1080,
     };
   }
 
   return {
     innerWidth: window.innerWidth,
-    innerHeight: window.innerHeight
+    innerHeight: window.innerHeight,
   };
 };
 
 export const calculateSafePosition = (
   position: { x: number; y: number },
   elementWidth: number = 400,
-  elementHeight: number = 500
+  elementHeight: number = 500,
 ) => {
   const { innerWidth, innerHeight } = safeGetWindowDimensions();
 
   return {
     x: Math.min(position.x, innerWidth - elementWidth),
-    y: Math.min(position.y, innerHeight - elementHeight)
+    y: Math.min(position.y, innerHeight - elementHeight),
   };
 };
 
 /**
  * Hook para manipulação segura de eventos de mouse
  */
-export const createSafeMouseHandler = (
-  callback: (rect: DOMRect) => void,
-  delay: number = 0
-) => {
+export const createSafeMouseHandler = (callback: (rect: DOMRect) => void, delay: number = 0) => {
   return (event: React.MouseEvent) => {
     const execute = () => {
       if (!event.currentTarget) return;

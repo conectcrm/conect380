@@ -233,6 +233,6 @@ Ver: `RESUMO_EXECUTIVO_MELHORIAS_BOT.md`
 
 ---
 
-**🚀 Bot do ConectCRM agora compete com Zendesk, Intercom e Drift!**
+**🚀 Bot do ConectCRM com recursos modernos de automação e triagem inteligente!**
 
 _Documentação preparada por GitHub Copilot em 10/11/2025_

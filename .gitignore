@@ -23,6 +23,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+*.log
+logs/
+backend-logs.txt
+frontend-start-log.txt
+build-log.txt
 
 # Runtime data
 pids
@@ -58,6 +63,13 @@ tmp/
 temp/
 archived/
 backup*/
+backups/
+migration-backup/
+
+# Uploads (não versionar arquivos de usuários)
+uploads/
+*.pem
+*.key
 
 # Database
 *.db
@@ -78,6 +90,24 @@ backup*/
 
 # Output of 'npm pack'
 *.tgz
+
+# ==================================================
+# 🚫 ARQUIVOS COMPACTADOS (Usar Git como backup!)
+# ==================================================
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+*-deploy.zip
+*-deploy.tar.gz
+backend-*.zip
+frontend-*.zip
+backend-*.tar.gz
+frontend-*.tar.gz
+*-fixed.zip
+*-updated.zip
+*-backup.zip
 
 # Yarn Integrity file
 .yarn-integrity
@@ -124,6 +154,14 @@ dist
 scripts/test-*.js
 scripts/debug-*.js
 scripts/temp-*.js
+scripts/*.env
+
+# 🔐 SEGURANÇA: Arquivos com credenciais expostas
+*-with-credentials.js
+*-with-token.js
+*-with-password.js
+credentials-*.js
+api-keys-*.js
 
 # SQL temporários (APENAS raiz)
 /*.sql

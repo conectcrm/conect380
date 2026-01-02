@@ -23,12 +23,12 @@ const salesData: SalesData[] = [
   { month: 'Set', sales: 260000, quantity: 95 },
   { month: 'Out', sales: 275000, quantity: 102 },
   { month: 'Nov', sales: 290000, quantity: 108 },
-  { month: 'Dez', sales: 320000, quantity: 125 }
+  { month: 'Dez', sales: 320000, quantity: 125 },
 ];
 
 export const SalesEvolutionChart: React.FC<SalesEvolutionChartProps> = ({
   className = '',
-  isLoading = false
+  isLoading = false,
 }) => {
   const [viewMode, setViewMode] = useState<'sales' | 'quantity'>('sales');
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -55,9 +55,9 @@ export const SalesEvolutionChart: React.FC<SalesEvolutionChartProps> = ({
     );
   }
 
-  const maxValue = Math.max(...safeData.map(item =>
-    viewMode === 'sales' ? item.sales : item.quantity
-  ));
+  const maxValue = Math.max(
+    ...safeData.map((item) => (viewMode === 'sales' ? item.sales : item.quantity)),
+  );
 
   const formatValue = (value: number) => {
     if (viewMode === 'sales') {
@@ -65,7 +65,7 @@ export const SalesEvolutionChart: React.FC<SalesEvolutionChartProps> = ({
         style: 'currency',
         currency: 'BRL',
         minimumFractionDigits: 0,
-        maximumFractionDigits: 0
+        maximumFractionDigits: 0,
       }).format(value);
     }
     return value.toString();
@@ -75,26 +75,26 @@ export const SalesEvolutionChart: React.FC<SalesEvolutionChartProps> = ({
     <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6 ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-gray-900">
-          Evolução de Vendas
-        </h3>
+        <h3 className="text-lg font-semibold text-gray-900">Evolução de Vendas</h3>
         <div className="flex bg-gray-100 rounded-lg p-1">
           <button
             onClick={() => setViewMode('sales')}
-            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'sales'
+            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+              viewMode === 'sales'
                 ? 'bg-white text-blue-600 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
-              }`}
+            }`}
             aria-pressed={viewMode === 'sales'}
           >
             Valor
           </button>
           <button
             onClick={() => setViewMode('quantity')}
-            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'quantity'
+            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+              viewMode === 'quantity'
                 ? 'bg-white text-blue-600 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
-              }`}
+            }`}
             aria-pressed={viewMode === 'quantity'}
           >
             Quantidade
@@ -134,9 +134,7 @@ export const SalesEvolutionChart: React.FC<SalesEvolutionChartProps> = ({
                 />
 
                 {/* Month label */}
-                <div className="mt-2 text-xs text-gray-600 font-medium">
-                  {item.month}
-                </div>
+                <div className="mt-2 text-xs text-gray-600 font-medium">{item.month}</div>
               </div>
             );
           })}
@@ -155,10 +153,12 @@ export const SalesEvolutionChart: React.FC<SalesEvolutionChartProps> = ({
             </div>
           </div>
           <div className="text-gray-500">
-            Total: {formatValue(
-              safeData.reduce((sum, item) =>
-                sum + (viewMode === 'sales' ? item.sales : item.quantity), 0
-              )
+            Total:{' '}
+            {formatValue(
+              safeData.reduce(
+                (sum, item) => sum + (viewMode === 'sales' ? item.sales : item.quantity),
+                0,
+              ),
             )}
           </div>
         </div>

@@ -73,8 +73,12 @@ export class Cliente {
   @Column({ type: 'text', nullable: true })
   observacoes: string;
 
-  @Column('uuid')
-  empresa_id: string;
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa_rel: Empresa;
 
   @Column('uuid', { nullable: true })
   responsavel_id: string; // Vendedor responsável

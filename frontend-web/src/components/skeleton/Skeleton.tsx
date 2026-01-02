@@ -11,7 +11,7 @@ export default function Skeleton({
   className = '',
   height = 'h-4',
   width = 'w-full',
-  rounded = true
+  rounded = true,
 }: SkeletonProps) {
   return (
     <div

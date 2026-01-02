@@ -7,14 +7,14 @@ export enum StatusFatura {
   PAGA = 'paga',
   VENCIDA = 'vencida',
   CANCELADA = 'cancelada',
-  PARCIALMENTE_PAGA = 'parcialmente_paga'
+  PARCIALMENTE_PAGA = 'parcialmente_paga',
 }
 
 export enum TipoFatura {
   UNICA = 'unica',
   RECORRENTE = 'recorrente',
   PARCELA = 'parcela',
-  ADICIONAL = 'adicional'
+  ADICIONAL = 'adicional',
 }
 
 export enum FormaPagamento {
@@ -23,7 +23,7 @@ export enum FormaPagamento {
   CARTAO_DEBITO = 'cartao_debito',
   BOLETO = 'boleto',
   TRANSFERENCIA = 'transferencia',
-  DINHEIRO = 'dinheiro'
+  DINHEIRO = 'dinheiro',
 }
 
 export enum StatusPagamento {
@@ -32,7 +32,7 @@ export enum StatusPagamento {
   APROVADO = 'aprovado',
   REJEITADO = 'rejeitado',
   CANCELADO = 'cancelado',
-  ESTORNADO = 'estornado'
+  ESTORNADO = 'estornado',
 }
 
 // Interfaces
@@ -191,9 +191,7 @@ export const faturamentoService = {
   // ==================== FATURAS ====================
 
   // Novo tipo de resposta paginada com agregados
-  async listarFaturasPaginadas(
-    filtros?: FiltrosFatura
-  ): Promise<FaturasPaginadasResponse> {
+  async listarFaturasPaginadas(filtros?: FiltrosFatura): Promise<FaturasPaginadasResponse> {
     try {
       const params = new URLSearchParams();
 
@@ -213,7 +211,7 @@ export const faturamentoService = {
           dataFinal: 'dataFim',
           formaPagamento: 'formaPagamento',
           vencidas: 'vencidas',
-          q: 'q'
+          q: 'q',
         };
 
         Object.entries(filtros).forEach(([key, value]) => {
@@ -232,8 +230,14 @@ export const faturamentoService = {
         const items = d.data.items as Fatura[];
         const total = Number(d.data.total ?? items.length) || 0;
         const page = Number(d.data.page ?? filtros?.page ?? 1) || 1;
-        const pageSize = Number(d.data.pageSize ?? filtros?.pageSize ?? filtros?.limit ?? items.length) || items.length;
-        const aggregates: Aggregates = d.data.aggregates ?? { valorTotal: 0, valorRecebido: 0, valorEmAberto: 0 };
+        const pageSize =
+          Number(d.data.pageSize ?? filtros?.pageSize ?? filtros?.limit ?? items.length) ||
+          items.length;
+        const aggregates: Aggregates = d.data.aggregates ?? {
+          valorTotal: 0,
+          valorRecebido: 0,
+          valorEmAberto: 0,
+        };
         return { data: items, total, page, pageSize, aggregates };
       }
 
@@ -274,19 +278,23 @@ export const faturamentoService = {
         dataVencimento: dadosFatura.dataVencimento,
         observacoes: dadosFatura.observacoes,
         valorDesconto: dadosFatura.valorDesconto || 0,
-        itens: dadosFatura.itens.map(item => ({
+        itens: dadosFatura.itens.map((item) => ({
           descricao: item.descricao,
           quantidade: Math.max(item.quantidade, 0.01),
           valorUnitario: Math.max(item.valorUnitario, 0.01),
           unidade: item.unidade || 'un',
           codigoProduto: item.codigoProduto || '',
           percentualDesconto: item.percentualDesconto || 0,
-          valorDesconto: item.valorDesconto || 0
-        }))
+          valorDesconto: item.valorDesconto || 0,
+        })),
       };
 
       // Only include contratoId if it's a valid number
-      if (dadosFatura.contratoId && dadosFatura.contratoId !== '' && !isNaN(Number(dadosFatura.contratoId))) {
+      if (
+        dadosFatura.contratoId &&
+        dadosFatura.contratoId !== '' &&
+        !isNaN(Number(dadosFatura.contratoId))
+      ) {
         backendData.contratoId = Number(dadosFatura.contratoId);
       }
 
@@ -295,7 +303,10 @@ export const faturamentoService = {
         backendData.formaPagamentoPreferida = dadosFatura.formaPagamento;
       }
 
-      console.log('💰 [FRONTEND] Dados transformados para backend:', JSON.stringify(backendData, null, 2));
+      console.log(
+        '💰 [FRONTEND] Dados transformados para backend:',
+        JSON.stringify(backendData, null, 2),
+      );
 
       const response = await api.post('/faturamento/faturas', backendData);
       return response.data.data || response.data;
@@ -307,7 +318,7 @@ export const faturamentoService = {
         statusText: error.response?.statusText,
         originalData: dadosFatura,
         transformedData: backendData,
-        fullError: error
+        fullError: error,
       });
 
       // Log específico da resposta do backend
@@ -371,7 +382,7 @@ export const faturamentoService = {
   async baixarPDF(id: number): Promise<Blob> {
     try {
       const response = await api.get(`/faturamento/faturas/${id}/pdf`, {
-        responseType: 'blob'
+        responseType: 'blob',
       });
       return response.data;
     } catch (error) {
@@ -474,7 +485,7 @@ export const faturamentoService = {
       [StatusFatura.PAGA]: 'Paga',
       [StatusFatura.VENCIDA]: 'Vencida',
       [StatusFatura.CANCELADA]: 'Cancelada',
-      [StatusFatura.PARCIALMENTE_PAGA]: 'Parcialmente Paga'
+      [StatusFatura.PARCIALMENTE_PAGA]: 'Parcialmente Paga',
     };
     return statusMap[status] || status;
   },
@@ -484,7 +495,7 @@ export const faturamentoService = {
       [TipoFatura.UNICA]: 'Única',
       [TipoFatura.RECORRENTE]: 'Recorrente',
       [TipoFatura.PARCELA]: 'Parcela',
-      [TipoFatura.ADICIONAL]: 'Adicional'
+      [TipoFatura.ADICIONAL]: 'Adicional',
     };
     return tipoMap[tipo] || tipo;
   },
@@ -496,7 +507,7 @@ export const faturamentoService = {
       [FormaPagamento.CARTAO_DEBITO]: 'Cartão de Débito',
       [FormaPagamento.BOLETO]: 'Boleto',
       [FormaPagamento.TRANSFERENCIA]: 'Transferência',
-      [FormaPagamento.DINHEIRO]: 'Dinheiro'
+      [FormaPagamento.DINHEIRO]: 'Dinheiro',
     };
     return formaMap[forma] || forma;
   },
@@ -511,7 +522,7 @@ export const faturamentoService = {
 
   verificarVencimento(dataVencimento: string): boolean {
     return new Date(dataVencimento) < new Date();
-  }
+  },
 };
 
 export default faturamentoService;

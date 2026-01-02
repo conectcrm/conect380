@@ -7,14 +7,17 @@ import { BlockData } from '../../types/flow-builder.types';
 
 export const ConditionBlock: React.FC<NodeProps<BlockData>> = ({ data, selected }) => {
   const condicoes = data.etapa?.condicoes || [];
-  const preview = condicoes.length > 0
-    ? `${condicoes[0].campo} ${condicoes[0].operador} ${condicoes[0].valor || ''}`
-    : 'Clique para configurar';
+  const preview =
+    condicoes.length > 0
+      ? `${condicoes[0].campo} ${condicoes[0].operador} ${condicoes[0].valor || ''}`
+      : 'Clique para configurar';
 
   return (
-    <div className={`relative bg-white rounded-lg shadow-md border-2 ${selected ? 'border-teal-500' : 'border-gray-300'
-      } transition-all hover:shadow-lg min-w-[200px] max-w-[300px]`}>
-
+    <div
+      className={`relative bg-white rounded-lg shadow-md border-2 ${
+        selected ? 'border-teal-500' : 'border-gray-300'
+      } transition-all hover:shadow-lg min-w-[200px] max-w-[300px]`}
+    >
       {/* Handle de entrada (top) */}
       <Handle
         type="target"
@@ -30,9 +33,7 @@ export const ConditionBlock: React.FC<NodeProps<BlockData>> = ({ data, selected 
 
       {/* Body */}
       <div className="p-3">
-        <p className="text-sm text-gray-700 font-mono whitespace-pre-wrap break-words">
-          {preview}
-        </p>
+        <p className="text-sm text-gray-700 font-mono whitespace-pre-wrap break-words">{preview}</p>
       </div>
 
       {/* Handles de saída (left e right) */}

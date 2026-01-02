@@ -1,13 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Search,
-  SlidersHorizontal,
-  Calendar,
-  DollarSign,
-  Tag,
-  X,
-  FilterX
-} from 'lucide-react';
+import { Search, SlidersHorizontal, Calendar, DollarSign, Tag, X, FilterX } from 'lucide-react';
 
 // Interface simplificada para este componente
 interface FiltrosSimples {
@@ -36,7 +28,7 @@ export const BarraBuscaFiltros: React.FC<BarraBuscaFiltrosProps> = ({
   onFiltrosChange,
   onLimparFiltros,
   mostrarFiltros,
-  onToggleFiltros
+  onToggleFiltros,
 }) => {
   const [filtrosLocais, setFiltrosLocais] = useState<FiltrosSimples>(filtros);
 
@@ -69,10 +61,11 @@ export const BarraBuscaFiltros: React.FC<BarraBuscaFiltrosProps> = ({
 
         <button
           onClick={onToggleFiltros}
-          className={`flex items-center gap-2 px-4 py-3 border rounded-lg transition-colors ${mostrarFiltros || temFiltrosAtivos
+          className={`flex items-center gap-2 px-4 py-3 border rounded-lg transition-colors ${
+            mostrarFiltros || temFiltrosAtivos
               ? 'bg-blue-50 border-blue-200 text-blue-700'
               : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-            }`}
+          }`}
         >
           <SlidersHorizontal className="w-4 h-4" />
           Filtros
@@ -99,10 +92,7 @@ export const BarraBuscaFiltros: React.FC<BarraBuscaFiltrosProps> = ({
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Filtros Avançados</h3>
-            <button
-              onClick={onToggleFiltros}
-              className="text-gray-400 hover:text-gray-600"
-            >
+            <button onClick={onToggleFiltros} className="text-gray-400 hover:text-gray-600">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -116,7 +106,9 @@ export const BarraBuscaFiltros: React.FC<BarraBuscaFiltrosProps> = ({
               </label>
               <select
                 value={filtrosLocais.status || ''}
-                onChange={(e) => setFiltrosLocais(prev => ({ ...prev, status: e.target.value || undefined }))}
+                onChange={(e) =>
+                  setFiltrosLocais((prev) => ({ ...prev, status: e.target.value || undefined }))
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Todos os status</option>
@@ -138,7 +130,9 @@ export const BarraBuscaFiltros: React.FC<BarraBuscaFiltrosProps> = ({
               <input
                 type="date"
                 value={filtrosLocais.dataInicio || ''}
-                onChange={(e) => setFiltrosLocais(prev => ({ ...prev, dataInicio: e.target.value || undefined }))}
+                onChange={(e) =>
+                  setFiltrosLocais((prev) => ({ ...prev, dataInicio: e.target.value || undefined }))
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -152,7 +146,9 @@ export const BarraBuscaFiltros: React.FC<BarraBuscaFiltrosProps> = ({
               <input
                 type="date"
                 value={filtrosLocais.dataFim || ''}
-                onChange={(e) => setFiltrosLocais(prev => ({ ...prev, dataFim: e.target.value || undefined }))}
+                onChange={(e) =>
+                  setFiltrosLocais((prev) => ({ ...prev, dataFim: e.target.value || undefined }))
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -168,7 +164,12 @@ export const BarraBuscaFiltros: React.FC<BarraBuscaFiltrosProps> = ({
                 step="0.01"
                 placeholder="0,00"
                 value={filtrosLocais.valorMinimo || ''}
-                onChange={(e) => setFiltrosLocais(prev => ({ ...prev, valorMinimo: parseFloat(e.target.value) || undefined }))}
+                onChange={(e) =>
+                  setFiltrosLocais((prev) => ({
+                    ...prev,
+                    valorMinimo: parseFloat(e.target.value) || undefined,
+                  }))
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -184,7 +185,12 @@ export const BarraBuscaFiltros: React.FC<BarraBuscaFiltrosProps> = ({
                 step="0.01"
                 placeholder="0,00"
                 value={filtrosLocais.valorMaximo || ''}
-                onChange={(e) => setFiltrosLocais(prev => ({ ...prev, valorMaximo: parseFloat(e.target.value) || undefined }))}
+                onChange={(e) =>
+                  setFiltrosLocais((prev) => ({
+                    ...prev,
+                    valorMaximo: parseFloat(e.target.value) || undefined,
+                  }))
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>

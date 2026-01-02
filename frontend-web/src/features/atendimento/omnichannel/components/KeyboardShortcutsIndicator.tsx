@@ -1,6 +1,6 @@
 /**
  * ⌨️ Indicador de Atalhos de Teclado
- * 
+ *
  * Mostra os atalhos disponíveis de forma sutil no header do chat
  */
 

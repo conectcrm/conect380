@@ -45,9 +45,7 @@ export function corrigirLoopsAutomaticamente(estrutura: EstruturaFluxo): LoopFix
       delete etapa.proximaEtapa;
       delete (etapa as any).proxima_etapa;
 
-      acoesTomadas.push(
-        `✂️ Removida conexão direta: ${penultimaEtapa} ⛔ ${ultimaEtapa}`
-      );
+      acoesTomadas.push(`✂️ Removida conexão direta: ${penultimaEtapa} ⛔ ${ultimaEtapa}`);
       corrigido = true;
     }
 
@@ -55,7 +53,7 @@ export function corrigirLoopsAutomaticamente(estrutura: EstruturaFluxo): LoopFix
     if (etapa.opcoes && Array.isArray(etapa.opcoes)) {
       const opcoesOriginais = etapa.opcoes.length;
 
-      etapa.opcoes = etapa.opcoes.filter(opcao => {
+      etapa.opcoes = etapa.opcoes.filter((opcao) => {
         const proxima = opcao.proximaEtapa || (opcao as any).proxima_etapa;
 
         if (proxima === ultimaEtapa) {
@@ -69,7 +67,7 @@ export function corrigirLoopsAutomaticamente(estrutura: EstruturaFluxo): LoopFix
 
           if (eOpcaoVoltar) {
             acoesTomadas.push(
-              `✂️ Removida opção "${opcao.texto}" de ${penultimaEtapa} (causava loop → ${ultimaEtapa})`
+              `✂️ Removida opção "${opcao.texto}" de ${penultimaEtapa} (causava loop → ${ultimaEtapa})`,
             );
             return false; // Remover opção
           }
@@ -84,12 +82,10 @@ export function corrigirLoopsAutomaticamente(estrutura: EstruturaFluxo): LoopFix
 
     // 3. Tentar remover de condições
     if (etapa.condicoes && Array.isArray(etapa.condicoes)) {
-      etapa.condicoes = etapa.condicoes.filter(condicao => {
+      etapa.condicoes = etapa.condicoes.filter((condicao) => {
         const proxima = condicao.proximaEtapa || (condicao as any).entao;
         if (proxima === ultimaEtapa) {
-          acoesTomadas.push(
-            `✂️ Removida condição de ${penultimaEtapa} → ${ultimaEtapa}`
-          );
+          acoesTomadas.push(`✂️ Removida condição de ${penultimaEtapa} → ${ultimaEtapa}`);
           return false;
         }
         return true;
@@ -176,7 +172,10 @@ function detectarLoops(estrutura: EstruturaFluxo): string[][] {
     }
 
     // Checar proximaEtapaCondicional
-    if ((etapa as any).proximaEtapaCondicional && Array.isArray((etapa as any).proximaEtapaCondicional)) {
+    if (
+      (etapa as any).proximaEtapaCondicional &&
+      Array.isArray((etapa as any).proximaEtapaCondicional)
+    ) {
       for (const cond of (etapa as any).proximaEtapaCondicional) {
         if (cond.entao) {
           dfs(cond.entao, newPath);

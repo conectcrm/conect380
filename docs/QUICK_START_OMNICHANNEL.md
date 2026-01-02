@@ -136,7 +136,7 @@ curl -X POST http://localhost:3000/atendimento/integracoes \
       "access_token": "SEU_ACCESS_TOKEN",
       "webhook_verify_token": "SEU_WEBHOOK_TOKEN"
     },
-    "webhookUrl": "https://seu-dominio.com/webhooks/whatsapp"
+    "webhookUrl": "https://seu-dominio.com/api/atendimento/webhooks/whatsapp/CANAL_ID"
   }'
 ```
 
@@ -376,7 +376,7 @@ npm run start:dev
 1. Acesse o Facebook Developer Console
 2. Vá em WhatsApp > Configuration
 3. Configure o webhook:
-   - URL: `https://seu-dominio.com/webhooks/whatsapp/CANAL_ID`
+  - URL: `https://seu-dominio.com/api/atendimento/webhooks/whatsapp/CANAL_ID`
    - Verify Token: O token definido nas integrações
    - Subscribe to: messages, message_status
 

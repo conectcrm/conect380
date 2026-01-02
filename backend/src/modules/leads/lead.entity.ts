@@ -34,6 +34,13 @@ export class Lead {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
+
   // Dados Básicos
   @Column({ length: 255 })
   nome: string;

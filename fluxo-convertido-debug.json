@@ -1,0 +1,227 @@
+{
+  "nome": "Atendimento Completo - Cadastro e Triagem",
+  "descricao": "Fluxo automático que verifica cadastro, coleta dados se necessário e direciona para atendimento",
+  "codigo": "atendimento-completo-v1",
+  "tipo": "arvore_decisao",
+  "canais": [
+    "whatsapp"
+  ],
+  "palavrasGatilho": [],
+  "prioridade": 10,
+  "ativo": true,
+  "estrutura": {
+    "versao": "2.0",
+    "etapaInicial": "inicio",
+    "etapas": {
+      "inicio": {
+        "id": "inicio",
+        "tipo": "inicio",
+        "mensagem": "Olá! 👋 Bem-vindo ao atendimento da nossa empresa. \n\nPor favor, aguarde enquanto verificamos seus dados...",
+        "proximaEtapa": "verificar_cadastro",
+        "aguardarResposta": false
+      },
+      "verificar_cadastro": {
+        "id": "verificar_cadastro",
+        "tipo": "condicao",
+        "mensagem": "",
+        "proximaEtapa": "boas_vindas_cadastrado",
+        "aguardarResposta": false,
+        "condicoes": [
+          {
+            "variavel": "contato.cadastrado",
+            "operador": "existe",
+            "valor": "true",
+            "proximaEtapa": "boas_vindas_cadastrado"
+          },
+          {
+            "variavel": "contato.cadastrado",
+            "operador": "nao_existe",
+            "valor": "false",
+            "proximaEtapa": "solicitar_primeiro_nome"
+          }
+        ]
+      },
+      "boas_vindas_cadastrado": {
+        "id": "boas_vindas_cadastrado",
+        "tipo": "mensagem",
+        "mensagem": "Olá {{contato.nome}}! 😊\n\nQue bom ter você de volta! Como posso ajudá-lo hoje?",
+        "proximaEtapa": "menu_atendimento",
+        "aguardarResposta": false
+      },
+      "solicitar_primeiro_nome": {
+        "id": "solicitar_primeiro_nome",
+        "tipo": "mensagem",
+        "mensagem": "Vejo que é seu primeiro contato conosco! 🎉\n\nPara oferecer um atendimento personalizado, preciso de algumas informações.",
+        "proximaEtapa": "coletar_primeiro_nome",
+        "aguardarResposta": false
+      },
+      "coletar_primeiro_nome": {
+        "id": "coletar_primeiro_nome",
+        "tipo": "pergunta",
+        "mensagem": "Qual é o seu *primeiro nome*? 📝",
+        "proximaEtapa": "coletar_sobrenome",
+        "aguardarResposta": false,
+        "validacao": {
+          "tipo": "texto",
+          "minimo": 2,
+          "mensagemErro": "Por favor, digite um nome válido (mínimo 2 caracteres)."
+        }
+      },
+      "coletar_sobrenome": {
+        "id": "coletar_sobrenome",
+        "tipo": "pergunta",
+        "mensagem": "Obrigado, {{contato.primeiroNome}}! 👍\n\nAgora, qual é o seu *sobrenome*?",
+        "proximaEtapa": "coletar_email",
+        "aguardarResposta": false,
+        "validacao": {
+          "tipo": "texto",
+          "minimo": 2,
+          "mensagemErro": "Por favor, digite um sobrenome válido (mínimo 2 caracteres)."
+        }
+      },
+      "coletar_email": {
+        "id": "coletar_email",
+        "tipo": "pergunta",
+        "mensagem": "Perfeito! Agora preciso do seu *e-mail* para contato. 📧\n\n_(Digite um e-mail válido)_",
+        "proximaEtapa": "coletar_empresa",
+        "aguardarResposta": false,
+        "validacao": {
+          "tipo": "email",
+          "mensagemErro": "Por favor, digite um e-mail válido (exemplo: seunome@empresa.com)."
+        }
+      },
+      "coletar_empresa": {
+        "id": "coletar_empresa",
+        "tipo": "pergunta",
+        "mensagem": "Qual é o nome da sua *empresa*? 🏢",
+        "proximaEtapa": "confirmar_dados",
+        "aguardarResposta": false,
+        "validacao": {
+          "tipo": "texto",
+          "minimo": 2,
+          "opcional": true,
+          "mensagemErro": "Digite o nome da empresa ou 'não tenho' para pular."
+        }
+      },
+      "confirmar_dados": {
+        "id": "confirmar_dados",
+        "tipo": "mensagem",
+        "mensagem": "✅ *Dados recebidos:*\n\n👤 Nome: {{contato.primeiroNome}} {{contato.sobrenome}}\n📧 E-mail: {{contato.email}}\n🏢 Empresa: {{contato.empresa}}\n\n_Salvando suas informações..._",
+        "proximaEtapa": "salvar_contato",
+        "aguardarResposta": false
+      },
+      "salvar_contato": {
+        "id": "salvar_contato",
+        "tipo": "acao",
+        "mensagem": "",
+        "proximaEtapa": "confirmacao_cadastro",
+        "aguardarResposta": false
+      },
+      "confirmacao_cadastro": {
+        "id": "confirmacao_cadastro",
+        "tipo": "mensagem",
+        "mensagem": "🎉 *Cadastro realizado com sucesso!*\n\nAgora você faz parte da nossa base de clientes. Vamos prosseguir com seu atendimento!",
+        "proximaEtapa": "menu_atendimento",
+        "aguardarResposta": false
+      },
+      "menu_atendimento": {
+        "id": "menu_atendimento",
+        "tipo": "menu",
+        "mensagem": "📋 *Como posso ajudá-lo hoje?*\n\nEscolha uma das opções abaixo:",
+        "opcoes": [
+          {
+            "numero": "1",
+            "texto": "💼 Comercial - Vendas e Orçamentos",
+            "proximaEtapa": "transferir_comercial"
+          },
+          {
+            "numero": "2",
+            "texto": "🛠️ Suporte Técnico",
+            "proximaEtapa": "transferir_suporte"
+          },
+          {
+            "numero": "3",
+            "texto": "💰 Financeiro - Pagamentos e Faturas",
+            "proximaEtapa": "transferir_financeiro"
+          },
+          {
+            "numero": "4",
+            "texto": "❓ Outros Assuntos",
+            "proximaEtapa": "transferir_geral"
+          }
+        ],
+        "aguardarResposta": false
+      },
+      "transferir_comercial": {
+        "id": "transferir_comercial",
+        "tipo": "mensagem",
+        "mensagem": "💼 *Área Comercial*\n\nVocê será transferido para um consultor de vendas. Aguarde um momento...",
+        "proximaEtapa": "acao_transferir_comercial",
+        "aguardarResposta": false
+      },
+      "acao_transferir_comercial": {
+        "id": "acao_transferir_comercial",
+        "tipo": "acao",
+        "mensagem": "",
+        "proximaEtapa": "fim",
+        "aguardarResposta": false
+      },
+      "transferir_suporte": {
+        "id": "transferir_suporte",
+        "tipo": "mensagem",
+        "mensagem": "🛠️ *Suporte Técnico*\n\nVocê será conectado com um técnico especializado. Aguarde...",
+        "proximaEtapa": "acao_transferir_suporte",
+        "aguardarResposta": false
+      },
+      "acao_transferir_suporte": {
+        "id": "acao_transferir_suporte",
+        "tipo": "acao",
+        "mensagem": "",
+        "proximaEtapa": "fim",
+        "aguardarResposta": false
+      },
+      "transferir_financeiro": {
+        "id": "transferir_financeiro",
+        "tipo": "mensagem",
+        "mensagem": "💰 *Setor Financeiro*\n\nVocê será atendido por nossa equipe financeira. Um momento...",
+        "proximaEtapa": "acao_transferir_financeiro",
+        "aguardarResposta": false
+      },
+      "acao_transferir_financeiro": {
+        "id": "acao_transferir_financeiro",
+        "tipo": "acao",
+        "mensagem": "",
+        "proximaEtapa": "fim",
+        "aguardarResposta": false
+      },
+      "transferir_geral": {
+        "id": "transferir_geral",
+        "tipo": "mensagem",
+        "mensagem": "❓ *Atendimento Geral*\n\nVocê será direcionado para um atendente. Aguarde um momento...",
+        "proximaEtapa": "acao_transferir_geral",
+        "aguardarResposta": false
+      },
+      "acao_transferir_geral": {
+        "id": "acao_transferir_geral",
+        "tipo": "acao",
+        "mensagem": "",
+        "proximaEtapa": "fim",
+        "aguardarResposta": false
+      },
+      "fim": {
+        "id": "fim",
+        "tipo": "fim",
+        "mensagem": "",
+        "aguardarResposta": false
+      }
+    },
+    "variaveis": {}
+  },
+  "permiteVoltar": true,
+  "permiteSair": true,
+  "salvarHistorico": true,
+  "tentarEntenderTextoLivre": false,
+  "tags": [],
+  "versao": 1,
+  "configuracoes": {}
+}

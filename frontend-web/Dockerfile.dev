@@ -1,0 +1,35 @@
+# ============================================
+# Dockerfile de DESENVOLVIMENTO para o frontend
+# - Instala dependências (npm ci)
+# - Usa dumb-init para sinais corretos
+# - Código é montado via volume definido no docker-compose
+# ============================================
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Instala utilitário para gerenciar sinais/exit codes adequadamente
+RUN apk add --no-cache dumb-init
+
+# Copia apenas arquivos de dependência para aproveitar cache
+COPY package*.json ./
+
+# Instala todas as dependências (inclui devDependencies para build local)
+RUN npm ci --legacy-peer-deps
+
+# Cria diretórios esperados antes do bind mount (evita erros do npm)
+RUN mkdir -p src && chown -R node:node /app
+
+USER node
+
+ENV PORT=3000 \
+  CHOKIDAR_USEPOLLING=true \
+  WATCHPACK_POLLING=true \
+  WDS_SOCKET_PORT=3000 \
+  BROWSER=none
+
+EXPOSE 3000
+
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["npm", "run", "start:docker"]

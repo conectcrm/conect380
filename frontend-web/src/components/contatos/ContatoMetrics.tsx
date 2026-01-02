@@ -1,13 +1,13 @@
 import React from 'react';
-import { 
-  Users, 
-  UserCheck, 
-  UserPlus, 
-  TrendingUp, 
-  DollarSign, 
+import {
+  Users,
+  UserCheck,
+  UserPlus,
+  TrendingUp,
+  DollarSign,
   Target,
   Calendar,
-  Award
+  Award,
 } from 'lucide-react';
 
 interface ContatoMetricsProps {
@@ -27,7 +27,7 @@ export const ContatoMetrics: React.FC<ContatoMetricsProps> = ({ metrics }) => {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -47,7 +47,7 @@ export const ContatoMetrics: React.FC<ContatoMetricsProps> = ({ metrics }) => {
       color: 'bg-blue-100 text-blue-600',
       bgColor: 'bg-blue-50',
       change: '+12%',
-      changeType: 'positive' as const
+      changeType: 'positive' as const,
     },
     {
       title: 'Contatos Ativos',
@@ -56,7 +56,7 @@ export const ContatoMetrics: React.FC<ContatoMetricsProps> = ({ metrics }) => {
       color: 'bg-green-100 text-green-600',
       bgColor: 'bg-green-50',
       change: '+8%',
-      changeType: 'positive' as const
+      changeType: 'positive' as const,
     },
     {
       title: 'Prospectos',
@@ -65,7 +65,7 @@ export const ContatoMetrics: React.FC<ContatoMetricsProps> = ({ metrics }) => {
       color: 'bg-orange-100 text-orange-600',
       bgColor: 'bg-orange-50',
       change: '+15%',
-      changeType: 'positive' as const
+      changeType: 'positive' as const,
     },
     {
       title: 'Novos Leads',
@@ -74,7 +74,7 @@ export const ContatoMetrics: React.FC<ContatoMetricsProps> = ({ metrics }) => {
       color: 'bg-purple-100 text-purple-600',
       bgColor: 'bg-purple-50',
       change: '+23%',
-      changeType: 'positive' as const
+      changeType: 'positive' as const,
     },
     {
       title: 'Valor Potencial',
@@ -83,7 +83,7 @@ export const ContatoMetrics: React.FC<ContatoMetricsProps> = ({ metrics }) => {
       color: 'bg-emerald-100 text-emerald-600',
       bgColor: 'bg-emerald-50',
       change: '+18%',
-      changeType: 'positive' as const
+      changeType: 'positive' as const,
     },
     {
       title: 'Pontuação Média',
@@ -92,7 +92,7 @@ export const ContatoMetrics: React.FC<ContatoMetricsProps> = ({ metrics }) => {
       color: 'bg-yellow-100 text-yellow-600',
       bgColor: 'bg-yellow-50',
       change: '+5%',
-      changeType: 'positive' as const
+      changeType: 'positive' as const,
     },
     {
       title: 'Novos este Mês',
@@ -101,7 +101,7 @@ export const ContatoMetrics: React.FC<ContatoMetricsProps> = ({ metrics }) => {
       color: 'bg-indigo-100 text-indigo-600',
       bgColor: 'bg-indigo-50',
       change: '+28%',
-      changeType: 'positive' as const
+      changeType: 'positive' as const,
     },
     {
       title: 'Taxa de Conversão',
@@ -110,37 +110,40 @@ export const ContatoMetrics: React.FC<ContatoMetricsProps> = ({ metrics }) => {
       color: 'bg-pink-100 text-pink-600',
       bgColor: 'bg-pink-50',
       change: '+3%',
-      changeType: 'positive' as const
-    }
+      changeType: 'positive' as const,
+    },
   ];
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
       {metricsData.map((metric, index) => {
         const Icon = metric.icon;
-        
+
         return (
-          <div key={index} className={`${metric.bgColor} rounded-xl p-4 md:p-6 border border-gray-100 hover:shadow-md transition-shadow`}>
+          <div
+            key={index}
+            className={`${metric.bgColor} rounded-xl p-4 md:p-6 border border-gray-100 hover:shadow-md transition-shadow`}
+          >
             <div className="flex items-center justify-between mb-3 md:mb-4">
-              <div className={`w-10 h-10 md:w-12 md:h-12 ${metric.color} rounded-lg flex items-center justify-center`}>
+              <div
+                className={`w-10 h-10 md:w-12 md:h-12 ${metric.color} rounded-lg flex items-center justify-center`}
+              >
                 <Icon className="w-5 h-5 md:w-6 md:h-6" />
               </div>
-              <span className={`text-xs md:text-sm font-medium px-2 py-1 rounded-full ${
-                metric.changeType === 'positive' 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-red-100 text-red-800'
-              }`}>
+              <span
+                className={`text-xs md:text-sm font-medium px-2 py-1 rounded-full ${
+                  metric.changeType === 'positive'
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-red-100 text-red-800'
+                }`}
+              >
                 {metric.change}
               </span>
             </div>
-            
+
             <div>
-              <h3 className="text-lg md:text-2xl font-bold text-[#002333] mb-1">
-                {metric.value}
-              </h3>
-              <p className="text-xs md:text-sm text-[#B4BEC9]">
-                {metric.title}
-              </p>
+              <h3 className="text-lg md:text-2xl font-bold text-[#002333] mb-1">{metric.value}</h3>
+              <p className="text-xs md:text-sm text-[#B4BEC9]">{metric.title}</p>
             </div>
           </div>
         );

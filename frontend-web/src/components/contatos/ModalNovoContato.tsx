@@ -9,11 +9,16 @@ import {
   FileText,
   Star,
   AlertCircle,
-  Loader2
+  Loader2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ClienteSelect, { ClienteSelectValue } from '../selects/ClienteSelect';
-import { contatosService, Contato, CreateContatoDto, UpdateContatoDto } from '../../services/contatosService';
+import {
+  contatosService,
+  Contato,
+  CreateContatoDto,
+  UpdateContatoDto,
+} from '../../services/contatosService';
 
 interface ModalNovoContatoProps {
   isOpen: boolean;
@@ -35,7 +40,7 @@ const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
   onClose,
   onSuccess,
   contato,
-  clienteId: clienteIdProp
+  clienteId: clienteIdProp,
 }) => {
   const [loading, setLoading] = useState(false);
   const [clienteSelecionado, setClienteSelecionado] = useState<ClienteSelectValue | null>(null);
@@ -45,7 +50,7 @@ const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
     telefone: '',
     cargo: '',
     principal: false,
-    observacoes: ''
+    observacoes: '',
   });
   const [errors, setErrors] = useState<FormErrors>({});
 
@@ -73,7 +78,7 @@ const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
         telefone: contato.telefone || '',
         cargo: contato.cargo || '',
         principal: contato.principal || false,
-        observacoes: contato.observacoes || ''
+        observacoes: contato.observacoes || '',
       });
       if (contato.cliente) {
         setClienteSelecionado({
@@ -92,7 +97,7 @@ const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
         telefone: '',
         cargo: '',
         principal: false,
-        observacoes: ''
+        observacoes: '',
       });
       setClienteSelecionado(null);
     }
@@ -101,7 +106,7 @@ const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
   const handleClienteSelecionado = (cliente: ClienteSelectValue | null) => {
     setClienteSelecionado(cliente);
     if (errors.clienteId) {
-      setErrors(prev => ({ ...prev, clienteId: undefined }));
+      setErrors((prev) => ({ ...prev, clienteId: undefined }));
     }
   };
 
@@ -115,22 +120,22 @@ const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
 
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value,
     }));
 
     if (errors[name as keyof FormErrors]) {
-      setErrors(prev => ({ ...prev, [name]: undefined }));
+      setErrors((prev) => ({ ...prev, [name]: undefined }));
     }
   };
 
   const handleTelefoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = sanitizeTelefoneInput(e.target.value);
-    setFormData(prev => ({ ...prev, telefone: value }));
+    setFormData((prev) => ({ ...prev, telefone: value }));
 
     if (errors.telefone) {
-      setErrors(prev => ({ ...prev, telefone: undefined }));
+      setErrors((prev) => ({ ...prev, telefone: undefined }));
     }
   };
 
@@ -182,7 +187,7 @@ const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
           telefone: telefoneNormalizado,
           cargo: formData.cargo || undefined,
           principal: formData.principal,
-          observacoes: formData.observacoes || undefined
+          observacoes: formData.observacoes || undefined,
         };
 
         await contatosService.atualizar(contato.id, updateData);
@@ -200,7 +205,7 @@ const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
           telefone: telefoneNormalizado,
           cargo: formData.cargo || undefined,
           principal: formData.principal,
-          observacoes: formData.observacoes || undefined
+          observacoes: formData.observacoes || undefined,
         };
 
         await contatosService.criar(clienteId, createData);
@@ -240,9 +245,7 @@ const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
           <div className="space-y-5">
             {!contato && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Cliente *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Cliente *</label>
                 <ClienteSelect
                   value={clienteSelecionado}
                   onChange={handleClienteSelecionado}
@@ -270,8 +273,9 @@ const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                   name="nome"
                   value={formData.nome}
                   onChange={handleChange}
-                  className={`w-full pl-10 pr-4 py-2.5 border ${errors.nome ? 'border-red-500' : 'border-gray-300'
-                    } rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent`}
+                  className={`w-full pl-10 pr-4 py-2.5 border ${
+                    errors.nome ? 'border-red-500' : 'border-gray-300'
+                  } rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent`}
                   placeholder="Digite o nome completo"
                   disabled={loading}
                 />
@@ -285,9 +289,7 @@ const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Telefone *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Telefone *</label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
@@ -295,15 +297,17 @@ const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                   name="telefone"
                   value={formData.telefone}
                   onChange={handleTelefoneChange}
-                  className={`w-full pl-10 pr-4 py-2.5 border ${errors.telefone ? 'border-red-500' : 'border-gray-300'
-                    } rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent`}
+                  className={`w-full pl-10 pr-4 py-2.5 border ${
+                    errors.telefone ? 'border-red-500' : 'border-gray-300'
+                  } rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent`}
                   placeholder="+55 11 99999-9999"
                   disabled={loading}
                   autoComplete="tel"
                 />
               </div>
               <p className="mt-1 text-xs text-gray-500">
-                Informe o número completo com DDI (formato E.164). Ex: +44 20 7946 0958. Caso não inclua o DDI, será assumido o código +55.
+                Informe o número completo com DDI (formato E.164). Ex: +44 20 7946 0958. Caso não
+                inclua o DDI, será assumido o código +55.
               </p>
               {errors.telefone && (
                 <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
@@ -314,9 +318,7 @@ const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                E-mail
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">E-mail</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
@@ -324,8 +326,9 @@ const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className={`w-full pl-10 pr-4 py-2.5 border ${errors.email ? 'border-red-500' : 'border-gray-300'
-                    } rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent`}
+                  className={`w-full pl-10 pr-4 py-2.5 border ${
+                    errors.email ? 'border-red-500' : 'border-gray-300'
+                  } rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent`}
                   placeholder="email@exemplo.com"
                   disabled={loading}
                 />
@@ -339,9 +342,7 @@ const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Cargo
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Cargo</label>
               <div className="relative">
                 <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
@@ -366,16 +367,17 @@ const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                 className="w-4 h-4 text-[#159A9C] border-gray-300 rounded focus:ring-[#159A9C]"
                 disabled={loading}
               />
-              <label htmlFor="principal" className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+              <label
+                htmlFor="principal"
+                className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer"
+              >
                 <Star className="w-4 h-4 text-yellow-500" />
                 Definir como contato principal
               </label>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Observações
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Observações</label>
               <div className="relative">
                 <FileText className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
                 <textarea

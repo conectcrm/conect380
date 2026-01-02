@@ -13,7 +13,7 @@ interface SelectFieldProps extends Omit<React.SelectHTMLAttributes<HTMLSelectEle
 }
 
 export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
-  ({ options, placeholder = "Selecione...", error = false, className = '', ...props }, ref) => {
+  ({ options, placeholder = 'Selecione...', error = false, className = '', ...props }, ref) => {
     return (
       <div className="relative">
         <select
@@ -34,24 +34,20 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
               {placeholder}
             </option>
           )}
-          {options.map(option => (
-            <option 
-              key={option.value} 
-              value={option.value}
-              className="text-gray-900 bg-white"
-            >
+          {options.map((option) => (
+            <option key={option.value} value={option.value} className="text-gray-900 bg-white">
               {option.label}
             </option>
           ))}
         </select>
-        
+
         {/* Ícone de dropdown customizado */}
         <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
           <ChevronDown className="h-4 w-4 text-gray-400" />
         </div>
       </div>
     );
-  }
+  },
 );
 
 SelectField.displayName = 'SelectField';

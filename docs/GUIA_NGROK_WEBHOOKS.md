@@ -171,7 +171,7 @@ Connections                   ttl     opn     rt1     rt5     p50     p90
 
 **URL do Webhook:**
 ```
-https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp
+https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
 ```
 
 **Configurar no Meta Developers:**
@@ -179,18 +179,20 @@ https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp
 1. Acesse: https://developers.facebook.com/apps
 2. Selecione seu app WhatsApp
 3. Vá em **WhatsApp > Configuration**
-4. **Callback URL:** `https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp`
+4. **Callback URL:** `https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>`
 5. **Verify Token:** `conectcrm_webhook_token_123` (mesmo do `.env`)
-6. Clique em **Verify and Save**
-7. Inscreva-se nos eventos:
+6. **Header obrigatório:** `X-Hub-Signature-256` com HMAC SHA256 gerado via App Secret
+7. Clique em **Verify and Save**
+8. Inscreva-se nos eventos:
    - ✅ messages
    - ✅ message_status
    - ✅ message_echoes
 
 **Testar Webhook:**
 ```powershell
-curl -X POST https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp `
+curl -X POST https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA> `
   -H "Content-Type: application/json" `
+  -H "X-Hub-Signature-256: sha256=<HMAC_GERADO>" `
   -d '{
     "object": "whatsapp_business_account",
     "entry": [{
@@ -343,8 +345,10 @@ curl "$NgrokUrl/api/health"
 
 # 2. WhatsApp Webhook
 Write-Host "`n2️⃣ WhatsApp Webhook..." -ForegroundColor Green
-curl -X POST "$NgrokUrl/api/atendimento/webhooks/whatsapp" `
+$empresaId = "<ID_EMPRESA>" # substitua pelo ID real
+curl -X POST "$NgrokUrl/api/atendimento/webhooks/whatsapp/$empresaId" `
   -H "Content-Type: application/json" `
+  -H "X-Hub-Signature-256: sha256=<HMAC_GERADO>" `
   -d '{
     "object": "whatsapp_business_account",
     "entry": [{

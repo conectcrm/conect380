@@ -16,7 +16,6 @@ interface FluxoStatus {
 }
 
 class OrquestradorSimplificado {
-
   /**
    * Demonstra o fluxo completo de proposta a faturamento
    */
@@ -25,7 +24,7 @@ class OrquestradorSimplificado {
       propostaId,
       etapaAtual: 'email',
       progresso: 0,
-      logs: []
+      logs: [],
     };
 
     try {
@@ -48,7 +47,6 @@ class OrquestradorSimplificado {
       this.adicionarLog(fluxo, 'conclusao', 'sucesso', '✅ Fluxo completo concluído com sucesso!');
 
       return fluxo;
-
     } catch (error) {
       this.adicionarLog(fluxo, fluxo.etapaAtual, 'erro', `❌ Erro: ${error}`);
       throw error;
@@ -185,13 +183,12 @@ class OrquestradorSimplificado {
       console.log(`Status: ${resultado.etapaAtual}`);
 
       console.log('\n📝 LOG DO FLUXO:');
-      resultado.logs.forEach(log => {
+      resultado.logs.forEach((log) => {
         const icon = log.status === 'sucesso' ? '✅' : '❌';
         console.log(`${icon} [${log.etapa.toUpperCase()}] ${log.mensagem}`);
       });
 
       this.exibirResumoCompleto();
-
     } catch (error) {
       console.error('❌ Erro no teste:', error);
     }
@@ -199,17 +196,22 @@ class OrquestradorSimplificado {
 
   // Métodos auxiliares
 
-  private adicionarLog(fluxo: FluxoStatus, etapa: string, status: 'sucesso' | 'erro', mensagem: string): void {
+  private adicionarLog(
+    fluxo: FluxoStatus,
+    etapa: string,
+    status: 'sucesso' | 'erro',
+    mensagem: string,
+  ): void {
     fluxo.logs.push({
       timestamp: new Date(),
       etapa,
       status,
-      mensagem
+      mensagem,
     });
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 

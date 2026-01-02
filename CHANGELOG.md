@@ -7,6 +7,14 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [Unreleased]
+
+### 🔐 Segurança / Admin Console
+- Adicionado papel `superadmin` para isolar o acesso ao Admin Console multi-tenant, incluindo migration (`1776000100000-AddSuperadminUserRole.ts`) e scripts de promoção automática (`backend/create-admin-user.js`, `backend/scripts/create-admin-user.js`).
+- Atualizado `docs/CREDENCIAIS_PADRAO.md` com instruções oficiais de criação/promocao do superadmin.
+- Criados testes automatizados para o `RolesGuard` (unitários) e para o pipeline de guards do `AdminEmpresasController` (E2E dedicado em `backend/test/admin/admin-empresas-guard.e2e-spec.ts`).
+- Frontend agora valida o papel `superadmin` nas rotas administrativas (`SuperAdminGuard`, helper `protegerRotaSuperadmin`) e oculta o menu Admin Console para perfis comuns.
+
 ## [1.0.0] - 2025-11-03
 
 ### 🎉 Lançamento Inicial - Sistema Completo

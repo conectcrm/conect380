@@ -14,7 +14,7 @@ export const formatarValorCompletoBRL = (valor: any): string => {
       style: 'currency',
       currency: 'BRL',
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2
+      maximumFractionDigits: 2,
     });
   } catch (error) {
     console.warn('Erro ao formatar valor completo BRL:', valor, error);
@@ -34,7 +34,7 @@ export const formatarValorMonetario = (valor: any, decimais: number = 2): string
     if (typeof valor === 'number' && !isNaN(valor)) {
       return valor.toLocaleString('pt-BR', {
         minimumFractionDigits: decimais,
-        maximumFractionDigits: decimais
+        maximumFractionDigits: decimais,
       });
     }
 
@@ -45,7 +45,7 @@ export const formatarValorMonetario = (valor: any, decimais: number = 2): string
       const numeroValor = parseFloat(valorLimpo.replace(',', '.')) || 0;
       return numeroValor.toLocaleString('pt-BR', {
         minimumFractionDigits: decimais,
-        maximumFractionDigits: decimais
+        maximumFractionDigits: decimais,
       });
     }
 
@@ -53,9 +53,8 @@ export const formatarValorMonetario = (valor: any, decimais: number = 2): string
     const numeroValor = parseFloat(valor) || 0;
     return numeroValor.toLocaleString('pt-BR', {
       minimumFractionDigits: decimais,
-      maximumFractionDigits: decimais
+      maximumFractionDigits: decimais,
     });
-
   } catch (error) {
     console.warn('Erro ao formatar valor monetário:', valor, error);
     return '0,00';
@@ -81,7 +80,6 @@ export const converterParaNumero = (valor: any): number => {
 
     const numero = parseFloat(valor);
     return isNaN(numero) ? 0 : numero;
-
   } catch (error) {
     console.warn('Erro ao converter para número:', valor, error);
     return 0;
@@ -102,7 +100,7 @@ export const formatarMoeda = (valor: any, opcoes: Intl.NumberFormatOptions = {})
       currency: 'BRL',
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-      ...opcoes
+      ...opcoes,
     });
   } catch (error) {
     console.warn('Erro ao formatar moeda:', valor, error);
@@ -130,7 +128,10 @@ export const validarValorMonetario = (valor: any): boolean => {
  * @param incluirHora - Se deve incluir hora (padrão: false)
  * @returns String formatada como "dd/mm/aaaa" ou "dd/mm/aaaa hh:mm"
  */
-export const formatarData = (data: Date | string | number, incluirHora: boolean = false): string => {
+export const formatarData = (
+  data: Date | string | number,
+  incluirHora: boolean = false,
+): string => {
   try {
     let dataObj: Date;
 
@@ -151,7 +152,7 @@ export const formatarData = (data: Date | string | number, incluirHora: boolean 
     const opcoes: Intl.DateTimeFormatOptions = {
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric'
+      year: 'numeric',
     };
 
     if (incluirHora) {
@@ -172,7 +173,10 @@ export const formatarData = (data: Date | string | number, incluirHora: boolean 
  * @param dataReferencia - Data de referência (padrão: hoje)
  * @returns Número de dias (positivo = futuro, negativo = passado)
  */
-export const calcularDiasVencimento = (dataVencimento: Date | string, dataReferencia?: Date): number => {
+export const calcularDiasVencimento = (
+  dataVencimento: Date | string,
+  dataReferencia?: Date,
+): number => {
   try {
     const vencimento = new Date(dataVencimento);
     const referencia = dataReferencia || new Date();
@@ -196,18 +200,22 @@ export const calcularDiasVencimento = (dataVencimento: Date | string, dataRefere
  * @returns Objeto com cor, texto e ícone
  */
 export const formatarStatusFatura = (status: string, diasVencimento?: number) => {
-  const statusMap: Record<string, { cor: string, texto: string, icone: string }> = {
-    'PENDENTE': {
-      cor: diasVencimento !== undefined && diasVencimento < 0 ? 'text-red-600' :
-        diasVencimento !== undefined && diasVencimento <= 7 ? 'text-yellow-600' : 'text-yellow-600',
+  const statusMap: Record<string, { cor: string; texto: string; icone: string }> = {
+    PENDENTE: {
+      cor:
+        diasVencimento !== undefined && diasVencimento < 0
+          ? 'text-red-600'
+          : diasVencimento !== undefined && diasVencimento <= 7
+            ? 'text-yellow-600'
+            : 'text-yellow-600',
       texto: 'Pendente',
-      icone: '⏳'
+      icone: '⏳',
     },
-    'ENVIADA': { cor: 'text-blue-600', texto: 'Enviada', icone: '📤' },
-    'PAGA': { cor: 'text-green-600', texto: 'Paga', icone: '✅' },
-    'VENCIDA': { cor: 'text-red-600', texto: 'Vencida', icone: '⚠️' },
-    'CANCELADA': { cor: 'text-gray-600', texto: 'Cancelada', icone: '❌' },
-    'PARCIALMENTE_PAGA': { cor: 'text-orange-600', texto: 'Parcial', icone: '🔄' }
+    ENVIADA: { cor: 'text-blue-600', texto: 'Enviada', icone: '📤' },
+    PAGA: { cor: 'text-green-600', texto: 'Paga', icone: '✅' },
+    VENCIDA: { cor: 'text-red-600', texto: 'Vencida', icone: '⚠️' },
+    CANCELADA: { cor: 'text-gray-600', texto: 'Cancelada', icone: '❌' },
+    PARCIALMENTE_PAGA: { cor: 'text-orange-600', texto: 'Parcial', icone: '🔄' },
   };
 
   return statusMap[status] || { cor: 'text-gray-600', texto: status, icone: '📄' };
@@ -261,18 +269,21 @@ export const truncarTexto = (texto: string, limite: number = 50): string => {
  * @param tipo - Tipo de destaque ('positivo', 'negativo', 'neutro')
  * @returns Objeto com valor formatado e classe CSS
  */
-export const formatarValorComDestaque = (valor: number, tipo: 'positivo' | 'negativo' | 'neutro' = 'neutro') => {
+export const formatarValorComDestaque = (
+  valor: number,
+  tipo: 'positivo' | 'negativo' | 'neutro' = 'neutro',
+) => {
   const valorFormatado = formatarValorCompletoBRL(valor);
 
   const classesMap = {
     positivo: 'text-green-600 font-semibold',
     negativo: 'text-red-600 font-semibold',
-    neutro: 'text-gray-900 font-medium'
+    neutro: 'text-gray-900 font-medium',
   };
 
   return {
     valor: valorFormatado,
-    classe: classesMap[tipo]
+    classe: classesMap[tipo],
   };
 };
 
@@ -305,10 +316,22 @@ export const gerarCorPorTexto = (texto: string): string => {
   }
 
   const cores = [
-    '#EF4444', '#F97316', '#F59E0B', '#EAB308',
-    '#84CC16', '#22C55E', '#10B981', '#14B8A6',
-    '#06B6D4', '#0EA5E9', '#3B82F6', '#6366F1',
-    '#8B5CF6', '#A855F7', '#D946EF', '#EC4899'
+    '#EF4444',
+    '#F97316',
+    '#F59E0B',
+    '#EAB308',
+    '#84CC16',
+    '#22C55E',
+    '#10B981',
+    '#14B8A6',
+    '#06B6D4',
+    '#0EA5E9',
+    '#3B82F6',
+    '#6366F1',
+    '#8B5CF6',
+    '#A855F7',
+    '#D946EF',
+    '#EC4899',
   ];
 
   return cores[Math.abs(hash) % cores.length];
@@ -326,7 +349,7 @@ export const obterNomeCliente = (cliente: any, clienteId?: number | string): str
     cliente,
     clienteId,
     clienteType: typeof cliente,
-    clienteKeys: cliente && typeof cliente === 'object' ? Object.keys(cliente) : 'N/A'
+    clienteKeys: cliente && typeof cliente === 'object' ? Object.keys(cliente) : 'N/A',
   });
 
   // Se cliente é um objeto com propriedade nome

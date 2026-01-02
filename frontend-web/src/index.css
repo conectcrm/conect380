@@ -22,23 +22,23 @@ code {
 
 /* Componentes customizados */
 .btn-primary {
-  @apply bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors duration-200 font-medium;
+  @apply bg-primary-600 text-white px-3 py-2 text-sm sm:px-4 sm:text-base rounded-lg hover:bg-primary-700 transition-colors duration-200 font-medium;
 }
 
 .btn-secondary {
-  @apply bg-secondary-200 text-secondary-800 px-4 py-2 rounded-lg hover:bg-secondary-300 transition-colors duration-200 font-medium;
+  @apply bg-secondary-200 text-secondary-800 px-3 py-2 text-sm sm:px-4 sm:text-base rounded-lg hover:bg-secondary-300 transition-colors duration-200 font-medium;
 }
 
 .btn-success {
-  @apply bg-success-600 text-white px-4 py-2 rounded-lg hover:bg-success-700 transition-colors duration-200 font-medium;
+  @apply bg-success-600 text-white px-3 py-2 text-sm sm:px-4 sm:text-base rounded-lg hover:bg-success-700 transition-colors duration-200 font-medium;
 }
 
 .btn-danger {
-  @apply bg-danger-600 text-white px-4 py-2 rounded-lg hover:bg-danger-700 transition-colors duration-200 font-medium;
+  @apply bg-danger-600 text-white px-3 py-2 text-sm sm:px-4 sm:text-base rounded-lg hover:bg-danger-700 transition-colors duration-200 font-medium;
 }
 
 .btn-outline {
-  @apply border border-primary-600 text-primary-600 px-4 py-2 rounded-lg hover:bg-primary-50 transition-colors duration-200 font-medium;
+  @apply border border-primary-600 text-primary-600 px-3 py-2 text-sm sm:px-4 sm:text-base rounded-lg hover:bg-primary-50 transition-colors duration-200 font-medium;
 }
 
 .input-field {
@@ -185,4 +185,35 @@ code {
 
 .slider-heat:disabled::-moz-range-thumb {
   cursor: not-allowed;
+}
+
+/* 🆕 Animação de fade-in para indicador de digitação */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* 🆕 Bounce melhorado para pontos de digitação */
+@keyframes bounce {
+
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+  }
+
+  40% {
+    transform: translateY(-8px);
+  }
 }

@@ -29,9 +29,9 @@ export default function ClienteSelect({
   onCreateNew,
   required = false,
   disabled = false,
-  className = "",
+  className = '',
   label = 'Cliente',
-  error
+  error,
 }: ClienteSelectProps) {
   const [clientes, setClientes] = useState<ClienteSelectValue[]>([]);
   const [loading, setLoading] = useState(false);
@@ -47,18 +47,20 @@ export default function ClienteSelect({
       setLoading(true);
       const response = await clientesService.getClientes({
         limit: 50,
-        search: busca?.trim() || undefined
+        search: busca?.trim() || undefined,
       });
 
       // Converter para o formato esperado
-      const clientesFormatados = response.data.map((cliente: ClienteService): ClienteSelectValue => ({
-        id: cliente.id ? String(cliente.id) : '',
-        nome: cliente.nome,
-        email: cliente.email,
-        telefone: cliente.telefone,
-        documento: cliente.documento,
-        tipo: cliente.tipo
-      }));
+      const clientesFormatados = response.data.map(
+        (cliente: ClienteService): ClienteSelectValue => ({
+          id: cliente.id ? String(cliente.id) : '',
+          nome: cliente.nome,
+          email: cliente.email,
+          telefone: cliente.telefone,
+          documento: cliente.documento,
+          tipo: cliente.tipo,
+        }),
+      );
 
       setClientes(clientesFormatados);
     } catch (error) {
@@ -70,25 +72,30 @@ export default function ClienteSelect({
   }, []);
 
   // Buscar clientes com debounce
-  const handleSearch = useCallback((query: string) => {
-    setSearchQuery(query);
-    carregarClientes(query);
-  }, [carregarClientes]);
+  const handleSearch = useCallback(
+    (query: string) => {
+      setSearchQuery(query);
+      carregarClientes(query);
+    },
+    [carregarClientes],
+  );
 
   // Converter clientes para opções do SearchSelect
-  const options = clientes.map(cliente => ({
+  const options = clientes.map((cliente) => ({
     id: cliente.id,
     label: cliente.nome,
-    subtitle: cliente.documento ? `${cliente.documento}${cliente.email ? ` • ${cliente.email}` : ''}` : cliente.email,
-    extra: cliente.telefone
+    subtitle: cliente.documento
+      ? `${cliente.documento}${cliente.email ? ` • ${cliente.email}` : ''}`
+      : cliente.email,
+    extra: cliente.telefone,
   }));
 
   // Encontrar o valor atual nas opções
-  const selectedOption = value ? options.find(opt => opt.id === value.id) || null : null;
+  const selectedOption = value ? options.find((opt) => opt.id === value.id) || null : null;
 
   const handleChange = (option: any) => {
     if (option) {
-      const cliente = clientes.find(c => c.id === option.id);
+      const cliente = clientes.find((c) => c.id === option.id);
       onChange(cliente || null);
     } else {
       onChange(null);
@@ -110,7 +117,7 @@ export default function ClienteSelect({
             disabled={disabled}
             loading={loading}
             icon="user"
-            emptyMessage={searchQuery ? "Nenhum cliente encontrado" : "Digite para buscar clientes"}
+            emptyMessage={searchQuery ? 'Nenhum cliente encontrado' : 'Digite para buscar clientes'}
             error={error}
           />
         </div>
@@ -138,15 +145,9 @@ export default function ClienteSelect({
             <div className="flex-1 min-w-0">
               <div className="font-medium text-blue-900">{value.nome}</div>
               <div className="text-sm text-blue-700 space-y-1">
-                {value.documento && (
-                  <div>📄 {value.documento}</div>
-                )}
-                {value.email && (
-                  <div>📧 {value.email}</div>
-                )}
-                {value.telefone && (
-                  <div>📞 {value.telefone}</div>
-                )}
+                {value.documento && <div>📄 {value.documento}</div>}
+                {value.email && <div>📧 {value.email}</div>}
+                {value.telefone && <div>📞 {value.telefone}</div>}
                 {value.tipo && (
                   <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded inline-block">
                     {value.tipo === 'pessoa_fisica' ? 'Pessoa Física' : 'Pessoa Jurídica'}

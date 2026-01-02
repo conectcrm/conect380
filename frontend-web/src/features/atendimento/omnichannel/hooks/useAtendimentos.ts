@@ -113,27 +113,27 @@ const mapearTicketParaFrontend = (ticket: any): Ticket => {
     typeof ticket.canal === 'string'
       ? ticket.canal
       : ticket.canal?.tipo ||
-        ticket.canal?.nome ||
-        ticket.canalTipo ||
-        ticket.canal_tipo ||
-        ticket.canalId ||
-        'whatsapp';
+      ticket.canal?.nome ||
+      ticket.canalTipo ||
+      ticket.canal_tipo ||
+      ticket.canalId ||
+      'whatsapp';
 
   const atendenteFonte = ticket.atendente
     ? {
-        ...ticket.atendente,
-        id: ticket.atendente.id,
-        nome: ticket.atendente.nome || 'Atendente',
-        foto: resolveAvatarUrl(ticket.atendente.foto || null),
-      }
+      ...ticket.atendente,
+      id: ticket.atendente.id,
+      nome: ticket.atendente.nome || 'Atendente',
+      foto: resolveAvatarUrl(ticket.atendente.foto || null),
+    }
     : undefined;
 
   const tempoUltimaMensagem = construirData(
     ticket.tempoUltimaMensagem ||
-      ticket.ultimaMensagemEm ||
-      ticket.ultima_mensagem_em ||
-      ticket.updatedAt ||
-      ticket.createdAt,
+    ticket.ultimaMensagemEm ||
+    ticket.ultima_mensagem_em ||
+    ticket.updatedAt ||
+    ticket.createdAt,
   );
 
   return {
@@ -301,10 +301,15 @@ export const useAtendimentos = (options: UseAtendimentosOptions = {}): UseAtendi
     setTicketsError(null);
 
     try {
-      const response = await atendimentoService.listarTickets({
+      // ✅ SPRINT 2: Adicionar filtro por atendenteId para mostrar apenas tickets do atendente logado
+      const filtrosComAtendente = {
         ...filtros,
         page: paginaAtual,
-      });
+        // Se atendenteAtualId existe E status não é 'fila', filtrar por atendenteId
+        ...(atendenteAtualId && filtros.status !== 'fila' ? { atendenteId: atendenteAtualId } : {}),
+      };
+
+      const response = await atendimentoService.listarTickets(filtrosComAtendente);
 
       const dados = Array.isArray(response.data) ? response.data : [];
       const ticketsTransformados = dados.map(mapearTicketParaFrontend);

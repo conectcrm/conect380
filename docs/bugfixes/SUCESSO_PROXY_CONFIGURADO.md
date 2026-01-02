@@ -138,7 +138,7 @@ the server responded with a status of 401 (Unauthorized)
 
 #### 👑 Administrador
 ```
-Email: admin@conectcrm.com
+Email: admin@conectsuite.com.br
 Senha: admin123
 Role: admin
 ```
@@ -183,7 +183,7 @@ curl http://localhost:3000/api/atendimento/canais
 # 1. Obter token JWT
 curl -X POST http://localhost:3001/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@conectcrm.com","senha":"admin123"}'
+  -d '{"email":"admin@conectsuite.com.br","senha":"admin123"}'
 
 # Resposta:
 # {"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}
@@ -250,7 +250,7 @@ curl http://localhost:3000/api/atendimento/canais \
 ```
 POST http://localhost:3000/auth/login
 Body: {
-  "email": "admin@conectcrm.com",
+  "email": "admin@conectsuite.com.br",
   "senha": "admin123"
 }
 
@@ -365,9 +365,9 @@ Depois que você fizer login e a página carregar, você poderá:
 - Business Account ID
 
 ### 2. Testar Webhook via ngrok
-- URL do webhook: `https://seu-ngrok.ngrok-free.app/api/atendimento/webhooks/whatsapp`
-- Método: POST
-- Verificação: GET com verify_token
+- URL do webhook: `https://seu-ngrok.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>`
+- Método: POST (sempre enviar `X-Hub-Signature-256`)
+- Verificação: GET com verify_token usando o mesmo `<ID_EMPRESA>`
 
 ### 3. Receber Mensagens Reais
 - Configurar no Meta Developers

@@ -53,7 +53,7 @@ INSERT INTO users (
 ) VALUES (
   'a47ac10b-58cc-4372-a567-0e02b2c3d480',
   'Administrador ConectCRM',
-  'admin@conectcrm.com',
+  'admin@conectsuite.com.br',
   '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
   'admin',
   'f47ac10b-58cc-4372-a567-0e02b2c3d479',

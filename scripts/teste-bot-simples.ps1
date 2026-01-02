@@ -8,7 +8,7 @@ $baseUrl = "http://localhost:3001"
 # 1. Login
 Write-Host "`n[1/6] Fazendo login..." -NoNewline
 try {
-  $loginBody = @{ email = "admin@conectcrm.com"; senha = "admin123" } | ConvertTo-Json
+  $loginBody = @{ email = "admin@conectsuite.com.br"; senha = "admin123" } | ConvertTo-Json
   $loginResp = Invoke-RestMethod -Uri "$baseUrl/auth/login" -Method POST -Body $loginBody -ContentType "application/json"
   $token = $loginResp.access_token
   $headers = @{ "Authorization" = "Bearer $token"; "Content-Type" = "application/json" }

@@ -61,11 +61,11 @@ export const EVENT_COLORS = {
   call: '#10B981',
   task: '#F59E0B',
   event: '#8B5CF6',
-  'follow-up': '#EF4444'
+  'follow-up': '#EF4444',
 } as const;
 
 export const PRIORITY_COLORS = {
   low: '#6B7280',
   medium: '#F59E0B',
-  high: '#EF4444'
+  high: '#EF4444',
 } as const;

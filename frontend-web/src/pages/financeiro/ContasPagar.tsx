@@ -31,7 +31,8 @@ const ContasPagar: React.FC = () => {
           </div>
           <div className="ml-3">
             <p className="text-sm text-orange-700">
-              <span className="font-medium">2 contas vencem hoje</span> e 5 contas vencem nos próximos 3 dias.
+              <span className="font-medium">2 contas vencem hoje</span> e 5 contas vencem nos
+              próximos 3 dias.
             </p>
           </div>
         </div>
@@ -42,7 +43,9 @@ const ContasPagar: React.FC = () => {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#DEEFE7]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Total a Pagar</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                Total a Pagar
+              </p>
               <p className="text-3xl font-bold text-[#002333] mt-2">R$ 87.650,00</p>
             </div>
             <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
@@ -54,7 +57,9 @@ const ContasPagar: React.FC = () => {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#DEEFE7]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Vencido</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                Vencido
+              </p>
               <p className="text-3xl font-bold text-[#002333] mt-2">R$ 12.300,00</p>
             </div>
             <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center shadow-sm">
@@ -66,7 +71,9 @@ const ContasPagar: React.FC = () => {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#DEEFE7]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Hoje</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                Hoje
+              </p>
               <p className="text-3xl font-bold text-[#002333] mt-2">R$ 8.500,00</p>
             </div>
             <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
@@ -78,7 +85,9 @@ const ContasPagar: React.FC = () => {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#DEEFE7]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Próximos 30 dias</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                Próximos 30 dias
+              </p>
               <p className="text-3xl font-bold text-[#002333] mt-2">R$ 66.850,00</p>
             </div>
             <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
@@ -144,15 +153,9 @@ const ContasPagar: React.FC = () => {
                   <div className="text-sm font-medium text-gray-900">Tech Solutions Ltda</div>
                   <div className="text-sm text-gray-500">contato@techsolutions.com</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  DUPLIC-789
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  R$ 3.800,00
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  19/07/2025
-                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">DUPLIC-789</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">R$ 3.800,00</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">19/07/2025</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
                     Hoje
@@ -168,15 +171,9 @@ const ContasPagar: React.FC = () => {
                   <div className="text-sm font-medium text-gray-900">Energia Elétrica SA</div>
                   <div className="text-sm text-gray-500">admin@energia.com</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  CONTA-456
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  R$ 1.200,00
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  15/07/2025
-                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">CONTA-456</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">R$ 1.200,00</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">15/07/2025</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
                     Vencido

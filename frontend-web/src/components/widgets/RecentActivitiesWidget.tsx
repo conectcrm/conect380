@@ -19,7 +19,7 @@ const activities: Activity[] = [
     description: 'Contato com João Silva sobre proposta #123',
     time: '2 horas atrás',
     user: 'Ana Costa',
-    priority: 'high'
+    priority: 'high',
   },
   {
     id: '2',
@@ -28,7 +28,7 @@ const activities: Activity[] = [
     description: 'Proposta #124 para Empresa ABC Ltd.',
     time: '4 horas atrás',
     user: 'Carlos Santos',
-    priority: 'medium'
+    priority: 'medium',
   },
   {
     id: '3',
@@ -37,7 +37,7 @@ const activities: Activity[] = [
     description: 'Apresentação de produto para cliente XYZ',
     time: '1 dia atrás',
     user: 'Maria Oliveira',
-    priority: 'medium'
+    priority: 'medium',
   },
   {
     id: '4',
@@ -46,7 +46,7 @@ const activities: Activity[] = [
     description: 'Follow-up da reunião da semana passada',
     time: '2 dias atrás',
     user: 'Pedro Lima',
-    priority: 'low'
+    priority: 'low',
   },
   {
     id: '5',
@@ -55,13 +55,13 @@ const activities: Activity[] = [
     description: 'Contato recebido via site institucional',
     time: '3 dias atrás',
     user: 'Sistema',
-    priority: 'medium'
-  }
+    priority: 'medium',
+  },
 ];
 
 const getActivityIcon = (type: Activity['type']) => {
-  const iconClass = "w-4 h-4";
-  
+  const iconClass = 'w-4 h-4';
+
   switch (type) {
     case 'call':
       return <Phone className={`${iconClass} text-blue-500`} />;
@@ -98,7 +98,7 @@ interface RecentActivitiesWidgetProps {
 
 export const RecentActivitiesWidget: React.FC<RecentActivitiesWidgetProps> = ({
   className = '',
-  isLoading = false
+  isLoading = false,
 }) => {
   if (isLoading) {
     return (
@@ -107,7 +107,10 @@ export const RecentActivitiesWidget: React.FC<RecentActivitiesWidgetProps> = ({
           <div className="h-6 bg-gray-200 rounded mb-4 w-1/2"></div>
           <div className="space-y-3">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex items-start gap-3 p-3 border-l-4 border-gray-200 rounded">
+              <div
+                key={i}
+                className="flex items-start gap-3 p-3 border-l-4 border-gray-200 rounded"
+              >
                 <div className="w-4 h-4 bg-gray-200 rounded"></div>
                 <div className="flex-1">
                   <div className="h-4 bg-gray-200 rounded mb-2"></div>
@@ -123,7 +126,7 @@ export const RecentActivitiesWidget: React.FC<RecentActivitiesWidgetProps> = ({
   }
 
   return (
-    <div 
+    <div
       className={`bg-white rounded-xl shadow-sm border p-6 ${className}`}
       role="region"
       aria-label="Atividades recentes do sistema"
@@ -133,7 +136,7 @@ export const RecentActivitiesWidget: React.FC<RecentActivitiesWidgetProps> = ({
           <Clock className="w-5 h-5 text-gray-600" />
           Atividades Recentes
         </h3>
-        <button 
+        <button
           className="text-sm text-blue-600 hover:text-blue-800 hover:underline focus:outline-none focus:underline"
           aria-label="Ver todas as atividades"
         >
@@ -149,19 +152,13 @@ export const RecentActivitiesWidget: React.FC<RecentActivitiesWidgetProps> = ({
             role="article"
             aria-label={`Atividade: ${activity.title}`}
           >
-            <div className="flex-shrink-0 mt-1">
-              {getActivityIcon(activity.type)}
-            </div>
-            
+            <div className="flex-shrink-0 mt-1">{getActivityIcon(activity.type)}</div>
+
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <h4 className="text-sm font-medium text-gray-900 mb-1">
-                    {activity.title}
-                  </h4>
-                  <p className="text-sm text-gray-600 mb-1">
-                    {activity.description}
-                  </p>
+                  <h4 className="text-sm font-medium text-gray-900 mb-1">{activity.title}</h4>
+                  <p className="text-sm text-gray-600 mb-1">{activity.description}</p>
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <User className="w-3 h-3" />
                     <span>{activity.user}</span>
@@ -177,7 +174,7 @@ export const RecentActivitiesWidget: React.FC<RecentActivitiesWidgetProps> = ({
 
       {/* Footer com call-to-action */}
       <div className="mt-6 pt-4 border-t border-gray-100">
-        <button 
+        <button
           className="w-full text-sm text-gray-600 hover:text-gray-800 py-2 hover:bg-gray-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
           aria-label="Carregar mais atividades"
         >

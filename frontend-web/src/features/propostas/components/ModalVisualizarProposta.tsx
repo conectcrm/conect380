@@ -13,7 +13,7 @@ import {
   MapPin,
   Phone,
   Mail,
-  Building
+  Building,
 } from 'lucide-react';
 
 interface ModalVisualizarPropostaProps {
@@ -27,14 +27,14 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
   isOpen,
   onClose,
   proposta,
-  onPropostaUpdated
+  onPropostaUpdated,
 }) => {
   if (!isOpen || !proposta) return null;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -45,20 +45,20 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
 
   const getStatusColor = (status?: string) => {
     const statusColors = {
-      'rascunho': 'bg-gray-100 text-gray-800',
-      'enviada': 'bg-blue-100 text-blue-800',
-      'aprovada': 'bg-green-100 text-green-800',
-      'rejeitada': 'bg-red-100 text-red-800'
+      rascunho: 'bg-gray-100 text-gray-800',
+      enviada: 'bg-blue-100 text-blue-800',
+      aprovada: 'bg-green-100 text-green-800',
+      rejeitada: 'bg-red-100 text-red-800',
     };
     return statusColors[status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800';
   };
 
   const getStatusText = (status?: string) => {
     const statusText = {
-      'rascunho': 'Rascunho',
-      'enviada': 'Enviada',
-      'aprovada': 'Aprovada',
-      'rejeitada': 'Rejeitada'
+      rascunho: 'Rascunho',
+      enviada: 'Enviada',
+      aprovada: 'Aprovada',
+      rejeitada: 'Rejeitada',
     };
     return statusText[status as keyof typeof statusText] || 'Indefinido';
   };
@@ -71,9 +71,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
           <div className="flex items-center">
             <FileText className="w-6 h-6 text-[#159A9C] mr-3" />
             <div>
-              <h3 className="text-xl font-semibold text-gray-900">
-                Proposta #{proposta.numero}
-              </h3>
+              <h3 className="text-xl font-semibold text-gray-900">Proposta #{proposta.numero}</h3>
               <p className="text-sm text-gray-600 mt-1">
                 {proposta.titulo || 'Proposta comercial'}
               </p>
@@ -81,7 +79,9 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
           </div>
 
           <div className="flex items-center space-x-4">
-            <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusColor(proposta.status)}`}>
+            <span
+              className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusColor(proposta.status)}`}
+            >
               {getStatusText(proposta.status)}
             </span>
             <button
@@ -95,12 +95,10 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
 
         {/* Ações de Compartilhamento */}
         <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-          <h4 className="text-sm font-medium text-gray-900 mb-3">
-            Compartilhar Proposta
-          </h4>
+          <h4 className="text-sm font-medium text-gray-900 mb-3">Compartilhar Proposta</h4>
           <PropostaActions
             proposta={proposta}
-            onViewProposta={() => { }}
+            onViewProposta={() => {}}
             onPropostaUpdated={onPropostaUpdated}
             showLabels={true}
             className="flex-wrap"
@@ -122,7 +120,9 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                     {proposta.cliente?.nome || 'Nome não informado'}
                   </p>
                   <p className="text-xs text-gray-600">
-                    {proposta.cliente?.tipoPessoa === 'juridica' ? 'Pessoa Jurídica' : 'Pessoa Física'}
+                    {proposta.cliente?.tipoPessoa === 'juridica'
+                      ? 'Pessoa Jurídica'
+                      : 'Pessoa Física'}
                   </p>
                 </div>
               </div>
@@ -189,9 +189,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                 <div className="flex items-center">
                   <Building className="w-4 h-4 text-gray-400 mr-3" />
                   <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {proposta.vendedor.nome}
-                    </p>
+                    <p className="text-sm font-medium text-gray-900">{proposta.vendedor.nome}</p>
                     <p className="text-xs text-gray-600">Vendedor responsável</p>
                   </div>
                 </div>
@@ -237,9 +235,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                             {item.produto.nome}
                           </div>
                           {item.produto.descricao && (
-                            <div className="text-sm text-gray-500">
-                              {item.produto.descricao}
-                            </div>
+                            <div className="text-sm text-gray-500">{item.produto.descricao}</div>
                           )}
                         </div>
                       </td>
@@ -266,12 +262,8 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
         {/* Observações */}
         {proposta.observacoes && (
           <div className="mt-6">
-            <h4 className="text-lg font-semibold text-gray-900 border-b pb-2 mb-4">
-              Observações
-            </h4>
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">
-              {proposta.observacoes}
-            </p>
+            <h4 className="text-lg font-semibold text-gray-900 border-b pb-2 mb-4">Observações</h4>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">{proposta.observacoes}</p>
           </div>
         )}
 

@@ -7,7 +7,7 @@ import { TransferirAtendimentoModal, TransferenciaData } from './modals/Transfer
 import { EncerrarAtendimentoModal, EncerramentoData } from './modals/EncerrarAtendimentoModal';
 import { EditarContatoModal, ContatoEditado } from './modals/EditarContatoModal';
 import { VincularClienteModal } from './modals/VincularClienteModal';
-import { AbrirDemandaModal, NovaDemanda } from './modals/AbrirDemandaModal';
+import ConvertTicketModal from '../../../components/ConvertTicketModal';
 import { SelecionarFilaModal } from '../../../components/chat/SelecionarFilaModal';
 import { Mensagem, NotaCliente, Demanda, StatusAtendimentoType, Ticket, CanalTipo } from './types';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -24,6 +24,7 @@ import { useDemandas } from '../../../hooks/useDemandas';
 import { useAuth } from '../../../hooks/useAuth';
 import { atendimentoService } from './services/atendimentoService';
 import { useAtendimentoStore } from '../../../stores/atendimentoStore';
+import demandaService from '../../../services/demandaService';
 import { useNotificacoesDesktop } from '../../../hooks/useNotificacoesDesktop';
 import { PopupNotifications, PopupNotificationItem } from './components/PopupNotifications';
 import { resolveAvatarUrl } from '../../../utils/avatar';
@@ -231,7 +232,7 @@ export const ChatOmnichannel: React.FC = () => {
     totaisPorStatus,
   } = useAtendimentos({
     autoRefresh: false, // WebSocket já cuida dos updates como nas principais plataformas
-    filtroInicial: { status: 'fila' },
+    filtroInicial: { status: 'em_atendimento' }, // ✅ Status padrão: atendimentos ativos
     atendenteAtualId: user?.id ?? null,
   });
 
@@ -243,7 +244,8 @@ export const ChatOmnichannel: React.FC = () => {
     [selecionarTicket],
   );
 
-  const [tabAtiva, setTabAtiva] = useState<StatusAtendimentoType>(filtros.status || 'fila');
+  // ✅ Status padrão: 'em_atendimento' (agente vê primeiro os atendimentos ativos)
+  const [tabAtiva, setTabAtiva] = useState<StatusAtendimentoType>(filtros.status || 'em_atendimento');
 
   // 🔄 Estado para progress bar de upload
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -487,20 +489,25 @@ export const ChatOmnichannel: React.FC = () => {
         }
       },
 
-      // 🔔 APENAS notificação popup (store já foi atualizada pelo hook)
+      // 🔔 Nova mensagem recebida via WebSocket
       onNovaMensagem: (mensagem: any) => {
-        if (DEBUG) console.log('💬 Nova mensagem - mostrando popup');
+        // 🔥 ADICIONAR DIRETAMENTE no hook (padrão Slack/WhatsApp/Discord)
+        if (mensagem.ticketId && adicionarMensagemRecebida) {
+          adicionarMensagemRecebida(mensagem);
+        }
+
+        // Mostrar popup de notificação
         websocketCallbacksRef.current.mostrarPopupMensagem(mensagem);
 
         // 🆕 Notificação desktop se janela não está focada e mensagem é do cliente
         if (
           document.hidden &&
           permissaoNotificacoes === 'granted' &&
-          mensagem.remetente !== 'atendente'
+          mensagem.remetente?.tipo !== 'atendente'
         ) {
           const conteudoPreview = mensagem.conteudo?.substring(0, 100) || 'Nova mensagem recebida';
           exibirNotificacaoDesktop({
-            titulo: `Nova mensagem de ${mensagem.remetenteNome || 'Cliente'}`,
+            titulo: `Nova mensagem de ${mensagem.remetente?.nome || 'Cliente'}`,
             corpo: conteudoPreview,
             tag: `msg-${mensagem.id}`,
             onClick: () => {
@@ -552,12 +559,10 @@ export const ChatOmnichannel: React.FC = () => {
   useEffect(() => {
     if (!ticketSelecionado?.id || !wsConnected) return;
 
-    if (DEBUG) console.log('🚪 Entrando na sala do ticket:', ticketSelecionado.id);
     entrarNoTicket(ticketSelecionado.id);
 
     // Sair da sala ao desmontar ou trocar de ticket
     return () => {
-      if (DEBUG) console.log('🚪 Saindo da sala do ticket:', ticketSelecionado.id);
       sairDoTicket(ticketSelecionado.id);
     };
   }, [ticketSelecionado?.id, wsConnected, entrarNoTicket, sairDoTicket]);
@@ -631,6 +636,7 @@ export const ChatOmnichannel: React.FC = () => {
   const [modalEditarContato, setModalEditarContato] = useState(false);
   const [modalVincularCliente, setModalVincularCliente] = useState(false);
   const [modalAbrirDemanda, setModalAbrirDemanda] = useState(false);
+  const [demandaVinculada, setDemandaVinculada] = useState<any>(null);
   const [modalSelecionarFila, setModalSelecionarFila] = useState(false);
 
   // Variáveis derivadas
@@ -774,6 +780,25 @@ export const ChatOmnichannel: React.FC = () => {
           return;
         }
 
+        // 🎯 CRÍTICO: Ao assumir atendimento, atribuir atendenteId do usuário atual
+        if (novoStatus === 'em_atendimento' && !ticketSelecionado.atendente && user?.id) {
+          // Atualizar status E atribuir atendente simultaneamente
+          await Promise.all([
+            atendimentoService.atualizarStatusTicket(ticketSelecionado.id, novoStatus),
+            atendimentoService.atualizarTicket(ticketSelecionado.id, { atendenteId: user.id }),
+          ]);
+
+          // Buscar ticket atualizado do backend para garantir dados corretos
+          const ticketAtualizado = await atendimentoService.buscarTicket(ticketSelecionado.id);
+          atualizarTicketLocal(ticketSelecionado.id, ticketAtualizado);
+
+          // 🔄 Mudar automaticamente para aba "Em Atendimento" após assumir
+          handleChangeTab('em_atendimento');
+
+          toast.success('Atendimento assumido com sucesso!');
+          return;
+        }
+
         // Para outros status, atualiza direto via API
         await atendimentoService.atualizarStatusTicket(ticketSelecionado.id, novoStatus);
 
@@ -786,7 +811,7 @@ export const ChatOmnichannel: React.FC = () => {
         toast.error('Erro ao alterar status. Tente novamente.');
       }
     },
-    [ticketSelecionado, handleEncerrar, atualizarTicketLocal],
+    [ticketSelecionado, handleEncerrar, atualizarTicketLocal, user],
   );
 
   // ⌨️ ATALHOS DE TECLADO para agilizar atendimento
@@ -878,59 +903,39 @@ export const ChatOmnichannel: React.FC = () => {
   );
 
   const handleAbrirDemanda = useCallback(() => {
+    console.log('🔍 Abrindo modal de conversão de ticket em demanda');
     setModalAbrirDemanda(true);
   }, []);
 
-  const handleConfirmarNovaDemanda = useCallback(
-    async (dados: NovaDemanda) => {
-      if (!ticketSelecionado) return;
-
-      try {
-        const clienteId = contexto?.cliente?.id;
-        const ticketId = ticketSelecionado.id;
-        const telefone = ticketSelecionado.contato?.telefone;
-
-        // Mapear tipo da modal para tipo do backend
-        const tipoMapping: Record<
-          string,
-          | 'tecnica'
-          | 'comercial'
-          | 'financeira'
-          | 'suporte'
-          | 'reclamacao'
-          | 'solicitacao'
-          | 'outros'
-        > = {
-          bug: 'tecnica',
-          feature: 'comercial',
-          suporte: 'suporte',
-          melhoria: 'solicitacao',
-        };
-
-        // ✅ Criar demanda no backend
-        const novaDemanda = await criarDemanda({
-          clienteId,
-          ticketId,
-          contatoTelefone: telefone,
-          titulo: dados.titulo,
-          descricao: dados.descricao,
-          tipo: tipoMapping[dados.tipo] || 'outros',
-          prioridade: dados.prioridade,
-          status: 'aberta',
-          dataVencimento: dados.prazo?.toISOString(),
-          responsavelId: dados.responsavelId,
-        });
-
-        if (novaDemanda) {
-          toast.success('Demanda criada com sucesso!', 2000);
-        }
-      } catch (error) {
-        console.error('❌ Erro ao criar demanda:', error);
-        toast.error('Erro ao criar demanda. Tente novamente.');
+  const handleConversaoSucesso = useCallback(
+    async (demandaId: string) => {
+      toast.success('Ticket convertido em demanda com sucesso!');
+      // Atualizar demanda vinculada
+      if (ticketSelecionado?.id) {
+        await verificarDemandaVinculada(ticketSelecionado.id);
       }
     },
-    [ticketSelecionado, contexto, criarDemanda],
+    [ticketSelecionado],
   );
+
+  // Verificar se ticket já tem demanda vinculada
+  const verificarDemandaVinculada = useCallback(async (ticketId: string) => {
+    try {
+      const demanda = await demandaService.buscarPorTicket(ticketId);
+      setDemandaVinculada(demanda);
+    } catch (err) {
+      setDemandaVinculada(null);
+    }
+  }, []);
+
+  // Verificar demanda quando ticket mudar
+  useEffect(() => {
+    if (ticketSelecionado?.id) {
+      verificarDemandaVinculada(ticketSelecionado.id);
+    } else {
+      setDemandaVinculada(null);
+    }
+  }, [ticketSelecionado?.id, verificarDemandaVinculada]);
 
   const handleAdicionarNota = useCallback(
     async (conteudo: string, importante: boolean) => {
@@ -1032,12 +1037,12 @@ export const ChatOmnichannel: React.FC = () => {
 
   // ✅ LAYOUT RESPONSIVO SIMPLIFICADO (Grid Tailwind Nativo)
   return (
-    <div className="h-full bg-gray-50 overflow-hidden">
+    <div className="h-full w-full bg-gray-50 flex flex-col overflow-hidden">
       {/* Grid Responsivo: Mobile (1 col) | Tablet (2 cols) | Desktop (3 cols) */}
-      <div className="h-full grid grid-cols-1 lg:grid-cols-[320px_1fr] xl:grid-cols-[340px_1fr_320px] gap-0">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[320px_1fr] xl:grid-cols-[340px_1fr_320px] gap-0 overflow-hidden">
 
         {/* COLUNA 1: Sidebar - Hidden no mobile */}
-        <div className="hidden lg:flex flex-col overflow-y-auto border-r bg-white">
+        <div className="hidden lg:flex flex-col h-full overflow-hidden border-r bg-white">
           <AtendimentosSidebar
             tickets={tickets}
             ticketSelecionado={ticketSelecionado?.id || ''}
@@ -1111,7 +1116,7 @@ export const ChatOmnichannel: React.FC = () => {
               notas={notas || []}
               onEditarContato={handleEditarContato}
               onVincularCliente={handleVincularCliente}
-              onAbrirDemanda={handleAbrirDemanda}
+              onConverterTicket={handleAbrirDemanda}
               onAdicionarNota={handleAdicionarNota}
               onExcluirNota={handleExcluirNota}
               theme={currentPalette}
@@ -1155,12 +1160,15 @@ export const ChatOmnichannel: React.FC = () => {
         contatoAtual={ticketSelecionado?.contato}
       />
 
-      <AbrirDemandaModal
-        isOpen={modalAbrirDemanda}
-        onClose={() => setModalAbrirDemanda(false)}
-        onConfirm={handleConfirmarNovaDemanda}
-        ticketAtual={ticketSelecionado}
-      />
+      {modalAbrirDemanda && ticketSelecionado && (
+        <ConvertTicketModal
+          ticketId={ticketSelecionado.id}
+          ticketNumero={ticketSelecionado.numero?.toString() || 'S/N'}
+          ticketAssunto={ticketSelecionado.ultimaMensagem || 'Sem assunto'}
+          onClose={() => setModalAbrirDemanda(false)}
+          onSuccess={handleConversaoSucesso}
+        />
+      )}
 
       <SelecionarFilaModal
         isOpen={modalSelecionarFila}

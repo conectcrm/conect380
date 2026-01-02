@@ -8,7 +8,6 @@ import {
   Globe,
   BarChart3,
   Settings,
-  TestTube,
   Users,
   Eye,
   ExternalLink,
@@ -20,10 +19,9 @@ import {
   Activity,
   Copy,
   Mail,
-  Plus
+  Plus,
 } from 'lucide-react';
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
-import { Link } from 'react-router-dom';
 
 const PortalClientePage: React.FC = () => {
   console.log('DEBUG: PortalClientePage carregada');
@@ -37,9 +35,9 @@ const PortalClientePage: React.FC = () => {
       enviadas: 156,
       visualizadas: 134,
       aceitas: 89,
-      rejeitadas: 12
+      rejeitadas: 12,
     },
-    tempoMedioVisualizacao: '4.2 min'
+    tempoMedioVisualizacao: '4.2 min',
   };
 
   const acessosRecentes = [
@@ -49,7 +47,7 @@ const PortalClientePage: React.FC = () => {
       proposta: 'PROP-2025-001',
       dataAcesso: '2025-01-27 14:30',
       acao: 'Visualizou proposta',
-      ip: '192.168.1.100'
+      ip: '192.168.1.100',
     },
     {
       id: 2,
@@ -57,7 +55,7 @@ const PortalClientePage: React.FC = () => {
       proposta: 'PROP-2025-002',
       dataAcesso: '2025-01-27 13:15',
       acao: 'Aceitou proposta',
-      ip: '10.0.0.45'
+      ip: '10.0.0.45',
     },
     {
       id: 3,
@@ -65,45 +63,45 @@ const PortalClientePage: React.FC = () => {
       proposta: 'PROP-2025-003',
       dataAcesso: '2025-01-27 11:20',
       acao: 'Rejeitou proposta',
-      ip: '172.16.0.12'
-    }
+      ip: '172.16.0.12',
+    },
   ];
 
   const propostas = [
     {
       id: 'PROP-2025-001',
       cliente: 'João Silva Ltda',
-      valor: 15500.00,
+      valor: 15500.0,
       status: 'Enviada',
       dataEnvio: '2025-01-25',
       acessos: 3,
-      ultimoAcesso: '2025-01-27 14:30'
+      ultimoAcesso: '2025-01-27 14:30',
     },
     {
       id: 'PROP-2025-002',
       cliente: 'Tech Solutions',
-      valor: 28900.00,
+      valor: 28900.0,
       status: 'Aceita',
       dataEnvio: '2025-01-24',
       acessos: 5,
-      ultimoAcesso: '2025-01-27 13:15'
+      ultimoAcesso: '2025-01-27 13:15',
     },
     {
       id: 'PROP-2025-003',
       cliente: 'Marina Costa ME',
-      valor: 7800.00,
+      valor: 7800.0,
       status: 'Rejeitada',
       dataEnvio: '2025-01-23',
       acessos: 2,
-      ultimoAcesso: '2025-01-27 11:20'
-    }
+      ultimoAcesso: '2025-01-27 11:20',
+    },
   ];
 
   const tabs = [
     { id: 'overview', label: 'Visão Geral', icon: BarChart3 },
     { id: 'propostas', label: 'Propostas', icon: FileText },
     { id: 'acessos', label: 'Log de Acessos', icon: Activity },
-    { id: 'configuracoes', label: 'Configurações', icon: Settings }
+    { id: 'configuracoes', label: 'Configurações', icon: Settings },
   ];
 
   const getStatusColor = (status: string) => {
@@ -131,10 +129,7 @@ const PortalClientePage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
-              <BackToNucleus
-                nucleusPath="/nuclei/gestao"
-                nucleusName="Gestão"
-              />
+              <BackToNucleus nucleusPath="/nuclei/gestao" nucleusName="Gestão" />
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] rounded-lg flex items-center justify-center">
                   <Globe className="h-6 w-6 text-white" />
@@ -147,13 +142,6 @@ const PortalClientePage: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-3">
-              <Link
-                to="/teste-portal"
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <TestTube className="h-4 w-4" />
-                Testar Portal
-              </Link>
               <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
                 <Plus className="h-4 w-4" />
                 Nova Proposta
@@ -198,7 +186,9 @@ const PortalClientePage: React.FC = () => {
                 <div className="flex items-center">
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-600">Total de Acessos</p>
-                    <p className="text-2xl font-bold text-gray-900">{estatisticas.totalAcessos.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {estatisticas.totalAcessos.toLocaleString()}
+                    </p>
                   </div>
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                     <Eye className="h-6 w-6 text-blue-600" />
@@ -223,7 +213,10 @@ const PortalClientePage: React.FC = () => {
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-600">Taxa de Aceite</p>
                     <p className="text-2xl font-bold text-gray-900">
-                      {Math.round((estatisticas.propostas.aceitas / estatisticas.propostas.enviadas) * 100)}%
+                      {Math.round(
+                        (estatisticas.propostas.aceitas / estatisticas.propostas.enviadas) * 100,
+                      )}
+                      %
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -236,7 +229,9 @@ const PortalClientePage: React.FC = () => {
                 <div className="flex items-center">
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-600">Tempo Médio</p>
-                    <p className="text-2xl font-bold text-gray-900">{estatisticas.tempoMedioVisualizacao}</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {estatisticas.tempoMedioVisualizacao}
+                    </p>
                   </div>
                   <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
                     <Calendar className="h-6 w-6 text-orange-600" />
@@ -253,14 +248,19 @@ const PortalClientePage: React.FC = () => {
               <div className="p-6">
                 <div className="space-y-4">
                   {acessosRecentes.map((acesso) => (
-                    <div key={acesso.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div
+                      key={acesso.id}
+                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                    >
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                           <Users className="h-5 w-5 text-blue-600" />
                         </div>
                         <div>
                           <p className="font-medium text-gray-900">{acesso.cliente}</p>
-                          <p className="text-sm text-gray-600">{acesso.acao} - {acesso.proposta}</p>
+                          <p className="text-sm text-gray-600">
+                            {acesso.acao} - {acesso.proposta}
+                          </p>
                         </div>
                       </div>
                       <div className="text-right">
@@ -319,12 +319,16 @@ const PortalClientePage: React.FC = () => {
                         R$ {proposta.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(proposta.status)}`}>
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(proposta.status)}`}
+                        >
                           {proposta.status}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{proposta.acessos} visualizações</div>
+                        <div className="text-sm text-gray-900">
+                          {proposta.acessos} visualizações
+                        </div>
                         <div className="text-xs text-gray-500">Último: {proposta.ultimoAcesso}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -357,7 +361,10 @@ const PortalClientePage: React.FC = () => {
             <div className="p-6">
               <div className="space-y-4">
                 {acessosRecentes.map((acesso) => (
-                  <div key={acesso.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div
+                    key={acesso.id}
+                    className="flex items-center justify-between p-4 border rounded-lg"
+                  >
                     <div className="flex items-center gap-4">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                       <div>
@@ -391,7 +398,9 @@ const PortalClientePage: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium text-gray-900">Expiração automática de links</p>
-                        <p className="text-sm text-gray-600">Links expiram automaticamente após o período configurado</p>
+                        <p className="text-sm text-gray-600">
+                          Links expiram automaticamente após o período configurado
+                        </p>
                       </div>
                       <div className="flex items-center">
                         <input
@@ -410,15 +419,23 @@ const PortalClientePage: React.FC = () => {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium text-gray-900">Notificar vendedor sobre acessos</p>
-                        <p className="text-sm text-gray-600">Enviar email quando cliente acessar proposta</p>
+                        <p className="font-medium text-gray-900">
+                          Notificar vendedor sobre acessos
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Enviar email quando cliente acessar proposta
+                        </p>
                       </div>
                       <input type="checkbox" defaultChecked className="rounded" />
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium text-gray-900">Notificar sobre aceites/rejeições</p>
-                        <p className="text-sm text-gray-600">Alerta imediato para decisões do cliente</p>
+                        <p className="font-medium text-gray-900">
+                          Notificar sobre aceites/rejeições
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Alerta imediato para decisões do cliente
+                        </p>
                       </div>
                       <input type="checkbox" defaultChecked className="rounded" />
                     </div>

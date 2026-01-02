@@ -56,14 +56,14 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
           telefone: '(11) 99999-8888',
           plano: {
             nome: 'Professional',
-            preco: 199.90,
-            features: ['Até 50 usuários', 'API completa', 'Suporte prioritário']
+            preco: 199.9,
+            features: ['Até 50 usuários', 'API completa', 'Suporte prioritário'],
           },
           status: 'ativa',
           isActive: true,
           dataVencimento: new Date('2025-08-30'),
           dataCriacao: new Date('2023-01-15'),
-          ultimoAcesso: new Date('2025-07-30')
+          ultimoAcesso: new Date('2025-07-30'),
         },
         {
           id: '2',
@@ -73,14 +73,14 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
           telefone: '(21) 88888-7777',
           plano: {
             nome: 'Enterprise',
-            preco: 499.90,
-            features: ['Usuários ilimitados', 'API + Webhooks', 'Suporte 24/7']
+            preco: 499.9,
+            features: ['Usuários ilimitados', 'API + Webhooks', 'Suporte 24/7'],
           },
           status: 'ativa',
           isActive: false,
           dataVencimento: new Date('2025-09-15'),
           dataCriacao: new Date('2022-08-20'),
-          ultimoAcesso: new Date('2025-07-29')
+          ultimoAcesso: new Date('2025-07-29'),
         },
         {
           id: '3',
@@ -90,30 +90,29 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
           telefone: '(31) 77777-6666',
           plano: {
             nome: 'Starter',
-            preco: 79.90,
-            features: ['Até 10 usuários', 'API básica', 'Suporte por email']
+            preco: 79.9,
+            features: ['Até 10 usuários', 'API básica', 'Suporte por email'],
           },
           status: 'trial',
           isActive: false,
           dataVencimento: new Date('2025-08-05'),
           dataCriacao: new Date('2025-07-20'),
-          ultimoAcesso: new Date('2025-07-28')
-        }
+          ultimoAcesso: new Date('2025-07-28'),
+        },
       ];
 
       // Simular delay da API
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
       setEmpresas(mockEmpresas);
-      const ativa = mockEmpresas.find(e => e.isActive) || mockEmpresas[0];
+      const ativa = mockEmpresas.find((e) => e.isActive) || mockEmpresas[0];
       setEmpresaAtiva(ativa);
-
     } catch (error) {
       console.error('Erro ao carregar empresas:', error);
       addNotification({
         type: 'error',
         title: 'Erro ao carregar empresas',
-        message: 'Não foi possível carregar suas empresas. Tente novamente.'
+        message: 'Não foi possível carregar suas empresas. Tente novamente.',
       });
     } finally {
       setLoading(false);
@@ -123,21 +122,24 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
   // Alternar empresa ativa
   const switchEmpresa = async (empresaId: string) => {
     try {
-      const empresa = empresas.find(e => e.id === empresaId);
+      const empresa = empresas.find((e) => e.id === empresaId);
       if (!empresa) {
         throw new Error('Empresa não encontrada');
       }
 
       // Atualizar estado local
-      setEmpresas(prev => prev.map(e => ({
-        ...e,
-        isActive: e.id === empresaId
-      })));
+      setEmpresas((prev) => {
+        if (!Array.isArray(prev)) return [];
+        return prev.map((e) => ({
+          ...e,
+          isActive: e.id === empresaId,
+        }));
+      });
 
       setEmpresaAtiva(empresa);
 
       // Simular chamada à API para alterar contexto
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       // Salvar no localStorage (ou seria enviado para API)
       localStorage.setItem('empresaAtiva', empresaId);
@@ -145,15 +147,14 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
       addNotification({
         type: 'success',
         title: 'Empresa alterada',
-        message: `Agora você está trabalhando com ${empresa.nome}`
+        message: `Agora você está trabalhando com ${empresa.nome}`,
       });
-
     } catch (error) {
       console.error('Erro ao alterar empresa:', error);
       addNotification({
         type: 'error',
         title: 'Erro ao alterar empresa',
-        message: 'Não foi possível alterar a empresa. Tente novamente.'
+        message: 'Não foi possível alterar a empresa. Tente novamente.',
       });
       throw error;
     }
@@ -170,23 +171,22 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
       // Simular criação na API
       const empresaComId: EmpresaInfo = {
         ...novaEmpresa,
-        id: Date.now().toString() // Em produção viria da API
+        id: Date.now().toString(), // Em produção viria da API
       };
 
-      setEmpresas(prev => [...prev, empresaComId]);
+      setEmpresas((prev) => [...prev, empresaComId]);
 
       addNotification({
         type: 'success',
         title: 'Empresa cadastrada',
-        message: `A empresa ${novaEmpresa.nome} foi cadastrada com sucesso.`
+        message: `A empresa ${novaEmpresa.nome} foi cadastrada com sucesso.`,
       });
-
     } catch (error) {
       console.error('Erro ao adicionar empresa:', error);
       addNotification({
         type: 'error',
         title: 'Erro ao cadastrar empresa',
-        message: 'Não foi possível cadastrar a empresa. Tente novamente.'
+        message: 'Não foi possível cadastrar a empresa. Tente novamente.',
       });
       throw error;
     }
@@ -195,26 +195,23 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
   // Atualizar empresa
   const updateEmpresa = async (empresaId: string, updates: Partial<EmpresaInfo>) => {
     try {
-      setEmpresas(prev => prev.map(e =>
-        e.id === empresaId ? { ...e, ...updates } : e
-      ));
+      setEmpresas((prev) => prev.map((e) => (e.id === empresaId ? { ...e, ...updates } : e)));
 
       if (empresaAtiva?.id === empresaId) {
-        setEmpresaAtiva(prev => prev ? { ...prev, ...updates } : null);
+        setEmpresaAtiva((prev) => (prev ? { ...prev, ...updates } : null));
       }
 
       addNotification({
         type: 'success',
         title: 'Empresa atualizada',
-        message: 'As informações da empresa foram atualizadas com sucesso.'
+        message: 'As informações da empresa foram atualizadas com sucesso.',
       });
-
     } catch (error) {
       console.error('Erro ao atualizar empresa:', error);
       addNotification({
         type: 'error',
         title: 'Erro ao atualizar empresa',
-        message: 'Não foi possível atualizar a empresa. Tente novamente.'
+        message: 'Não foi possível atualizar a empresa. Tente novamente.',
       });
       throw error;
     }
@@ -232,14 +229,10 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
     switchEmpresa,
     refreshEmpresas,
     addEmpresa,
-    updateEmpresa
+    updateEmpresa,
   };
 
-  return (
-    <EmpresaContext.Provider value={value}>
-      {children}
-    </EmpresaContext.Provider>
-  );
+  return <EmpresaContext.Provider value={value}>{children}</EmpresaContext.Provider>;
 };
 
 export const useEmpresas = (): EmpresaContextType => {

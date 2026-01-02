@@ -13,7 +13,7 @@ import {
   FiltrosCategorias,
   FiltrosSubcategorias,
   FiltrosConfiguracoes,
-  EstatisticasCategorias
+  EstatisticasCategorias,
 } from '../types/produtos';
 
 const BASE_URL = 'http://localhost:3001';
@@ -64,14 +64,15 @@ class CategoriasProdutosService {
       const categoriasLocal = this.obterCategoriasDoStorage();
 
       if (filtros?.busca) {
-        return categoriasLocal.filter(cat =>
-          cat.nome.toLowerCase().includes(filtros.busca!.toLowerCase()) ||
-          cat.descricao.toLowerCase().includes(filtros.busca!.toLowerCase())
+        return categoriasLocal.filter(
+          (cat) =>
+            cat.nome.toLowerCase().includes(filtros.busca!.toLowerCase()) ||
+            cat.descricao.toLowerCase().includes(filtros.busca!.toLowerCase()),
         );
       }
 
       if (filtros?.ativo !== undefined) {
-        return categoriasLocal.filter(cat => cat.ativo === filtros.ativo);
+        return categoriasLocal.filter((cat) => cat.ativo === filtros.ativo);
       }
 
       return categoriasLocal;
@@ -96,7 +97,7 @@ class CategoriasProdutosService {
 
       // Fallback para localStorage
       const categorias = this.obterCategoriasDoStorage();
-      const categoria = categorias.find(cat => cat.id === id);
+      const categoria = categorias.find((cat) => cat.id === id);
 
       if (!categoria) {
         throw new Error('Categoria não encontrada');
@@ -139,7 +140,7 @@ class CategoriasProdutosService {
         ativo: categoria.ativo !== false,
         subcategorias: [],
         criadoEm: new Date().toISOString(),
-        atualizadoEm: new Date().toISOString()
+        atualizadoEm: new Date().toISOString(),
       };
 
       categorias.push(novaCategoria);
@@ -160,7 +161,7 @@ class CategoriasProdutosService {
         ativo: categoria.ativo !== false,
         subcategorias: [],
         criadoEm: new Date().toISOString(),
-        atualizadoEm: new Date().toISOString()
+        atualizadoEm: new Date().toISOString(),
       };
 
       categorias.push(novaCategoria);
@@ -234,7 +235,9 @@ class CategoriasProdutosService {
     }
   }
 
-  async criarSubcategoria(subcategoria: CriarSubcategoriaProdutoRequest): Promise<SubcategoriaProduto> {
+  async criarSubcategoria(
+    subcategoria: CriarSubcategoriaProdutoRequest,
+  ): Promise<SubcategoriaProduto> {
     try {
       const response = await fetch(`${BASE_URL}/subcategorias-produtos`, {
         method: 'POST',
@@ -257,7 +260,9 @@ class CategoriasProdutosService {
     }
   }
 
-  async atualizarSubcategoria(subcategoria: AtualizarSubcategoriaProdutoRequest): Promise<SubcategoriaProduto> {
+  async atualizarSubcategoria(
+    subcategoria: AtualizarSubcategoriaProdutoRequest,
+  ): Promise<SubcategoriaProduto> {
     try {
       const response = await fetch(`${BASE_URL}/subcategorias-produtos/${subcategoria.id}`, {
         method: 'PUT',
@@ -321,7 +326,9 @@ class CategoriasProdutosService {
     }
   }
 
-  async criarConfiguracao(configuracao: CriarConfiguracaoProdutoRequest): Promise<ConfiguracaoProduto> {
+  async criarConfiguracao(
+    configuracao: CriarConfiguracaoProdutoRequest,
+  ): Promise<ConfiguracaoProduto> {
     try {
       const response = await fetch(`${BASE_URL}/configuracoes-produtos`, {
         method: 'POST',
@@ -344,7 +351,9 @@ class CategoriasProdutosService {
     }
   }
 
-  async atualizarConfiguracao(configuracao: AtualizarConfiguracaoProdutoRequest): Promise<ConfiguracaoProduto> {
+  async atualizarConfiguracao(
+    configuracao: AtualizarConfiguracaoProdutoRequest,
+  ): Promise<ConfiguracaoProduto> {
     try {
       const response = await fetch(`${BASE_URL}/configuracoes-produtos/${configuracao.id}`, {
         method: 'PUT',

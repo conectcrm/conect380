@@ -1,10 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Workflow,
   RefreshCw,
   Plus,
-  Search,
-  Filter as FilterIcon,
   Copy,
   Rocket,
   Ban,
@@ -23,18 +21,20 @@ import {
   FluxoTriagem,
   FilterFluxoDto,
   CreateFluxoDto,
+  EstruturaFluxo,
 } from '../../../services/fluxoService';
+import { getErrorMessage } from '../../../utils/errorHandling';
 
 interface FormState {
   nome: string;
   descricao: string;
-  tipo: string;
+  tipo: CreateFluxoDto['tipo'];
   canais: string[];
   estruturaJson: string;
   ativo: boolean;
 }
 
-const defaultEstrutura = {
+const defaultEstrutura: EstruturaFluxo = {
   etapaInicial: 'inicio',
   etapas: {
     inicio: {
@@ -92,23 +92,6 @@ const canaisDisponiveis = [
   { value: 'facebook', label: 'Facebook Messenger' },
 ];
 
-const statusOptions = [
-  { value: '', label: 'Todos' },
-  { value: 'true', label: 'Ativos' },
-  { value: 'false', label: 'Inativos' },
-];
-
-const publicadoOptions = [
-  { value: '', label: 'Todos' },
-  { value: 'true', label: 'Publicados' },
-  { value: 'false', label: 'Rascunhos' },
-];
-
-const canaisFilterOptions = [
-  { value: '', label: 'Todos os canais' },
-  ...canaisDisponiveis,
-];
-
 const defaultFormState: FormState = {
   nome: '',
   descricao: '',
@@ -128,27 +111,23 @@ const defaultFiltros = {
 
 type FiltrosState = typeof defaultFiltros;
 
-const formatDate = (dateString?: string) => {
+const formatDate = (dateString?: string): string => {
   if (!dateString) return '—';
-  try {
-    return new Date(dateString).toLocaleString('pt-BR');
-  } catch (error) {
-    console.warn('Não foi possível formatar a data', dateString, error);
-    return dateString;
-  }
+  const parsedDate = new Date(dateString);
+  return Number.isNaN(parsedDate.getTime()) ? dateString : parsedDate.toLocaleString('pt-BR');
 };
 
-const canaisToString = (canais?: string[]) => {
+const canaisToString = (canais?: string[]): string => {
   if (!Array.isArray(canais) || canais.length === 0) {
     return 'Não definido';
   }
   return canais.join(', ');
 };
 
-const parseJsonSafe = (value: string) => {
+const parseJsonSafe = (value: string): EstruturaFluxo | null => {
   try {
-    return JSON.parse(value);
-  } catch (error) {
+    return JSON.parse(value) as EstruturaFluxo;
+  } catch {
     return null;
   }
 };
@@ -164,7 +143,7 @@ const montarFiltrosRequest = (filtros: FiltrosState): FilterFluxoDto => {
   return params;
 };
 
-const fluxoFiltrado = (lista: FluxoTriagem[], filtros: typeof defaultFiltros) => {
+const fluxoFiltrado = (lista: FluxoTriagem[], filtros: typeof defaultFiltros): FluxoTriagem[] => {
   const busca = filtros.search.trim().toLowerCase();
 
   return lista.filter((fluxo) => {
@@ -176,7 +155,9 @@ const fluxoFiltrado = (lista: FluxoTriagem[], filtros: typeof defaultFiltros) =>
 
     const atendeTipo = filtros.tipo ? fluxo.tipo === filtros.tipo : true;
     const atendeAtivo = filtros.ativo ? String(fluxo.ativo) === filtros.ativo : true;
-    const atendePublicado = filtros.publicado ? String(fluxo.publicado) === filtros.publicado : true;
+    const atendePublicado = filtros.publicado
+      ? String(fluxo.publicado) === filtros.publicado
+      : true;
     const atendeCanal = filtros.canal ? canaisAtuais.includes(filtros.canal) : true;
 
     return atendeBusca && atendeTipo && atendeAtivo && atendePublicado && atendeCanal;
@@ -196,10 +177,10 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
   const [isSaving, setIsSaving] = useState(false);
   const [editingFluxo, setEditingFluxo] = useState<FluxoTriagem | null>(null);
   const [formState, setFormState] = useState<FormState>(defaultFormState);
-  const [filtros, setFiltros] = useState(() => ({ ...defaultFiltros }));
+  const [filtros, setFiltros] = useState<FiltrosState>(() => ({ ...defaultFiltros }));
   const [jsonErro, setJsonErro] = useState<string | null>(null);
 
-  const carregarFluxos = async (filtrosAtuais?: FilterFluxoDto) => {
+  const carregarFluxos = useCallback(async (filtrosAtuais?: FilterFluxoDto): Promise<void> => {
     setLoading(true);
     setError(null);
     try {
@@ -213,21 +194,16 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
       setFluxos(normalizados);
     } catch (err: unknown) {
       console.error('Erro ao carregar fluxos', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      setError(normalizedMessage || fallbackMessage || 'Não foi possível carregar os fluxos.');
+      setError(getErrorMessage(err, 'Não foi possível carregar os fluxos.'));
       setFluxos([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    carregarFluxos();
-  }, []);
+    void carregarFluxos();
+  }, [carregarFluxos]);
 
   const fluxosFiltrados = useMemo(() => fluxoFiltrado(fluxos, filtros), [fluxos, filtros]);
 
@@ -236,7 +212,7 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
   const fluxosAtivos = fluxos.filter((fluxo) => fluxo.ativo).length;
   const totalExecucoes = fluxos.reduce((acc, fluxo) => acc + (fluxo.totalExecucoes || 0), 0);
 
-  const abrirModal = (fluxo?: FluxoTriagem) => {
+  const abrirModal = (fluxo?: FluxoTriagem): void => {
     if (fluxo) {
       setEditingFluxo(fluxo);
       setFormState({
@@ -249,29 +225,36 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
       });
     } else {
       setEditingFluxo(null);
-      setFormState(defaultFormState);
+      setFormState({ ...defaultFormState });
     }
     setJsonErro(null);
     setShowModal(true);
   };
 
-  const fecharModal = () => {
+  const fecharModal = (): void => {
     setShowModal(false);
     setEditingFluxo(null);
-    setFormState(defaultFormState);
+    setFormState({ ...defaultFormState });
     setJsonErro(null);
   };
 
-  const handleInputChange = (campo: keyof FormState, valor: string | boolean | string[]) => {
+  const handleInputChange = (campo: keyof FormState, valor: string | boolean | string[]): void => {
     setFormState((prev) => ({
       ...prev,
       [campo]: valor,
     }));
   };
 
-  const handleSalvar = async () => {
+  const handleSalvar = async (): Promise<void> => {
     setIsSaving(true);
     setJsonErro(null);
+    setError(null);
+
+    if (!formState.nome.trim()) {
+      setError('Nome do fluxo é obrigatório.');
+      setIsSaving(false);
+      return;
+    }
 
     const estrutura = parseJsonSafe(formState.estruturaJson);
     if (!estrutura) {
@@ -281,9 +264,9 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
     }
 
     const payload: CreateFluxoDto = {
-      nome: formState.nome,
-      descricao: formState.descricao,
-      tipo: formState.tipo as CreateFluxoDto['tipo'],
+      nome: formState.nome.trim(),
+      descricao: formState.descricao.trim(),
+      tipo: formState.tipo,
       canais: Array.isArray(formState.canais) ? formState.canais : ['whatsapp'],
       estrutura,
       ativo: formState.ativo,
@@ -297,38 +280,27 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
       }
       await carregarFluxos(montarFiltrosRequest(filtros));
       fecharModal();
-    } catch (err) {
-      console.error('Erro ao salvar fluxo', err);
-      console.error('Response data:', (err as any)?.response?.data);
-      console.error('Response status:', (err as any)?.response?.status);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      setError(normalizedMessage || fallbackMessage || 'Não foi possível salvar o fluxo.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Não foi possível salvar o fluxo.'));
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDuplicar = async (fluxo: FluxoTriagem) => {
+  const handleDuplicar = async (fluxo: FluxoTriagem): Promise<void> => {
     try {
+      setError(null);
       await fluxoService.duplicar(fluxo.id, `${fluxo.nome} (cópia)`);
       await carregarFluxos(montarFiltrosRequest(filtros));
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Erro ao duplicar fluxo', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      setError(normalizedMessage || fallbackMessage || 'Não foi possível duplicar o fluxo.');
+      setError(getErrorMessage(err, 'Não foi possível duplicar o fluxo.'));
     }
   };
 
-  const handlePublicar = async (fluxo: FluxoTriagem) => {
+  const handlePublicar = async (fluxo: FluxoTriagem): Promise<void> => {
     try {
+      setError(null);
       if (fluxo.publicado) {
         await fluxoService.despublicar(fluxo.id);
       } else {
@@ -340,43 +312,25 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
         });
       }
       await carregarFluxos(montarFiltrosRequest(filtros));
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Erro ao alterar publicação', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      setError(normalizedMessage || fallbackMessage || 'Não foi possível alterar a publicação.');
+      setError(getErrorMessage(err, 'Não foi possível alterar a publicação.'));
     }
   };
 
-  const handleExcluir = async (fluxo: FluxoTriagem) => {
+  const handleExcluir = async (fluxo: FluxoTriagem): Promise<void> => {
     if (!window.confirm(`Deseja realmente excluir o fluxo "${fluxo.nome}"?`)) {
       return;
     }
 
     try {
+      setError(null);
       await fluxoService.deletar(fluxo.id);
       await carregarFluxos(montarFiltrosRequest(filtros));
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Erro ao excluir fluxo', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      setError(normalizedMessage || fallbackMessage || 'Não foi possível excluir o fluxo.');
+      setError(getErrorMessage(err, 'Não foi possível excluir o fluxo.'));
     }
-  };
-
-  const handleAplicarFiltros = () => {
-    carregarFluxos(montarFiltrosRequest(filtros));
-  };
-
-  const handleLimparFiltros = () => {
-    setFiltros({ ...defaultFiltros });
-    carregarFluxos();
   };
 
   return (
@@ -431,6 +385,7 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
               placeholder="Buscar fluxos..."
               value={filtros.search}
               onChange={(event) => setFiltros((prev) => ({ ...prev, search: event.target.value }))}
+              aria-label="Buscar fluxos por nome ou descrição"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
             />
           </div>
@@ -439,6 +394,7 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
               onClick={() => carregarFluxos(montarFiltrosRequest(filtros))}
               disabled={loading}
               className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              aria-label="Atualizar lista de fluxos"
             >
               <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
             </button>
@@ -453,104 +409,11 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
               onClick={() => abrirModal()}
               className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               title="Editor JSON avançado"
+              aria-label="Abrir editor JSON avançado"
             >
               <Code2 className="h-5 w-5" />
             </button>
           </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-lg shadow-sm border p-6 mb-6" style={{ display: 'none' }}>
-        <div className="flex flex-col lg:flex-row lg:items-end gap-4">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Buscar fluxos</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Digite o nome ou descrição"
-                value={filtros.search}
-                onChange={(event) => setFiltros((prev) => ({ ...prev, search: event.target.value }))}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
-              />
-            </div>
-          </div>
-
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
-            <select
-              value={filtros.tipo}
-              onChange={(event) => setFiltros((prev) => ({ ...prev, tipo: event.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent"
-            >
-              {tiposFluxo.map((tipo) => (
-                <option key={tipo.value} value={tipo.value}>
-                  {tipo.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-            <select
-              value={filtros.ativo}
-              onChange={(event) => setFiltros((prev) => ({ ...prev, ativo: event.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent"
-            >
-              {statusOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Publicação</label>
-            <select
-              value={filtros.publicado}
-              onChange={(event) => setFiltros((prev) => ({ ...prev, publicado: event.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent"
-            >
-              {publicadoOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Canal</label>
-            <select
-              value={filtros.canal}
-              onChange={(event) => setFiltros((prev) => ({ ...prev, canal: event.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent"
-            >
-              {canaisFilterOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-3 mt-4">
-          <button
-            onClick={handleLimparFiltros}
-            className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Limpar filtros
-          </button>
-          <button
-            onClick={handleAplicarFiltros}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-[#9333EA] text-white rounded-lg hover:bg-[#7E22CE] transition-colors"
-          >
-            <FilterIcon className="w-4 h-4" />
-            Aplicar filtros
-          </button>
         </div>
       </div>
 
@@ -569,7 +432,9 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
           <div className="px-6 py-12 text-center text-gray-600">
             <Workflow className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {filtros.search ? 'Nenhum fluxo encontrado com os filtros atuais' : 'Nenhum fluxo cadastrado'}
+              {filtros.search
+                ? 'Nenhum fluxo encontrado com os filtros atuais'
+                : 'Nenhum fluxo cadastrado'}
             </h3>
             <p className="text-gray-600 mb-5">
               {filtros.search
@@ -594,8 +459,7 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
               <div className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-12 h-12 rounded-xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm"
-                    >
+                    <div className="w-12 h-12 rounded-xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
                       <Workflow className="h-6 w-6 text-[#159A9C]" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -624,10 +488,10 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
                   </div>
                   <button
                     onClick={() => navigate(`/gestao/fluxos/${fluxo.id}/builder`)}
-                    className="p-2 hover:bg-purple-50 rounded-lg transition-colors group"
+                    className="p-2 hover:bg-[#159A9C]/10 rounded-lg transition-colors group"
                     title="Abrir no construtor visual"
                   >
-                    <Layers className="h-5 w-5 text-[#9333EA] group-hover:scale-110 transition-transform" />
+                    <Layers className="h-5 w-5 text-[#159A9C] group-hover:scale-110 transition-transform" />
                   </button>
                 </div>
 
@@ -689,8 +553,8 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
                   <button
                     onClick={() => handlePublicar(fluxo)}
                     className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${fluxo.publicado
-                      ? 'border border-gray-300 hover:bg-gray-50 text-gray-700'
-                      : 'bg-[#159A9C] text-white hover:bg-[#0F7B7D]'
+                        ? 'border border-gray-300 hover:bg-gray-50 text-gray-700'
+                        : 'bg-[#159A9C] text-white hover:bg-[#0F7B7D]'
                       }`}
                     title={fluxo.publicado ? 'Despublicar' : 'Publicar'}
                   >
@@ -719,7 +583,9 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
                 <h2 className="text-xl font-semibold text-gray-900">
                   {editingFluxo ? 'Editar fluxo' : 'Criar novo fluxo'}
                 </h2>
-                <p className="text-sm text-gray-600">Defina as informações básicas e cole a estrutura do fluxo em JSON.</p>
+                <p className="text-sm text-gray-600">
+                  Defina as informações básicas e cole a estrutura do fluxo em JSON.
+                </p>
               </div>
               <button
                 onClick={fecharModal}
@@ -732,12 +598,14 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
             <div className="px-6 py-6 space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Nome do fluxo</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nome do fluxo
+                  </label>
                   <input
                     value={formState.nome}
                     onChange={(event) => handleInputChange('nome', event.target.value)}
                     placeholder="Fluxo de atendimento padrão"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -745,7 +613,7 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
                   <select
                     value={formState.tipo}
                     onChange={(event) => handleInputChange('tipo', event.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                   >
                     {tiposFluxo
                       .filter((tipo) => tipo.value !== '')
@@ -765,18 +633,23 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
                   onChange={(event) => handleInputChange('descricao', event.target.value)}
                   placeholder="Explique o objetivo do fluxo para facilitar o entendimento da equipe."
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Canais habilitados</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Canais habilitados
+                  </label>
                   <div className="flex flex-wrap gap-2">
                     {canaisDisponiveis.map((canal) => {
                       const checked = formState.canais.includes(canal.value);
                       return (
-                        <label key={canal.value} className="flex items-center gap-2 text-sm text-gray-700">
+                        <label
+                          key={canal.value}
+                          className="flex items-center gap-2 text-sm text-gray-700"
+                        >
                           <input
                             type="checkbox"
                             checked={checked}
@@ -786,6 +659,7 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
                                 : formState.canais.filter((item) => item !== canal.value);
                               handleInputChange('canais', novoValor);
                             }}
+                            className="h-4 w-4 text-[#159A9C] border-gray-300 rounded focus:ring-[#159A9C]"
                           />
                           {canal.label}
                         </label>
@@ -799,6 +673,7 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
                       type="checkbox"
                       checked={formState.ativo}
                       onChange={(event) => handleInputChange('ativo', event.target.checked)}
+                      className="h-4 w-4 text-[#159A9C] border-gray-300 rounded focus:ring-[#159A9C]"
                     />
                     Fluxo ativo
                   </label>
@@ -808,22 +683,27 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                   Estrutura (JSON)
-                  <span className="text-xs font-normal text-gray-500">Cole a estrutura de etapas e opções do fluxo</span>
+                  <span className="text-xs font-normal text-gray-500">
+                    Cole a estrutura de etapas e opções do fluxo
+                  </span>
                 </label>
                 <textarea
                   value={formState.estruturaJson}
                   onChange={(event) => handleInputChange('estruturaJson', event.target.value)}
-                  className="w-full h-64 font-mono text-sm px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent"
+                  className="w-full h-64 font-mono text-sm px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                 />
                 {jsonErro && <span className="text-sm text-red-600">{jsonErro}</span>}
                 <div className="flex items-center justify-between text-xs text-gray-500 mt-2">
                   <div className="flex items-center gap-2">
                     <Code2 className="w-4 h-4" />
-                    Exemplo rápido: etapa inicial "inicio" com opções para núcleos de suporte e vendas.
+                    Exemplo rápido: etapa inicial "inicio" com opções para núcleos de suporte e
+                    vendas.
                   </div>
                   <button
-                    onClick={() => handleInputChange('estruturaJson', JSON.stringify(defaultEstrutura, null, 2))}
-                    className="text-[#9333EA] hover:text-[#7E22CE]"
+                    onClick={() =>
+                      handleInputChange('estruturaJson', JSON.stringify(defaultEstrutura, null, 2))
+                    }
+                    className="text-[#159A9C] hover:text-[#0F7B7D]"
                   >
                     Restaurar exemplo
                   </button>
@@ -841,7 +721,7 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
               <button
                 onClick={handleSalvar}
                 disabled={isSaving}
-                className="px-4 py-2 bg-[#9333EA] text-white rounded-lg hover:bg-[#7E22CE] disabled:opacity-50"
+                className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50"
               >
                 {isSaving ? 'Salvando...' : editingFluxo ? 'Atualizar fluxo' : 'Criar fluxo'}
               </button>
@@ -854,5 +734,3 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
 };
 
 export default GestaoFluxosPage;
-
-

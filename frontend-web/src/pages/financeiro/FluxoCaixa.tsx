@@ -19,7 +19,7 @@ const FluxoCaixa: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <select 
+            <select
               value={selectedPeriod}
               onChange={(e) => setSelectedPeriod(e.target.value)}
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -104,7 +104,7 @@ const FluxoCaixa: React.FC = () => {
             </div>
           </div>
         </div>
-        
+
         {/* Placeholder para gráfico */}
         <div className="h-80 bg-gray-50 rounded-lg flex items-center justify-center">
           <div className="text-center">
@@ -146,15 +146,9 @@ const FluxoCaixa: React.FC = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               <tr>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  19/07/2025
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-900">
-                  Pagamento NF-001 - João Silva
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  Recebimento
-                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">19/07/2025</td>
+                <td className="px-6 py-4 text-sm text-gray-900">Pagamento NF-001 - João Silva</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Recebimento</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                     Entrada
@@ -168,15 +162,11 @@ const FluxoCaixa: React.FC = () => {
                 </td>
               </tr>
               <tr>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  18/07/2025
-                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">18/07/2025</td>
                 <td className="px-6 py-4 text-sm text-gray-900">
                   Pagamento Fornecedor - Tech Solutions
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  Fornecedores
-                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Fornecedores</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
                     Saída
@@ -190,15 +180,9 @@ const FluxoCaixa: React.FC = () => {
                 </td>
               </tr>
               <tr>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  17/07/2025
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-900">
-                  Transferência entre contas
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  Transferência
-                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">17/07/2025</td>
+                <td className="px-6 py-4 text-sm text-gray-900">Transferência entre contas</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Transferência</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                     Interno

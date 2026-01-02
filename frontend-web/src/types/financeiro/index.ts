@@ -9,7 +9,7 @@ export enum StatusContaPagar {
   PAGO = 'pago',
   VENCIDO = 'vencido',
   AGENDADO = 'agendado',
-  CANCELADO = 'cancelado'
+  CANCELADO = 'cancelado',
 }
 
 export enum FormaPagamento {
@@ -19,7 +19,7 @@ export enum FormaPagamento {
   CARTAO_CREDITO = 'cartao_credito',
   CARTAO_DEBITO = 'cartao_debito',
   DINHEIRO = 'dinheiro',
-  CHEQUE = 'cheque'
+  CHEQUE = 'cheque',
 }
 
 export enum CategoriaContaPagar {
@@ -33,14 +33,14 @@ export enum CategoriaContaPagar {
   JURIDICO = 'juridico',
   CONTABILIDADE = 'contabilidade',
   VIAGEM = 'viagem',
-  OUTROS = 'outros'
+  OUTROS = 'outros',
 }
 
 export enum PrioridadePagamento {
   BAIXA = 'baixa',
   MEDIA = 'media',
   ALTA = 'alta',
-  URGENTE = 'urgente'
+  URGENTE = 'urgente',
 }
 
 export interface Fornecedor {
@@ -77,13 +77,13 @@ export interface ContaPagar {
   fornecedor: Fornecedor;
   descricao: string;
   numeroDocumento?: string; // Número da nota fiscal, fatura, etc.
-  
+
   // Datas
   dataEmissao: string;
   dataVencimento: string;
   dataPagamento?: string;
   dataAgendamento?: string;
-  
+
   // Valores
   valorOriginal: number;
   valorDesconto: number;
@@ -92,39 +92,39 @@ export interface ContaPagar {
   valorTotal: number;
   valorPago: number;
   valorRestante: number;
-  
+
   // Status e categoria
   status: StatusContaPagar;
   categoria: CategoriaContaPagar;
   prioridade: PrioridadePagamento;
-  
+
   // Pagamento
   tipoPagamento?: FormaPagamento;
   contaBancariaId?: string;
   contaBancaria?: ContaBancaria;
   comprovantePagamento?: string;
-  
+
   // Recorrência
   recorrente: boolean;
   frequenciaRecorrencia?: 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual';
   proximoVencimento?: string;
-  
+
   // Aprovação
   necessitaAprovacao: boolean;
   aprovadoPor?: string;
   dataAprovacao?: string;
-  
+
   // Anexos e observações
   anexos: Anexo[];
   observacoes?: string;
   observacoesInternas?: string;
-  
+
   // Auditoria
   criadoPor: string;
   criadoEm: string;
   atualizadoPor?: string;
   atualizadoEm: string;
-  
+
   // Tags personalizadas
   tags: string[];
 }
@@ -246,7 +246,7 @@ export const STATUS_LABELS = {
   [StatusContaPagar.PAGO]: 'Pago',
   [StatusContaPagar.VENCIDO]: 'Vencido',
   [StatusContaPagar.AGENDADO]: 'Agendado',
-  [StatusContaPagar.CANCELADO]: 'Cancelado'
+  [StatusContaPagar.CANCELADO]: 'Cancelado',
 };
 
 export const FORMA_PAGAMENTO_LABELS = {
@@ -256,7 +256,7 @@ export const FORMA_PAGAMENTO_LABELS = {
   [FormaPagamento.CARTAO_CREDITO]: 'Cartão de Crédito',
   [FormaPagamento.CARTAO_DEBITO]: 'Cartão de Débito',
   [FormaPagamento.DINHEIRO]: 'Dinheiro',
-  [FormaPagamento.CHEQUE]: 'Cheque'
+  [FormaPagamento.CHEQUE]: 'Cheque',
 };
 
 export const CATEGORIA_LABELS = {
@@ -270,12 +270,12 @@ export const CATEGORIA_LABELS = {
   [CategoriaContaPagar.JURIDICO]: 'Jurídico',
   [CategoriaContaPagar.CONTABILIDADE]: 'Contabilidade',
   [CategoriaContaPagar.VIAGEM]: 'Viagem',
-  [CategoriaContaPagar.OUTROS]: 'Outros'
+  [CategoriaContaPagar.OUTROS]: 'Outros',
 };
 
 export const PRIORIDADE_LABELS = {
   [PrioridadePagamento.BAIXA]: 'Baixa',
   [PrioridadePagamento.MEDIA]: 'Média',
   [PrioridadePagamento.ALTA]: 'Alta',
-  [PrioridadePagamento.URGENTE]: 'Urgente'
+  [PrioridadePagamento.URGENTE]: 'Urgente',
 };

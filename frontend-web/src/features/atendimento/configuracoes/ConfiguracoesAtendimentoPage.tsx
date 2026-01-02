@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
-import { Settings, Target, Tag, Workflow, MessageSquare } from 'lucide-react';
+import { Settings, Target, Tag, MessageSquare } from 'lucide-react';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 
 // Tabs
 import { NucleosTab } from './tabs/NucleosTab';
 import { TagsTab } from './tabs/TagsTab';
-import { FluxosTab } from './tabs/FluxosTab';
 import { GeralTab } from './tabs/GeralTab';
 import { CanaisTab } from './tabs/CanaisTab';
 
-type TabId = 'geral' | 'nucleos' | 'tags' | 'fluxos' | 'canais';
+type TabId = 'geral' | 'nucleos' | 'tags' | 'canais';
 
 interface Tab {
   id: TabId;
@@ -36,12 +35,6 @@ const tabs: Tab[] = [
     label: 'Tags',
     icon: Tag,
     description: 'Categorize tickets com tags flexíveis (substitui departamentos)',
-  },
-  {
-    id: 'fluxos',
-    label: 'Fluxos',
-    icon: Workflow,
-    description: 'Configure fluxos de triagem e automação',
   },
   {
     id: 'canais',
@@ -73,8 +66,6 @@ const ConfiguracoesAtendimentoPage: React.FC = () => {
         return <NucleosTab />;
       case 'tags':
         return <TagsTab />;
-      case 'fluxos':
-        return <FluxosTab />;
       case 'canais':
         return <CanaisTab />;
       default:
@@ -124,10 +115,9 @@ const ConfiguracoesAtendimentoPage: React.FC = () => {
                       className={`
                         group relative min-w-0 flex-1 overflow-hidden py-4 px-4 text-center text-sm font-medium
                         hover:bg-gray-50 focus:z-10 transition-all duration-200
-                        ${
-                          isActive
-                            ? 'text-[#159A9C] border-b-2 border-[#159A9C]'
-                            : 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent'
+                        ${isActive
+                          ? 'text-[#159A9C] border-b-2 border-[#159A9C]'
+                          : 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent'
                         }
                       `}
                       aria-current={isActive ? 'page' : undefined}

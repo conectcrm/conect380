@@ -42,7 +42,7 @@ interface NotificationCallbacks {
 export const useFornecedorRemoval = (
   onSuccess?: () => void,
   onNavigateToContas?: (fornecedorId: number) => void,
-  notifications?: NotificationCallbacks
+  notifications?: NotificationCallbacks,
 ): UseFornecedorRemovalResult => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<FornecedorRemovalError | null>(null);
@@ -56,7 +56,7 @@ export const useFornecedorRemoval = (
       setError({
         message: errorResponse.message,
         details: errorResponse.details,
-        alternatives: errorResponse.alternatives || []
+        alternatives: errorResponse.alternatives || [],
       });
       return false;
     }
@@ -75,8 +75,8 @@ export const useFornecedorRemoval = (
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
       });
 
       if (!response.ok) {
@@ -110,8 +110,8 @@ export const useFornecedorRemoval = (
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
       });
 
       if (!response.ok) {
@@ -147,12 +147,14 @@ export const useFornecedorRemoval = (
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
       });
 
       if (response.ok) {
-        notifications?.onInfo?.('Histórico de contas pagas removido. Tentando excluir novamente...');
+        notifications?.onInfo?.(
+          'Histórico de contas pagas removido. Tentando excluir novamente...',
+        );
         return await removeFornecedor(id);
       } else {
         notifications?.onError?.('Não foi possível limpar o histórico');
@@ -171,6 +173,6 @@ export const useFornecedorRemoval = (
     removeFornecedor,
     desativarFornecedor,
     clearError,
-    retryRemoval
+    retryRemoval,
   };
 };

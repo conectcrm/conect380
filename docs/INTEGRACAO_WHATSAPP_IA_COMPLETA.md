@@ -32,7 +32,7 @@ Implementação completa de um sistema de atendimento WhatsApp com respostas aut
    └─ Meta recebe a mensagem
 
 3. Meta → ngrok (Túnel público)
-   └─ Webhook: POST https://xyz.ngrok.io/api/atendimento/webhooks/whatsapp
+   └─ Webhook: POST https://xyz.ngrok.io/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
 
 4. ngrok → Backend NestJS (localhost:3001)
    └─ WhatsAppWebhookController recebe o webhook
@@ -173,10 +173,10 @@ Implementação completa de um sistema de atendimento WhatsApp com respostas aut
 1. Acesse: https://developers.facebook.com/apps
 2. Selecione seu App → WhatsApp → Configuration
 3. Configure:
-   - **Callback URL**: `https://xyz.ngrok.io/api/atendimento/webhooks/whatsapp`
+   - **Callback URL**: `https://xyz.ngrok.io/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>` (sempre inclua o identificador da empresa)
    - **Verify Token**: `conectcrm_webhook_token_123`
 4. Subscrever: ✅ `messages`
-5. Clicar em "Verify and Save"
+5. Clique em "Verify and Save" e garanta que sua integração envia o header `X-Hub-Signature-256` para validação HMAC.
 
 ### **3. Configurar IA (OpenAI ou Anthropic)**
 
@@ -294,8 +294,8 @@ DATABASE_URL=postgresql://...
 
 #### **Webhooks**
 
-- `GET /api/atendimento/webhooks/whatsapp` - Verificação
-- `POST /api/atendimento/webhooks/whatsapp` - Receber eventos
+- `GET /api/atendimento/webhooks/whatsapp/:empresaId` - Verificação
+- `POST /api/atendimento/webhooks/whatsapp/:empresaId` - Receber eventos (validar `X-Hub-Signature-256`)
 - `GET /api/atendimento/webhooks/whatsapp/:empresaId` - Verificação (empresa específica)
 - `POST /api/atendimento/webhooks/whatsapp/:empresaId` - Receber eventos (empresa específica)
 

@@ -55,6 +55,7 @@ export interface Ticket {
 
 export interface Mensagem {
   id: string;
+  idExterno?: string | null;
   ticketId: string;
   tipo?: string;
   remetente: {

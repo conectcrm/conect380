@@ -1,0 +1,42 @@
+# ============================================
+# Dockerfile para DESENVOLVIMENTO
+# ============================================
+# Hot reload com volumes montados
+# Não compila no build, usa nest start --watch
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Instalar dumb-init para gerenciamento de processos
+RUN apk add --no-cache dumb-init curl
+
+# Copiar package.json e instalar dependências
+COPY package*.json ./
+
+# Instalar TODAS as dependências (incluindo devDependencies)
+RUN npm ci --legacy-peer-deps
+
+# Criar diretórios necessários
+RUN mkdir -p uploads logs dist && \
+  chown -R node:node /app
+
+# Copiar entrypoint que garante node_modules ao iniciar o container
+COPY docker/entrypoint.dev.sh /usr/local/bin/entrypoint-dev.sh
+RUN chmod +x /usr/local/bin/entrypoint-dev.sh
+
+# Usar usuário não-root
+USER node
+
+# Expor porta
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:3001/health || exit 1
+
+# Usar dumb-init
+ENTRYPOINT ["dumb-init", "--", "/usr/local/bin/entrypoint-dev.sh"]
+
+# ✅ COMANDO DE DESENVOLVIMENTO - Watch Mode
+CMD ["npm", "run", "start:dev"]

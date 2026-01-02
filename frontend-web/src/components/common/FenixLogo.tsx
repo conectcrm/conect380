@@ -6,15 +6,11 @@ interface FenixLogoProps {
   variant?: 'full' | 'icon';
 }
 
-const FenixLogo: React.FC<FenixLogoProps> = ({ 
-  className = '', 
-  size = 'md',
-  variant = 'full'
-}) => {
+const FenixLogo: React.FC<FenixLogoProps> = ({ className = '', size = 'md', variant = 'full' }) => {
   const sizeClasses = {
     sm: 'h-6 w-auto',
-    md: 'h-8 w-auto', 
-    lg: 'h-12 w-auto'
+    md: 'h-8 w-auto',
+    lg: 'h-12 w-auto',
   };
 
   if (variant === 'icon') {
@@ -26,10 +22,7 @@ const FenixLogo: React.FC<FenixLogoProps> = ({
           xmlns="http://www.w3.org/2000/svg"
           className="w-full h-full text-blue-600"
         >
-          <path
-            d="M12 2L2 7L12 12L22 7L12 2Z"
-            fill="currentColor"
-          />
+          <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor" />
           <path
             d="M2 17L12 22L22 17"
             stroke="currentColor"
@@ -58,10 +51,7 @@ const FenixLogo: React.FC<FenixLogoProps> = ({
           xmlns="http://www.w3.org/2000/svg"
           className="w-full h-full text-blue-600"
         >
-          <path
-            d="M12 2L2 7L12 12L22 7L12 2Z"
-            fill="currentColor"
-          />
+          <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor" />
           <path
             d="M2 17L12 22L22 17"
             stroke="currentColor"

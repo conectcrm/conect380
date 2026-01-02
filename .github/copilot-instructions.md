@@ -3,6 +3,257 @@
 
 Objetivo: orientar rapidamente agentes AI a serem produtivos no repositório ConectCRM com regras específicas do projeto, comandos essenciais e exemplos práticos.
 
+---
+
+## 🎯 PROPÓSITO E VISÃO DO CONECTCRM
+
+### O Que É o ConectCRM?
+ConectCRM é um **sistema SaaS multi-tenant** de gestão empresarial completo que unifica:
+- 📞 **Atendimento Omnichannel** (WhatsApp, Email, Chat, Telefone)
+- 💼 **CRM e Vendas** (Leads, Oportunidades, Propostas, Contratos)
+- 💰 **Financeiro** (Faturas, Pagamentos, Cobrança Recorrente)
+- 🤖 **Automação com IA** (Triagem automática, Bot inteligente, Insights)
+- 📊 **Analytics** (Dashboards, Relatórios, Métricas)
+
+### O Que NÃO É o ConectCRM?
+- ❌ Não é um chat simples (é gestão completa)
+- ❌ Não é single-tenant (SEMPRE multi-tenant)
+- ❌ Não é monolítico isolado (todos módulos integrados)
+- ❌ Não é apenas CRUD (tem automação e IA)
+
+### Princípios Invioláveis
+1. **Multi-Tenant SEMPRE** - Toda entidade de negócio TEM empresa_id + RLS
+2. **Omnichannel Integrado** - Todos canais convergem para inbox único
+3. **Dados Unificados** - Cliente, Ticket, Proposta, Fatura = mesmo contexto
+4. **IA Como Core** - Não é "extra", é parte fundamental
+5. **Performance First** - Otimizações não são opcionais
+6. **Segurança por Design** - Não adicionar depois, já nasce seguro
+
+---
+
+## 🏗️ ARQUITETURA DE MÓDULOS (MAPA MENTAL)
+
+### Módulo Central: ATENDIMENTO
+- Ticket/Demanda = registro único de atendimento
+- Conecta com: Cliente, Canal, Atendente, Equipe, Fila
+- Gera: Notas, Mensagens, Atividades, SLA
+
+### Módulo: CRM/VENDAS
+- Lead → Oportunidade → Proposta → Contrato
+- Conecta com: Cliente (do Atendimento), Produto
+- Gera: Atividades, Faturas (Financeiro)
+
+### Módulo: FINANCEIRO
+- Fatura → Pagamento → Transação
+- Conecta com: Cliente, Contrato, Gateway
+- Gera: Contas a Pagar/Receber, Cobrança Recorrente
+
+### Módulo: AUTOMAÇÃO/IA
+- Fluxo → Evento → Ação
+- Conecta com: TODOS os módulos (trigger e ação)
+- Usa: OpenAI, Anthropic, Triagem Bot
+
+### ⚠️ REGRA CRÍTICA: INTEGRAÇÃO OBRIGATÓRIA
+- ❌ NÃO criar módulo isolado ("depois a gente integra")
+- ✅ SEMPRE pensar: "Como isso se conecta com Cliente/Ticket/Fatura?"
+- ✅ SEMPRE adicionar relacionamentos desde o início
+
+---
+
+## 🚫 ANTI-PADRÕES (NUNCA FAZER!)
+
+### 1. Criar Tabela Sem Multi-Tenant
+```typescript
+// ❌ ERRADO
+@Entity('produtos')
+export class Produto {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+  
+  @Column()
+  nome: string;
+  // ❌ FALTA empresa_id!
+}
+
+// ✅ CORRETO
+@Entity('produtos')
+export class Produto {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+  
+  @Column({ type: 'uuid' })
+  empresaId: string; // ⚡ OBRIGATÓRIO
+  
+  @ManyToOne(() => Empresa)
+  empresa: Empresa;
+  
+  @Column()
+  nome: string;
+}
+```
+
+### 2. Criar Módulo Sem Relacionamento
+```typescript
+// ❌ ERRADO - Módulo isolado
+export class ProdutoEntity {
+  id: string;
+  nome: string;
+  preco: number;
+  // ❌ Não se conecta com nada!
+}
+
+// ✅ CORRETO - Módulo integrado
+export class ProdutoEntity {
+  id: string;
+  empresaId: string;
+  
+  // Relacionamentos obrigatórios
+  @ManyToOne(() => Cliente)
+  fornecedor?: Cliente; // ✅ Conecta com CRM
+  
+  @OneToMany(() => ItemCotacao)
+  itensCotacao: ItemCotacao[]; // ✅ Conecta com Vendas
+  
+  @OneToMany(() => ItemFatura)
+  itensFatura: ItemFatura[]; // ✅ Conecta com Financeiro
+}
+```
+
+### 3. Implementar Feature Sem Validação
+```typescript
+// ❌ ERRADO - Sem validação
+@Post()
+async criar(@Body() data: any) {
+  return await this.service.criar(data); // ❌ Aceita qualquer coisa!
+}
+
+// ✅ CORRETO - Com validação
+@Post()
+@UseGuards(JwtAuthGuard) // ⚡ Autenticação
+async criar(@Body() dto: CreateProdutoDto) { // ⚡ DTO com class-validator
+  return await this.service.criar(dto);
+}
+```
+
+### 4. Esquecer Estados de Loading/Error
+```tsx
+// ❌ ERRADO - Sem estados
+const ProdutosPage = () => {
+  const [produtos, setProdutos] = useState([]);
+  
+  useEffect(() => {
+    api.get('/produtos').then(setProdutos); // ❌ E se der erro?
+  }, []);
+  
+  return <div>{produtos.map(...)}</div>; // ❌ Sem loading!
+}
+
+// ✅ CORRETO - Com todos os estados
+const ProdutosPage = () => {
+  const [produtos, setProdutos] = useState([]);
+  const [loading, setLoading] = useState(true); // ⚡ Loading
+  const [error, setError] = useState(null); // ⚡ Error
+  
+  useEffect(() => {
+    carregarProdutos();
+  }, []);
+  
+  const carregarProdutos = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await api.get('/produtos');
+      setProdutos(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  if (loading) return <Loading />;
+  if (error) return <Error message={error} />;
+  if (!produtos.length) return <Empty />;
+  
+  return <div>{produtos.map(...)}</div>;
+}
+```
+
+### 5. Ignorar Performance
+```typescript
+// ❌ ERRADO - Query N+1
+async listarComItens() {
+  const produtos = await this.produtoRepo.find();
+  
+  for (const produto of produtos) {
+    produto.itens = await this.itemRepo.find({ produtoId: produto.id });
+    // ❌ 1 query + N queries!
+  }
+  
+  return produtos;
+}
+
+// ✅ CORRETO - Eager Loading
+async listarComItens() {
+  return await this.produtoRepo.find({
+    relations: ['itens'], // ⚡ 1 query só com JOIN
+    order: { nome: 'ASC' },
+  });
+}
+```
+
+### 6. Migration Sem RLS
+```typescript
+// ❌ ERRADO - Esqueceu RLS
+export class CreateProdutos1234567890 implements MigrationInterface {
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
+      CREATE TABLE produtos (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        empresa_id UUID NOT NULL REFERENCES empresas(id),
+        nome VARCHAR(100) NOT NULL
+      );
+    `);
+    // ❌ FALTA: ENABLE ROW LEVEL SECURITY!
+    // ❌ FALTA: CREATE POLICY!
+  }
+}
+
+// ✅ CORRETO - Com RLS completo
+export class CreateProdutos1234567890 implements MigrationInterface {
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // 1. Criar tabela
+    await queryRunner.query(`
+      CREATE TABLE produtos (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        empresa_id UUID NOT NULL REFERENCES empresas(id),
+        nome VARCHAR(100) NOT NULL
+      );
+    `);
+
+    // 2. ⚡ OBRIGATÓRIO: Habilitar RLS
+    await queryRunner.query(`
+      ALTER TABLE produtos ENABLE ROW LEVEL SECURITY;
+    `);
+
+    // 3. ⚡ OBRIGATÓRIO: Criar política
+    await queryRunner.query(`
+      CREATE POLICY tenant_isolation_produtos ON produtos
+        FOR ALL USING (empresa_id = get_current_tenant());
+    `);
+
+    // 4. ⚡ OBRIGATÓRIO: Criar índice
+    await queryRunner.query(`
+      CREATE INDEX idx_produtos_empresa_id ON produtos(empresa_id);
+    `);
+
+    console.log('✅ Tabela produtos criada com RLS ativo');
+  }
+}
+```
+
+---
+
 ## 🚨 REGRA CRÍTICA: NUNCA PULAR ETAPAS
 
 **SEMPRE obter consentimento explícito do usuário antes de:**
@@ -11,6 +262,7 @@ Objetivo: orientar rapidamente agentes AI a serem produtivos no repositório Con
 - ❌ Avançar para próxima fase antes de validar a atual
 - ❌ Fazer suposições sobre requisitos não especificados
 - ❌ Executar comandos que modificam o sistema sem permissão
+- ✅ Após QUALQUER implementação ou mudança que exija validação, execute testes adequados (backend: `npm test`, frontend: `npm run test` ou testes direcionados). Se não puder rodar, informe e peça autorização para o usuário.
 
 **Fluxo Obrigatório:**
 1. ✅ Apresentar plano detalhado com TODAS as etapas
@@ -19,6 +271,10 @@ Objetivo: orientar rapidamente agentes AI a serem produtivos no repositório Con
 4. ✅ Validar resultado da etapa com o usuário
 5. ✅ Perguntar se deve prosseguir para próxima etapa
 6. ✅ Repetir ciclo até conclusão completa
+
+**Regra extra para roadmaps/documentações:** ao executar um plano baseado em uma documentação/roadmap, mantenha as etapas marcadas (checkbox ou status) e informe o progresso ao usuário antes de avançar para a próxima.
+
+**Regra extra de sequência:** só prossiga para a próxima etapa do plano se não houver pendências na etapa atual, a menos que o usuário peça explicitamente para pular.
 
 **Exemplo Correto:**
 ```
@@ -41,6 +297,7 @@ Copilot: "Semana 1 concluída. Quer que eu valide o resultado
 - Responda sempre em português brasileiro (pt-BR), mantendo termos técnicos em inglês apenas quando não houver tradução adequada.
 - Ao reportar logs, comandos ou mensagens de erro, contextualize em português para manter a conversa padronizada.
 - **SEMPRE pergunte antes de executar ações que modificam código, banco de dados ou infraestrutura.**
+- Para questões de análise/revisão, não pergunte o óbvio: realize toda a análise disponível e só questione o usuário quando for necessário para mudanças ou decisões que dependam dele.
 
 1) Onde olhar primeiro
 - Frontend: `frontend-web/` (páginas em `frontend-web/src/pages` e features em `frontend-web/src/features`).
@@ -54,6 +311,7 @@ Copilot: "Semana 1 concluída. Quer que eu valide o resultado
 - ❌ **NÃO mudar**: Cores da paleta Crevasse (#159A9C, #002333, #DEEFE7, #B4BEC9, #FFFFFF)
 
 3) Comandos rápidos (dev)
+- **Node obrigatório**: use Node 22.16+ (frontend só sobe com `NODE_OPTIONS=--max_old_space_size=4096`). Ajuste via `nvm use 22.16.0` ou `fnm use 22.16` antes de rodar qualquer comando.
 - Iniciar backend em modo dev: `cd backend && npm run start:dev` (porta padrão 3001).
 - Iniciar frontend: `cd frontend-web && npm start` (proxy para `http://localhost:3001`).
 - Testes backend: `cd backend && npm test`. Frontend: `cd frontend-web && npm run test`.
@@ -328,6 +586,143 @@ import { Card } from '../components/ui/card';            // ❌
 import { Dialog } from '../components/ui/dialog';        // ❌
 ```
 
+## 🔔 Componentes Padrão OBRIGATÓRIOS do Sistema
+
+### ⚠️ REGRA CRÍTICA: SEMPRE usar componentes oficiais do sistema!
+
+**NUNCA crie modais de confirmação ou toast customizados manualmente!**
+
+O sistema **JÁ POSSUI** componentes padronizados e testados que **DEVEM** ser usados:
+
+### 1️⃣ Modal de Confirmação (Deleção, Cancelamento, etc.)
+
+**Componente:** `ConfirmationModal` + hook `useConfirmation`
+
+**Quando usar:**
+- ✅ Deletar registros (tickets, produtos, usuários, etc.)
+- ✅ Cancelar ações irreversíveis
+- ✅ Confirmar operações críticas
+- ✅ Qualquer ação que precisa confirmação do usuário
+
+**Como usar:**
+
+```typescript
+// 1. Importar no topo do arquivo
+import { useConfirmation } from '../hooks/useConfirmation';
+import { ConfirmationModal } from '../components/common/ConfirmationModal';
+
+// 2. No componente, adicionar o hook
+const { confirmationState, showConfirmation } = useConfirmation();
+
+// 3. Na função de deleção/cancelamento
+const handleDeletar = (item: ItemType, e: React.MouseEvent) => {
+  e.stopPropagation();
+
+  showConfirmation({
+    title: 'Deletar Item',
+    message: `Deseja realmente deletar "${item.nome}"?\n\nEsta ação não pode ser desfeita.`,
+    confirmText: 'Sim, Deletar',
+    cancelText: 'Cancelar',
+    icon: 'danger', // 'danger' | 'warning' | 'info' | 'success'
+    confirmButtonClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+    onConfirm: async () => {
+      try {
+        await api.delete(`/endpoint/${item.id}`);
+        toast.success('Item deletado com sucesso!');
+        await recarregarLista();
+      } catch (err) {
+        toast.error('Erro ao deletar item');
+      }
+    },
+  });
+};
+
+// 4. No JSX, adicionar o modal (ANTES do </div> de fechamento)
+<ConfirmationModal confirmationState={confirmationState} />
+```
+
+**Ícones disponíveis:**
+- `'danger'` - XCircle vermelho (deleções, ações destrutivas)
+- `'warning'` - AlertTriangle amarelo (avisos, atenção)
+- `'info'` - Info azul (informações)
+- `'success'` - CheckCircle verde (confirmações positivas)
+
+### 2️⃣ Sistema de Notificações (Toast)
+
+**Biblioteca:** `react-hot-toast` (JÁ instalada e configurada)
+
+**Quando usar:**
+- ✅ Feedback de sucesso (criação, edição, deleção)
+- ✅ Mensagens de erro (falhas em requisições)
+- ✅ Avisos e informações ao usuário
+- ✅ Qualquer notificação temporária
+
+**Como usar:**
+
+```typescript
+// 1. Importar no topo do arquivo
+import toast from 'react-hot-toast';
+
+// 2. Usar nas funções
+try {
+  await api.post('/endpoint', data);
+  toast.success('Registro criado com sucesso!'); // Verde, 3s
+} catch (err) {
+  const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+  toast.error(`Erro: ${errorMessage}`); // Vermelho, 5s
+}
+
+// Outras variações:
+toast.loading('Salvando...'); // Spinner azul
+toast('Informação simples'); // Neutro
+toast.error('Erro crítico', { duration: 5000 }); // Customizar duração
+```
+
+**Configuração automática:**
+- ✅ Posição: top-right
+- ✅ Duração padrão: 3000ms (sucesso), 5000ms (erro)
+- ✅ Estilo: Alinhado com tema Crevasse
+- ✅ Animações: Fade in/out suaves
+
+### ❌ O QUE NUNCA FAZER:
+
+```typescript
+// ❌ ERRADO - Modal customizado manual
+const [showDeleteModal, setShowDeleteModal] = useState(false);
+<div className="fixed inset-0 bg-black..."> {/* NÃO FAÇA ISSO! */}
+
+// ❌ ERRADO - Toast manual com createElement
+const toastDiv = document.createElement('div');
+toastDiv.innerHTML = `<span>Sucesso!</span>`; // NÃO FAÇA ISSO!
+
+// ❌ ERRADO - window.confirm do navegador
+if (window.confirm('Deletar?')) { /* NÃO FAÇA ISSO! */ }
+
+// ❌ ERRADO - alert do navegador  
+alert('Erro ao salvar'); // NÃO FAÇA ISSO!
+```
+
+### ✅ CHECKLIST para TODA página com operações CRUD:
+
+- [ ] Importei `useConfirmation` e `ConfirmationModal`?
+- [ ] Importei `toast` do `react-hot-toast`?
+- [ ] Adicionei `<ConfirmationModal confirmationState={confirmationState} />` no JSX?
+- [ ] Usei `showConfirmation()` para confirmações ao invés de `window.confirm()`?
+- [ ] Usei `toast.success()` e `toast.error()` ao invés de toast manual?
+- [ ] Removi qualquer `useState` de modal customizado (`showDeleteModal`, etc.)?
+- [ ] Removi qualquer `document.createElement('div')` para toast manual?
+
+### 📚 Referências de Código
+
+**Exemplos de uso correto:**
+- `frontend-web/src/pages/GestaoTicketsPage.tsx` - ConfirmationModal + toast
+- `frontend-web/src/features/atendimento/omnichannel/ChatOmnichannel.tsx` - toast
+- `frontend-web/src/pages/GestaoTemplatesPage.tsx` - toast
+- `frontend-web/src/components/common/ConfirmationModal.tsx` - Implementação do modal
+- `frontend-web/src/hooks/useConfirmation.ts` - Hook do modal
+
+**Sempre procure por estes padrões antes de criar algo novo!**
+
 ## 🎯 Botões - Padrão do Sistema
 
 **REGRA CRÍTICA**: Tema Crevasse (#159A9C) para TODOS os botões primários do sistema!
@@ -601,6 +996,282 @@ backend/src/modules/
 *Service.ts    → Services de API
 *Config.ts     → Arquivos de configuração
 ```
+
+---
+
+## 🔒 ARQUITETURA MULTI-TENANT (CRÍTICA)
+
+### ⚠️ REGRA FUNDAMENTAL: SISTEMA É MULTI-TENANT COM ISOLAMENTO POR EMPRESA
+
+ConectCRM é um sistema **multi-tenant SaaS** onde cada empresa (tenant) tem isolamento **total** de dados.
+
+**TODA entity que pertence a uma empresa DEVE ter isolamento multi-tenant implementado.**
+
+### 🚨 3-Layer Security Architecture (OBRIGATÓRIA)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Layer 1: JWT Authentication                                │
+│ → Token contém empresa_id do usuário autenticado          │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Layer 2: TenantContextMiddleware (NestJS)                 │
+│ → Extrai empresa_id do JWT                                │
+│ → Chama set_current_tenant(empresa_id) no PostgreSQL      │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Layer 3: Row Level Security (PostgreSQL)                  │
+│ → TODAS as queries filtram por empresa_id automaticamente │
+│ → Política: tenant_isolation_<tabela>                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### ✅ Quando Criar uma Nova Entity
+
+**SEMPRE adicione empresa_id + RLS se a entity for:**
+- Dados de clientes/usuários de uma empresa específica
+- Registros de negócio (vendas, produtos, tickets, faturas)
+- Configurações específicas de empresa
+- Qualquer dado que não deve ser compartilhado entre empresas
+
+#### ✅ Template de Entity Multi-Tenant:
+
+```typescript
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Empresa } from '../../empresas/entities/empresa.entity';
+
+@Entity('minha_tabela')
+export class MinhaEntity {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  // ⚡ OBRIGATÓRIO: Campo empresa_id para multi-tenant
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  // ⚡ OBRIGATÓRIO: Relação com Empresa
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
+
+  @Column({ length: 100 })
+  nome: string;
+
+  // ... demais campos
+}
+```
+
+#### ❌ NUNCA faça isso:
+
+```typescript
+// ❌ ERRADO - Entity sem empresa_id (dados vazam!)
+@Entity('produtos')
+export class Produto {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+  
+  @Column()
+  nome: string;
+  // ❌ Falta empresa_id! Empresas verão produtos umas das outras!
+}
+```
+
+### 🚨 Quando Criar uma Migration (OBRIGATÓRIO)
+
+**SEMPRE habilite RLS** ao criar tabela com `empresa_id`:
+
+```typescript
+import { MigrationInterface, QueryRunner } from 'typeorm';
+
+export class CreateMinhaTabela1234567890 implements MigrationInterface {
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // 1. Criar tabela
+    await queryRunner.query(`
+      CREATE TABLE minha_tabela (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        empresa_id UUID NOT NULL REFERENCES empresas(id),
+        nome VARCHAR(100) NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // 2. ⚡ OBRIGATÓRIO: Habilitar RLS
+    await queryRunner.query(`
+      ALTER TABLE minha_tabela ENABLE ROW LEVEL SECURITY;
+    `);
+
+    // 3. ⚡ OBRIGATÓRIO: Criar política de isolamento
+    await queryRunner.query(`
+      CREATE POLICY tenant_isolation_minha_tabela ON minha_tabela
+      FOR ALL USING (empresa_id = get_current_tenant());
+    `);
+
+    // 4. Criar índice para performance
+    await queryRunner.query(`
+      CREATE INDEX idx_minha_tabela_empresa_id ON minha_tabela(empresa_id);
+    `);
+
+    console.log('✅ Tabela criada com RLS habilitado');
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP POLICY IF EXISTS tenant_isolation_minha_tabela ON minha_tabela;`);
+    await queryRunner.query(`DROP TABLE minha_tabela;`);
+  }
+}
+```
+
+### 🔍 Verificar se Precisa de empresa_id
+
+**✅ PRECISA de empresa_id:**
+- ✅ Clientes, contatos, leads
+- ✅ Produtos, propostas, cotações, contratos
+- ✅ Tickets, demandas, atendimentos
+- ✅ Faturas, pagamentos, transações
+- ✅ Equipes, departamentos, usuários
+- ✅ Configurações específicas da empresa
+- ✅ Logs, auditorias, atividades
+
+**❌ NÃO precisa de empresa_id:**
+- ❌ Tabela `empresas` (é o tenant raiz)
+- ❌ `planos`, `modulos_sistema` (configurações globais)
+- ❌ `password_reset_tokens` (temporário, expira)
+- ❌ Tabelas de referência compartilhadas (países, moedas)
+
+### 📊 Tabelas JÁ Protegidas por RLS (Sprint 1 - Completo):
+
+```
+✅ clientes               ✅ user_activities
+✅ atendentes             ✅ atendimento_tickets
+✅ equipes                ✅ audit_logs
+✅ departamentos          ✅ empresas (política especial)
+✅ fluxos_triagem
+✅ sessoes_triagem
+✅ atendimento_demandas
+✅ fornecedores
+✅ contas_pagar
+✅ canais
+✅ nucleos_atendimento
+✅ triagem_logs
+```
+
+### ⚠️ IMPORTANTE: Como TenantContextMiddleware Funciona
+
+O middleware **já está ativo** no sistema:
+
+```typescript
+// backend/src/common/middleware/tenant-context.middleware.ts
+@Injectable()
+export class TenantContextMiddleware implements NestMiddleware {
+  async use(req: any, res: any, next: () => void) {
+    const user = req.user; // Vem do JwtAuthGuard
+    
+    if (user?.empresa_id) {
+      // ⚡ Define contexto no PostgreSQL
+      await queryRunner.query('SELECT set_current_tenant($1)', [user.empresa_id]);
+      
+      // Agora TODAS as queries filtram por empresa_id automaticamente!
+    }
+    
+    next();
+  }
+}
+```
+
+**O que isso significa:**
+- ✅ Você **não precisa** adicionar `where: { empresa_id }` em queries
+- ✅ RLS filtra automaticamente no banco de dados
+- ✅ É impossível (via SQL) acessar dados de outra empresa
+- ⚠️ **MAS**: Se a tabela não tiver RLS, o filtro não funciona!
+
+### 🧪 Como Testar Isolamento Multi-Tenant
+
+```typescript
+// Teste E2E - Verificar que Empresa A não vê dados da Empresa B
+describe('Multi-Tenant Isolation', () => {
+  it('Empresa A não deve ver produtos da Empresa B', async () => {
+    // Login como Empresa A
+    const tokenA = await loginAsEmpresa('empresa-a-id');
+    
+    // Criar produto para Empresa A
+    const produtoA = await request(app.getHttpServer())
+      .post('/produtos')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ nome: 'Produto A' });
+    
+    // Login como Empresa B
+    const tokenB = await loginAsEmpresa('empresa-b-id');
+    
+    // Tentar listar produtos como Empresa B
+    const response = await request(app.getHttpServer())
+      .get('/produtos')
+      .set('Authorization', `Bearer ${tokenB}`);
+    
+    // ✅ Empresa B não deve ver Produto A
+    expect(response.body).not.toContainEqual(
+      expect.objectContaining({ id: produtoA.body.id })
+    );
+  });
+});
+```
+
+### 📝 Checklist Multi-Tenant (OBRIGATÓRIO)
+
+Ao criar qualquer feature nova:
+
+- [ ] Entity tem campo `empresa_id: string` (UUID)?
+- [ ] Entity tem relação `@ManyToOne(() => Empresa)`?
+- [ ] Migration habilita `ROW LEVEL SECURITY`?
+- [ ] Migration cria política `tenant_isolation_*`?
+- [ ] Controller usa `@UseGuards(JwtAuthGuard)`?
+- [ ] Índice criado em `empresa_id` para performance?
+- [ ] Testado isolamento (Empresa A não vê dados de B)?
+
+### 🚨 O Que NUNCA Fazer
+
+```typescript
+// ❌ NUNCA: Desabilitar RLS em tabela multi-tenant
+ALTER TABLE produtos DISABLE ROW LEVEL SECURITY; // 🚫 PROIBIDO!
+
+// ❌ NUNCA: Consultar dados sem JwtAuthGuard
+@Get('/produtos')  // ❌ Falta @UseGuards(JwtAuthGuard)
+async listar() { ... }
+
+// ❌ NUNCA: Criar entity de negócio sem empresa_id
+@Entity('vendas')
+export class Venda {
+  id: string;
+  valor: number;
+  // ❌ Falta empresa_id! Vazamento de dados!
+}
+
+// ❌ NUNCA: Fazer query raw ignorando RLS
+await queryRunner.query(`
+  SELECT * FROM produtos WHERE id = $1
+  -- ❌ Não usa get_current_tenant(), pode vazar dados!
+`, [id]);
+```
+
+### 💡 Dicas Importantes
+
+1. **RLS é sua última linha de defesa**: Mesmo se houver bug no código, RLS impede vazamento.
+
+2. **Performance**: RLS adiciona filtro `WHERE empresa_id = X` automaticamente. Sempre crie índice!
+
+3. **Migrations antigas**: Se encontrar entity com `empresa_id` sem RLS, **abra issue** imediatamente.
+
+4. **Testes**: Sempre teste isolamento entre empresas em features críticas.
+
+5. **Code Review**: Verifique se todo PR com nova entity tem RLS configurado.
+
+### 🔗 Referências
+
+- **Middleware**: `backend/src/common/middleware/tenant-context.middleware.ts`
+- **Migration exemplo**: `backend/src/migrations/1730476887000-EnableRowLevelSecurity.ts`
+- **Documentação completa**: `SPRINT1_100_COMPLETO.md`
+- **Roadmap**: `docs/handbook/ROADMAP_MULTI_TENANT_PRODUCAO.md`
 
 ---
 
@@ -1784,6 +2455,12 @@ DATABASE_PASSWORD=sua_senha_aqui  # ← Não colocar senha real
 OPENAI_API_KEY=sk-your-key-here   # ← Não colocar chave real
 JWT_SECRET=your-secret-here       # ← Não colocar secret real
 ```
+
+### Credenciais padrão (dev local)
+
+- Consulte **`docs/CREDENCIAIS_PADRAO.md`** para saber o usuário/senha padrão (atualmente `admin@conectsuite.com.br` / `admin123`).
+- Atualize esse documento sempre que trocar as credenciais que scripts usam (ex.: `scripts/verify-backend.ps1`, smoke tests, fixtures Playwright).
+- Nunca invente uma credencial diferente em README, guias ou scripts: referencie o documento único para evitar divergências.
 
 ---
 

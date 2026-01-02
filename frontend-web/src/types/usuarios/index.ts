@@ -1,4 +1,5 @@
 export enum UserRole {
+  SUPERADMIN = 'superadmin',
   ADMIN = 'admin',
   MANAGER = 'manager',
   VENDEDOR = 'vendedor',
@@ -108,6 +109,7 @@ export interface EstatisticasUsuarios {
 }
 
 export const ROLE_LABELS: Record<UserRole, string> = {
+  [UserRole.SUPERADMIN]: 'Super Admin',
   [UserRole.ADMIN]: 'Administrador',
   [UserRole.MANAGER]: 'Gerente',
   [UserRole.VENDEDOR]: 'Vendedor',
@@ -115,6 +117,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 };
 
 export const ROLE_COLORS: Record<UserRole, string> = {
+  [UserRole.SUPERADMIN]: 'bg-purple-100 text-purple-800',
   [UserRole.ADMIN]: 'bg-red-100 text-red-800',
   [UserRole.MANAGER]: 'bg-blue-100 text-blue-800',
   [UserRole.VENDEDOR]: 'bg-green-100 text-green-800',

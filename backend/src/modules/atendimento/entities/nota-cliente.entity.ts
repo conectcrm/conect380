@@ -8,6 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { User } from '../../users/user.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 /**
  * 📝 Entity: Notas do Cliente
@@ -52,6 +53,10 @@ export class NotaCliente {
    */
   @Column({ type: 'uuid', name: 'empresa_id' })
   empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   /**
    * Conteúdo da nota (texto livre)

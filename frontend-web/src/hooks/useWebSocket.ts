@@ -17,14 +17,7 @@ interface WebSocketState {
 }
 
 export function useWebSocket(options: UseWebSocketOptions) {
-  const {
-    url,
-    token,
-    autoConnect = true,
-    onConnect,
-    onDisconnect,
-    onError,
-  } = options;
+  const { url, token, autoConnect = true, onConnect, onDisconnect, onError } = options;
 
   const [state, setState] = useState<WebSocketState>({
     connected: false,
@@ -102,10 +95,21 @@ export function useWebSocket(options: UseWebSocketOptions) {
   // Desconectar
   const disconnect = useCallback(() => {
     if (socketRef.current) {
-      console.log('[WebSocket] Desconectando...');
-      socketRef.current.disconnect();
-      socketRef.current = null;
-      setState({ connected: false, connecting: false, error: null });
+      try {
+        // ✅ Verificar se socket está realmente conectado antes de desconectar
+        if (socketRef.current.connected || socketRef.current.active) {
+          console.log('[WebSocket] Desconectando...');
+          socketRef.current.disconnect();
+        } else {
+          console.log('[WebSocket] Já estava desconectado');
+        }
+      } catch (err) {
+        // ✅ Ignorar erros de desconexão (socket já pode estar fechado)
+        console.log('[WebSocket] Erro ao desconectar (esperado em desenvolvimento):', err);
+      } finally {
+        socketRef.current = null;
+        setState({ connected: false, connecting: false, error: null });
+      }
     }
   }, []);
 
@@ -160,7 +164,8 @@ export function useWebSocket(options: UseWebSocketOptions) {
 
   // Auto-conectar quando token estiver disponível
   useEffect(() => {
-    if (autoConnect && token) {
+    // ✅ Evitar múltiplas conexões em React StrictMode
+    if (autoConnect && token && !socketRef.current) {
       connect();
     }
 
@@ -168,7 +173,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
       disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoConnect, token]);
+  }, [autoConnect, token]); // Não incluir connect/disconnect nas dependências para evitar reconexões
 
   return {
     ...state,

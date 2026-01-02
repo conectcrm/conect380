@@ -1,5 +1,23 @@
 import React from 'react';
-import { X, FileText, User, Calendar, DollarSign, CreditCard, MapPin, Phone, Mail, Eye, Download, Send, Link2, CheckCircle, Clock, AlertCircle, XCircle } from 'lucide-react';
+import {
+  X,
+  FileText,
+  User,
+  Calendar,
+  DollarSign,
+  CreditCard,
+  MapPin,
+  Phone,
+  Mail,
+  Eye,
+  Download,
+  Send,
+  Link2,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  XCircle,
+} from 'lucide-react';
 import { Fatura, StatusFatura, faturamentoService } from '../../services/faturamentoService';
 import { formatarValorMonetario } from '../../utils/formatacao';
 
@@ -20,9 +38,8 @@ export default function ModalDetalhesFatura({
   onEdit,
   onGeneratePaymentLink,
   onSendEmail,
-  onDownloadPDF
+  onDownloadPDF,
 }: ModalDetalhesFaturaProps) {
-
   if (!isOpen || !fatura) return null;
 
   const getStatusIcon = (status: StatusFatura) => {
@@ -76,7 +93,9 @@ export default function ModalDetalhesFatura({
               </h2>
               <div className="flex items-center gap-2 mt-1">
                 {getStatusIcon(fatura.status)}
-                <span className={`px-2 py-1 rounded-md text-xs font-medium border ${getStatusColor(fatura.status)}`}>
+                <span
+                  className={`px-2 py-1 rounded-md text-xs font-medium border ${getStatusColor(fatura.status)}`}
+                >
                   {faturamentoService.formatarStatusFatura(fatura.status)}
                 </span>
                 {isVencida && fatura.status === StatusFatura.PENDENTE && (
@@ -144,11 +163,15 @@ export default function ModalDetalhesFatura({
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-gray-500">Tipo:</span>
-                    <p className="font-medium">{faturamentoService.formatarTipoFatura(fatura.tipo)}</p>
+                    <p className="font-medium">
+                      {faturamentoService.formatarTipoFatura(fatura.tipo)}
+                    </p>
                   </div>
                   <div>
                     <span className="text-gray-500">Data de Emissão:</span>
-                    <p className="font-medium">{new Date(fatura.dataEmissao).toLocaleDateString('pt-BR')}</p>
+                    <p className="font-medium">
+                      {new Date(fatura.dataEmissao).toLocaleDateString('pt-BR')}
+                    </p>
                   </div>
                   <div>
                     <span className="text-gray-500">Data de Vencimento:</span>
@@ -159,7 +182,9 @@ export default function ModalDetalhesFatura({
                   <div>
                     <span className="text-gray-500">Forma de Pagamento:</span>
                     <p className="font-medium">
-                      {fatura.formaPagamento ? faturamentoService.formatarFormaPagamento(fatura.formaPagamento) : 'Não definida'}
+                      {fatura.formaPagamento
+                        ? faturamentoService.formatarFormaPagamento(fatura.formaPagamento)
+                        : 'Não definida'}
                     </p>
                   </div>
                 </div>
@@ -173,7 +198,9 @@ export default function ModalDetalhesFatura({
                     Cliente
                   </h3>
                   <div className="space-y-2 text-sm">
-                    <p className="font-medium text-gray-900">{fatura.cliente.nome || `Cliente ID: ${fatura.clienteId}`}</p>
+                    <p className="font-medium text-gray-900">
+                      {fatura.cliente.nome || `Cliente ID: ${fatura.clienteId}`}
+                    </p>
                     {fatura.cliente.email && (
                       <div className="flex items-center gap-2 text-gray-600">
                         <Mail className="w-3 h-3" />
@@ -215,24 +242,32 @@ export default function ModalDetalhesFatura({
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Valor Bruto:</span>
-                    <span className="font-medium">R$ {formatarValorMonetario(fatura.valorBruto)}</span>
+                    <span className="font-medium">
+                      R$ {formatarValorMonetario(fatura.valorBruto)}
+                    </span>
                   </div>
                   {fatura.valorDesconto > 0 && (
                     <div className="flex justify-between">
                       <span className="text-gray-600">Desconto:</span>
-                      <span className="font-medium text-red-600">- R$ {formatarValorMonetario(fatura.valorDesconto)}</span>
+                      <span className="font-medium text-red-600">
+                        - R$ {formatarValorMonetario(fatura.valorDesconto)}
+                      </span>
                     </div>
                   )}
                   {fatura.valorImpostos > 0 && (
                     <div className="flex justify-between">
                       <span className="text-gray-600">Impostos:</span>
-                      <span className="font-medium">R$ {formatarValorMonetario(fatura.valorImpostos)}</span>
+                      <span className="font-medium">
+                        R$ {formatarValorMonetario(fatura.valorImpostos)}
+                      </span>
                     </div>
                   )}
                   <hr className="border-gray-300" />
                   <div className="flex justify-between text-lg">
                     <span className="font-semibold">Total:</span>
-                    <span className="font-semibold text-green-600">R$ {formatarValorMonetario(fatura.valorTotal)}</span>
+                    <span className="font-semibold text-green-600">
+                      R$ {formatarValorMonetario(fatura.valorTotal)}
+                    </span>
                   </div>
 
                   {valorPago > 0 && (
@@ -240,11 +275,15 @@ export default function ModalDetalhesFatura({
                       <hr className="border-gray-300" />
                       <div className="flex justify-between">
                         <span className="text-gray-600">Valor Pago:</span>
-                        <span className="font-medium text-green-600">R$ {formatarValorMonetario(valorPago)}</span>
+                        <span className="font-medium text-green-600">
+                          R$ {formatarValorMonetario(valorPago)}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Valor Pendente:</span>
-                        <span className={`font-medium ${valorPendente > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        <span
+                          className={`font-medium ${valorPendente > 0 ? 'text-red-600' : 'text-green-600'}`}
+                        >
                           R$ {formatarValorMonetario(valorPendente)}
                         </span>
                       </div>
@@ -317,7 +356,9 @@ export default function ModalDetalhesFatura({
                         R$ {formatarValorMonetario(item.valorUnitario)}
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-red-600">
-                        {item.valorDesconto ? `- R$ ${formatarValorMonetario(item.valorDesconto)}` : '-'}
+                        {item.valorDesconto
+                          ? `- R$ ${formatarValorMonetario(item.valorDesconto)}`
+                          : '-'}
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-medium text-gray-900">
                         R$ {formatarValorMonetario(item.valorTotal)}
@@ -369,12 +410,15 @@ export default function ModalDetalhesFatura({
                           R$ {formatarValorMonetario(pagamento.valor)}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${pagamento.status === 'aprovado'
-                            ? 'bg-green-100 text-green-800'
-                            : pagamento.status === 'rejeitado'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-yellow-100 text-yellow-800'
-                            }`}>
+                          <span
+                            className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
+                              pagamento.status === 'aprovado'
+                                ? 'bg-green-100 text-green-800'
+                                : pagamento.status === 'rejeitado'
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-yellow-100 text-yellow-800'
+                            }`}
+                          >
                             {pagamento.status}
                           </span>
                         </td>

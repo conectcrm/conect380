@@ -68,7 +68,7 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
 
       const [configsData, filasData] = await Promise.all([
         distribuicaoAvancadaService.listarConfiguracoes(),
-        api.get('/api/filas').then(res => res.data.data || res.data),
+        api.get('/api/filas').then((res) => res.data.data || res.data),
       ]);
 
       setConfiguracoes(Array.isArray(configsData) ? configsData : []);
@@ -182,8 +182,8 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
     const labels: Record<AlgoritmoDistribuicao, string> = {
       'round-robin': 'Round-Robin',
       'menor-carga': 'Menor Carga',
-      'skills': 'Skills-Based',
-      'hibrido': 'Híbrido',
+      skills: 'Skills-Based',
+      hibrido: 'Híbrido',
     };
     return labels[algoritmo];
   };
@@ -192,8 +192,8 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
     const colors: Record<AlgoritmoDistribuicao, string> = {
       'round-robin': 'bg-blue-500/10 text-blue-600',
       'menor-carga': 'bg-green-500/10 text-green-600',
-      'skills': 'bg-purple-500/10 text-purple-600',
-      'hibrido': 'bg-[#159A9C]/10 text-[#159A9C]',
+      skills: 'bg-purple-500/10 text-purple-600',
+      hibrido: 'bg-[#159A9C]/10 text-[#159A9C]',
     };
     return colors[algoritmo];
   };
@@ -202,10 +202,7 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header com BackToNucleus */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusName="Atendimento"
-          nucleusPath="/atendimento"
-        />
+        <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
       </div>
 
       {/* Container principal */}
@@ -265,10 +262,7 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
                 <h3 className="font-semibold text-red-900">Erro</h3>
                 <p className="text-red-700 text-sm mt-1">{error}</p>
               </div>
-              <button
-                onClick={() => setError(null)}
-                className="text-red-600 hover:text-red-800"
-              >
+              <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -321,10 +315,9 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
                       </span>
                     </div>
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.ativo
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                        }`}
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        config.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}
                     >
                       {config.ativo ? 'Ativo' : 'Inativo'}
                     </span>
@@ -411,9 +404,7 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               {/* Fila */}
               <div>
-                <label className="block text-sm font-medium text-[#002333] mb-2">
-                  Fila *
-                </label>
+                <label className="block text-sm font-medium text-[#002333] mb-2">Fila *</label>
                 <select
                   value={formData.filaId}
                   onChange={(e) => setFormData({ ...formData, filaId: e.target.value })}
@@ -512,9 +503,7 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
                     }
                     className="w-5 h-5 text-[#159A9C] rounded focus:ring-2 focus:ring-[#159A9C]"
                   />
-                  <span className="text-sm text-[#002333]">
-                    Priorizar atendentes online
-                  </span>
+                  <span className="text-sm text-[#002333]">Priorizar atendentes online</span>
                 </label>
 
                 <label className="flex items-center gap-3 cursor-pointer">
@@ -526,9 +515,7 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
                     }
                     className="w-5 h-5 text-[#159A9C] rounded focus:ring-2 focus:ring-[#159A9C]"
                   />
-                  <span className="text-sm text-[#002333]">
-                    Considerar skills dos atendentes
-                  </span>
+                  <span className="text-sm text-[#002333]">Considerar skills dos atendentes</span>
                 </label>
 
                 <label className="flex items-center gap-3 cursor-pointer">
@@ -540,18 +527,14 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
                     }
                     className="w-5 h-5 text-[#159A9C] rounded focus:ring-2 focus:ring-[#159A9C]"
                   />
-                  <span className="text-sm text-[#002333]">
-                    Permitir overflow (fila de backup)
-                  </span>
+                  <span className="text-sm text-[#002333]">Permitir overflow (fila de backup)</span>
                 </label>
 
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={formData.ativo}
-                    onChange={(e) =>
-                      setFormData({ ...formData, ativo: e.target.checked })
-                    }
+                    onChange={(e) => setFormData({ ...formData, ativo: e.target.checked })}
                     className="w-5 h-5 text-[#159A9C] rounded focus:ring-2 focus:ring-[#159A9C]"
                   />
                   <span className="text-sm text-[#002333]">Ativo</span>

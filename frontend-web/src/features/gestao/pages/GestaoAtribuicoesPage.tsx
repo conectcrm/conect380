@@ -77,7 +77,9 @@ interface GestaoAtribuicoesPageProps {
   hideBackButton?: boolean;
 }
 
-const GestaoAtribuicoesPage: React.FC<GestaoAtribuicoesPageProps> = ({ hideBackButton = false }) => {
+const GestaoAtribuicoesPage: React.FC<GestaoAtribuicoesPageProps> = ({
+  hideBackButton = false,
+}) => {
   const [atribuicoes, setAtribuicoes] = useState<AtribuicaoView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,16 +112,16 @@ const GestaoAtribuicoesPage: React.FC<GestaoAtribuicoesPageProps> = ({ hideBackB
   // Função auxiliar para executar promises com limite de concorrência
   const executarComLimite = async <T,>(
     promises: (() => Promise<T>)[],
-    limite: number = 3
+    limite: number = 3,
   ): Promise<T[]> => {
     const resultados: T[] = [];
     for (let i = 0; i < promises.length; i += limite) {
       const lote = promises.slice(i, i + limite);
-      const resultadosLote = await Promise.all(lote.map(fn => fn()));
+      const resultadosLote = await Promise.all(lote.map((fn) => fn()));
       resultados.push(...resultadosLote);
       // Aguardar 500ms entre lotes para evitar rate limit
       if (i + limite < promises.length) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
     return resultados;
@@ -145,39 +147,45 @@ const GestaoAtribuicoesPage: React.FC<GestaoAtribuicoesPageProps> = ({ hideBackB
 
       const equipesNormalizadas: Equipe[] = Array.isArray(equipesResponse)
         ? equipesResponse.map((equipe: any) => ({
-          id: equipe.id,
-          nome: equipe.nome,
-          cor: equipe.cor,
-        }))
+            id: equipe.id,
+            nome: equipe.nome,
+            cor: equipe.cor,
+          }))
         : [];
 
       const atendentesNormalizados: Atendente[] = Array.isArray(atendentesResponse)
         ? atendentesResponse
-          .map((atendente: any) => {
-            if (!atendente) {
-              return null;
-            }
+            .map((atendente: any) => {
+              if (!atendente) {
+                return null;
+              }
 
-            const usuarioId = atendente?.usuarioId
-              || atendente?.usuario_id
-              || atendente?.userId
-              || atendente?.user_id
-              || null;
+              const usuarioId =
+                atendente?.usuarioId ||
+                atendente?.usuario_id ||
+                atendente?.userId ||
+                atendente?.user_id ||
+                null;
 
-            if (!usuarioId) {
-              console.warn('Atendente sem usuário vinculado. Ignorando na atribuição direta.', atendente);
-              return null;
-            }
+              if (!usuarioId) {
+                console.warn(
+                  'Atendente sem usuário vinculado. Ignorando na atribuição direta.',
+                  atendente,
+                );
+                return null;
+              }
 
-            return {
-              id: usuarioId,
-              nome: atendente?.nome || atendente?.user?.nome || 'Atendente sem nome',
-              usuarioId,
-              atendenteId: atendente?.id,
-              email: atendente?.email || atendente?.user?.email || null,
-            } as Atendente;
-          })
-          .filter((atendente): atendente is Atendente => Boolean(atendente && atendente.id && atendente.nome))
+              return {
+                id: usuarioId,
+                nome: atendente?.nome || atendente?.user?.nome || 'Atendente sem nome',
+                usuarioId,
+                atendenteId: atendente?.id,
+                email: atendente?.email || atendente?.user?.email || null,
+              } as Atendente;
+            })
+            .filter((atendente): atendente is Atendente =>
+              Boolean(atendente && atendente.id && atendente.nome),
+            )
         : [];
 
       const nucleosVisiveis = Array.isArray(nucleosResponse)
@@ -304,11 +312,12 @@ const GestaoAtribuicoesPage: React.FC<GestaoAtribuicoesPageProps> = ({ hideBackB
           return;
         }
 
-        const duplicada = atribuicoes.some((atrib) =>
-          atrib.tipo === 'atendente' &&
-          atrib.atendenteId === formAtendenteId &&
-          (atrib.nucleoId || null) === (formNucleoId || null) &&
-          (atrib.departamentoId || null) === (formDepartamentoId || null),
+        const duplicada = atribuicoes.some(
+          (atrib) =>
+            atrib.tipo === 'atendente' &&
+            atrib.atendenteId === formAtendenteId &&
+            (atrib.nucleoId || null) === (formNucleoId || null) &&
+            (atrib.departamentoId || null) === (formDepartamentoId || null),
         );
 
         if (duplicada) {
@@ -349,11 +358,12 @@ const GestaoAtribuicoesPage: React.FC<GestaoAtribuicoesPageProps> = ({ hideBackB
           return;
         }
 
-        const duplicada = atribuicoes.some((atrib) =>
-          atrib.tipo === 'equipe' &&
-          atrib.equipeId === formEquipeId &&
-          (atrib.nucleoId || null) === (formNucleoId || null) &&
-          (atrib.departamentoId || null) === (formDepartamentoId || null),
+        const duplicada = atribuicoes.some(
+          (atrib) =>
+            atrib.tipo === 'equipe' &&
+            atrib.equipeId === formEquipeId &&
+            (atrib.nucleoId || null) === (formNucleoId || null) &&
+            (atrib.departamentoId || null) === (formDepartamentoId || null),
         );
 
         if (duplicada) {
@@ -461,12 +471,12 @@ const GestaoAtribuicoesPage: React.FC<GestaoAtribuicoesPageProps> = ({ hideBackB
     const mapa = new Map<string, GrupoResponsavel>();
 
     atribuicoes.forEach((atrib) => {
-      const chave = atrib.tipo === 'atendente'
-        ? `atendente-${atrib.atendenteId}`
-        : `equipe-${atrib.equipeId}`;
-      const titulo = atrib.tipo === 'atendente'
-        ? atrib.atendenteNome || 'Atendente'
-        : atrib.equipeNome || 'Equipe';
+      const chave =
+        atrib.tipo === 'atendente' ? `atendente-${atrib.atendenteId}` : `equipe-${atrib.equipeId}`;
+      const titulo =
+        atrib.tipo === 'atendente'
+          ? atrib.atendenteNome || 'Atendente'
+          : atrib.equipeNome || 'Equipe';
 
       if (!mapa.has(chave)) {
         mapa.set(chave, { chave, titulo, tipo: atrib.tipo, itens: [] });
@@ -502,9 +512,7 @@ const GestaoAtribuicoesPage: React.FC<GestaoAtribuicoesPageProps> = ({ hideBackB
   const totalEquipes = new Set(
     atribuicoes.filter((a) => a.tipo === 'equipe').map((a) => a.equipeId),
   ).size;
-  const totalNucleos = new Set(
-    atribuicoes.map((a) => a.nucleoId).filter(Boolean),
-  ).size;
+  const totalNucleos = new Set(atribuicoes.map((a) => a.nucleoId).filter(Boolean)).size;
 
   const nucleoSelecionado = nucleos.find((n) => n.id === formNucleoId);
 
@@ -523,24 +531,9 @@ const GestaoAtribuicoesPage: React.FC<GestaoAtribuicoesPageProps> = ({ hideBackB
           icone={Target}
           color="crevasse"
         />
-        <KPICard
-          titulo="Atendentes"
-          valor={totalAtendentes}
-          icone={User}
-          color="crevasse"
-        />
-        <KPICard
-          titulo="Equipes"
-          valor={totalEquipes}
-          icone={Users}
-          color="crevasse"
-        />
-        <KPICard
-          titulo="Núcleos"
-          valor={totalNucleos}
-          icone={GitBranch}
-          color="crevasse"
-        />
+        <KPICard titulo="Atendentes" valor={totalAtendentes} icone={User} color="crevasse" />
+        <KPICard titulo="Equipes" valor={totalEquipes} icone={Users} color="crevasse" />
+        <KPICard titulo="Núcleos" valor={totalNucleos} icone={GitBranch} color="crevasse" />
       </section>
 
       <section className="bg-white rounded-lg shadow-sm border border-[#DEEFE7] p-6 mb-6">
@@ -548,19 +541,21 @@ const GestaoAtribuicoesPage: React.FC<GestaoAtribuicoesPageProps> = ({ hideBackB
           <div className="flex gap-2">
             <button
               onClick={() => setViewMode('atendente')}
-              className={`px-4 py-2 rounded-lg transition-colors ${viewMode === 'atendente'
-                ? 'bg-[#9333EA] text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                viewMode === 'atendente'
+                  ? 'bg-[#9333EA] text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
             >
               Por Atendente
             </button>
             <button
               onClick={() => setViewMode('nucleo')}
-              className={`px-4 py-2 rounded-lg transition-colors ${viewMode === 'nucleo'
-                ? 'bg-[#9333EA] text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                viewMode === 'nucleo'
+                  ? 'bg-[#9333EA] text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
             >
               Por Núcleo
             </button>
@@ -599,7 +594,9 @@ const GestaoAtribuicoesPage: React.FC<GestaoAtribuicoesPageProps> = ({ hideBackB
       ) : atribuicoes.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
           <Target className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhuma atribuição configurada</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            Nenhuma atribuição configurada
+          </h3>
           <p className="text-gray-500 mb-6">
             Cadastre atribuições para direcionar atendentes e equipes aos núcleos corretos.
           </p>
@@ -667,12 +664,20 @@ interface ViewPorResponsavelProps {
   onRemover: (atrib: AtribuicaoView) => void;
 }
 
-const ViewPorResponsavel: React.FC<ViewPorResponsavelProps> = ({ grupos, expandedItems, onToggle, onRemover }) => (
+const ViewPorResponsavel: React.FC<ViewPorResponsavelProps> = ({
+  grupos,
+  expandedItems,
+  onToggle,
+  onRemover,
+}) => (
   <div className="space-y-4">
     {grupos.map((grupo) => {
       const isExpanded = expandedItems.has(grupo.chave);
       return (
-        <div key={grupo.chave} className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow">
+        <div
+          key={grupo.chave}
+          className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow"
+        >
           <button
             type="button"
             onClick={() => onToggle(grupo.chave)}
@@ -699,11 +704,16 @@ const ViewPorResponsavel: React.FC<ViewPorResponsavelProps> = ({ grupos, expande
           {isExpanded && (
             <div className="px-6 pb-4 space-y-3 border-t">
               {grupo.itens.map((item) => (
-                <div key={item.id} className="flex items-center justify-between py-3 border-b last:border-0">
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between py-3 border-b last:border-0"
+                >
                   <div>
                     <p className="font-medium text-[#002333]">
                       {item.nucleoNome || 'Sem núcleo definido'}
-                      {item.departamentoNome && <span className="text-sm text-gray-500"> → {item.departamentoNome}</span>}
+                      {item.departamentoNome && (
+                        <span className="text-sm text-gray-500"> → {item.departamentoNome}</span>
+                      )}
                     </p>
                     <p className="text-xs text-gray-400">
                       {item.tipo === 'atendente' ? 'Atribuição individual' : 'Atribuição da equipe'}
@@ -733,12 +743,20 @@ interface ViewPorNucleoProps {
   onRemover: (atrib: AtribuicaoView) => void;
 }
 
-const ViewPorNucleo: React.FC<ViewPorNucleoProps> = ({ grupos, expandedItems, onToggle, onRemover }) => (
+const ViewPorNucleo: React.FC<ViewPorNucleoProps> = ({
+  grupos,
+  expandedItems,
+  onToggle,
+  onRemover,
+}) => (
   <div className="space-y-4">
     {grupos.map((grupo) => {
       const isExpanded = expandedItems.has(grupo.chave);
       return (
-        <div key={grupo.chave} className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow">
+        <div
+          key={grupo.chave}
+          className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow"
+        >
           <button
             type="button"
             onClick={() => onToggle(grupo.chave)}
@@ -761,14 +779,19 @@ const ViewPorNucleo: React.FC<ViewPorNucleoProps> = ({ grupos, expandedItems, on
           {isExpanded && (
             <div className="px-6 pb-4 space-y-3 border-t">
               {grupo.itens.map((item) => (
-                <div key={item.id} className="flex items-center justify-between py-3 border-b last:border-0">
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between py-3 border-b last:border-0"
+                >
                   <div>
                     <p className="font-medium text-[#002333]">
                       {item.tipo === 'atendente' ? item.atendenteNome : item.equipeNome}
                     </p>
                     <p className="text-xs text-gray-500">
                       {item.tipo === 'atendente' ? 'Atendente' : 'Equipe'}
-                      {item.departamentoNome && <span className="text-xs text-gray-400"> • {item.departamentoNome}</span>}
+                      {item.departamentoNome && (
+                        <span className="text-xs text-gray-400"> • {item.departamentoNome}</span>
+                      )}
                     </p>
                   </div>
                   <button
@@ -841,24 +864,28 @@ const ModalNovaAtribuicao: React.FC<ModalNovaAtribuicaoProps> = ({
 
       <div className="p-6 space-y-6">
         <div>
-          <label className="block text-sm font-medium text-[#002333] mb-2">Tipo de Responsável *</label>
+          <label className="block text-sm font-medium text-[#002333] mb-2">
+            Tipo de Responsável *
+          </label>
           <div className="flex gap-3">
             <button
               onClick={() => setFormTipo('atendente')}
-              className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${formTipo === 'atendente'
-                ? 'border-[#9333EA] bg-purple-50 text-[#9333EA]'
-                : 'border-gray-200 hover:border-gray-300'
-                }`}
+              className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${
+                formTipo === 'atendente'
+                  ? 'border-[#9333EA] bg-purple-50 text-[#9333EA]'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
             >
               <User className="h-5 w-5 mx-auto mb-1" />
               <span className="font-medium">Atendente</span>
             </button>
             <button
               onClick={() => setFormTipo('equipe')}
-              className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${formTipo === 'equipe'
-                ? 'border-[#9333EA] bg-purple-50 text-[#9333EA]'
-                : 'border-gray-200 hover:border-gray-300'
-                }`}
+              className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${
+                formTipo === 'equipe'
+                  ? 'border-[#9333EA] bg-purple-50 text-[#9333EA]'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
             >
               <Users className="h-5 w-5 mx-auto mb-1" />
               <span className="font-medium">Equipe</span>
@@ -921,7 +948,9 @@ const ModalNovaAtribuicao: React.FC<ModalNovaAtribuicaoProps> = ({
 
         {nucleoSelecionado && nucleoSelecionado.departamentos.length > 0 && (
           <div>
-            <label className="block text-sm font-medium text-[#002333] mb-2">Departamento (opcional)</label>
+            <label className="block text-sm font-medium text-[#002333] mb-2">
+              Departamento (opcional)
+            </label>
             <select
               value={formDepartamentoId}
               onChange={(e) => setFormDepartamentoId(e.target.value)}

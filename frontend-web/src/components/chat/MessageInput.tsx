@@ -4,8 +4,9 @@ import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 import { Smile, Paperclip, X, Zap } from 'lucide-react';
 import { FileUpload } from './FileUpload';
 import { RespostasRapidas } from './RespostasRapidas';
+import { API_BASE_URL } from '../../services/api';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_URL = API_BASE_URL;
 
 interface MessageInputProps {
   ticketId: string;
@@ -14,7 +15,12 @@ interface MessageInputProps {
   enviando?: boolean;
 }
 
-export function MessageInput({ ticketId, onTyping, onEnviarMensagem, enviando: enviandoExterno }: MessageInputProps) {
+export function MessageInput({
+  ticketId,
+  onTyping,
+  onEnviarMensagem,
+  enviando: enviandoExterno,
+}: MessageInputProps) {
   const [mensagem, setMensagem] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -30,10 +36,7 @@ export function MessageInput({ ticketId, onTyping, onEnviarMensagem, enviando: e
   // Fechar emoji picker ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        emojiPickerRef.current &&
-        !emojiPickerRef.current.contains(event.target as Node)
-      ) {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
         setMostrarEmojiPicker(false);
       }
     };
@@ -77,7 +80,12 @@ export function MessageInput({ ticketId, onTyping, onEnviarMensagem, enviando: e
     handleTyping();
 
     // Detectar trigger "/" para Respostas Rápidas
-    if (newValue === '/' || (newValue.length > 1 && newValue[newValue.length - 1] === '/' && newValue[newValue.length - 2] === ' ')) {
+    if (
+      newValue === '/' ||
+      (newValue.length > 1 &&
+        newValue[newValue.length - 1] === '/' &&
+        newValue[newValue.length - 2] === ' ')
+    ) {
       setMostrarRespostasRapidas(true);
     }
   };
@@ -110,7 +118,7 @@ export function MessageInput({ ticketId, onTyping, onEnviarMensagem, enviando: e
             headers: {
               Authorization: `Bearer ${token}`,
             },
-          }
+          },
         );
       }
 
@@ -276,12 +284,7 @@ export function MessageInput({ ticketId, onTyping, onEnviarMensagem, enviando: e
               />
             </svg>
           ) : (
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -294,9 +297,14 @@ export function MessageInput({ ticketId, onTyping, onEnviarMensagem, enviando: e
       </form>
 
       <p className="text-xs text-gray-400 mt-2">
-        <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded">Enter</kbd> para enviar •
-        <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded ml-1">Shift+Enter</kbd> quebrar linha •
-        <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded ml-1">/</kbd> respostas rápidas
+        <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded">Enter</kbd> para
+        enviar •
+        <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded ml-1">
+          Shift+Enter
+        </kbd>{' '}
+        quebrar linha •
+        <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded ml-1">/</kbd>{' '}
+        respostas rápidas
       </p>
 
       {/* Modal de FileUpload */}

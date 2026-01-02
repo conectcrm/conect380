@@ -153,9 +153,7 @@ export const empresaConfigService = {
    * @param data - Configurações a atualizar
    * @returns Configurações atualizadas
    */
-  async updateConfig(
-    data: UpdateEmpresaConfigDto,
-  ): Promise<ConfiguracoesEmpresa> {
+  async updateConfig(data: UpdateEmpresaConfigDto): Promise<ConfiguracoesEmpresa> {
     const response = await api.put(`/empresas/config`, data);
     return response.data;
   },

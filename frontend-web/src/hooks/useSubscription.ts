@@ -118,7 +118,7 @@ export const useSubscription = () => {
 
     try {
       const response = await api.patch(`/assinaturas/empresa/${user.empresa.id}/plano`, {
-        novoPlanoId
+        novoPlanoId,
       });
 
       setAssinatura(response.data);
@@ -136,7 +136,7 @@ export const useSubscription = () => {
 
     try {
       const response = await api.patch(`/assinaturas/empresa/${user.empresa.id}/cancelar`, {
-        dataFim
+        dataFim,
       });
 
       setAssinatura(response.data);
@@ -150,9 +150,11 @@ export const useSubscription = () => {
   const temAcessoModulo = (codigoModulo: string): boolean => {
     if (!assinatura || assinatura.status !== 'ativa') return false;
 
-    return assinatura.plano.modulosInclusos?.some(
-      modulo => modulo.codigo === codigoModulo && modulo.ativo
-    ) || false;
+    return (
+      assinatura.plano.modulosInclusos?.some(
+        (modulo) => modulo.codigo === codigoModulo && modulo.ativo,
+      ) || false
+    );
   };
 
   // Verificar se pode executar ação (baseado em limites)
@@ -179,18 +181,18 @@ export const useSubscription = () => {
       usuarios: {
         usado: limites.usuariosAtivos,
         total: limites.limiteUsuarios,
-        percentual: Math.min((limites.usuariosAtivos / limites.limiteUsuarios) * 100, 100)
+        percentual: Math.min((limites.usuariosAtivos / limites.limiteUsuarios) * 100, 100),
       },
       clientes: {
         usado: limites.clientesCadastrados,
         total: limites.limiteClientes,
-        percentual: Math.min((limites.clientesCadastrados / limites.limiteClientes) * 100, 100)
+        percentual: Math.min((limites.clientesCadastrados / limites.limiteClientes) * 100, 100),
       },
       storage: {
         usado: Math.round(limites.storageUtilizado / (1024 * 1024)), // MB
         total: Math.round(limites.limiteStorage / (1024 * 1024)), // MB
-        percentual: Math.min((limites.storageUtilizado / limites.limiteStorage) * 100, 100)
-      }
+        percentual: Math.min((limites.storageUtilizado / limites.limiteStorage) * 100, 100),
+      },
     };
   };
 
@@ -201,7 +203,7 @@ export const useSubscription = () => {
         status: 'sem-assinatura',
         cor: 'gray',
         texto: 'Sem Assinatura',
-        descricao: 'Empresa não possui assinatura ativa'
+        descricao: 'Empresa não possui assinatura ativa',
       };
     }
 
@@ -210,26 +212,26 @@ export const useSubscription = () => {
         status: 'ativa',
         cor: 'green',
         texto: 'Ativa',
-        descricao: 'Assinatura funcionando normalmente'
+        descricao: 'Assinatura funcionando normalmente',
       },
       suspensa: {
         status: 'suspensa',
         cor: 'orange',
         texto: 'Suspensa',
-        descricao: 'Assinatura temporariamente suspensa'
+        descricao: 'Assinatura temporariamente suspensa',
       },
       cancelada: {
         status: 'cancelada',
         cor: 'red',
         texto: 'Cancelada',
-        descricao: 'Assinatura foi cancelada'
+        descricao: 'Assinatura foi cancelada',
       },
       pendente: {
         status: 'pendente',
         cor: 'yellow',
         texto: 'Pendente',
-        descricao: 'Aguardando confirmação de pagamento'
-      }
+        descricao: 'Aguardando confirmação de pagamento',
+      },
     };
 
     return statusMap[assinatura.status] || statusMap.pendente;
@@ -273,6 +275,6 @@ export const useSubscription = () => {
     // Flags úteis
     temAssinatura: !!assinatura,
     assinaturaAtiva: assinatura?.status === 'ativa',
-    precisaUpgrade: (modulo: string) => !temAcessoModulo(modulo)
+    precisaUpgrade: (modulo: string) => !temAcessoModulo(modulo),
   };
 };

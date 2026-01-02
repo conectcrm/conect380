@@ -1,7 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Edit3, Trash2, FileText, DollarSign, Filter, Download, MoreVertical, Eye, Send, Link2, Calendar, Activity, Settings, CheckCircle, Clock, AlertCircle, XCircle, Building2, ChevronUp, ChevronDown, X, Loader2, BarChart3, Mail, CreditCard, Bell, Shield } from 'lucide-react';
+import {
+  Plus,
+  Search,
+  Edit3,
+  Trash2,
+  FileText,
+  DollarSign,
+  Filter,
+  Download,
+  MoreVertical,
+  Eye,
+  Send,
+  Link2,
+  Calendar,
+  Activity,
+  Settings,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  XCircle,
+  Building2,
+  ChevronUp,
+  ChevronDown,
+  X,
+  Loader2,
+  BarChart3,
+  Mail,
+  CreditCard,
+  Bell,
+  Shield,
+} from 'lucide-react';
 import {
   faturamentoService,
   Fatura,
@@ -10,7 +40,7 @@ import {
   TipoFatura,
   FormaPagamento,
   FiltrosFatura,
-  FaturasPaginadasResponse
+  FaturasPaginadasResponse,
 } from '../../services/faturamentoService';
 import ModalFatura from './ModalFatura';
 import ModalDetalhesFatura from './ModalDetalhesFatura';
@@ -31,7 +61,10 @@ import { useFaturasPaginadas } from '../../hooks/useFaturasPaginadas';
 import { useDebounce } from 'use-debounce';
 import { obterNomeCliente, obterEmailCliente } from '../../utils/formatacao';
 import ModalConfirmacao from '../../components/common/ModalConfirmacao';
-import { useConfirmacaoInteligente, useValidacaoFinanceira } from '../../hooks/useConfirmacaoInteligente';
+import {
+  useConfirmacaoInteligente,
+  useValidacaoFinanceira,
+} from '../../hooks/useConfirmacaoInteligente';
 import NotificacaoSucesso from '../../components/common/NotificacaoSucesso';
 import { useNotificacaoFinanceira } from '../../hooks/useNotificacao';
 
@@ -74,7 +107,11 @@ export default function FaturamentoPage() {
   const [total, setTotal] = useState(0);
   const [sortBy, setSortBy] = useState<string>('dataVencimento');
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
-  const [aggregates, setAggregates] = useState<{ valorTotal?: number; valorRecebido?: number; valorEmAberto?: number }>({});
+  const [aggregates, setAggregates] = useState<{
+    valorTotal?: number;
+    valorRecebido?: number;
+    valorEmAberto?: number;
+  }>({});
   const [buscaDebounced] = useDebounce(busca, 500);
 
   // Estados para seleção múltipla
@@ -91,7 +128,9 @@ export default function FaturamentoPage() {
   const [modalEmailAberto, setModalEmailAberto] = useState(false);
   const [modalGatewayAberto, setModalGatewayAberto] = useState(false);
   const [faturaGateway, setFaturaGateway] = useState<Fatura | null>(null);
-  const [visaoAtiva, setVisaoAtiva] = useState<'dashboard' | 'relatorios' | 'email' | 'ia' | 'workflows' | 'notificacoes' | 'backup'>('dashboard');
+  const [visaoAtiva, setVisaoAtiva] = useState<
+    'dashboard' | 'relatorios' | 'email' | 'ia' | 'workflows' | 'notificacoes' | 'backup'
+  >('dashboard');
 
   const [dashboardCards, setDashboardCards] = useState<DashboardCards>({
     totalFaturas: 0,
@@ -99,7 +138,7 @@ export default function FaturamentoPage() {
     valorTotalPendente: 0,
     valorTotalPago: 0,
     faturasPagas: 0,
-    faturasDoMes: 0
+    faturasDoMes: 0,
   });
 
   // Estado para configuração dos cards
@@ -107,7 +146,7 @@ export default function FaturamentoPage() {
     'totalFaturas',
     'valorTotalPendente',
     'valorTotalPago',
-    'faturasDoMes'
+    'faturasDoMes',
   ]);
 
   // Hooks para confirmação inteligente
@@ -161,13 +200,14 @@ export default function FaturamentoPage() {
 
     const hoje = new Date();
     const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    const vencidas = dados.data.filter(f =>
-      f.status !== StatusFatura.PAGA &&
-      f.status !== StatusFatura.CANCELADA &&
-      new Date(f.dataVencimento) < hoje
+    const vencidas = dados.data.filter(
+      (f) =>
+        f.status !== StatusFatura.PAGA &&
+        f.status !== StatusFatura.CANCELADA &&
+        new Date(f.dataVencimento) < hoje,
     ).length;
-    const pagas = dados.data.filter(f => f.status === StatusFatura.PAGA).length;
-    const doMes = dados.data.filter(f => new Date(f.dataEmissao) >= inicioMes).length;
+    const pagas = dados.data.filter((f) => f.status === StatusFatura.PAGA).length;
+    const doMes = dados.data.filter((f) => new Date(f.dataEmissao) >= inicioMes).length;
 
     setDashboardCards({
       totalFaturas: dados.total || dados.data.length,
@@ -223,7 +263,7 @@ export default function FaturamentoPage() {
         color: 'text-[#159A9C]',
         gradient: '',
         description: 'Visão geral de todas as faturas cadastradas',
-        isActive: cardsConfigurados.includes('totalFaturas')
+        isActive: cardsConfigurados.includes('totalFaturas'),
       },
       {
         id: 'faturasPagas',
@@ -233,7 +273,7 @@ export default function FaturamentoPage() {
         color: 'text-green-600',
         gradient: '',
         description: 'Faturas finalizadas e quitadas',
-        isActive: cardsConfigurados.includes('faturasPagas')
+        isActive: cardsConfigurados.includes('faturasPagas'),
       },
       {
         id: 'faturasVencidas',
@@ -243,33 +283,33 @@ export default function FaturamentoPage() {
         color: 'text-red-600',
         gradient: '',
         description: 'Faturas atrasadas que requerem atenção',
-        isActive: cardsConfigurados.includes('faturasVencidas')
+        isActive: cardsConfigurados.includes('faturasVencidas'),
       },
       {
         id: 'valorTotalPendente',
         title: 'Valor Pendente',
         value: `R$ ${Number(dashboardCards.valorTotalPendente).toLocaleString('pt-BR', {
           minimumFractionDigits: 2,
-          maximumFractionDigits: 2
+          maximumFractionDigits: 2,
         })}`,
         icon: Clock,
         color: 'text-yellow-600',
         gradient: '',
         description: 'Valor total aguardando recebimento',
-        isActive: cardsConfigurados.includes('valorTotalPendente')
+        isActive: cardsConfigurados.includes('valorTotalPendente'),
       },
       {
         id: 'valorTotalPago',
         title: 'Valor Recebido',
         value: `R$ ${Number(dashboardCards.valorTotalPago).toLocaleString('pt-BR', {
           minimumFractionDigits: 2,
-          maximumFractionDigits: 2
+          maximumFractionDigits: 2,
         })}`,
         icon: DollarSign,
         color: 'text-green-600',
         gradient: '',
         description: 'Total de valores já recebidos',
-        isActive: cardsConfigurados.includes('valorTotalPago')
+        isActive: cardsConfigurados.includes('valorTotalPago'),
       },
       {
         id: 'faturasDoMes',
@@ -279,8 +319,8 @@ export default function FaturamentoPage() {
         color: 'text-[#159A9C]',
         gradient: '',
         description: 'Faturas emitidas no mês atual',
-        isActive: cardsConfigurados.includes('faturasDoMes')
-      }
+        isActive: cardsConfigurados.includes('faturasDoMes'),
+      },
     ];
   };
 
@@ -352,7 +392,7 @@ export default function FaturamentoPage() {
   };
 
   const abrirFaturaNotificacao = (faturaId: number) => {
-    const fatura = faturas.find(f => f.id === faturaId);
+    const fatura = faturas.find((f) => f.id === faturaId);
     if (fatura) {
       abrirModalDetalhes(fatura);
     }
@@ -374,7 +414,7 @@ export default function FaturamentoPage() {
       // Atualiza o status da fatura para pago
       if (faturaGateway) {
         await faturamentoService.atualizarFatura(faturaGateway.id, {
-          status: StatusFatura.PAGA
+          status: StatusFatura.PAGA,
         });
         carregarFaturas();
         fecharModalGateway();
@@ -423,7 +463,7 @@ export default function FaturamentoPage() {
           break;
         case 'abrir_fatura':
           if (dados.faturaId) {
-            const fatura = faturas.find(f => f.id === dados.faturaId);
+            const fatura = faturas.find((f) => f.id === dados.faturaId);
             if (fatura) abrirModalDetalhes(fatura);
           }
           break;
@@ -479,7 +519,7 @@ export default function FaturamentoPage() {
   const excluirFatura = async (id: number) => {
     try {
       // Buscar a fatura para validação
-      const fatura = faturas.find(f => f.id === id);
+      const fatura = faturas.find((f) => f.id === id);
       if (!fatura) {
         console.error('Fatura não encontrada:', id);
         alert('Fatura não encontrada.');
@@ -510,15 +550,15 @@ export default function FaturamentoPage() {
             await refetch();
 
             // Também força uma atualização do estado local para garantir
-            setFaturas(prev => prev.filter(f => f.id !== id));
+            setFaturas((prev) => prev.filter((f) => f.id !== id));
 
             // Atualizar faturas selecionadas removendo a excluída
-            setFaturasSelecionadas(prev => prev.filter(faturaId => faturaId !== id));
+            setFaturasSelecionadas((prev) => prev.filter((faturaId) => faturaId !== id));
 
             // Mostrar notificação de sucesso
             notificacao.mostrarSucesso(
               'Fatura Excluída',
-              `Fatura #${faturamentoService.formatarNumeroFatura(fatura.numero)} foi excluída com sucesso.`
+              `Fatura #${faturamentoService.formatarNumeroFatura(fatura.numero)} foi excluída com sucesso.`,
             );
           } catch (error) {
             console.error('Erro ao excluir fatura no serviço:', error);
@@ -526,7 +566,7 @@ export default function FaturamentoPage() {
             throw error; // Re-throw para ser capturado pelo catch externo
           }
         },
-        dadosContexto
+        dadosContexto,
       );
     } catch (error) {
       console.error('Erro ao excluir fatura:', error);
@@ -540,7 +580,7 @@ export default function FaturamentoPage() {
       navigator.clipboard.writeText(link);
       notificacao.mostrarSucesso(
         'Link Copiado',
-        'Link de pagamento copiado para a área de transferência!'
+        'Link de pagamento copiado para a área de transferência!',
       );
       carregarFaturas(); // Recarregar para atualizar o link
     } catch (error) {
@@ -552,10 +592,7 @@ export default function FaturamentoPage() {
   const enviarPorEmail = async (id: number) => {
     try {
       await faturamentoService.enviarFaturaPorEmail(id);
-      notificacao.mostrarSucesso(
-        'Email Enviado',
-        'Fatura enviada por email com sucesso!'
-      );
+      notificacao.mostrarSucesso('Email Enviado', 'Fatura enviada por email com sucesso!');
     } catch (error) {
       console.error('Erro ao enviar fatura por email:', error);
       notificacao.erro.operacaoFalhou('enviar fatura por email');
@@ -613,8 +650,8 @@ export default function FaturamentoPage() {
           webhookData: {
             source: 'manual',
             timestamp: new Date().toISOString(),
-            userRegistered: true
-          }
+            userRegistered: true,
+          },
         };
 
         await faturamentoService.processarPagamento(pagamentoCreated.id, processarData);
@@ -633,7 +670,6 @@ export default function FaturamentoPage() {
 
       // Fechar modal após sucesso
       fecharModalPagamentos();
-
     } catch (error) {
       console.error('Erro ao registrar pagamento:', error);
       notificacao.erro.operacaoFalhou('registrar pagamento');
@@ -646,7 +682,7 @@ export default function FaturamentoPage() {
     if (faturasSelecionadas.length === 0) {
       notificacao.mostrarAviso(
         'Seleção Necessária',
-        'Selecione pelo menos uma fatura para executar esta ação.'
+        'Selecione pelo menos uma fatura para executar esta ação.',
       );
       return;
     }
@@ -655,7 +691,7 @@ export default function FaturamentoPage() {
       setProcessandoAcaoMassa(true);
       setProgressoAcaoMassa(0);
 
-      const faturasSelecionadasData = faturas.filter(f => faturasSelecionadas.includes(f.id));
+      const faturasSelecionadasData = faturas.filter((f) => faturasSelecionadas.includes(f.id));
 
       switch (acao) {
         case 'enviar-email':
@@ -667,7 +703,7 @@ export default function FaturamentoPage() {
           }
           notificacao.mostrarSucesso(
             'Emails Enviados',
-            `${faturasSelecionadas.length} email(s) enviado(s) com sucesso!`
+            `${faturasSelecionadas.length} email(s) enviado(s) com sucesso!`,
           );
           break;
 
@@ -675,7 +711,7 @@ export default function FaturamentoPage() {
           for (let i = 0; i < faturasSelecionadas.length; i++) {
             const faturaId = faturasSelecionadas[i];
             await baixarPDF(faturaId);
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise((resolve) => setTimeout(resolve, 500));
             setProgressoAcaoMassa(((i + 1) / faturasSelecionadas.length) * 100);
           }
           break;
@@ -689,17 +725,17 @@ export default function FaturamentoPage() {
             }
             setProgressoAcaoMassa(((i + 1) / faturasSelecionadasData.length) * 100);
           }
-          notificacao.mostrarSucesso(
-            'Cobranças Geradas',
-            'Cobranças geradas com sucesso!'
-          );
+          notificacao.mostrarSucesso('Cobranças Geradas', 'Cobranças geradas com sucesso!');
           break;
 
         case 'exportar':
           setProgressoAcaoMassa(50);
-          const csvData = faturasSelecionadasData.map(f =>
-            `${f.numero},${f.cliente.nome},${f.valorTotal},${f.status},${f.dataVencimento}`
-          ).join('\n');
+          const csvData = faturasSelecionadasData
+            .map(
+              (f) =>
+                `${f.numero},${f.cliente.nome},${f.valorTotal},${f.status},${f.dataVencimento}`,
+            )
+            .join('\n');
           const blob = new Blob([csvData], { type: 'text/csv' });
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
@@ -732,7 +768,7 @@ export default function FaturamentoPage() {
 
               // Notificação de sucesso é exibida automaticamente pelo hook
             },
-            { quantidadeItens: faturasSelecionadas.length }
+            { quantidadeItens: faturasSelecionadas.length },
           );
           return; // Sair da função para não executar o finally
           break;
@@ -745,7 +781,6 @@ export default function FaturamentoPage() {
       // Limpar seleção após ação
       setFaturasSelecionadas([]);
       setMostrarAcoesMassa(false);
-
     } catch (error) {
       console.error('Erro ao executar ação em massa:', error);
       alert('Erro ao executar ação. Tente novamente.');
@@ -756,10 +791,8 @@ export default function FaturamentoPage() {
   };
 
   const toggleSelecaoFatura = (id: number) => {
-    setFaturasSelecionadas(prev =>
-      prev.includes(id)
-        ? prev.filter(faturaId => faturaId !== id)
-        : [...prev, id]
+    setFaturasSelecionadas((prev) =>
+      prev.includes(id) ? prev.filter((faturaId) => faturaId !== id) : [...prev, id],
     );
   };
 
@@ -767,7 +800,7 @@ export default function FaturamentoPage() {
     if (faturasSelecionadas.length === faturas.length) {
       setFaturasSelecionadas([]);
     } else {
-      setFaturasSelecionadas(faturas.map(f => f.id));
+      setFaturasSelecionadas(faturas.map((f) => f.id));
     }
   };
 
@@ -803,10 +836,11 @@ export default function FaturamentoPage() {
     }
   };
 
-  const faturasFiltradas = faturas.filter(fatura =>
-    fatura.numero.toLowerCase().includes(busca.toLowerCase()) ||
-    (fatura.cliente?.nome?.toLowerCase().includes(busca.toLowerCase())) ||
-    fatura.observacoes?.toLowerCase().includes(busca.toLowerCase())
+  const faturasFiltradas = faturas.filter(
+    (fatura) =>
+      fatura.numero.toLowerCase().includes(busca.toLowerCase()) ||
+      fatura.cliente?.nome?.toLowerCase().includes(busca.toLowerCase()) ||
+      fatura.observacoes?.toLowerCase().includes(busca.toLowerCase()),
   );
 
   useEffect(() => {
@@ -817,10 +851,7 @@ export default function FaturamentoPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusName="Financeiro"
-          nucleusPath="/nuclei/financeiro"
-        />
+        <BackToNucleus nucleusName="Financeiro" nucleusPath="/nuclei/financeiro" />
       </div>
 
       <div className="p-6">
@@ -836,7 +867,9 @@ export default function FaturamentoPage() {
                 )}
               </h1>
               <p className="mt-2 text-[#B4BEC9]">
-                {carregando ? 'Carregando faturas...' : `Gerencie suas ${dashboardCards.totalFaturas} faturas, pagamentos e cobranças`}
+                {carregando
+                  ? 'Carregando faturas...'
+                  : `Gerencie suas ${dashboardCards.totalFaturas} faturas, pagamentos e cobranças`}
               </p>
             </div>
 
@@ -872,10 +905,11 @@ export default function FaturamentoPage() {
             <nav className="flex space-x-4 px-6 overflow-x-auto">
               <button
                 onClick={() => setVisaoAtiva('dashboard')}
-                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${visaoAtiva === 'dashboard'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${
+                  visaoAtiva === 'dashboard'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4" />
@@ -885,10 +919,11 @@ export default function FaturamentoPage() {
 
               <button
                 onClick={() => setVisaoAtiva('ia')}
-                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${visaoAtiva === 'ia'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${
+                  visaoAtiva === 'ia'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <Activity className="w-4 h-4" />
@@ -898,10 +933,11 @@ export default function FaturamentoPage() {
 
               <button
                 onClick={() => setVisaoAtiva('relatorios')}
-                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${visaoAtiva === 'relatorios'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${
+                  visaoAtiva === 'relatorios'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <BarChart3 className="w-4 h-4" />
@@ -911,10 +947,11 @@ export default function FaturamentoPage() {
 
               <button
                 onClick={() => setVisaoAtiva('email')}
-                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${visaoAtiva === 'email'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${
+                  visaoAtiva === 'email'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <Mail className="w-4 h-4" />
@@ -924,10 +961,11 @@ export default function FaturamentoPage() {
 
               <button
                 onClick={() => setVisaoAtiva('workflows')}
-                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${visaoAtiva === 'workflows'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${
+                  visaoAtiva === 'workflows'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <Settings className="w-4 h-4" />
@@ -937,10 +975,11 @@ export default function FaturamentoPage() {
 
               <button
                 onClick={() => setVisaoAtiva('notificacoes')}
-                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${visaoAtiva === 'notificacoes'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${
+                  visaoAtiva === 'notificacoes'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <Bell className="w-4 h-4" />
@@ -950,10 +989,11 @@ export default function FaturamentoPage() {
 
               <button
                 onClick={() => setVisaoAtiva('backup')}
-                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${visaoAtiva === 'backup'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${
+                  visaoAtiva === 'backup'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <Shield className="w-4 h-4" />
@@ -969,33 +1009,44 @@ export default function FaturamentoPage() {
           <div>
             {/* Cards do Dashboard (KPI Cards - Padrão Crevasse) */}
             <div className={`grid gap-6 mb-8 ${obterClasseGrid(cardsConfigurados.length)}`}>
-              {carregando ? (
-                // Skeleton para cards do dashboard
-                Array.from({ length: 6 }).map((_, index) => (
-                  <SkeletonCard key={index} />
-                ))
-              ) : (
-                obterTodasConfiguracoesCards()
-                  .filter(card => card.isActive)
-                  .map((card) => {
-                    const IconComponent = card.icon;
-                    const numeroCards = cardsConfigurados.length;
-                    return (
-                      <div key={card.id} className={`p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF] ${obterClassesCard(numeroCards)}`}>
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">{card.title}</p>
-                            <p className={`${numeroCards <= 2 ? 'text-4xl' : 'text-3xl'} font-bold mt-2 text-[#002333]`}>{card.value}</p>
-                            <p className="text-sm text-[#002333]/70 mt-3">{card.description.replace(/[📊✅⚠️⏳💰📅]/g, '').trim()}</p>
-                          </div>
-                          <div className={`${numeroCards <= 2 ? 'h-14 w-14' : 'h-12 w-12'} rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm flex-shrink-0`}>
-                            <IconComponent className={`${numeroCards <= 2 ? 'h-7 w-7' : 'h-6 w-6'} text-[#159A9C]`} />
+              {carregando
+                ? // Skeleton para cards do dashboard
+                  Array.from({ length: 6 }).map((_, index) => <SkeletonCard key={index} />)
+                : obterTodasConfiguracoesCards()
+                    .filter((card) => card.isActive)
+                    .map((card) => {
+                      const IconComponent = card.icon;
+                      const numeroCards = cardsConfigurados.length;
+                      return (
+                        <div
+                          key={card.id}
+                          className={`p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF] ${obterClassesCard(numeroCards)}`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                                {card.title}
+                              </p>
+                              <p
+                                className={`${numeroCards <= 2 ? 'text-4xl' : 'text-3xl'} font-bold mt-2 text-[#002333]`}
+                              >
+                                {card.value}
+                              </p>
+                              <p className="text-sm text-[#002333]/70 mt-3">
+                                {card.description.replace(/[📊✅⚠️⏳💰📅]/g, '').trim()}
+                              </p>
+                            </div>
+                            <div
+                              className={`${numeroCards <= 2 ? 'h-14 w-14' : 'h-12 w-12'} rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm flex-shrink-0`}
+                            >
+                              <IconComponent
+                                className={`${numeroCards <= 2 ? 'h-7 w-7' : 'h-6 w-6'} text-[#159A9C]`}
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })
-              )}
+                      );
+                    })}
             </div>
 
             {/* Filtros e Busca */}
@@ -1020,12 +1071,15 @@ export default function FaturamentoPage() {
 
                 <div className="flex gap-2">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Status
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
                     <select
                       value={filtros.status || ''}
-                      onChange={(e) => setFiltros(prev => ({ ...prev, status: e.target.value as StatusFatura || undefined }))}
+                      onChange={(e) =>
+                        setFiltros((prev) => ({
+                          ...prev,
+                          status: (e.target.value as StatusFatura) || undefined,
+                        }))
+                      }
                       className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                     >
                       <option value="">Todos os Status</option>
@@ -1038,12 +1092,15 @@ export default function FaturamentoPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Tipo
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
                     <select
                       value={filtros.tipo || ''}
-                      onChange={(e) => setFiltros(prev => ({ ...prev, tipo: e.target.value as TipoFatura || undefined }))}
+                      onChange={(e) =>
+                        setFiltros((prev) => ({
+                          ...prev,
+                          tipo: (e.target.value as TipoFatura) || undefined,
+                        }))
+                      }
                       className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                     >
                       <option value="">Todos os Tipos</option>
@@ -1071,9 +1128,7 @@ export default function FaturamentoPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Ordem
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Ordem</label>
                     <select
                       value={sortOrder}
                       onChange={(e) => setSortOrder(e.target.value as 'ASC' | 'DESC')}
@@ -1085,9 +1140,7 @@ export default function FaturamentoPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Ações
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Ações</label>
                     <button
                       onClick={buscarFaturas}
                       className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors"
@@ -1100,12 +1153,20 @@ export default function FaturamentoPage() {
                 </div>
               </div>
               {/* Chips de filtros aplicados */}
-              {(busca || filtros.status || filtros.tipo || sortBy !== 'dataVencimento' || sortOrder !== 'DESC') && (
+              {(busca ||
+                filtros.status ||
+                filtros.tipo ||
+                sortBy !== 'dataVencimento' ||
+                sortOrder !== 'DESC') && (
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   {busca && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-700 border">
                       Busca: "{busca}"
-                      <button className="ml-1 hover:text-red-600" onClick={() => setBusca('')} aria-label="Limpar busca">
+                      <button
+                        className="ml-1 hover:text-red-600"
+                        onClick={() => setBusca('')}
+                        aria-label="Limpar busca"
+                      >
                         <X className="w-3 h-3" />
                       </button>
                     </span>
@@ -1113,7 +1174,11 @@ export default function FaturamentoPage() {
                   {filtros.status && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-700 border">
                       Status: {faturamentoService.formatarStatusFatura(filtros.status as any)}
-                      <button className="ml-1 hover:text-red-600" onClick={() => setFiltros(prev => ({ ...prev, status: undefined }))} aria-label="Limpar filtro de status">
+                      <button
+                        className="ml-1 hover:text-red-600"
+                        onClick={() => setFiltros((prev) => ({ ...prev, status: undefined }))}
+                        aria-label="Limpar filtro de status"
+                      >
                         <X className="w-3 h-3" />
                       </button>
                     </span>
@@ -1121,7 +1186,11 @@ export default function FaturamentoPage() {
                   {filtros.tipo && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-700 border">
                       Tipo: {faturamentoService.formatarTipoFatura(filtros.tipo as any)}
-                      <button className="ml-1 hover:text-red-600" onClick={() => setFiltros(prev => ({ ...prev, tipo: undefined }))} aria-label="Limpar filtro de tipo">
+                      <button
+                        className="ml-1 hover:text-red-600"
+                        onClick={() => setFiltros((prev) => ({ ...prev, tipo: undefined }))}
+                        aria-label="Limpar filtro de tipo"
+                      >
                         <X className="w-3 h-3" />
                       </button>
                     </span>
@@ -1129,14 +1198,28 @@ export default function FaturamentoPage() {
                   {(sortBy !== 'dataVencimento' || sortOrder !== 'DESC') && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-700 border">
                       Ordenação: {sortBy} {sortOrder === 'DESC' ? '↓' : '↑'}
-                      <button className="ml-1 hover:text-red-600" onClick={() => { setSortBy('dataVencimento'); setSortOrder('DESC'); }} aria-label="Resetar ordenação">
+                      <button
+                        className="ml-1 hover:text-red-600"
+                        onClick={() => {
+                          setSortBy('dataVencimento');
+                          setSortOrder('DESC');
+                        }}
+                        aria-label="Resetar ordenação"
+                      >
                         <X className="w-3 h-3" />
                       </button>
                     </span>
                   )}
                   <button
                     className="ml-auto text-sm text-blue-600 hover:text-blue-800 underline"
-                    onClick={() => { setBusca(''); setFiltros({}); setSortBy('dataVencimento'); setSortOrder('DESC'); setPage(1); refetch(); }}
+                    onClick={() => {
+                      setBusca('');
+                      setFiltros({});
+                      setSortBy('dataVencimento');
+                      setSortOrder('DESC');
+                      setPage(1);
+                      refetch();
+                    }}
                   >
                     Limpar tudo
                   </button>
@@ -1237,9 +1320,13 @@ export default function FaturamentoPage() {
               ) : faturasFiltradas.length === 0 ? (
                 <div className="p-10 text-center">
                   <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma fatura encontrada</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Nenhuma fatura encontrada
+                  </h3>
                   <p className="text-gray-600 mb-6">
-                    {busca ? 'Nenhum resultado para a busca/filtros atuais.' : 'Você ainda não possui faturas cadastradas.'}
+                    {busca
+                      ? 'Nenhum resultado para a busca/filtros atuais.'
+                      : 'Você ainda não possui faturas cadastradas.'}
                   </p>
                   <div className="flex items-center justify-center gap-3">
                     <button
@@ -1271,7 +1358,10 @@ export default function FaturamentoPage() {
                           <div className="col-span-1 flex items-center justify-center">
                             <input
                               type="checkbox"
-                              checked={faturasSelecionadas.length === faturasFiltradas.length && faturasFiltradas.length > 0}
+                              checked={
+                                faturasSelecionadas.length === faturasFiltradas.length &&
+                                faturasFiltradas.length > 0
+                              }
                               onChange={toggleSelecaoTodas}
                               className="w-4 h-4 text-[#159A9C] bg-white border-gray-300 rounded shadow-sm focus:ring-[#159A9C] focus:ring-2 transition-all"
                             />
@@ -1292,7 +1382,7 @@ export default function FaturamentoPage() {
                             className="col-span-2 flex items-center gap-1 cursor-pointer hover:text-blue-600 transition-colors"
                             onClick={() => {
                               if (sortBy === 'dataVencimento') {
-                                setSortOrder(prev => (prev === 'DESC' ? 'ASC' : 'DESC'));
+                                setSortOrder((prev) => (prev === 'DESC' ? 'ASC' : 'DESC'));
                               } else {
                                 setSortBy('dataVencimento');
                                 setSortOrder('DESC');
@@ -1304,13 +1394,18 @@ export default function FaturamentoPage() {
                           >
                             <Calendar className="w-3 h-3 text-blue-600" />
                             <span>Vencimento</span>
-                            {sortBy === 'dataVencimento' && (sortOrder === 'DESC' ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
+                            {sortBy === 'dataVencimento' &&
+                              (sortOrder === 'DESC' ? (
+                                <ChevronDown className="w-3 h-3" />
+                              ) : (
+                                <ChevronUp className="w-3 h-3" />
+                              ))}
                           </div>
                           <div
                             className="col-span-2 flex items-center justify-end gap-1 cursor-pointer hover:text-blue-600 transition-colors pr-8"
                             onClick={() => {
                               if (sortBy === 'valorTotal') {
-                                setSortOrder(prev => (prev === 'DESC' ? 'ASC' : 'DESC'));
+                                setSortOrder((prev) => (prev === 'DESC' ? 'ASC' : 'DESC'));
                               } else {
                                 setSortBy('valorTotal');
                                 setSortOrder('DESC');
@@ -1322,7 +1417,12 @@ export default function FaturamentoPage() {
                           >
                             <DollarSign className="w-3 h-3 text-blue-600" />
                             <span>Valor</span>
-                            {sortBy === 'valorTotal' && (sortOrder === 'DESC' ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
+                            {sortBy === 'valorTotal' &&
+                              (sortOrder === 'DESC' ? (
+                                <ChevronDown className="w-3 h-3" />
+                              ) : (
+                                <ChevronUp className="w-3 h-3" />
+                              ))}
                           </div>
                           <div className="col-span-1 flex items-center justify-center gap-1">
                             <Settings className="w-3 h-3 text-blue-600" />
@@ -1334,21 +1434,34 @@ export default function FaturamentoPage() {
                       {/* Body do Grid */}
                       <div className="divide-y divide-gray-100">
                         {faturasFiltradas.map((fatura, index) => {
-                          const isVencida = faturamentoService.verificarVencimento(fatura.dataVencimento);
+                          const isVencida = faturamentoService.verificarVencimento(
+                            fatura.dataVencimento,
+                          );
                           const isSelected = faturasSelecionadas.includes(fatura.id);
                           const dataVencimento = new Date(fatura.dataVencimento);
                           const dataEmissao = new Date(fatura.dataEmissao);
                           const hoje = new Date();
-                          const diasVencimento = Math.ceil((dataVencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+                          const diasVencimento = Math.ceil(
+                            (dataVencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24),
+                          );
 
                           // Definir classes de estilo baseado no status
-                          let rowClass = `grid grid-cols-12 gap-4 px-4 py-3 hover:bg-gradient-to-r hover:from-blue-25 hover:to-indigo-25 transition-all duration-200 group ${isSelected ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 shadow-sm' : ''
-                            }`;
+                          let rowClass = `grid grid-cols-12 gap-4 px-4 py-3 hover:bg-gradient-to-r hover:from-blue-25 hover:to-indigo-25 transition-all duration-200 group ${
+                            isSelected
+                              ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 shadow-sm'
+                              : ''
+                          }`;
 
                           if (isVencida && fatura.status === StatusFatura.PENDENTE) {
-                            rowClass += ' bg-gradient-to-r from-red-25 to-red-50 border-l-4 border-red-400';
-                          } else if (diasVencimento <= 7 && diasVencimento > 0 && fatura.status === StatusFatura.PENDENTE) {
-                            rowClass += ' bg-gradient-to-r from-yellow-25 to-yellow-50 border-l-4 border-yellow-400';
+                            rowClass +=
+                              ' bg-gradient-to-r from-red-25 to-red-50 border-l-4 border-red-400';
+                          } else if (
+                            diasVencimento <= 7 &&
+                            diasVencimento > 0 &&
+                            fatura.status === StatusFatura.PENDENTE
+                          ) {
+                            rowClass +=
+                              ' bg-gradient-to-r from-yellow-25 to-yellow-50 border-l-4 border-yellow-400';
                           }
 
                           return (
@@ -1365,18 +1478,24 @@ export default function FaturamentoPage() {
 
                               {/* Número da Fatura */}
                               <div className="col-span-2 flex items-center">
-                                <div className={`w-8 h-8 bg-gradient-to-br ${fatura.status === StatusFatura.PAGA
-                                  ? 'from-emerald-100 to-emerald-200 shadow-emerald-200'
-                                  : isVencida
-                                    ? 'from-red-100 to-red-200 shadow-red-200'
-                                    : 'from-blue-100 to-blue-200 shadow-blue-200'
-                                  } rounded-xl flex items-center justify-center mr-3 shadow-md transition-all group-hover:shadow-lg group-hover:scale-105`}>
-                                  <FileText className={`w-4 h-4 ${fatura.status === StatusFatura.PAGA
-                                    ? 'text-emerald-600'
-                                    : isVencida
-                                      ? 'text-red-600'
-                                      : 'text-blue-600'
-                                    }`} />
+                                <div
+                                  className={`w-8 h-8 bg-gradient-to-br ${
+                                    fatura.status === StatusFatura.PAGA
+                                      ? 'from-emerald-100 to-emerald-200 shadow-emerald-200'
+                                      : isVencida
+                                        ? 'from-red-100 to-red-200 shadow-red-200'
+                                        : 'from-blue-100 to-blue-200 shadow-blue-200'
+                                  } rounded-xl flex items-center justify-center mr-3 shadow-md transition-all group-hover:shadow-lg group-hover:scale-105`}
+                                >
+                                  <FileText
+                                    className={`w-4 h-4 ${
+                                      fatura.status === StatusFatura.PAGA
+                                        ? 'text-emerald-600'
+                                        : isVencida
+                                          ? 'text-red-600'
+                                          : 'text-blue-600'
+                                    }`}
+                                  />
                                 </div>
                                 <div>
                                   <div className="text-sm font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">
@@ -1398,7 +1517,10 @@ export default function FaturamentoPage() {
                                     {obterNomeCliente(fatura.cliente, fatura.clienteId)}
                                   </div>
                                   {obterEmailCliente(fatura.cliente) && (
-                                    <div className="text-xs text-gray-500 truncate hidden md:block" title={obterEmailCliente(fatura.cliente)!}>
+                                    <div
+                                      className="text-xs text-gray-500 truncate hidden md:block"
+                                      title={obterEmailCliente(fatura.cliente)!}
+                                    >
                                       {obterEmailCliente(fatura.cliente)}
                                     </div>
                                   )}
@@ -1410,7 +1532,9 @@ export default function FaturamentoPage() {
                                 <div className="flex items-center gap-2">
                                   <div className="flex items-center gap-1">
                                     {getStatusIcon(fatura.status, 'w-4 h-4')}
-                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium shadow-sm transition-all group-hover:shadow-md ${getStatusColor(fatura.status)}`}>
+                                    <span
+                                      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium shadow-sm transition-all group-hover:shadow-md ${getStatusColor(fatura.status)}`}
+                                    >
                                       {faturamentoService.formatarStatusFatura(fatura.status)}
                                     </span>
                                   </div>
@@ -1423,34 +1547,42 @@ export default function FaturamentoPage() {
                                       VENCIDA
                                     </span>
                                   )}
-                                  {diasVencimento <= 7 && diasVencimento > 0 && fatura.status === StatusFatura.PENDENTE && (
-                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 shadow-sm">
-                                      <Clock className="w-2.5 h-2.5 mr-0.5" />
-                                      {diasVencimento}d
-                                    </span>
-                                  )}
+                                  {diasVencimento <= 7 &&
+                                    diasVencimento > 0 &&
+                                    fatura.status === StatusFatura.PENDENTE && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 shadow-sm">
+                                        <Clock className="w-2.5 h-2.5 mr-0.5" />
+                                        {diasVencimento}d
+                                      </span>
+                                    )}
                                 </div>
                               </div>
 
                               {/* Vencimento */}
                               <div className="col-span-2 flex items-center">
                                 <div>
-                                  <div className={`text-sm font-medium tabular-nums ${isVencida
-                                    ? 'text-red-600'
-                                    : diasVencimento <= 7 && diasVencimento > 0 && fatura.status === StatusFatura.PENDENTE
-                                      ? 'text-yellow-600'
-                                      : 'text-gray-900'
-                                    } group-hover:text-blue-700 transition-colors`}>
+                                  <div
+                                    className={`text-sm font-medium tabular-nums ${
+                                      isVencida
+                                        ? 'text-red-600'
+                                        : diasVencimento <= 7 &&
+                                            diasVencimento > 0 &&
+                                            fatura.status === StatusFatura.PENDENTE
+                                          ? 'text-yellow-600'
+                                          : 'text-gray-900'
+                                    } group-hover:text-blue-700 transition-colors`}
+                                  >
                                     {dataVencimento.toLocaleDateString('pt-BR', {
                                       day: '2-digit',
                                       month: '2-digit',
-                                      year: '2-digit'
+                                      year: '2-digit',
                                     })}
                                   </div>
                                   <div className="text-xs text-gray-400 tabular-nums hidden sm:block">
-                                    Em: {dataEmissao.toLocaleDateString('pt-BR', {
+                                    Em:{' '}
+                                    {dataEmissao.toLocaleDateString('pt-BR', {
                                       day: '2-digit',
-                                      month: '2-digit'
+                                      month: '2-digit',
                                     })}
                                   </div>
                                 </div>
@@ -1463,12 +1595,14 @@ export default function FaturamentoPage() {
                                     <span className="text-gray-500 mr-1 font-normal">R$</span>
                                     {Number(fatura.valorTotal).toLocaleString('pt-BR', {
                                       minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2
+                                      maximumFractionDigits: 2,
                                     })}
                                   </div>
                                   {fatura.formaPagamento && (
                                     <div className="text-xs text-gray-500 truncate hidden md:block">
-                                      {faturamentoService.formatarFormaPagamento(fatura.formaPagamento)}
+                                      {faturamentoService.formatarFormaPagamento(
+                                        fatura.formaPagamento,
+                                      )}
                                     </div>
                                   )}
                                   {fatura.status === StatusFatura.PAGA && (
@@ -1492,15 +1626,16 @@ export default function FaturamentoPage() {
                                     <Eye className="w-3 h-3" />
                                   </button>
 
-                                  {fatura.status !== StatusFatura.PAGA && fatura.status !== StatusFatura.CANCELADA && (
-                                    <button
-                                      onClick={() => abrirModalEdicao(fatura)}
-                                      className="p-2 text-[#159A9C] hover:text-[#0F7B7D] hover:bg-[#159A9C]/10 rounded-lg transition-all duration-200 border border-[#159A9C] hover:border-[#0F7B7D] shadow-sm hover:shadow-md"
-                                      title="Editar Fatura"
-                                    >
-                                      <Edit3 className="w-3 h-3" />
-                                    </button>
-                                  )}
+                                  {fatura.status !== StatusFatura.PAGA &&
+                                    fatura.status !== StatusFatura.CANCELADA && (
+                                      <button
+                                        onClick={() => abrirModalEdicao(fatura)}
+                                        className="p-2 text-[#159A9C] hover:text-[#0F7B7D] hover:bg-[#159A9C]/10 rounded-lg transition-all duration-200 border border-[#159A9C] hover:border-[#0F7B7D] shadow-sm hover:shadow-md"
+                                        title="Editar Fatura"
+                                      >
+                                        <Edit3 className="w-3 h-3" />
+                                      </button>
+                                    )}
 
                                   {/* Menu dropdown para ações secundárias */}
                                   <div className="relative group/menu">
@@ -1572,24 +1707,31 @@ export default function FaturamentoPage() {
                   {/* Versão mobile/tablet - cards */}
                   <div className="lg:hidden space-y-4 p-4">
                     {faturasFiltradas.map((fatura) => {
-                      const isVencida = faturamentoService.verificarVencimento(fatura.dataVencimento);
+                      const isVencida = faturamentoService.verificarVencimento(
+                        fatura.dataVencimento,
+                      );
                       const isSelected = faturasSelecionadas.includes(fatura.id);
                       const dataVencimento = new Date(fatura.dataVencimento);
                       const dataEmissao = new Date(fatura.dataEmissao);
                       const hoje = new Date();
-                      const diasVencimento = Math.ceil((dataVencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+                      const diasVencimento = Math.ceil(
+                        (dataVencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24),
+                      );
 
                       return (
                         <div
                           key={fatura.id}
-                          className={`bg-white rounded-xl border-2 p-5 transition-all shadow-sm hover:shadow-md ${isSelected
-                            ? 'border-blue-500 bg-blue-50 shadow-blue-100'
-                            : isVencida && fatura.status === StatusFatura.PENDENTE
-                              ? 'border-red-400 bg-red-50 shadow-red-100'
-                              : diasVencimento <= 7 && diasVencimento > 0 && fatura.status === StatusFatura.PENDENTE
-                                ? 'border-yellow-400 bg-yellow-50 shadow-yellow-100'
-                                : 'border-gray-200 hover:border-gray-300'
-                            }`}
+                          className={`bg-white rounded-xl border-2 p-5 transition-all shadow-sm hover:shadow-md ${
+                            isSelected
+                              ? 'border-blue-500 bg-blue-50 shadow-blue-100'
+                              : isVencida && fatura.status === StatusFatura.PENDENTE
+                                ? 'border-red-400 bg-red-50 shadow-red-100'
+                                : diasVencimento <= 7 &&
+                                    diasVencimento > 0 &&
+                                    fatura.status === StatusFatura.PENDENTE
+                                  ? 'border-yellow-400 bg-yellow-50 shadow-yellow-100'
+                                  : 'border-gray-200 hover:border-gray-300'
+                          }`}
                         >
                           {/* Header do card aprimorado */}
                           <div className="flex items-start justify-between mb-4">
@@ -1600,18 +1742,24 @@ export default function FaturamentoPage() {
                                 onChange={() => toggleSelecaoFatura(fatura.id)}
                                 className="w-4 h-4 text-[#159A9C] bg-gray-100 border-gray-300 rounded focus:ring-[#159A9C] focus:ring-2"
                               />
-                              <div className={`w-12 h-12 bg-gradient-to-br ${fatura.status === StatusFatura.PAGA
-                                ? 'from-green-100 to-green-200'
-                                : isVencida
-                                  ? 'from-red-100 to-red-200'
-                                  : 'from-blue-100 to-blue-200'
-                                } rounded-xl flex items-center justify-center shadow-sm`}>
-                                <FileText className={`w-6 h-6 ${fatura.status === StatusFatura.PAGA
-                                  ? 'text-green-600'
-                                  : isVencida
-                                    ? 'text-red-600'
-                                    : 'text-blue-600'
-                                  }`} />
+                              <div
+                                className={`w-12 h-12 bg-gradient-to-br ${
+                                  fatura.status === StatusFatura.PAGA
+                                    ? 'from-green-100 to-green-200'
+                                    : isVencida
+                                      ? 'from-red-100 to-red-200'
+                                      : 'from-blue-100 to-blue-200'
+                                } rounded-xl flex items-center justify-center shadow-sm`}
+                              >
+                                <FileText
+                                  className={`w-6 h-6 ${
+                                    fatura.status === StatusFatura.PAGA
+                                      ? 'text-green-600'
+                                      : isVencida
+                                        ? 'text-red-600'
+                                        : 'text-blue-600'
+                                  }`}
+                                />
                               </div>
                               <div>
                                 <div className="font-bold text-gray-900 text-lg">
@@ -1625,9 +1773,13 @@ export default function FaturamentoPage() {
 
                             {/* Status e badges aprimorados */}
                             <div className="flex flex-col items-end gap-2">
-                              <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${getStatusColor(fatura.status)} shadow-sm`}>
+                              <span
+                                className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${getStatusColor(fatura.status)} shadow-sm`}
+                              >
                                 {getStatusIcon(fatura.status)}
-                                <span className="ml-1.5">{faturamentoService.formatarStatusFatura(fatura.status)}</span>
+                                <span className="ml-1.5">
+                                  {faturamentoService.formatarStatusFatura(fatura.status)}
+                                </span>
                               </span>
                               {isVencida && fatura.status === StatusFatura.PENDENTE && (
                                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 animate-pulse">
@@ -1635,12 +1787,14 @@ export default function FaturamentoPage() {
                                   VENCIDA
                                 </span>
                               )}
-                              {diasVencimento <= 7 && diasVencimento > 0 && fatura.status === StatusFatura.PENDENTE && (
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                  <Clock className="w-3 h-3 mr-1" />
-                                  {diasVencimento} dia{diasVencimento !== 1 ? 's' : ''}
-                                </span>
-                              )}
+                              {diasVencimento <= 7 &&
+                                diasVencimento > 0 &&
+                                fatura.status === StatusFatura.PENDENTE && (
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                    <Clock className="w-3 h-3 mr-1" />
+                                    {diasVencimento} dia{diasVencimento !== 1 ? 's' : ''}
+                                  </span>
+                                )}
                             </div>
                           </div>
 
@@ -1655,7 +1809,10 @@ export default function FaturamentoPage() {
                                 {obterNomeCliente(fatura.cliente, fatura.clienteId)}
                               </div>
                               {obterEmailCliente(fatura.cliente) && (
-                                <div className="text-sm text-gray-500 truncate mt-1" title={obterEmailCliente(fatura.cliente)!}>
+                                <div
+                                  className="text-sm text-gray-500 truncate mt-1"
+                                  title={obterEmailCliente(fatura.cliente)!}
+                                >
                                   {obterEmailCliente(fatura.cliente)}
                                 </div>
                               )}
@@ -1666,9 +1823,10 @@ export default function FaturamentoPage() {
                                 Valor
                               </label>
                               <div className="text-xl font-bold text-gray-900 mt-1">
-                                R$ {Number(fatura.valorTotal).toLocaleString('pt-BR', {
+                                R${' '}
+                                {Number(fatura.valorTotal).toLocaleString('pt-BR', {
                                   minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2
+                                  maximumFractionDigits: 2,
                                 })}
                               </div>
                               {fatura.formaPagamento && (
@@ -1692,36 +1850,46 @@ export default function FaturamentoPage() {
                                 <Calendar className="w-3 h-3" />
                                 Vencimento
                               </label>
-                              <div className={`font-semibold mt-1 ${isVencida
-                                ? 'text-red-600'
-                                : diasVencimento <= 7 && diasVencimento > 0 && fatura.status === StatusFatura.PENDENTE
-                                  ? 'text-yellow-600'
-                                  : 'text-gray-900'
-                                }`}>
+                              <div
+                                className={`font-semibold mt-1 ${
+                                  isVencida
+                                    ? 'text-red-600'
+                                    : diasVencimento <= 7 &&
+                                        diasVencimento > 0 &&
+                                        fatura.status === StatusFatura.PENDENTE
+                                      ? 'text-yellow-600'
+                                      : 'text-gray-900'
+                                }`}
+                              >
                                 {dataVencimento.toLocaleDateString('pt-BR', {
                                   day: '2-digit',
                                   month: '2-digit',
-                                  year: 'numeric'
+                                  year: 'numeric',
                                 })}
                                 {isVencida && (
                                   <div className="text-xs text-red-500 font-normal mt-1">
-                                    Venceu há {Math.abs(diasVencimento)} dia{Math.abs(diasVencimento) !== 1 ? 's' : ''}
+                                    Venceu há {Math.abs(diasVencimento)} dia
+                                    {Math.abs(diasVencimento) !== 1 ? 's' : ''}
                                   </div>
                                 )}
-                                {diasVencimento <= 7 && diasVencimento > 0 && fatura.status === StatusFatura.PENDENTE && (
-                                  <div className="text-xs text-yellow-500 font-normal mt-1">
-                                    Vence em {diasVencimento} dia{diasVencimento !== 1 ? 's' : ''}
-                                  </div>
-                                )}
+                                {diasVencimento <= 7 &&
+                                  diasVencimento > 0 &&
+                                  fatura.status === StatusFatura.PENDENTE && (
+                                    <div className="text-xs text-yellow-500 font-normal mt-1">
+                                      Vence em {diasVencimento} dia{diasVencimento !== 1 ? 's' : ''}
+                                    </div>
+                                  )}
                               </div>
                             </div>
                             <div className="bg-gray-50 rounded-lg p-3">
-                              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Emissão</label>
+                              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                Emissão
+                              </label>
                               <div className="text-gray-900 font-semibold mt-1">
                                 {dataEmissao.toLocaleDateString('pt-BR', {
                                   day: '2-digit',
                                   month: '2-digit',
-                                  year: 'numeric'
+                                  year: 'numeric',
                                 })}
                               </div>
                             </div>
@@ -1737,15 +1905,16 @@ export default function FaturamentoPage() {
                                 <Eye className="w-4 h-4" />
                                 Ver
                               </button>
-                              {fatura.status !== StatusFatura.PAGA && fatura.status !== StatusFatura.CANCELADA && (
-                                <button
-                                  onClick={() => abrirModalEdicao(fatura)}
-                                  className="px-4 py-2 text-sm text-[#159A9C] hover:text-[#0F7B7D] hover:bg-[#159A9C]/10 rounded-lg transition-all duration-200 flex items-center gap-2 border border-[#159A9C] hover:border-[#0F7B7D] shadow-sm hover:shadow-md font-medium"
-                                >
-                                  <Edit3 className="w-4 h-4" />
-                                  Editar
-                                </button>
-                              )}
+                              {fatura.status !== StatusFatura.PAGA &&
+                                fatura.status !== StatusFatura.CANCELADA && (
+                                  <button
+                                    onClick={() => abrirModalEdicao(fatura)}
+                                    className="px-4 py-2 text-sm text-[#159A9C] hover:text-[#0F7B7D] hover:bg-[#159A9C]/10 rounded-lg transition-all duration-200 flex items-center gap-2 border border-[#159A9C] hover:border-[#0F7B7D] shadow-sm hover:shadow-md font-medium"
+                                  >
+                                    <Edit3 className="w-4 h-4" />
+                                    Editar
+                                  </button>
+                                )}
                               {fatura.status !== StatusFatura.PAGA && (
                                 <button
                                   onClick={() => abrirModalPagamentos(fatura)}
@@ -1846,10 +2015,12 @@ export default function FaturamentoPage() {
                         <span className="text-gray-600">Página atual:</span>
                         <span className="font-bold text-blue-700 tabular-nums whitespace-nowrap">
                           <span className="text-gray-500 mr-1 font-normal">R$</span>
-                          {faturasFiltradas.reduce((acc, f) => acc + Number(f.valorTotal || 0), 0).toLocaleString('pt-BR', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
-                          })}
+                          {faturasFiltradas
+                            .reduce((acc, f) => acc + Number(f.valorTotal || 0), 0)
+                            .toLocaleString('pt-BR', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
                         </span>
                         <span className="text-gray-500">({faturasFiltradas.length} itens)</span>
                       </div>
@@ -1861,7 +2032,7 @@ export default function FaturamentoPage() {
                           <span className="text-gray-500 mr-1 font-normal">R$</span>
                           {Number(aggregates?.valorRecebido ?? 0).toLocaleString('pt-BR', {
                             minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
+                            maximumFractionDigits: 2,
                           })}
                         </span>
                       </div>
@@ -1873,7 +2044,7 @@ export default function FaturamentoPage() {
                           <span className="text-gray-500 mr-1 font-normal">R$</span>
                           {Number(aggregates?.valorEmAberto ?? 0).toLocaleString('pt-BR', {
                             minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
+                            maximumFractionDigits: 2,
                           })}
                         </span>
                       </div>
@@ -1894,7 +2065,15 @@ export default function FaturamentoPage() {
                   <div className="flex flex-col lg:flex-row items-center justify-between gap-4 px-6 py-4 border-t bg-white">
                     <div className="text-sm text-gray-600 flex items-center gap-2">
                       <FileText className="w-4 h-4 text-gray-400" />
-                      Mostrando <span className="font-semibold tabular-nums">{(page - 1) * pageSize + 1}</span> - <span className="font-semibold tabular-nums">{Math.min(page * pageSize, total)}</span> de <span className="font-semibold tabular-nums">{total}</span> faturas
+                      Mostrando{' '}
+                      <span className="font-semibold tabular-nums">
+                        {(page - 1) * pageSize + 1}
+                      </span>{' '}
+                      -{' '}
+                      <span className="font-semibold tabular-nums">
+                        {Math.min(page * pageSize, total)}
+                      </span>{' '}
+                      de <span className="font-semibold tabular-nums">{total}</span> faturas
                     </div>
 
                     <div className="flex items-center gap-4">
@@ -1925,7 +2104,9 @@ export default function FaturamentoPage() {
                             className="w-16 px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                             aria-label="Número da página"
                           />
-                          <span className="text-sm text-gray-600">de {Math.max(1, Math.ceil(total / pageSize))}</span>
+                          <span className="text-sm text-gray-600">
+                            de {Math.max(1, Math.ceil(total / pageSize))}
+                          </span>
                         </div>
 
                         <button
@@ -1965,42 +2146,27 @@ export default function FaturamentoPage() {
 
         {/* Visão de Dashboard IA */}
         {visaoAtiva === 'ia' && (
-          <DashboardIA
-            faturas={faturas}
-            onExecutarAcao={handleAcaoNotificacao}
-          />
+          <DashboardIA faturas={faturas} onExecutarAcao={handleAcaoNotificacao} />
         )}
 
         {/* Visão de Relatórios Avançados */}
         {visaoAtiva === 'relatorios' && (
-          <RelatoriosAvancados
-            faturas={faturas}
-            onExportar={handleExportarRelatorio}
-          />
+          <RelatoriosAvancados faturas={faturas} onExportar={handleExportarRelatorio} />
         )}
 
         {/* Visão de Automação de Emails */}
         {visaoAtiva === 'email' && (
-          <EmailAutomacao
-            faturas={faturas}
-            onEnviarEmail={handleEnviarEmail}
-          />
+          <EmailAutomacao faturas={faturas} onEnviarEmail={handleEnviarEmail} />
         )}
 
         {/* Visão de Workflows */}
         {visaoAtiva === 'workflows' && (
-          <WorkflowAutomacao
-            faturas={faturas}
-            onExecutarAcao={handleExecutarWorkflow}
-          />
+          <WorkflowAutomacao faturas={faturas} onExecutarAcao={handleExecutarWorkflow} />
         )}
 
         {/* Visão de Notificações */}
         {visaoAtiva === 'notificacoes' && (
-          <NotificacoesInteligentes
-            faturas={faturas}
-            onAcaoNotificacao={handleAcaoNotificacao}
-          />
+          <NotificacoesInteligentes faturas={faturas} onAcaoNotificacao={handleAcaoNotificacao} />
         )}
 
         {/* Visão de Backup e Recuperação */}
@@ -2074,7 +2240,7 @@ export default function FaturamentoPage() {
 
       {/* Sistema de Notificações */}
       {notificacao.notificacoes.map((notif, index) => (
-        <div key={notif.id} style={{ top: `${(index * 110) + 16}px` }}>
+        <div key={notif.id} style={{ top: `${index * 110 + 16}px` }}>
           <NotificacaoSucesso
             isOpen={true}
             tipo={notif.tipo}

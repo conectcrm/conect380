@@ -9,7 +9,7 @@
 
 ### **1️⃣ Callback URL**
 ```
-https://4f1d295b3b6e.ngrok-free.app/api/atendimento/webhooks/whatsapp
+https://4f1d295b3b6e.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
 ```
 
 ### **2️⃣ Verify Token**
@@ -28,7 +28,7 @@ Marque estas opções:
 
 **Teste realizado com sucesso:**
 ```
-GET http://localhost:3001/api/atendimento/webhooks/whatsapp
+GET http://localhost:3001/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
     ?hub.mode=subscribe
     &hub.verify_token=conectcrm_webhook_token_123
     &hub.challenge=TEST123
@@ -68,17 +68,18 @@ http://127.0.0.1:4040
 3. **Vá em:** WhatsApp > Configuration
 4. **Cole Callback URL:**
    ```
-   https://4f1d295b3b6e.ngrok-free.app/api/atendimento/webhooks/whatsapp
+   https://4f1d295b3b6e.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
    ```
 5. **Cole Verify Token:**
    ```
    conectcrm_webhook_token_123
    ```
-6. **Marque os eventos:**
+6. **Configure o App Secret (para assinar o webhook) e certifique-se de que o Meta envia o header `X-Hub-Signature-256`.**
+7. **Marque os eventos:**
    - ☑️ messages
    - ☑️ message_status
-7. **Clique em:** "Verify and Save"
-8. **Aguarde:** ✅ "Webhook verified successfully"
+8. **Clique em:** "Verify and Save"
+9. **Aguarde:** ✅ "Webhook verified successfully"
 
 ---
 
@@ -124,7 +125,8 @@ http://127.0.0.1:4040
 ### **Erro: "Callback verification failed"**
 1. Verifique se backend está rodando
 2. Teste: http://localhost:3001
-3. Confira URL completa (com `/api/atendimento/webhooks/whatsapp`)
+3. Confira URL completa (com `/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>`)
+4. Garanta que o header `X-Hub-Signature-256` esteja chegando no backend
 4. Confira verify token exatamente como está
 
 ### **Ver Dashboard ngrok:**

@@ -35,25 +35,56 @@ const clienteSchema = yup.object({
   cidade: yup.string(),
   estado: yup.string(),
   cep: yup.string(),
-  observacoes: yup.string().max(500, 'Observações não podem ter mais de 500 caracteres')
+  observacoes: yup.string().max(500, 'Observações não podem ter mais de 500 caracteres'),
 });
 
 const estados = [
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 
-  'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+  'AC',
+  'AL',
+  'AP',
+  'AM',
+  'BA',
+  'CE',
+  'DF',
+  'ES',
+  'GO',
+  'MA',
+  'MT',
+  'MS',
+  'MG',
+  'PA',
+  'PB',
+  'PR',
+  'PE',
+  'PI',
+  'RJ',
+  'RN',
+  'RS',
+  'RO',
+  'RR',
+  'SC',
+  'SP',
+  'SE',
+  'TO',
 ];
 
 export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
   isOpen,
   onClose,
   onClienteCriado,
-  isLoading = false
+  isLoading = false,
 }) => {
-  const { control, handleSubmit, watch, reset, formState: { errors, isValid } } = useForm<ClienteFormData>({
+  const {
+    control,
+    handleSubmit,
+    watch,
+    reset,
+    formState: { errors, isValid },
+  } = useForm<ClienteFormData>({
     resolver: yupResolver(clienteSchema),
     defaultValues: {
-      tipo: 'pessoa_juridica'
-    }
+      tipo: 'pessoa_juridica',
+    },
   });
 
   const tipoSelecionado = watch('tipo');
@@ -64,12 +95,12 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
       const novoCliente = {
         id: Date.now().toString(),
         ...data,
-        status: 'prospect' as const
+        status: 'prospect' as const,
       };
 
       // Aqui faria a chamada para a API
       // const cliente = await clientesService.create(data);
-      
+
       toast.success(`Cliente ${data.nome} criado com sucesso!`);
       onClienteCriado(novoCliente);
       reset();
@@ -101,7 +132,6 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            
             {/* Tipo de Pessoa */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -135,14 +165,11 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
                   </div>
                 )}
               />
-              {errors.tipo && (
-                <p className="text-sm text-red-600 mt-1">{errors.tipo.message}</p>
-              )}
+              {errors.tipo && <p className="text-sm text-red-600 mt-1">{errors.tipo.message}</p>}
             </div>
 
             {/* Grid de campos principais */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
               {/* Nome */}
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -158,21 +185,19 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
                         {...field}
                         type="text"
                         className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C]"
-                        placeholder={tipoSelecionado === 'pessoa_fisica' ? 'João Silva' : 'Empresa XYZ Ltda'}
+                        placeholder={
+                          tipoSelecionado === 'pessoa_fisica' ? 'João Silva' : 'Empresa XYZ Ltda'
+                        }
                       />
                     </div>
                   )}
                 />
-                {errors.nome && (
-                  <p className="text-sm text-red-600 mt-1">{errors.nome.message}</p>
-                )}
+                {errors.nome && <p className="text-sm text-red-600 mt-1">{errors.nome.message}</p>}
               </div>
 
               {/* Email */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                 <Controller
                   name="email"
                   control={control}
@@ -195,9 +220,7 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
 
               {/* Telefone */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Telefone
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
                 <Controller
                   name="telefone"
                   control={control}
@@ -230,7 +253,11 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
                         {...field}
                         type="text"
                         className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C]"
-                        placeholder={tipoSelecionado === 'pessoa_fisica' ? '000.000.000-00' : '00.000.000/0000-00'}
+                        placeholder={
+                          tipoSelecionado === 'pessoa_fisica'
+                            ? '000.000.000-00'
+                            : '00.000.000/0000-00'
+                        }
                       />
                     </div>
                   )}
@@ -242,9 +269,7 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
 
               {/* CEP */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  CEP
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
                 <Controller
                   name="cep"
                   control={control}
@@ -261,9 +286,7 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
 
               {/* Endereço */}
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Endereço
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Endereço</label>
                 <Controller
                   name="endereco"
                   control={control}
@@ -283,9 +306,7 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
 
               {/* Cidade */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cidade
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
                 <Controller
                   name="cidade"
                   control={control}
@@ -302,9 +323,7 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
 
               {/* Estado */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Estado
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
                 <Controller
                   name="estado"
                   control={control}
@@ -314,8 +333,10 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C]"
                     >
                       <option value="">Selecionar</option>
-                      {estados.map(estado => (
-                        <option key={estado} value={estado}>{estado}</option>
+                      {estados.map((estado) => (
+                        <option key={estado} value={estado}>
+                          {estado}
+                        </option>
                       ))}
                     </select>
                   )}
@@ -324,9 +345,7 @@ export const ModalNovoCliente: React.FC<ModalNovoClienteProps> = ({
 
               {/* Observações */}
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Observações
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
                 <Controller
                   name="observacoes"
                   control={control}

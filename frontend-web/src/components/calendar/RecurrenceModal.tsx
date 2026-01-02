@@ -1,13 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Calendar,
-  Clock,
-  RotateCcw,
-  Settings,
-  X,
-  Check,
-  AlertTriangle
-} from 'lucide-react';
+import { Calendar, Clock, RotateCcw, Settings, X, Check, AlertTriangle } from 'lucide-react';
 
 interface RecurrencePattern {
   type: 'daily' | 'weekly' | 'monthly' | 'yearly';
@@ -32,14 +24,14 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
   onClose,
   onSave,
   startDate,
-  eventTitle
+  eventTitle,
 }) => {
   const [pattern, setPattern] = useState<RecurrencePattern>({
     type: 'weekly',
     interval: 1,
     daysOfWeek: [],
     endType: 'occurrences',
-    occurrences: 10
+    occurrences: 10,
   });
 
   const [preview, setPreview] = useState<Date[]>([]);
@@ -47,8 +39,18 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
   // Nomes dos dias da semana
   const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   const monthNames = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    'Janeiro',
+    'Fevereiro',
+    'Março',
+    'Abril',
+    'Maio',
+    'Junho',
+    'Julho',
+    'Agosto',
+    'Setembro',
+    'Outubro',
+    'Novembro',
+    'Dezembro',
   ];
 
   // Calcular preview das próximas ocorrências
@@ -73,9 +75,7 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
           if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
             // Para eventos semanais com dias específicos
             const currentDayOfWeek = current.getDay();
-            const nextDays = pattern.daysOfWeek
-              .filter(day => day > currentDayOfWeek)
-              .sort();
+            const nextDays = pattern.daysOfWeek.filter((day) => day > currentDayOfWeek).sort();
 
             if (nextDays.length > 0) {
               const nextDay = nextDays[0];
@@ -86,7 +86,7 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
               next.setDate(current.getDate() + (7 - currentDayOfWeek + firstDay));
             }
           } else {
-            next.setDate(current.getDate() + (7 * pattern.interval));
+            next.setDate(current.getDate() + 7 * pattern.interval);
           }
           break;
 
@@ -133,7 +133,10 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
       return;
     }
 
-    if (pattern.endType === 'date' && (!pattern.endDate || new Date(pattern.endDate) <= new Date(startDate))) {
+    if (
+      pattern.endType === 'date' &&
+      (!pattern.endDate || new Date(pattern.endDate) <= new Date(startDate))
+    ) {
       alert('Data final deve ser posterior à data inicial');
       return;
     }
@@ -144,10 +147,10 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
   const toggleDayOfWeek = (day: number) => {
     const current = pattern.daysOfWeek || [];
     const updated = current.includes(day)
-      ? current.filter(d => d !== day)
+      ? current.filter((d) => d !== day)
       : [...current, day].sort();
 
-    setPattern(prev => ({ ...prev, daysOfWeek: updated }));
+    setPattern((prev) => ({ ...prev, daysOfWeek: updated }));
   };
 
   const getRecurrenceDescription = (): string => {
@@ -160,10 +163,11 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
         break;
       case 'weekly':
         if (daysOfWeek && daysOfWeek.length > 0) {
-          const dayLabels = daysOfWeek.map(d => dayNames[d]).join(', ');
-          base = interval === 1
-            ? `Toda semana: ${dayLabels}`
-            : `A cada ${interval} semanas: ${dayLabels}`;
+          const dayLabels = daysOfWeek.map((d) => dayNames[d]).join(', ');
+          base =
+            interval === 1
+              ? `Toda semana: ${dayLabels}`
+              : `A cada ${interval} semanas: ${dayLabels}`;
         } else {
           base = interval === 1 ? 'Toda semana' : `A cada ${interval} semanas`;
         }
@@ -200,17 +204,10 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              Configurar Recorrência
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              {eventTitle}
-            </p>
+            <h2 className="text-xl font-semibold text-gray-900">Configurar Recorrência</h2>
+            <p className="text-sm text-gray-600 mt-1">{eventTitle}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -222,24 +219,23 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
 
             {/* Tipo de recorrência */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Repetir
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Repetir</label>
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { value: 'daily', label: 'Diariamente' },
                   { value: 'weekly', label: 'Semanalmente' },
                   { value: 'monthly', label: 'Mensalmente' },
-                  { value: 'yearly', label: 'Anualmente' }
-                ].map(option => (
+                  { value: 'yearly', label: 'Anualmente' },
+                ].map((option) => (
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => setPattern(prev => ({ ...prev, type: option.value as any }))}
-                    className={`p-3 text-sm font-medium rounded-lg border transition-colors ${pattern.type === option.value
-                      ? 'bg-[#159A9C] text-white border-[#159A9C]'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                      }`}
+                    onClick={() => setPattern((prev) => ({ ...prev, type: option.value as any }))}
+                    className={`p-3 text-sm font-medium rounded-lg border transition-colors ${
+                      pattern.type === option.value
+                        ? 'bg-[#159A9C] text-white border-[#159A9C]'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
                   >
                     {option.label}
                   </button>
@@ -249,9 +245,7 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
 
             {/* Intervalo */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Intervalo
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Intervalo</label>
               <div className="flex items-center space-x-2">
                 <span className="text-sm text-gray-600">A cada</span>
                 <input
@@ -259,10 +253,12 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
                   min="1"
                   max="99"
                   value={pattern.interval}
-                  onChange={(e) => setPattern(prev => ({
-                    ...prev,
-                    interval: parseInt(e.target.value) || 1
-                  }))}
+                  onChange={(e) =>
+                    setPattern((prev) => ({
+                      ...prev,
+                      interval: parseInt(e.target.value) || 1,
+                    }))
+                  }
                   className="w-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                 />
                 <span className="text-sm text-gray-600">
@@ -286,10 +282,11 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
                       key={index}
                       type="button"
                       onClick={() => toggleDayOfWeek(index)}
-                      className={`w-10 h-10 text-sm font-medium rounded-lg border transition-colors ${pattern.daysOfWeek?.includes(index)
-                        ? 'bg-[#159A9C] text-white border-[#159A9C]'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                        }`}
+                      className={`w-10 h-10 text-sm font-medium rounded-lg border transition-colors ${
+                        pattern.daysOfWeek?.includes(index)
+                          ? 'bg-[#159A9C] text-white border-[#159A9C]'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
                     >
                       {day}
                     </button>
@@ -300,16 +297,14 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
 
             {/* Fim da recorrência */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Terminar
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Terminar</label>
               <div className="space-y-3">
                 <label className="flex items-center space-x-2">
                   <input
                     type="radio"
                     name="endType"
                     checked={pattern.endType === 'never'}
-                    onChange={() => setPattern(prev => ({ ...prev, endType: 'never' }))}
+                    onChange={() => setPattern((prev) => ({ ...prev, endType: 'never' }))}
                     className="text-[#159A9C] focus:ring-[#159A9C]"
                   />
                   <span className="text-sm text-gray-700">Nunca</span>
@@ -320,14 +315,14 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
                     type="radio"
                     name="endType"
                     checked={pattern.endType === 'date'}
-                    onChange={() => setPattern(prev => ({ ...prev, endType: 'date' }))}
+                    onChange={() => setPattern((prev) => ({ ...prev, endType: 'date' }))}
                     className="text-[#159A9C] focus:ring-[#159A9C]"
                   />
                   <span className="text-sm text-gray-700">Em</span>
                   <input
                     type="date"
                     value={pattern.endDate || ''}
-                    onChange={(e) => setPattern(prev => ({ ...prev, endDate: e.target.value }))}
+                    onChange={(e) => setPattern((prev) => ({ ...prev, endDate: e.target.value }))}
                     disabled={pattern.endType !== 'date'}
                     className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#159A9C] disabled:bg-gray-100"
                   />
@@ -338,7 +333,7 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
                     type="radio"
                     name="endType"
                     checked={pattern.endType === 'occurrences'}
-                    onChange={() => setPattern(prev => ({ ...prev, endType: 'occurrences' }))}
+                    onChange={() => setPattern((prev) => ({ ...prev, endType: 'occurrences' }))}
                     className="text-[#159A9C] focus:ring-[#159A9C]"
                   />
                   <span className="text-sm text-gray-700">Após</span>
@@ -347,10 +342,12 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
                     min="2"
                     max="999"
                     value={pattern.occurrences || ''}
-                    onChange={(e) => setPattern(prev => ({
-                      ...prev,
-                      occurrences: parseInt(e.target.value) || 2
-                    }))}
+                    onChange={(e) =>
+                      setPattern((prev) => ({
+                        ...prev,
+                        occurrences: parseInt(e.target.value) || 2,
+                      }))
+                    }
                     disabled={pattern.endType !== 'occurrences'}
                     className="w-20 px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#159A9C] disabled:bg-gray-100"
                   />
@@ -364,12 +361,8 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
               <div className="flex items-start space-x-2">
                 <RotateCcw className="w-5 h-5 text-blue-600 mt-0.5" />
                 <div>
-                  <h4 className="text-sm font-medium text-blue-900 mb-1">
-                    Resumo da Recorrência
-                  </h4>
-                  <p className="text-sm text-blue-700">
-                    {getRecurrenceDescription()}
-                  </p>
+                  <h4 className="text-sm font-medium text-blue-900 mb-1">Resumo da Recorrência</h4>
+                  <p className="text-sm text-blue-700">{getRecurrenceDescription()}</p>
                 </div>
               </div>
             </div>
@@ -391,12 +384,16 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
                 {preview.slice(0, 10).map((date, index) => (
                   <div
                     key={index}
-                    className={`flex items-center justify-between p-2 rounded-md ${index === 0 ? 'bg-[#159A9C] text-white' : 'bg-white'
-                      }`}
+                    className={`flex items-center justify-between p-2 rounded-md ${
+                      index === 0 ? 'bg-[#159A9C] text-white' : 'bg-white'
+                    }`}
                   >
                     <div className="flex items-center space-x-3">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${index === 0 ? 'bg-white text-[#159A9C]' : 'bg-gray-100 text-gray-600'
-                        }`}>
+                      <div
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                          index === 0 ? 'bg-white text-[#159A9C]' : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
                         {index + 1}
                       </div>
                       <span className="text-sm font-medium">
@@ -404,13 +401,16 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
                           weekday: 'short',
                           day: '2-digit',
                           month: 'short',
-                          year: 'numeric'
+                          year: 'numeric',
                         })}
                       </span>
                     </div>
                     {index === 0 && (
-                      <span className={`text-xs px-2 py-1 rounded-full ${index === 0 ? 'bg-white text-[#159A9C]' : 'bg-gray-200 text-gray-600'
-                        }`}>
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full ${
+                          index === 0 ? 'bg-white text-[#159A9C]' : 'bg-gray-200 text-gray-600'
+                        }`}
+                      >
                         Original
                       </span>
                     )}
@@ -430,9 +430,7 @@ export const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
               <div className="flex items-start space-x-2">
                 <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
                 <div>
-                  <h4 className="text-sm font-medium text-amber-900 mb-1">
-                    Importante
-                  </h4>
+                  <h4 className="text-sm font-medium text-amber-900 mb-1">Importante</h4>
                   <ul className="text-sm text-amber-700 space-y-1">
                     <li>• Todas as ocorrências terão as mesmas configurações</li>
                     <li>• Alterações na série afetarão todos os eventos futuros</li>

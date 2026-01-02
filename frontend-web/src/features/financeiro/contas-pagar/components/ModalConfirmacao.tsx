@@ -24,7 +24,7 @@ const ModalConfirmacao: React.FC<ModalConfirmacaoProps> = ({
   mensagem,
   tipo,
   loading = false,
-  dados
+  dados,
 }) => {
   if (!isOpen) return null;
 
@@ -48,28 +48,28 @@ const ModalConfirmacao: React.FC<ModalConfirmacaoProps> = ({
           bg: 'bg-red-50',
           border: 'border-red-200',
           confirmBtn: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
-          confirmText: 'text-white'
+          confirmText: 'text-white',
         };
       case 'pagar':
         return {
           bg: 'bg-green-50',
           border: 'border-green-200',
           confirmBtn: 'bg-green-600 hover:bg-green-700 focus:ring-green-500',
-          confirmText: 'text-white'
+          confirmText: 'text-white',
         };
       case 'exportar':
         return {
           bg: 'bg-blue-50',
           border: 'border-blue-200',
           confirmBtn: 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500',
-          confirmText: 'text-white'
+          confirmText: 'text-white',
         };
       default:
         return {
           bg: 'bg-yellow-50',
           border: 'border-yellow-200',
           confirmBtn: 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500',
-          confirmText: 'text-white'
+          confirmText: 'text-white',
         };
     }
   };
@@ -79,7 +79,7 @@ const ModalConfirmacao: React.FC<ModalConfirmacaoProps> = ({
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -91,9 +91,7 @@ const ModalConfirmacao: React.FC<ModalConfirmacaoProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               {getIcon()}
-              <h3 className="text-lg font-semibold text-gray-900">
-                {titulo}
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900">{titulo}</h3>
             </div>
             <button
               onClick={onClose}
@@ -107,9 +105,7 @@ const ModalConfirmacao: React.FC<ModalConfirmacaoProps> = ({
 
         {/* Body */}
         <div className="p-6">
-          <p className="text-gray-700 mb-4">
-            {mensagem}
-          </p>
+          <p className="text-gray-700 mb-4">{mensagem}</p>
 
           {/* Dados adicionais */}
           {dados && (
@@ -137,7 +133,10 @@ const ModalConfirmacao: React.FC<ModalConfirmacaoProps> = ({
                   <span className="text-sm font-medium text-gray-600 block mb-2">Itens:</span>
                   <div className="max-h-32 overflow-y-auto">
                     {dados.itens.map((item, index) => (
-                      <div key={index} className="text-sm text-gray-700 py-1 px-2 bg-white rounded mb-1">
+                      <div
+                        key={index}
+                        className="text-sm text-gray-700 py-1 px-2 bg-white rounded mb-1"
+                      >
                         {item}
                       </div>
                     ))}
@@ -179,10 +178,15 @@ const ModalConfirmacao: React.FC<ModalConfirmacaoProps> = ({
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
               )}
               <span>
-                {loading ? 'Processando...' :
-                  tipo === 'excluir' ? 'Excluir' :
-                    tipo === 'pagar' ? 'Confirmar Pagamento' :
-                      tipo === 'exportar' ? 'Exportar' : 'Confirmar'}
+                {loading
+                  ? 'Processando...'
+                  : tipo === 'excluir'
+                    ? 'Excluir'
+                    : tipo === 'pagar'
+                      ? 'Confirmar Pagamento'
+                      : tipo === 'exportar'
+                        ? 'Exportar'
+                        : 'Confirmar'}
               </span>
             </button>
           </div>

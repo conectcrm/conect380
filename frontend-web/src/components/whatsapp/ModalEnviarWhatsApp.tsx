@@ -10,7 +10,7 @@ import {
   FileText,
   Phone,
   User,
-  DollarSign
+  DollarSign,
 } from 'lucide-react';
 
 interface ModalEnviarWhatsAppProps {
@@ -43,14 +43,14 @@ const ModalEnviarWhatsApp: React.FC<ModalEnviarWhatsAppProps> = ({
   onClose,
   proposta,
   pdfBuffer,
-  onSuccess
+  onSuccess,
 }) => {
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [customMessage, setCustomMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [whatsappStatus, setWhatsappStatus] = useState<WhatsAppStatus>({
     isConnected: false,
-    isAuthenticated: false
+    isAuthenticated: false,
   });
   const [step, setStep] = useState<'check' | 'form' | 'sending' | 'success' | 'error'>('check');
   const [errorMessage, setErrorMessage] = useState('');
@@ -77,8 +77,8 @@ const ModalEnviarWhatsApp: React.FC<ModalEnviarWhatsAppProps> = ({
     try {
       const response = await fetch('/api/whatsapp/status', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
       });
 
       if (response.ok) {
@@ -104,9 +104,9 @@ const ModalEnviarWhatsApp: React.FC<ModalEnviarWhatsAppProps> = ({
       const response = await fetch('/api/whatsapp/initialize', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
       });
 
       if (response.ok) {
@@ -149,7 +149,7 @@ const ModalEnviarWhatsApp: React.FC<ModalEnviarWhatsAppProps> = ({
   const getDefaultMessage = (): string => {
     const valorFormatado = new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(proposta.valorTotal);
 
     return `🎯 *Nova Proposta Comercial*
@@ -211,9 +211,9 @@ _Enviado automaticamente pelo sistema ${proposta.empresa.nome}_`;
       const response = await fetch('/api/whatsapp/send-proposal', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
-        body: formData
+        body: formData,
       });
 
       const result = await response.json();
@@ -243,9 +243,7 @@ _Enviado automaticamente pelo sistema ${proposta.empresa.nome}_`;
         return (
           <div className="text-center py-6">
             <MessageCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Verificando WhatsApp
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Verificando WhatsApp</h3>
 
             {!whatsappStatus.isConnected ? (
               <div className="space-y-4">
@@ -293,10 +291,7 @@ _Enviado automaticamente pelo sistema ${proposta.empresa.nome}_`;
                   </p>
                 </div>
 
-                <Button
-                  onClick={() => setStep('form')}
-                  className="bg-blue-500 hover:bg-blue-600"
-                >
+                <Button onClick={() => setStep('form')} className="bg-blue-500 hover:bg-blue-600">
                   Continuar
                 </Button>
               </div>
@@ -327,7 +322,7 @@ _Enviado automaticamente pelo sistema ${proposta.empresa.nome}_`;
                   <p className="font-medium">
                     {new Intl.NumberFormat('pt-BR', {
                       style: 'currency',
-                      currency: 'BRL'
+                      currency: 'BRL',
                     }).format(proposta.valorTotal)}
                   </p>
                 </div>
@@ -389,8 +384,7 @@ _Enviado automaticamente pelo sistema ${proposta.empresa.nome}_`;
               <p className="text-sm text-blue-600 mt-1">
                 {pdfBuffer
                   ? 'O arquivo PDF da proposta será enviado junto com a mensagem.'
-                  : 'Apenas a mensagem será enviada, sem anexo.'
-                }
+                  : 'Apenas a mensagem será enviada, sem anexo.'}
               </p>
             </div>
           </div>
@@ -400,12 +394,8 @@ _Enviado automaticamente pelo sistema ${proposta.empresa.nome}_`;
         return (
           <div className="text-center py-8">
             <Loader2 className="w-16 h-16 text-blue-500 mx-auto mb-4 animate-spin" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Enviando Proposta...
-            </h3>
-            <p className="text-gray-600">
-              Aguarde enquanto enviamos a proposta via WhatsApp
-            </p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Enviando Proposta...</h3>
+            <p className="text-gray-600">Aguarde enquanto enviamos a proposta via WhatsApp</p>
           </div>
         );
 
@@ -413,17 +403,16 @@ _Enviado automaticamente pelo sistema ${proposta.empresa.nome}_`;
         return (
           <div className="text-center py-8">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Proposta Enviada!
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Proposta Enviada!</h3>
             <p className="text-gray-600 mb-4">
               A proposta foi enviada com sucesso para {formatNumber(whatsappNumber)}
             </p>
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <p className="text-sm text-green-700">
-                ✅ Cliente: {proposta.cliente.nome}<br />
-                ✅ Proposta: {proposta.numero}<br />
-                ✅ WhatsApp: {formatNumber(whatsappNumber)}<br />
+                ✅ Cliente: {proposta.cliente.nome}
+                <br />✅ Proposta: {proposta.numero}
+                <br />✅ WhatsApp: {formatNumber(whatsappNumber)}
+                <br />
                 {pdfBuffer && '✅ PDF anexado'}
               </p>
             </div>
@@ -434,23 +423,13 @@ _Enviado automaticamente pelo sistema ${proposta.empresa.nome}_`;
         return (
           <div className="text-center py-8">
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Erro ao Enviar
-            </h3>
-            <p className="text-gray-600 mb-4">
-              {errorMessage}
-            </p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Erro ao Enviar</h3>
+            <p className="text-gray-600 mb-4">{errorMessage}</p>
             <div className="flex justify-center gap-2">
-              <Button
-                onClick={() => setStep('form')}
-                variant="outline"
-              >
+              <Button onClick={() => setStep('form')} variant="outline">
                 Tentar Novamente
               </Button>
-              <Button
-                onClick={checkWhatsAppStatus}
-                className="bg-green-500 hover:bg-green-600"
-              >
+              <Button onClick={checkWhatsAppStatus} className="bg-green-500 hover:bg-green-600">
                 Verificar WhatsApp
               </Button>
             </div>
@@ -499,16 +478,9 @@ _Enviado automaticamente pelo sistema ${proposta.empresa.nome}_`;
   };
 
   return (
-    <BaseModal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Enviar via WhatsApp"
-      maxWidth="lg"
-    >
+    <BaseModal isOpen={isOpen} onClose={onClose} title="Enviar via WhatsApp" maxWidth="lg">
       {renderContent()}
-      <div className="flex justify-end gap-2 mt-6">
-        {renderFooter()}
-      </div>
+      <div className="flex justify-end gap-2 mt-6">{renderFooter()}</div>
     </BaseModal>
   );
 };

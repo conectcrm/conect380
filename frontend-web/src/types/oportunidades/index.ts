@@ -1,6 +1,18 @@
 // Importar e re-exportar enums do arquivo enums.ts
-import { EstagioOportunidade, PrioridadeOportunidade, OrigemOportunidade, TipoAtividade } from './enums';
-export { EstagioOportunidade, PrioridadeOportunidade, OrigemOportunidade, TipoAtividade };
+import {
+  EstagioOportunidade,
+  PrioridadeOportunidade,
+  OrigemOportunidade,
+  TipoAtividade,
+  MotivoPerda,
+} from './enums';
+export {
+  EstagioOportunidade,
+  PrioridadeOportunidade,
+  OrigemOportunidade,
+  TipoAtividade,
+  MotivoPerda,
+};
 
 export interface Oportunidade {
   id: number;
@@ -54,6 +66,15 @@ export interface Oportunidade {
   ultimaAtividade?: Date;
   tempoNoEstagio: string;
   probabilidadeVisual: 'baixa' | 'media' | 'alta';
+
+  // Novos campos: Motivo de Perda, SLA e Auto-Probability
+  motivoPerda?: MotivoPerda;
+  motivoPerdaDetalhes?: string;
+  concorrenteNome?: string;
+  dataRevisao?: Date | string;
+  dataUltimaMudancaEstagio?: Date | string;
+  diasNoEstagioAtual?: number;
+  precisaAtencao?: boolean;
 }
 
 export interface Atividade {

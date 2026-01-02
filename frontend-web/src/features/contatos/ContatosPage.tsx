@@ -16,7 +16,7 @@ import {
   List as ListIcon,
   Loader2,
   MoreVertical,
-  Eye
+  Eye,
 } from 'lucide-react';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import ModalNovoContato from '../../components/contatos/ModalNovoContato';
@@ -51,7 +51,7 @@ const ContatosPage: React.FC = () => {
       // Carregar tudo em paralelo
       const [contatosData, clientesData] = await Promise.all([
         contatosService.listarTodos(),
-        clientesService.getClientes({ limit: 1000 })
+        clientesService.getClientes({ limit: 1000 }),
       ]);
 
       setContatos(contatosData);
@@ -69,18 +69,19 @@ const ContatosPage: React.FC = () => {
 
     // Filtro por cliente
     if (clienteFiltro) {
-      resultado = resultado.filter(c => c.clienteId === clienteFiltro);
+      resultado = resultado.filter((c) => c.clienteId === clienteFiltro);
     }
 
     // Filtro por busca
     if (searchTerm) {
       const termo = searchTerm.toLowerCase();
-      resultado = resultado.filter(contato =>
-        contato.nome.toLowerCase().includes(termo) ||
-        contato.email?.toLowerCase().includes(termo) ||
-        contato.telefone.includes(termo) ||
-        contato.cargo?.toLowerCase().includes(termo) ||
-        contato.cliente?.nome.toLowerCase().includes(termo)
+      resultado = resultado.filter(
+        (contato) =>
+          contato.nome.toLowerCase().includes(termo) ||
+          contato.email?.toLowerCase().includes(termo) ||
+          contato.telefone.includes(termo) ||
+          contato.cargo?.toLowerCase().includes(termo) ||
+          contato.cliente?.nome.toLowerCase().includes(termo),
       );
     }
 
@@ -129,13 +130,13 @@ const ContatosPage: React.FC = () => {
   };
 
   // Cliente selecionado
-  const clienteSelecionado = clientes.find(c => c.id === clienteFiltro);
+  const clienteSelecionado = clientes.find((c) => c.id === clienteFiltro);
 
   // Estatísticas
   const totalContatos = contatosFiltrados.length;
-  const contatosPrincipais = contatosFiltrados.filter(c => c.principal).length;
-  const contatosAtivos = contatosFiltrados.filter(c => c.ativo).length;
-  const contatosComEmail = contatosFiltrados.filter(c => c.email).length;
+  const contatosPrincipais = contatosFiltrados.filter((c) => c.principal).length;
+  const contatosAtivos = contatosFiltrados.filter((c) => c.ativo).length;
+  const contatosComEmail = contatosFiltrados.filter((c) => c.email).length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -165,8 +166,7 @@ const ContatosPage: React.FC = () => {
                       ? 'Carregando contatos...'
                       : clienteFiltro && clienteSelecionado
                         ? `${totalContatos} contatos de ${clienteSelecionado.nome}`
-                        : `Gerencie seus ${totalContatos} contatos cadastrados`
-                    }
+                        : `Gerencie seus ${totalContatos} contatos cadastrados`}
                   </p>
                 </div>
                 <div className="mt-4 sm:mt-0 flex items-center gap-3">
@@ -188,9 +188,13 @@ const ContatosPage: React.FC = () => {
               <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Total de Contatos</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                      Total de Contatos
+                    </p>
                     <p className="mt-2 text-3xl font-bold text-[#002333]">{totalContatos}</p>
-                    <p className="mt-3 text-sm text-[#002333]/70">Base completa de contatos cadastrados no sistema.</p>
+                    <p className="mt-3 text-sm text-[#002333]/70">
+                      Base completa de contatos cadastrados no sistema.
+                    </p>
                   </div>
                   <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
                     <Users className="h-6 w-6 text-[#159A9C]" />
@@ -201,9 +205,13 @@ const ContatosPage: React.FC = () => {
               <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Principais</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                      Principais
+                    </p>
                     <p className="mt-2 text-3xl font-bold text-[#002333]">{contatosPrincipais}</p>
-                    <p className="mt-3 text-sm text-[#002333]/70">Contatos definidos como principais dos clientes.</p>
+                    <p className="mt-3 text-sm text-[#002333]/70">
+                      Contatos definidos como principais dos clientes.
+                    </p>
                   </div>
                   <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
                     <Star className="h-6 w-6 text-yellow-600" />
@@ -214,9 +222,13 @@ const ContatosPage: React.FC = () => {
               <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Ativos</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                      Ativos
+                    </p>
                     <p className="mt-2 text-3xl font-bold text-[#002333]">{contatosAtivos}</p>
-                    <p className="mt-3 text-sm text-[#002333]/70">Contatos ativos e disponíveis para comunicação.</p>
+                    <p className="mt-3 text-sm text-[#002333]/70">
+                      Contatos ativos e disponíveis para comunicação.
+                    </p>
                   </div>
                   <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
                     <User className="h-6 w-6 text-green-600" />
@@ -227,9 +239,13 @@ const ContatosPage: React.FC = () => {
               <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Com E-mail</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                      Com E-mail
+                    </p>
                     <p className="mt-2 text-3xl font-bold text-[#002333]">{contatosComEmail}</p>
-                    <p className="mt-3 text-sm text-[#002333]/70">Contatos com e-mail cadastrado para comunicação.</p>
+                    <p className="mt-3 text-sm text-[#002333]/70">
+                      Contatos com e-mail cadastrado para comunicação.
+                    </p>
                   </div>
                   <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
                     <Mail className="h-6 w-6 text-[#159A9C]" />
@@ -243,14 +259,16 @@ const ContatosPage: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
             <div className="flex flex-col sm:flex-row gap-4 items-end">
               <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Cliente (opcional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Filtrar por Cliente (opcional)
+                </label>
                 <select
                   value={clienteFiltro}
                   onChange={(e) => setClienteFiltro(e.target.value)}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent bg-white"
                 >
                   <option value="">Todos os clientes</option>
-                  {clientes.map(cliente => (
+                  {clientes.map((cliente) => (
                     <option key={cliente.id} value={cliente.id}>
                       {cliente.nome} {cliente.documento ? `- ${cliente.documento}` : ''}
                     </option>
@@ -259,7 +277,9 @@ const ContatosPage: React.FC = () => {
               </div>
 
               <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Buscar Contatos</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Buscar Contatos
+                </label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <input
@@ -274,24 +294,28 @@ const ContatosPage: React.FC = () => {
 
               {contatosFiltrados.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Modo de Visualização</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Modo de Visualização
+                  </label>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setViewMode('grid')}
-                      className={`p-2.5 rounded-lg transition-colors border ${viewMode === 'grid'
-                        ? 'bg-[#159A9C] text-white border-[#159A9C]'
-                        : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-300'
-                        }`}
+                      className={`p-2.5 rounded-lg transition-colors border ${
+                        viewMode === 'grid'
+                          ? 'bg-[#159A9C] text-white border-[#159A9C]'
+                          : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-300'
+                      }`}
                       title="Visualização em Grade"
                     >
                       <Grid3X3 className="w-5 h-5" />
                     </button>
                     <button
                       onClick={() => setViewMode('list')}
-                      className={`p-2.5 rounded-lg transition-colors border ${viewMode === 'list'
-                        ? 'bg-[#159A9C] text-white border-[#159A9C]'
-                        : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-300'
-                        }`}
+                      className={`p-2.5 rounded-lg transition-colors border ${
+                        viewMode === 'list'
+                          ? 'bg-[#159A9C] text-white border-[#159A9C]'
+                          : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-300'
+                      }`}
                       title="Visualização em Lista"
                     >
                       <ListIcon className="w-5 h-5" />
@@ -343,7 +367,7 @@ const ContatosPage: React.FC = () => {
           {/* Lista de Contatos - Grid */}
           {!loading && viewMode === 'grid' && contatosFiltrados.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {contatosFiltrados.map(contato => (
+              {contatosFiltrados.map((contato) => (
                 <div
                   key={contato.id}
                   className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow"
@@ -361,9 +385,7 @@ const ContatosPage: React.FC = () => {
                             <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                           )}
                         </h3>
-                        {contato.cargo && (
-                          <p className="text-sm text-gray-600">{contato.cargo}</p>
-                        )}
+                        {contato.cargo && <p className="text-sm text-gray-600">{contato.cargo}</p>}
                         {contato.cliente && (
                           <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
                             <Building className="w-3 h-3" />
@@ -423,9 +445,7 @@ const ContatosPage: React.FC = () => {
                   {/* Observações */}
                   {contato.observacoes && (
                     <div className="mt-4 pt-4 border-t border-gray-100">
-                      <p className="text-sm text-gray-500 line-clamp-2">
-                        {contato.observacoes}
-                      </p>
+                      <p className="text-sm text-gray-500 line-clamp-2">{contato.observacoes}</p>
                     </div>
                   )}
                 </div>
@@ -460,7 +480,7 @@ const ContatosPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {contatosFiltrados.map(contato => (
+                  {contatosFiltrados.map((contato) => (
                     <tr key={contato.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">

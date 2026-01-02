@@ -107,10 +107,7 @@ const GestaoFilasPage: React.FC = () => {
   const totalFilas = filas.length;
   const filasAtivas = filas.filter((f) => f.ativo).length;
   const filasInativas = filas.filter((f) => !f.ativo).length;
-  const totalAtendentes = filas.reduce(
-    (acc, f) => acc + (f.atendentes?.length || 0),
-    0,
-  );
+  const totalAtendentes = filas.reduce((acc, f) => acc + (f.atendentes?.length || 0), 0);
 
   // Filtro de busca
   const filasFiltradas = filas.filter(
@@ -226,10 +223,7 @@ const GestaoFilasPage: React.FC = () => {
       <div className="min-h-screen bg-gray-50">
         {/* Header com BackToNucleus */}
         <div className="bg-white border-b px-6 py-4">
-          <BackToNucleus
-            nucleusName="Atendimento"
-            nucleusPath="/atendimento"
-          />
+          <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
         </div>
 
         {/* Aviso de Empresa Não Selecionada */}
@@ -247,13 +241,13 @@ const GestaoFilasPage: React.FC = () => {
                   </p>
                   <div className="flex gap-3">
                     <button
-                      onClick={() => window.location.href = '/login'}
+                      onClick={() => (window.location.href = '/login')}
                       className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm font-medium"
                     >
                       Fazer Login
                     </button>
                     <button
-                      onClick={() => window.location.href = '/'}
+                      onClick={() => (window.location.href = '/')}
                       className="px-4 py-2 bg-white text-[#002333] border border-[#B4BEC9] rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
                     >
                       Voltar ao Início
@@ -272,10 +266,7 @@ const GestaoFilasPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header com BackToNucleus */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusName="Atendimento"
-          nucleusPath="/atendimento"
-        />
+        <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
       </div>
 
       {/* Container Principal */}
@@ -322,12 +313,8 @@ const GestaoFilasPage: React.FC = () => {
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
                     Total de Filas
                   </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {totalFilas}
-                  </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    Filas cadastradas no sistema
-                  </p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">{totalFilas}</p>
+                  <p className="mt-3 text-sm text-[#002333]/70">Filas cadastradas no sistema</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
                   <Users className="h-6 w-6 text-[#159A9C]" />
@@ -342,12 +329,8 @@ const GestaoFilasPage: React.FC = () => {
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
                     Filas Ativas
                   </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {filasAtivas}
-                  </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    Recebendo tickets atualmente
-                  </p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">{filasAtivas}</p>
+                  <p className="mt-3 text-sm text-[#002333]/70">Recebendo tickets atualmente</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
                   <CheckCircle className="h-6 w-6 text-green-600" />
@@ -362,12 +345,8 @@ const GestaoFilasPage: React.FC = () => {
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
                     Filas Inativas
                   </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {filasInativas}
-                  </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    Pausadas ou desabilitadas
-                  </p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">{filasInativas}</p>
+                  <p className="mt-3 text-sm text-[#002333]/70">Pausadas ou desabilitadas</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-gray-500/10 flex items-center justify-center shadow-sm">
                   <AlertCircle className="h-6 w-6 text-gray-600" />
@@ -382,12 +361,8 @@ const GestaoFilasPage: React.FC = () => {
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
                     Total Atendentes
                   </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {totalAtendentes}
-                  </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    Atendentes em todas as filas
-                  </p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">{totalAtendentes}</p>
+                  <p className="mt-3 text-sm text-[#002333]/70">Atendentes em todas as filas</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
                   <UserPlus className="h-6 w-6 text-[#159A9C]" />
@@ -415,10 +390,7 @@ const GestaoFilasPage: React.FC = () => {
             <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6 flex items-center gap-2">
               <AlertCircle className="h-5 w-5 flex-shrink-0" />
               <span className="text-sm">{error}</span>
-              <button
-                onClick={resetError}
-                className="ml-auto text-red-600 hover:text-red-800"
-              >
+              <button onClick={resetError} className="ml-auto text-red-600 hover:text-red-800">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -471,14 +443,13 @@ const GestaoFilasPage: React.FC = () => {
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-bold text-[#002333]">
-                            {fila.nome}
-                          </h3>
+                          <h3 className="text-lg font-bold text-[#002333]">{fila.nome}</h3>
                           <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${fila.ativo
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                              }`}
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              fila.ativo
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}
                           >
                             {fila.ativo ? 'Ativa' : 'Inativa'}
                           </span>
@@ -510,9 +481,12 @@ const GestaoFilasPage: React.FC = () => {
                       <div>
                         <p className="text-xs text-gray-500 mb-1">Estratégia</p>
                         <p className="text-sm font-medium text-gray-900">
-                          {fila.estrategiaDistribuicao === EstrategiaDistribuicao.ROUND_ROBIN && 'Round Robin'}
-                          {fila.estrategiaDistribuicao === EstrategiaDistribuicao.MENOR_CARGA && 'Menor Carga'}
-                          {fila.estrategiaDistribuicao === EstrategiaDistribuicao.PRIORIDADE && 'Por Prioridade'}
+                          {fila.estrategiaDistribuicao === EstrategiaDistribuicao.ROUND_ROBIN &&
+                            'Round Robin'}
+                          {fila.estrategiaDistribuicao === EstrategiaDistribuicao.MENOR_CARGA &&
+                            'Menor Carga'}
+                          {fila.estrategiaDistribuicao === EstrategiaDistribuicao.PRIORIDADE &&
+                            'Por Prioridade'}
                         </p>
                       </div>
                       <div>
@@ -619,9 +593,7 @@ const GestaoFilasPage: React.FC = () => {
 
               {/* Descrição */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Descrição
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
                 <textarea
                   value={formFila.descricao}
                   onChange={(e) => setFormFila({ ...formFila, descricao: e.target.value })}
@@ -640,7 +612,9 @@ const GestaoFilasPage: React.FC = () => {
                 </label>
                 <select
                   value={formFila.nucleoId || ''}
-                  onChange={(e) => setFormFila({ ...formFila, nucleoId: e.target.value || undefined })}
+                  onChange={(e) =>
+                    setFormFila({ ...formFila, nucleoId: e.target.value || undefined })
+                  }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                 >
                   <option value="">Nenhum (opcional)</option>
@@ -654,12 +628,12 @@ const GestaoFilasPage: React.FC = () => {
 
               {/* Departamento */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Departamento
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Departamento</label>
                 <select
                   value={formFila.departamentoId || ''}
-                  onChange={(e) => setFormFila({ ...formFila, departamentoId: e.target.value || undefined })}
+                  onChange={(e) =>
+                    setFormFila({ ...formFila, departamentoId: e.target.value || undefined })
+                  }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                 >
                   <option value="">Nenhum (opcional)</option>
@@ -716,7 +690,7 @@ const GestaoFilasPage: React.FC = () => {
                   onChange={(e) =>
                     setFormFila({
                       ...formFila,
-                      capacidadeMaxima: e.target.value ? parseInt(e.target.value) : 10
+                      capacidadeMaxima: e.target.value ? parseInt(e.target.value) : 10,
                     })
                   }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
@@ -736,9 +710,7 @@ const GestaoFilasPage: React.FC = () => {
                   }
                   className="h-4 w-4 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
                 />
-                <label className="ml-2 text-sm text-gray-700">
-                  Distribuição Automática
-                </label>
+                <label className="ml-2 text-sm text-gray-700">Distribuição Automática</label>
               </div>
               <p className="text-xs text-gray-500 -mt-2">
                 Se ativado, tickets serão distribuídos automaticamente ao entrar na fila
@@ -782,9 +754,7 @@ const GestaoFilasPage: React.FC = () => {
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-xl font-bold text-[#002333]">
-                Adicionar Atendente
-              </h2>
+              <h2 className="text-xl font-bold text-[#002333]">Adicionar Atendente</h2>
               <button
                 onClick={() => setShowDialogAtendente(false)}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -840,9 +810,7 @@ const GestaoFilasPage: React.FC = () => {
 
               {/* Prioridade */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Prioridade
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Prioridade</label>
                 <input
                   type="number"
                   min="1"

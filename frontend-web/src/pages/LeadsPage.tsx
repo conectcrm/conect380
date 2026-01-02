@@ -72,9 +72,7 @@ const leadSchema = yup.object().shape({
       return trimmed === '' ? undefined : trimmed;
     })
     .optional(),
-  origem: yup
-    .string()
-    .required('Origem é obrigatória'),
+  origem: yup.string().required('Origem é obrigatória'),
   observacoes: yup
     .string()
     .transform((value) => {
@@ -98,12 +96,8 @@ const convertSchema = yup.object().shape({
       return originalValue === '' ? undefined : value;
     })
     .positive('Valor deve ser positivo'),
-  data_fechamento_prevista: yup
-    .string()
-    .optional(),
-  observacoes: yup
-    .string()
-    .optional(),
+  data_fechamento_prevista: yup.string().optional(),
+  observacoes: yup.string().optional(),
 });
 
 const LeadsPage: React.FC = () => {
@@ -199,9 +193,10 @@ const LeadsPage: React.FC = () => {
   const handleOpenDialog = (lead?: Lead) => {
     if (lead) {
       setEditingLead(lead);
-      const safeOrigin = lead.origem && Object.values(OrigemLead).includes(lead.origem as OrigemLead)
-        ? (lead.origem as OrigemLead)
-        : OrigemLead.MANUAL;
+      const safeOrigin =
+        lead.origem && Object.values(OrigemLead).includes(lead.origem as OrigemLead)
+          ? (lead.origem as OrigemLead)
+          : OrigemLead.MANUAL;
       resetLeadForm({
         nome: lead.nome ?? '',
         email: lead.email ?? '',
@@ -424,8 +419,7 @@ const LeadsPage: React.FC = () => {
       lead.email?.toLowerCase().includes(busca.toLowerCase()) ||
       lead.empresa_nome?.toLowerCase().includes(busca.toLowerCase());
 
-    const matchStatus =
-      filtroStatus === 'todos' || lead.status === filtroStatus;
+    const matchStatus = filtroStatus === 'todos' || lead.status === filtroStatus;
 
     return matchBusca && matchStatus;
   });
@@ -539,9 +533,7 @@ const LeadsPage: React.FC = () => {
                   <p className="mt-2 text-3xl font-bold text-[#002333]">
                     {estatisticas?.total || 0}
                   </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    Leads cadastrados no sistema
-                  </p>
+                  <p className="mt-3 text-sm text-[#002333]/70">Leads cadastrados no sistema</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
                   <UserPlus className="h-6 w-6 text-[#159A9C]" />
@@ -559,9 +551,7 @@ const LeadsPage: React.FC = () => {
                   <p className="mt-2 text-3xl font-bold text-[#002333]">
                     {estatisticas?.qualificados || 0}
                   </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    Prontos para conversão
-                  </p>
+                  <p className="mt-3 text-sm text-[#002333]/70">Prontos para conversão</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
                   <CheckCircle className="h-6 w-6 text-green-600" />
@@ -599,9 +589,7 @@ const LeadsPage: React.FC = () => {
                   <p className="mt-2 text-3xl font-bold text-[#002333]">
                     {estatisticas?.scoreMedio?.toFixed(0) || 0}
                   </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    Qualidade média dos leads
-                  </p>
+                  <p className="mt-3 text-sm text-[#002333]/70">Qualidade média dos leads</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
                   <Award className="h-6 w-6 text-yellow-600" />
@@ -614,9 +602,7 @@ const LeadsPage: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
             <div className="flex flex-col sm:flex-row gap-4 items-end">
               <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Buscar Leads
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Buscar Leads</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <input
@@ -630,9 +616,7 @@ const LeadsPage: React.FC = () => {
               </div>
 
               <div className="w-full sm:w-64">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
                 <select
                   value={filtroStatus}
                   onChange={(e) => setFiltroStatus(e.target.value)}
@@ -704,7 +688,7 @@ const LeadsPage: React.FC = () => {
                         </h3>
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                            lead.status
+                            lead.status,
                           )}`}
                         >
                           {getStatusLabel(lead.status)}
@@ -757,9 +741,7 @@ const LeadsPage: React.FC = () => {
                   <div className="flex items-center justify-between pt-4 border-t">
                     <div className="flex items-center gap-2">
                       <Target className="h-4 w-4 text-yellow-500" />
-                      <span className="text-sm font-medium text-gray-700">
-                        Score: {lead.score}
-                      </span>
+                      <span className="text-sm font-medium text-gray-700">Score: {lead.score}</span>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                       {getOrigemLabel(lead.origem)}
@@ -809,7 +791,9 @@ const LeadsPage: React.FC = () => {
                       {editingLead ? 'Editar Lead' : 'Novo Lead'}
                     </h2>
                     <p className="text-sm text-white/80 mt-0.5">
-                      {editingLead ? 'Atualize as informações do lead' : 'Preencha os dados do novo lead'}
+                      {editingLead
+                        ? 'Atualize as informações do lead'
+                        : 'Preencha os dados do novo lead'}
                     </p>
                   </div>
                 </div>
@@ -824,9 +808,11 @@ const LeadsPage: React.FC = () => {
             </div>
 
             {/* Body */}
-            <form onSubmit={handleLeadSubmit(onSubmitLead)} className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+            <form
+              onSubmit={handleLeadSubmit(onSubmitLead)}
+              className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]"
+            >
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
                 {/* COLUNA 1: Dados Básicos */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
@@ -842,8 +828,9 @@ const LeadsPage: React.FC = () => {
                     <input
                       {...register('nome')}
                       type="text"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${leadErrors.nome ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                        leadErrors.nome ? 'border-red-300' : 'border-gray-300'
+                      }`}
                       placeholder="Digite o nome completo"
                       disabled={isSubmitting}
                     />
@@ -857,16 +844,15 @@ const LeadsPage: React.FC = () => {
 
                   {/* Email */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
                         {...register('email')}
                         type="email"
-                        className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${leadErrors.email ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                        className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                          leadErrors.email ? 'border-red-300' : 'border-gray-300'
+                        }`}
                         placeholder="email@exemplo.com"
                         disabled={isSubmitting}
                       />
@@ -881,9 +867,7 @@ const LeadsPage: React.FC = () => {
 
                   {/* Telefone */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Telefone
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
                     <div className="relative">
                       <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
@@ -901,14 +885,14 @@ const LeadsPage: React.FC = () => {
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
                     <Briefcase className="w-5 h-5 text-[#159A9C]" />
-                    <h3 className="text-lg font-semibold text-[#002333]">Informações Profissionais</h3>
+                    <h3 className="text-lg font-semibold text-[#002333]">
+                      Informações Profissionais
+                    </h3>
                   </div>
 
                   {/* Empresa */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Empresa
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
                     <div className="relative">
                       <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
@@ -923,13 +907,12 @@ const LeadsPage: React.FC = () => {
 
                   {/* Origem */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Origem *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Origem *</label>
                     <select
                       {...register('origem')}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${leadErrors.origem ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                        leadErrors.origem ? 'border-red-300' : 'border-gray-300'
+                      }`}
                       disabled={isSubmitting}
                     >
                       <option value={OrigemLead.MANUAL}>Manual</option>
@@ -952,9 +935,7 @@ const LeadsPage: React.FC = () => {
 
               {/* Observações (Full Width) */}
               <div className="mt-6">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Observações
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
                 <textarea
                   {...register('observacoes')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors resize-none"
@@ -1010,9 +991,7 @@ const LeadsPage: React.FC = () => {
                     <ArrowRight className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-white">
-                      Converter Lead em Oportunidade
-                    </h2>
+                    <h2 className="text-xl font-bold text-white">Converter Lead em Oportunidade</h2>
                     <p className="text-sm text-white/80 mt-0.5">
                       {leadToConvert.nome} ({leadToConvert.email})
                     </p>
@@ -1029,15 +1008,16 @@ const LeadsPage: React.FC = () => {
             </div>
 
             {/* Body */}
-            <form onSubmit={handleConvertSubmit(onSubmitConvert)} className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+            <form
+              onSubmit={handleConvertSubmit(onSubmitConvert)}
+              className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]"
+            >
               <div className="space-y-6">
                 {/* Informações do Lead */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <User className="w-5 h-5 text-blue-600" />
-                    <h3 className="text-sm font-semibold text-blue-900">
-                      Informações do Lead
-                    </h3>
+                    <h3 className="text-sm font-semibold text-blue-900">Informações do Lead</h3>
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-sm text-blue-800">
                     <div>
@@ -1064,8 +1044,9 @@ const LeadsPage: React.FC = () => {
                   <input
                     {...registerConvert('titulo_oportunidade')}
                     type="text"
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${convertErrors.titulo_oportunidade ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                      convertErrors.titulo_oportunidade ? 'border-red-300' : 'border-gray-300'
+                    }`}
                     placeholder="Ex: Venda de software para Empresa X"
                     disabled={isSubmitting}
                   />
@@ -1090,8 +1071,9 @@ const LeadsPage: React.FC = () => {
                         {...registerConvert('valor_estimado')}
                         type="number"
                         step="0.01"
-                        className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${convertErrors.valor_estimado ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                        className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                          convertErrors.valor_estimado ? 'border-red-300' : 'border-gray-300'
+                        }`}
                         placeholder="0.00"
                         disabled={isSubmitting}
                       />
@@ -1182,9 +1164,7 @@ const LeadsPage: React.FC = () => {
                     <Upload className="h-6 w-6 text-[#159A9C]" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-[#002333]">
-                      Importar Leads via CSV
-                    </h2>
+                    <h2 className="text-2xl font-bold text-[#002333]">Importar Leads via CSV</h2>
                     <p className="text-sm text-[#B4BEC9] mt-1">
                       Envie um arquivo CSV com seus leads para importação em massa
                     </p>
@@ -1203,18 +1183,20 @@ const LeadsPage: React.FC = () => {
                 <div className="flex gap-3">
                   <FileText className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
                   <div className="text-sm">
-                    <p className="font-semibold text-blue-900 mb-2">
-                      Formato do arquivo CSV:
-                    </p>
+                    <p className="font-semibold text-blue-900 mb-2">Formato do arquivo CSV:</p>
                     <p className="text-blue-800 mb-2">
                       O arquivo deve conter as seguintes colunas (cabeçalho obrigatório):
                     </p>
                     <ul className="list-disc list-inside text-blue-700 space-y-1 ml-2">
-                      <li><strong>nome</strong> (obrigatório)</li>
+                      <li>
+                        <strong>nome</strong> (obrigatório)
+                      </li>
                       <li>email</li>
                       <li>telefone</li>
                       <li>empresa_nome</li>
-                      <li>origem (site, formulario, email, telefone, redes_sociais, indicacao, outros)</li>
+                      <li>
+                        origem (site, formulario, email, telefone, redes_sociais, indicacao, outros)
+                      </li>
                       <li>observacoes</li>
                       <li>responsavel_email (email do usuário responsável)</li>
                     </ul>
@@ -1236,17 +1218,12 @@ const LeadsPage: React.FC = () => {
                     id="csv-upload"
                     disabled={importing}
                   />
-                  <label
-                    htmlFor="csv-upload"
-                    className="cursor-pointer flex flex-col items-center"
-                  >
+                  <label htmlFor="csv-upload" className="cursor-pointer flex flex-col items-center">
                     <Upload className="h-12 w-12 text-gray-400 mb-3" />
                     <p className="text-sm font-medium text-gray-700 mb-1">
                       Clique para selecionar ou arraste o arquivo
                     </p>
-                    <p className="text-xs text-gray-500">
-                      Apenas arquivos .csv (máximo 10MB)
-                    </p>
+                    <p className="text-xs text-gray-500">Apenas arquivos .csv (máximo 10MB)</p>
                   </label>
                 </div>
                 {importFile && (
@@ -1269,21 +1246,15 @@ const LeadsPage: React.FC = () => {
                   </h3>
                   <div className="grid grid-cols-3 gap-4 mb-3">
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-gray-700">
-                        {importResult.total}
-                      </p>
+                      <p className="text-2xl font-bold text-gray-700">{importResult.total}</p>
                       <p className="text-xs text-gray-500">Total Processados</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-green-600">
-                        {importResult.importados}
-                      </p>
+                      <p className="text-2xl font-bold text-green-600">{importResult.importados}</p>
                       <p className="text-xs text-gray-500">Importados</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-red-600">
-                        {importResult.erros}
-                      </p>
+                      <p className="text-2xl font-bold text-red-600">{importResult.erros}</p>
                       <p className="text-xs text-gray-500">Erros</p>
                     </div>
                   </div>
@@ -1297,7 +1268,10 @@ const LeadsPage: React.FC = () => {
                       </p>
                       <div className="max-h-40 overflow-y-auto bg-white rounded border border-red-200 p-3 space-y-2">
                         {importResult.detalhes.slice(0, 10).map((detalhe, index) => (
-                          <div key={index} className="text-xs text-red-600 border-b border-red-100 pb-1 last:border-b-0">
+                          <div
+                            key={index}
+                            className="text-xs text-red-600 border-b border-red-100 pb-1 last:border-b-0"
+                          >
                             <strong>Linha {detalhe.linha}:</strong> {detalhe.erro}
                           </div>
                         ))}

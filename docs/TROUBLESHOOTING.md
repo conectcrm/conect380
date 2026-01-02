@@ -564,12 +564,13 @@ curl http://127.0.0.1:4040/api/tunnels
 # 2. Verificar URL no Meta Developers
 https://developers.facebook.com/apps
 → WhatsApp → Configuração → Webhook
-URL: https://SEU-DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp
+URL: https://SEU-DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
 Token: conectcrm_webhook_token_123
 
 # 3. Testar webhook manualmente
-curl -X POST https://SEU-DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp \
+curl -X POST https://SEU-DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA> \
   -H "Content-Type: application/json" \
+  -H "X-Hub-Signature-256: sha256=<HMAC_GERADO_COM_APP_SECRET>" \
   -d '{"test": "message"}'
 
 # 4. Ver logs do backend

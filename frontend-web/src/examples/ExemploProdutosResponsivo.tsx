@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { ModalCadastroProduto } from '@/examples/ModalCadastroProduto';
-import { ResponsiveLayout, ResponsiveGrid, ResponsiveCard } from '@/components/layout/ResponsiveLayout';
+import {
+  ResponsiveLayout,
+  ResponsiveGrid,
+  ResponsiveCard,
+} from '@/components/layout/ResponsiveLayout';
 import { useResponsive } from '@/hooks/useResponsive';
 import { Package, Plus, Edit, Trash2, Search } from 'lucide-react';
 
@@ -30,46 +34,44 @@ export const ExemploProdutosResponsivo: React.FC = () => {
       preco: 2999.99,
       categoria: 'eletrônicos',
       status: 'ativo',
-      descricao: 'Smartphone top de linha com câmera profissional'
+      descricao: 'Smartphone top de linha com câmera profissional',
     },
     {
       id: '2',
       nome: 'Camiseta Básica',
       codigo: 'PROD002',
-      preco: 49.90,
+      preco: 49.9,
       categoria: 'roupas',
-      status: 'ativo'
+      status: 'ativo',
     },
     {
       id: '3',
       nome: 'Sofá 3 Lugares',
       codigo: 'PROD003',
-      preco: 1299.00,
+      preco: 1299.0,
       categoria: 'casa',
-      status: 'descontinuado'
-    }
+      status: 'descontinuado',
+    },
   ]);
 
   const handleSaveProduto = async (data: any) => {
     // Simular delay de API
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
     if (produtoSelecionado) {
       // Atualizar produto existente
-      setProdutos(prev => prev.map(p => 
-        p.id === produtoSelecionado.id 
-          ? { ...p, ...data }
-          : p
-      ));
+      setProdutos((prev) =>
+        prev.map((p) => (p.id === produtoSelecionado.id ? { ...p, ...data } : p)),
+      );
     } else {
       // Criar novo produto
       const novoProduto = {
         id: Date.now().toString(),
-        ...data
+        ...data,
       };
-      setProdutos(prev => [...prev, novoProduto]);
+      setProdutos((prev) => [...prev, novoProduto]);
     }
-    
+
     setProdutoSelecionado(null);
   };
 
@@ -85,17 +87,21 @@ export const ExemploProdutosResponsivo: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'ativo': return 'bg-green-100 text-green-800';
-      case 'inativo': return 'bg-yellow-100 text-yellow-800';
-      case 'descontinuado': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'ativo':
+        return 'bg-green-100 text-green-800';
+      case 'inativo':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'descontinuado':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const formatPreco = (preco: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(preco);
   };
 
@@ -109,11 +115,9 @@ export const ExemploProdutosResponsivo: React.FC = () => {
               <Package className="w-6 h-6 text-blue-600" />
               Produtos
             </h1>
-            <p className="text-responsive text-gray-600 mt-1">
-              Gerencie o catálogo de produtos
-            </p>
+            <p className="text-responsive text-gray-600 mt-1">Gerencie o catálogo de produtos</p>
           </div>
-          
+
           <button
             onClick={handleNovoProduto}
             className={`btn bg-blue-600 text-white hover:bg-blue-700 ${isMobile ? 'w-full' : ''}`}
@@ -135,32 +139,29 @@ export const ExemploProdutosResponsivo: React.FC = () => {
       </div>
 
       {/* Estatísticas responsivas */}
-      <ResponsiveGrid 
-        columns={{ mobile: 1, tablet: 2, desktop: 4 }}
-        className="mb-6"
-      >
+      <ResponsiveGrid columns={{ mobile: 1, tablet: 2, desktop: 4 }} className="mb-6">
         <ResponsiveCard className="text-center">
           <div className="text-2xl font-bold text-blue-600">{produtos.length}</div>
           <div className="text-sm text-gray-600">Total de Produtos</div>
         </ResponsiveCard>
-        
+
         <ResponsiveCard className="text-center">
           <div className="text-2xl font-bold text-green-600">
-            {produtos.filter(p => p.status === 'ativo').length}
+            {produtos.filter((p) => p.status === 'ativo').length}
           </div>
           <div className="text-sm text-gray-600">Produtos Ativos</div>
         </ResponsiveCard>
-        
+
         <ResponsiveCard className="text-center">
           <div className="text-2xl font-bold text-yellow-600">
-            {produtos.filter(p => p.status === 'inativo').length}
+            {produtos.filter((p) => p.status === 'inativo').length}
           </div>
           <div className="text-sm text-gray-600">Produtos Inativos</div>
         </ResponsiveCard>
-        
+
         <ResponsiveCard className="text-center">
           <div className="text-2xl font-bold text-red-600">
-            {produtos.filter(p => p.status === 'descontinuado').length}
+            {produtos.filter((p) => p.status === 'descontinuado').length}
           </div>
           <div className="text-sm text-gray-600">Descontinuados</div>
         </ResponsiveCard>
@@ -175,30 +176,24 @@ export const ExemploProdutosResponsivo: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex justify-between items-start">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 break-words">
-                      {produto.nome}
-                    </h3>
+                    <h3 className="font-semibold text-gray-900 break-words">{produto.nome}</h3>
                     <p className="text-sm text-gray-600">{produto.codigo}</p>
                   </div>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(produto.status)}`}>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(produto.status)}`}
+                  >
                     {produto.status}
                   </span>
                 </div>
-                
-                <div className="text-lg font-bold text-green-600">
-                  {formatPreco(produto.preco)}
-                </div>
-                
-                <div className="text-sm text-gray-600 capitalize">
-                  {produto.categoria}
-                </div>
-                
+
+                <div className="text-lg font-bold text-green-600">{formatPreco(produto.preco)}</div>
+
+                <div className="text-sm text-gray-600 capitalize">{produto.categoria}</div>
+
                 {produto.descricao && (
-                  <p className="text-sm text-gray-700 break-words">
-                    {produto.descricao}
-                  </p>
+                  <p className="text-sm text-gray-700 break-words">{produto.descricao}</p>
                 )}
-                
+
                 <div className="flex gap-2 pt-2 border-t">
                   <button
                     onClick={() => handleEditProduto(produto)}
@@ -207,9 +202,7 @@ export const ExemploProdutosResponsivo: React.FC = () => {
                     <Edit className="w-3 h-3" />
                     Editar
                   </button>
-                  <button
-                    className="flex-1 btn bg-red-600 text-white hover:bg-red-700 text-sm"
-                  >
+                  <button className="flex-1 btn bg-red-600 text-white hover:bg-red-700 text-sm">
                     <Trash2 className="w-3 h-3" />
                     Excluir
                   </button>
@@ -255,10 +248,9 @@ export const ExemploProdutosResponsivo: React.FC = () => {
                         </div>
                         {produto.descricao && (
                           <div className="text-sm text-gray-500 break-words max-w-xs">
-                            {produto.descricao.length > 50 
-                              ? `${produto.descricao.slice(0, 50)}...` 
-                              : produto.descricao
-                            }
+                            {produto.descricao.length > 50
+                              ? `${produto.descricao.slice(0, 50)}...`
+                              : produto.descricao}
                           </div>
                         )}
                       </div>
@@ -273,7 +265,9 @@ export const ExemploProdutosResponsivo: React.FC = () => {
                       {produto.categoria}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(produto.status)}`}>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(produto.status)}`}
+                      >
                         {produto.status}
                       </span>
                     </td>

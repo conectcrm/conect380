@@ -6,6 +6,7 @@
 
 import { TEMPLATE_PROPOSTA_EMAIL, EMAIL_PROVIDERS } from '../config/emailConfig';
 import { formatarTokenParaExibicao } from '../utils/tokenUtils';
+import { API_BASE_URL } from './api';
 
 export interface EmailData {
   to: string;
@@ -65,7 +66,7 @@ class EmailServiceReal {
     this.isDebugMode = process.env.REACT_APP_EMAIL_DEBUG === 'true';
     this.isTestMode = process.env.REACT_APP_EMAIL_TEST_MODE === 'true';
     // ✅ CORREÇÃO: Usar backend integrado ao invés do servidor separado
-    this.emailServerUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+    this.emailServerUrl = API_BASE_URL;
   }
 
   /**
@@ -77,7 +78,7 @@ class EmailServiceReal {
         console.log('📧 [EMAIL DEBUG] Enviando proposta via API /email/enviar-proposta:', {
           propostaNumero: data.proposta.numero,
           clienteEmail: data.cliente.email,
-          tokenFormatado: formatarTokenParaExibicao(data.proposta.token)
+          tokenFormatado: formatarTokenParaExibicao(data.proposta.token),
         });
       }
 
@@ -85,7 +86,7 @@ class EmailServiceReal {
         return this.simularEnvio({
           to: data.cliente.email,
           subject: `Proposta Comercial #${data.proposta.numero} - ${data.empresa.nome}`,
-          html: 'Email de teste'
+          html: 'Email de teste',
         });
       }
 
@@ -93,7 +94,7 @@ class EmailServiceReal {
       const response = await fetch(`${this.emailServerUrl}/email/enviar-proposta`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           proposta: {
@@ -101,12 +102,14 @@ class EmailServiceReal {
             numero: data.proposta.numero,
             valorTotal: data.proposta.valorTotal,
             dataValidade: data.proposta.dataValidade,
-            token: data.proposta.numero // ✅ CORREÇÃO: Usar número da proposta como token
+            token: data.proposta.numero, // ✅ CORREÇÃO: Usar número da proposta como token
           },
           emailCliente: data.cliente.email,
-          linkPortal: data.portalUrl ? `${data.portalUrl}/proposta/${data.proposta.numero}` : `${window.location.origin}/portal/proposta/${data.proposta.numero}`, // ✅ CORREÇÃO: Usar número da proposta
-          registrarToken: true // ✅ Solicitar que o backend registre o token
-        })
+          linkPortal: data.portalUrl
+            ? `${data.portalUrl}/proposta/${data.proposta.numero}`
+            : `${window.location.origin}/portal/proposta/${data.proposta.numero}`, // ✅ CORREÇÃO: Usar número da proposta
+          registrarToken: true, // ✅ Solicitar que o backend registre o token
+        }),
       });
 
       if (!response.ok) {
@@ -121,18 +124,17 @@ class EmailServiceReal {
           success: true,
           messageId: result.timestamp,
           provider: 'backend-integrado-proposta',
-          timestamp: new Date()
+          timestamp: new Date(),
         };
       } else {
         throw new Error(result.message || 'Erro desconhecido na API');
       }
-
     } catch (error) {
       console.error('❌ Erro ao enviar e-mail de proposta:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Erro desconhecido',
-        timestamp: new Date()
+        timestamp: new Date(),
       };
     }
   }
@@ -146,14 +148,14 @@ class EmailServiceReal {
       const response = await fetch(`${this.emailServerUrl}/email/enviar`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          to: [emailData.to],                    // ✅ Novo formato: 'to'
-          subject: emailData.subject,            // ✅ Novo formato: 'subject' 
+          to: [emailData.to], // ✅ Novo formato: 'to'
+          subject: emailData.subject, // ✅ Novo formato: 'subject'
           message: emailData.html || emailData.text, // ✅ Novo formato: 'message'
-          attachments: emailData.attachments || []   // ✅ Novo formato: 'attachments'
-        })
+          attachments: emailData.attachments || [], // ✅ Novo formato: 'attachments'
+        }),
       });
 
       if (!response.ok) {
@@ -166,16 +168,15 @@ class EmailServiceReal {
         success: result.success || true,
         messageId: result.id,
         provider: 'backend-integrado',
-        timestamp: new Date()
+        timestamp: new Date(),
       };
-
     } catch (error) {
       console.error(`❌ Erro no backend integrado:`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Erro desconhecido',
         provider: 'backend-integrado',
-        timestamp: new Date()
+        timestamp: new Date(),
       };
     }
   }
@@ -187,12 +188,12 @@ class EmailServiceReal {
     const response = await fetch(`${this.emailServerUrl}/api/email/gmail`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        ...emailData
+        ...emailData,
         // Não enviamos config - deixamos o backend usar suas próprias credenciais
-      })
+      }),
     });
 
     if (!response.ok) {
@@ -204,7 +205,7 @@ class EmailServiceReal {
       success: true,
       messageId: result.messageId,
       provider: 'gmail',
-      timestamp: new Date()
+      timestamp: new Date(),
     };
   }
 
@@ -215,12 +216,12 @@ class EmailServiceReal {
     const response = await fetch(`${this.emailServerUrl}/api/email/sendgrid`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         ...emailData,
-        apiKey: process.env.REACT_APP_SENDGRID_API_KEY
-      })
+        apiKey: process.env.REACT_APP_SENDGRID_API_KEY,
+      }),
     });
 
     if (!response.ok) {
@@ -232,7 +233,7 @@ class EmailServiceReal {
       success: true,
       messageId: result.messageId,
       provider: 'sendgrid',
-      timestamp: new Date()
+      timestamp: new Date(),
     };
   }
 
@@ -243,16 +244,16 @@ class EmailServiceReal {
     const response = await fetch(`${this.emailServerUrl}/api/email/aws-ses`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         ...emailData,
         config: {
           accessKeyId: process.env.REACT_APP_AWS_ACCESS_KEY_ID,
           secretAccessKey: process.env.REACT_APP_AWS_SECRET_ACCESS_KEY,
-          region: process.env.REACT_APP_AWS_REGION
-        }
-      })
+          region: process.env.REACT_APP_AWS_REGION,
+        },
+      }),
     });
 
     if (!response.ok) {
@@ -264,7 +265,7 @@ class EmailServiceReal {
       success: true,
       messageId: result.messageId,
       provider: 'aws-ses',
-      timestamp: new Date()
+      timestamp: new Date(),
     };
   }
 
@@ -275,7 +276,7 @@ class EmailServiceReal {
     const response = await fetch(`${this.emailServerUrl}/api/email/smtp`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         ...emailData,
@@ -283,9 +284,9 @@ class EmailServiceReal {
           host: process.env.REACT_APP_SMTP_HOST,
           port: process.env.REACT_APP_SMTP_PORT,
           user: process.env.REACT_APP_SMTP_USER,
-          password: process.env.REACT_APP_SMTP_PASSWORD
-        }
-      })
+          password: process.env.REACT_APP_SMTP_PASSWORD,
+        },
+      }),
     });
 
     if (!response.ok) {
@@ -297,7 +298,7 @@ class EmailServiceReal {
       success: true,
       messageId: result.messageId,
       provider: 'smtp',
-      timestamp: new Date()
+      timestamp: new Date(),
     };
   }
 
@@ -312,13 +313,13 @@ class EmailServiceReal {
     console.log('📩 Tamanho HTML:', emailData.html.length, 'chars');
 
     // Simular delay de rede
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     return {
       success: true,
       messageId: `test-${Date.now()}`,
       provider: 'simulado',
-      timestamp: new Date()
+      timestamp: new Date(),
     };
   }
 
@@ -326,14 +327,16 @@ class EmailServiceReal {
    * Gerar HTML do e-mail de proposta
    */
   private gerarEmailProposta(data: PropostaEmailData): string {
-    return TEMPLATE_PROPOSTA_EMAIL
-      .replace(/{{nomeCliente}}/g, data.cliente.nome)
+    return TEMPLATE_PROPOSTA_EMAIL.replace(/{{nomeCliente}}/g, data.cliente.nome)
       .replace(/{{numeroProposta}}/g, data.proposta.numero)
       .replace(/{{token}}/g, formatarTokenParaExibicao(data.proposta.token))
-      .replace(/{{valorTotal}}/g, new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL'
-      }).format(data.proposta.valorTotal))
+      .replace(
+        /{{valorTotal}}/g,
+        new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        }).format(data.proposta.valorTotal),
+      )
       .replace(/{{dataValidade}}/g, data.proposta.dataValidade)
       .replace(/{{nomeVendedor}}/g, data.vendedor.nome)
       .replace(/{{emailVendedor}}/g, data.vendedor.email)
@@ -342,7 +345,10 @@ class EmailServiceReal {
       .replace(/{{emailEmpresa}}/g, data.empresa.email)
       .replace(/{{telefoneEmpresa}}/g, data.empresa.telefone)
       .replace(/{{enderecoEmpresa}}/g, data.empresa.endereco)
-      .replace(/{{linkPortal}}/g, `${data.portalUrl}/${data.proposta.numero}/${data.proposta.token}`);
+      .replace(
+        /{{linkPortal}}/g,
+        `${data.portalUrl}/${data.proposta.numero}/${data.proposta.token}`,
+      );
   }
 
   /**
@@ -391,7 +397,7 @@ ${data.empresa.telefone} | ${data.empresa.email}
       provider: this.provider,
       info: EMAIL_PROVIDERS[this.provider] || null,
       isDebug: this.isDebugMode,
-      isTest: this.isTestMode
+      isTest: this.isTestMode,
     };
   }
 
@@ -419,7 +425,7 @@ ${data.empresa.telefone} | ${data.empresa.email}
         Data/Hora: ${new Date().toLocaleString('pt-BR')}
         
         Este é um e-mail de teste do sistema ConectCRM.
-      `
+      `,
     };
 
     // ✅ CORREÇÃO: Usar o método integrado ao invés dos métodos específicos por provedor
@@ -433,7 +439,9 @@ ${data.empresa.telefone} | ${data.empresa.email}
   async enviarEmailComConfig(emailData: EmailData, config: any): Promise<EmailResponse> {
     try {
       // ✅ CORREÇÃO: Sempre usar o backend integrado independente do provedor
-      console.log(`📧 [EmailService] Enviando via backend integrado (provedor configurado: ${config.provider})`);
+      console.log(
+        `📧 [EmailService] Enviando via backend integrado (provedor configurado: ${config.provider})`,
+      );
       return await this.enviarEmail(emailData);
     } catch (error) {
       console.error(`❌ Erro no backend integrado (provedor: ${config.provider}):`, error);
@@ -441,7 +449,7 @@ ${data.empresa.telefone} | ${data.empresa.email}
         success: false,
         error: error instanceof Error ? error.message : 'Erro desconhecido',
         provider: 'backend-integrado',
-        timestamp: new Date()
+        timestamp: new Date(),
       };
     }
   }
@@ -449,19 +457,22 @@ ${data.empresa.telefone} | ${data.empresa.email}
   /**
    * Gmail SMTP com configuração específica
    */
-  private async enviarViaGmailComConfig(emailData: EmailData, gmailConfig: any): Promise<EmailResponse> {
+  private async enviarViaGmailComConfig(
+    emailData: EmailData,
+    gmailConfig: any,
+  ): Promise<EmailResponse> {
     const response = await fetch(`${this.emailServerUrl}/api/email/gmail`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         ...emailData,
         config: {
           user: gmailConfig.user,
-          password: gmailConfig.password
-        }
-      })
+          password: gmailConfig.password,
+        },
+      }),
     });
 
     if (!response.ok) {
@@ -473,23 +484,26 @@ ${data.empresa.telefone} | ${data.empresa.email}
       success: true,
       messageId: result.messageId,
       provider: 'gmail',
-      timestamp: new Date()
+      timestamp: new Date(),
     };
   }
 
   /**
    * SendGrid com configuração específica
    */
-  private async enviarViaSendGridComConfig(emailData: EmailData, sendgridConfig: any): Promise<EmailResponse> {
+  private async enviarViaSendGridComConfig(
+    emailData: EmailData,
+    sendgridConfig: any,
+  ): Promise<EmailResponse> {
     const response = await fetch(`${this.emailServerUrl}/api/email/sendgrid`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         ...emailData,
-        apiKey: sendgridConfig.apiKey
-      })
+        apiKey: sendgridConfig.apiKey,
+      }),
     });
 
     if (!response.ok) {
@@ -501,27 +515,30 @@ ${data.empresa.telefone} | ${data.empresa.email}
       success: true,
       messageId: result.messageId,
       provider: 'sendgrid',
-      timestamp: new Date()
+      timestamp: new Date(),
     };
   }
 
   /**
    * AWS SES com configuração específica
    */
-  private async enviarViaAWSComConfig(emailData: EmailData, awsConfig: any): Promise<EmailResponse> {
+  private async enviarViaAWSComConfig(
+    emailData: EmailData,
+    awsConfig: any,
+  ): Promise<EmailResponse> {
     const response = await fetch(`${this.emailServerUrl}/api/email/aws-ses`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         ...emailData,
         config: {
           accessKeyId: awsConfig.accessKeyId,
           secretAccessKey: awsConfig.secretAccessKey,
-          region: awsConfig.region
-        }
-      })
+          region: awsConfig.region,
+        },
+      }),
     });
 
     if (!response.ok) {
@@ -533,18 +550,21 @@ ${data.empresa.telefone} | ${data.empresa.email}
       success: true,
       messageId: result.messageId,
       provider: 'aws-ses',
-      timestamp: new Date()
+      timestamp: new Date(),
     };
   }
 
   /**
    * SMTP com configuração específica
    */
-  private async enviarViaSMTPComConfig(emailData: EmailData, smtpConfig: any): Promise<EmailResponse> {
+  private async enviarViaSMTPComConfig(
+    emailData: EmailData,
+    smtpConfig: any,
+  ): Promise<EmailResponse> {
     const response = await fetch(`${this.emailServerUrl}/api/email/smtp`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         ...emailData,
@@ -552,9 +572,9 @@ ${data.empresa.telefone} | ${data.empresa.email}
           host: smtpConfig.host,
           port: smtpConfig.port,
           user: smtpConfig.user,
-          password: smtpConfig.password
-        }
-      })
+          password: smtpConfig.password,
+        },
+      }),
     });
 
     if (!response.ok) {
@@ -566,7 +586,7 @@ ${data.empresa.telefone} | ${data.empresa.email}
       success: true,
       messageId: result.messageId,
       provider: 'smtp',
-      timestamp: new Date()
+      timestamp: new Date(),
     };
   }
 
@@ -594,7 +614,7 @@ ${data.empresa.telefone} | ${data.empresa.email}
         Data/Hora: ${new Date().toLocaleString('pt-BR')}
         
         Este é um e-mail de teste do sistema ConectCRM.
-      `
+      `,
     };
 
     return await this.enviarEmail(emailData);

@@ -12,7 +12,7 @@ import {
   AlertCircle,
   Download,
   Send,
-  RotateCcw
+  RotateCcw,
 } from 'lucide-react';
 import PaymentComponent from '../payments/PaymentComponent';
 import stripeService from '../../services/stripeService';
@@ -48,7 +48,7 @@ interface BillingIntegrationProps {
 const BillingIntegration: React.FC<BillingIntegrationProps> = ({
   faturas,
   onFaturaUpdate,
-  onPaymentSuccess
+  onPaymentSuccess,
 }) => {
   const [faturaSelected, setFaturaSelected] = useState<Fatura | null>(null);
   const [showPayment, setShowPayment] = useState(false);
@@ -61,7 +61,7 @@ const BillingIntegration: React.FC<BillingIntegrationProps> = ({
       console.log('Pagamento Stripe aprovado:', payment);
 
       // Encontrar fatura relacionada
-      const fatura = faturas.find(f => f.payment_intent_id === payment.id);
+      const fatura = faturas.find((f) => f.payment_intent_id === payment.id);
       if (fatura) {
         const faturaAtualizada = { ...fatura, status: 'paga' as const };
         onFaturaUpdate(faturaAtualizada);
@@ -75,7 +75,7 @@ const BillingIntegration: React.FC<BillingIntegrationProps> = ({
       console.log('Pagamento Mercado Pago aprovado:', payment);
 
       // Encontrar fatura relacionada
-      const fatura = faturas.find(f => f.mercadopago_payment_id === payment.id.toString());
+      const fatura = faturas.find((f) => f.mercadopago_payment_id === payment.id.toString());
       if (fatura) {
         const faturaAtualizada = { ...fatura, status: 'paga' as const };
         onFaturaUpdate(faturaAtualizada);
@@ -84,32 +84,54 @@ const BillingIntegration: React.FC<BillingIntegrationProps> = ({
       }
     };
 
-    window.addEventListener('stripe:payment:succeeded', handleStripePaymentSuccess as EventListener);
-    window.addEventListener('mercadopago:payment:approved', handleMercadoPagoPaymentSuccess as EventListener);
+    window.addEventListener(
+      'stripe:payment:succeeded',
+      handleStripePaymentSuccess as EventListener,
+    );
+    window.addEventListener(
+      'mercadopago:payment:approved',
+      handleMercadoPagoPaymentSuccess as EventListener,
+    );
 
     return () => {
-      window.removeEventListener('stripe:payment:succeeded', handleStripePaymentSuccess as EventListener);
-      window.removeEventListener('mercadopago:payment:approved', handleMercadoPagoPaymentSuccess as EventListener);
+      window.removeEventListener(
+        'stripe:payment:succeeded',
+        handleStripePaymentSuccess as EventListener,
+      );
+      window.removeEventListener(
+        'mercadopago:payment:approved',
+        handleMercadoPagoPaymentSuccess as EventListener,
+      );
     };
   }, [faturas, onFaturaUpdate, onPaymentSuccess]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'paga': return 'bg-green-100 text-green-800';
-      case 'pendente': return 'bg-yellow-100 text-yellow-800';
-      case 'vencida': return 'bg-red-100 text-red-800';
-      case 'cancelada': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'paga':
+        return 'bg-green-100 text-green-800';
+      case 'pendente':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'vencida':
+        return 'bg-red-100 text-red-800';
+      case 'cancelada':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'paga': return <CheckCircle className="h-4 w-4" />;
-      case 'pendente': return <Clock className="h-4 w-4" />;
-      case 'vencida': return <AlertCircle className="h-4 w-4" />;
-      case 'cancelada': return <XCircle className="h-4 w-4" />;
-      default: return <Clock className="h-4 w-4" />;
+      case 'paga':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'pendente':
+        return <Clock className="h-4 w-4" />;
+      case 'vencida':
+        return <AlertCircle className="h-4 w-4" />;
+      case 'cancelada':
+        return <XCircle className="h-4 w-4" />;
+      default:
+        return <Clock className="h-4 w-4" />;
     }
   };
 
@@ -120,7 +142,7 @@ const BillingIntegration: React.FC<BillingIntegrationProps> = ({
 
   const enviarCobrancaPorEmail = async (fatura: Fatura) => {
     const faturaId = fatura.id;
-    setLoading(prev => ({ ...prev, [faturaId]: true }));
+    setLoading((prev) => ({ ...prev, [faturaId]: true }));
 
     try {
       // Implementar envio de cobrança por email
@@ -128,8 +150,8 @@ const BillingIntegration: React.FC<BillingIntegrationProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+        },
       });
 
       if (response.ok) {
@@ -141,7 +163,7 @@ const BillingIntegration: React.FC<BillingIntegrationProps> = ({
       console.error('Erro ao enviar cobrança:', error);
       toast.error('Erro ao enviar cobrança por email');
     } finally {
-      setLoading(prev => ({ ...prev, [faturaId]: false }));
+      setLoading((prev) => ({ ...prev, [faturaId]: false }));
     }
   };
 
@@ -149,8 +171,8 @@ const BillingIntegration: React.FC<BillingIntegrationProps> = ({
     try {
       const response = await fetch(`/api/faturas/${fatura.id}/pdf`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+        },
       });
 
       if (response.ok) {
@@ -174,7 +196,7 @@ const BillingIntegration: React.FC<BillingIntegrationProps> = ({
 
   const reprocessarPagamento = async (fatura: Fatura) => {
     const faturaId = fatura.id;
-    setLoading(prev => ({ ...prev, [faturaId]: true }));
+    setLoading((prev) => ({ ...prev, [faturaId]: true }));
 
     try {
       let pagamento;
@@ -202,7 +224,7 @@ const BillingIntegration: React.FC<BillingIntegrationProps> = ({
       console.error('Erro ao reprocessar pagamento:', error);
       toast.error('Erro ao verificar status do pagamento');
     } finally {
-      setLoading(prev => ({ ...prev, [faturaId]: false }));
+      setLoading((prev) => ({ ...prev, [faturaId]: false }));
     }
   };
 
@@ -250,13 +272,13 @@ const BillingIntegration: React.FC<BillingIntegrationProps> = ({
         <h2 className="text-2xl font-bold">Faturamento</h2>
         <div className="flex gap-2">
           <Badge variant="outline">
-            {faturas.filter(f => f.status === 'pendente').length} Pendentes
+            {faturas.filter((f) => f.status === 'pendente').length} Pendentes
           </Badge>
           <Badge variant="outline">
-            {faturas.filter(f => f.status === 'vencida').length} Vencidas
+            {faturas.filter((f) => f.status === 'vencida').length} Vencidas
           </Badge>
           <Badge variant="outline" className="bg-green-50">
-            {faturas.filter(f => f.status === 'paga').length} Pagas
+            {faturas.filter((f) => f.status === 'paga').length} Pagas
           </Badge>
         </div>
       </div>
@@ -266,9 +288,7 @@ const BillingIntegration: React.FC<BillingIntegrationProps> = ({
           <Card key={fatura.id} className="w-full">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">
-                  Fatura {fatura.numero}
-                </CardTitle>
+                <CardTitle className="text-lg">Fatura {fatura.numero}</CardTitle>
                 <Badge className={getStatusColor(fatura.status)}>
                   <div className="flex items-center gap-1">
                     {getStatusIcon(fatura.status)}
@@ -291,7 +311,7 @@ const BillingIntegration: React.FC<BillingIntegrationProps> = ({
                   <p className="text-2xl font-bold text-green-600">
                     {new Intl.NumberFormat('pt-BR', {
                       style: 'currency',
-                      currency: 'BRL'
+                      currency: 'BRL',
                     }).format(fatura.valor)}
                   </p>
                 </div>
@@ -333,11 +353,7 @@ const BillingIntegration: React.FC<BillingIntegrationProps> = ({
                   Enviar por Email
                 </Button>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => baixarFatura(fatura)}
-                >
+                <Button variant="outline" size="sm" onClick={() => baixarFatura(fatura)}>
                   <Download className="h-4 w-4 mr-2" />
                   Baixar PDF
                 </Button>

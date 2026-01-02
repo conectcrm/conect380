@@ -25,16 +25,16 @@ https://abc123def456.ngrok-free.app
 
 **Cole esta URL no campo "Callback URL":**
 ```
-https://SUA_URL_DO_NGROK.ngrok-free.app/api/atendimento/webhooks/whatsapp
+https://SUA_URL_DO_NGROK.ngrok-free.app/api/atendimento/webhooks/whatsapp/<EMPRESA_ID>
 ```
 
 **Exemplo completo:**
 ```
-https://abc123def456.ngrok-free.app/api/atendimento/webhooks/whatsapp
+https://abc123def456.ngrok-free.app/api/atendimento/webhooks/whatsapp/2f6e1d3c-1234-4abc-9def-888888888888
 ```
 
 ⚠️ **IMPORTANTE:**
-- ✅ Incluir o `/api/atendimento/webhooks/whatsapp` no final
+- ✅ Incluir o `/api/atendimento/webhooks/whatsapp/<EMPRESA_ID>` no final
 - ✅ Usar HTTPS (ngrok sempre fornece HTTPS)
 - ✅ Não colocar barra `/` no final
 
@@ -74,7 +74,7 @@ Marque estas opções:
 │ Callback URL:                                               │
 │ ┌─────────────────────────────────────────────────────────┐ │
 │ │ https://abc123.ngrok-free.app/api/atendimento/webhooks/│ │
-│ │ whatsapp                                                 │ │
+│ │ whatsapp/<EMPRESA_ID>                                    │ │
 │ └─────────────────────────────────────────────────────────┘ │
 │                                                             │
 │ Verify Token:                                               │
@@ -94,6 +94,10 @@ Marque estas opções:
 ---
 
 ## 🔄 **PASSO 4: Fluxo Completo de Configuração**
+
+> ⚠️ **Importante**: todas as URLs de webhook agora exigem o ID da empresa. Use sempre o formato `.../webhooks/whatsapp/<EMPRESA_ID>`. Sem esse segmento, o backend rejeita o callback.
+
+> 🔐 **Assinatura obrigatória**: mantenha o App Secret configurado no Meta. Apenas em ambientes de laboratório defina `ALLOW_INSECURE_WHATSAPP_WEBHOOK=true` para aceitar callbacks sem secret (nunca em produção).
 
 ### **1. Iniciar Ambiente Local**
 ```powershell
@@ -116,7 +120,7 @@ https://developers.facebook.com/apps
 
 **Callback URL:**
 ```
-https://abc123def456.ngrok-free.app/api/atendimento/webhooks/whatsapp
+https://abc123def456.ngrok-free.app/api/atendimento/webhooks/whatsapp/<EMPRESA_ID>
 ```
 
 **Verify Token:**
@@ -190,7 +194,7 @@ No terminal do backend, você verá:
 **Solução:**
 1. Verificar se backend está rodando: http://localhost:3001
 2. Verificar dashboard ngrok: http://127.0.0.1:4040
-3. Conferir URL completa (com `/api/atendimento/webhooks/whatsapp`)
+3. Conferir URL completa (com `/api/atendimento/webhooks/whatsapp/<EMPRESA_ID>`) 
 4. Conferir verify token exatamente como está
 
 ### **Erro: "Webhook não recebe mensagens"**
@@ -249,7 +253,7 @@ async receiveWebhook(@Body() body: any) {
 
 ### **Para Meta Developers (Webhook):**
 ```
-Callback URL: https://SEU_NGROK.ngrok-free.app/api/atendimento/webhooks/whatsapp
+Callback URL: https://SEU_NGROK.ngrok-free.app/api/atendimento/webhooks/whatsapp/<EMPRESA_ID>
 Verify Token: conectcrm_webhook_token_123
 ```
 
@@ -273,7 +277,7 @@ Você vai precisar também:
 - [ ] ngrok conectado
 - [ ] URL do ngrok copiada
 - [ ] Meta Developers aberto
-- [ ] Callback URL configurada (com `/api/atendimento/webhooks/whatsapp`)
+- [ ] Callback URL configurada (com `/api/atendimento/webhooks/whatsapp/<EMPRESA_ID>`)
 - [ ] Verify Token configurado (`conectcrm_webhook_token_123`)
 - [ ] Eventos marcados (messages, message_status)
 - [ ] Clicou em "Verify and Save"

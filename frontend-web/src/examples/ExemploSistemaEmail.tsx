@@ -10,7 +10,7 @@ import { gerarTokenNumerico, formatarTokenParaExibicao } from '../utils/tokenUti
 // Para demonstração - em um projeto real você usaria react-hot-toast ou similar
 const toast = {
   success: (msg: string) => alert('✅ ' + msg),
-  error: (msg: string) => alert('❌ ' + msg)
+  error: (msg: string) => alert('❌ ' + msg),
 };
 
 // ============================================
@@ -26,26 +26,26 @@ export const exemploEnvioProposta = async () => {
   const dadosProposta = {
     cliente: {
       nome: 'João Silva',
-      email: 'joao@exemplo.com'
+      email: 'joao@exemplo.com',
     },
     proposta: {
       numero: '2024-001',
-      valorTotal: 5000.00,
+      valorTotal: 5000.0,
       dataValidade: '31/12/2024',
-      token: token
+      token: token,
     },
     vendedor: {
       nome: 'Maria Santos',
       email: 'maria@conectcrm.com',
-      telefone: '(11) 99999-9999'
+      telefone: '(11) 99999-9999',
     },
     empresa: {
       nome: 'ConectCRM',
       email: 'contato@conectcrm.com',
       telefone: '(11) 88888-8888',
-      endereco: 'Rua das Empresas, 123 - São Paulo/SP'
+      endereco: 'Rua das Empresas, 123 - São Paulo/SP',
     },
-    portalUrl: 'http://localhost:3000/portal'
+    portalUrl: 'http://localhost:3000/portal',
   };
 
   // 3. Enviar e-mail
@@ -118,26 +118,26 @@ export const ExemploComponenteEmail: React.FC = () => {
       const dados = {
         cliente: {
           nome: 'Cliente Teste',
-          email: 'cliente@teste.com'
+          email: 'cliente@teste.com',
         },
         proposta: {
           numero: 'TESTE-001',
-          valorTotal: 1500.00,
+          valorTotal: 1500.0,
           dataValidade: '31/12/2024',
-          token: token
+          token: token,
         },
         vendedor: {
           nome: 'Vendedor Teste',
           email: 'vendedor@conectcrm.com',
-          telefone: '(11) 99999-9999'
+          telefone: '(11) 99999-9999',
         },
         empresa: {
           nome: 'ConectCRM',
           email: 'contato@conectcrm.com',
           telefone: '(11) 88888-8888',
-          endereco: 'São Paulo/SP'
+          endereco: 'São Paulo/SP',
         },
-        portalUrl: window.location.origin + '/portal'
+        portalUrl: window.location.origin + '/portal',
       };
 
       const resultado = await emailServiceReal.enviarPropostaParaCliente(dados);
@@ -201,7 +201,7 @@ export const configuracaoProducao = {
 
     // Debug (desligar em produção)
     REACT_APP_EMAIL_DEBUG: 'false',
-    REACT_APP_EMAIL_TEST_MODE: 'false'
+    REACT_APP_EMAIL_TEST_MODE: 'false',
   },
 
   // Configurações recomendadas
@@ -211,8 +211,8 @@ export const configuracaoProducao = {
     '📧 Teste com e-mails reais antes de usar',
     '📊 Monitor logs de envio em produção',
     '🔄 Configure backup de provedores',
-    '🛡️ Use HTTPS em produção sempre'
-  ]
+    '🛡️ Use HTTPS em produção sempre',
+  ],
 };
 
 // Para usar os exemplos, chame as funções:
@@ -232,5 +232,5 @@ export default {
   exemploTesteConfiguracao,
   exemploVerificarStatus,
   ExemploComponenteEmail,
-  configuracaoProducao
+  configuracaoProducao,
 };

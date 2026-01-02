@@ -17,11 +17,14 @@ import {
   Building,
   X,
   Save,
-  Upload
+  Upload,
 } from 'lucide-react';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 import ModalConfirmacao from '../../../components/common/ModalConfirmacao';
-import { useConfirmacaoInteligente, useValidacaoFinanceira } from '../../../hooks/useConfirmacaoInteligente';
+import {
+  useConfirmacaoInteligente,
+  useValidacaoFinanceira,
+} from '../../../hooks/useConfirmacaoInteligente';
 import {
   ContaPagar,
   StatusContaPagar,
@@ -34,7 +37,7 @@ import {
   FORMA_PAGAMENTO_LABELS,
   CategoriaContaPagar,
   FormaPagamento,
-  PrioridadePagamento
+  PrioridadePagamento,
 } from '../../../types/financeiro';
 
 // Importar os novos componentes aprimorados
@@ -89,19 +92,19 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
             email: 'contato@techsolutions.com',
             ativo: true,
             criadoEm: '2024-01-01',
-            atualizadoEm: '2024-01-01'
+            atualizadoEm: '2024-01-01',
           },
           descricao: 'Licenças de software mensal',
           numeroDocumento: 'NF-001234',
           dataEmissao: '2024-01-01',
           dataVencimento: '2024-01-15',
-          valorOriginal: 2500.00,
+          valorOriginal: 2500.0,
           valorDesconto: 0,
           valorMulta: 0,
           valorJuros: 0,
-          valorTotal: 2500.00,
+          valorTotal: 2500.0,
           valorPago: 0,
-          valorRestante: 2500.00,
+          valorRestante: 2500.0,
           status: StatusContaPagar.EM_ABERTO,
           categoria: CategoriaContaPagar.TECNOLOGIA,
           prioridade: PrioridadePagamento.ALTA,
@@ -113,7 +116,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
           criadoPor: 'user1',
           criadoEm: '2024-01-01',
           atualizadoEm: '2024-01-01',
-          tags: ['software', 'recorrente']
+          tags: ['software', 'recorrente'],
         },
         {
           id: '2',
@@ -126,18 +129,18 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
             email: 'vendas@papelaria.com',
             ativo: true,
             criadoEm: '2024-01-01',
-            atualizadoEm: '2024-01-01'
+            atualizadoEm: '2024-01-01',
           },
           descricao: 'Material de escritório',
           numeroDocumento: 'NF-567890',
           dataEmissao: '2024-01-10',
           dataVencimento: '2024-01-20',
-          valorOriginal: 450.00,
-          valorDesconto: 50.00,
+          valorOriginal: 450.0,
+          valorDesconto: 50.0,
           valorMulta: 0,
           valorJuros: 0,
-          valorTotal: 400.00,
-          valorPago: 400.00,
+          valorTotal: 400.0,
+          valorPago: 400.0,
           valorRestante: 0,
           status: StatusContaPagar.PAGO,
           categoria: CategoriaContaPagar.ESCRITORIO,
@@ -150,20 +153,20 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
           criadoPor: 'user1',
           criadoEm: '2024-01-10',
           atualizadoEm: '2024-01-18',
-          tags: ['material', 'escritorio']
-        }
+          tags: ['material', 'escritorio'],
+        },
       ];
 
       const mockResumo: ResumoFinanceiro = {
-        totalVencendoHoje: 5420.30,
+        totalVencendoHoje: 5420.3,
         quantidadeVencendoHoje: 3,
-        totalMes: 45230.80,
+        totalMes: 45230.8,
         quantidadeMes: 28,
-        totalAtrasado: 12450.00,
+        totalAtrasado: 12450.0,
         quantidadeAtrasado: 5,
-        totalPagoMes: 38920.50,
+        totalPagoMes: 38920.5,
         quantidadePagoMes: 22,
-        proximosVencimentos: mockContas.slice(0, 5)
+        proximosVencimentos: mockContas.slice(0, 5),
       };
 
       setContas(mockContas);
@@ -195,27 +198,28 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
   const handleExcluirConta = async (contaId: string) => {
     try {
       // Buscar a conta para validação
-      const conta = contas.find(c => c.id === contaId);
+      const conta = contas.find((c) => c.id === contaId);
       if (!conta) return;
 
       // Usar confirmação inteligente baseada no status da conta
-      const tipoConfirmacao = conta.status === StatusContaPagar.PAGO ? 'estornar-pagamento' : 'excluir-transacao';
-      
+      const tipoConfirmacao =
+        conta.status === StatusContaPagar.PAGO ? 'estornar-pagamento' : 'excluir-transacao';
+
       // Obter dados contextuais
       const dadosContexto = {
         numero: conta.numero,
         valor: conta.valorTotal,
         cliente: conta.fornecedor?.nome,
-        status: STATUS_LABELS[conta.status]
+        status: STATUS_LABELS[conta.status],
       };
 
       // Mostrar confirmação inteligente
       confirmacao.confirmar(
         tipoConfirmacao,
         async () => {
-          setContas(contas.filter(c => c.id !== contaId));
+          setContas(contas.filter((c) => c.id !== contaId));
         },
-        dadosContexto
+        dadosContexto,
       );
     } catch (err) {
       console.error('Erro ao excluir conta:', err);
@@ -244,7 +248,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
 
   // Filtros e busca
   const contasFiltradas = useMemo(() => {
-    return contas.filter(conta => {
+    return contas.filter((conta) => {
       if (termoBusca) {
         const termo = termoBusca.toLowerCase();
         return (
@@ -261,7 +265,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
   const formatarMoeda = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(valor);
   };
 
@@ -309,10 +313,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
     return (
       <div className="text-center py-12">
         <div className="text-red-600 text-lg mb-2">{error}</div>
-        <button
-          onClick={carregarDados}
-          className="text-blue-600 hover:text-blue-800 underline"
-        >
+        <button onClick={carregarDados} className="text-blue-600 hover:text-blue-800 underline">
           Tentar novamente
         </button>
       </div>
@@ -323,10 +324,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusPath="/nuclei/financeiro"
-          nucleusName="Financeiro"
-        />
+        <BackToNucleus nucleusPath="/nuclei/financeiro" nucleusName="Financeiro" />
       </div>
 
       <div className="p-6">
@@ -342,7 +340,9 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                 )}
               </h1>
               <p className="mt-2 text-[#B4BEC9]">
-                {loading ? 'Carregando contas...' : `Gerencie suas ${contasFiltradas.length} obrigações financeiras`}
+                {loading
+                  ? 'Carregando contas...'
+                  : `Gerencie suas ${contasFiltradas.length} obrigações financeiras`}
               </p>
             </div>
 
@@ -372,11 +372,15 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
             <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Vencendo Hoje</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                    Vencendo Hoje
+                  </p>
                   <p className="text-3xl font-bold text-[#002333] mt-2">
                     {formatarMoeda(resumoFinanceiro.totalVencendoHoje)}
                   </p>
-                  <p className="text-sm text-[#002333]/70 mt-3">⏰ {resumoFinanceiro.quantidadeVencendoHoje} conta(s)</p>
+                  <p className="text-sm text-[#002333]/70 mt-3">
+                    ⏰ {resumoFinanceiro.quantidadeVencendoHoje} conta(s)
+                  </p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
                   <Clock className="w-6 h-6 text-yellow-600" />
@@ -387,11 +391,15 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
             <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Total do Mês</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                    Total do Mês
+                  </p>
                   <p className="text-3xl font-bold text-[#002333] mt-2">
                     {formatarMoeda(resumoFinanceiro.totalMes)}
                   </p>
-                  <p className="text-sm text-[#002333]/70 mt-3">📅 {resumoFinanceiro.quantidadeMes} conta(s)</p>
+                  <p className="text-sm text-[#002333]/70 mt-3">
+                    📅 {resumoFinanceiro.quantidadeMes} conta(s)
+                  </p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
                   <Calendar className="w-6 h-6 text-[#159A9C]" />
@@ -402,11 +410,15 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
             <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Em Atraso</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                    Em Atraso
+                  </p>
                   <p className="text-3xl font-bold text-[#002333] mt-2">
                     {formatarMoeda(resumoFinanceiro.totalAtrasado)}
                   </p>
-                  <p className="text-sm text-[#002333]/70 mt-3">🚨 {resumoFinanceiro.quantidadeAtrasado} conta(s)</p>
+                  <p className="text-sm text-[#002333]/70 mt-3">
+                    🚨 {resumoFinanceiro.quantidadeAtrasado} conta(s)
+                  </p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center shadow-sm">
                   <AlertTriangle className="w-6 h-6 text-red-600" />
@@ -417,11 +429,15 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
             <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Pago no Mês</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                    Pago no Mês
+                  </p>
                   <p className="text-3xl font-bold text-[#002333] mt-2">
                     {formatarMoeda(resumoFinanceiro.totalPagoMes)}
                   </p>
-                  <p className="text-sm text-[#002333]/70 mt-3">✅ {resumoFinanceiro.quantidadePagoMes} conta(s)</p>
+                  <p className="text-sm text-[#002333]/70 mt-3">
+                    ✅ {resumoFinanceiro.quantidadePagoMes} conta(s)
+                  </p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
                   <CheckCircle className="w-6 h-6 text-green-600" />
@@ -470,7 +486,10 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
         <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
           <div className="flex-1 max-w-md">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <Search
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                size={20}
+              />
               <input
                 type="text"
                 placeholder="Buscar por número, fornecedor, descrição..."
@@ -521,7 +540,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                     type="checkbox"
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setContasSelecionadas(contas.map(c => c.id));
+                        setContasSelecionadas(contas.map((c) => c.id));
                       } else {
                         setContasSelecionadas([]);
                       }
@@ -578,14 +597,18 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {contasFiltradas.map((conta) => {
-                const isVencida = new Date(conta.dataVencimento) < new Date() && conta.status === StatusContaPagar.EM_ABERTO;
-                const isVencendoHoje = new Date(conta.dataVencimento).toDateString() === new Date().toDateString();
+                const isVencida =
+                  new Date(conta.dataVencimento) < new Date() &&
+                  conta.status === StatusContaPagar.EM_ABERTO;
+                const isVencendoHoje =
+                  new Date(conta.dataVencimento).toDateString() === new Date().toDateString();
 
                 return (
                   <tr
                     key={conta.id}
-                    className={`hover:bg-gray-50 transition-colors ${isVencida ? 'bg-red-50' : isVencendoHoje ? 'bg-orange-50' : ''
-                      }`}
+                    className={`hover:bg-gray-50 transition-colors ${
+                      isVencida ? 'bg-red-50' : isVencendoHoje ? 'bg-orange-50' : ''
+                    }`}
                   >
                     <td className="px-4 py-4">
                       <input
@@ -595,7 +618,9 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                           if (e.target.checked) {
                             setContasSelecionadas([...contasSelecionadas, conta.id]);
                           } else {
-                            setContasSelecionadas(contasSelecionadas.filter(id => id !== conta.id));
+                            setContasSelecionadas(
+                              contasSelecionadas.filter((id) => id !== conta.id),
+                            );
                           }
                         }}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -616,7 +641,10 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                       <div className="text-sm text-gray-500">{conta.fornecedor.cnpjCpf}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900 max-w-xs truncate" title={conta.descricao}>
+                      <div
+                        className="text-sm text-gray-900 max-w-xs truncate"
+                        title={conta.descricao}
+                      >
                         {conta.descricao}
                       </div>
                       {conta.numeroDocumento && (
@@ -629,10 +657,15 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className={`text-sm ${isVencida ? 'text-red-600 font-medium' :
-                          isVencendoHoje ? 'text-orange-600 font-medium' :
-                            'text-gray-900'
-                        }`}>
+                      <div
+                        className={`text-sm ${
+                          isVencida
+                            ? 'text-red-600 font-medium'
+                            : isVencendoHoje
+                              ? 'text-orange-600 font-medium'
+                              : 'text-gray-900'
+                        }`}
+                      >
                         {formatarData(conta.dataVencimento)}
                       </div>
                       {(isVencida || isVencendoHoje) && (
@@ -654,7 +687,9 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         {getStatusIcon(conta.status)}
-                        <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(conta.status)}`}>
+                        <span
+                          className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(conta.status)}`}
+                        >
                           {STATUS_LABELS[conta.status]}
                         </span>
                       </div>
@@ -722,7 +757,9 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
             <div className="p-6">
               <div className="mb-4">
                 <p className="text-sm text-gray-600">Conta: {contaSelecionada.numero}</p>
-                <p className="text-sm text-gray-600">Fornecedor: {contaSelecionada.fornecedor.nome}</p>
+                <p className="text-sm text-gray-600">
+                  Fornecedor: {contaSelecionada.fornecedor.nome}
+                </p>
                 <p className="text-lg font-semibold text-red-600">
                   Valor Restante: {formatarMoeda(contaSelecionada.valorRestante)}
                 </p>

@@ -12,34 +12,34 @@ jest.mock('../hooks/useAccessibility', () => ({
 describe('AccessibleButton', () => {
   it('deve renderizar texto do botão corretamente', () => {
     render(<AccessibleButton>Clique aqui</AccessibleButton>);
-    
+
     expect(screen.getByRole('button', { name: 'Clique aqui' })).toBeInTheDocument();
   });
 
   it('deve aplicar variant primary por padrão', () => {
     render(<AccessibleButton>Botão</AccessibleButton>);
-    
+
     const button = screen.getByRole('button');
     expect(button).toHaveClass('bg-blue-600', 'text-white');
   });
 
   it('deve aplicar variant secundário corretamente', () => {
     render(<AccessibleButton variant="secondary">Botão</AccessibleButton>);
-    
+
     const button = screen.getByRole('button');
     expect(button).toHaveClass('bg-gray-600', 'text-white');
   });
 
   it('deve aplicar variant outline corretamente', () => {
     render(<AccessibleButton variant="outline">Botão</AccessibleButton>);
-    
+
     const button = screen.getByRole('button');
     expect(button).toHaveClass('border-2', 'border-blue-600', 'text-blue-600');
   });
 
   it('deve aplicar variant danger corretamente', () => {
     render(<AccessibleButton variant="danger">Botão</AccessibleButton>);
-    
+
     const button = screen.getByRole('button');
     expect(button).toHaveClass('bg-red-600', 'text-white');
   });
@@ -58,9 +58,9 @@ describe('AccessibleButton', () => {
     render(
       <AccessibleButton loading={true} loadingText="Salvando...">
         Salvar
-      </AccessibleButton>
+      </AccessibleButton>,
     );
-    
+
     const button = screen.getByRole('button');
     expect(button).toHaveAttribute('aria-busy', 'true');
     expect(button).toBeDisabled();
@@ -70,7 +70,7 @@ describe('AccessibleButton', () => {
   it('deve chamar onClick quando clicado', () => {
     const handleClick = jest.fn();
     render(<AccessibleButton onClick={handleClick}>Clique</AccessibleButton>);
-    
+
     fireEvent.click(screen.getByRole('button'));
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
@@ -80,9 +80,9 @@ describe('AccessibleButton', () => {
     render(
       <AccessibleButton onClick={handleClick} loading={true}>
         Clique
-      </AccessibleButton>
+      </AccessibleButton>,
     );
-    
+
     fireEvent.click(screen.getByRole('button'));
     expect(handleClick).not.toHaveBeenCalled();
   });
@@ -92,9 +92,9 @@ describe('AccessibleButton', () => {
     render(
       <AccessibleButton onClick={handleClick} disabled={true}>
         Clique
-      </AccessibleButton>
+      </AccessibleButton>,
     );
-    
+
     fireEvent.click(screen.getByRole('button'));
     expect(handleClick).not.toHaveBeenCalled();
   });
@@ -102,23 +102,20 @@ describe('AccessibleButton', () => {
   it('deve renderizar ícones corretamente', () => {
     const LeftIcon = () => <span data-testid="left-icon">←</span>;
     const RightIcon = () => <span data-testid="right-icon">→</span>;
-    
+
     render(
-      <AccessibleButton
-        leftIcon={<LeftIcon />}
-        rightIcon={<RightIcon />}
-      >
+      <AccessibleButton leftIcon={<LeftIcon />} rightIcon={<RightIcon />}>
         Botão com ícones
-      </AccessibleButton>
+      </AccessibleButton>,
     );
-    
+
     expect(screen.getByTestId('left-icon')).toBeInTheDocument();
     expect(screen.getByTestId('right-icon')).toBeInTheDocument();
   });
 
   it('deve aplicar fullWidth corretamente', () => {
     render(<AccessibleButton fullWidth={true}>Botão largo</AccessibleButton>);
-    
+
     const button = screen.getByRole('button');
     expect(button).toHaveClass('w-full');
   });
@@ -138,19 +135,15 @@ describe('AccessibleButton', () => {
   });
 
   it('deve ter aria-label customizado', () => {
-    render(
-      <AccessibleButton aria-label="Botão personalizado">
-        Clique
-      </AccessibleButton>
-    );
-    
+    render(<AccessibleButton aria-label="Botão personalizado">Clique</AccessibleButton>);
+
     const button = screen.getByRole('button');
     expect(button).toHaveAttribute('aria-label', 'Botão personalizado');
   });
 
   it('deve ser focável via teclado', () => {
     render(<AccessibleButton>Focável</AccessibleButton>);
-    
+
     const button = screen.getByRole('button');
     button.focus();
     expect(button).toHaveFocus();
@@ -159,7 +152,7 @@ describe('AccessibleButton', () => {
   it('deve responder a tecla Enter', () => {
     const handleClick = jest.fn();
     render(<AccessibleButton onClick={handleClick}>Botão</AccessibleButton>);
-    
+
     const button = screen.getByRole('button');
     fireEvent.keyDown(button, { key: 'Enter' });
     // O comportamento padrão do navegador deve chamar o onClick
@@ -168,7 +161,7 @@ describe('AccessibleButton', () => {
   it('deve responder a tecla Space', () => {
     const handleClick = jest.fn();
     render(<AccessibleButton onClick={handleClick}>Botão</AccessibleButton>);
-    
+
     const button = screen.getByRole('button');
     fireEvent.keyDown(button, { key: ' ' });
     // O comportamento padrão do navegador deve chamar o onClick

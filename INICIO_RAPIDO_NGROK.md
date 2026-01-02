@@ -56,13 +56,14 @@ Use a URL copiada nos webhooks das plataformas (ver seção abaixo).
 **2. WhatsApp > Configuration**  
 **3. Callback URL:**
 ```
-https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp
+https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
 ```
 **4. Verify Token:**
 ```
 conectcrm_webhook_token_123
 ```
-**5. Eventos:** messages, message_status
+**5. Header obrigatório:** `X-Hub-Signature-256` (HMAC SHA256 com o App Secret)
+**6. Eventos:** messages, message_status
 
 ---
 
@@ -116,9 +117,10 @@ curl https://SEU_DOMINIO.ngrok-free.app/api/health
 
 **WhatsApp Webhook:**
 ```powershell
-curl -X POST https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp `
-  -H "Content-Type: application/json" `
-  -d '{"entry":[{"changes":[{"value":{"messages":[{"from":"5511999999999","text":{"body":"Teste"}}]}}]}]}'
+curl -X POST https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA> `
+   -H "Content-Type: application/json" `
+   -H "X-Hub-Signature-256: sha256=<HMAC_GERADO>" `
+   -d '{"entry":[{"changes":[{"value":{"messages":[{"from":"5511999999999","text":{"body":"Teste"}}]}}]}]}'
 ```
 
 ---

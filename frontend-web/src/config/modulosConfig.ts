@@ -17,7 +17,8 @@ export const MODULOS_INFO: Record<ModuloEnum, ModuloInfo> = {
   [ModuloEnum.ATENDIMENTO]: {
     id: ModuloEnum.ATENDIMENTO,
     nome: 'Atendimento',
-    descricao: 'Gestão completa de atendimento ao cliente com chat, tickets, triagem automática, equipes, fluxos conversacionais e integração WhatsApp.',
+    descricao:
+      'Gestão completa de atendimento ao cliente com chat, tickets, triagem automática, equipes, fluxos conversacionais e integração WhatsApp.',
     preco: 'R$ 199',
     recursos: [
       'Chat em tempo real com clientes',
@@ -27,14 +28,15 @@ export const MODULOS_INFO: Record<ModuloEnum, ModuloInfo> = {
       'Fluxos conversacionais personalizados',
       'Integração WhatsApp Business',
       'Histórico completo de atendimentos',
-      'Relatórios e métricas de performance'
-    ]
+      'Relatórios e métricas de performance',
+    ],
   },
 
   [ModuloEnum.CRM]: {
     id: ModuloEnum.CRM,
     nome: 'CRM',
-    descricao: 'Gestão completa de relacionamento com clientes. Base de dados centralizada, histórico de interações, segmentação e análise de comportamento.',
+    descricao:
+      'Gestão completa de relacionamento com clientes. Base de dados centralizada, histórico de interações, segmentação e análise de comportamento.',
     preco: 'R$ 299',
     recursos: [
       'Base de clientes ilimitada',
@@ -44,14 +46,15 @@ export const MODULOS_INFO: Record<ModuloEnum, ModuloInfo> = {
       'Tags e categorização',
       'Pipeline de relacionamento',
       'Análise de comportamento',
-      'Integração com outros módulos'
-    ]
+      'Integração com outros módulos',
+    ],
   },
 
   [ModuloEnum.VENDAS]: {
     id: ModuloEnum.VENDAS,
     nome: 'Vendas',
-    descricao: 'Gestão completa do ciclo de vendas. Propostas, cotações, produtos, combos, funil de vendas e acompanhamento de oportunidades.',
+    descricao:
+      'Gestão completa do ciclo de vendas. Propostas, cotações, produtos, combos, funil de vendas e acompanhamento de oportunidades.',
     preco: 'R$ 349',
     recursos: [
       'Gestão de propostas comerciais',
@@ -61,14 +64,15 @@ export const MODULOS_INFO: Record<ModuloEnum, ModuloInfo> = {
       'Funil de vendas visual',
       'Acompanhamento de oportunidades',
       'Previsão de receita',
-      'Relatórios de performance de vendas'
-    ]
+      'Relatórios de performance de vendas',
+    ],
   },
 
   [ModuloEnum.FINANCEIRO]: {
     id: ModuloEnum.FINANCEIRO,
     nome: 'Financeiro',
-    descricao: 'Controle financeiro completo. Contas a pagar e receber, fluxo de caixa, gestão de fornecedores e relatórios financeiros.',
+    descricao:
+      'Controle financeiro completo. Contas a pagar e receber, fluxo de caixa, gestão de fornecedores e relatórios financeiros.',
     preco: 'R$ 249',
     recursos: [
       'Contas a pagar e receber',
@@ -78,14 +82,15 @@ export const MODULOS_INFO: Record<ModuloEnum, ModuloInfo> = {
       'Conciliação bancária',
       'Relatórios financeiros',
       'Previsão de caixa',
-      'Alertas de vencimento'
-    ]
+      'Alertas de vencimento',
+    ],
   },
 
   [ModuloEnum.BILLING]: {
     id: ModuloEnum.BILLING,
     nome: 'Billing',
-    descricao: 'Gestão de assinaturas e pagamentos recorrentes. Planos, faturas automáticas, controle de cobranças e integração com gateways de pagamento.',
+    descricao:
+      'Gestão de assinaturas e pagamentos recorrentes. Planos, faturas automáticas, controle de cobranças e integração com gateways de pagamento.',
     preco: 'R$ 199',
     recursos: [
       'Gestão de assinaturas',
@@ -95,14 +100,15 @@ export const MODULOS_INFO: Record<ModuloEnum, ModuloInfo> = {
       'Integração com gateways',
       'Controle de inadimplência',
       'Relatórios de MRR/ARR',
-      'Gestão de upgrades/downgrades'
-    ]
+      'Gestão de upgrades/downgrades',
+    ],
   },
 
   [ModuloEnum.ADMINISTRACAO]: {
     id: ModuloEnum.ADMINISTRACAO,
     nome: 'Administração',
-    descricao: 'Módulo de gestão empresarial multi-tenant. Controle de empresas, usuários, permissões avançadas e auditoria completa. Exclusivo para plano Enterprise.',
+    descricao:
+      'Módulo de gestão empresarial multi-tenant. Controle de empresas, usuários, permissões avançadas e auditoria completa. Exclusivo para plano Enterprise.',
     preco: 'R$ 999',
     recursos: [
       'Gestão multi-tenant',
@@ -112,9 +118,9 @@ export const MODULOS_INFO: Record<ModuloEnum, ModuloInfo> = {
       'Auditoria completa de ações',
       'Dashboard administrativo',
       'Relatórios consolidados',
-      'Suporte prioritário'
-    ]
-  }
+      'Suporte prioritário',
+    ],
+  },
 };
 
 /**

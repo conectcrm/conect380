@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useI18n } from '../../contexts/I18nContext';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import { ModalProposta } from '../../components/modals/ModalProposta';
@@ -47,7 +47,7 @@ import {
   Target,
   TrendingDown,
   Users,
-  Copy
+  Copy,
 } from 'lucide-react';
 
 // 🔧 Função auxiliar para buscar dados reais do cliente (com cache para evitar requisições duplicadas)
@@ -68,7 +68,7 @@ const buscarDadosReaisDoCliente = async (nome: string, emailFicticio: string = '
   try {
     // ⚡ OTIMIZADO: Verificar se o cache global ainda é válido
     const agora = Date.now();
-    const cacheExpirado = (agora - ultimaCarregaClientes) > CACHE_CLIENTES_DURACAO;
+    const cacheExpirado = agora - ultimaCarregaClientes > CACHE_CLIENTES_DURACAO;
 
     if (!clientesGlobaisPromise || cacheExpirado) {
       if (cacheExpirado) {
@@ -76,24 +76,26 @@ const buscarDadosReaisDoCliente = async (nome: string, emailFicticio: string = '
       }
 
       ultimaCarregaClientes = agora;
-      clientesGlobaisPromise = import('../../services/clientesService').then(module =>
-        module.clientesService.getClientes({ limit: 100 })
-      ).then(response => {
-        return response?.data || [];
-      }).catch(error => {
-        console.error(`❌ [CACHE GLOBAL] Erro ao carregar clientes:`, error);
-        clientesGlobaisPromise = null; // Reset para tentar novamente
-        ultimaCarregaClientes = 0;
-        return [];
-      });
+      clientesGlobaisPromise = import('../../services/clientesService')
+        .then((module) => module.clientesService.getClientes({ limit: 100 }))
+        .then((response) => {
+          return response?.data || [];
+        })
+        .catch((error) => {
+          console.error(`❌ [CACHE GLOBAL] Erro ao carregar clientes:`, error);
+          clientesGlobaisPromise = null; // Reset para tentar novamente
+          ultimaCarregaClientes = 0;
+          return [];
+        });
     }
 
     const todosClientes = await clientesGlobaisPromise;
 
     if (todosClientes && todosClientes.length > 0) {
-      const clienteReal = todosClientes.find(c =>
-        c.nome?.toLowerCase().includes(nome.toLowerCase()) ||
-        nome.toLowerCase().includes(c.nome?.toLowerCase())
+      const clienteReal = todosClientes.find(
+        (c) =>
+          c.nome?.toLowerCase().includes(nome.toLowerCase()) ||
+          nome.toLowerCase().includes(c.nome?.toLowerCase()),
       );
 
       let resultado = null;
@@ -101,7 +103,7 @@ const buscarDadosReaisDoCliente = async (nome: string, emailFicticio: string = '
         resultado = {
           nome: clienteReal.nome,
           email: clienteReal.email,
-          telefone: clienteReal.telefone
+          telefone: clienteReal.telefone,
         };
       }
 
@@ -132,11 +134,11 @@ const converterPropostaParaUI = async (proposta: any) => {
     clienteTelefone = safeRender(proposta.cliente.telefone) || '';
 
     // ⚡ OTIMIZADO: Só buscar dados reais se realmente necessário e não estiver em cache
-    const isEmailFicticio = clienteEmail && (
-      clienteEmail.includes('@cliente.com') ||
-      clienteEmail.includes('@cliente.temp') ||
-      clienteEmail.includes('@email.com')
-    );
+    const isEmailFicticio =
+      clienteEmail &&
+      (clienteEmail.includes('@cliente.com') ||
+        clienteEmail.includes('@cliente.temp') ||
+        clienteEmail.includes('@email.com'));
 
     if (isEmailFicticio) {
       // ✅ CACHE OTIMIZADO: Verificar cache primeiro, apenas buscar se necessário
@@ -189,11 +191,17 @@ const converterPropostaParaUI = async (proposta: any) => {
 
   // 🔧 CORREÇÃO DE DATAS - Garantir que as datas sejam válidas
   const criadaEm = proposta.criadaEm ? new Date(proposta.criadaEm) : new Date();
-  const dataValidade = proposta.dataValidade ? new Date(proposta.dataValidade) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 dias por padrão
+  const dataValidade = proposta.dataValidade
+    ? new Date(proposta.dataValidade)
+    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 dias por padrão
 
   // Validar se as datas são válidas
-  const dataCreated = !isNaN(criadaEm.getTime()) ? criadaEm.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
-  const dataExpiry = !isNaN(dataValidade.getTime()) ? dataValidade.toISOString().split('T')[0] : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const dataCreated = !isNaN(criadaEm.getTime())
+    ? criadaEm.toISOString().split('T')[0]
+    : new Date().toISOString().split('T')[0];
+  const dataExpiry = !isNaN(dataValidade.getTime())
+    ? dataValidade.toISOString().split('T')[0]
+    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
   // Calcular dias restantes
   const hoje = new Date();
@@ -212,15 +220,24 @@ const converterPropostaParaUI = async (proposta: any) => {
     data_vencimento: dataExpiry,
     dias_restantes: diasRestantes, // ✅ Campo calculado para mostrar dias restantes
     data_aprovacao: proposta.status === 'aprovada' ? new Date().toISOString().split('T')[0] : null,
-    vendedor: typeof proposta.vendedor === 'object' && proposta.vendedor?.nome
-      ? safeRender(proposta.vendedor.nome)
-      : typeof proposta.vendedor === 'string'
-        ? safeRender(proposta.vendedor)
-        : 'Sistema', // Usando vendedor real quando disponível
-    descricao: safeRender(proposta.observacoes) || `Proposta com ${proposta.produtos?.length || 0} produtos`,
-    probabilidade: proposta.status === 'aprovada' ? 100 : proposta.status === 'enviada' ? 70 : proposta.status === 'rejeitada' ? 0 : 30,
+    vendedor:
+      typeof proposta.vendedor === 'object' && proposta.vendedor?.nome
+        ? safeRender(proposta.vendedor.nome)
+        : typeof proposta.vendedor === 'string'
+          ? safeRender(proposta.vendedor)
+          : 'Sistema', // Usando vendedor real quando disponível
+    descricao:
+      safeRender(proposta.observacoes) || `Proposta com ${proposta.produtos?.length || 0} produtos`,
+    probabilidade:
+      proposta.status === 'aprovada'
+        ? 100
+        : proposta.status === 'enviada'
+          ? 70
+          : proposta.status === 'rejeitada'
+            ? 0
+            : 30,
     categoria: 'proposta',
-    urgencia: diasRestantes <= 3 ? 'alta' : diasRestantes <= 7 ? 'media' : 'baixa' // ✅ Indicador de urgência
+    urgencia: diasRestantes <= 3 ? 'alta' : diasRestantes <= 7 ? 'media' : 'baixa', // ✅ Indicador de urgência
   };
 
   return resultado;
@@ -231,6 +248,8 @@ const converterPropostaParaUI = async (proposta: any) => {
 const PropostasPage: React.FC = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   // Estados inicializados com arrays vazios - dados vêm do banco
   const [propostas, setPropostas] = useState<any[]>([]);
   const [filteredPropostas, setFilteredPropostas] = useState<any[]>([]);
@@ -249,13 +268,13 @@ const PropostasPage: React.FC = () => {
     pendingUpdate: false,
     updateSource: '',
     batchTimeout: null as NodeJS.Timeout | null,
-    requestId: null as string | null
+    requestId: null as string | null,
   });
   const REFRESH_CONFIG = {
-    minInterval: 5000,        // Intervalo mínimo entre atualizações
-    batchWindow: 2000,        // Janela para agrupar múltiplas solicitações
-    forceInterval: 30000,     // Intervalo para forçar atualização mesmo sem mudanças
-    modalDebounce: 1000      // Debounce específico para interações do modal
+    minInterval: 5000, // Intervalo mínimo entre atualizações
+    batchWindow: 2000, // Janela para agrupar múltiplas solicitações
+    forceInterval: 30000, // Intervalo para forçar atualização mesmo sem mudanças
+    modalDebounce: 1000, // Debounce específico para interações do modal
   };
 
   // Sistema unificado de logs
@@ -264,14 +283,19 @@ const PropostasPage: React.FC = () => {
   // Novos estados para funcionalidades avançadas
   const [selectedPropostas, setSelectedPropostas] = useState<string[]>([]);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [sortBy, setSortBy] = useState<'data_criacao' | 'valor' | 'cliente' | 'status'>('data_criacao');
+  const [sortBy, setSortBy] = useState<'data_criacao' | 'valor' | 'cliente' | 'status'>(
+    'data_criacao',
+  );
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [valueRange, setValueRange] = useState({ min: '', max: '' });
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'cards' | 'dashboard'>('dashboard'); // Novo modo dashboard
   const [filtrosAvancados, setFiltrosAvancados] = useState<any>({});
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [notification, setNotification] = useState<{
+    message: string;
+    type: 'success' | 'error';
+  } | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedPropostaForView, setSelectedPropostaForView] = useState<any>(null);
 
@@ -289,120 +313,128 @@ const PropostasPage: React.FC = () => {
   }, []);
 
   // � Sistema Inteligente de Atualizações v2
-  const carregarPropostas = useCallback(async (options: {
-    force?: boolean;
-    source?: string;
-    immediate?: boolean;
-  } = {}) => {
-    const { force = false, source = 'manual', immediate = false } = options;
-    const now = Date.now();
-    const requestId = `req_${now}_${Math.random().toString(36).substr(2, 9)}`;
+  const carregarPropostas = useCallback(
+    async (
+      options: {
+        force?: boolean;
+        source?: string;
+        immediate?: boolean;
+      } = {},
+    ) => {
+      const { force = false, source = 'manual', immediate = false } = options;
+      const now = Date.now();
+      const requestId = `req_${now}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Função para verificar se devemos prosseguir com a atualização
-    const shouldUpdate = () => {
-      if (force) return true;
-      if (isLoadingPropostas) return false;
+      // Função para verificar se devemos prosseguir com a atualização
+      const shouldUpdate = () => {
+        if (force) return true;
+        if (isLoadingPropostas) return false;
 
-      const timeSinceLastUpdate = now - updateControl.current.lastUpdate;
-      if (timeSinceLastUpdate < REFRESH_CONFIG.minInterval) {
-        logUpdate('UPDATE_REJECTED', {
-          reason: 'TOO_SOON',
-          source,
-          timeSinceLastUpdate
-        });
-        return false;
-      }
+        const timeSinceLastUpdate = now - updateControl.current.lastUpdate;
+        if (timeSinceLastUpdate < REFRESH_CONFIG.minInterval) {
+          logUpdate('UPDATE_REJECTED', {
+            reason: 'TOO_SOON',
+            source,
+            timeSinceLastUpdate,
+          });
+          return false;
+        }
 
-      return true;
-    };
+        return true;
+      };
 
-    // Se já houver uma atualização pendente e não for forçada, apenas registre
-    if (!force && updateControl.current.pendingUpdate) {
-      logUpdate('UPDATE_QUEUED', { source, requestId });
-      return;
-    }
-
-    try {
-      setIsLoadingPropostas(true);
-      setIsLoading(true);
-      updateControl.current.lastUpdate = now;
-      updateControl.current.requestId = requestId;
-
-      const propostasReais = await propostasService.findAll();
-
-      // Verificar se esta requisição ainda é válida (evitar race conditions)
-      if (updateControl.current.requestId !== requestId) {
+      // Se já houver uma atualização pendente e não for forçada, apenas registre
+      if (!force && updateControl.current.pendingUpdate) {
+        logUpdate('UPDATE_QUEUED', { source, requestId });
         return;
       }
 
-      if (propostasReais && propostasReais.length > 0) {
-        // ✅ CONVERTER TODAS AS PROPOSTAS COM BUSCA DE DADOS REAIS
-        const propostasFormatadas = await Promise.all(
-          propostasReais.map(async (proposta) => {
-            // Converter proposta do backend para o formato esperado
-            const propostaFormatada = {
-              id: proposta.id,
-              numero: proposta.numero,
-              cliente: proposta.cliente, // O backend já retorna o objeto cliente correto
-              total: proposta.valor || proposta.total,
-              status: proposta.status,
-              observacoes: proposta.observacoes,
-              criadaEm: proposta.criadaEm || new Date().toISOString(),
-              dataValidade: proposta.dataVencimento || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-              vendedor: proposta.vendedor,
-              produtos: proposta.produtos || []
-            };
-            return await converterPropostaParaUI(propostaFormatada);
-          })
-        );
+      try {
+        setIsLoadingPropostas(true);
+        setIsLoading(true);
+        updateControl.current.lastUpdate = now;
+        updateControl.current.requestId = requestId;
 
-        // Verificar novamente se esta requisição ainda é válida
+        const propostasReais = await propostasService.findAll();
+
+        // Verificar se esta requisição ainda é válida (evitar race conditions)
         if (updateControl.current.requestId !== requestId) {
           return;
         }
 
-        // Validar que todas as propostas têm campos string
-        const propostasValidadas = propostasFormatadas.map(proposta => ({
-          ...proposta,
-          numero: safeRender(proposta.numero),
-          cliente: safeRender(proposta.cliente),
-          cliente_contato: safeRender(proposta.cliente_contato),
-          titulo: safeRender(proposta.titulo),
-          status: safeRender(proposta.status),
-          vendedor: safeRender(proposta.vendedor),
-          categoria: safeRender(proposta.categoria),
-          descricao: safeRender(proposta.descricao),
-          data_criacao: safeRender(proposta.data_criacao),
-          data_vencimento: safeRender(proposta.data_vencimento),
-          data_aprovacao: proposta.data_aprovacao ? safeRender(proposta.data_aprovacao) : null,
-          valor: Number(proposta.valor) || 0,
-          probabilidade: Number(proposta.probabilidade) || 0
-        }));
+        if (propostasReais && propostasReais.length > 0) {
+          // ✅ CONVERTER TODAS AS PROPOSTAS COM BUSCA DE DADOS REAIS
+          const propostasFormatadas = await Promise.all(
+            propostasReais.map(async (proposta) => {
+              // Converter proposta do backend para o formato esperado
+              const propostaFormatada = {
+                id: proposta.id,
+                numero: proposta.numero,
+                cliente: proposta.cliente, // O backend já retorna o objeto cliente correto
+                total: proposta.valor || proposta.total,
+                status: proposta.status,
+                observacoes: proposta.observacoes,
+                criadaEm: proposta.criadaEm || new Date().toISOString(),
+                dataValidade:
+                  proposta.dataVencimento ||
+                  new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                vendedor: proposta.vendedor,
+                produtos: proposta.produtos || [],
+              };
+              return await converterPropostaParaUI(propostaFormatada);
+            }),
+          );
 
-        setPropostas(propostasValidadas);
-        setFilteredPropostas(propostasValidadas);
-      } else {
+          // Verificar novamente se esta requisição ainda é válida
+          if (updateControl.current.requestId !== requestId) {
+            return;
+          }
+
+          // Validar que todas as propostas têm campos string
+          const propostasValidadas = propostasFormatadas.map((proposta) => ({
+            ...proposta,
+            numero: safeRender(proposta.numero),
+            cliente: safeRender(proposta.cliente),
+            cliente_contato: safeRender(proposta.cliente_contato),
+            titulo: safeRender(proposta.titulo),
+            status: safeRender(proposta.status),
+            vendedor: safeRender(proposta.vendedor),
+            categoria: safeRender(proposta.categoria),
+            descricao: safeRender(proposta.descricao),
+            data_criacao: safeRender(proposta.data_criacao),
+            data_vencimento: safeRender(proposta.data_vencimento),
+            data_aprovacao: proposta.data_aprovacao ? safeRender(proposta.data_aprovacao) : null,
+            valor: Number(proposta.valor) || 0,
+            probabilidade: Number(proposta.probabilidade) || 0,
+          }));
+
+          setPropostas(propostasValidadas);
+          setFilteredPropostas(propostasValidadas);
+        } else {
+          setPropostas([]);
+          setFilteredPropostas([]);
+        }
+      } catch (error) {
+        console.error(`❌ [OTIMIZADO] Erro ao carregar propostas (${requestId}):`, error);
         setPropostas([]);
         setFilteredPropostas([]);
+        const friendlyMessage =
+          error instanceof Error ? error.message : 'Erro ao carregar propostas do banco de dados';
+        showNotification(friendlyMessage, 'error');
+      } finally {
+        // Só resetar se ainda é a requisição atual
+        if (updateControl.current.requestId === requestId) {
+          setIsLoading(false);
+          setIsLoadingPropostas(false);
+          updateControl.current.requestId = null;
+        } else {
+          setIsLoading(false);
+          setIsLoadingPropostas(false);
+        }
       }
-    } catch (error) {
-      console.error(`❌ [OTIMIZADO] Erro ao carregar propostas (${requestId}):`, error);
-      setPropostas([]);
-      setFilteredPropostas([]);
-      // ❌ REMOVIDO: showNotification causa dependência circular
-      console.error('Erro ao carregar propostas do banco de dados');
-    } finally {
-      // Só resetar se ainda é a requisição atual
-      if (updateControl.current.requestId === requestId) {
-        setIsLoading(false);
-        setIsLoadingPropostas(false);
-        updateControl.current.requestId = null;
-      } else {
-        setIsLoading(false);
-        setIsLoadingPropostas(false);
-      }
-    }
-  }, [isLoadingPropostas]); // ✅ Dependências limpas
+    },
+    [isLoadingPropostas],
+  ); // ✅ Dependências limpas
 
   // ✅ CARREGAMENTO INICIAL SIMPLIFICADO - Sem dependência circular
   useEffect(() => {
@@ -418,6 +450,30 @@ const PropostasPage: React.FC = () => {
       isMounted = false;
     };
   }, []);
+
+  // ✅ DETECTAR PROPOSTA RECÉM-GERADA DO PIPELINE
+  useEffect(() => {
+    const propostaId = searchParams.get('proposta');
+
+    if (propostaId && propostas.length > 0) {
+      // Aguardar 500ms para garantir que propostas carregaram
+      const timer = setTimeout(() => {
+        const propostaEncontrada = propostas.find((p) => p.id === propostaId);
+
+        if (propostaEncontrada) {
+          console.log('✅ Proposta recém-gerada encontrada:', propostaEncontrada);
+
+          // Abrir modal de detalhes automaticamente
+          handleVisualizarProposta(propostaEncontrada);
+
+          // Limpar query string da URL
+          navigate(location.pathname, { replace: true });
+        }
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, propostas, location.pathname, navigate]);
   // 🔄 POLLING AUTOMÁTICO DESABILITADO - Causava múltiplas requisições desnecessárias
   // useEffect(() => {
   //   const intervalo = setInterval(() => {
@@ -460,17 +516,13 @@ const PropostasPage: React.FC = () => {
 
       // Atualização local imediata
       if (detail.propostaId && detail.novoStatus) {
-        setPropostas(prev => prev.map(p =>
-          p.id === detail.propostaId
-            ? { ...p, status: detail.novoStatus }
-            : p
-        ));
+        setPropostas((prev) =>
+          prev.map((p) => (p.id === detail.propostaId ? { ...p, status: detail.novoStatus } : p)),
+        );
 
-        setFilteredPropostas(prev => prev.map(p =>
-          p.id === detail.propostaId
-            ? { ...p, status: detail.novoStatus }
-            : p
-        ));
+        setFilteredPropostas((prev) =>
+          prev.map((p) => (p.id === detail.propostaId ? { ...p, status: detail.novoStatus } : p)),
+        );
       }
 
       // Agendar atualização do servidor
@@ -520,7 +572,9 @@ const PropostasPage: React.FC = () => {
       showNotification('Proposta criada com sucesso!', 'success');
     } catch (error) {
       console.error('❌ Erro ao criar proposta:', error);
-      showNotification('Erro ao criar proposta. Tente novamente.', 'error');
+      const friendlyMessage =
+        error instanceof Error ? error.message : 'Erro ao criar proposta. Tente novamente.';
+      showNotification(friendlyMessage, 'error');
     } finally {
       setIsLoadingCreate(false);
     }
@@ -532,27 +586,28 @@ const PropostasPage: React.FC = () => {
 
     // Filtro por busca
     if (searchTerm) {
-      filtered = filtered.filter(proposta =>
-        proposta.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        proposta.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        proposta.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        proposta.cliente_contato.toLowerCase().includes(searchTerm.toLowerCase())
+      filtered = filtered.filter(
+        (proposta) =>
+          proposta.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          proposta.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          proposta.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          proposta.cliente_contato.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
 
     // Filtro por status
     if (selectedStatus !== 'todos') {
-      filtered = filtered.filter(proposta => proposta.status === selectedStatus);
+      filtered = filtered.filter((proposta) => proposta.status === selectedStatus);
     }
 
     // Filtro por vendedor
     if (selectedVendedor !== 'todos') {
-      filtered = filtered.filter(proposta => proposta.vendedor === selectedVendedor);
+      filtered = filtered.filter((proposta) => proposta.vendedor === selectedVendedor);
     }
 
     // Filtros avançados - range de datas
     if (dateRange.start && dateRange.end) {
-      filtered = filtered.filter(proposta => {
+      filtered = filtered.filter((proposta) => {
         const dataCreated = new Date(proposta.data_criacao);
         const startDate = new Date(dateRange.start);
         const endDate = new Date(dateRange.end);
@@ -562,7 +617,7 @@ const PropostasPage: React.FC = () => {
 
     // Filtros avançados - range de valores
     if (valueRange.min || valueRange.max) {
-      filtered = filtered.filter(proposta => {
+      filtered = filtered.filter((proposta) => {
         const valor = proposta.valor;
         const min = valueRange.min ? parseFloat(valueRange.min) : 0;
         const max = valueRange.max ? parseFloat(valueRange.max) : Infinity;
@@ -572,13 +627,13 @@ const PropostasPage: React.FC = () => {
 
     // Filtros avançados do componente FiltrosAvancados
     if (filtrosAvancados.status) {
-      filtered = filtered.filter(p => p.status === filtrosAvancados.status);
+      filtered = filtered.filter((p) => p.status === filtrosAvancados.status);
     }
     if (filtrosAvancados.vendedor) {
-      filtered = filtered.filter(p => p.vendedor === filtrosAvancados.vendedor);
+      filtered = filtered.filter((p) => p.vendedor === filtrosAvancados.vendedor);
     }
     if (filtrosAvancados.dataInicio && filtrosAvancados.dataFim) {
-      filtered = filtered.filter(p => {
+      filtered = filtered.filter((p) => {
         const dataProposta = new Date(p.data_criacao);
         const inicio = new Date(filtrosAvancados.dataInicio);
         const fim = new Date(filtrosAvancados.dataFim);
@@ -588,7 +643,7 @@ const PropostasPage: React.FC = () => {
 
     // ✅ NOVO: Filtro por urgência
     if (filtrosAvancados.urgencia && filtrosAvancados.urgencia !== 'todas') {
-      filtered = filtered.filter(p => {
+      filtered = filtered.filter((p) => {
         switch (filtrosAvancados.urgencia) {
           case 'vencidas':
             return p.dias_restantes <= 0;
@@ -604,16 +659,16 @@ const PropostasPage: React.FC = () => {
       });
     }
     if (filtrosAvancados.valorMin !== undefined) {
-      filtered = filtered.filter(p => p.valor >= filtrosAvancados.valorMin);
+      filtered = filtered.filter((p) => p.valor >= filtrosAvancados.valorMin);
     }
     if (filtrosAvancados.valorMax !== undefined) {
-      filtered = filtered.filter(p => p.valor <= filtrosAvancados.valorMax);
+      filtered = filtered.filter((p) => p.valor <= filtrosAvancados.valorMax);
     }
     if (filtrosAvancados.categoria) {
-      filtered = filtered.filter(p => p.categoria === filtrosAvancados.categoria);
+      filtered = filtered.filter((p) => p.categoria === filtrosAvancados.categoria);
     }
     if (filtrosAvancados.probabilidadeMin !== undefined) {
-      filtered = filtered.filter(p => p.probabilidade >= filtrosAvancados.probabilidadeMin);
+      filtered = filtered.filter((p) => p.probabilidade >= filtrosAvancados.probabilidadeMin);
     }
 
     // Aplicar ordenação
@@ -641,7 +696,17 @@ const PropostasPage: React.FC = () => {
     });
 
     setFilteredPropostas(filtered);
-  }, [propostas, searchTerm, selectedStatus, selectedVendedor, dateRange, valueRange, sortBy, sortOrder, filtrosAvancados]);
+  }, [
+    propostas,
+    searchTerm,
+    selectedStatus,
+    selectedVendedor,
+    dateRange,
+    valueRange,
+    sortBy,
+    sortOrder,
+    filtrosAvancados,
+  ]);
 
   // Função para lidar com ações em lote
   const handleBulkAction = (action: string, success: boolean) => {
@@ -669,15 +734,15 @@ const PropostasPage: React.FC = () => {
     const isChecked = event.target.checked;
 
     if (isChecked) {
-      setPropostasSelecionadas(prev => [...prev, propostaId]);
+      setPropostasSelecionadas((prev) => [...prev, propostaId]);
     } else {
-      setPropostasSelecionadas(prev => prev.filter(id => id !== propostaId));
+      setPropostasSelecionadas((prev) => prev.filter((id) => id !== propostaId));
     }
   };
 
   // Selecionar todas as propostas visíveis
   const handleSelectAll = () => {
-    const propostasVisiveis = filteredPropostas.map(p => p.id?.toString() || p.numero);
+    const propostasVisiveis = filteredPropostas.map((p) => p.id?.toString() || p.numero);
     setPropostasSelecionadas(propostasVisiveis);
   };
 
@@ -695,7 +760,7 @@ const PropostasPage: React.FC = () => {
     const safeHandler = createSafeMouseHandler((rect) => {
       setPreviewPosition({
         x: rect.right + 10,
-        y: rect.top + rect.height / 2
+        y: rect.top + rect.height / 2,
       });
       setPreviewProposta(proposta);
       setShowPreview(true);
@@ -759,19 +824,31 @@ const PropostasPage: React.FC = () => {
     try {
       switch (acao) {
         case 'enviar-email':
-          showNotification(`Enviando ${propostasSelecionadas.length} proposta(s) por email...`, 'success');
+          showNotification(
+            `Enviando ${propostasSelecionadas.length} proposta(s) por email...`,
+            'success',
+          );
           break;
 
         case 'gerar-contratos':
-          showNotification(`Gerando contratos para ${propostasSelecionadas.length} proposta(s)...`, 'success');
+          showNotification(
+            `Gerando contratos para ${propostasSelecionadas.length} proposta(s)...`,
+            'success',
+          );
           break;
 
         case 'criar-faturas':
-          showNotification(`Criando faturas para ${propostasSelecionadas.length} proposta(s)...`, 'success');
+          showNotification(
+            `Criando faturas para ${propostasSelecionadas.length} proposta(s)...`,
+            'success',
+          );
           break;
 
         case 'avancar-fluxo':
-          showNotification(`Avançando fluxo de ${propostasSelecionadas.length} proposta(s)...`, 'success');
+          showNotification(
+            `Avançando fluxo de ${propostasSelecionadas.length} proposta(s)...`,
+            'success',
+          );
           break;
 
         case 'exportar-pdf':
@@ -779,7 +856,11 @@ const PropostasPage: React.FC = () => {
           break;
 
         case 'excluir':
-          if (window.confirm(`Tem certeza que deseja excluir ${propostasSelecionadas.length} proposta(s)?`)) {
+          if (
+            window.confirm(
+              `Tem certeza que deseja excluir ${propostasSelecionadas.length} proposta(s)?`,
+            )
+          ) {
             showNotification(`Excluindo ${propostasSelecionadas.length} proposta(s)...`, 'success');
             setPropostasSelecionadas([]);
           }
@@ -791,7 +872,6 @@ const PropostasPage: React.FC = () => {
 
       // Recarregar propostas após a ação
       carregarPropostas({ force: true });
-
     } catch (error) {
       console.error('Erro ao executar ação em massa:', error);
       showNotification('Erro ao executar ação', 'error');
@@ -831,7 +911,10 @@ const PropostasPage: React.FC = () => {
         // Usar o serviço real para exclusão em lote
         // await propostasService.excluirEmLote(selectedPropostas);
 
-        showNotification(`${selectedPropostas.length} proposta(s) excluída(s) com sucesso! (simulado)`, 'success');
+        showNotification(
+          `${selectedPropostas.length} proposta(s) excluída(s) com sucesso! (simulado)`,
+          'success',
+        );
         setSelectedPropostas([]);
         setShowBulkActions(false);
 
@@ -855,7 +938,10 @@ const PropostasPage: React.FC = () => {
         // await propostasService.atualizarStatus(propostaId, newStatus);
       }
 
-      showNotification(`Status de ${selectedPropostas.length} proposta(s) alterado com sucesso! (simulado)`, 'success');
+      showNotification(
+        `Status de ${selectedPropostas.length} proposta(s) alterado com sucesso! (simulado)`,
+        'success',
+      );
       setSelectedPropostas([]);
       setShowBulkActions(false);
 
@@ -870,21 +956,15 @@ const PropostasPage: React.FC = () => {
   };
 
   const handleBulkExport = async () => {
-    const selectedData = propostas.filter(p => selectedPropostas.includes(p.id));
+    const selectedData = propostas.filter((p) => selectedPropostas.includes(p.id));
 
     // Criar CSV
     const headers = ['Número', 'Cliente', 'Título', 'Valor', 'Status', 'Data Criação', 'Vendedor'];
     const csvContent = [
       headers.join(','),
-      ...selectedData.map(p => [
-        p.numero,
-        p.cliente,
-        p.titulo,
-        p.valor,
-        p.status,
-        p.data_criacao,
-        p.vendedor
-      ].join(','))
+      ...selectedData.map((p) =>
+        [p.numero, p.cliente, p.titulo, p.valor, p.status, p.data_criacao, p.vendedor].join(','),
+      ),
     ].join('\n');
 
     // Download
@@ -910,11 +990,11 @@ const PropostasPage: React.FC = () => {
 
   const calcularMetricas = () => {
     const total = filteredPropostas.length;
-    const aprovadas = filteredPropostas.filter(p => p.status === 'aprovada').length;
-    const emNegociacao = filteredPropostas.filter(p => p.status === 'negociacao').length;
+    const aprovadas = filteredPropostas.filter((p) => p.status === 'aprovada').length;
+    const emNegociacao = filteredPropostas.filter((p) => p.status === 'negociacao').length;
     const valorTotal = filteredPropostas.reduce((sum, p) => sum + p.valor, 0);
     const valorAprovado = filteredPropostas
-      .filter(p => p.status === 'aprovada')
+      .filter((p) => p.status === 'aprovada')
       .reduce((sum, p) => sum + p.valor, 0);
 
     const taxaConversao = total > 0 ? (aprovadas / total) * 100 : 0;
@@ -925,7 +1005,7 @@ const PropostasPage: React.FC = () => {
       emNegociacao,
       valorTotal,
       valorAprovado,
-      taxaConversao
+      taxaConversao,
     };
   };
 
@@ -933,45 +1013,61 @@ const PropostasPage: React.FC = () => {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'aprovada': return <CheckCircle className="w-4 h-4" />;
-      case 'rejeitada': return <XCircle className="w-4 h-4" />;
-      case 'negociacao': return <TrendingUp className="w-4 h-4" />;
-      case 'enviada': return <Clock className="w-4 h-4" />;
-      case 'rascunho': return <Edit className="w-4 h-4" />;
-      default: return <AlertCircle className="w-4 h-4" />;
+      case 'aprovada':
+        return <CheckCircle className="w-4 h-4" />;
+      case 'rejeitada':
+        return <XCircle className="w-4 h-4" />;
+      case 'negociacao':
+        return <TrendingUp className="w-4 h-4" />;
+      case 'enviada':
+        return <Clock className="w-4 h-4" />;
+      case 'rascunho':
+        return <Edit className="w-4 h-4" />;
+      default:
+        return <AlertCircle className="w-4 h-4" />;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'aprovada': return 'bg-green-100 text-green-800';
-      case 'rejeitada': return 'bg-red-100 text-red-800';
-      case 'negociacao': return 'bg-blue-100 text-blue-800';
-      case 'enviada': return 'bg-yellow-100 text-yellow-800';
-      case 'rascunho': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'aprovada':
+        return 'bg-[#16A34A]/10 text-[#16A34A]';
+      case 'rejeitada':
+        return 'bg-[#DC2626]/10 text-[#DC2626]';
+      case 'negociacao':
+        return 'bg-[#159A9C]/10 text-[#0F7B7D]';
+      case 'enviada':
+        return 'bg-[#FBBF24]/20 text-[#92400E]';
+      case 'rascunho':
+        return 'bg-[#B4BEC9]/20 text-[#002333]';
+      default:
+        return 'bg-[#B4BEC9]/20 text-[#002333]';
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'aprovada': return 'Aprovada';
-      case 'rejeitada': return 'Rejeitada';
-      case 'negociacao': return 'Em Negociação';
-      case 'enviada': return 'Enviada';
-      case 'rascunho': return 'Rascunho';
-      default: return status;
+      case 'aprovada':
+        return 'Aprovada';
+      case 'rejeitada':
+        return 'Rejeitada';
+      case 'negociacao':
+        return 'Em Negociação';
+      case 'enviada':
+        return 'Enviada';
+      case 'rascunho':
+        return 'Rascunho';
+      default:
+        return status;
     }
   };
 
   // Manipuladores dos botões de ações
   const converterPropostaParaPDF = async (proposta: any): Promise<DadosProposta> => {
-
     // Verificar se a proposta tem dados reais do sistema
     const temDadosReais = proposta.id && proposta.id.startsWith('prop_');
 
     if (temDadosReais) {
-
       try {
         // Buscar dados completos da proposta (simulado por enquanto)
 
@@ -986,12 +1082,12 @@ const PropostasPage: React.FC = () => {
                 categoria: proposta.categoria || 'Geral',
                 descricao: proposta.descricao || 'Produto/serviço da proposta',
                 unidade: 'un',
-                tipo: 'servico'
+                tipo: 'servico',
               },
               quantidade: 1,
-              desconto: 0
-            }
-          ]
+              desconto: 0,
+            },
+          ],
         };
 
         // Converter produtos reais para formato PDF
@@ -1034,7 +1130,7 @@ const PropostasPage: React.FC = () => {
               descricaoDetalhada += `\n• Economia: R$ ${economia.toFixed(2)} (${produto.desconto.toFixed(1)}% OFF)`;
             }
             if (produto.produtosCombo && produto.produtosCombo.length > 0) {
-              descricaoDetalhada += `\n• Itens inclusos: ${produto.produtosCombo.map(p => p.nome).join(', ')}`;
+              descricaoDetalhada += `\n• Itens inclusos: ${produto.produtosCombo.map((p) => p.nome).join(', ')}`;
             }
           } else {
             descricaoDetalhada += descricaoDetalhada ? '\n' : '';
@@ -1050,13 +1146,13 @@ const PropostasPage: React.FC = () => {
             quantidade: quantidade,
             valorUnitario: valorUnitario,
             desconto: desconto,
-            valorTotal: valorTotal
+            valorTotal: valorTotal,
           };
         });
 
         // Calcular totais reais
         const subtotal = propostaCompleta.subtotal;
-        const descontoGlobal = (propostaCompleta.descontoGlobal || 0);
+        const descontoGlobal = propostaCompleta.descontoGlobal || 0;
         const impostos = propostaCompleta.impostos || 0;
         const valorTotal = propostaCompleta.total;
 
@@ -1066,19 +1162,25 @@ const PropostasPage: React.FC = () => {
 
         // Mapear status para o formato correto
         const statusMap = {
-          'rascunho': 'draft',
-          'enviada': 'sent',
-          'aprovada': 'approved',
-          'rejeitada': 'rejected'
+          rascunho: 'draft',
+          enviada: 'sent',
+          aprovada: 'approved',
+          rejeitada: 'rejected',
         } as const;
 
         return {
           numeroProposta: propostaCompleta.numero || `PROP-${Date.now()}`,
           titulo: propostaCompleta.titulo || `Proposta para ${clienteReal?.nome || 'Cliente'}`,
-          descricao: propostaCompleta.observacoes || 'Proposta comercial com produtos/serviços selecionados conforme necessidades específicas do cliente.',
+          descricao:
+            propostaCompleta.observacoes ||
+            'Proposta comercial com produtos/serviços selecionados conforme necessidades específicas do cliente.',
           status: statusMap[propostaCompleta.status || 'rascunho'],
-          dataEmissao: propostaCompleta.criadaEm ? new Date(propostaCompleta.criadaEm).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR'),
-          dataValidade: propostaCompleta.dataValidade ? new Date(propostaCompleta.dataValidade).toLocaleDateString('pt-BR') : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR'),
+          dataEmissao: propostaCompleta.criadaEm
+            ? new Date(propostaCompleta.criadaEm).toLocaleDateString('pt-BR')
+            : new Date().toLocaleDateString('pt-BR'),
+          dataValidade: propostaCompleta.dataValidade
+            ? new Date(propostaCompleta.dataValidade).toLocaleDateString('pt-BR')
+            : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR'),
           empresa: {
             nome: 'FenixCRM Solutions',
             endereco: 'Rua das Inovações, 123 - Centro Empresarial',
@@ -1087,7 +1189,7 @@ const PropostasPage: React.FC = () => {
             cep: '01234-567',
             telefone: '(11) 3333-4444',
             email: 'contato@fenixcrm.com.br',
-            cnpj: '12.345.678/0001-90'
+            cnpj: '12.345.678/0001-90',
           },
           cliente: {
             nome: clienteReal?.nome || 'Cliente Não Informado',
@@ -1096,29 +1198,37 @@ const PropostasPage: React.FC = () => {
             telefone: clienteReal?.telefone || 'Não informado',
             documento: clienteReal?.documento || 'Não informado',
             tipoDocumento: clienteReal?.tipoPessoa === 'juridica' ? 'CNPJ' : 'CPF',
-            endereco: clienteReal?.endereco ?
-              `${clienteReal.endereco}${clienteReal.cidade ? `, ${clienteReal.cidade}` : ''}${clienteReal.estado ? `/${clienteReal.estado}` : ''}${clienteReal.cep ? ` - CEP: ${clienteReal.cep}` : ''}` :
-              'Endereço não informado'
+            endereco: clienteReal?.endereco
+              ? `${clienteReal.endereco}${clienteReal.cidade ? `, ${clienteReal.cidade}` : ''}${clienteReal.estado ? `/${clienteReal.estado}` : ''}${clienteReal.cep ? ` - CEP: ${clienteReal.cep}` : ''}`
+              : 'Endereço não informado',
           },
           vendedor: {
             nome: vendedorReal?.nome || 'Consultor FenixCRM',
             email: vendedorReal?.email || 'vendedor@fenixcrm.com.br',
             telefone: '(11) 98765-4321',
-            cargo: vendedorReal?.tipo === 'gerente' ? 'Gerente de Vendas' :
-              vendedorReal?.tipo === 'admin' ? 'Diretor Comercial' :
-                'Consultor de Vendas'
+            cargo:
+              vendedorReal?.tipo === 'gerente'
+                ? 'Gerente de Vendas'
+                : vendedorReal?.tipo === 'admin'
+                  ? 'Diretor Comercial'
+                  : 'Consultor de Vendas',
           },
           itens: itensReais,
           subtotal: subtotal,
           descontoGeral: descontoGlobal,
-          percentualDesconto: subtotal > 0 ? (descontoGlobal / subtotal * 100) : 0,
+          percentualDesconto: subtotal > 0 ? (descontoGlobal / subtotal) * 100 : 0,
           impostos: impostos,
           valorTotal: valorTotal,
-          formaPagamento: propostaCompleta.formaPagamento === 'avista' ? 'À vista com desconto especial' :
-            propostaCompleta.formaPagamento === 'parcelado' ? `Parcelado em até ${propostaCompleta.parcelas || 3}x sem juros` :
-              propostaCompleta.formaPagamento === 'boleto' ? 'Boleto bancário' :
-                propostaCompleta.formaPagamento === 'cartao' ? 'Cartão de crédito' :
-                  'Conforme acordo comercial',
+          formaPagamento:
+            propostaCompleta.formaPagamento === 'avista'
+              ? 'À vista com desconto especial'
+              : propostaCompleta.formaPagamento === 'parcelado'
+                ? `Parcelado em até ${propostaCompleta.parcelas || 3}x sem juros`
+                : propostaCompleta.formaPagamento === 'boleto'
+                  ? 'Boleto bancário'
+                  : propostaCompleta.formaPagamento === 'cartao'
+                    ? 'Cartão de crédito'
+                    : 'Conforme acordo comercial',
           prazoEntrega: `${propostaCompleta.validadeDias || 30} dias úteis`,
           garantia: '12 meses de garantia e suporte técnico especializado',
           validadeProposta: `${propostaCompleta.validadeDias || 30} dias corridos`,
@@ -1128,11 +1238,12 @@ const PropostasPage: React.FC = () => {
             'Entrega conforme cronograma acordado entre as partes',
             'Garantia e suporte técnico conforme especificações técnicas',
             'Valores já incluem todos os impostos aplicáveis',
-            'Alterações no escopo podem gerar custos adicionais'
+            'Alterações no escopo podem gerar custos adicionais',
           ],
-          observacoes: propostaCompleta.observacoes || `Esta proposta foi elaborada especialmente para ${clienteReal?.nome || 'o cliente'}, incluindo produtos/serviços selecionados conforme suas necessidades específicas. Estamos à disposição para esclarecimentos e ajustes necessários.`
+          observacoes:
+            propostaCompleta.observacoes ||
+            `Esta proposta foi elaborada especialmente para ${clienteReal?.nome || 'o cliente'}, incluindo produtos/serviços selecionados conforme suas necessidades específicas. Estamos à disposição para esclarecimentos e ajustes necessários.`,
         };
-
       } catch (error) {
         console.error('❌ Erro ao converter proposta real:', error);
         throw new Error('Não foi possível converter a proposta. Verifique os dados.');
@@ -1161,15 +1272,17 @@ const PropostasPage: React.FC = () => {
           nome: proposta.vendedor || 'Vendedor',
           email: 'vendedor@conectcrm.com',
           tipo: 'vendedor',
-          ativo: true
+          ativo: true,
         },
         cliente: {
           id: `cliente_${proposta.id}`,
           nome: proposta.cliente || 'Cliente não informado',
           documento: '',
-          email: proposta.cliente_contato || `${proposta.cliente?.toLowerCase().replace(/\s+/g, '.')}@email.com`,
+          email:
+            proposta.cliente_contato ||
+            `${proposta.cliente?.toLowerCase().replace(/\s+/g, '.')}@email.com`,
           telefone: proposta.cliente_telefone || '',
-          tipoPessoa: 'fisica'
+          tipoPessoa: 'fisica',
         },
         produtos: [
           {
@@ -1178,19 +1291,19 @@ const PropostasPage: React.FC = () => {
               nome: proposta.titulo || 'Produto/Serviço',
               preco: proposta.valor || 0,
               categoria: 'Geral',
-              unidade: 'un'
+              unidade: 'un',
             },
             quantidade: 1,
             desconto: 0,
-            subtotal: proposta.valor || 0
-          }
+            subtotal: proposta.valor || 0,
+          },
         ],
         descontoGlobal: 0,
         impostos: 0,
         formaPagamento: 'avista',
         validadeDias: 30,
         observacoes: `Esta proposta foi elaborada especialmente para ${proposta.cliente}, considerando as necessidades específicas do projeto "${proposta.titulo}". Estamos à disposição para esclarecimentos e ajustes necessários.`,
-        incluirImpostosPDF: false
+        incluirImpostosPDF: false,
       } as any; // Usar any temporariamente para resolver tipos
 
       setSelectedPropostaForView(propostaCompleta);
@@ -1319,13 +1432,15 @@ const PropostasPage: React.FC = () => {
                     </tr>
                 </thead>
                 <tbody>
-                    ${dados.itens.map((item, index) => {
-      // Separar descrição dos detalhes técnicos
-      const descricaoLinhas = (item.descricao || '').split('\n');
-      const descricaoPrincipal = descricaoLinhas.find(linha => !linha.startsWith('•')) || '';
-      const detalhes = descricaoLinhas.filter(linha => linha.startsWith('•'));
+                    ${dados.itens
+        .map((item, index) => {
+          // Separar descrição dos detalhes técnicos
+          const descricaoLinhas = (item.descricao || '').split('\n');
+          const descricaoPrincipal =
+            descricaoLinhas.find((linha) => !linha.startsWith('•')) || '';
+          const detalhes = descricaoLinhas.filter((linha) => linha.startsWith('•'));
 
-      return `
+          return `
                     <tr>
                         <td class="text-center">${index + 1}</td>
                         <td>
@@ -1339,7 +1454,8 @@ const PropostasPage: React.FC = () => {
                         <td class="text-right currency">R$ ${item.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     </tr>
                     `;
-    }).join('')}
+        })
+        .join('')}
                 </tbody>
             </table>
         </div>
@@ -1351,18 +1467,24 @@ const PropostasPage: React.FC = () => {
                     <td>Subtotal:</td>
                     <td class="text-right currency">R$ ${(dados.subtotal || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 </tr>
-                ${dados.descontoGeral ? `
+                ${dados.descontoGeral
+        ? `
                 <tr>
                     <td>Desconto Geral (${dados.percentualDesconto || 0}%):</td>
                     <td class="text-right currency">- R$ ${dados.descontoGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 </tr>
-                ` : ''}
-                ${dados.impostos ? `
+                `
+        : ''
+      }
+                ${dados.impostos
+        ? `
                 <tr>
                     <td>Impostos:</td>
                     <td class="text-right currency">R$ ${dados.impostos.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 </tr>
-                ` : ''}
+                `
+        : ''
+      }
                 <tr class="total-final">
                     <td><strong>VALOR TOTAL:</strong></td>
                     <td class="text-right"><strong>R$ ${dados.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
@@ -1437,7 +1559,9 @@ const PropostasPage: React.FC = () => {
         await carregarPropostas({ force: true });
       } catch (error) {
         console.error('❌ Erro ao excluir proposta:', error);
-        showNotification('Erro ao excluir proposta. Tente novamente.', 'error');
+        const friendlyMessage =
+          error instanceof Error ? error.message : 'Erro ao excluir proposta. Tente novamente.';
+        showNotification(friendlyMessage, 'error');
       } finally {
         setIsLoading(false);
       }
@@ -1451,13 +1575,13 @@ const PropostasPage: React.FC = () => {
       'Gerar PDF',
       'Enviar por Email',
       'Histórico',
-      'Alterar Status'
+      'Alterar Status',
     ];
 
     const opcaoEscolhida = window.prompt(
       `Selecione uma opção para ${proposta.numero}:\n\n` +
       opcoes.map((opcao, index) => `${index + 1}. ${opcao}`).join('\n') +
-      '\n\nDigite o número da opção:'
+      '\n\nDigite o número da opção:',
     );
 
     if (opcaoEscolhida && opcaoEscolhida !== '') {
@@ -1471,7 +1595,7 @@ const PropostasPage: React.FC = () => {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -1480,8 +1604,12 @@ const PropostasPage: React.FC = () => {
   };
 
   const totalValorPropostas = propostas.reduce((sum, p) => sum + p.valor, 0);
-  const valorAprovadas = propostas.filter(p => p.status === 'aprovada').reduce((sum, p) => sum + p.valor, 0);
-  const valorNegociacao = propostas.filter(p => p.status === 'negociacao').reduce((sum, p) => sum + p.valor, 0);
+  const valorAprovadas = propostas
+    .filter((p) => p.status === 'aprovada')
+    .reduce((sum, p) => sum + p.valor, 0);
+  const valorNegociacao = propostas
+    .filter((p) => p.status === 'negociacao')
+    .reduce((sum, p) => sum + p.valor, 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1500,18 +1628,17 @@ const PropostasPage: React.FC = () => {
 
       {/* Header Padronizado */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusName="Vendas"
-          nucleusPath="/nuclei/vendas"
-        />
+        <BackToNucleus nucleusName="Vendas" nucleusPath="/nuclei/vendas" />
       </div>
 
       {/* Notificação */}
       {notification && (
-        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${notification.type === 'success'
-          ? 'bg-green-100 border border-green-400 text-green-700'
-          : 'bg-red-100 border border-red-400 text-red-700'
-          }`}>
+        <div
+          className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${notification.type === 'success'
+              ? 'bg-[#159A9C]/10 border border-[#159A9C]/30 text-[#0F7B7D]'
+              : 'bg-[#DC2626]/10 border border-[#DC2626]/30 text-[#DC2626]'
+            }`}
+        >
           <div className="flex items-center">
             {notification.type === 'success' ? (
               <CheckCircle className="h-5 w-5 mr-2" />
@@ -1542,7 +1669,9 @@ const PropostasPage: React.FC = () => {
                 )}
               </h1>
               <p className="mt-2 text-[#B4BEC9]">
-                {isLoading ? 'Carregando propostas...' : `Acompanhe suas ${propostas.length} propostas comerciais`}
+                {isLoading
+                  ? 'Carregando propostas...'
+                  : `Acompanhe suas ${propostas.length} propostas comerciais`}
               </p>
             </div>
 
@@ -1552,7 +1681,7 @@ const PropostasPage: React.FC = () => {
                 onClick={() => {
                   setShowWizardModal(true);
                 }}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium"
               >
                 <Plus className="w-5 h-5" />
                 Nova Proposta
@@ -1590,8 +1719,8 @@ const PropostasPage: React.FC = () => {
               <button
                 onClick={() => setViewMode('dashboard')}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'dashboard'
-                  ? 'bg-white text-blue-700 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                    ? 'bg-white text-[#0F7B7D] shadow-sm border border-[#DEEFE7]'
+                    : 'text-gray-500 hover:text-gray-700'
                   }`}
                 title="Visualização Dashboard"
               >
@@ -1600,8 +1729,8 @@ const PropostasPage: React.FC = () => {
               <button
                 onClick={() => setViewMode('table')}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'table'
-                  ? 'bg-white text-blue-700 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                    ? 'bg-white text-[#0F7B7D] shadow-sm border border-[#DEEFE7]'
+                    : 'text-gray-500 hover:text-gray-700'
                   }`}
                 title="Visualização Lista"
               >
@@ -1610,8 +1739,8 @@ const PropostasPage: React.FC = () => {
               <button
                 onClick={() => setViewMode('cards')}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'cards'
-                  ? 'bg-white text-blue-700 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                    ? 'bg-white text-[#0F7B7D] shadow-sm border border-[#DEEFE7]'
+                    : 'text-gray-500 hover:text-gray-700'
                   }`}
                 title="Visualização Cards"
               >
@@ -1640,8 +1769,12 @@ const PropostasPage: React.FC = () => {
               <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-4 hover:shadow-lg transition-shadow duration-300">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60 truncate">Total de Propostas</p>
-                    <p className="text-2xl sm:text-3xl font-bold text-[#002333] mt-2">{propostas.length}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60 truncate">
+                      Total de Propostas
+                    </p>
+                    <p className="text-2xl sm:text-3xl font-bold text-[#002333] mt-2">
+                      {propostas.length}
+                    </p>
                     <p className="text-sm text-[#002333]/70 mt-3 truncate">📊 Visão geral</p>
                   </div>
                   <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm flex-shrink-0">
@@ -1653,14 +1786,16 @@ const PropostasPage: React.FC = () => {
               <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-4 hover:shadow-lg transition-shadow duration-300">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60 truncate">Aprovadas</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60 truncate">
+                      Aprovadas
+                    </p>
                     <p className="text-2xl sm:text-3xl font-bold text-[#002333] mt-2">
-                      {propostas.filter(p => p.status === 'aprovada').length}
+                      {propostas.filter((p) => p.status === 'aprovada').length}
                     </p>
                     <p className="text-sm text-[#002333]/70 mt-3 truncate">✅ Fechadas</p>
                   </div>
-                  <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm flex-shrink-0">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
+                  <div className="h-12 w-12 rounded-2xl bg-[#16A34A]/10 flex items-center justify-center shadow-sm flex-shrink-0">
+                    <CheckCircle className="w-6 h-6 text-[#16A34A]" />
                   </div>
                 </div>
               </div>
@@ -1668,14 +1803,16 @@ const PropostasPage: React.FC = () => {
               <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-4 hover:shadow-lg transition-shadow duration-300">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60 truncate">Em Negociação</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60 truncate">
+                      Em Negociação
+                    </p>
                     <p className="text-2xl sm:text-3xl font-bold text-[#002333] mt-2">
-                      {propostas.filter(p => p.status === 'negociacao').length}
+                      {propostas.filter((p) => p.status === 'negociacao').length}
                     </p>
                     <p className="text-sm text-[#002333]/70 mt-3 truncate">🔄 Em andamento</p>
                   </div>
-                  <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm flex-shrink-0">
-                    <TrendingUp className="w-6 h-6 text-yellow-600" />
+                  <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm flex-shrink-0">
+                    <TrendingUp className="w-6 h-6 text-[#0F7B7D]" />
                   </div>
                 </div>
               </div>
@@ -1683,7 +1820,9 @@ const PropostasPage: React.FC = () => {
               <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-4 hover:shadow-lg transition-shadow duration-300">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60 truncate">Valor Total</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60 truncate">
+                      Valor Total
+                    </p>
                     <div className="mt-2">
                       <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-[#002333] break-words leading-tight">
                         {formatCurrency(totalValorPropostas)}
@@ -1710,7 +1849,7 @@ const PropostasPage: React.FC = () => {
                       placeholder="Buscar por número, cliente ou título..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-8 sm:pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full pl-8 sm:pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -1720,7 +1859,7 @@ const PropostasPage: React.FC = () => {
                   <select
                     value={selectedStatus}
                     onChange={(e) => setSelectedStatus(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                   >
                     <option value="todos">Todos os Status</option>
                     <option value="rascunho">Rascunho</option>
@@ -1736,7 +1875,7 @@ const PropostasPage: React.FC = () => {
                   <select
                     value={selectedVendedor}
                     onChange={(e) => setSelectedVendedor(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                   >
                     <option value="todos">Todos os Vendedores</option>
                     <option value="Maria Santos">Maria Santos</option>
@@ -1749,8 +1888,10 @@ const PropostasPage: React.FC = () => {
                 <div className="w-full sm:w-auto sm:min-w-[160px] lg:w-48">
                   <select
                     value={filtrosAvancados.urgencia || 'todas'}
-                    onChange={(e) => setFiltrosAvancados({ ...filtrosAvancados, urgencia: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onChange={(e) =>
+                      setFiltrosAvancados({ ...filtrosAvancados, urgencia: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                   >
                     <option value="todas">Todas as Urgências</option>
                     <option value="vencidas">🔴 Vencidas</option>
@@ -1764,14 +1905,14 @@ const PropostasPage: React.FC = () => {
                 <button
                   onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
                   className={`px-3 sm:px-4 py-2 border rounded-lg flex items-center justify-center gap-2 text-sm transition-colors flex-shrink-0 ${showAdvancedFilters
-                    ? 'bg-blue-50 border-blue-300 text-blue-700'
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                      ? 'bg-[#159A9C]/10 border-[#159A9C]/40 text-[#0F7B7D]'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                     }`}
                 >
                   <Filter className="w-4 h-4" />
                   Filtros
                   {Object.keys(filtrosAvancados).length > 0 && (
-                    <span className="bg-blue-500 text-white text-xs rounded-full px-2 py-0.5 ml-1">
+                    <span className="bg-[#159A9C] text-white text-xs rounded-full px-2 py-0.5 ml-1">
                       {Object.keys(filtrosAvancados).length}
                     </span>
                   )}
@@ -1791,12 +1932,12 @@ const PropostasPage: React.FC = () => {
                     {/* Indicadores de filtros ativos */}
                     <div className="flex items-center space-x-2">
                       {selectedStatus !== 'todos' && (
-                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-[#159A9C]/10 text-[#0F7B7D] rounded-full">
                           Status: {selectedStatus}
                         </span>
                       )}
                       {filtrosAvancados.urgencia && filtrosAvancados.urgencia !== 'todas' && (
-                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-[#FBBF24]/20 text-[#92400E] rounded-full">
                           {filtrosAvancados.urgencia === 'vencidas' && '🔴 Vencidas'}
                           {filtrosAvancados.urgencia === 'urgentes' && '🟠 Urgentes'}
                           {filtrosAvancados.urgencia === 'próximas' && '🟡 Próximas'}
@@ -1804,7 +1945,7 @@ const PropostasPage: React.FC = () => {
                         </span>
                       )}
                       {searchTerm && (
-                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-[#159A9C]/10 text-[#0F7B7D] rounded-full">
                           Busca: "{searchTerm}"
                         </span>
                       )}
@@ -1829,12 +1970,20 @@ const PropostasPage: React.FC = () => {
                         <th className="px-6 py-3 text-left">
                           <input
                             type="checkbox"
-                            checked={propostasSelecionadas.length === filteredPropostas.length && filteredPropostas.length > 0}
-                            onChange={propostasSelecionadas.length === filteredPropostas.length ? handleDeselectAll : handleSelectAll}
+                            checked={
+                              propostasSelecionadas.length === filteredPropostas.length &&
+                              filteredPropostas.length > 0
+                            }
+                            onChange={
+                              propostasSelecionadas.length === filteredPropostas.length
+                                ? handleDeselectAll
+                                : handleSelectAll
+                            }
                             className="rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
                           />
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        <th
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                           onClick={() => {
                             if (sortBy === 'data_criacao') {
                               setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -1842,15 +1991,20 @@ const PropostasPage: React.FC = () => {
                               setSortBy('data_criacao');
                               setSortOrder('desc');
                             }
-                          }}>
+                          }}
+                        >
                           <div className="flex items-center space-x-1">
                             <span>Proposta</span>
-                            {sortBy === 'data_criacao' && (
-                              sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
-                            )}
+                            {sortBy === 'data_criacao' &&
+                              (sortOrder === 'asc' ? (
+                                <ArrowUp className="w-3 h-3" />
+                              ) : (
+                                <ArrowDown className="w-3 h-3" />
+                              ))}
                           </div>
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        <th
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                           onClick={() => {
                             if (sortBy === 'cliente') {
                               setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -1858,15 +2012,20 @@ const PropostasPage: React.FC = () => {
                               setSortBy('cliente');
                               setSortOrder('asc');
                             }
-                          }}>
+                          }}
+                        >
                           <div className="flex items-center space-x-1">
                             <span>Cliente</span>
-                            {sortBy === 'cliente' && (
-                              sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
-                            )}
+                            {sortBy === 'cliente' &&
+                              (sortOrder === 'asc' ? (
+                                <ArrowUp className="w-3 h-3" />
+                              ) : (
+                                <ArrowDown className="w-3 h-3" />
+                              ))}
                           </div>
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile cursor-pointer hover:bg-gray-100"
+                        <th
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile cursor-pointer hover:bg-gray-100"
                           onClick={() => {
                             if (sortBy === 'status') {
                               setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -1874,15 +2033,20 @@ const PropostasPage: React.FC = () => {
                               setSortBy('status');
                               setSortOrder('asc');
                             }
-                          }}>
+                          }}
+                        >
                           <div className="flex items-center space-x-1">
                             <span>Status</span>
-                            {sortBy === 'status' && (
-                              sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
-                            )}
+                            {sortBy === 'status' &&
+                              (sortOrder === 'asc' ? (
+                                <ArrowUp className="w-3 h-3" />
+                              ) : (
+                                <ArrowDown className="w-3 h-3" />
+                              ))}
                           </div>
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        <th
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                           onClick={() => {
                             if (sortBy === 'valor') {
                               setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -1890,12 +2054,16 @@ const PropostasPage: React.FC = () => {
                               setSortBy('valor');
                               setSortOrder('desc');
                             }
-                          }}>
+                          }}
+                        >
                           <div className="flex items-center space-x-1">
                             <span>Valor</span>
-                            {sortBy === 'valor' && (
-                              sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
-                            )}
+                            {sortBy === 'valor' &&
+                              (sortOrder === 'asc' ? (
+                                <ArrowUp className="w-3 h-3" />
+                              ) : (
+                                <ArrowDown className="w-3 h-3" />
+                              ))}
                           </div>
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile">
@@ -1913,7 +2081,7 @@ const PropostasPage: React.FC = () => {
                       {filteredPropostas.map((proposta) => (
                         <tr
                           key={proposta.id}
-                          className={`hover:bg-gray-50 ${propostasSelecionadas.includes(proposta.id?.toString() || proposta.numero) ? 'bg-blue-50' : ''} transition-colors duration-200`}
+                          className={`hover:bg-gray-50 ${propostasSelecionadas.includes(proposta.id?.toString() || proposta.numero) ? 'bg-[#159A9C]/10' : ''} transition-colors duration-200`}
                           onMouseEnter={(e) => handleMouseEnterProposta(proposta, e)}
                           onMouseLeave={handleMouseLeaveProposta}
                         >
@@ -1921,48 +2089,68 @@ const PropostasPage: React.FC = () => {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <input
                               type="checkbox"
-                              checked={propostasSelecionadas.includes(proposta.id?.toString() || proposta.numero)}
-                              onChange={(e) => handleSelectProposta(proposta.id?.toString() || proposta.numero, e)}
+                              checked={propostasSelecionadas.includes(
+                                proposta.id?.toString() || proposta.numero,
+                              )}
+                              onChange={(e) =>
+                                handleSelectProposta(proposta.id?.toString() || proposta.numero, e)
+                              }
                               className="rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
                             />
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap" data-label="Proposta">
                             <div>
-                              <div className="text-sm font-medium text-gray-900">{safeRender(proposta.numero)}</div>
-                              <div className="subinfo ellipsis-text">{safeRender(proposta.titulo)}</div>
+                              <div className="text-sm font-medium text-gray-900">
+                                {safeRender(proposta.numero)}
+                              </div>
+                              <div className="subinfo ellipsis-text">
+                                {safeRender(proposta.titulo)}
+                              </div>
                               <div className="subinfo flex items-center mt-1">
                                 <Calendar className="w-3 h-3 mr-1" />
                                 Criada em {formatDate(safeRender(proposta.data_criacao))}
                               </div>
+                              {proposta.oportunidade && (
+                                <div className="mt-1">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-[#159A9C]/10 text-[#159A9C] border border-[#159A9C]/20">
+                                    <Target className="w-3 h-3 mr-1" />
+                                    {proposta.oportunidade.titulo}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap" data-label="Cliente">
                             <div>
-                              <div className="text-sm font-medium text-gray-900 ellipsis-text">{safeRender(proposta.cliente)}</div>
+                              <div className="text-sm font-medium text-gray-900 ellipsis-text">
+                                {safeRender(proposta.cliente)}
+                              </div>
                               <div className="subinfo flex items-center">
                                 <User className="w-4 h-4 mr-1" />
-                                <span className="ellipsis-sm">{safeRender(proposta.cliente_contato)}</span>
+                                <span className="ellipsis-sm">
+                                  {safeRender(proposta.cliente_contato)}
+                                </span>
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap col-hide-mobile" data-label="Status">
+                          <td
+                            className="px-6 py-4 whitespace-nowrap col-hide-mobile"
+                            data-label="Status"
+                          >
                             <div className="space-y-2">
                               {/* Novo Status com Fluxo Automatizado */}
-                              <StatusFluxo
-                                status={safeRender(proposta.status)}
-                                compact={true}
-                              />
+                              <StatusFluxo status={safeRender(proposta.status)} compact={true} />
 
                               {/* Indicadores adicionais */}
                               <div className="flex items-center space-x-2">
                                 {proposta.urgencia === 'alta' && (
-                                  <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 border border-red-200">
+                                  <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-[#DC2626]/10 text-[#DC2626] border border-[#DC2626]/20">
                                     <AlertCircle className="w-3 h-3 mr-1" />
                                     Urgente
                                   </span>
                                 )}
                                 {proposta.status === 'enviada' && (
-                                  <span className="text-blue-600 text-xs">📧 Enviada</span>
+                                  <span className="text-[#0F7B7D] text-xs">📧 Enviada</span>
                                 )}
                               </div>
 
@@ -1980,21 +2168,29 @@ const PropostasPage: React.FC = () => {
                               {safeRender(proposta.categoria)}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 col-hide-mobile" data-label="Vendedor">
+                          <td
+                            className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 col-hide-mobile"
+                            data-label="Vendedor"
+                          >
                             {safeRender(proposta.vendedor)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap col-hide-mobile" data-label="Vencimento">
+                          <td
+                            className="px-6 py-4 whitespace-nowrap col-hide-mobile"
+                            data-label="Vencimento"
+                          >
                             <div className="data-proposta text-sm text-gray-900">
                               {formatDate(safeRender(proposta.data_vencimento))}
                             </div>
-                            <div className={`subinfo ${proposta.dias_restantes <= 0
-                              ? 'text-red-600 font-semibold'
-                              : proposta.dias_restantes <= 3
-                                ? 'text-orange-600 font-semibold'
-                                : proposta.dias_restantes <= 7
-                                  ? 'text-yellow-600'
-                                  : 'text-green-600'
-                              }`}>
+                            <div
+                              className={`subinfo ${proposta.dias_restantes <= 0
+                                  ? 'text-[#DC2626] font-semibold'
+                                  : proposta.dias_restantes <= 3
+                                    ? 'text-[#B45309] font-semibold'
+                                    : proposta.dias_restantes <= 7
+                                      ? 'text-[#92400E]'
+                                      : 'text-[#16A34A]'
+                                }`}
+                            >
                               {proposta.dias_restantes <= 0 ? (
                                 <span className="flex items-center">
                                   <AlertCircle className="w-3 h-3 mr-1" />
@@ -2013,7 +2209,10 @@ const PropostasPage: React.FC = () => {
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" data-label="Ações">
+                          <td
+                            className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"
+                            data-label="Ações"
+                          >
                             <PropostaActions
                               proposta={proposta}
                               onViewProposta={handleViewProposta}
@@ -2031,16 +2230,15 @@ const PropostasPage: React.FC = () => {
               <div className="bg-white px-6 py-3 border-t border-gray-200 sm:px-6">
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-gray-700">
-                    Mostrando <span className="font-medium">1</span> a <span className="font-medium">{filteredPropostas.length}</span> de{' '}
+                    Mostrando <span className="font-medium">1</span> a{' '}
+                    <span className="font-medium">{filteredPropostas.length}</span> de{' '}
                     <span className="font-medium">{filteredPropostas.length}</span> resultados
                   </div>
                   <div className="flex space-x-2">
                     <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
                       Anterior
                     </button>
-                    <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm">
-                      1
-                    </button>
+                    <button className="px-3 py-1 bg-[#159A9C] hover:bg-[#0F7B7D] text-white rounded text-sm transition-colors">1</button>
                     <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
                       Próximo
                     </button>
@@ -2125,10 +2323,12 @@ const PropostasPage: React.FC = () => {
 
         {/* Notificações Toast */}
         {notification && (
-          <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg ${notification.type === 'success'
-            ? 'bg-green-100 text-green-800 border border-green-200'
-            : 'bg-red-100 text-red-800 border border-red-200'
-            }`}>
+          <div
+            className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg ${notification.type === 'success'
+                ? 'bg-[#159A9C]/10 text-[#0F7B7D] border border-[#159A9C]/30'
+                : 'bg-[#DC2626]/10 text-[#DC2626] border border-[#DC2626]/30'
+              }`}
+          >
             <div className="flex items-center gap-2">
               {notification.type === 'success' ? (
                 <CheckCircle className="w-5 h-5" />

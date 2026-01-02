@@ -229,9 +229,7 @@ export const ModalDepartamento: React.FC<ModalDepartamentoProps> = ({
 
           {/* Descrição */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Descrição
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
             <textarea
               value={formData.descricao}
               onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
@@ -252,7 +250,9 @@ export const ModalDepartamento: React.FC<ModalDepartamentoProps> = ({
                 <input
                   type="text"
                   value={formData.codigo}
-                  onChange={(e) => setFormData({ ...formData, codigo: e.target.value.toUpperCase() })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, codigo: e.target.value.toUpperCase() })
+                  }
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="SUPORTE_TECNICO"
                   required
@@ -276,9 +276,7 @@ export const ModalDepartamento: React.FC<ModalDepartamentoProps> = ({
           {/* Cor e Ícone */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Cor
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Cor</label>
               <div className="flex gap-2">
                 <input
                   type="color"
@@ -299,9 +297,7 @@ export const ModalDepartamento: React.FC<ModalDepartamentoProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ícone
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Ícone</label>
               <input
                 type="text"
                 value={formData.icone}
@@ -325,21 +321,21 @@ export const ModalDepartamento: React.FC<ModalDepartamentoProps> = ({
                 )}
                 <div>
                   <p className="text-sm font-medium text-gray-900">Visível no Bot</p>
-                  <p className="text-xs text-gray-600">
-                    Aparecer como opção no menu do WhatsApp
-                  </p>
+                  <p className="text-xs text-gray-600">Aparecer como opção no menu do WhatsApp</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, visivelNoBot: !formData.visivelNoBot })}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.visivelNoBot ? 'bg-blue-600' : 'bg-gray-300'
-                  }`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  formData.visivelNoBot ? 'bg-blue-600' : 'bg-gray-300'
+                }`}
                 disabled={loading}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.visivelNoBot ? 'translate-x-6' : 'translate-x-1'
-                    }`}
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    formData.visivelNoBot ? 'translate-x-6' : 'translate-x-1'
+                  }`}
                 />
               </button>
             </div>
@@ -348,31 +344,33 @@ export const ModalDepartamento: React.FC<ModalDepartamentoProps> = ({
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center ${formData.ativo ? 'bg-green-100' : 'bg-gray-200'
-                    }`}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    formData.ativo ? 'bg-green-100' : 'bg-gray-200'
+                  }`}
                 >
                   <div
-                    className={`w-3 h-3 rounded-full ${formData.ativo ? 'bg-green-600' : 'bg-gray-400'
-                      }`}
+                    className={`w-3 h-3 rounded-full ${
+                      formData.ativo ? 'bg-green-600' : 'bg-gray-400'
+                    }`}
                   />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-900">Ativo</p>
-                  <p className="text-xs text-gray-600">
-                    Departamento está operacional
-                  </p>
+                  <p className="text-xs text-gray-600">Departamento está operacional</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, ativo: !formData.ativo })}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.ativo ? 'bg-green-600' : 'bg-gray-300'
-                  }`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  formData.ativo ? 'bg-green-600' : 'bg-gray-300'
+                }`}
                 disabled={loading}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.ativo ? 'translate-x-6' : 'translate-x-1'
-                    }`}
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    formData.ativo ? 'translate-x-6' : 'translate-x-1'
+                  }`}
                 />
               </button>
             </div>
@@ -380,19 +378,10 @@ export const ModalDepartamento: React.FC<ModalDepartamentoProps> = ({
 
           {/* Footer */}
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-            <Button
-              type="button"
-              onClick={handleClose}
-              variant="outline"
-              disabled={loading}
-            >
+            <Button type="button" onClick={handleClose} variant="outline" disabled={loading}>
               Cancelar
             </Button>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
+            <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700">
               {loading ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />

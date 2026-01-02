@@ -22,7 +22,7 @@ export const ContatoFilters: React.FC<ContatoFiltersProps> = ({
   setProprietarioFilter,
   fonteFilter,
   setFonteFilter,
-  onReset
+  onReset,
 }) => {
   const statusOptions = [
     { value: 'todos', label: 'Todos os Status' },
@@ -30,7 +30,7 @@ export const ContatoFilters: React.FC<ContatoFiltersProps> = ({
     { value: 'cliente', label: 'Cliente' },
     { value: 'prospecto', label: 'Prospecto' },
     { value: 'inativo', label: 'Inativo' },
-    { value: 'ex-cliente', label: 'Ex-Cliente' }
+    { value: 'ex-cliente', label: 'Ex-Cliente' },
   ];
 
   const tipoOptions = [
@@ -39,7 +39,7 @@ export const ContatoFilters: React.FC<ContatoFiltersProps> = ({
     { value: 'cliente', label: 'Cliente' },
     { value: 'parceiro', label: 'Parceiro' },
     { value: 'fornecedor', label: 'Fornecedor' },
-    { value: 'outro', label: 'Outro' }
+    { value: 'outro', label: 'Outro' },
   ];
 
   const proprietarioOptions = [
@@ -49,7 +49,7 @@ export const ContatoFilters: React.FC<ContatoFiltersProps> = ({
     { value: 'Ana Silva', label: 'Ana Silva' },
     { value: 'Lucas Oliveira', label: 'Lucas Oliveira' },
     { value: 'Carla Santos', label: 'Carla Santos' },
-    { value: 'Roberto Lima', label: 'Roberto Lima' }
+    { value: 'Roberto Lima', label: 'Roberto Lima' },
   ];
 
   const fonteOptions = [
@@ -63,19 +63,20 @@ export const ContatoFilters: React.FC<ContatoFiltersProps> = ({
     { value: 'Networking', label: 'Networking' },
     { value: 'Telemarketing', label: 'Telemarketing' },
     { value: 'Email Marketing', label: 'Email Marketing' },
-    { value: 'Outros', label: 'Outros' }
+    { value: 'Outros', label: 'Outros' },
   ];
 
-  const hasActiveFilters = statusFilter !== 'todos' || 
-                          tipoFilter !== 'todos' || 
-                          proprietarioFilter !== 'todos' || 
-                          fonteFilter !== 'todas';
+  const hasActiveFilters =
+    statusFilter !== 'todos' ||
+    tipoFilter !== 'todos' ||
+    proprietarioFilter !== 'todos' ||
+    fonteFilter !== 'todas';
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-4 md:p-6 mb-6 border border-gray-200">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
         <h3 className="text-lg font-semibold text-[#002333]">Filtros Avançados</h3>
-        
+
         {hasActiveFilters && (
           <button
             onClick={onReset}
@@ -90,9 +91,7 @@ export const ContatoFilters: React.FC<ContatoFiltersProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Filtro de Status */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Status
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -108,9 +107,7 @@ export const ContatoFilters: React.FC<ContatoFiltersProps> = ({
 
         {/* Filtro de Tipo */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Tipo
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
           <select
             value={tipoFilter}
             onChange={(e) => setTipoFilter(e.target.value)}
@@ -126,9 +123,7 @@ export const ContatoFilters: React.FC<ContatoFiltersProps> = ({
 
         {/* Filtro de Proprietário */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Proprietário
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Proprietário</label>
           <select
             value={proprietarioFilter}
             onChange={(e) => setProprietarioFilter(e.target.value)}
@@ -144,9 +139,7 @@ export const ContatoFilters: React.FC<ContatoFiltersProps> = ({
 
         {/* Filtro de Fonte */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Fonte
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Fonte</label>
           <select
             value={fonteFilter}
             onChange={(e) => setFonteFilter(e.target.value)}
@@ -166,10 +159,10 @@ export const ContatoFilters: React.FC<ContatoFiltersProps> = ({
         <div className="mt-4 pt-4 border-t border-gray-200">
           <div className="flex flex-wrap gap-2">
             <span className="text-sm text-gray-600 mr-2">Filtros ativos:</span>
-            
+
             {statusFilter !== 'todos' && (
               <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                Status: {statusOptions.find(o => o.value === statusFilter)?.label}
+                Status: {statusOptions.find((o) => o.value === statusFilter)?.label}
                 <button
                   onClick={() => setStatusFilter('todos')}
                   className="hover:bg-blue-200 rounded-full p-0.5"
@@ -181,7 +174,7 @@ export const ContatoFilters: React.FC<ContatoFiltersProps> = ({
 
             {tipoFilter !== 'todos' && (
               <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                Tipo: {tipoOptions.find(o => o.value === tipoFilter)?.label}
+                Tipo: {tipoOptions.find((o) => o.value === tipoFilter)?.label}
                 <button
                   onClick={() => setTipoFilter('todos')}
                   className="hover:bg-green-200 rounded-full p-0.5"
@@ -193,7 +186,8 @@ export const ContatoFilters: React.FC<ContatoFiltersProps> = ({
 
             {proprietarioFilter !== 'todos' && (
               <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
-                Proprietário: {proprietarioOptions.find(o => o.value === proprietarioFilter)?.label}
+                Proprietário:{' '}
+                {proprietarioOptions.find((o) => o.value === proprietarioFilter)?.label}
                 <button
                   onClick={() => setProprietarioFilter('todos')}
                   className="hover:bg-purple-200 rounded-full p-0.5"
@@ -205,7 +199,7 @@ export const ContatoFilters: React.FC<ContatoFiltersProps> = ({
 
             {fonteFilter !== 'todas' && (
               <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
-                Fonte: {fonteOptions.find(o => o.value === fonteFilter)?.label}
+                Fonte: {fonteOptions.find((o) => o.value === fonteFilter)?.label}
                 <button
                   onClick={() => setFonteFilter('todas')}
                   className="hover:bg-orange-200 rounded-full p-0.5"

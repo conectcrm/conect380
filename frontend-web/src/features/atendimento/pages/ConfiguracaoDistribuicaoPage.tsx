@@ -1,9 +1,9 @@
 /**
  * Página de Configuração de Auto-Distribuição de Filas
- * 
+ *
  * Permite configurar estratégias de distribuição automática de tickets,
  * capacidades dos atendentes e prioridades.
- * 
+ *
  * @author ConectCRM
  * @date 07/11/2025
  */
@@ -96,10 +96,7 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
       const user = userStr ? JSON.parse(userStr) : null;
       const empresaId = user?.empresaId || 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
 
-      const config = await distribuicaoService.buscarConfiguracao(
-        filaSelecionada,
-        empresaId
-      );
+      const config = await distribuicaoService.buscarConfiguracao(filaSelecionada, empresaId);
 
       if (config) {
         setConfiguracao(config);
@@ -137,7 +134,7 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
       const sucesso = await distribuicaoService.atualizarConfiguracao(
         filaSelecionada,
         empresaId,
-        configuracao
+        configuracao,
       );
 
       if (sucesso) {
@@ -175,14 +172,12 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
   const handleUpdateAtendente = (
     atendenteId: string,
     campo: keyof AtendenteCapacidade,
-    valor: any
+    valor: any,
   ) => {
     if (!configuracao) return;
 
     const atendentesAtualizados = configuracao.atendentes?.map((atendente) =>
-      atendente.atendenteId === atendenteId
-        ? { ...atendente, [campo]: valor }
-        : atendente
+      atendente.atendenteId === atendenteId ? { ...atendente, [campo]: valor } : atendente,
     );
 
     setConfiguracao({
@@ -195,10 +190,7 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="bg-white border-b px-6 py-4">
-          <BackToNucleus
-            nucleusName="Atendimento"
-            nucleusPath="/nuclei/atendimento"
-          />
+          <BackToNucleus nucleusName="Atendimento" nucleusPath="/nuclei/atendimento" />
         </div>
         <div className="p-6">
           <div className="flex items-center justify-center h-64">
@@ -213,10 +205,7 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusName="Atendimento"
-          nucleusPath="/nuclei/atendimento"
-        />
+        <BackToNucleus nucleusName="Atendimento" nucleusPath="/nuclei/atendimento" />
       </div>
 
       <div className="p-6">
@@ -228,7 +217,8 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
               Configuração de Auto-Distribuição
             </h1>
             <p className="text-[#002333]/70 mt-2">
-              Configure estratégias de distribuição automática de tickets para suas filas de atendimento
+              Configure estratégias de distribuição automática de tickets para suas filas de
+              atendimento
             </p>
           </div>
 
@@ -253,9 +243,7 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
 
           {/* Seleção de Fila */}
           <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <label className="block text-sm font-medium text-[#002333] mb-2">
-              Selecionar Fila
-            </label>
+            <label className="block text-sm font-medium text-[#002333] mb-2">Selecionar Fila</label>
             <select
               value={filaSelecionada || ''}
               onChange={(e) => setFilaSelecionada(e.target.value)}
@@ -286,16 +274,14 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
                   </div>
                   <button
                     onClick={handleToggleAutomatica}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${configuracao.distribuicaoAutomatica
-                        ? 'bg-[#9333EA]'
-                        : 'bg-gray-200'
-                      }`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      configuracao.distribuicaoAutomatica ? 'bg-[#9333EA]' : 'bg-gray-200'
+                    }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${configuracao.distribuicaoAutomatica
-                          ? 'translate-x-6'
-                          : 'translate-x-1'
-                        }`}
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        configuracao.distribuicaoAutomatica ? 'translate-x-6' : 'translate-x-1'
+                      }`}
                     />
                   </button>
                 </div>
@@ -312,10 +298,11 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
                   {/* Round Robin */}
                   <button
                     onClick={() => handleChangeEstrategia(EstrategiaDistribuicao.ROUND_ROBIN)}
-                    className={`p-4 border-2 rounded-lg text-left transition-all ${configuracao.estrategiaDistribuicao === EstrategiaDistribuicao.ROUND_ROBIN
+                    className={`p-4 border-2 rounded-lg text-left transition-all ${
+                      configuracao.estrategiaDistribuicao === EstrategiaDistribuicao.ROUND_ROBIN
                         ? 'border-[#9333EA] bg-[#9333EA]/10'
                         : 'border-[#B4BEC9] hover:border-[#9333EA]/50'
-                      }`}
+                    }`}
                   >
                     <div className="text-2xl mb-2">
                       {distribuicaoService.iconeEstrategia(EstrategiaDistribuicao.ROUND_ROBIN)}
@@ -329,10 +316,11 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
                   {/* Menor Carga */}
                   <button
                     onClick={() => handleChangeEstrategia(EstrategiaDistribuicao.MENOR_CARGA)}
-                    className={`p-4 border-2 rounded-lg text-left transition-all ${configuracao.estrategiaDistribuicao === EstrategiaDistribuicao.MENOR_CARGA
+                    className={`p-4 border-2 rounded-lg text-left transition-all ${
+                      configuracao.estrategiaDistribuicao === EstrategiaDistribuicao.MENOR_CARGA
                         ? 'border-[#9333EA] bg-[#9333EA]/10'
                         : 'border-[#B4BEC9] hover:border-[#9333EA]/50'
-                      }`}
+                    }`}
                   >
                     <div className="text-2xl mb-2">
                       {distribuicaoService.iconeEstrategia(EstrategiaDistribuicao.MENOR_CARGA)}
@@ -346,10 +334,11 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
                   {/* Prioridade */}
                   <button
                     onClick={() => handleChangeEstrategia(EstrategiaDistribuicao.PRIORIDADE)}
-                    className={`p-4 border-2 rounded-lg text-left transition-all ${configuracao.estrategiaDistribuicao === EstrategiaDistribuicao.PRIORIDADE
+                    className={`p-4 border-2 rounded-lg text-left transition-all ${
+                      configuracao.estrategiaDistribuicao === EstrategiaDistribuicao.PRIORIDADE
                         ? 'border-[#9333EA] bg-[#9333EA]/10'
                         : 'border-[#B4BEC9] hover:border-[#9333EA]/50'
-                      }`}
+                    }`}
                   >
                     <div className="text-2xl mb-2">
                       {distribuicaoService.iconeEstrategia(EstrategiaDistribuicao.PRIORIDADE)}
@@ -406,7 +395,7 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
                                   handleUpdateAtendente(
                                     atendente.atendenteId,
                                     'capacidade',
-                                    parseInt(e.target.value)
+                                    parseInt(e.target.value),
                                   )
                                 }
                                 className="w-20 px-3 py-1 border border-[#B4BEC9] rounded focus:ring-2 focus:ring-[#9333EA]"
@@ -422,14 +411,12 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
                                   handleUpdateAtendente(
                                     atendente.atendenteId,
                                     'prioridade',
-                                    parseInt(e.target.value)
+                                    parseInt(e.target.value),
                                   )
                                 }
                                 className="w-20 px-3 py-1 border border-[#B4BEC9] rounded focus:ring-2 focus:ring-[#9333EA]"
                               />
-                              <span className="text-xs text-[#002333]/60 ml-2">
-                                (1 = maior)
-                              </span>
+                              <span className="text-xs text-[#002333]/60 ml-2">(1 = maior)</span>
                             </td>
                             <td className="py-3 px-4">
                               <button
@@ -437,13 +424,14 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
                                   handleUpdateAtendente(
                                     atendente.atendenteId,
                                     'ativo',
-                                    !atendente.ativo
+                                    !atendente.ativo,
                                   )
                                 }
-                                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${atendente.ativo
+                                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                                  atendente.ativo
                                     ? 'bg-green-100 text-green-800 hover:bg-green-200'
                                     : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                                  }`}
+                                }`}
                               >
                                 {atendente.ativo ? 'Ativo' : 'Inativo'}
                               </button>
@@ -461,8 +449,12 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
                         <p className="font-medium mb-1">Dicas de Configuração:</p>
                         <ul className="list-disc list-inside space-y-1">
                           <li>Capacidade: número máximo de tickets simultâneos por atendente</li>
-                          <li>Prioridade: quanto menor o número, maior a prioridade (1 = máxima)</li>
-                          <li>Status Inativo: atendente não receberá novos tickets automaticamente</li>
+                          <li>
+                            Prioridade: quanto menor o número, maior a prioridade (1 = máxima)
+                          </li>
+                          <li>
+                            Status Inativo: atendente não receberá novos tickets automaticamente
+                          </li>
                         </ul>
                       </div>
                     </div>

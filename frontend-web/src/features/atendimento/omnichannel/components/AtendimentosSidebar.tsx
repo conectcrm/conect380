@@ -161,34 +161,38 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
     [ticketsUnicos],
   );
 
-  const tabs: { value: StatusAtendimentoType; label: string; count: number }[] = [
+  const tabs: { value: StatusAtendimentoType; label: string; labelCompacto: string; count: number }[] = [
     {
       value: 'fila',
       label: 'Fila',
+      labelCompacto: 'Fila',
       count: contagemPorStatus?.fila ?? contagemFallback.fila,
     },
     {
       value: 'em_atendimento',
       label: 'Em Atendimento',
+      labelCompacto: 'Atendendo',
       count: contagemPorStatus?.em_atendimento ?? contagemFallback.em_atendimento,
     },
     {
       value: 'envio_ativo',
       label: 'Envio Ativo',
+      labelCompacto: 'Enviando',
       count: contagemPorStatus?.envio_ativo ?? contagemFallback.envio_ativo,
     },
     {
       value: 'encerrado',
       label: 'Encerrado',
+      labelCompacto: 'Fechados',
       count: contagemPorStatus?.encerrado ?? contagemFallback.encerrado,
     },
   ];
 
   return (
     <div className="flex flex-col h-full bg-white border-r border-gray-200">
-      {/* Header com Tabs */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex space-x-1 mb-4">
+      {/* Header com Tabs - Responsivo */}
+      <div className="p-3 border-b border-gray-200 flex-shrink-0">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 mb-3">
           {tabs.map((tab) => (
             <button
               key={tab.value}
@@ -197,18 +201,20 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
                 backgroundColor: tabAtiva === tab.value ? theme.colors.primary : '',
                 color: tabAtiva === tab.value ? '#FFFFFF' : '',
               }}
-              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${tabAtiva === tab.value ? 'shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              className={`px-2 py-1.5 rounded-lg font-medium text-[11px] transition-all ${tabAtiva === tab.value ? 'shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
             >
-              {tab.label}
-              {tab.count > 0 && (
-                <span
-                  className={`ml-2 px-2 py-0.5 rounded-full text-xs ${tabAtiva === tab.value ? 'bg-white/20' : 'bg-gray-300'
-                    }`}
-                >
-                  {tab.count}
-                </span>
-              )}
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="truncate max-w-full">{tab.labelCompacto}</span>
+                {tab.count > 0 && (
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${tabAtiva === tab.value ? 'bg-white/20' : 'bg-gray-300'
+                      }`}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+              </div>
             </button>
           ))}
         </div>
@@ -227,7 +233,12 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
       </div>
 
       {/* Lista de Atendimentos */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400"
+        style={{
+          scrollbarWidth: 'thin',
+          scrollbarColor: '#D1D5DB #F3F4F6'
+        }}
+      >
         {loading ? (
           <TicketListSkeleton count={5} />
         ) : ticketsFiltrados.length === 0 ? (
@@ -359,7 +370,7 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
       </div>
 
       {/* Botão Novo Atendimento */}
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-3 border-t border-gray-200 flex-shrink-0">
         <button
           onClick={onNovoAtendimento}
           style={{
@@ -368,7 +379,7 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
           }}
           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = theme.colors.primaryHover)}
           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = theme.colors.primary)}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-colors shadow-md hover:shadow-lg"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors shadow-md hover:shadow-lg"
         >
           <Plus className="w-5 h-5" />
           Novo Atendimento

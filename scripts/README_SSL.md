@@ -105,7 +105,7 @@ nslookup conectcrm.com.br
 
 ```powershell
 # Executar script de instalação
-.\scripts\setup-ssl.ps1 -Domain "conectcrm.com.br" -Email "admin@conectcrm.com.br"
+.\scripts\setup-ssl.ps1 -Domain "conectcrm.com.br" -Email "admin@conectsuite.com.br"
 
 # Para testes (staging - não é certificado válido)
 .\scripts\setup-ssl.ps1 -Domain "test.conectcrm.com.br" -Email "dev@conectcrm.com.br" -Staging
@@ -136,7 +136,7 @@ iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocola
 choco install certbot -y
 
 # 3. Gerar certificado
-certbot certonly --standalone --agree-tos --email admin@conectcrm.com.br -d conectcrm.com.br
+certbot certonly --standalone --agree-tos --email admin@conectsuite.com.br -d conectcrm.com.br
 
 # 4. Copiar certificados
 New-Item -ItemType Directory -Path "certs" -Force
@@ -152,7 +152,7 @@ sudo apt-get update
 sudo apt-get install -y certbot
 
 # 2. Gerar certificado
-sudo certbot certonly --standalone --agree-tos --email admin@conectcrm.com.br -d conectcrm.com.br
+sudo certbot certonly --standalone --agree-tos --email admin@conectsuite.com.br -d conectcrm.com.br
 
 # 3. Copiar certificados
 mkdir -p certs
@@ -516,7 +516,7 @@ nslookup conectcrm.com.br 8.8.8.8
 openssl x509 -in certs/cert.pem -noout -text | Select-String "Subject:"
 
 # Se estiver errado, gerar novamente
-.\scripts\setup-ssl.ps1 -Domain "conectcrm-correto.com.br" -Email "admin@conectcrm.com.br"
+.\scripts\setup-ssl.ps1 -Domain "conectcrm-correto.com.br" -Email "admin@conectsuite.com.br"
 ```
 
 ---

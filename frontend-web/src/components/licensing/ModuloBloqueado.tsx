@@ -11,9 +11,9 @@ interface ModuloBloqueadoProps {
 
 /**
  * Componente exibido quando usuário tenta acessar módulo não licenciado
- * 
+ *
  * @example
- * <ModuloBloqueado 
+ * <ModuloBloqueado
  *   moduloNome="CRM"
  *   moduloDescricao="Gestão completa de clientes, contatos e relacionamento"
  *   preco="R$ 299"
@@ -24,7 +24,7 @@ export const ModuloBloqueado: React.FC<ModuloBloqueadoProps> = ({
   moduloNome,
   moduloDescricao,
   preco,
-  recursos = []
+  recursos = [],
 }) => {
   const navigate = useNavigate();
 
@@ -34,7 +34,10 @@ export const ModuloBloqueado: React.FC<ModuloBloqueadoProps> = ({
 
   const handleContatar = () => {
     // TODO: Integrar com sistema de vendas/suporte
-    window.open('https://wa.me/5511999999999?text=Olá! Gostaria de contratar o módulo ' + moduloNome, '_blank');
+    window.open(
+      'https://wa.me/5511999999999?text=Olá! Gostaria de contratar o módulo ' + moduloNome,
+      '_blank',
+    );
   };
 
   return (
@@ -48,9 +51,7 @@ export const ModuloBloqueado: React.FC<ModuloBloqueadoProps> = ({
               <Lock className="h-12 w-12 text-white" />
             </div>
 
-            <h1 className="text-3xl font-bold text-white mb-3">
-              Módulo {moduloNome}
-            </h1>
+            <h1 className="text-3xl font-bold text-white mb-3">Módulo {moduloNome}</h1>
 
             <p className="text-blue-100 text-lg">
               Este recurso não está disponível no seu plano atual
@@ -64,17 +65,13 @@ export const ModuloBloqueado: React.FC<ModuloBloqueadoProps> = ({
               <h2 className="text-xl font-semibold text-gray-900 mb-3">
                 O que você ganha com este módulo:
               </h2>
-              <p className="text-gray-600 leading-relaxed">
-                {moduloDescricao}
-              </p>
+              <p className="text-gray-600 leading-relaxed">{moduloDescricao}</p>
             </div>
 
             {/* Recursos (se fornecidos) */}
             {recursos.length > 0 && (
               <div className="mb-8">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Principais recursos:
-                </h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Principais recursos:</h3>
                 <ul className="space-y-3">
                   {recursos.map((recurso, index) => (
                     <li key={index} className="flex items-start gap-3">

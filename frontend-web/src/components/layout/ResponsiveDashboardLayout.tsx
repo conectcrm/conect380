@@ -4,9 +4,15 @@ import { useAuth } from '../../hooks/useAuth';
 import { formatCompanyName, formatUserName } from '../../utils/textUtils';
 import LanguageSelector from '../common/LanguageSelector';
 import {
-  Bell, Wifi, WifiOff, Search,
-  Settings, HelpCircle, LogOut,
-  User, ChevronDown
+  Bell,
+  Wifi,
+  WifiOff,
+  Search,
+  Settings,
+  MessageCircle,
+  LogOut,
+  User,
+  ChevronDown,
 } from 'lucide-react';
 
 interface ResponsiveDashboardLayoutProps {
@@ -32,7 +38,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
   const [notifications] = useState([
     { id: 1, type: 'info', message: 'Nova proposta recebida', time: '2 min' },
     { id: 2, type: 'warning', message: 'Cliente aguarda retorno', time: '15 min' },
-    { id: 3, type: 'success', message: 'Venda concluída', time: '1h' }
+    { id: 3, type: 'success', message: 'Venda concluída', time: '1h' },
   ]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -43,7 +49,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
   const [searchResults] = useState([
     { id: 1, type: 'cliente', title: 'João Silva', subtitle: 'cliente@email.com' },
     { id: 2, type: 'proposta', title: 'Proposta #001', subtitle: 'R$ 15.000,00' },
-    { id: 3, type: 'contrato', title: 'Contrato #123', subtitle: 'Ativo até 12/2025' }
+    { id: 3, type: 'contrato', title: 'Contrato #123', subtitle: 'Ativo até 12/2025' },
   ]);
 
   // Monitor de conexão
@@ -90,7 +96,9 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
     const handleKeydown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
         event.preventDefault();
-        const searchInput = document.querySelector('input[placeholder*="Buscar"]') as HTMLInputElement;
+        const searchInput = document.querySelector(
+          'input[placeholder*="Buscar"]',
+        ) as HTMLInputElement;
         if (searchInput) {
           searchInput.focus();
         }
@@ -112,7 +120,6 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
       <header className="bg-white shadow-lg border-b sticky top-0 z-20" role="banner">
         <div className="w-full max-w-[1440px] mx-auto px-6 py-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
-
             {/* Seção Esquerda: Logo + Dashboard Title */}
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
@@ -124,7 +131,9 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">Fênix CRM</h1>
-                  <p className="text-sm text-gray-600 hidden sm:block">Dashboard - Visão geral do seu negócio</p>
+                  <p className="text-sm text-gray-600 hidden sm:block">
+                    Dashboard - Visão geral do seu negócio
+                  </p>
                 </div>
               </div>
             </div>
@@ -168,38 +177,46 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
 
                     <div className="max-h-80 overflow-y-auto">
                       {searchResults
-                        .filter(result =>
-                          result.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          result.subtitle.toLowerCase().includes(searchQuery.toLowerCase())
+                        .filter(
+                          (result) =>
+                            result.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            result.subtitle.toLowerCase().includes(searchQuery.toLowerCase()),
                         )
                         .map((result) => (
-                          <div key={result.id} className="p-3 hover:bg-gray-50 cursor-pointer transition-colors border-b last:border-b-0">
+                          <div
+                            key={result.id}
+                            className="p-3 hover:bg-gray-50 cursor-pointer transition-colors border-b last:border-b-0"
+                          >
                             <div className="flex items-center gap-3">
-                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-medium ${result.type === 'cliente' ? 'bg-blue-500' :
-                                  result.type === 'proposta' ? 'bg-green-500' :
-                                    'bg-purple-500'
-                                }`}>
-                                {result.type === 'cliente' ? 'C' :
-                                  result.type === 'proposta' ? 'P' : 'CT'}
+                              <div
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-medium ${result.type === 'cliente'
+                                    ? 'bg-blue-500'
+                                    : result.type === 'proposta'
+                                      ? 'bg-green-500'
+                                      : 'bg-purple-500'
+                                  }`}
+                              >
+                                {result.type === 'cliente'
+                                  ? 'C'
+                                  : result.type === 'proposta'
+                                    ? 'P'
+                                    : 'CT'}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-gray-900 truncate">
                                   {result.title}
                                 </p>
-                                <p className="text-xs text-gray-500 truncate">
-                                  {result.subtitle}
-                                </p>
+                                <p className="text-xs text-gray-500 truncate">{result.subtitle}</p>
                               </div>
-                              <div className="text-xs text-gray-400 capitalize">
-                                {result.type}
-                              </div>
+                              <div className="text-xs text-gray-400 capitalize">{result.type}</div>
                             </div>
                           </div>
                         ))}
 
-                      {searchResults.filter(result =>
-                        result.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        result.subtitle.toLowerCase().includes(searchQuery.toLowerCase())
+                      {searchResults.filter(
+                        (result) =>
+                          result.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          result.subtitle.toLowerCase().includes(searchQuery.toLowerCase()),
                       ).length === 0 && (
                           <div className="p-6 text-center">
                             <Search className="w-8 h-8 text-gray-300 mx-auto mb-2" />
@@ -221,12 +238,13 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
 
             {/* Seção Direita: Status + Notificações + Idioma + Usuário */}
             <div className="flex items-center gap-3">
-
               {/* Status Online */}
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-full transition-all duration-300 ${isOnline
-                  ? 'bg-green-50 border border-green-200 text-green-700'
-                  : 'bg-red-50 border border-red-200 text-red-700'
-                }`}>
+              <div
+                className={`flex items-center gap-2 px-3 py-2 rounded-full transition-all duration-300 ${isOnline
+                    ? 'bg-green-50 border border-green-200 text-green-700'
+                    : 'bg-red-50 border border-red-200 text-red-700'
+                  }`}
+              >
                 {isOnline ? (
                   <Wifi className="w-4 h-4 animate-pulse" />
                 ) : (
@@ -269,11 +287,16 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                     <div className="max-h-64 overflow-y-auto">
                       {notifications.length > 0 ? (
                         notifications.map((notification) => (
-                          <div key={notification.id} className="p-3 border-b last:border-b-0 hover:bg-gray-50 transition-colors cursor-pointer">
+                          <div
+                            key={notification.id}
+                            className="p-3 border-b last:border-b-0 hover:bg-gray-50 transition-colors cursor-pointer"
+                          >
                             <div className="flex items-start gap-3">
                               <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm text-gray-900 leading-relaxed">{notification.message}</p>
+                                <p className="text-sm text-gray-900 leading-relaxed">
+                                  {notification.message}
+                                </p>
                                 <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
                               </div>
                             </div>
@@ -302,7 +325,9 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
               {/* Seletor de Idioma com Bandeira */}
               <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-full transition-colors cursor-pointer">
                 <span className="text-lg">🇧🇷</span>
-                <span className="text-sm font-medium text-gray-700 hidden lg:inline">Português</span>
+                <span className="text-sm font-medium text-gray-700 hidden lg:inline">
+                  Português
+                </span>
               </div>
 
               {/* Avatar/Menu do Usuário */}
@@ -364,11 +389,13 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                         </div>
                       </button>
                       <button className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors group">
-                        <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-green-100 transition-colors">
-                          <HelpCircle className="w-4 h-4 text-gray-600 group-hover:text-green-600" />
+                        <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                          <MessageCircle className="w-4 h-4 text-gray-600 group-hover:text-blue-600" />
                         </div>
                         <div>
-                          <span className="text-sm font-medium text-gray-700">Central de Ajuda</span>
+                          <span className="text-sm font-medium text-gray-700">
+                            Central de Ajuda
+                          </span>
                           <p className="text-xs text-gray-500">Suporte e documentação</p>
                         </div>
                       </button>
@@ -407,15 +434,10 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
         <div className="bg-white rounded-xl border border-[#DEEFE7] shadow-sm p-6 mb-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2
-                id={headingId}
-                className="text-2xl font-semibold text-[#002333] tracking-tight"
-              >
+              <h2 id={headingId} className="text-2xl font-semibold text-[#002333] tracking-tight">
                 {title}
               </h2>
-              {subtitle && (
-                <p className="text-sm text-gray-600 mt-1">{subtitle}</p>
-              )}
+              {subtitle && <p className="text-sm text-gray-600 mt-1">{subtitle}</p>}
             </div>
             {actions && (
               <div className="flex items-center gap-3 flex-wrap" aria-label="Ações do dashboard">

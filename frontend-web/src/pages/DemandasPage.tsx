@@ -69,13 +69,13 @@ export default function DemandasPage() {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Sprint 2: Buscar tickets com tipo (demanda foi migrada como tipo='suporte')
       const response = await ticketsService.listar({
         empresaId: user.empresa.id,
         tipo: 'suporte', // Demandas foram migradas como tipo='suporte'
       });
-      
+
       setDemandas(response.data || []);
     } catch (err: any) {
       console.error('Erro ao carregar demandas (tickets):', err);
@@ -89,22 +89,22 @@ export default function DemandasPage() {
   // Estatísticas - Sprint 2: Calculadas a partir dos tickets
   const stats = {
     total: demandas.length,
-    abertas: demandas.filter((d) => 
+    abertas: demandas.filter((d) =>
       d.status === 'ABERTO' || d.status === 'FILA'
     ).length,
-    emAndamento: demandas.filter((d) => 
+    emAndamento: demandas.filter((d) =>
       d.status === 'EM_ATENDIMENTO'
     ).length,
-    aguardandoCliente: demandas.filter((d) => 
+    aguardandoCliente: demandas.filter((d) =>
       d.status === 'AGUARDANDO' || d.status === 'AGUARDANDO_CLIENTE'
     ).length,
-    concluidas: demandas.filter((d) => 
+    concluidas: demandas.filter((d) =>
       d.status === 'RESOLVIDO' || d.status === 'CONCLUIDO' || d.status === 'ENCERRADO'
     ).length,
-    canceladas: demandas.filter((d) => 
+    canceladas: demandas.filter((d) =>
       d.status === 'CANCELADO'
     ).length,
-    criticas: demandas.filter((d) => 
+    criticas: demandas.filter((d) =>
       d.prioridade === 'URGENTE' || d.severity === 'CRITICA'
     ).length,
   };
@@ -119,8 +119,8 @@ export default function DemandasPage() {
       (demanda.numero?.toString().includes(searchTerm));
 
     // Filtro de status - Sprint 2: Status do ticket
-    const matchStatus = 
-      filtroStatus === 'todas' || 
+    const matchStatus =
+      filtroStatus === 'todas' ||
       demanda.status?.toString() === filtroStatus ||
       // Compatibilidade com status antigos
       (filtroStatus === 'aberta' && (demanda.status === 'ABERTO' || demanda.status === 'FILA')) ||
@@ -133,8 +133,8 @@ export default function DemandasPage() {
     const matchTipo = filtroTipo === 'todos' || demanda.tipo === filtroTipo;
 
     // Filtro de prioridade
-    const matchPrioridade = 
-      filtroPrioridade === 'todas' || 
+    const matchPrioridade =
+      filtroPrioridade === 'todas' ||
       demanda.prioridade?.toString() === filtroPrioridade ||
       // Compatibilidade com prioridades antigas (lowercase)
       demanda.prioridade?.toLowerCase() === filtroPrioridade;

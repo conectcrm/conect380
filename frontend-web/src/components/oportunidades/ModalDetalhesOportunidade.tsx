@@ -18,9 +18,14 @@ import {
   PhoneCall,
   Send,
   User,
-  Copy
+  Copy,
 } from 'lucide-react';
-import { Oportunidade, Atividade, EstagioOportunidade, PrioridadeOportunidade } from '../../types/oportunidades';
+import {
+  Oportunidade,
+  Atividade,
+  EstagioOportunidade,
+  PrioridadeOportunidade,
+} from '../../types/oportunidades';
 import { oportunidadesService } from '../../services/oportunidadesService';
 import { differenceInDays } from 'date-fns';
 
@@ -35,7 +40,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   oportunidade,
   onClose,
   onEditar,
-  onClonar
+  onClonar,
 }) => {
   const [atividades, setAtividades] = useState<Atividade[]>([]);
   const [loadingAtividades, setLoadingAtividades] = useState(false);
@@ -70,22 +75,34 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
 
   // Cor da probabilidade
   const prob = oportunidade.probabilidade || 0;
-  const probColor = prob <= 20 ? 'bg-red-100 text-red-700 border-red-200' :
-    prob <= 40 ? 'bg-orange-100 text-orange-700 border-orange-200' :
-      prob <= 60 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
-        prob <= 80 ? 'bg-green-100 text-green-700 border-green-200' :
-          'bg-green-200 text-green-800 border-green-300';
-  const probEmoji = prob <= 20 ? '❄️' : prob <= 40 ? '🌤️' : prob <= 60 ? '☀️' : prob <= 80 ? '🔥' : '🚀';
+  const probColor =
+    prob <= 20
+      ? 'bg-red-100 text-red-700 border-red-200'
+      : prob <= 40
+        ? 'bg-orange-100 text-orange-700 border-orange-200'
+        : prob <= 60
+          ? 'bg-yellow-100 text-yellow-700 border-yellow-200'
+          : prob <= 80
+            ? 'bg-green-100 text-green-700 border-green-200'
+            : 'bg-green-200 text-green-800 border-green-300';
+  const probEmoji =
+    prob <= 20 ? '❄️' : prob <= 40 ? '🌤️' : prob <= 60 ? '☀️' : prob <= 80 ? '🔥' : '🚀';
 
   // Ícone por tipo de atividade
   const getIconeAtividade = (tipo: string) => {
     switch (tipo) {
-      case 'call': return <PhoneCall className="h-4 w-4 text-blue-600" />;
-      case 'email': return <Send className="h-4 w-4 text-indigo-600" />;
-      case 'meeting': return <Users className="h-4 w-4 text-purple-600" />;
-      case 'note': return <MessageSquare className="h-4 w-4 text-gray-600" />;
-      case 'task': return <CheckCircle className="h-4 w-4 text-green-600" />;
-      default: return <FileText className="h-4 w-4 text-gray-600" />;
+      case 'call':
+        return <PhoneCall className="h-4 w-4 text-blue-600" />;
+      case 'email':
+        return <Send className="h-4 w-4 text-indigo-600" />;
+      case 'meeting':
+        return <Users className="h-4 w-4 text-purple-600" />;
+      case 'note':
+        return <MessageSquare className="h-4 w-4 text-gray-600" />;
+      case 'task':
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      default:
+        return <FileText className="h-4 w-4 text-gray-600" />;
     }
   };
 
@@ -98,7 +115,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
       [EstagioOportunidade.NEGOCIACAO]: 'Negociação',
       [EstagioOportunidade.FECHAMENTO]: 'Fechamento',
       [EstagioOportunidade.GANHO]: 'Ganho',
-      [EstagioOportunidade.PERDIDO]: 'Perdido'
+      [EstagioOportunidade.PERDIDO]: 'Perdido',
     };
     return estagios[estagio] || estagio;
   };
@@ -106,7 +123,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   const formatarMoeda = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(valor);
   };
 
@@ -116,7 +133,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
       month: 'short',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
@@ -178,19 +195,21 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
           <div className="flex">
             <button
               onClick={() => setAbaSelecionada('detalhes')}
-              className={`px-6 py-3 font-medium transition-colors border-b-2 ${abaSelecionada === 'detalhes'
-                ? 'border-[#159A9C] text-[#159A9C] bg-white'
-                : 'border-transparent text-gray-600 hover:text-gray-800'
-                }`}
+              className={`px-6 py-3 font-medium transition-colors border-b-2 ${
+                abaSelecionada === 'detalhes'
+                  ? 'border-[#159A9C] text-[#159A9C] bg-white'
+                  : 'border-transparent text-gray-600 hover:text-gray-800'
+              }`}
             >
               Detalhes
             </button>
             <button
               onClick={() => setAbaSelecionada('atividades')}
-              className={`px-6 py-3 font-medium transition-colors border-b-2 flex items-center gap-2 ${abaSelecionada === 'atividades'
-                ? 'border-[#159A9C] text-[#159A9C] bg-white'
-                : 'border-transparent text-gray-600 hover:text-gray-800'
-                }`}
+              className={`px-6 py-3 font-medium transition-colors border-b-2 flex items-center gap-2 ${
+                abaSelecionada === 'atividades'
+                  ? 'border-[#159A9C] text-[#159A9C] bg-white'
+                  : 'border-transparent text-gray-600 hover:text-gray-800'
+              }`}
             >
               Atividades
               {atividades.length > 0 && (
@@ -261,9 +280,12 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                     <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4 flex items-start gap-3">
                       <AlertCircle className="h-6 w-6 text-yellow-600 flex-shrink-0 mt-0.5" />
                       <div>
-                        <h4 className="font-semibold text-yellow-900">Atenção: Vencimento Próximo</h4>
+                        <h4 className="font-semibold text-yellow-900">
+                          Atenção: Vencimento Próximo
+                        </h4>
                         <p className="text-yellow-700 text-sm">
-                          Esta oportunidade vence em {diasAteVencimento} {diasAteVencimento === 1 ? 'dia' : 'dias'}
+                          Esta oportunidade vence em {diasAteVencimento}{' '}
+                          {diasAteVencimento === 1 ? 'dia' : 'dias'}
                         </p>
                       </div>
                     </div>
@@ -336,14 +358,20 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                     <AlertCircle className="h-5 w-5 text-[#159A9C] mt-0.5" />
                     <div>
                       <p className="text-sm text-gray-600">Prioridade</p>
-                      <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${oportunidade.prioridade === PrioridadeOportunidade.ALTA
-                        ? 'bg-red-100 text-red-700'
-                        : oportunidade.prioridade === PrioridadeOportunidade.MEDIA
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-green-100 text-green-700'
-                        }`}>
-                        {oportunidade.prioridade === PrioridadeOportunidade.ALTA ? 'Alta' :
-                          oportunidade.prioridade === PrioridadeOportunidade.MEDIA ? 'Média' : 'Baixa'}
+                      <span
+                        className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
+                          oportunidade.prioridade === PrioridadeOportunidade.ALTA
+                            ? 'bg-red-100 text-red-700'
+                            : oportunidade.prioridade === PrioridadeOportunidade.MEDIA
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-green-100 text-green-700'
+                        }`}
+                      >
+                        {oportunidade.prioridade === PrioridadeOportunidade.ALTA
+                          ? 'Alta'
+                          : oportunidade.prioridade === PrioridadeOportunidade.MEDIA
+                            ? 'Média'
+                            : 'Baixa'}
                       </span>
                     </div>
                   </div>
@@ -354,7 +382,9 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                     <Tag className="h-5 w-5 text-[#159A9C] mt-0.5" />
                     <div>
                       <p className="text-sm text-gray-600">Origem</p>
-                      <p className="font-semibold text-[#002333] capitalize">{oportunidade.origem}</p>
+                      <p className="font-semibold text-[#002333] capitalize">
+                        {oportunidade.origem}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -377,7 +407,9 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                 <div>
                   <h3 className="text-lg font-bold text-[#002333] mb-3">Descrição</h3>
                   <div className="bg-gray-50 rounded-xl p-4">
-                    <p className="text-[#002333]/80 whitespace-pre-wrap">{oportunidade.descricao}</p>
+                    <p className="text-[#002333]/80 whitespace-pre-wrap">
+                      {oportunidade.descricao}
+                    </p>
                   </div>
                 </div>
               )}
@@ -447,7 +479,8 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                               </p>
                               <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
                                 <User className="h-3 w-3" />
-                                {atividade.criadoPor?.nome || 'Sistema'} • {formatarData(atividade.createdAt)}
+                                {atividade.criadoPor?.nome || 'Sistema'} •{' '}
+                                {formatarData(atividade.createdAt)}
                               </p>
                             </div>
                           </div>

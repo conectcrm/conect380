@@ -37,3 +37,14 @@ export enum TipoAtividade {
   NOTA = 'note',
   TAREFA = 'task',
 }
+
+export enum MotivoPerda {
+  PRECO = 'PRECO',
+  CONCORRENTE = 'CONCORRENTE',
+  TIMING = 'TIMING',
+  ORCAMENTO = 'ORCAMENTO',
+  PRODUTO = 'PRODUTO',
+  PROJETO_CANCELADO = 'PROJETO_CANCELADO',
+  SEM_RESPOSTA = 'SEM_RESPOSTA',
+  OUTRO = 'OUTRO',
+}

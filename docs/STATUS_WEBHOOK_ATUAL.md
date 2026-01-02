@@ -200,9 +200,9 @@ Token de acesso inválido ou expirado                   ❌
 - **Status**: ✅ Válido
 
 ### Webhook
-- **Endpoint**: `https://[seu-domínio]/api/atendimento/webhooks/whatsapp`
-- **Método**: POST
-- **Verificação**: GET com hub.* params
+- **Endpoint**: `https://[seu-domínio]/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>`
+- **Método**: POST (com header `X-Hub-Signature-256` assinado com o App Secret)
+- **Verificação**: GET `/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>?hub.*`
 - **Empresa Padrão**: f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 ---

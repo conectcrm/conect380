@@ -43,7 +43,7 @@ export interface NovoFornecedor {
   ativo?: boolean;
 }
 
-export interface AtualizarFornecedor extends Partial<NovoFornecedor> { }
+export interface AtualizarFornecedor extends Partial<NovoFornecedor> {}
 
 export const fornecedorService = {
   // Listar todos os fornecedores
@@ -188,7 +188,7 @@ export const fornecedorService = {
       console.error('Erro ao obter estatísticas:', error);
       throw error;
     }
-  }
+  },
 };
 
 export default fornecedorService;

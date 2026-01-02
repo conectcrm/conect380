@@ -19,7 +19,7 @@ import {
   Paperclip,
   History,
   Star,
-  MessageSquare
+  MessageSquare,
 } from 'lucide-react';
 import { Cotacao, StatusCotacao } from '../../types/cotacaoTypes';
 import { cotacaoService } from '../../services/cotacaoService';
@@ -40,7 +40,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
   cotacao,
   onEdit,
   onDelete,
-  onStatusChange
+  onStatusChange,
 }) => {
   const [activeTab, setActiveTab] = useState<'info' | 'itens' | 'anexos' | 'historico'>('info');
   const [isChangingStatus, setIsChangingStatus] = useState(false);
@@ -56,7 +56,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
       rejeitada: 'bg-red-100 text-red-800',
       vencida: 'bg-orange-100 text-orange-800',
       convertida: 'bg-purple-100 text-purple-800',
-      cancelada: 'bg-gray-100 text-gray-600'
+      cancelada: 'bg-gray-100 text-gray-600',
     };
     return colors[status] || colors.rascunho;
   };
@@ -70,7 +70,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
       rejeitada: XCircle,
       vencida: AlertCircle,
       convertida: Star,
-      cancelada: XCircle
+      cancelada: XCircle,
     };
     const Icon = icons[status] || Clock;
     return <Icon className="w-4 h-4" />;
@@ -81,7 +81,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
       baixa: 'bg-green-100 text-green-800',
       media: 'bg-yellow-100 text-yellow-800',
       alta: 'bg-orange-100 text-orange-800',
-      urgente: 'bg-red-100 text-red-800'
+      urgente: 'bg-red-100 text-red-800',
     };
     return colors[prioridade as keyof typeof colors] || colors.media;
   };
@@ -89,7 +89,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -152,7 +152,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
       await cotacaoService.enviarPorEmail(
         cotacao.id,
         [cotacao.fornecedor.email],
-        'Segue em anexo a cotação solicitada.'
+        'Segue em anexo a cotação solicitada.',
       );
       toast.success('Email enviado com sucesso!');
     } catch (error) {
@@ -175,22 +175,19 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
           <div className="flex items-center space-x-3">
             <FileText className="w-6 h-6 text-white" />
             <div>
-              <h2 className="text-xl font-semibold text-white">
-                {cotacao.numero}
-              </h2>
+              <h2 className="text-xl font-semibold text-white">{cotacao.numero}</h2>
               <p className="text-[#DEEFE7] text-sm">{cotacao.titulo}</p>
             </div>
           </div>
           <div className="flex items-center space-x-3">
             {/* Status Badge */}
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(cotacao.status)}`}>
+            <span
+              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(cotacao.status)}`}
+            >
               {getStatusIcon(cotacao.status)}
               <span className="ml-1 capitalize">{cotacao.status.replace('_', ' ')}</span>
             </span>
-            <button
-              onClick={onClose}
-              className="text-white hover:text-gray-200 transition-colors"
-            >
+            <button onClick={onClose} className="text-white hover:text-gray-200 transition-colors">
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -271,15 +268,16 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
               { id: 'info', label: 'Informações', icon: FileText },
               { id: 'itens', label: 'Itens', icon: Tag },
               { id: 'anexos', label: 'Anexos', icon: Paperclip },
-              { id: 'historico', label: 'Histórico', icon: History }
+              { id: 'historico', label: 'Histórico', icon: History },
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id as any)}
-                className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${activeTab === id
-                  ? 'border-[#159A9C] text-[#159A9C]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
+                className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === id
+                    ? 'border-[#159A9C] text-[#159A9C]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
               >
                 <div className="flex items-center space-x-2">
                   <Icon className="w-4 h-4" />
@@ -335,7 +333,9 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
                     <div>
                       <label className="text-sm font-medium text-gray-500">Prioridade</label>
                       <div className="mt-1">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getPrioridadeColor(cotacao.prioridade)}`}>
+                        <span
+                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getPrioridadeColor(cotacao.prioridade)}`}
+                        >
                           {cotacao.prioridade.charAt(0).toUpperCase() + cotacao.prioridade.slice(1)}
                         </span>
                       </div>
@@ -366,10 +366,14 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
                     </div>
 
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Data de Vencimento</label>
+                      <label className="text-sm font-medium text-gray-500">
+                        Data de Vencimento
+                      </label>
                       <div className="flex items-center space-x-2 mt-1">
                         <Clock className="w-4 h-4 text-gray-400" />
-                        <span className={`${isVencida() ? 'text-red-600 font-medium' : 'text-gray-900'}`}>
+                        <span
+                          className={`${isVencida() ? 'text-red-600 font-medium' : 'text-gray-900'}`}
+                        >
                           {formatDate(cotacao.dataVencimento)}
                         </span>
                       </div>
@@ -492,7 +496,9 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
                       <tr key={item.id || index}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div>
-                            <div className="text-sm font-medium text-gray-900">{item.descricao}</div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {item.descricao}
+                            </div>
                             {item.observacoes && (
                               <div className="text-sm text-gray-500">{item.observacoes}</div>
                             )}
@@ -515,7 +521,10 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
                   </tbody>
                   <tfoot className="bg-gray-50">
                     <tr>
-                      <td colSpan={4} className="px-6 py-4 text-right text-sm font-medium text-gray-900">
+                      <td
+                        colSpan={4}
+                        className="px-6 py-4 text-right text-sm font-medium text-gray-900"
+                      >
                         Total Geral:
                       </td>
                       <td className="px-6 py-4 text-sm font-bold text-[#159A9C]">
@@ -592,15 +601,20 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
                       <div className="w-32 text-sm font-medium text-gray-500">Status:</div>
                       <div>
                         <span
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${cotacao.statusAprovacao === 'aprovado'
+                          className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                            cotacao.statusAprovacao === 'aprovado'
                               ? 'bg-green-100 text-green-800'
                               : cotacao.statusAprovacao === 'reprovado'
                                 ? 'bg-red-100 text-red-800'
                                 : 'bg-yellow-100 text-yellow-800'
-                            }`}
+                          }`}
                         >
-                          {cotacao.statusAprovacao === 'aprovado' && <CheckCircle className="w-4 h-4 mr-1" />}
-                          {cotacao.statusAprovacao === 'reprovado' && <XCircle className="w-4 h-4 mr-1" />}
+                          {cotacao.statusAprovacao === 'aprovado' && (
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                          )}
+                          {cotacao.statusAprovacao === 'reprovado' && (
+                            <XCircle className="w-4 h-4 mr-1" />
+                          )}
                           {!cotacao.statusAprovacao && <Clock className="w-4 h-4 mr-1" />}
                           {cotacao.statusAprovacao === 'aprovado'
                             ? 'Aprovado'
@@ -619,7 +633,9 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
                           <User className="w-4 h-4 text-gray-400" />
                           <span className="text-gray-900">{cotacao.aprovador.nome}</span>
                           {cotacao.aprovador.email && (
-                            <span className="text-gray-500 text-sm">({cotacao.aprovador.email})</span>
+                            <span className="text-gray-500 text-sm">
+                              ({cotacao.aprovador.email})
+                            </span>
                           )}
                         </div>
                       </div>
@@ -637,7 +653,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
                               month: '2-digit',
                               year: 'numeric',
                               hour: '2-digit',
-                              minute: '2-digit'
+                              minute: '2-digit',
                             })}
                           </span>
                         </div>
@@ -649,7 +665,9 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
                       <div className="flex items-start gap-3">
                         <div className="w-32 text-sm font-medium text-gray-500">Justificativa:</div>
                         <div className="flex-1 bg-gray-50 rounded-lg p-4 border border-gray-200">
-                          <p className="text-gray-700 whitespace-pre-wrap">{cotacao.justificativaAprovacao}</p>
+                          <p className="text-gray-700 whitespace-pre-wrap">
+                            {cotacao.justificativaAprovacao}
+                          </p>
                         </div>
                       </div>
                     )}
@@ -659,15 +677,14 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
 
               {/* Histórico de Alterações */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Histórico de Alterações</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Histórico de Alterações
+                </h3>
 
                 {cotacao.historico && cotacao.historico.length > 0 ? (
                   <div className="space-y-4">
                     {cotacao.historico.map((entrada) => (
-                      <div
-                        key={entrada.id}
-                        className="border border-gray-200 rounded-lg p-4"
-                      >
+                      <div key={entrada.id} className="border border-gray-200 rounded-lg p-4">
                         <div className="flex items-start justify-between">
                           <div className="flex items-start space-x-3">
                             <History className="w-5 h-5 text-gray-400 mt-0.5" />

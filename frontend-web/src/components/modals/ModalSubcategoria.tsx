@@ -32,9 +32,12 @@ interface ModalSubcategoriaProps {
 // Schema de validação
 const subcategoriaSchema = yup.object().shape({
   nome: yup.string().required('Nome é obrigatório').min(2, 'Nome deve ter pelo menos 2 caracteres'),
-  descricao: yup.string().required('Descrição é obrigatória').min(10, 'Descrição deve ter pelo menos 10 caracteres'),
+  descricao: yup
+    .string()
+    .required('Descrição é obrigatória')
+    .min(10, 'Descrição deve ter pelo menos 10 caracteres'),
   categoriaId: yup.string().required('Categoria é obrigatória'),
-  ativa: yup.boolean()
+  ativa: yup.boolean(),
 });
 
 const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
@@ -44,18 +47,23 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
   subcategoria,
   categoriaAtual,
   categorias,
-  isLoading = false
+  isLoading = false,
 }) => {
   const [isSaving, setIsSaving] = useState(false);
 
-  const { control, handleSubmit, reset, formState: { errors } } = useForm<Subcategoria>({
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<Subcategoria>({
     resolver: yupResolver(subcategoriaSchema),
     defaultValues: {
       nome: '',
       descricao: '',
       categoriaId: categoriaAtual?.id || '',
-      ativa: true
-    }
+      ativa: true,
+    },
   });
 
   // Reset form quando subcategoria ou categoria atual muda
@@ -65,14 +73,14 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
         nome: subcategoria.nome,
         descricao: subcategoria.descricao,
         categoriaId: subcategoria.categoriaId,
-        ativa: subcategoria.ativa
+        ativa: subcategoria.ativa,
       });
     } else {
       reset({
         nome: '',
         descricao: '',
         categoriaId: categoriaAtual?.id || '',
-        ativa: true
+        ativa: true,
       });
     }
   }, [subcategoria, categoriaAtual, reset, isOpen]);
@@ -80,10 +88,10 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
   const onSubmit = async (data: Subcategoria) => {
     try {
       setIsSaving(true);
-      
+
       const subcategoriaData: Subcategoria = {
         ...data,
-        id: subcategoria?.id
+        id: subcategoria?.id,
       };
 
       await onSave(subcategoriaData);
@@ -127,11 +135,15 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
                     {subcategoria ? 'Editar Subcategoria' : 'Nova Subcategoria'}
                   </h3>
                   <p className="text-sm text-gray-500">
-                    {subcategoria ? 'Atualize as informações da subcategoria' : 'Crie uma nova subcategoria'}
+                    {subcategoria
+                      ? 'Atualize as informações da subcategoria'
+                      : 'Crie uma nova subcategoria'}
                   </p>
                   {categoriaAtual && (
                     <div className="mt-2 flex items-center">
-                      <div className={`w-3 h-3 rounded-full bg-${categoriaAtual.cor}-500 mr-2`}></div>
+                      <div
+                        className={`w-3 h-3 rounded-full bg-${categoriaAtual.cor}-500 mr-2`}
+                      ></div>
                       <span className="text-xs text-gray-600">
                         Categoria: {categoriaAtual.nome}
                       </span>
@@ -152,9 +164,7 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               {/* Categoria */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Categoria *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Categoria *</label>
                 <Controller
                   name="categoriaId"
                   control={control}
@@ -194,16 +204,12 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
                     />
                   )}
                 />
-                {errors.nome && (
-                  <p className="text-red-500 text-sm mt-1">{errors.nome.message}</p>
-                )}
+                {errors.nome && <p className="text-red-500 text-sm mt-1">{errors.nome.message}</p>}
               </div>
 
               {/* Descrição */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Descrição *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição *</label>
                 <Controller
                   name="descricao"
                   control={control}

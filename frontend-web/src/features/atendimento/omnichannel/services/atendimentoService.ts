@@ -133,6 +133,45 @@ export const normalizarMidiaUrl = (valor?: string | null): string | null => {
 };
 
 export const normalizarMensagemPayload = (mensagem: Mensagem): Mensagem => {
+  const statusNormalizado = ((): Mensagem['status'] => {
+    const raw = (mensagem as any)?.status?.toString().toLowerCase();
+    if (raw === 'entregue') return 'entregue';
+    if (raw === 'lido') return 'lido';
+    if (raw === 'enviado') return 'enviado';
+    if (raw === 'enviando') return 'enviando';
+    return 'enviado';
+  })();
+
+  const remetenteBruto: any = (mensagem as any).remetente;
+  const remetenteNormalizado = (() => {
+    if (remetenteBruto && typeof remetenteBruto === 'object' && !Array.isArray(remetenteBruto)) {
+      const tipo = (remetenteBruto.tipo || remetenteBruto.remetente || '').toString().toLowerCase();
+      return {
+        id: remetenteBruto.id,
+        nome: remetenteBruto.nome || (tipo === 'atendente' ? 'Atendente' : 'Cliente'),
+        foto: resolveAvatarUrl(remetenteBruto.foto || null) || undefined,
+        tipo: tipo === 'atendente' ? 'atendente' : 'cliente',
+      } as Mensagem['remetente'];
+    }
+
+    if (typeof remetenteBruto === 'string') {
+      const tipo = remetenteBruto.toLowerCase();
+      return {
+        id: mensagem.id,
+        nome: tipo === 'atendente' ? 'Atendente' : 'Cliente',
+        foto: undefined,
+        tipo: tipo === 'atendente' ? 'atendente' : 'cliente',
+      } as Mensagem['remetente'];
+    }
+
+    return {
+      id: mensagem.id,
+      nome: 'Cliente',
+      foto: undefined,
+      tipo: 'cliente',
+    } as Mensagem['remetente'];
+  })();
+
   const anexosNormalizados = (mensagem.anexos || []).map((anexo) => {
     const urlPrincipal = normalizarMidiaUrl(
       anexo.url ?? anexo.downloadUrl ?? anexo.originalUrl ?? null,
@@ -170,12 +209,10 @@ export const normalizarMensagemPayload = (mensagem: Mensagem): Mensagem => {
 
   return {
     ...mensagem,
+    status: statusNormalizado,
     anexos: anexosNormalizados,
     audio: audioNormalizado,
-    remetente: {
-      ...mensagem.remetente,
-      foto: resolveAvatarUrl(mensagem.remetente?.foto || null) || undefined,
-    },
+    remetente: remetenteNormalizado,
   };
 };
 

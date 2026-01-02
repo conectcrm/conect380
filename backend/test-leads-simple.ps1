@@ -7,7 +7,7 @@ Write-Host ""
 # 1. Login
 Write-Host "1. Testando Login..." -ForegroundColor Yellow
 $loginBody = @{
-  email    = "admin@conectcrm.com"
+  email    = "admin@conectsuite.com.br"
   password = "Admin@123"
 } | ConvertTo-Json
 

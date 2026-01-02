@@ -26,44 +26,48 @@ export const useConfirmation = () => {
     isOpen: false,
     options: {},
     onConfirm: () => {},
-    onCancel: () => {}
+    onCancel: () => {},
   });
 
-  const showConfirmation = useCallback((
-    options: ConfirmationOptions & {
-      onConfirm: () => void;
-      onCancel?: () => void;
-    }
-  ) => {
-    setConfirmationState({
-      isOpen: true,
-      options: {
-        title: options.title || 'Confirmar ação',
-        message: options.message || 'Tem certeza que deseja continuar?',
-        confirmText: options.confirmText || 'Confirmar',
-        cancelText: options.cancelText || 'Cancelar',
-        confirmButtonClass: options.confirmButtonClass || 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
-        icon: options.icon || 'warning'
+  const showConfirmation = useCallback(
+    (
+      options: ConfirmationOptions & {
+        onConfirm: () => void;
+        onCancel?: () => void;
       },
-      onConfirm: () => {
-        options.onConfirm();
-        setConfirmationState(prev => ({ ...prev, isOpen: false }));
-      },
-      onCancel: () => {
-        if (options.onCancel) options.onCancel();
-        setConfirmationState(prev => ({ ...prev, isOpen: false }));
-      }
-    });
-  }, []);
+    ) => {
+      setConfirmationState({
+        isOpen: true,
+        options: {
+          title: options.title || 'Confirmar ação',
+          message: options.message || 'Tem certeza que deseja continuar?',
+          confirmText: options.confirmText || 'Confirmar',
+          cancelText: options.cancelText || 'Cancelar',
+          confirmButtonClass:
+            options.confirmButtonClass || 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+          icon: options.icon || 'warning',
+        },
+        onConfirm: () => {
+          options.onConfirm();
+          setConfirmationState((prev) => ({ ...prev, isOpen: false }));
+        },
+        onCancel: () => {
+          if (options.onCancel) options.onCancel();
+          setConfirmationState((prev) => ({ ...prev, isOpen: false }));
+        },
+      });
+    },
+    [],
+  );
 
   const hideConfirmation = useCallback(() => {
-    setConfirmationState(prev => ({ ...prev, isOpen: false }));
+    setConfirmationState((prev) => ({ ...prev, isOpen: false }));
   }, []);
 
   return {
     confirmationState,
     showConfirmation,
-    hideConfirmation
+    hideConfirmation,
   };
 };
 

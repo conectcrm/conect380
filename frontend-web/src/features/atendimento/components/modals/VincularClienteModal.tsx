@@ -22,7 +22,9 @@ export function VincularClienteModal({ isOpen, onClose, onSucesso, ticketAtual }
   const [novoClienteNome, setNovoClienteNome] = useState('');
   const [novoClienteEmail, setNovoClienteEmail] = useState('');
   const [novoClienteTelefone, setNovoClienteTelefone] = useState('');
-  const [novoClienteTipo, setNovoClienteTipo] = useState<'pessoa_fisica' | 'pessoa_juridica'>('pessoa_fisica');
+  const [novoClienteTipo, setNovoClienteTipo] = useState<'pessoa_fisica' | 'pessoa_juridica'>(
+    'pessoa_fisica',
+  );
   const [novoClienteDocumento, setNovoClienteDocumento] = useState('');
 
   const [buscando, setBuscando] = useState(false);
@@ -152,7 +154,7 @@ export function VincularClienteModal({ isOpen, onClose, onSucesso, ticketAtual }
       await api.patch(
         `/atendimento/tickets/${ticketAtual.id}`,
         { clienteId },
-        { params: { empresaId } }
+        { params: { empresaId } },
       );
 
       console.log('✅ Cliente vinculado ao ticket:', clienteId);
@@ -183,7 +185,8 @@ export function VincularClienteModal({ isOpen, onClose, onSucesso, ticketAtual }
 
   const mostrarToastSucesso = () => {
     const toast = document.createElement('div');
-    toast.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2';
+    toast.className =
+      'fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2';
     toast.innerHTML = `
       <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
@@ -260,9 +263,7 @@ export function VincularClienteModal({ isOpen, onClose, onSucesso, ticketAtual }
                 <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 animate-spin" />
               )}
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Digite pelo menos 3 caracteres para buscar
-            </p>
+            <p className="text-xs text-gray-500 mt-1">Digite pelo menos 3 caracteres para buscar</p>
           </div>
 
           {/* Lista de Clientes Encontrados */}
@@ -277,16 +278,20 @@ export function VincularClienteModal({ isOpen, onClose, onSucesso, ticketAtual }
                     key={cliente.id}
                     onClick={() => setClienteSelecionado(cliente)}
                     disabled={loading}
-                    className={`w-full p-4 text-left border-b last:border-b-0 transition-colors ${clienteSelecionado?.id === cliente.id
-                      ? 'bg-[#159A9C]/10 border-[#159A9C]'
-                      : 'hover:bg-gray-50'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    className={`w-full p-4 text-left border-b last:border-b-0 transition-colors ${
+                      clienteSelecionado?.id === cliente.id
+                        ? 'bg-[#159A9C]/10 border-[#159A9C]'
+                        : 'hover:bg-gray-50'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${cliente.tipo === 'pessoa_juridica'
-                        ? 'bg-blue-100 text-blue-600'
-                        : 'bg-green-100 text-green-600'
-                        }`}>
+                      <div
+                        className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          cliente.tipo === 'pessoa_juridica'
+                            ? 'bg-blue-100 text-blue-600'
+                            : 'bg-green-100 text-green-600'
+                        }`}
+                      >
                         {cliente.tipo === 'pessoa_juridica' ? (
                           <Building2 className="h-5 w-5" />
                         ) : (
@@ -300,13 +305,20 @@ export function VincularClienteModal({ isOpen, onClose, onSucesso, ticketAtual }
                           <div className="text-xs text-gray-500 mt-1">{cliente.telefone}</div>
                         )}
                         <div className="flex items-center gap-2 mt-2">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cliente.status === 'cliente'
-                            ? 'bg-green-100 text-green-800'
-                            : cliente.status === 'lead'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-gray-100 text-gray-800'
-                            }`}>
-                            {cliente.status === 'cliente' ? 'Cliente' : cliente.status === 'lead' ? 'Lead' : cliente.status}
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              cliente.status === 'cliente'
+                                ? 'bg-green-100 text-green-800'
+                                : cliente.status === 'lead'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {cliente.status === 'cliente'
+                              ? 'Cliente'
+                              : cliente.status === 'lead'
+                                ? 'Lead'
+                                : cliente.status}
                           </span>
                           <span className="text-xs text-gray-500">
                             {cliente.tipo === 'pessoa_juridica' ? 'PJ' : 'PF'}
@@ -387,10 +399,11 @@ export function VincularClienteModal({ isOpen, onClose, onSucesso, ticketAtual }
                   <button
                     onClick={() => setNovoClienteTipo('pessoa_fisica')}
                     disabled={loading}
-                    className={`flex-1 p-3 rounded-lg border-2 transition-all ${novoClienteTipo === 'pessoa_fisica'
-                      ? 'border-[#159A9C] bg-[#159A9C]/10'
-                      : 'border-gray-200 hover:border-gray-300'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    className={`flex-1 p-3 rounded-lg border-2 transition-all ${
+                      novoClienteTipo === 'pessoa_fisica'
+                        ? 'border-[#159A9C] bg-[#159A9C]/10'
+                        : 'border-gray-200 hover:border-gray-300'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     <User className="h-5 w-5 mx-auto mb-1" />
                     <div className="text-sm font-medium">Pessoa Física</div>
@@ -398,10 +411,11 @@ export function VincularClienteModal({ isOpen, onClose, onSucesso, ticketAtual }
                   <button
                     onClick={() => setNovoClienteTipo('pessoa_juridica')}
                     disabled={loading}
-                    className={`flex-1 p-3 rounded-lg border-2 transition-all ${novoClienteTipo === 'pessoa_juridica'
-                      ? 'border-[#159A9C] bg-[#159A9C]/10'
-                      : 'border-gray-200 hover:border-gray-300'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    className={`flex-1 p-3 rounded-lg border-2 transition-all ${
+                      novoClienteTipo === 'pessoa_juridica'
+                        ? 'border-[#159A9C] bg-[#159A9C]/10'
+                        : 'border-gray-200 hover:border-gray-300'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     <Building2 className="h-5 w-5 mx-auto mb-1" />
                     <div className="text-sm font-medium">Pessoa Jurídica</div>
@@ -419,16 +433,18 @@ export function VincularClienteModal({ isOpen, onClose, onSucesso, ticketAtual }
                   value={novoClienteNome}
                   onChange={(e) => setNovoClienteNome(e.target.value)}
                   disabled={loading}
-                  placeholder={novoClienteTipo === 'pessoa_juridica' ? 'Razão Social' : 'Nome completo do cliente'}
+                  placeholder={
+                    novoClienteTipo === 'pessoa_juridica'
+                      ? 'Razão Social'
+                      : 'Nome completo do cliente'
+                  }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C] disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
               </div>
 
               {/* Email */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                 <input
                   type="email"
                   value={novoClienteEmail}
@@ -441,9 +457,7 @@ export function VincularClienteModal({ isOpen, onClose, onSucesso, ticketAtual }
 
               {/* Telefone */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Telefone
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
                 <input
                   type="tel"
                   value={novoClienteTelefone}
@@ -464,7 +478,9 @@ export function VincularClienteModal({ isOpen, onClose, onSucesso, ticketAtual }
                   value={novoClienteDocumento}
                   onChange={(e) => setNovoClienteDocumento(e.target.value)}
                   disabled={loading}
-                  placeholder={novoClienteTipo === 'pessoa_juridica' ? '00.000.000/0000-00' : '000.000.000-00'}
+                  placeholder={
+                    novoClienteTipo === 'pessoa_juridica' ? '00.000.000/0000-00' : '000.000.000-00'
+                  }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C] disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
               </div>

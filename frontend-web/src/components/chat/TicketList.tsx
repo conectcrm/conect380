@@ -88,28 +88,31 @@ export function TicketList({ tickets, activeTicketId, onTicketSelect }: TicketLi
         <div className="flex gap-2 overflow-x-auto pb-2">
           <button
             onClick={() => setFiltroStatus('todos')}
-            className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${filtroStatus === 'todos'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+            className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+              filtroStatus === 'todos'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
           >
             Todos ({tickets.length})
           </button>
           <button
             onClick={() => setFiltroStatus('aberto')}
-            className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${filtroStatus === 'aberto'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+            className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+              filtroStatus === 'aberto'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
           >
             Abertos ({tickets.filter((t) => t.status === 'aberto').length})
           </button>
           <button
             onClick={() => setFiltroStatus('em_atendimento')}
-            className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${filtroStatus === 'em_atendimento'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+            className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+              filtroStatus === 'em_atendimento'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
           >
             Em Atendimento ({tickets.filter((t) => t.status === 'em_atendimento').length})
           </button>
@@ -120,12 +123,7 @@ export function TicketList({ tickets, activeTicketId, onTicketSelect }: TicketLi
       <div className="flex-1 overflow-y-auto">
         {ticketsFiltrados.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-400 p-4">
-            <svg
-              className="w-12 h-12 mb-2"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
+            <svg className="w-12 h-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -141,8 +139,9 @@ export function TicketList({ tickets, activeTicketId, onTicketSelect }: TicketLi
               <button
                 key={ticket.id}
                 onClick={() => onTicketSelect(ticket.id)}
-                className={`w-full p-4 text-left hover:bg-gray-50 transition-colors ${activeTicketId === ticket.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
-                  }`}
+                className={`w-full p-4 text-left hover:bg-gray-50 transition-colors ${
+                  activeTicketId === ticket.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
+                }`}
               >
                 <div className="flex gap-3">
                   {/* Avatar com status online/offline */}
@@ -167,7 +166,9 @@ export function TicketList({ tickets, activeTicketId, onTicketSelect }: TicketLi
                             {ticket.mensagensNaoLidas > 99 ? '99+' : ticket.mensagensNaoLidas}
                           </span>
                         )}
-                        <span className="text-xs text-gray-400">{formatarData(ticket.criadoEm)}</span>
+                        <span className="text-xs text-gray-400">
+                          {formatarData(ticket.criadoEm)}
+                        </span>
                       </div>
                     </div>
 
@@ -180,7 +181,9 @@ export function TicketList({ tickets, activeTicketId, onTicketSelect }: TicketLi
                     )}
 
                     <div className="flex items-center gap-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(ticket.status)}`}>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(ticket.status)}`}
+                      >
                         {ticket.status}
                       </span>
                       {ticket.atendenteId && (

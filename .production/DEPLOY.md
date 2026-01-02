@@ -151,7 +151,7 @@ curl http://localhost:3500/health
 # Login (teste JWT)
 curl -X POST http://localhost:3500/auth/login `
   -H "Content-Type: application/json" `
-  -d '{"email":"admin@conectcrm.com","password":"senha123"}'
+  -d '{"email":"admin@conectsuite.com.br","password":"senha123"}'
 
 # Testar endpoint protegido (com JWT do login)
 curl -X GET http://localhost:3500/oportunidades `

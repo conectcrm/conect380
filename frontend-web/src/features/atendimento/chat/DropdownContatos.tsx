@@ -1,8 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { User, Star, Phone, Mail, Briefcase, Plus, X, Check, Loader2, AlertCircle } from 'lucide-react';
+import {
+  User,
+  Star,
+  Phone,
+  Mail,
+  Briefcase,
+  Plus,
+  X,
+  Check,
+  Loader2,
+  AlertCircle,
+} from 'lucide-react';
 import axios from 'axios';
+import { API_BASE_URL } from '../../../services/api';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_URL = API_BASE_URL;
 
 // ========================================
 // INTERFACES
@@ -48,7 +60,7 @@ export const DropdownContatos: React.FC<DropdownContatosProps> = ({
   contatoAtualId,
   onContatoSelecionado,
   onContatoAdicionado,
-  className = ''
+  className = '',
 }) => {
   // Estado
   const [contatos, setContatos] = useState<Contato[]>([]);
@@ -64,7 +76,7 @@ export const DropdownContatos: React.FC<DropdownContatosProps> = ({
     telefone: '',
     cargo: '',
     departamento: '',
-    principal: false
+    principal: false,
   });
 
   // ========================================
@@ -84,12 +96,9 @@ export const DropdownContatos: React.FC<DropdownContatosProps> = ({
     try {
       const token = localStorage.getItem('authToken');
 
-      const response = await axios.get(
-        `${API_URL}/api/crm/clientes/${clienteId}/contatos`,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
+      const response = await axios.get(`${API_URL}/api/crm/clientes/${clienteId}/contatos`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       // Ordenar: principal primeiro, depois por nome
       const contatosOrdenados = response.data.sort((a: Contato, b: Contato) => {
@@ -137,7 +146,7 @@ export const DropdownContatos: React.FC<DropdownContatosProps> = ({
         telefone: novoContato.telefone.trim(),
         cargo: novoContato.cargo.trim() || null,
         departamento: novoContato.departamento.trim() || null,
-        principal: novoContato.principal
+        principal: novoContato.principal,
       };
 
       const response = await axios.post(
@@ -146,9 +155,9 @@ export const DropdownContatos: React.FC<DropdownContatosProps> = ({
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
+            'Content-Type': 'application/json',
+          },
+        },
       );
 
       const contatoCriado = response.data;
@@ -169,10 +178,9 @@ export const DropdownContatos: React.FC<DropdownContatosProps> = ({
         telefone: '',
         cargo: '',
         departamento: '',
-        principal: false
+        principal: false,
       });
       setMostrarFormNovoContato(false);
-
     } catch (error: any) {
       console.error('❌ Erro ao criar contato:', error);
       setErro(error.response?.data?.message || 'Erro ao criar contato');
@@ -193,15 +201,14 @@ export const DropdownContatos: React.FC<DropdownContatosProps> = ({
         `${API_URL}/api/crm/contatos/${contatoId}/principal`,
         {},
         {
-          headers: { Authorization: `Bearer ${token}` }
-        }
+          headers: { Authorization: `Bearer ${token}` },
+        },
       );
 
       console.log('✅ Contato marcado como principal');
 
       // Recarregar lista
       await carregarContatos();
-
     } catch (error: any) {
       console.error('❌ Erro ao tornar principal:', error);
       setErro(error.response?.data?.message || 'Erro ao atualizar contato');
@@ -226,7 +233,7 @@ export const DropdownContatos: React.FC<DropdownContatosProps> = ({
       telefone: '',
       cargo: '',
       departamento: '',
-      principal: false
+      principal: false,
     });
     setErro(null);
   };
@@ -289,9 +296,7 @@ export const DropdownContatos: React.FC<DropdownContatosProps> = ({
         <form onSubmit={handleCriarContato} className="p-4 bg-blue-50 border-b border-blue-200">
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Nome *
-              </label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Nome *</label>
               <input
                 type="text"
                 value={novoContato.nome}
@@ -303,9 +308,7 @@ export const DropdownContatos: React.FC<DropdownContatosProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Telefone *
-              </label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Telefone *</label>
               <input
                 type="tel"
                 value={novoContato.telefone}
@@ -317,9 +320,7 @@ export const DropdownContatos: React.FC<DropdownContatosProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Email
-              </label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
               <input
                 type="email"
                 value={novoContato.email}
@@ -332,9 +333,7 @@ export const DropdownContatos: React.FC<DropdownContatosProps> = ({
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Cargo
-                </label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Cargo</label>
                 <input
                   type="text"
                   value={novoContato.cargo}
@@ -346,9 +345,7 @@ export const DropdownContatos: React.FC<DropdownContatosProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Departamento
-                </label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Departamento</label>
                 <input
                   type="text"
                   value={novoContato.departamento}

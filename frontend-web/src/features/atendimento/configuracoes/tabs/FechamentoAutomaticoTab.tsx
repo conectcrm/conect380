@@ -14,7 +14,7 @@ import {
   Users,
   Edit2,
   Trash2,
-  Globe
+  Globe,
 } from 'lucide-react';
 import {
   buscarConfiguracao,
@@ -24,14 +24,14 @@ import {
   listarConfiguracoes,
   ConfiguracaoInatividade,
   ConfiguracaoInactivityDto,
-  Departamento
+  Departamento,
 } from '../../../../services/configuracaoInactividadeService';
 
 const STATUS_OPTIONS = [
   { value: 'AGUARDANDO', label: 'Aguardando' },
   { value: 'EM_ATENDIMENTO', label: 'Em Atendimento' },
   { value: 'PENDENTE', label: 'Pendente' },
-  { value: 'RESOLVIDO', label: 'Resolvido' }
+  { value: 'RESOLVIDO', label: 'Resolvido' },
 ];
 
 // 🎯 Funções auxiliares para conversão de tempo com máscara HH:MM:SS
@@ -54,7 +54,7 @@ const hmsParaMinutos = (hms: string): number => {
   const horas = parseInt(partes[0] || '0');
   const minutos = parseInt(partes[1] || '0');
   // Ignoramos segundos (índice 2) pois trabalhamos com minutos
-  return (horas * 60) + minutos;
+  return horas * 60 + minutos;
 };
 
 /**
@@ -114,7 +114,10 @@ export const FechamentoAutomaticoTab: React.FC = () => {
   const [mensagemAviso, setMensagemAviso] = useState('');
   const [mensagemFechamento, setMensagemFechamento] = useState('');
   const [ativo, setAtivo] = useState(false);
-  const [statusSelecionados, setStatusSelecionados] = useState<string[]>(['AGUARDANDO', 'EM_ATENDIMENTO']);
+  const [statusSelecionados, setStatusSelecionados] = useState<string[]>([
+    'AGUARDANDO',
+    'EM_ATENDIMENTO',
+  ]);
 
   const empresaId = localStorage.getItem('empresaAtiva') || 'empresa-teste-id';
 
@@ -247,7 +250,7 @@ export const FechamentoAutomaticoTab: React.FC = () => {
         mensagemAviso: mensagemAviso || null,
         mensagemFechamento: mensagemFechamento || null,
         ativo,
-        statusAplicaveis: statusSelecionados.length > 0 ? statusSelecionados : null
+        statusAplicaveis: statusSelecionados.length > 0 ? statusSelecionados : null,
       };
 
       const response = await salvarConfiguracao(empresaId, dto);
@@ -291,9 +294,9 @@ export const FechamentoAutomaticoTab: React.FC = () => {
         const { processados, fechados, avisados } = response.resultado;
         setSucesso(
           `✅ Verificação concluída!\n` +
-          `📊 Processados: ${processados}\n` +
-          `🔒 Fechados: ${fechados}\n` +
-          `⚠️ Avisados: ${avisados}`
+            `📊 Processados: ${processados}\n` +
+            `🔒 Fechados: ${fechados}\n` +
+            `⚠️ Avisados: ${avisados}`,
         );
       }
     } catch (err: unknown) {
@@ -307,7 +310,7 @@ export const FechamentoAutomaticoTab: React.FC = () => {
 
   const handleToggleStatus = (status: string) => {
     if (statusSelecionados.includes(status)) {
-      setStatusSelecionados(statusSelecionados.filter(s => s !== status));
+      setStatusSelecionados(statusSelecionados.filter((s) => s !== status));
     } else {
       setStatusSelecionados([...statusSelecionados, status]);
     }
@@ -338,7 +341,7 @@ export const FechamentoAutomaticoTab: React.FC = () => {
   };
 
   const editarConfiguracao = (configId: string) => {
-    const configParaEditar = configuracoes.find(c => c.id === configId);
+    const configParaEditar = configuracoes.find((c) => c.id === configId);
     if (configParaEditar) {
       setDepartamentoSelecionado(configParaEditar.departamentoId || null);
     }
@@ -366,21 +369,22 @@ export const FechamentoAutomaticoTab: React.FC = () => {
           {/* Botão Global */}
           <button
             onClick={() => setDepartamentoSelecionado(null)}
-            className={`w-full px-4 py-3 rounded-lg border-2 transition-all flex items-center justify-between ${departamentoSelecionado === null
+            className={`w-full px-4 py-3 rounded-lg border-2 transition-all flex items-center justify-between ${
+              departamentoSelecionado === null
                 ? 'border-[#159A9C] bg-[#159A9C]/5 text-[#002333]'
                 : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-              }`}
+            }`}
           >
             <div className="flex items-center">
               <Globe className="h-5 w-5 mr-3" />
               <div className="text-left">
                 <div className="font-semibold">Configuração Global</div>
-                <div className="text-xs text-gray-500">Aplica-se a todos os departamentos sem configuração específica</div>
+                <div className="text-xs text-gray-500">
+                  Aplica-se a todos os departamentos sem configuração específica
+                </div>
               </div>
             </div>
-            {departamentoSelecionado === null && (
-              <CheckCircle className="h-5 w-5 text-[#159A9C]" />
-            )}
+            {departamentoSelecionado === null && <CheckCircle className="h-5 w-5 text-[#159A9C]" />}
           </button>
 
           {/* Seletor de Departamento */}
@@ -394,7 +398,7 @@ export const FechamentoAutomaticoTab: React.FC = () => {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
             >
               <option value="">Selecione um departamento...</option>
-              {departamentos.map(dept => (
+              {departamentos.map((dept) => (
                 <option key={dept.id} value={dept.id}>
                   {dept.nome}
                 </option>
@@ -407,12 +411,10 @@ export const FechamentoAutomaticoTab: React.FC = () => {
       {/* 📋 Lista de Configurações Existentes */}
       {configuracoes.length > 0 && (
         <div className="bg-white rounded-lg shadow-sm border p-6">
-          <h3 className="text-lg font-semibold text-[#002333] mb-4">
-            Configurações Ativas
-          </h3>
+          <h3 className="text-lg font-semibold text-[#002333] mb-4">Configurações Ativas</h3>
 
           <div className="space-y-3">
-            {configuracoes.map(configItem => (
+            {configuracoes.map((configItem) => (
               <div
                 key={configItem.id}
                 className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
@@ -451,10 +453,9 @@ export const FechamentoAutomaticoTab: React.FC = () => {
 
                 <div className="flex items-center gap-3">
                   <span
-                    className={`px-2 py-1 rounded text-xs font-medium ${configItem.ativo
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-600'
-                      }`}
+                    className={`px-2 py-1 rounded text-xs font-medium ${
+                      configItem.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                    }`}
                   >
                     {configItem.ativo ? '✓ Ativo' : '○ Inativo'}
                   </span>
@@ -506,10 +507,11 @@ export const FechamentoAutomaticoTab: React.FC = () => {
               onChange={(e) => handleTimeoutChange(e.target.value)}
               placeholder="00:00:00"
               maxLength={8}
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent font-mono text-lg ${timeoutTexto.length === 8 && !validarFormatoHMS(timeoutTexto)
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent font-mono text-lg ${
+                timeoutTexto.length === 8 && !validarFormatoHMS(timeoutTexto)
                   ? 'border-red-300 bg-red-50'
                   : 'border-gray-300'
-                }`}
+              }`}
             />
             <p className="text-xs text-gray-500 mt-1">
               ⏰ Digite os números e os ":" aparecem automaticamente. Formato: HH:MM:SS
@@ -551,10 +553,11 @@ export const FechamentoAutomaticoTab: React.FC = () => {
                 onChange={(e) => handleAvisoChange(e.target.value)}
                 placeholder="00:00:00"
                 maxLength={8}
-                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent font-mono text-lg ${avisoTexto.length === 8 && !validarFormatoHMS(avisoTexto)
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent font-mono text-lg ${
+                  avisoTexto.length === 8 && !validarFormatoHMS(avisoTexto)
                     ? 'border-red-300 bg-red-50'
                     : 'border-gray-300'
-                  }`}
+                }`}
               />
               <p className="text-xs text-gray-500 mt-1">
                 ⏰ Formato: HH:MM:SS - Deve ser menor que {minutosParaHMS(timeoutMinutos)}
@@ -604,7 +607,7 @@ export const FechamentoAutomaticoTab: React.FC = () => {
               Aplicar para quais status?
             </label>
             <div className="grid grid-cols-2 gap-3">
-              {STATUS_OPTIONS.map(status => (
+              {STATUS_OPTIONS.map((status) => (
                 <label
                   key={status.value}
                   className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"

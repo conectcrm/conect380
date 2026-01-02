@@ -28,7 +28,7 @@ export const EditarContatoModal: React.FC<EditarContatoModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  contato
+  contato,
 }) => {
   const { currentPalette } = useTheme();
 
@@ -48,7 +48,7 @@ export const EditarContatoModal: React.FC<EditarContatoModalProps> = ({
   };
 
   const handleRemoverTag = (tag: string) => {
-    setTags(tags.filter(t => t !== tag));
+    setTags(tags.filter((t) => t !== tag));
   };
 
   const handleConfirmar = () => {
@@ -63,7 +63,7 @@ export const EditarContatoModal: React.FC<EditarContatoModalProps> = ({
       email: email.trim() || undefined,
       empresa: empresa.trim() || undefined,
       tags,
-      observacoes: observacoes.trim() || undefined
+      observacoes: observacoes.trim() || undefined,
     };
 
     onConfirm(dados);
@@ -92,12 +92,8 @@ export const EditarContatoModal: React.FC<EditarContatoModalProps> = ({
               <User className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
-                Editar Contato
-              </h2>
-              <p className="text-sm text-gray-500">
-                Atualize as informações do contato
-              </p>
+              <h2 className="text-xl font-semibold text-gray-900">Editar Contato</h2>
+              <p className="text-sm text-gray-500">Atualize as informações do contato</p>
             </div>
           </div>
           <button
@@ -186,7 +182,9 @@ export const EditarContatoModal: React.FC<EditarContatoModalProps> = ({
                   type="text"
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAdicionarTag())}
+                  onKeyPress={(e) =>
+                    e.key === 'Enter' && (e.preventDefault(), handleAdicionarTag())
+                  }
                   placeholder="Digite uma tag e pressione Enter"
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-offset-0 focus:border-transparent text-sm"
                   style={{ '--tw-ring-color': currentPalette.colors.primary } as any}
@@ -207,10 +205,7 @@ export const EditarContatoModal: React.FC<EditarContatoModalProps> = ({
                       className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium"
                     >
                       {tag}
-                      <button
-                        onClick={() => handleRemoverTag(tag)}
-                        className="hover:text-red-600"
-                      >
+                      <button onClick={() => handleRemoverTag(tag)} className="hover:text-red-600">
                         <X className="w-3 h-3" />
                       </button>
                     </span>
@@ -221,9 +216,7 @@ export const EditarContatoModal: React.FC<EditarContatoModalProps> = ({
 
             {/* Observações */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Observações
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Observações</label>
               <textarea
                 value={observacoes}
                 onChange={(e) => setObservacoes(e.target.value)}

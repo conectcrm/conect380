@@ -21,10 +21,10 @@ export const DebugUserSwitch: React.FC<DebugModeProps> = ({ onUserChange, curren
     {
       id: '1',
       nome: 'Admin Sistema',
-      email: 'admin@conectcrm.com',
+      email: 'admin@conectsuite.com.br',
       perfil: 'admin',
       tipo: 'admin',
-      role: 'admin'
+      role: 'admin',
     },
     {
       id: '2',
@@ -32,7 +32,7 @@ export const DebugUserSwitch: React.FC<DebugModeProps> = ({ onUserChange, curren
       email: 'gestor@conectcrm.com',
       perfil: 'gestor',
       tipo: 'gestor',
-      role: 'gestor'
+      role: 'gestor',
     },
     {
       id: '3',
@@ -40,7 +40,7 @@ export const DebugUserSwitch: React.FC<DebugModeProps> = ({ onUserChange, curren
       email: 'vendedora@conectcrm.com',
       perfil: 'vendedor',
       tipo: 'vendedor',
-      role: 'vendedor'
+      role: 'vendedor',
     },
     {
       id: '4',
@@ -48,7 +48,7 @@ export const DebugUserSwitch: React.FC<DebugModeProps> = ({ onUserChange, curren
       email: 'operacional@conectcrm.com',
       perfil: 'operacional',
       tipo: 'operacional',
-      role: 'operacional'
+      role: 'operacional',
     },
     {
       id: '5',
@@ -56,8 +56,8 @@ export const DebugUserSwitch: React.FC<DebugModeProps> = ({ onUserChange, curren
       email: 'financeiro@conectcrm.com',
       perfil: 'financeiro',
       tipo: 'financeiro',
-      role: 'financeiro'
-    }
+      role: 'financeiro',
+    },
   ];
 
   return (
@@ -94,9 +94,10 @@ export const DebugUserSwitch: React.FC<DebugModeProps> = ({ onUserChange, curren
                 }}
                 className={`
                   w-full text-left p-3 rounded-lg transition-all mb-1
-                  ${currentUser?.id === user.id
-                    ? 'bg-blue-50 border border-blue-200'
-                    : 'hover:bg-gray-50 border border-transparent'
+                  ${
+                    currentUser?.id === user.id
+                      ? 'bg-blue-50 border border-blue-200'
+                      : 'hover:bg-gray-50 border border-transparent'
                   }
                 `}
               >
@@ -121,12 +122,7 @@ export const DebugUserSwitch: React.FC<DebugModeProps> = ({ onUserChange, curren
       )}
 
       {/* Overlay para fechar */}
-      {isOpen && (
-        <div
-          className="fixed inset-0"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
+      {isOpen && <div className="fixed inset-0" onClick={() => setIsOpen(false)} />}
     </div>
   );
 };

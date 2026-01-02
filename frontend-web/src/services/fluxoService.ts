@@ -1,6 +1,12 @@
 import api from './api';
 
-export type TipoFluxo = 'menu_simples' | 'arvore_decisao' | 'coleta_dados' | 'menu_opcoes' | 'keyword_match' | 'condicional';
+export type TipoFluxo =
+  | 'menu_simples'
+  | 'arvore_decisao'
+  | 'coleta_dados'
+  | 'menu_opcoes'
+  | 'keyword_match'
+  | 'condicional';
 
 export interface EstruturaFluxo {
   etapaInicial: string;
@@ -54,7 +60,7 @@ export interface CreateFluxoDto {
   configuracoes?: Record<string, unknown>;
 }
 
-export interface UpdateFluxoDto extends Partial<CreateFluxoDto> { }
+export interface UpdateFluxoDto extends Partial<CreateFluxoDto> {}
 
 export interface PublicarFluxoDto {
   mensagemPublicacao?: string;

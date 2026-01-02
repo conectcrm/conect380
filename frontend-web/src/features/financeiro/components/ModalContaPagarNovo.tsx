@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   X,
   Save,
@@ -11,13 +11,12 @@ import {
   Building,
   Tag,
   AlertCircle,
-  User,
   CreditCard,
   RefreshCw,
   ChevronDown,
   Check,
   Paperclip,
-  Eye
+  Eye,
 } from 'lucide-react';
 import {
   ContaPagar,
@@ -27,20 +26,16 @@ import {
   PrioridadePagamento,
   CATEGORIA_LABELS,
   FORMA_PAGAMENTO_LABELS,
-  PRIORIDADE_LABELS
+  PRIORIDADE_LABELS,
 } from '../../../types/financeiro';
 
 interface ModalContaPagarProps {
   conta?: ContaPagar | null;
   onClose: () => void;
-  onSave: (conta: NovaContaPagar) => void;
+  onSave: (conta: NovaContaPagar) => Promise<void> | void;
 }
 
-const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
-  conta,
-  onClose,
-  onSave
-}) => {
+const ModalContaPagar: React.FC<ModalContaPagarProps> = ({ conta, onClose, onSave }) => {
   const [etapaAtual, setEtapaAtual] = useState(0);
   const [formData, setFormData] = useState<NovaContaPagar>({
     fornecedorId: '',
@@ -59,7 +54,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
     recorrente: false,
     frequenciaRecorrencia: 'mensal',
     numeroParcelas: 1,
-    prioridade: PrioridadePagamento.MEDIA
+    prioridade: PrioridadePagamento.MEDIA,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -67,6 +62,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
   const [novaTag, setNovaTag] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [fornecedorDropdownAberto, setFornecedorDropdownAberto] = useState(false);
+  const [erroGeral, setErroGeral] = useState<string | null>(null);
 
   // Mock de dados - em produção viriam da API
   const fornecedoresMock = [
@@ -74,20 +70,20 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
     { id: 'forn2', nome: 'Papelaria Central', cnpjCpf: '98.765.432/0001-10' },
     { id: 'forn3', nome: 'Escritório Legal', cnpjCpf: '11.222.333/0001-44' },
     { id: 'forn4', nome: 'Marketing Digital Pro', cnpjCpf: '55.666.777/0001-88' },
-    { id: 'forn5', nome: 'Infraestrutura Cloud', cnpjCpf: '99.888.777/0001-22' }
+    { id: 'forn5', nome: 'Infraestrutura Cloud', cnpjCpf: '99.888.777/0001-22' },
   ];
 
   const contasBancariasMock = [
     { id: 'conta1', nome: 'Conta Corrente - Banco do Brasil', banco: 'Banco do Brasil' },
     { id: 'conta2', nome: 'Conta Poupança - Caixa', banco: 'Caixa Econômica' },
-    { id: 'conta3', nome: 'Conta Empresarial - Santander', banco: 'Santander' }
+    { id: 'conta3', nome: 'Conta Empresarial - Santander', banco: 'Santander' },
   ];
 
   const etapas = [
     { id: 0, nome: 'Informações Básicas', icon: FileText },
     { id: 1, nome: 'Valores e Pagamento', icon: DollarSign },
     { id: 2, nome: 'Classificação', icon: Tag },
-    { id: 3, nome: 'Anexos e Observações', icon: Paperclip }
+    { id: 3, nome: 'Anexos e Observações', icon: Paperclip },
   ];
 
   // Preencher formulário ao editar
@@ -109,22 +105,26 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
         tags: conta.tags || [],
         recorrente: conta.recorrente,
         frequenciaRecorrencia: conta.frequenciaRecorrencia,
-        prioridade: conta.prioridade
+        prioridade: conta.prioridade,
       });
     }
   }, [conta]);
 
-  const handleInputChange = (campo: keyof NovaContaPagar, valor: any) => {
-    setFormData(prev => ({
+  const handleInputChange = <K extends keyof NovaContaPagar>(
+    campo: K,
+    valor: NovaContaPagar[K],
+  ): void => {
+    const campoKey = campo as string;
+    setFormData((prev) => ({
       ...prev,
-      [campo]: valor
+      [campo]: valor,
     }));
 
     // Limpar erro do campo
-    if (errors[campo]) {
-      setErrors(prev => ({
+    if (errors[campoKey]) {
+      setErrors((prev) => ({
         ...prev,
-        [campo]: ''
+        [campoKey]: '',
       }));
     }
   };
@@ -134,19 +134,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
   const [valorDescontoInput, setValorDescontoInput] = useState('');
 
   // Atualizar inputs formatados quando formData muda (carregamento inicial ou edição)
-  useEffect(() => {
-    if (formData.valorOriginal > 0) {
-      const formatted = formatCurrency((formData.valorOriginal * 100).toString());
-      setValorOriginalInput(formatted ? `R$ ${formatted}` : '');
-    }
-    if (formData.valorDesconto > 0) {
-      const formatted = formatCurrency((formData.valorDesconto * 100).toString());
-      setValorDescontoInput(formatted ? `R$ ${formatted}` : '');
-    }
-  }, [conta]); // Apenas quando conta muda (edição)
-
-  // Formatação automática de campos monetários (igual ao modal de oportunidades)
-  const formatCurrency = (value: string): string => {
+  const formatCurrency = useCallback((value: string): string => {
     // Remove todos os caracteres não numéricos
     const numericValue = value.replace(/\D/g, '');
     if (!numericValue || numericValue === '0') return '';
@@ -154,10 +142,26 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
     // Converte para número e formata
     const formattedValue = (parseInt(numericValue) / 100).toFixed(2);
     return formattedValue.replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  };
+  }, []);
+
+  useEffect(() => {
+    if (conta?.valorOriginal && conta.valorOriginal > 0) {
+      const formatted = formatCurrency((conta.valorOriginal * 100).toString());
+      setValorOriginalInput(formatted ? `R$ ${formatted}` : '');
+    } else {
+      setValorOriginalInput('');
+    }
+
+    if (conta?.valorDesconto && conta.valorDesconto > 0) {
+      const formatted = formatCurrency((conta.valorDesconto * 100).toString());
+      setValorDescontoInput(formatted ? `R$ ${formatted}` : '');
+    } else {
+      setValorDescontoInput('');
+    }
+  }, [conta, formatCurrency]);
 
   // Handler para valor original (usando formatação automática)
-  const handleValorOriginalChange = (valorInput: string) => {
+  const handleValorOriginalChange = (valorInput: string): void => {
     // Remove o "R$ " se existir para evitar formatação dupla
     const cleanValue = valorInput.replace(/^R\$\s*/, '');
     const formatted = formatCurrency(cleanValue);
@@ -166,23 +170,25 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
     setValorOriginalInput(formattedValue);
 
     // Converte para valor numérico para cálculos
-    const valorNumerico = formattedValue ? parseFloat(formattedValue.replace(/[^\d,]/g, '').replace(',', '.')) : 0;
-    setFormData(prev => ({
+    const valorNumerico = formattedValue
+      ? parseFloat(formattedValue.replace(/[^\d,]/g, '').replace(',', '.'))
+      : 0;
+    setFormData((prev) => ({
       ...prev,
-      valorOriginal: valorNumerico
+      valorOriginal: valorNumerico,
     }));
 
     // Limpar erro do campo
     if (errors.valorOriginal) {
-      setErrors(prev => ({
+      setErrors((prev) => ({
         ...prev,
-        valorOriginal: ''
+        valorOriginal: '',
       }));
     }
   };
 
   // Handler para valor desconto (usando formatação automática)
-  const handleValorDescontoChange = (valorInput: string) => {
+  const handleValorDescontoChange = (valorInput: string): void => {
     // Remove o "R$ " se existir para evitar formatação dupla
     const cleanValue = valorInput.replace(/^R\$\s*/, '');
     const formatted = formatCurrency(cleanValue);
@@ -191,93 +197,68 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
     setValorDescontoInput(formattedValue);
 
     // Converte para valor numérico para cálculos
-    const valorNumerico = formattedValue ? parseFloat(formattedValue.replace(/[^\d,]/g, '').replace(',', '.')) : 0;
-    setFormData(prev => ({
+    const valorNumerico = formattedValue
+      ? parseFloat(formattedValue.replace(/[^\d,]/g, '').replace(',', '.'))
+      : 0;
+    setFormData((prev) => ({
       ...prev,
-      valorDesconto: valorNumerico
+      valorDesconto: valorNumerico,
     }));
 
     // Limpar erro do campo
     if (errors.valorDesconto) {
-      setErrors(prev => ({
+      setErrors((prev) => ({
         ...prev,
-        valorDesconto: ''
-      }));
-    }
-  };
-
-  // Handler específico para campos numéricos que permite valores vazios
-  const handleNumericChange = (campo: keyof NovaContaPagar, value: string) => {
-    if (value === '') {
-      // Permitir campo vazio durante a edição
-      setFormData(prev => ({
-        ...prev,
-        [campo]: '' as any
-      }));
-    } else {
-      const numericValue = parseFloat(value);
-      if (!isNaN(numericValue)) {
-        setFormData(prev => ({
-          ...prev,
-          [campo]: numericValue
-        }));
-      }
-    }
-
-    // Limpar erro do campo
-    if (errors[campo]) {
-      setErrors(prev => ({
-        ...prev,
-        [campo]: ''
+        valorDesconto: '',
       }));
     }
   };
 
   // Handler específico para campos inteiros
-  const handleIntegerChange = (campo: keyof NovaContaPagar, value: string, defaultValue: number = 1) => {
+  const handleIntegerChange = (value: string, defaultValue = 1): void => {
     if (value === '') {
       // Permitir campo vazio durante a edição
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        [campo]: defaultValue as any
+        numeroParcelas: defaultValue,
       }));
     } else {
       const intValue = parseInt(value);
       if (!isNaN(intValue) && intValue > 0) {
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
-          [campo]: intValue
+          numeroParcelas: intValue,
         }));
       }
     }
 
     // Limpar erro do campo
-    if (errors[campo]) {
-      setErrors(prev => ({
+    if (errors.numeroParcelas) {
+      setErrors((prev) => ({
         ...prev,
-        [campo]: ''
+        numeroParcelas: '',
       }));
     }
   };
 
-  const handleAdicionarTag = () => {
+  const handleAdicionarTag = (): void => {
     if (novaTag.trim() && !formData.tags?.includes(novaTag.trim())) {
       handleInputChange('tags', [...(formData.tags || []), novaTag.trim()]);
       setNovaTag('');
     }
   };
 
-  const handleRemoverTag = (tag: string) => {
-    handleInputChange('tags', formData.tags?.filter(t => t !== tag) || []);
+  const handleRemoverTag = (tag: string): void => {
+    handleInputChange('tags', formData.tags?.filter((t) => t !== tag) || []);
   };
 
-  const handleAnexoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAnexoChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     const files = Array.from(event.target.files || []);
-    setAnexos(prev => [...prev, ...files]);
+    setAnexos((prev) => [...prev, ...files]);
   };
 
-  const handleRemoverAnexo = (index: number) => {
-    setAnexos(prev => prev.filter((_, i) => i !== index));
+  const handleRemoverAnexo = (index: number): void => {
+    setAnexos((prev) => prev.filter((_, i) => i !== index));
   };
 
   const validarFormulario = (): boolean => {
@@ -310,44 +291,46 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
     return Object.keys(novosErros).length === 0;
   };
 
-  const handleSalvar = async () => {
+  const handleSalvar = async (): Promise<void> => {
     if (!validarFormulario()) {
+      setErroGeral('Corrija os campos destacados para continuar.');
       return;
     }
 
     setSalvando(true);
+    setErroGeral(null);
     try {
       const dadosParaSalvar = {
         ...formData,
-        anexos: anexos
+        anexos: anexos,
       };
 
       await onSave(dadosParaSalvar);
-    } catch (error) {
-      console.error('Erro ao salvar conta:', error);
+    } catch {
+      setErroGeral('Não foi possível salvar a conta. Tente novamente.');
     } finally {
       setSalvando(false);
     }
   };
 
-  const proximaEtapa = () => {
+  const proximaEtapa = (): void => {
     if (etapaAtual < etapas.length - 1) {
-      setEtapaAtual(etapaAtual + 1);
+      setEtapaAtual((prev) => Math.min(prev + 1, etapas.length - 1));
     }
   };
 
-  const etapaAnterior = () => {
+  const etapaAnterior = (): void => {
     if (etapaAtual > 0) {
-      setEtapaAtual(etapaAtual - 1);
+      setEtapaAtual((prev) => Math.max(prev - 1, 0));
     }
   };
 
-  const podeAvancar = () => {
+  const podeAvancar = (): boolean => {
     switch (etapaAtual) {
       case 0:
-        return formData.fornecedorId && formData.descricao.trim();
+        return Boolean(formData.fornecedorId && formData.descricao.trim());
       case 1:
-        return (Number(formData.valorOriginal) || 0) > 0 && formData.dataVencimento;
+        return (Number(formData.valorOriginal) || 0) > 0 && Boolean(formData.dataVencimento);
       case 2:
         return true;
       case 3:
@@ -357,7 +340,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
     }
   };
 
-  const renderEtapaIndicator = () => (
+  const renderEtapaIndicator = (): React.ReactNode => (
     <div className="flex items-center justify-center mb-8">
       {etapas.map((etapa, index) => {
         const Icon = etapa.icon;
@@ -366,22 +349,21 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
 
         return (
           <div key={etapa.id} className="flex items-center">
-            <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${isActive
-                ? 'border-blue-600 bg-blue-600 text-white'
-                : isCompleted
-                  ? 'border-green-600 bg-green-600 text-white'
-                  : 'border-gray-300 bg-white text-gray-400'
-              }`}>
-              {isCompleted ? (
-                <Check className="h-5 w-5" />
-              ) : (
-                <Icon className="h-5 w-5" />
-              )}
+            <div
+              className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${isActive
+                  ? 'border-blue-600 bg-blue-600 text-white'
+                  : isCompleted
+                    ? 'border-green-600 bg-green-600 text-white'
+                    : 'border-gray-300 bg-white text-gray-400'
+                }`}
+            >
+              {isCompleted ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
             </div>
 
             {index < etapas.length - 1 && (
-              <div className={`w-16 h-1 mx-2 ${index < etapaAtual ? 'bg-green-600' : 'bg-gray-300'
-                }`} />
+              <div
+                className={`w-16 h-1 mx-2 ${index < etapaAtual ? 'bg-green-600' : 'bg-gray-300'}`}
+              />
             )}
           </div>
         );
@@ -389,7 +371,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
     </div>
   );
 
-  const renderConteudoEtapa = () => {
+  const renderConteudoEtapa = (): React.ReactNode => {
     switch (etapaAtual) {
       case 0:
         return (
@@ -402,9 +384,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Fornecedor */}
               <div className="lg:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Fornecedor *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Fornecedor *</label>
                 <div className="relative">
                   <button
                     type="button"
@@ -416,9 +396,9 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                       <Building className="h-5 w-5 text-gray-400" />
                       <span className={formData.fornecedorId ? 'text-gray-900' : 'text-gray-500'}>
                         {formData.fornecedorId
-                          ? fornecedoresMock.find(f => f.id === formData.fornecedorId)?.nome || 'Fornecedor não encontrado'
-                          : 'Selecione um fornecedor'
-                        }
+                          ? fornecedoresMock.find((f) => f.id === formData.fornecedorId)?.nome ||
+                          'Fornecedor não encontrado'
+                          : 'Selecione um fornecedor'}
                       </span>
                     </div>
                     <ChevronDown className="h-5 w-5 text-gray-400" />
@@ -453,9 +433,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
 
               {/* Descrição */}
               <div className="lg:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Descrição *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Descrição *</label>
                 <div className="relative">
                   <FileText className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                   <input
@@ -590,15 +568,15 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
 
               {/* Valor Total */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Valor Total
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Valor Total</label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                   <input
                     type="text"
                     value={(() => {
-                      const valorTotal = (Number(formData.valorOriginal) || 0) - (Number(formData.valorDesconto) || 0);
+                      const valorTotal =
+                        (Number(formData.valorOriginal) || 0) -
+                        (Number(formData.valorDesconto) || 0);
                       if (valorTotal <= 0) return 'R$ 0,00';
                       const formatted = formatCurrency((valorTotal * 100).toString());
                       return `R$ ${formatted}`;
@@ -618,11 +596,15 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                   <CreditCard className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                   <select
                     value={formData.tipoPagamento}
-                    onChange={(e) => handleInputChange('tipoPagamento', e.target.value as FormaPagamento)}
+                    onChange={(e) =>
+                      handleInputChange('tipoPagamento', e.target.value as FormaPagamento)
+                    }
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     {Object.entries(FORMA_PAGAMENTO_LABELS).map(([valor, label]) => (
-                      <option key={valor} value={valor}>{label}</option>
+                      <option key={valor} value={valor}>
+                        {label}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -640,7 +622,9 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                 >
                   <option value="">Selecione uma conta</option>
                   {contasBancariasMock.map((conta) => (
-                    <option key={conta.id} value={conta.id}>{conta.nome}</option>
+                    <option key={conta.id} value={conta.id}>
+                      {conta.nome}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -656,7 +640,10 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                   onChange={(e) => handleInputChange('recorrente', e.target.checked)}
                   className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
-                <label htmlFor="recorrente" className="text-sm font-medium text-gray-700 flex items-center space-x-2">
+                <label
+                  htmlFor="recorrente"
+                  className="text-sm font-medium text-gray-700 flex items-center space-x-2"
+                >
                   <RefreshCw className="h-4 w-4" />
                   <span>Conta recorrente</span>
                 </label>
@@ -670,7 +657,12 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                     </label>
                     <select
                       value={formData.frequenciaRecorrencia}
-                      onChange={(e) => handleInputChange('frequenciaRecorrencia', e.target.value as any)}
+                      onChange={(e) =>
+                        handleInputChange(
+                          'frequenciaRecorrencia',
+                          e.target.value as NovaContaPagar['frequenciaRecorrencia'],
+                        )
+                      }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="mensal">Mensal</option>
@@ -689,7 +681,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                       type="number"
                       min="1"
                       value={formData.numeroParcelas}
-                      onChange={(e) => handleIntegerChange('numeroParcelas', e.target.value, 1)}
+                      onChange={(e) => handleIntegerChange(e.target.value, 1)}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
@@ -710,18 +702,20 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Categoria */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Categoria
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Categoria</label>
                 <div className="relative">
                   <Tag className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                   <select
                     value={formData.categoria}
-                    onChange={(e) => handleInputChange('categoria', e.target.value as CategoriaContaPagar)}
+                    onChange={(e) =>
+                      handleInputChange('categoria', e.target.value as CategoriaContaPagar)
+                    }
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     {Object.entries(CATEGORIA_LABELS).map(([valor, label]) => (
-                      <option key={valor} value={valor}>{label}</option>
+                      <option key={valor} value={valor}>
+                        {label}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -729,25 +723,25 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
 
               {/* Prioridade */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Prioridade
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Prioridade</label>
                 <select
                   value={formData.prioridade}
-                  onChange={(e) => handleInputChange('prioridade', e.target.value as PrioridadePagamento)}
+                  onChange={(e) =>
+                    handleInputChange('prioridade', e.target.value as PrioridadePagamento)
+                  }
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   {Object.entries(PRIORIDADE_LABELS).map(([valor, label]) => (
-                    <option key={valor} value={valor}>{label}</option>
+                    <option key={valor} value={valor}>
+                      {label}
+                    </option>
                   ))}
                 </select>
               </div>
 
               {/* Tags */}
               <div className="lg:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tags
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
                 <div className="space-y-3">
                   <div className="flex items-center space-x-2">
                     <input
@@ -804,14 +798,16 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
             <div className="space-y-6">
               {/* Upload de Anexos */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Anexos
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Anexos</label>
                 <div className="relative border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
                   <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <div className="space-y-2">
-                    <p className="text-sm font-medium text-gray-700">Clique para fazer upload ou arraste arquivos aqui</p>
-                    <p className="text-xs text-gray-500">Formatos aceitos: PDF, DOC, DOCX, JPG, PNG (Máx: 10MB)</p>
+                    <p className="text-sm font-medium text-gray-700">
+                      Clique para fazer upload ou arraste arquivos aqui
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Formatos aceitos: PDF, DOC, DOCX, JPG, PNG (Máx: 10MB)
+                    </p>
                   </div>
                   <input
                     type="file"
@@ -825,17 +821,19 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                 {anexos.length > 0 && (
                   <div className="mt-4 space-y-2">
                     {anexos.map((anexo, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      >
                         <div className="flex items-center space-x-3">
                           <Paperclip className="h-4 w-4 text-gray-400" />
                           <span className="text-sm font-medium text-gray-700">{anexo.name}</span>
-                          <span className="text-xs text-gray-500">({(anexo.size / 1024 / 1024).toFixed(2)} MB)</span>
+                          <span className="text-xs text-gray-500">
+                            ({(anexo.size / 1024 / 1024).toFixed(2)} MB)
+                          </span>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <button
-                            type="button"
-                            className="p-1 text-gray-400 hover:text-gray-600"
-                          >
+                          <button type="button" className="p-1 text-gray-400 hover:text-gray-600">
                             <Eye className="h-4 w-4" />
                           </button>
                           <button
@@ -854,9 +852,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
 
               {/* Observações */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Observações
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Observações</label>
                 <textarea
                   value={formData.observacoes}
                   onChange={(e) => handleInputChange('observacoes', e.target.value)}
@@ -887,9 +883,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
               <h2 className="text-2xl font-bold text-gray-900">
                 {conta ? 'Editar Conta a Pagar' : 'Nova Conta a Pagar'}
               </h2>
-              <p className="text-sm text-gray-600">
-                {etapas[etapaAtual].nome}
-              </p>
+              <p className="text-sm text-gray-600">{etapas[etapaAtual].nome}</p>
             </div>
           </div>
 
@@ -902,14 +896,17 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
         </div>
 
         {/* Progress Indicator */}
-        <div className="p-6 border-b border-gray-100">
+        <div className="p-6 border-b border-gray-100 space-y-4">
           {renderEtapaIndicator()}
+          {erroGeral && (
+            <div className="px-4 py-2 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm">
+              {erroGeral}
+            </div>
+          )}
         </div>
 
         {/* Content */}
-        <div className="p-6 max-h-[60vh] overflow-y-auto">
-          {renderConteudoEtapa()}
-        </div>
+        <div className="p-6 max-h-[60vh] overflow-y-auto">{renderConteudoEtapa()}</div>
 
         {/* Footer */}
         <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">

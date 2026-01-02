@@ -5,15 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import {
-  Users,
-  TrendingUp,
-  Clock,
-  CheckCircle,
-  AlertCircle,
-  X,
-  BarChart3,
-} from 'lucide-react';
+import { Users, TrendingUp, Clock, CheckCircle, AlertCircle, X, BarChart3 } from 'lucide-react';
 import { useFilaStore } from '../../stores/filaStore';
 import { Fila, EstrategiaDistribuicao } from '../../services/filaService';
 import { useAuth } from '../../hooks/useAuth';
@@ -34,12 +26,7 @@ export const FilaIndicator: React.FC<FilaIndicatorProps> = ({
   const { user } = useAuth();
   const empresaId = user?.empresa?.id || '';
 
-  const {
-    filas,
-    metricas,
-    buscarFila,
-    obterMetricas,
-  } = useFilaStore();
+  const { filas, metricas, buscarFila, obterMetricas } = useFilaStore();
 
   const [fila, setFila] = useState<Fila | null>(null);
   const [showDetails, setShowDetails] = useState(false);
@@ -180,10 +167,7 @@ export const FilaIndicator: React.FC<FilaIndicatorProps> = ({
         {showTooltip && showDetails && (
           <>
             {/* Overlay para fechar */}
-            <div
-              className="fixed inset-0 z-40"
-              onClick={() => setShowDetails(false)}
-            />
+            <div className="fixed inset-0 z-40" onClick={() => setShowDetails(false)} />
 
             {/* Tooltip Card */}
             <div className="absolute left-0 top-full mt-2 z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200 p-4">
@@ -202,9 +186,7 @@ export const FilaIndicator: React.FC<FilaIndicatorProps> = ({
               </div>
 
               {/* Descrição */}
-              {fila.descricao && (
-                <p className="text-xs text-gray-600 mb-3">{fila.descricao}</p>
-              )}
+              {fila.descricao && <p className="text-xs text-gray-600 mb-3">{fila.descricao}</p>}
 
               {/* Informações da Fila */}
               <div className="grid grid-cols-2 gap-3 mb-3">
@@ -242,9 +224,7 @@ export const FilaIndicator: React.FC<FilaIndicatorProps> = ({
                 <div className="pt-3 border-t">
                   <div className="flex items-center gap-2 mb-3">
                     <BarChart3 className="h-4 w-4 text-[#159A9C]" />
-                    <p className="text-xs font-semibold text-gray-700">
-                      Métricas em Tempo Real
-                    </p>
+                    <p className="text-xs font-semibold text-gray-700">Métricas em Tempo Real</p>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div className="text-center p-2 bg-yellow-50 rounded">
@@ -307,8 +287,8 @@ export const FilaIndicator: React.FC<FilaIndicatorProps> = ({
         <div>
           <p className={`text-sm font-bold ${cores.text}`}>{fila.nome}</p>
           <p className="text-xs text-gray-600">
-            {traduzirEstrategia(fila.estrategiaDistribuicao)} •{' '}
-            {fila.atendentes?.length || 0} atendentes
+            {traduzirEstrategia(fila.estrategiaDistribuicao)} • {fila.atendentes?.length || 0}{' '}
+            atendentes
           </p>
         </div>
       </div>
@@ -317,15 +297,11 @@ export const FilaIndicator: React.FC<FilaIndicatorProps> = ({
         <div className="flex items-center gap-4">
           <div className="text-center">
             <p className="text-xs text-gray-500">Aguardando</p>
-            <p className={`text-lg font-bold ${cores.text}`}>
-              {metricasFila.ticketsAguardando}
-            </p>
+            <p className={`text-lg font-bold ${cores.text}`}>{metricasFila.ticketsAguardando}</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-gray-500">Em Atendimento</p>
-            <p className={`text-lg font-bold ${cores.text}`}>
-              {metricasFila.ticketsEmAtendimento}
-            </p>
+            <p className={`text-lg font-bold ${cores.text}`}>{metricasFila.ticketsEmAtendimento}</p>
           </div>
         </div>
       )}

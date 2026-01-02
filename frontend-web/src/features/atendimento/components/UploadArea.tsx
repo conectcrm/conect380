@@ -170,7 +170,7 @@ export function UploadArea({
         setArquivos((prev) => [...prev, ...arquivosParaAdicionar]);
       }
     },
-    [arquivos.length, maxFiles]
+    [arquivos.length, maxFiles],
   );
 
   const removerArquivo = (id: string) => {
@@ -187,8 +187,8 @@ export function UploadArea({
     try {
       setArquivos((prev) =>
         prev.map((a) =>
-          a.id === arquivoUpload.id ? { ...a, status: 'uploading', progresso: 0 } : a
-        )
+          a.id === arquivoUpload.id ? { ...a, status: 'uploading', progresso: 0 } : a,
+        ),
       );
 
       const token = localStorage.getItem('authToken');
@@ -204,7 +204,7 @@ export function UploadArea({
             : 0;
 
           setArquivos((prev) =>
-            prev.map((a) => (a.id === arquivoUpload.id ? { ...a, progresso } : a))
+            prev.map((a) => (a.id === arquivoUpload.id ? { ...a, progresso } : a)),
           );
         },
       });
@@ -215,21 +215,20 @@ export function UploadArea({
         prev.map((a) =>
           a.id === arquivoUpload.id
             ? { ...a, status: 'success', progresso: 100, url: dados.url }
-            : a
-        )
+            : a,
+        ),
       );
 
       return dados;
     } catch (error: any) {
       console.error('❌ Erro ao fazer upload:', error);
 
-      const mensagemErro =
-        error.response?.data?.message || 'Erro ao fazer upload do arquivo';
+      const mensagemErro = error.response?.data?.message || 'Erro ao fazer upload do arquivo';
 
       setArquivos((prev) =>
         prev.map((a) =>
-          a.id === arquivoUpload.id ? { ...a, status: 'error', erro: mensagemErro } : a
-        )
+          a.id === arquivoUpload.id ? { ...a, status: 'error', erro: mensagemErro } : a,
+        ),
       );
 
       throw error;
@@ -326,9 +325,10 @@ export function UploadArea({
         className={`
           border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
           transition-all duration-200
-          ${isDragging
-            ? 'border-[#159A9C] bg-[#159A9C]/5 scale-[1.02]'
-            : 'border-gray-300 hover:border-[#159A9C] hover:bg-gray-50'
+          ${
+            isDragging
+              ? 'border-[#159A9C] bg-[#159A9C]/5 scale-[1.02]'
+              : 'border-gray-300 hover:border-[#159A9C] hover:bg-gray-50'
           }
         `}
       >
@@ -344,18 +344,14 @@ export function UploadArea({
         <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
 
         <p className="text-lg font-medium text-[#002333] mb-2">
-          {isDragging
-            ? 'Solte os arquivos aqui'
-            : 'Arraste arquivos ou clique para selecionar'}
+          {isDragging ? 'Solte os arquivos aqui' : 'Arraste arquivos ou clique para selecionar'}
         </p>
 
         <p className="text-sm text-gray-500">
           Máximo {maxFiles} arquivos • Até {formatarTamanho(maxFileSize)} cada
         </p>
 
-        <p className="text-xs text-gray-400 mt-2">
-          Imagens, PDF, Word, Excel, Áudio
-        </p>
+        <p className="text-xs text-gray-400 mt-2">Imagens, PDF, Word, Excel, Áudio</p>
       </div>
 
       {/* Mensagem de Erro */}
@@ -418,9 +414,7 @@ export function UploadArea({
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[#002333] truncate">
-                    {arquivo.nome}
-                  </p>
+                  <p className="text-sm font-medium text-[#002333] truncate">{arquivo.nome}</p>
                   <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
                     <span>{tipoLabel}</span>
                     <span>•</span>
@@ -436,9 +430,7 @@ export function UploadArea({
                           style={{ width: `${arquivo.progresso}%` }}
                         />
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {arquivo.progresso}%
-                      </p>
+                      <p className="text-xs text-gray-500 mt-1">{arquivo.progresso}%</p>
                     </div>
                   )}
 
@@ -450,18 +442,14 @@ export function UploadArea({
 
                 {/* Status Icon */}
                 <div className="flex items-center gap-2">
-                  {arquivo.status === 'pending' && (
-                    <Clock className="h-5 w-5 text-gray-400" />
-                  )}
+                  {arquivo.status === 'pending' && <Clock className="h-5 w-5 text-gray-400" />}
                   {arquivo.status === 'uploading' && (
                     <Loader2 className="h-5 w-5 text-[#159A9C] animate-spin" />
                   )}
                   {arquivo.status === 'success' && (
                     <CheckCircle className="h-5 w-5 text-green-600" />
                   )}
-                  {arquivo.status === 'error' && (
-                    <AlertCircle className="h-5 w-5 text-red-600" />
-                  )}
+                  {arquivo.status === 'error' && <AlertCircle className="h-5 w-5 text-red-600" />}
 
                   {/* Botão Remover */}
                   {arquivo.status !== 'uploading' && (

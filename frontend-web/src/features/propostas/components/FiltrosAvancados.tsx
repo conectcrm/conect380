@@ -9,7 +9,7 @@ import {
   BarChart3,
   ChevronDown,
   ChevronUp,
-  RotateCcw
+  RotateCcw,
 } from 'lucide-react';
 
 interface FiltrosAvancadosProps {
@@ -30,7 +30,7 @@ interface FiltrosAvancadosProps {
 export const FiltrosAvancados: React.FC<FiltrosAvancadosProps> = ({
   onFiltersChange,
   isOpen,
-  onToggle
+  onToggle,
 }) => {
   const [filtros, setFiltros] = useState({
     status: '',
@@ -40,7 +40,7 @@ export const FiltrosAvancados: React.FC<FiltrosAvancadosProps> = ({
     valorMin: '',
     valorMax: '',
     categoria: '',
-    probabilidadeMin: ''
+    probabilidadeMin: '',
   });
 
   const [vendedores, setVendedores] = useState<Array<{ id: string; nome: string }>>([]);
@@ -52,7 +52,7 @@ export const FiltrosAvancados: React.FC<FiltrosAvancadosProps> = ({
       try {
         setIsLoadingVendedores(true);
         const vendedoresData = await propostasService.obterVendedores();
-        setVendedores(vendedoresData.map(v => ({ id: v.id, nome: v.nome })));
+        setVendedores(vendedoresData.map((v) => ({ id: v.id, nome: v.nome })));
       } catch (error) {
         console.error('Erro ao carregar vendedores:', error);
       } finally {
@@ -78,7 +78,9 @@ export const FiltrosAvancados: React.FC<FiltrosAvancadosProps> = ({
       valorMin: novosFiltros.valorMin ? parseFloat(novosFiltros.valorMin) : undefined,
       valorMax: novosFiltros.valorMax ? parseFloat(novosFiltros.valorMax) : undefined,
       categoria: novosFiltros.categoria || undefined,
-      probabilidadeMin: novosFiltros.probabilidadeMin ? parseFloat(novosFiltros.probabilidadeMin) : undefined
+      probabilidadeMin: novosFiltros.probabilidadeMin
+        ? parseFloat(novosFiltros.probabilidadeMin)
+        : undefined,
     };
 
     onFiltersChange(filtrosConvertidos);
@@ -93,7 +95,7 @@ export const FiltrosAvancados: React.FC<FiltrosAvancadosProps> = ({
       valorMin: '',
       valorMax: '',
       categoria: '',
-      probabilidadeMin: ''
+      probabilidadeMin: '',
     };
     setFiltros(filtrosLimpos);
     onFiltersChange({});
@@ -131,7 +133,7 @@ export const FiltrosAvancados: React.FC<FiltrosAvancadosProps> = ({
   };
 
   const contarFiltrosAtivos = () => {
-    return Object.values(filtros).filter(value => value !== '').length;
+    return Object.values(filtros).filter((value) => value !== '').length;
   };
 
   if (!isOpen) {
@@ -192,8 +194,8 @@ export const FiltrosAvancados: React.FC<FiltrosAvancadosProps> = ({
             { key: 'hoje', label: 'Hoje' },
             { key: 'semana', label: 'Esta Semana' },
             { key: 'mes', label: 'Este Mês' },
-            { key: 'trimestre', label: 'Este Trimestre' }
-          ].map(periodo => (
+            { key: 'trimestre', label: 'Este Trimestre' },
+          ].map((periodo) => (
             <button
               key={periodo.key}
               onClick={() => aplicarFiltroRapido(periodo.key)}
@@ -237,7 +239,7 @@ export const FiltrosAvancados: React.FC<FiltrosAvancadosProps> = ({
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
           >
             <option value="">Todos os Vendedores</option>
-            {vendedores.map(vendedor => (
+            {vendedores.map((vendedor) => (
               <option key={vendedor.id} value={vendedor.id}>
                 {vendedor.nome}
               </option>
@@ -351,7 +353,7 @@ export const FiltrosAvancados: React.FC<FiltrosAvancadosProps> = ({
                   label = `Status: ${value}`;
                   break;
                 case 'vendedor':
-                  const vendedor = vendedores.find(v => v.id === value);
+                  const vendedor = vendedores.find((v) => v.id === value);
                   label = `Vendedor: ${vendedor?.nome || value}`;
                   break;
                 case 'dataInicio':

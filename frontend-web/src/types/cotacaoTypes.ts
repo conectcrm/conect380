@@ -83,8 +83,8 @@ export interface HistoricoCotacao {
   usuarioId: string;
   usuario: string;
   timestamp: string;
-  dadosAnteriores?: Record<string, any>;
-  dadosNovos?: Record<string, any>;
+  dadosAnteriores?: Record<string, unknown>;
+  dadosNovos?: Record<string, unknown>;
 }
 
 export enum StatusCotacao {

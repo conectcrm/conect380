@@ -117,8 +117,8 @@ export const TagsTab: React.FC = () => {
     });
   };
 
-  const tagsFiltradas = tags.filter(tag =>
-    tag.nome.toLowerCase().includes(searchTerm.toLowerCase())
+  const tagsFiltradas = tags.filter((tag) =>
+    tag.nome.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   // Loading state
@@ -151,8 +151,9 @@ export const TagsTab: React.FC = () => {
           <div>
             <h3 className="font-semibold text-blue-900 mb-1">Sistema de Tags Flexível</h3>
             <p className="text-sm text-blue-700">
-              Tags permitem categorização flexível. Um ticket pode ter múltiplas tags (ex: "Urgente" + "VIP" + "Comercial").
-              Substitui o sistema rígido de departamentos, oferecendo mais flexibilidade.
+              Tags permitem categorização flexível. Um ticket pode ter múltiplas tags (ex: "Urgente"
+              + "VIP" + "Comercial"). Substitui o sistema rígido de departamentos, oferecendo mais
+              flexibilidade.
             </p>
           </div>
         </div>
@@ -226,9 +227,7 @@ export const TagsTab: React.FC = () => {
                     <Tag className="h-5 w-5" style={{ color: tag.cor }} />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-[#002333] text-lg">
-                      {tag.nome}
-                    </h3>
+                    <h3 className="font-semibold text-[#002333] text-lg">{tag.nome}</h3>
                     {tag.usageCount !== undefined && (
                       <p className="text-xs text-gray-500">
                         {tag.usageCount} ticket{tag.usageCount !== 1 ? 's' : ''}
@@ -255,11 +254,7 @@ export const TagsTab: React.FC = () => {
               </div>
 
               {/* Descrição */}
-              {tag.descricao && (
-                <p className="text-sm text-gray-600 mb-4">
-                  {tag.descricao}
-                </p>
-              )}
+              {tag.descricao && <p className="text-sm text-gray-600 mb-4">{tag.descricao}</p>}
 
               {/* Preview da Tag */}
               <div className="flex items-center gap-2">
@@ -278,10 +273,9 @@ export const TagsTab: React.FC = () => {
               {/* Status */}
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${tag.ativo
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
-                    }`}
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    tag.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                  }`}
                 >
                   {tag.ativo ? 'Ativa' : 'Inativa'}
                 </span>
@@ -329,19 +323,18 @@ export const TagsTab: React.FC = () => {
 
               {/* Cor */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Cor da Tag *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cor da Tag *</label>
                 <div className="grid grid-cols-6 gap-2">
                   {CORES_PRESET.map((cor) => (
                     <button
                       key={cor.value}
                       type="button"
                       onClick={() => setFormData({ ...formData, cor: cor.value })}
-                      className={`w-10 h-10 rounded-full transition-all ${formData.cor === cor.value
+                      className={`w-10 h-10 rounded-full transition-all ${
+                        formData.cor === cor.value
                           ? 'ring-2 ring-offset-2 ring-[#159A9C] scale-110'
                           : 'hover:scale-105'
-                        }`}
+                      }`}
                       style={{ backgroundColor: cor.value }}
                       title={cor.label}
                     />
@@ -365,9 +358,7 @@ export const TagsTab: React.FC = () => {
 
               {/* Preview */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Preview
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Preview</label>
                 <span
                   className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
                   style={{

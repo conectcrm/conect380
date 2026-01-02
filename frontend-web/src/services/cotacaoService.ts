@@ -5,7 +5,7 @@ import {
   AtualizarCotacaoRequest,
   FiltroCotacao,
   StatusCotacao,
-  CotacaoListResponse
+  CotacaoListResponse,
 } from '../types/cotacaoTypes';
 
 export const cotacaoService = {
@@ -16,7 +16,7 @@ export const cotacaoService = {
       Object.entries(filtros).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
           if (Array.isArray(value)) {
-            value.forEach(v => params.append(key, v.toString()));
+            value.forEach((v) => params.append(key, v.toString()));
           } else {
             params.append(key, value.toString());
           }
@@ -36,14 +36,14 @@ export const cotacaoService = {
           page: 1,
           limit: fallbackItems.length,
           total: fallbackItems.length,
-          pages: 1
+          pages: 1,
         },
         statistics: {
           total: fallbackItems.length,
           totalValue: fallbackItems.reduce((sum, item) => sum + (item.valorTotal || 0), 0),
           byStatus: [],
-          byPriority: []
-        }
+          byPriority: [],
+        },
       };
     }
 
@@ -53,20 +53,20 @@ export const cotacaoService = {
       page: 1,
       limit: items.length,
       total: items.length,
-      pages: 1
+      pages: 1,
     };
 
     const statistics = payload?.statistics ?? {
       total: items.length,
       totalValue: items.reduce((sum: number, item: Cotacao) => sum + (item.valorTotal || 0), 0),
       byStatus: [],
-      byPriority: []
+      byPriority: [],
     };
 
     return {
       items,
       pagination,
-      statistics
+      statistics,
     };
   },
 
@@ -94,14 +94,14 @@ export const cotacaoService = {
 
   async aprovar(id: string, justificativa?: string): Promise<Cotacao> {
     const response = await api.post(`/cotacao/${id}/aprovar`, {
-      justificativa
+      justificativa,
     });
     return response.data.data;
   },
 
   async reprovar(id: string, justificativa: string): Promise<Cotacao> {
     const response = await api.post(`/cotacao/${id}/reprovar`, {
-      justificativa
+      justificativa,
     });
     return response.data.data;
   },
@@ -114,7 +114,7 @@ export const cotacaoService = {
   async alterarStatus(id: string, status: StatusCotacao, observacao?: string): Promise<Cotacao> {
     const response = await api.patch(`/cotacao/${id}/status`, {
       status,
-      observacao
+      observacao,
     });
     return response.data;
   },
@@ -127,13 +127,13 @@ export const cotacaoService = {
   async enviarPorEmail(id: string, emails: string[], mensagem?: string): Promise<void> {
     await api.post(`/cotacao/${id}/enviar-email`, {
       destinatarios: emails,
-      mensagem
+      mensagem,
     });
   },
 
   async gerarPDF(id: string): Promise<Blob> {
     const response = await api.get(`/cotacao/${id}/pdf`, {
-      responseType: 'blob'
+      responseType: 'blob',
     });
     return response.data;
   },
@@ -146,7 +146,7 @@ export const cotacaoService = {
       Object.entries(filtros).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
           if (Array.isArray(value)) {
-            value.forEach(v => params.append(key, v.toString()));
+            value.forEach((v) => params.append(key, v.toString()));
           } else {
             params.append(key, value.toString());
           }
@@ -155,7 +155,7 @@ export const cotacaoService = {
     }
 
     const response = await api.get(`/cotacao/exportar?${params.toString()}`, {
-      responseType: 'blob'
+      responseType: 'blob',
     });
     return response.data;
   },
@@ -178,11 +178,14 @@ export const cotacaoService = {
   async salvarTemplate(nome: string, cotacaoId: string): Promise<void> {
     await api.post('/cotacao/templates', {
       nome,
-      cotacaoId
+      cotacaoId,
     });
   },
 
-  async aprovarLote(cotacaoIds: string[], justificativa?: string): Promise<{
+  async aprovarLote(
+    cotacaoIds: string[],
+    justificativa?: string,
+  ): Promise<{
     total: number;
     sucessos: number;
     falhas: number;
@@ -191,12 +194,15 @@ export const cotacaoService = {
   }> {
     const response = await api.post('/cotacao/aprovar-lote', {
       cotacaoIds,
-      justificativa
+      justificativa,
     });
     return response.data.data;
   },
 
-  async reprovarLote(cotacaoIds: string[], justificativa: string): Promise<{
+  async reprovarLote(
+    cotacaoIds: string[],
+    justificativa: string,
+  ): Promise<{
     total: number;
     sucessos: number;
     falhas: number;
@@ -205,8 +211,8 @@ export const cotacaoService = {
   }> {
     const response = await api.post('/cotacao/reprovar-lote', {
       cotacaoIds,
-      justificativa
+      justificativa,
     });
     return response.data.data;
-  }
+  },
 };

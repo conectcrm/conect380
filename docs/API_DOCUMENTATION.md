@@ -606,13 +606,14 @@ Authorization: Bearer {token}
 
 ### 6. WebHooks (WhatsApp)
 
-#### POST /atendimento/webhooks/whatsapp
+#### POST /api/atendimento/webhooks/whatsapp/:empresaId
 
 Recebe eventos do WhatsApp Business API.
 
 **Headers:**
 ```http
 Content-Type: application/json
+X-Hub-Signature-256: sha256=<assinatura gerada com App Secret>
 ```
 
 **Request (Mensagem Recebida):**
@@ -652,7 +653,7 @@ Content-Type: application/json
 
 ---
 
-#### GET /atendimento/webhooks/whatsapp
+#### GET /api/atendimento/webhooks/whatsapp/:empresaId
 
 Verifica token do webhook (Meta).
 

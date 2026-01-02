@@ -11,7 +11,7 @@ async function run() {
 
   await client.connect();
   try {
-    const res = await client.query("SELECT id, empresa_id, email FROM users WHERE email = 'admin@conectcrm.com'");
+    const res = await client.query("SELECT id, empresa_id, email FROM users WHERE email = 'admin@conectsuite.com.br'");
     console.log(res.rows[0]);
   } finally {
     await client.end();

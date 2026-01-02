@@ -78,7 +78,7 @@ const LoginPage: React.FC = () => {
             email: error.data.email,
             nome: error.data.nome,
             senhaTemporaria: error.data.senhaTemporaria || password,
-          }
+          },
         });
         return;
       }
@@ -108,7 +108,8 @@ const LoginPage: React.FC = () => {
               <ConectCRMLogoFinal size="2xl" variant="full" />
             </div>
             <h2 className="text-fluid-3xl font-bold mb-4">
-              Transforme seus<br />
+              Transforme seus
+              <br />
               <span className="text-[#DEEFE7]">negócios digitais</span>
             </h2>
             <p className="text-fluid-lg text-[#DEEFE7] mb-8">
@@ -123,7 +124,7 @@ const LoginPage: React.FC = () => {
               'Dashboard com métricas em tempo real',
               'Sistema de notificações inteligente',
               'Integração com principais ferramentas',
-              'Suporte técnico especializado'
+              'Suporte técnico especializado',
             ].map((feature, index) => (
               <div key={index} className="flex items-center space-x-3">
                 <div className="w-5 h-5 bg-[#DEEFE7] rounded-full flex items-center justify-center">
@@ -164,12 +165,8 @@ const LoginPage: React.FC = () => {
 
           {/* Form Header */}
           <div className="text-center mb-8">
-            <h1 className="text-fluid-2xl font-bold text-[#002333] mb-2">
-              Bem-vindo de volta!
-            </h1>
-            <p className="text-[#B4BEC9]">
-              Faça login para acessar sua conta
-            </p>
+            <h1 className="text-fluid-2xl font-bold text-[#002333] mb-2">Bem-vindo de volta!</h1>
+            <p className="text-[#B4BEC9]">Faça login para acessar sua conta</p>
           </div>
 
           {/* Login Form */}
@@ -187,23 +184,20 @@ const LoginPage: React.FC = () => {
                     value={email}
                     onChange={(e) => {
                       setEmail(e.target.value);
-                      if (errors.email) setErrors(prev => ({ ...prev, email: undefined }));
+                      if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
                     }}
-                    className={`w-full pl-11 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.email ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                      }`}
+                    className={`w-full pl-11 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                      errors.email ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    }`}
                     placeholder="seu@empresa.com"
                   />
                 </div>
-                {errors.email && (
-                  <p className="text-red-500 text-sm mt-1">{errors.email}</p>
-                )}
+                {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
               </div>
 
               {/* Password Field */}
               <div>
-                <label className="block text-sm font-semibold text-[#002333] mb-2">
-                  Senha
-                </label>
+                <label className="block text-sm font-semibold text-[#002333] mb-2">Senha</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#B4BEC9] w-5 h-5" />
                   <input
@@ -211,10 +205,11 @@ const LoginPage: React.FC = () => {
                     value={password}
                     onChange={(e) => {
                       setPassword(e.target.value);
-                      if (errors.password) setErrors(prev => ({ ...prev, password: undefined }));
+                      if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
                     }}
-                    className={`w-full pl-11 pr-12 py-3 border rounded-xl focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.password ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                      }`}
+                    className={`w-full pl-11 pr-12 py-3 border rounded-xl focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                      errors.password ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    }`}
                     placeholder="Digite sua senha"
                   />
                   <button
@@ -225,9 +220,7 @@ const LoginPage: React.FC = () => {
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
-                {errors.password && (
-                  <p className="text-red-500 text-sm mt-1">{errors.password}</p>
-                )}
+                {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
               </div>
 
               {/* Remember & Forgot */}

@@ -16,7 +16,7 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
     cnpj: '',
     email: '',
     telefone: '',
-    planoSelecionado: 'Professional' as 'Starter' | 'Professional' | 'Enterprise'
+    planoSelecionado: 'Professional' as 'Starter' | 'Professional' | 'Enterprise',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -24,34 +24,40 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
   const planos = [
     {
       nome: 'Starter' as const,
-      preco: 79.90,
+      preco: 79.9,
       descricao: 'Ideal para pequenas empresas',
       features: ['Até 10 usuários', 'API básica', 'Suporte por email', 'Backup manual'],
       cor: 'green',
-      popular: false
+      popular: false,
     },
     {
       nome: 'Professional' as const,
-      preco: 199.90,
+      preco: 199.9,
       descricao: 'Para empresas em crescimento',
       features: ['Até 50 usuários', 'API completa', 'Suporte prioritário', 'Backup automático'],
       cor: 'blue',
-      popular: true
+      popular: true,
     },
     {
       nome: 'Enterprise' as const,
-      preco: 499.90,
+      preco: 499.9,
       descricao: 'Para grandes organizações',
-      features: ['Usuários ilimitados', 'API + Webhooks', 'Suporte 24/7', 'Relatórios avançados', 'White-label'],
+      features: [
+        'Usuários ilimitados',
+        'API + Webhooks',
+        'Suporte 24/7',
+        'Relatórios avançados',
+        'White-label',
+      ],
       cor: 'purple',
-      popular: false
-    }
+      popular: false,
+    },
   ];
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -88,7 +94,7 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
     try {
       setLoading(true);
 
-      const planoInfo = planos.find(p => p.nome === formData.planoSelecionado)!;
+      const planoInfo = planos.find((p) => p.nome === formData.planoSelecionado)!;
 
       await addEmpresa({
         nome: formData.nome,
@@ -98,13 +104,13 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
         plano: {
           nome: planoInfo.nome,
           preco: planoInfo.preco,
-          features: planoInfo.features
+          features: planoInfo.features,
         },
         status: 'trial',
         isActive: false,
         dataVencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 dias
         dataCriacao: new Date(),
-        ultimoAcesso: new Date()
+        ultimoAcesso: new Date(),
       });
 
       // Reset form and close modal
@@ -113,12 +119,11 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
         cnpj: '',
         email: '',
         telefone: '',
-        planoSelecionado: 'Professional'
+        planoSelecionado: 'Professional',
       });
       setStep(1);
       setErrors({});
       onClose();
-
     } catch (error) {
       console.error('Erro ao criar empresa:', error);
     } finally {
@@ -165,8 +170,12 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
 
           {/* Progress Steps */}
           <div className="flex items-center gap-2 mt-6">
-            <div className={`flex-1 h-2 rounded-full ${step >= 1 ? 'bg-[#159A9C]' : 'bg-gray-200'}`}></div>
-            <div className={`flex-1 h-2 rounded-full ${step >= 2 ? 'bg-[#159A9C]' : 'bg-gray-200'}`}></div>
+            <div
+              className={`flex-1 h-2 rounded-full ${step >= 1 ? 'bg-[#159A9C]' : 'bg-gray-200'}`}
+            ></div>
+            <div
+              className={`flex-1 h-2 rounded-full ${step >= 2 ? 'bg-[#159A9C]' : 'bg-gray-200'}`}
+            ></div>
           </div>
           <div className="flex justify-between text-xs text-gray-500 mt-2">
             <span>Informações</span>
@@ -186,9 +195,10 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
                 <input
                   type="text"
                   value={formData.nome}
-                  onChange={(e) => setFormData(prev => ({ ...prev, nome: e.target.value }))}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C]/20 focus:border-[#159A9C] ${errors.nome ? 'border-red-300' : 'border-gray-300'
-                    }`}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, nome: e.target.value }))}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C]/20 focus:border-[#159A9C] ${
+                    errors.nome ? 'border-red-300' : 'border-gray-300'
+                  }`}
                   placeholder="Ex: Minha Empresa Ltda"
                 />
                 {errors.nome && (
@@ -200,15 +210,16 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  CNPJ *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">CNPJ *</label>
                 <input
                   type="text"
                   value={formData.cnpj}
-                  onChange={(e) => setFormData(prev => ({ ...prev, cnpj: formatCNPJ(e.target.value) }))}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C]/20 focus:border-[#159A9C] ${errors.cnpj ? 'border-red-300' : 'border-gray-300'
-                    }`}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, cnpj: formatCNPJ(e.target.value) }))
+                  }
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C]/20 focus:border-[#159A9C] ${
+                    errors.cnpj ? 'border-red-300' : 'border-gray-300'
+                  }`}
                   placeholder="00.000.000/0000-00"
                   maxLength={18}
                 />
@@ -221,17 +232,16 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C]/20 focus:border-[#159A9C] ${errors.email ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
+                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C]/20 focus:border-[#159A9C] ${
+                      errors.email ? 'border-red-300' : 'border-gray-300'
+                    }`}
                     placeholder="contato@empresa.com.br"
                   />
                 </div>
@@ -244,17 +254,18 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Telefone *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Telefone *</label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="text"
                     value={formData.telefone}
-                    onChange={(e) => setFormData(prev => ({ ...prev, telefone: formatPhone(e.target.value) }))}
-                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C]/20 focus:border-[#159A9C] ${errors.telefone ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, telefone: formatPhone(e.target.value) }))
+                    }
+                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C]/20 focus:border-[#159A9C] ${
+                      errors.telefone ? 'border-red-300' : 'border-gray-300'
+                    }`}
                     placeholder="(11) 99999-9999"
                     maxLength={15}
                   />
@@ -279,11 +290,14 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
                 {planos.map((plano) => (
                   <div
                     key={plano.nome}
-                    className={`relative border-2 rounded-xl p-6 cursor-pointer transition-all ${formData.planoSelecionado === plano.nome
-                      ? 'border-[#159A9C] bg-[#159A9C]/5'
-                      : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    onClick={() => setFormData(prev => ({ ...prev, planoSelecionado: plano.nome }))}
+                    className={`relative border-2 rounded-xl p-6 cursor-pointer transition-all ${
+                      formData.planoSelecionado === plano.nome
+                        ? 'border-[#159A9C] bg-[#159A9C]/5'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() =>
+                      setFormData((prev) => ({ ...prev, planoSelecionado: plano.nome }))
+                    }
                   >
                     {plano.popular && (
                       <div className="absolute -top-3 left-6">
@@ -305,7 +319,10 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
                         <p className="text-gray-600 mb-4">{plano.descricao}</p>
                         <div className="grid grid-cols-2 gap-2">
                           {plano.features.map((feature, index) => (
-                            <div key={index} className="flex items-center gap-2 text-sm text-gray-600">
+                            <div
+                              key={index}
+                              className="flex items-center gap-2 text-sm text-gray-600"
+                            >
                               <div className="w-1.5 h-1.5 bg-[#159A9C] rounded-full"></div>
                               {feature}
                             </div>
@@ -314,10 +331,13 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
                       </div>
 
                       <div className="flex-shrink-0 ml-4">
-                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${formData.planoSelecionado === plano.nome
-                          ? 'border-[#159A9C] bg-[#159A9C]'
-                          : 'border-gray-300'
-                          }`}>
+                        <div
+                          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                            formData.planoSelecionado === plano.nome
+                              ? 'border-[#159A9C] bg-[#159A9C]'
+                              : 'border-gray-300'
+                          }`}
+                        >
                           {formData.planoSelecionado === plano.nome && (
                             <div className="w-2 h-2 bg-white rounded-full"></div>
                           )}
@@ -334,8 +354,8 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
                   <div>
                     <h4 className="font-medium text-blue-900 mb-1">Trial de 30 dias grátis</h4>
                     <p className="text-sm text-blue-700">
-                      Você pode testar todos os recursos por 30 dias sem compromisso.
-                      Nenhum cartão de crédito necessário.
+                      Você pode testar todos os recursos por 30 dias sem compromisso. Nenhum cartão
+                      de crédito necessário.
                     </p>
                   </div>
                 </div>

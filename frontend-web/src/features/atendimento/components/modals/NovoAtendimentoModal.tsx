@@ -311,11 +311,10 @@ export function NovoAtendimentoModal({ isOpen, onClose, onSucesso }: NovoAtendim
                     key={canal.id}
                     type="button"
                     onClick={() => setFormData((prev) => ({ ...prev, canalId: canal.id }))}
-                    className={`p-4 rounded-lg border-2 transition-all text-left ${
-                      formData.canalId === canal.id
+                    className={`p-4 rounded-lg border-2 transition-all text-left ${formData.canalId === canal.id
                         ? 'border-[#159A9C] bg-[#159A9C]/5'
                         : 'border-gray-200 hover:border-[#159A9C]/50'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
                       {canal.tipo === 'whatsapp' && <Phone className="h-5 w-5 text-green-600" />}
@@ -536,48 +535,47 @@ export function NovoAtendimentoModal({ isOpen, onClose, onSucesso }: NovoAtendim
           </div>
 
           {/* Prioridade */
-          <div>
-            <label className="block text-sm font-medium text-[#002333] mb-2">Prioridade</label>
-            <div className="grid grid-cols-4 gap-3">
-              {[
-                {
-                  valor: 'baixa',
-                  label: 'Baixa',
-                  cor: 'bg-gray-100 text-gray-700 border-gray-300',
-                },
-                {
-                  valor: 'media',
-                  label: 'Média',
-                  cor: 'bg-blue-100 text-blue-700 border-blue-300',
-                },
-                {
-                  valor: 'alta',
-                  label: 'Alta',
-                  cor: 'bg-orange-100 text-orange-700 border-orange-300',
-                },
-                {
-                  valor: 'urgente',
-                  label: 'Urgente',
-                  cor: 'bg-red-100 text-red-700 border-red-300',
-                },
-              ].map((prioridade) => (
-                <button
-                  key={prioridade.valor}
-                  type="button"
-                  onClick={() =>
-                    setFormData((prev) => ({ ...prev, prioridade: prioridade.valor as any }))
-                  }
-                  className={`px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium ${
-                    formData.prioridade === prioridade.valor
-                      ? prioridade.cor + ' ring-2 ring-offset-2'
-                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                  }`}
-                >
-                  {prioridade.label}
-                </button>
-              ))}
+            <div>
+              <label className="block text-sm font-medium text-[#002333] mb-2">Prioridade</label>
+              <div className="grid grid-cols-4 gap-3">
+                {[
+                  {
+                    valor: 'baixa',
+                    label: 'Baixa',
+                    cor: 'bg-gray-100 text-gray-700 border-gray-300',
+                  },
+                  {
+                    valor: 'media',
+                    label: 'Média',
+                    cor: 'bg-blue-100 text-blue-700 border-blue-300',
+                  },
+                  {
+                    valor: 'alta',
+                    label: 'Alta',
+                    cor: 'bg-orange-100 text-orange-700 border-orange-300',
+                  },
+                  {
+                    valor: 'urgente',
+                    label: 'Urgente',
+                    cor: 'bg-red-100 text-red-700 border-red-300',
+                  },
+                ].map((prioridade) => (
+                  <button
+                    key={prioridade.valor}
+                    type="button"
+                    onClick={() =>
+                      setFormData((prev) => ({ ...prev, prioridade: prioridade.valor as any }))
+                    }
+                    className={`px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium ${formData.prioridade === prioridade.valor
+                        ? prioridade.cor + ' ring-2 ring-offset-2'
+                        : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                  >
+                    {prioridade.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
           {/* Actions */}
           <div className="flex items-center gap-3 pt-4 border-t">

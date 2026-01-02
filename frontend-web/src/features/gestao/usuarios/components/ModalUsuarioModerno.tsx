@@ -20,21 +20,34 @@ import {
   EyeOff,
   UserCheck,
   UserX,
-  Building,
   AlertCircle,
-  CheckCircle,
   Info,
   UserPlus,
   Edit3,
   Lock,
-  Globe,
-  Calendar,
-  Badge
+  Badge,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { Usuario, NovoUsuario, AtualizarUsuario, UserRole, ROLE_LABELS } from '../../../../types/usuarios/index';
+import {
+  Usuario,
+  NovoUsuario,
+  AtualizarUsuario,
+  UserRole,
+  ROLE_LABELS,
+} from '../../../../types/usuarios/index';
 import { useConfirmation } from '../../../../hooks/useConfirmation';
 import { ConfirmationModal } from '../../../../components/common/ConfirmationModal';
+import { getErrorMessage } from '../../../../utils/errorHandling';
+
+const ROLE_OPTIONS = Object.entries(ROLE_LABELS).filter(([value]) => value !== UserRole.SUPERADMIN);
+
+type AtualizarUsuarioComSenha = AtualizarUsuario & { senha?: string };
+
+type PasswordStrength = {
+  strength: number;
+  label: string;
+  color: string;
+};
 
 // Funções utilitárias para formatação de telefone
 const formatarTelefone = (value: string): string => {
@@ -68,33 +81,73 @@ const validarTelefone = (telefone: string): boolean => {
   // Verifica DDD válido (códigos de área brasileiros)
   const ddd = parseInt(numeros.slice(0, 2));
   const dddsValidos = [
-    11, 12, 13, 14, 15, 16, 17, 18, 19, // SP
-    21, 22, 24, // RJ/ES
-    27, 28, // ES
-    31, 32, 33, 34, 35, 37, 38, // MG
-    41, 42, 43, 44, 45, 46, // PR
-    47, 48, 49, // SC
-    51, 53, 54, 55, // RS
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19, // SP
+    21,
+    22,
+    24, // RJ/ES
+    27,
+    28, // ES
+    31,
+    32,
+    33,
+    34,
+    35,
+    37,
+    38, // MG
+    41,
+    42,
+    43,
+    44,
+    45,
+    46, // PR
+    47,
+    48,
+    49, // SC
+    51,
+    53,
+    54,
+    55, // RS
     61, // DF/GO
-    62, 64, // GO/TO
+    62,
+    64, // GO/TO
     63, // TO
-    65, 66, // MT
+    65,
+    66, // MT
     67, // MS
     68, // AC
     69, // RO
-    71, 73, 74, 75, 77, // BA
+    71,
+    73,
+    74,
+    75,
+    77, // BA
     79, // SE
-    81, 87, // PE
+    81,
+    87, // PE
     82, // AL
     83, // PB
     84, // RN
-    85, 88, // CE
-    86, 89, // PI
-    91, 93, 94, // PA
-    92, 97, // AM
+    85,
+    88, // CE
+    86,
+    89, // PI
+    91,
+    93,
+    94, // PA
+    92,
+    97, // AM
     95, // RR
     96, // AP
-    98, 99 // MA
+    98,
+    99, // MA
   ];
 
   if (!dddsValidos.includes(ddd)) {
@@ -111,45 +164,58 @@ const validarTelefone = (telefone: string): boolean => {
 
 // Schema de validação aprimorado
 const schemaBase = {
-  nome: yup.string()
+  nome: yup
+    .string()
     .required('Nome é obrigatório')
     .min(2, 'Nome deve ter pelo menos 2 caracteres')
     .max(100, 'Nome deve ter no máximo 100 caracteres')
     .matches(/^[a-zA-ZÀ-ÿ\s]+$/, 'Nome deve conter apenas letras e espaços'),
 
-  email: yup.string()
+  email: yup
+    .string()
     .required('Email é obrigatório')
     .email('Email deve ter um formato válido')
     .max(255, 'Email deve ter no máximo 255 caracteres'),
 
-  telefone: yup.string()
+  telefone: yup
+    .string()
     .nullable()
-    .transform(value => value || null)
-    .test('telefone-valido', 'Telefone deve ter um formato válido (10 ou 11 dígitos com DDD válido)', function (value) {
-      return validarTelefone(value || '');
-    }),
+    .transform((value) => value || null)
+    .test(
+      'telefone-valido',
+      'Telefone deve ter um formato válido (10 ou 11 dígitos com DDD válido)',
+      function (value) {
+        return validarTelefone(value || '');
+      },
+    ),
 
-  role: yup.string()
+  role: yup
+    .string()
     .required('Perfil é obrigatório')
     .oneOf(Object.values(UserRole), 'Perfil inválido'),
 
-  ativo: yup.boolean().required()
+  ativo: yup.boolean().required(),
 };
 
 const schemaNovo = yup.object().shape({
   ...schemaBase,
-  senha: yup.string()
+  senha: yup
+    .string()
     .required('Senha é obrigatória')
     .min(6, 'Senha deve ter pelo menos 6 caracteres')
     .max(50, 'Senha deve ter no máximo 50 caracteres')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Senha deve conter pelo menos: 1 letra minúscula, 1 maiúscula e 1 número')
+    .matches(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+      'Senha deve conter pelo menos: 1 letra minúscula, 1 maiúscula e 1 número',
+    ),
 });
 
 const schemaEdicao = yup.object().shape({
   ...schemaBase,
-  senha: yup.string()
+  senha: yup
+    .string()
     .nullable()
-    .transform(value => value || null)
+    .transform((value) => value || null)
     .test('senha-opcional', 'Senha deve ter pelo menos 6 caracteres', function (value) {
       if (!value) return true; // Se não há valor, é válido (campo opcional)
       return value.length >= 6;
@@ -158,10 +224,14 @@ const schemaEdicao = yup.object().shape({
       if (!value) return true;
       return value.length <= 50;
     })
-    .test('senha-formato', 'Senha deve conter pelo menos: 1 letra minúscula, 1 maiúscula e 1 número', function (value) {
-      if (!value) return true;
-      return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(value);
-    })
+    .test(
+      'senha-formato',
+      'Senha deve conter pelo menos: 1 letra minúscula, 1 maiúscula e 1 número',
+      function (value) {
+        if (!value) return true;
+        return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(value);
+      },
+    ),
 });
 
 interface ModalUsuarioModernoProps {
@@ -182,10 +252,11 @@ interface FormData {
 }
 
 const roleIcons = {
+  [UserRole.SUPERADMIN]: <Shield className="w-4 h-4" />,
   [UserRole.ADMIN]: <Badge className="w-4 h-4" />,
   [UserRole.MANAGER]: <UserCheck className="w-4 h-4" />,
   [UserRole.VENDEDOR]: <User className="w-4 h-4" />,
-  [UserRole.USER]: <User className="w-4 h-4" />
+  [UserRole.USER]: <User className="w-4 h-4" />,
 };
 
 export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
@@ -193,7 +264,7 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  onSubmit
+  onSubmit,
 }) => {
   // Hooks
   const isEdit = !!usuario;
@@ -204,6 +275,7 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
   // Importa o contexto de autenticação
   // @ts-ignore
   const { user } = require('../../../../hooks/useAuth').useAuth();
+  const empresaId = user?.empresa?.id ?? '';
 
   // Configuração do form
   const {
@@ -211,7 +283,7 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
     handleSubmit,
     reset,
     watch,
-    formState: { errors, isValid, isDirty }
+    formState: { errors, isValid, isDirty },
   } = useForm<FormData>({
     resolver: yupResolver(isEdit ? schemaEdicao : schemaNovo),
     mode: 'onChange',
@@ -221,12 +293,12 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
       senha: '',
       telefone: '',
       role: UserRole.USER,
-      ativo: true
-    }
+      ativo: true,
+    },
   });
 
   // Watch para validação em tempo real
-  const watchedSenha = watch('senha');
+  const watchedSenha = watch('senha') || '';
   const watchedRole = watch('role');
 
   // Reset form quando modal abre/fecha ou usuário muda
@@ -239,7 +311,7 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
           senha: '',
           telefone: usuario.telefone || '',
           role: usuario.role,
-          ativo: usuario.ativo
+          ativo: usuario.ativo,
         });
       } else {
         reset({
@@ -248,7 +320,7 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
           senha: '',
           telefone: '',
           role: UserRole.USER,
-          ativo: true
+          ativo: true,
         });
       }
       setShowSenha(false);
@@ -256,18 +328,19 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
   }, [isOpen, usuario, reset]);
 
   // Função para fechar modal com confirmação se houver mudanças
-  const handleClose = useCallback(() => {
+  const handleClose = useCallback((): void => {
     if (isDirty) {
       showConfirmation({
         title: 'Descartar alterações?',
-        message: 'Existem alterações não salvas no formulário. Se você fechar agora, todas as informações digitadas serão perdidas. Tem certeza que deseja continuar?',
+        message:
+          'Existem alterações não salvas no formulário. Se você fechar agora, todas as informações digitadas serão perdidas. Tem certeza que deseja continuar?',
         confirmText: 'Descartar alterações',
         cancelText: 'Continuar editando',
         icon: 'warning',
         confirmButtonClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
         onConfirm: () => {
           onClose();
-        }
+        },
       });
     } else {
       onClose();
@@ -278,7 +351,7 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
       // ESC para fechar
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -294,58 +367,70 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, handleClose, handleSubmit]);
+  }, [isOpen, handleClose, handleSubmit, onFormSubmit]);
 
   // Submit do formulário
-  const onFormSubmit = async (data: FormData) => {
-    if (!isValid || isSubmitting) return;
+  const onFormSubmit = useCallback(
+    async (data: FormData): Promise<void> => {
+      if (!isValid || isSubmitting) {
+        return;
+      }
 
-    setIsSubmitting(true);
+      if (isEdit && !usuario) {
+        toast.error('Usuário não encontrado para edição.');
+        return;
+      }
 
-    try {
-      let dados: NovoUsuario | AtualizarUsuario;
+      setIsSubmitting(true);
 
-      if (isEdit) {
-        dados = {
-          id: usuario!.id,
-          nome: data.nome?.trim() || '',
-          email: data.email?.trim().toLowerCase() || '',
-          telefone: data.telefone?.trim() || undefined,
-          role: data.role,
-          ativo: data.ativo
-        };
+      try {
+        let dados: NovoUsuario | AtualizarUsuarioComSenha;
 
-        // Adiciona senha apenas se foi preenchida
-        if (data.senha && data.senha.trim()) {
-          (dados as any).senha = data.senha.trim();
+        if (isEdit && usuario) {
+          const payload: AtualizarUsuarioComSenha = {
+            id: usuario.id,
+            nome: data.nome?.trim() || '',
+            email: data.email?.trim().toLowerCase() || '',
+            telefone: data.telefone?.trim() || undefined,
+            role: data.role,
+            ativo: data.ativo,
+          };
+
+          if (data.senha && data.senha.trim()) {
+            payload.senha = data.senha.trim();
+          }
+
+          dados = payload;
+        } else {
+          dados = {
+            nome: data.nome?.trim() || '',
+            email: data.email?.trim().toLowerCase() || '',
+            senha: data.senha || '',
+            telefone: data.telefone?.trim() || undefined,
+            role: data.role,
+            empresa_id: empresaId,
+            ativo: data.ativo,
+          };
         }
-      } else {
-        dados = {
-          nome: data.nome?.trim() || '',
-          email: data.email?.trim().toLowerCase() || '',
-          senha: data.senha || '',
-          telefone: data.telefone?.trim() || undefined,
-          role: data.role,
-          empresa_id: user?.empresa?.id || '',
-          ativo: data.ativo
-        };
-      }
 
-      const resultado = await onSubmit(dados);
-      if (resultado) {
-        toast.success(isEdit ? 'Usuário atualizado com sucesso!' : 'Usuário criado com sucesso!');
-        onSuccess();
+        const resultado = await onSubmit(dados);
+        if (resultado) {
+          toast.success(isEdit ? 'Usuário atualizado com sucesso!' : 'Usuário criado com sucesso!');
+          onSuccess();
+        }
+      } catch (err) {
+        const mensagem = getErrorMessage(err, 'Erro ao salvar usuário');
+        console.error('Erro ao salvar usuário:', err);
+        toast.error(mensagem);
+      } finally {
+        setIsSubmitting(false);
       }
-    } catch (error: any) {
-      console.error('Erro ao salvar usuário:', error);
-      toast.error(error.message || 'Erro ao salvar usuário');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    },
+    [empresaId, isEdit, isSubmitting, isValid, onSubmit, onSuccess, usuario],
+  );
 
   // Função para avaliar força da senha
-  const getPasswordStrength = (password: string) => {
+  const getPasswordStrength = (password: string): PasswordStrength => {
     if (!password) return { strength: 0, label: '', color: '' };
 
     let strength = 0;
@@ -390,20 +475,25 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
 
         {/* Modal Container - Paisagem */}
         <div className="inline-block w-[calc(100%-2rem)] sm:w-[700px] md:w-[800px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] bg-white rounded-2xl shadow-2xl transform transition-all align-middle">
-
           {/* Header */}
           <div className="bg-gradient-to-r from-[#159A9C] to-[#0f7b7d] px-8 py-6 rounded-t-2xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-white bg-opacity-20 rounded-xl">
-                  {isEdit ? <Edit3 className="w-6 h-6 text-white" /> : <UserPlus className="w-6 h-6 text-white" />}
+                  {isEdit ? (
+                    <Edit3 className="w-6 h-6 text-white" />
+                  ) : (
+                    <UserPlus className="w-6 h-6 text-white" />
+                  )}
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-white">
                     {isEdit ? 'Editar Usuário' : 'Novo Usuário'}
                   </h3>
                   <p className="text-[#a8e6e7] text-sm">
-                    {isEdit ? 'Atualize as informações do usuário' : 'Adicione um novo membro à equipe'}
+                    {isEdit
+                      ? 'Atualize as informações do usuário'
+                      : 'Adicione um novo membro à equipe'}
                   </p>
                 </div>
               </div>
@@ -419,10 +509,8 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
 
           {/* Content */}
           <form onSubmit={handleSubmit(onFormSubmit)} className="p-8">
-
             {/* Grid Layout - 2 colunas */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
               {/* Coluna Esquerda - Informações Básicas */}
               <div className="space-y-6">
                 <div className="flex items-center space-x-2 pb-3 border-b border-gray-200">
@@ -445,10 +533,11 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                           {...field}
                           type="text"
                           placeholder="Digite o nome completo"
-                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 ${errors.nome
+                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 ${
+                            errors.nome
                               ? 'border-red-300 bg-red-50'
                               : 'border-gray-200 hover:border-gray-300'
-                            }`}
+                          }`}
                         />
                       </div>
                     )}
@@ -463,9 +552,7 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
 
                 {/* Email */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-800 mb-2">
-                    Email *
-                  </label>
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">Email *</label>
                   <Controller
                     name="email"
                     control={control}
@@ -476,10 +563,11 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                           {...field}
                           type="email"
                           placeholder="usuario@empresa.com"
-                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 ${errors.email
+                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 ${
+                            errors.email
                               ? 'border-red-300 bg-red-50'
                               : 'border-gray-200 hover:border-gray-300'
-                            }`}
+                          }`}
                         />
                       </div>
                     )}
@@ -514,10 +602,11 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                           }}
                           placeholder="(11) 99999-9999"
                           maxLength={15}
-                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 ${errors.telefone
+                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 ${
+                            errors.telefone
                               ? 'border-red-300 bg-red-50'
                               : 'border-gray-200 hover:border-gray-300'
-                            }`}
+                          }`}
                         />
                       </div>
                     )}
@@ -558,12 +647,15 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                         <input
                           {...field}
                           type={showSenha ? 'text' : 'password'}
-                          placeholder={isEdit ? 'Digite uma nova senha (opcional)' : 'Digite uma senha segura'}
+                          placeholder={
+                            isEdit ? 'Digite uma nova senha (opcional)' : 'Digite uma senha segura'
+                          }
                           autoComplete="new-password"
-                          className={`w-full pl-12 pr-12 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 ${errors.senha
+                          className={`w-full pl-12 pr-12 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 ${
+                            errors.senha
                               ? 'border-red-300 bg-red-50'
                               : 'border-gray-200 hover:border-gray-300'
-                            }`}
+                          }`}
                         />
                         <button
                           type="button"
@@ -587,9 +679,13 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
-                          className={`h-2 rounded-full transition-all duration-300 ${passwordStrength.strength <= 2 ? 'bg-red-500' :
-                              passwordStrength.strength <= 4 ? 'bg-yellow-500' : 'bg-green-500'
-                            }`}
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            passwordStrength.strength <= 2
+                              ? 'bg-red-500'
+                              : passwordStrength.strength <= 4
+                                ? 'bg-yellow-500'
+                                : 'bg-green-500'
+                          }`}
                           style={{ width: `${(passwordStrength.strength / 6) * 100}%` }}
                         />
                       </div>
@@ -620,12 +716,18 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                         <Shield className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                         <select
                           {...field}
-                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 appearance-none bg-white ${errors.role
+                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-[#159A9C] focus:ring-opacity-20 focus:border-[#159A9C] transition-all duration-200 appearance-none bg-white ${
+                            errors.role
                               ? 'border-red-300 bg-red-50'
                               : 'border-gray-200 hover:border-gray-300'
-                            }`}
+                          }`}
                         >
-                          {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                          {usuario?.role === UserRole.SUPERADMIN && (
+                            <option value={UserRole.SUPERADMIN}>
+                              {ROLE_LABELS[UserRole.SUPERADMIN]}
+                            </option>
+                          )}
+                          {ROLE_OPTIONS.map(([value, label]) => (
                             <option key={value} value={value}>
                               {label}
                             </option>
@@ -650,10 +752,16 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                       </span>
                     </div>
                     <p className="text-xs text-gray-600">
-                      {watchedRole === UserRole.ADMIN && 'Acesso total ao sistema, incluindo configurações e gestão de usuários.'}
-                      {watchedRole === UserRole.MANAGER && 'Acesso de gerenciamento com permissões avançadas para relatórios e equipes.'}
-                      {watchedRole === UserRole.VENDEDOR && 'Acesso focado em vendas com permissões para clientes e oportunidades.'}
-                      {watchedRole === UserRole.USER && 'Acesso padrão às funcionalidades principais do sistema.'}
+                      {watchedRole === UserRole.SUPERADMIN &&
+                        'Acesso irrestrito à plataforma, incluindo ferramentas de provisionamento, auditoria e segurança crítica.'}
+                      {watchedRole === UserRole.ADMIN &&
+                        'Acesso total ao sistema, incluindo configurações e gestão de usuários.'}
+                      {watchedRole === UserRole.MANAGER &&
+                        'Acesso de gerenciamento com permissões avançadas para relatórios e equipes.'}
+                      {watchedRole === UserRole.VENDEDOR &&
+                        'Acesso focado em vendas com permissões para clientes e oportunidades.'}
+                      {watchedRole === UserRole.USER &&
+                        'Acesso padrão às funcionalidades principais do sistema.'}
                     </p>
                   </div>
                 </div>
@@ -680,23 +788,31 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                           />
                           <div
                             onClick={() => onChange(!value)}
-                            className={`w-12 h-6 rounded-full cursor-pointer flex items-center transition-colors duration-200 ${value ? 'bg-[#159A9C]' : 'bg-gray-300'
-                              }`}
+                            className={`w-12 h-6 rounded-full cursor-pointer flex items-center transition-colors duration-200 ${
+                              value ? 'bg-[#159A9C]' : 'bg-gray-300'
+                            }`}
                           >
-                            <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-200 ${value ? 'translate-x-6' : 'translate-x-1'
-                              }`} />
+                            <div
+                              className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
+                                value ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
                           {value ? (
                             <>
                               <UserCheck className="w-5 h-5 text-green-500" />
-                              <span className="text-sm font-medium text-green-700">Usuário ativo</span>
+                              <span className="text-sm font-medium text-green-700">
+                                Usuário ativo
+                              </span>
                             </>
                           ) : (
                             <>
                               <UserX className="w-5 h-5 text-red-500" />
-                              <span className="text-sm font-medium text-red-700">Usuário inativo</span>
+                              <span className="text-sm font-medium text-red-700">
+                                Usuário inativo
+                              </span>
                             </>
                           )}
                         </div>
@@ -706,8 +822,7 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
                   <p className="mt-2 text-xs text-gray-500">
                     {watch('ativo')
                       ? 'O usuário poderá fazer login e acessar o sistema normalmente.'
-                      : 'O usuário não poderá fazer login até que seja reativado.'
-                    }
+                      : 'O usuário não poderá fazer login até que seja reativado.'}
                   </p>
                 </div>
               </div>

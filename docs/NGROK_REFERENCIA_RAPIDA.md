@@ -89,8 +89,9 @@ Invoke-RestMethod http://127.0.0.1:4040/api/tunnels
 
 ### WhatsApp (Meta Developers)
 ```
-URL: https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp
+URL: https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
 Verify Token: conectcrm_webhook_token_123
+Header: X-Hub-Signature-256 (HMAC SHA256 com o App Secret)
 ```
 
 **Configurar em:** https://developers.facebook.com/apps
@@ -120,8 +121,9 @@ curl https://SEU_DOMINIO.ngrok-free.app/api/health
 
 ### WhatsApp Webhook
 ```powershell
-curl -X POST https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp `
+curl -X POST https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA> `
   -H "Content-Type: application/json" `
+  -H "X-Hub-Signature-256: sha256=<HMAC_GERADO>" `
   -d '{"entry":[{"changes":[{"value":{"messages":[{"from":"5511999999999","text":{"body":"Teste"}}]}}]}]}'
 ```
 

@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Brain, Target, AlertTriangle, DollarSign, Calendar, Users, Zap } from 'lucide-react';
+import {
+  TrendingUp,
+  TrendingDown,
+  Brain,
+  Target,
+  AlertTriangle,
+  DollarSign,
+  Calendar,
+  Users,
+  Zap,
+} from 'lucide-react';
 import { Fatura, StatusFatura } from '../../services/faturamentoService';
 import { formatarValorCompletoBRL, converterParaNumero } from '../../utils/formatacao';
 
@@ -47,15 +57,17 @@ export default function DashboardIA({ faturas, onExecutarAcao }: DashboardIAProp
     setCarregandoIA(true);
 
     // Simula processamento de ML
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    const faturasPagas = faturas.filter(f => f.status === StatusFatura.PAGA);
-    const faturasVencidas = faturas.filter(f => {
+    const faturasPagas = faturas.filter((f) => f.status === StatusFatura.PAGA);
+    const faturasVencidas = faturas.filter((f) => {
       const dataVencimento = new Date(f.dataVencimento);
       return dataVencimento < new Date() && f.status !== StatusFatura.PAGA;
     });
 
-    const faturamentoMedio = faturasPagas.reduce((acc, f) => acc + converterParaNumero(f.valorTotal), 0) / Math.max(faturasPagas.length, 1);
+    const faturamentoMedio =
+      faturasPagas.reduce((acc, f) => acc + converterParaNumero(f.valorTotal), 0) /
+      Math.max(faturasPagas.length, 1);
     const taxaInadimplencia = (faturasVencidas.length / Math.max(faturas.length, 1)) * 100;
 
     // Simula previsões baseadas em padrões históricos
@@ -63,7 +75,7 @@ export default function DashboardIA({ faturas, onExecutarAcao }: DashboardIAProp
       proximoMes: {
         faturamentoEstimado: faturamentoMedio * faturas.length * 1.15, // Crescimento de 15%
         confianca: 85,
-        tendencia: faturamentoMedio > 50000 ? 'alta' : 'estavel'
+        tendencia: faturamentoMedio > 50000 ? 'alta' : 'estavel',
       },
       inadimplencia: {
         riscoPorcentagem: taxaInadimplencia,
@@ -71,14 +83,14 @@ export default function DashboardIA({ faturas, onExecutarAcao }: DashboardIAProp
         acoesSugeridas: [
           'Enviar cobrança personalizada para clientes com maior valor em atraso',
           'Ofertar desconto de 5% para pagamento à vista',
-          'Implementar parcelamento para valores acima de R$ 1.000'
-        ]
+          'Implementar parcelamento para valores acima de R$ 1.000',
+        ],
       },
       oportunidades: {
         melhorDiaCobranca: 15, // Dia do mês com maior taxa de conversão
         clientesPropensos: ['Empresa ABC', 'Tech Solutions', 'Marketing Pro'],
-        valorPotencial: faturamentoMedio * 2.3
-      }
+        valorPotencial: faturamentoMedio * 2.3,
+      },
     };
 
     setPrevisoes(previsao);
@@ -92,7 +104,7 @@ export default function DashboardIA({ faturas, onExecutarAcao }: DashboardIAProp
         descricao: `${faturasVencidas.length} faturas vencidas representam ${taxaInadimplencia.toFixed(1)}% do total`,
         acao: 'executar_cobranca_automatica',
         impacto: faturasVencidas.reduce((acc, f) => acc + converterParaNumero(f.valorTotal), 0),
-        prioridade: 1
+        prioridade: 1,
       },
       {
         id: '2',
@@ -101,7 +113,7 @@ export default function DashboardIA({ faturas, onExecutarAcao }: DashboardIAProp
         descricao: '3 clientes têm potencial para upgrade de plano',
         acao: 'enviar_proposta_upgrade',
         impacto: 15000,
-        prioridade: 2
+        prioridade: 2,
       },
       {
         id: '3',
@@ -110,8 +122,8 @@ export default function DashboardIA({ faturas, onExecutarAcao }: DashboardIAProp
         descricao: 'Faturamento tende a cair 20% no próximo mês',
         acao: 'campanha_promocional',
         impacto: faturamentoMedio * 0.2,
-        prioridade: 2
-      }
+        prioridade: 2,
+      },
     ];
 
     setAlertas(novosAlertas);
@@ -126,19 +138,27 @@ export default function DashboardIA({ faturas, onExecutarAcao }: DashboardIAProp
 
   const getCorAlerta = (tipo: string) => {
     switch (tipo) {
-      case 'critico': return 'border-red-500 bg-red-50';
-      case 'atencao': return 'border-yellow-500 bg-yellow-50';
-      case 'oportunidade': return 'border-green-500 bg-green-50';
-      default: return 'border-gray-300 bg-gray-50';
+      case 'critico':
+        return 'border-red-500 bg-red-50';
+      case 'atencao':
+        return 'border-yellow-500 bg-yellow-50';
+      case 'oportunidade':
+        return 'border-green-500 bg-green-50';
+      default:
+        return 'border-gray-300 bg-gray-50';
     }
   };
 
   const getIconeAlerta = (tipo: string) => {
     switch (tipo) {
-      case 'critico': return <AlertTriangle className="w-5 h-5 text-red-600" />;
-      case 'atencao': return <Calendar className="w-5 h-5 text-yellow-600" />;
-      case 'oportunidade': return <Target className="w-5 h-5 text-green-600" />;
-      default: return <Brain className="w-5 h-5 text-gray-600" />;
+      case 'critico':
+        return <AlertTriangle className="w-5 h-5 text-red-600" />;
+      case 'atencao':
+        return <Calendar className="w-5 h-5 text-yellow-600" />;
+      case 'oportunidade':
+        return <Target className="w-5 h-5 text-green-600" />;
+      default:
+        return <Brain className="w-5 h-5 text-gray-600" />;
     }
   };
 
@@ -155,7 +175,10 @@ export default function DashboardIA({ faturas, onExecutarAcao }: DashboardIAProp
           <h3 className="text-lg font-medium text-gray-900 mb-2">IA Analisando Dados</h3>
           <p className="text-gray-600">Processando padrões e gerando insights inteligentes...</p>
           <div className="mt-4 bg-gray-200 rounded-full h-2">
-            <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: '70%' }}></div>
+            <div
+              className="bg-blue-600 h-2 rounded-full animate-pulse"
+              style={{ width: '70%' }}
+            ></div>
           </div>
         </div>
       </div>
@@ -177,8 +200,9 @@ export default function DashboardIA({ faturas, onExecutarAcao }: DashboardIAProp
           <div className="flex items-center gap-3">
             <button
               onClick={() => setModoAvancado(!modoAvancado)}
-              className={`px-4 py-2 rounded-lg transition-colors ${modoAvancado ? 'bg-white text-blue-600' : 'bg-blue-700 text-white'
-                }`}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                modoAvancado ? 'bg-white text-blue-600' : 'bg-blue-700 text-white'
+              }`}
             >
               {modoAvancado ? 'Modo Simples' : 'Modo Avançado'}
             </button>
@@ -204,7 +228,9 @@ export default function DashboardIA({ faturas, onExecutarAcao }: DashboardIAProp
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Previsão Próximo Mês</h3>
-                <p className="text-sm text-gray-600">Confiança: {previsoes.proximoMes.confianca}%</p>
+                <p className="text-sm text-gray-600">
+                  Confiança: {previsoes.proximoMes.confianca}%
+                </p>
               </div>
             </div>
             <div className="text-2xl font-bold text-green-600 mb-2">
@@ -216,7 +242,9 @@ export default function DashboardIA({ faturas, onExecutarAcao }: DashboardIAProp
               ) : (
                 <TrendingDown className="w-4 h-4 text-red-500" />
               )}
-              <span className={`text-sm ${previsoes.proximoMes.tendencia === 'alta' ? 'text-green-600' : 'text-red-600'}`}>
+              <span
+                className={`text-sm ${previsoes.proximoMes.tendencia === 'alta' ? 'text-green-600' : 'text-red-600'}`}
+              >
                 Tendência {previsoes.proximoMes.tendencia}
               </span>
             </div>
@@ -230,7 +258,9 @@ export default function DashboardIA({ faturas, onExecutarAcao }: DashboardIAProp
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Risco de Inadimplência</h3>
-                <p className="text-sm text-gray-600">{previsoes.inadimplencia.faturas.length} faturas em risco</p>
+                <p className="text-sm text-gray-600">
+                  {previsoes.inadimplencia.faturas.length} faturas em risco
+                </p>
               </div>
             </div>
             <div className="text-2xl font-bold text-red-600 mb-2">
@@ -259,7 +289,8 @@ export default function DashboardIA({ faturas, onExecutarAcao }: DashboardIAProp
               {formatarValorCompletoBRL(previsoes.oportunidades.valorPotencial)}
             </div>
             <div className="text-sm text-gray-600">
-              Melhor dia para cobrança: <span className="font-semibold">{previsoes.oportunidades.melhorDiaCobranca}</span>
+              Melhor dia para cobrança:{' '}
+              <span className="font-semibold">{previsoes.oportunidades.melhorDiaCobranca}</span>
             </div>
           </div>
         </div>
@@ -273,7 +304,7 @@ export default function DashboardIA({ faturas, onExecutarAcao }: DashboardIAProp
         </div>
 
         <div className="space-y-4">
-          {alertas.map(alerta => (
+          {alertas.map((alerta) => (
             <div
               key={alerta.id}
               className={`border-l-4 rounded-lg p-4 ${getCorAlerta(alerta.tipo)}`}
@@ -292,12 +323,13 @@ export default function DashboardIA({ faturas, onExecutarAcao }: DashboardIAProp
                 </div>
                 <button
                   onClick={() => onExecutarAcao(alerta.acao, { alertaId: alerta.id })}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${alerta.tipo === 'critico'
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    alerta.tipo === 'critico'
                       ? 'bg-red-600 text-white hover:bg-red-700'
                       : alerta.tipo === 'oportunidade'
                         ? 'bg-green-600 text-white hover:bg-green-700'
                         : 'bg-yellow-600 text-white hover:bg-yellow-700'
-                    }`}
+                  }`}
                 >
                   Executar Ação
                 </button>
@@ -336,7 +368,10 @@ export default function DashboardIA({ faturas, onExecutarAcao }: DashboardIAProp
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Clientes Estratégicos</h3>
             <div className="space-y-3">
               {previsoes.oportunidades.clientesPropensos.map((cliente, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 border rounded-lg"
+                >
                   <div className="flex items-center gap-3">
                     <Users className="w-5 h-5 text-blue-600" />
                     <span className="font-medium text-gray-900">{cliente}</span>

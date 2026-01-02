@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Usuario } from '../../../../types/usuarios/index';
 import { X, Key, Copy, Eye, EyeOff, AlertTriangle, CheckCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { getErrorMessage } from '../../../../utils/errorHandling';
 
 interface ModalResetSenhaProps {
   usuario: Usuario;
@@ -14,36 +15,42 @@ export const ModalResetSenha: React.FC<ModalResetSenhaProps> = ({
   usuario,
   isOpen,
   onClose,
-  onReset
+  onReset,
 }) => {
   const [novaSenha, setNovaSenha] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   const [showSenha, setShowSenha] = useState(false);
 
-  const handleReset = async () => {
+  const handleReset = async (): Promise<void> => {
     setIsResetting(true);
     try {
       const senha = await onReset(usuario.id);
       if (senha) {
         setNovaSenha(senha);
       }
+    } catch (err) {
+      const mensagem = getErrorMessage(err, 'Erro ao resetar senha');
+      console.error('Erro ao resetar senha do usuário:', err);
+      toast.error(mensagem);
     } finally {
       setIsResetting(false);
     }
   };
 
-  const handleCopiarSenha = async () => {
+  const handleCopiarSenha = async (): Promise<void> => {
     if (novaSenha) {
       try {
         await navigator.clipboard.writeText(novaSenha);
         toast.success('Senha copiada para a área de transferência!');
-      } catch (error) {
-        toast.error('Erro ao copiar senha');
+      } catch (err) {
+        const mensagem = getErrorMessage(err, 'Erro ao copiar senha');
+        console.error('Erro ao copiar senha temporária:', err);
+        toast.error(mensagem);
       }
     }
   };
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     setNovaSenha(null);
     setShowSenha(false);
     onClose();
@@ -54,15 +61,16 @@ export const ModalResetSenha: React.FC<ModalResetSenhaProps> = ({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={handleClose} />
+        <div
+          className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+          onClick={handleClose}
+        />
 
         <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full sm:p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-2">
               <Key className="w-6 h-6 text-[#159A9C]" />
-              <h3 className="text-lg font-semibold text-gray-900">
-                Resetar Senha
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900">Resetar Senha</h3>
             </div>
             <button
               onClick={handleClose}
@@ -92,12 +100,8 @@ export const ModalResetSenha: React.FC<ModalResetSenhaProps> = ({
                   )}
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-gray-900">
-                    {usuario.nome}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {usuario.email}
-                  </div>
+                  <div className="text-sm font-medium text-gray-900">{usuario.nome}</div>
+                  <div className="text-sm text-gray-500">{usuario.email}</div>
                 </div>
               </div>
             </div>
@@ -109,11 +113,10 @@ export const ModalResetSenha: React.FC<ModalResetSenhaProps> = ({
                   <div className="flex">
                     <AlertTriangle className="w-5 h-5 text-yellow-400" />
                     <div className="ml-3">
-                      <h3 className="text-sm font-medium text-yellow-800">
-                        Atenção
-                      </h3>
+                      <h3 className="text-sm font-medium text-yellow-800">Atenção</h3>
                       <p className="mt-1 text-sm text-yellow-700">
-                        Uma nova senha será gerada automaticamente. O usuário deverá usar essa nova senha no próximo login.
+                        Uma nova senha será gerada automaticamente. O usuário deverá usar essa nova
+                        senha no próximo login.
                       </p>
                     </div>
                   </div>
@@ -162,9 +165,7 @@ export const ModalResetSenha: React.FC<ModalResetSenhaProps> = ({
 
                 {/* Nova senha */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nova Senha
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Nova Senha</label>
                   <div className="flex items-center space-x-2">
                     <div className="flex-1 relative">
                       <input

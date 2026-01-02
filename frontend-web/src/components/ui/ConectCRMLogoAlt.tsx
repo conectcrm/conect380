@@ -11,13 +11,13 @@ export const ConectCRMLogoAlt: React.FC<ConectCRMLogoAltProps> = ({
   className = '',
   size = 'md',
   variant = 'full',
-  highContrast = false
+  highContrast = false,
 }) => {
   const sizeClasses = {
     sm: { container: 'h-8', icon: 'w-8 h-8', text: 'text-lg' },
     md: { container: 'h-10', icon: 'w-10 h-10', text: 'text-xl' },
     lg: { container: 'h-12', icon: 'w-12 h-12', text: 'text-2xl' },
-    xl: { container: 'h-16', icon: 'w-16 h-16', text: 'text-3xl' }
+    xl: { container: 'h-16', icon: 'w-16 h-16', text: 'text-3xl' },
   };
 
   const sizes = sizeClasses[size];
@@ -41,12 +41,7 @@ export const ConectCRMLogoAlt: React.FC<ConectCRMLogoAltProps> = ({
               stroke="#1E293B"
               strokeWidth="2"
             />
-            <path
-              d="M8 8C8 8 12 6 16 8"
-              stroke="#0066CC"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
+            <path d="M8 8C8 8 12 6 16 8" stroke="#0066CC" strokeWidth="2" strokeLinecap="round" />
             <path
               d="M8 16C8 16 12 18 16 16"
               stroke="#0066CC"
@@ -65,19 +60,14 @@ export const ConectCRMLogoAlt: React.FC<ConectCRMLogoAltProps> = ({
   const ConectIcon = () => (
     <div className={`${sizes.icon} relative flex items-center justify-center`}>
       <div className="relative w-full h-full bg-gradient-to-br from-white to-gray-50 rounded-full shadow-md border border-gray-200 flex items-center justify-center">
-        <svg
-          viewBox="0 0 24 24"
-          className="w-5 h-5"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
+        <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <linearGradient id="connectGradient" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#1E293B" />
               <stop offset="100%" stopColor="#334155" />
             </linearGradient>
           </defs>
-          
+
           {/* Conexões dinâmicas */}
           <path
             d="M6 9L12 6L18 9"
@@ -113,8 +103,7 @@ export const ConectCRMLogoAlt: React.FC<ConectCRMLogoAltProps> = ({
     return (
       <div className={`${className} flex items-center`}>
         <span className={`font-bold ${sizes.text}`}>
-          <span className="text-gray-900">Conect</span>{' '}
-          <span className="text-gray-700">CRM</span>
+          <span className="text-gray-900">Conect</span> <span className="text-gray-700">CRM</span>
         </span>
       </div>
     );
@@ -124,8 +113,7 @@ export const ConectCRMLogoAlt: React.FC<ConectCRMLogoAltProps> = ({
     <div className={`${className} ${sizes.container} flex items-center gap-3`}>
       {highContrast ? <ConectIconHighContrast /> : <ConectIcon />}
       <span className={`font-bold ${sizes.text} whitespace-nowrap`}>
-        <span className="text-gray-900">Conect</span>{' '}
-        <span className="text-gray-700">CRM</span>
+        <span className="text-gray-900">Conect</span> <span className="text-gray-700">CRM</span>
       </span>
     </div>
   );

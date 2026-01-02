@@ -1,6 +1,6 @@
 /**
  * 📁 Upload Component - Componente de Upload Avançado
- * 
+ *
  * Funcionalidades:
  * - Drag & Drop
  * - Progress tracking
@@ -11,17 +11,13 @@
  */
 
 import React, { useState, useRef, useCallback } from 'react';
+import { Upload, X, Image, File, CheckCircle, AlertCircle, Loader2, Plus } from 'lucide-react';
 import {
-  Upload,
-  X,
-  Image,
-  File,
-  CheckCircle,
-  AlertCircle,
-  Loader2,
-  Plus
-} from 'lucide-react';
-import { uploadService, UploadOptions, UploadProgress, UploadResult } from '../../services/uploadService';
+  uploadService,
+  UploadOptions,
+  UploadProgress,
+  UploadResult,
+} from '../../services/uploadService';
 
 interface FileUploadProps {
   category: 'avatar' | 'client-attachment' | 'document' | 'system';
@@ -72,83 +68,86 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   };
 
   // Processar arquivos selecionados
-  const processFiles = useCallback(async (selectedFiles: FileList | File[]) => {
-    const fileArray = Array.from(selectedFiles);
+  const processFiles = useCallback(
+    async (selectedFiles: FileList | File[]) => {
+      const fileArray = Array.from(selectedFiles);
 
-    // Validar número máximo de arquivos
-    const totalFiles = files.length + fileArray.length;
-    if (totalFiles > maxFiles) {
-      onUploadError?.(`Máximo de ${maxFiles} arquivos permitidos`);
-      return;
-    }
+      // Validar número máximo de arquivos
+      const totalFiles = files.length + fileArray.length;
+      if (totalFiles > maxFiles) {
+        onUploadError?.(`Máximo de ${maxFiles} arquivos permitidos`);
+        return;
+      }
 
-    // Preparar arquivos com progress inicial
-    const newFiles: FileWithProgress[] = fileArray.map(file => ({
-      file,
-      progress: {
-        fileName: file.name,
-        progress: 0,
-        status: 'uploading' as const
-      },
-      previewUrl: showPreview ? uploadService.generatePreviewUrl(file) : undefined
-    }));
+      // Preparar arquivos com progress inicial
+      const newFiles: FileWithProgress[] = fileArray.map((file) => ({
+        file,
+        progress: {
+          fileName: file.name,
+          progress: 0,
+          status: 'uploading' as const,
+        },
+        previewUrl: showPreview ? uploadService.generatePreviewUrl(file) : undefined,
+      }));
 
-    setFiles(prev => [...prev, ...newFiles]);
-    setIsUploading(true);
+      setFiles((prev) => [...prev, ...newFiles]);
+      setIsUploading(true);
 
-    try {
-      // Upload sequencial para melhor controle
-      for (let i = 0; i < newFiles.length; i++) {
-        const fileWithProgress = newFiles[i];
+      try {
+        // Upload sequencial para melhor controle
+        for (let i = 0; i < newFiles.length; i++) {
+          const fileWithProgress = newFiles[i];
 
-        try {
-          const result = await uploadService.uploadFile(
-            fileWithProgress.file,
-            category,
-            (progress) => {
-              setFiles(prev => prev.map(f =>
+          try {
+            const result = await uploadService.uploadFile(
+              fileWithProgress.file,
+              category,
+              (progress) => {
+                setFiles((prev) =>
+                  prev.map((f) => (f.file === fileWithProgress.file ? { ...f, progress } : f)),
+                );
+              },
+            );
+
+            // Atualizar com resultado
+            setFiles((prev) =>
+              prev.map((f) =>
                 f.file === fileWithProgress.file
-                  ? { ...f, progress }
-                  : f
-              ));
-            }
-          );
-
-          // Atualizar com resultado
-          setFiles(prev => prev.map(f =>
-            f.file === fileWithProgress.file
-              ? { ...f, result, progress: { ...f.progress, status: 'success' } }
-              : f
-          ));
-
-        } catch (error) {
-          setFiles(prev => prev.map(f =>
-            f.file === fileWithProgress.file
-              ? {
-                ...f,
-                progress: {
-                  ...f.progress,
-                  status: 'error',
-                  error: error instanceof Error ? error.message : 'Erro no upload'
-                }
-              }
-              : f
-          ));
+                  ? { ...f, result, progress: { ...f.progress, status: 'success' } }
+                  : f,
+              ),
+            );
+          } catch (error) {
+            setFiles((prev) =>
+              prev.map((f) =>
+                f.file === fileWithProgress.file
+                  ? {
+                      ...f,
+                      progress: {
+                        ...f.progress,
+                        status: 'error',
+                        error: error instanceof Error ? error.message : 'Erro no upload',
+                      },
+                    }
+                  : f,
+              ),
+            );
+          }
         }
-      }
 
-      // Notificar sucesso apenas dos uploads bem-sucedidos
-      const successfulUploads = files.filter(f => f.result).map(f => f.result!);
-      if (successfulUploads.length > 0) {
-        onUploadSuccess?.(successfulUploads);
+        // Notificar sucesso apenas dos uploads bem-sucedidos
+        const successfulUploads = files.filter((f) => f.result).map((f) => f.result!);
+        if (successfulUploads.length > 0) {
+          onUploadSuccess?.(successfulUploads);
+        }
+      } catch (error) {
+        onUploadError?.(error instanceof Error ? error.message : 'Erro no upload');
+      } finally {
+        setIsUploading(false);
       }
-
-    } catch (error) {
-      onUploadError?.(error instanceof Error ? error.message : 'Erro no upload');
-    } finally {
-      setIsUploading(false);
-    }
-  }, [files, category, maxFiles, showPreview, onUploadSuccess, onUploadError]);
+    },
+    [files, category, maxFiles, showPreview, onUploadSuccess, onUploadError],
+  );
 
   // Handlers para drag & drop
   const handleDragOver = (e: React.DragEvent) => {
@@ -184,7 +183,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
   // Remover arquivo
   const removeFile = (index: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
+    setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   // Abrir seletor de arquivo
@@ -198,8 +197,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   const getOverallStatus = () => {
     if (files.length === 0) return 'empty';
     if (isUploading) return 'uploading';
-    if (files.some(f => f.progress.status === 'error')) return 'error';
-    if (files.every(f => f.progress.status === 'success')) return 'success';
+    if (files.some((f) => f.progress.status === 'error')) return 'error';
+    if (files.every((f) => f.progress.status === 'success')) return 'success';
     return 'partial';
   };
 
@@ -213,10 +212,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           disabled={disabled}
           className={`
             p-2 rounded-lg border-2 border-dashed transition-all duration-200
-            ${isDragging
-              ? 'border-blue-400 bg-blue-50'
-              : 'border-gray-300 hover:border-gray-400'
-            }
+            ${isDragging ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}
             ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'}
             ${overallStatus === 'success' ? 'border-green-400 bg-green-50' : ''}
             ${overallStatus === 'error' ? 'border-red-400 bg-red-50' : ''}
@@ -253,10 +249,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
       <div
         className={`
           relative border-2 border-dashed rounded-lg p-6 transition-all duration-200
-          ${isDragging
-            ? 'border-blue-400 bg-blue-50'
-            : 'border-gray-300 hover:border-gray-400'
-          }
+          ${isDragging ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'}
           ${overallStatus === 'success' ? 'border-green-400 bg-green-50' : ''}
           ${overallStatus === 'error' ? 'border-red-400 bg-red-50' : ''}
@@ -299,9 +292,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
       {/* Lista de arquivos */}
       {files.length > 0 && (
         <div className="space-y-3">
-          <h4 className="text-sm font-medium text-gray-900">
-            Arquivos ({files.length})
-          </h4>
+          <h4 className="text-sm font-medium text-gray-900">Arquivos ({files.length})</h4>
 
           <div className="space-y-2">
             {files.map((fileWithProgress, index) => (
@@ -326,11 +317,7 @@ interface FileItemProps {
   onRemove: () => void;
 }
 
-const FileItem: React.FC<FileItemProps> = ({
-  fileWithProgress,
-  showPreview,
-  onRemove
-}) => {
+const FileItem: React.FC<FileItemProps> = ({ fileWithProgress, showPreview, onRemove }) => {
   const { file, progress, previewUrl } = fileWithProgress;
   const fileIcon = uploadService.getFileIcon(file.type);
   const formattedSize = uploadService.formatFileSize(file.size);
@@ -340,11 +327,7 @@ const FileItem: React.FC<FileItemProps> = ({
       {/* Preview ou ícone */}
       <div className="flex-shrink-0">
         {showPreview && previewUrl && file.type.startsWith('image/') ? (
-          <img
-            src={previewUrl}
-            alt={file.name}
-            className="w-10 h-10 object-cover rounded"
-          />
+          <img src={previewUrl} alt={file.name} className="w-10 h-10 object-cover rounded" />
         ) : (
           <div className="w-10 h-10 flex items-center justify-center bg-gray-100 rounded">
             <span className="text-lg">{fileIcon}</span>
@@ -354,12 +337,8 @@ const FileItem: React.FC<FileItemProps> = ({
 
       {/* Informações do arquivo */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 truncate">
-          {file.name}
-        </p>
-        <p className="text-xs text-gray-500">
-          {formattedSize}
-        </p>
+        <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+        <p className="text-xs text-gray-500">{formattedSize}</p>
 
         {/* Barra de progresso */}
         {progress.status === 'uploading' && (
@@ -379,9 +358,7 @@ const FileItem: React.FC<FileItemProps> = ({
 
         {/* Mensagem de erro */}
         {progress.status === 'error' && progress.error && (
-          <p className="text-xs text-red-500 mt-1">
-            {progress.error}
-          </p>
+          <p className="text-xs text-red-500 mt-1">{progress.error}</p>
         )}
       </div>
 
@@ -391,13 +368,9 @@ const FileItem: React.FC<FileItemProps> = ({
           <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
         )}
 
-        {progress.status === 'success' && (
-          <CheckCircle className="w-4 h-4 text-green-500" />
-        )}
+        {progress.status === 'success' && <CheckCircle className="w-4 h-4 text-green-500" />}
 
-        {progress.status === 'error' && (
-          <AlertCircle className="w-4 h-4 text-red-500" />
-        )}
+        {progress.status === 'error' && <AlertCircle className="w-4 h-4 text-red-500" />}
 
         <button
           onClick={onRemove}

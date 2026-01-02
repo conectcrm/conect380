@@ -26,22 +26,12 @@
 
 ### 2.1 Endpoint do Webhook
 
-**URL Base:** `http://localhost:3001/api/atendimento/webhooks/whatsapp`
+**URL Base:** `http://localhost:3001/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>`
 
 **Rotas Disponíveis:**
 ```typescript
-GET  /api/atendimento/webhooks/whatsapp
-     - Verificação do webhook (Meta/Facebook)
-     - Parâmetros esperados:
-       * hub.mode=subscribe
-       * hub.verify_token=<token>
-       * hub.challenge=<challenge>
-
 GET  /api/atendimento/webhooks/whatsapp/:empresaId
      - Verificação específica por empresa
-
-POST /api/atendimento/webhooks/whatsapp
-     - Recebimento de mensagens e eventos
 
 POST /api/atendimento/webhooks/whatsapp/:empresaId
      - Recebimento específico por empresa
@@ -67,7 +57,7 @@ POST /webhooks/whatsapp/:empresaId/test
 
 **Teste 1:** GET sem parâmetros
 ```
-URL: http://localhost:3001/api/atendimento/webhooks/whatsapp
+URL: http://localhost:3001/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
 Resultado: ❌ HTTP 403 Forbidden
 Causa: Parâmetros obrigatórios ausentes (hub.mode, hub.verify_token, hub.challenge)
 Conclusão: ✅ COMPORTAMENTO ESPERADO (webhook protegido)
@@ -135,7 +125,7 @@ SET
   ativo = true,
   status = 'ATIVO',
   webhook_secret = 'test_webhook_secret_123',
-  webhook_url = 'http://localhost:3001/api/atendimento/webhooks/whatsapp',
+  webhook_url = 'http://localhost:3001/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>',
   provider = 'meta'
 WHERE id = '2fe447a9-3547-427e-be9c-e7ef36eca202';
 ```
@@ -198,7 +188,7 @@ async function testarRecebimentoMensagem() {
   };
   
   try {
-    const response = await axios.post(url, payload);
+    const response = await axios.post(url, payload, { headers });
     console.log('✅ Mensagem recebida!');
     console.log('Resposta:', response.data);
   } catch (error) {

@@ -35,7 +35,7 @@ async function createAdmin() {
 
   // Coletar dados do admin
   const nome = await question('Nome do Admin: ') || 'Admin Sistema';
-  const email = await question('Email do Admin: ') || 'admin@conectcrm.com.br';
+  const email = await question('Email do Admin: ') || 'admin@conectsuite.com.br';
   let senha = await question('Senha (mín. 8 caracteres): ');
 
   // Validar senha
@@ -67,7 +67,7 @@ async function createAdmin() {
         $1,
         $2,
         $3,
-        'admin',
+        'superadmin',
         true,
         true,
         NOW(),
@@ -75,6 +75,7 @@ async function createAdmin() {
       )
       ON CONFLICT (email) DO UPDATE SET
         senha = EXCLUDED.senha,
+        role = 'superadmin',
         deve_trocar_senha = true,
         updated_at = NOW()
     `, [nome, email, senhaHash]);

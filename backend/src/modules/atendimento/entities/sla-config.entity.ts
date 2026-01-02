@@ -4,7 +4,10 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 interface HorarioFuncionamento {
   inicio: string;
@@ -67,6 +70,10 @@ export class SlaConfig {
 
   @Column({ type: 'uuid' })
   empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresaId' })
+  empresa: Empresa;
 
   @CreateDateColumn()
   createdAt: Date;

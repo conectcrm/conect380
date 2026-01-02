@@ -22,11 +22,11 @@ interface ChatHeaderProps {
 const Avatar: React.FC<{ name?: string; src?: string }> = ({ name, src }) => {
   const initials = name
     ? name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
     : '??';
 
   return (
@@ -87,7 +87,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   contextoAberto,
   onToggleContexto,
   onStatusChange,
-  onPrioridadeChange
+  onPrioridadeChange,
 }) => {
   if (!ticket) {
     return (
@@ -127,9 +127,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
                   <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                 </span>
               )}
-              <span className="text-xs text-gray-500 font-mono">
-                #{ticket.numero}
-              </span>
+              <span className="text-xs text-gray-500 font-mono">#{ticket.numero}</span>
             </div>
 
             <div className="flex items-center gap-3 text-sm text-gray-500">
@@ -139,11 +137,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
                   <span className="truncate">{ticket.contatoTelefone}</span>
                 </div>
               )}
-              {ticket.assunto && (
-                <span className="truncate text-xs">
-                  {ticket.assunto}
-                </span>
-              )}
+              {ticket.assunto && <span className="truncate text-xs">{ticket.assunto}</span>}
             </div>
           </div>
         </div>
@@ -179,10 +173,11 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           {/* Toggle Contexto */}
           <button
             onClick={onToggleContexto}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${contextoAberto
+            className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${
+              contextoAberto
                 ? 'bg-blue-50 text-blue-700 border border-blue-200'
                 : 'bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100'
-              }`}
+            }`}
             title={contextoAberto ? 'Fechar painel de contexto' : 'Abrir painel de contexto'}
           >
             {contextoAberto ? (

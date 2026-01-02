@@ -1,191 +1,269 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Target,
   Plus,
-  Edit,
+  Edit2,
   Trash2,
-  Calendar,
+  Search,
+  X,
+  DollarSign,
   User,
   MapPin,
-  DollarSign,
-  Save,
-  X,
-  TrendingUp,
-  Users,
-  Building2
+  Building2,
 } from 'lucide-react';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
-
-interface Meta {
-  id: string;
-  tipo: 'mensal' | 'trimestral' | 'anual';
-  periodo: string;
-  vendedor?: string;
-  regiao?: string;
-  valor: number;
-  descricao: string;
-  ativa: boolean;
-  criadaEm: string;
-}
+import { metaService, Meta, MetaTipo } from '../../services/metaService';
+import { usuariosService } from '../../services/usuariosService';
+import { UserRole } from '../../types/usuarios';
+import { api } from '../../services/api';
 
 interface FormularioMeta {
-  tipo: 'mensal' | 'trimestral' | 'anual';
+  tipo: MetaTipo;
   periodo: string;
-  vendedor: string;
-  regiao: string;
+  vendedorId?: string;
+  regiao?: string;
   valor: string;
   descricao: string;
 }
 
+const DEFAULT_PERIOD = () => {
+  const agora = new Date();
+  const ano = agora.getFullYear();
+  const mes = (agora.getMonth() + 1).toString().padStart(2, '0');
+  return `${ano}-${mes}`;
+};
+
 const MetasConfiguracao: React.FC = () => {
   const [metas, setMetas] = useState<Meta[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingMeta, setEditingMeta] = useState<Meta | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [busca, setBusca] = useState('');
+  const [vendedores, setVendedores] = useState<Array<{ id: string; nome?: string }>>([]);
+  const [regioes, setRegioes] = useState<string[]>([]);
+  const [loadingVendedores, setLoadingVendedores] = useState(false);
+  const [loadingRegioes, setLoadingRegioes] = useState(false);
 
   const [formulario, setFormulario] = useState<FormularioMeta>({
     tipo: 'mensal',
-    periodo: '',
-    vendedor: 'Todos',
-    regiao: 'Todas',
+    periodo: DEFAULT_PERIOD(),
+    vendedorId: 'todos',
+    regiao: 'todas',
     valor: '',
-    descricao: ''
+    descricao: '',
   });
 
-  // Carregar metas da API
   useEffect(() => {
     carregarMetas();
+    carregarVendedores();
+    carregarRegioes();
   }, []);
 
   const carregarMetas = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/metas');
-      if (response.ok) {
-        const data = await response.json();
-        setMetas(data);
-      } else {
-        console.error('Erro ao carregar metas');
-        // Fallback para dados mock em caso de erro
-        const metasIniciais: Meta[] = [
-          {
-            id: '1',
-            tipo: 'mensal',
-            periodo: '2025-01',
-            vendedor: 'Todos',
-            regiao: 'Todas',
-            valor: 450000,
-            descricao: 'Meta geral mensal para toda equipe',
-            ativa: true,
-            criadaEm: '2025-01-01'
-          },
-          {
-            id: '2',
-            tipo: 'trimestral',
-            periodo: '2025-Q1',
-            vendedor: 'João Silva',
-            regiao: 'São Paulo',
-            valor: 300000,
-            descricao: 'Meta específica para João Silva na região SP',
-            ativa: true,
-            criadaEm: '2025-01-01'
-          }
-        ];
-        setMetas(metasIniciais);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar metas:', error);
+      setError(null);
+      const dados = await metaService.listar();
+      const normalizados = Array.isArray(dados)
+        ? dados.map((item) => ({ ...item, valor: Number(item.valor) || 0 }))
+        : [];
+      setMetas(normalizados);
+    } catch (err: unknown) {
+      console.error('Erro ao carregar metas:', err);
+      const responseMessage = (err as any)?.response?.data?.message;
+      const normalizedMessage = Array.isArray(responseMessage)
+        ? responseMessage.join('. ')
+        : responseMessage;
+      const fallbackMessage = err instanceof Error ? err.message : undefined;
+      setError(normalizedMessage || fallbackMessage || 'Erro ao carregar metas');
+      setMetas([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
+  const carregarVendedores = async () => {
     try {
-      const dadosMeta = {
-        tipo: formulario.tipo,
-        periodo: formulario.periodo,
-        vendedorId: formulario.vendedor === 'Todos' ? undefined : parseInt(formulario.vendedor),
-        regiao: formulario.regiao === 'Todas' ? undefined : formulario.regiao,
-        valor: parseFloat(formulario.valor.replace(/[^\d,]/g, '').replace(',', '.')),
-        descricao: formulario.descricao
-      };
+      setLoadingVendedores(true);
+      setError(null);
 
-      let response;
+      const { usuarios } = await usuariosService.listarUsuarios({
+        role: UserRole.VENDEDOR,
+        ativo: true,
+        limite: 1000,
+      });
 
-      if (editingMeta) {
-        // Atualizar meta existente
-        response = await fetch(`http://localhost:3001/metas/${editingMeta.id}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(dadosMeta),
-        });
-      } else {
-        // Criar nova meta
-        response = await fetch('http://localhost:3001/metas', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(dadosMeta),
-        });
+      const normalizados = usuarios.map((usuario) => ({
+        id: String(usuario.id),
+        nome: usuario.nome,
+      }));
+
+      if (normalizados.length === 0) {
+        const fallbackIds = Array.from(
+          new Set(
+            metas
+              .map((m) => m.vendedorId)
+              .filter((v) => v !== undefined)
+              .map(String),
+          ),
+        );
+        setVendedores(fallbackIds.map((id) => ({ id })));
+        return;
       }
 
-      if (response.ok) {
-        const metaSalva = await response.json();
-
-        // Converter a resposta da API para o formato do frontend
-        const metaFormatada: Meta = {
-          id: metaSalva.id.toString(),
-          tipo: metaSalva.tipo,
-          periodo: metaSalva.periodo,
-          vendedor: metaSalva.vendedorId ? `Vendedor ${metaSalva.vendedorId}` : 'Todos',
-          regiao: metaSalva.regiao || 'Todas',
-          valor: metaSalva.valor,
-          descricao: metaSalva.descricao,
-          ativa: metaSalva.ativa,
-          criadaEm: new Date(metaSalva.criadaEm).toISOString().split('T')[0]
-        };
-
-        if (editingMeta) {
-          setMetas(prev => prev.map(meta => meta.id === editingMeta.id ? metaFormatada : meta));
-        } else {
-          setMetas(prev => [...prev, metaFormatada]);
-        }
-
-        resetForm();
-
-        // Mostrar mensagem de sucesso
-        console.log(editingMeta ? 'Meta atualizada com sucesso!' : 'Meta criada com sucesso!');
-      } else {
-        const errorData = await response.json();
-        console.error('Erro ao salvar meta:', errorData);
-        throw new Error(errorData.message || 'Erro ao salvar meta');
-      }
-    } catch (error) {
-      console.error('Erro ao salvar meta:', error);
-      alert(`Erro ao salvar meta: ${error.message}`);
+      setVendedores(normalizados);
+    } catch (err: unknown) {
+      console.error('Erro ao carregar vendedores:', err);
+      const responseMessage = (err as any)?.response?.data?.message;
+      const normalizedMessage = Array.isArray(responseMessage)
+        ? responseMessage.join('. ')
+        : responseMessage;
+      const fallbackMessage = err instanceof Error ? err.message : undefined;
+      setError(normalizedMessage || fallbackMessage || 'Erro ao carregar vendedores');
     } finally {
-      setLoading(false);
+      setLoadingVendedores(false);
+    }
+  };
+
+  const carregarRegioes = async () => {
+    try {
+      setLoadingRegioes(true);
+      setError(null);
+
+      const response = await api.get('/dashboard/resumo', {
+        params: { periodo: 'mensal' },
+      });
+
+      const regioesDisponiveis = response?.data?.metadata?.regioesDisponiveis;
+      const normalizadas = Array.isArray(regioesDisponiveis)
+        ? regioesDisponiveis.filter((regiao) => regiao && regiao.toLowerCase() !== 'todas')
+        : [];
+
+      if (normalizadas.length === 0) {
+        const fallback = Array.from(
+          new Set(metas.map((m) => m.regiao).filter(Boolean) as string[]),
+        );
+        setRegioes(fallback);
+        return;
+      }
+
+      setRegioes(normalizadas);
+    } catch (err: unknown) {
+      console.error('Erro ao carregar regiões:', err);
+      const responseMessage = (err as any)?.response?.data?.message;
+      const normalizedMessage = Array.isArray(responseMessage)
+        ? responseMessage.join('. ')
+        : responseMessage;
+      const fallbackMessage = err instanceof Error ? err.message : undefined;
+      setError(normalizedMessage || fallbackMessage || 'Erro ao carregar regiões');
+    } finally {
+      setLoadingRegioes(false);
     }
   };
 
   const resetForm = () => {
     setFormulario({
       tipo: 'mensal',
-      periodo: '',
-      vendedor: 'Todos',
-      regiao: 'Todas',
+      periodo: DEFAULT_PERIOD(),
+      vendedorId: 'todos',
+      regiao: 'todas',
       valor: '',
-      descricao: ''
+      descricao: '',
     });
     setShowForm(false);
     setEditingMeta(null);
+  };
+
+  const formatarValor = (valor: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+
+  const formatarPeriodo = (tipo: MetaTipo, periodo: string) => {
+    if (tipo === 'mensal') {
+      const [ano, mes] = periodo.split('-');
+      const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      return `${meses[Number(mes) - 1]} ${ano}`;
+    }
+    if (tipo === 'trimestral') return periodo.replace('Q', 'T');
+    return periodo;
+  };
+
+  const metasFiltradas = useMemo(() => {
+    return metas.filter((meta) => {
+      const termo = busca.toLowerCase();
+      return (
+        meta.descricao?.toLowerCase().includes(termo) ||
+        meta.regiao?.toLowerCase().includes(termo) ||
+        meta.periodo.toLowerCase().includes(termo)
+      );
+    });
+  }, [busca, metas]);
+
+  const vendedoresDisponiveis = useMemo(() => {
+    if (vendedores.length > 0) return vendedores;
+
+    const valores = metas
+      .map((m) => m.vendedorId)
+      .filter((v) => v !== undefined) as number[];
+    const unicos = Array.from(new Set(valores)).map((id) => ({ id: String(id) }));
+    return unicos;
+  }, [metas, vendedores]);
+
+  const regioesDisponiveis = useMemo(() => {
+    if (regioes.length > 0) return regioes;
+
+    const valores = metas.map((m) => m.regiao).filter(Boolean) as string[];
+    return Array.from(new Set(valores));
+  }, [metas, regioes]);
+
+  const parseValorParaNumero = (valor: string) => {
+    const somenteNumero = valor.replace(/\./g, '').replace(',', '.');
+    const parsed = Number(somenteNumero);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setError(null);
+      setLoading(true);
+
+      const payload = {
+        tipo: formulario.tipo,
+        periodo: formulario.periodo,
+        valor: parseValorParaNumero(formulario.valor),
+        vendedorId:
+          formulario.vendedorId && formulario.vendedorId !== 'todos'
+            ? Number(formulario.vendedorId)
+            : undefined,
+        regiao: formulario.regiao && formulario.regiao !== 'todas' ? formulario.regiao : undefined,
+        descricao: formulario.descricao || undefined,
+      };
+
+      const metaSalva = editingMeta
+        ? await metaService.atualizar(editingMeta.id, payload)
+        : await metaService.criar(payload);
+      const metaNormalizada = { ...metaSalva, valor: Number(metaSalva.valor) || 0 };
+
+      setMetas((prev) => {
+        if (editingMeta) {
+          return prev.map((m) => (m.id === editingMeta.id ? metaNormalizada : m));
+        }
+        return [...prev, metaNormalizada];
+      });
+
+      resetForm();
+    } catch (err: unknown) {
+      console.error('Erro ao salvar meta:', err);
+      const responseMessage = (err as any)?.response?.data?.message;
+      const normalizedMessage = Array.isArray(responseMessage)
+        ? responseMessage.join('. ')
+        : responseMessage;
+      const fallbackMessage = err instanceof Error ? err.message : undefined;
+      setError(normalizedMessage || fallbackMessage || 'Erro ao salvar meta');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEdit = (meta: Meta) => {
@@ -193,64 +271,47 @@ const MetasConfiguracao: React.FC = () => {
     setFormulario({
       tipo: meta.tipo,
       periodo: meta.periodo,
-      vendedor: meta.vendedor || 'Todos',
-      regiao: meta.regiao || 'Todas',
+      vendedorId: meta.vendedorId ? String(meta.vendedorId) : 'todos',
+      regiao: meta.regiao || 'todas',
       valor: meta.valor.toLocaleString('pt-BR'),
-      descricao: meta.descricao
+      descricao: meta.descricao || '',
     });
     setShowForm(true);
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja excluir esta meta?')) {
-      try {
-        setLoading(true);
-        const response = await fetch(`http://localhost:3001/metas/${id}`, {
-          method: 'DELETE',
-        });
-
-        if (response.ok) {
-          setMetas(prev => prev.filter(meta => meta.id !== id));
-          console.log('Meta excluída com sucesso!');
-        } else {
-          const errorData = await response.json();
-          console.error('Erro ao excluir meta:', errorData);
-          throw new Error(errorData.message || 'Erro ao excluir meta');
-        }
-      } catch (error) {
-        console.error('Erro ao excluir meta:', error);
-        alert(`Erro ao excluir meta: ${error.message}`);
-      } finally {
-        setLoading(false);
-      }
+    if (!window.confirm('Tem certeza que deseja excluir esta meta?')) return;
+    try {
+      setError(null);
+      setLoading(true);
+      await metaService.remover(id);
+      setMetas((prev) => prev.filter((meta) => meta.id !== id));
+    } catch (err: unknown) {
+      console.error('Erro ao excluir meta:', err);
+      const responseMessage = (err as any)?.response?.data?.message;
+      const normalizedMessage = Array.isArray(responseMessage)
+        ? responseMessage.join('. ')
+        : responseMessage;
+      const fallbackMessage = err instanceof Error ? err.message : undefined;
+      setError(normalizedMessage || fallbackMessage || 'Erro ao excluir meta');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const formatarPeriodo = (tipo: string, periodo: string) => {
-    switch (tipo) {
-      case 'mensal':
-        const [ano, mes] = periodo.split('-');
-        const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-        return `${meses[parseInt(mes) - 1]} ${ano}`;
-      case 'trimestral':
-        return periodo.replace('Q', 'T');
-      case 'anual':
-        return periodo;
-      default:
-        return periodo;
-    }
+  const renderBadgetTipo = (tipo: MetaTipo) => {
+    const base = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium';
+    return (
+      <span className={`${base} bg-[#159A9C]/10 text-[#159A9C] capitalize`}>
+        {tipo}
+      </span>
+    );
   };
 
-  const formatarValor = (valor: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(valor);
-  };
+  const valorTotal = metas.reduce((acc, meta) => acc + (Number(meta.valor) || 0), 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white border-b px-6 py-4">
         <BackToNucleus
           nucleusName="Configurações"
@@ -260,307 +321,344 @@ const MetasConfiguracao: React.FC = () => {
       </div>
 
       <div className="p-6">
-        {/* Header da página */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Configuração de Metas</h2>
-            <p className="text-gray-600 mt-1">
-              Defina metas de vendas por período, vendedor ou região para acompanhar performance
-            </p>
-          </div>
-
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
-          >
-            <Plus className="w-4 h-4" />
-            Nova Meta
-          </button>
-        </div>
-
-        {/* Lista de Metas */}
-        <div className="bg-white rounded-lg shadow-sm border">
-          <div className="p-6 border-b">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Target className="w-5 h-5" />
-              Metas Configuradas
-            </h3>
-          </div>
-
-          <div className="divide-y">
-            {metas.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <Target className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p className="text-lg font-medium mb-2">Nenhuma meta configurada</p>
-                <p>Crie sua primeira meta para começar o acompanhamento</p>
-              </div>
-            ) : (
-              metas.map((meta) => (
-                <div key={meta.id} className="p-6 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-4 mb-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${meta.tipo === 'mensal' ? 'bg-blue-100 text-blue-800' :
-                          meta.tipo === 'trimestral' ? 'bg-green-100 text-green-800' :
-                            'bg-purple-100 text-purple-800'
-                          }`}>
-                          {meta.tipo}
-                        </span>
-
-                        <span className="text-lg font-semibold text-gray-900">
-                          {formatarValor(meta.valor)}
-                        </span>
-
-                        <span className="text-sm text-gray-500">
-                          {formatarPeriodo(meta.tipo, meta.periodo)}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-6 text-sm text-gray-600">
-                        {meta.vendedor && (
-                          <div className="flex items-center gap-1">
-                            <User className="w-4 h-4" />
-                            {meta.vendedor}
-                          </div>
-                        )}
-
-                        {meta.regiao && (
-                          <div className="flex items-center gap-1">
-                            <MapPin className="w-4 h-4" />
-                            {meta.regiao}
-                          </div>
-                        )}
-
-                        {!meta.vendedor && !meta.regiao && (
-                          <div className="flex items-center gap-1 text-blue-600">
-                            <Building2 className="w-4 h-4" />
-                            Meta Geral
-                          </div>
-                        )}
-                      </div>
-
-                      {meta.descricao && (
-                        <p className="text-sm text-gray-600 mt-2">{meta.descricao}</p>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleEdit(meta)}
-                        className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
-                        title="Editar meta"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-
-                      <button
-                        onClick={() => handleDelete(meta.id)}
-                        className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                        title="Excluir meta"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
+        <div className="max-w-7xl mx-auto space-y-6">
+          <div className="bg-white rounded-lg shadow-sm border px-6 py-6">
+            <div className="flex flex-col sm:flex-row justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3 text-[#002333]">
+                  <Target className="h-8 w-8 text-[#159A9C]" />
+                  <h1 className="text-3xl font-bold">Metas Comerciais</h1>
+                  {loading && (
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#159A9C]"></div>
+                  )}
                 </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Formulário de Nova Meta */}
-        {showForm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
-              <div className="flex items-center justify-between p-6 border-b">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  {editingMeta ? 'Editar Meta' : 'Nova Meta'}
-                </h3>
-                <button
-                  onClick={resetForm}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-6 h-6" />
-                </button>
+                <p className="text-sm text-[#002333]/70 mt-2 max-w-3xl">
+                  Defina metas por período, vendedor ou região para acompanhar a performance
+                  comercial no núcleo de Configurações.
+                </p>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Tipo de Meta */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Tipo de Meta
-                    </label>
-                    <select
-                      value={formulario.tipo}
-                      onChange={(e) => setFormulario(prev => ({ ...prev, tipo: e.target.value as 'mensal' | 'trimestral' | 'anual' }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    >
-                      <option value="mensal">Mensal</option>
-                      <option value="trimestral">Trimestral</option>
-                      <option value="anual">Anual</option>
-                    </select>
-                  </div>
-
-                  {/* Período */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Período
-                    </label>
-                    <input
-                      type={formulario.tipo === 'mensal' ? 'month' : 'text'}
-                      value={formulario.periodo}
-                      onChange={(e) => setFormulario(prev => ({ ...prev, periodo: e.target.value }))}
-                      placeholder={
-                        formulario.tipo === 'trimestral' ? 'Ex: 2025-Q1' :
-                          formulario.tipo === 'anual' ? 'Ex: 2025' : ''
-                      }
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Vendedor */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Vendedor
-                    </label>
-                    <select
-                      value={formulario.vendedor}
-                      onChange={(e) => setFormulario(prev => ({ ...prev, vendedor: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="Todos">Todos os vendedores</option>
-                      <option value="João Silva">João Silva</option>
-                      <option value="Maria Santos">Maria Santos</option>
-                      <option value="Carlos Oliveira">Carlos Oliveira</option>
-                    </select>
-                  </div>
-
-                  {/* Região */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Região
-                    </label>
-                    <select
-                      value={formulario.regiao}
-                      onChange={(e) => setFormulario(prev => ({ ...prev, regiao: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="Todas">Todas as regiões</option>
-                      <option value="São Paulo">São Paulo</option>
-                      <option value="Rio de Janeiro">Rio de Janeiro</option>
-                      <option value="Minas Gerais">Minas Gerais</option>
-                      <option value="Sul">Região Sul</option>
-                      <option value="Norte">Região Norte</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Valor da Meta */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Valor da Meta
-                  </label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <input
-                      type="text"
-                      value={formulario.valor}
-                      onChange={(e) => {
-                        const valor = e.target.value.replace(/\D/g, '');
-                        const formatado = new Intl.NumberFormat('pt-BR').format(parseInt(valor) || 0);
-                        setFormulario(prev => ({ ...prev, valor: formatado }));
-                      }}
-                      placeholder="450.000"
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Descrição */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Descrição (Opcional)
-                  </label>
-                  <textarea
-                    value={formulario.descricao}
-                    onChange={(e) => setFormulario(prev => ({ ...prev, descricao: e.target.value }))}
-                    placeholder="Descreva o objetivo desta meta..."
-                    rows={3}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                <div className="relative w-full sm:w-64">
+                  <Search className="h-4 w-4 text-[#B4BEC9] absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={busca}
+                    onChange={(e) => setBusca(e.target.value)}
+                    placeholder="Buscar por período, região ou descrição"
+                    className="w-full pl-9 pr-3 py-2 border border-[#B4BEC9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C] text-sm"
                   />
                 </div>
 
-                {/* Botões */}
-                <div className="flex items-center justify-end gap-3 pt-4 border-t">
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                  >
-                    Cancelar
-                  </button>
+                <button
+                  onClick={() => {
+                    setEditingMeta(null);
+                    setShowForm(true);
+                  }}
+                  className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors flex items-center gap-2 text-sm font-medium disabled:opacity-50"
+                  disabled={loading}
+                >
+                  <Plus className="h-4 w-4" />
+                  Nova Meta
+                </button>
+              </div>
+            </div>
 
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#159A9C] hover:bg-[#0F7B7D] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                  >
-                    <Save className="w-4 h-4" />
-                    {loading ? 'Salvando...' : editingMeta ? 'Atualizar' : 'Criar Meta'}
-                  </button>
+            {error && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-white">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                    Total de Metas
+                  </p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">{metas.length}</p>
                 </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Cards de Resumo */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="bg-blue-100 p-2 rounded-lg">
-                <Target className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total de Metas</p>
-                <p className="text-2xl font-bold text-gray-900">{metas.length}</p>
+                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                  <Target className="h-6 w-6 text-[#159A9C]" />
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="bg-green-100 p-2 rounded-lg">
-                <TrendingUp className="w-5 h-5 text-green-600" />
+            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-white">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                    Metas Ativas
+                  </p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">{metas.filter((m) => m.ativa).length}</p>
+                </div>
+                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                  <User className="h-6 w-6 text-[#159A9C]" />
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Metas Ativas</p>
-                <p className="text-2xl font-bold text-gray-900">{metas.filter(m => m.ativa).length}</p>
+            </div>
+
+            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-white">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                    Valor Total
+                  </p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">{formatarValor(valorTotal)}</p>
+                </div>
+                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                  <DollarSign className="h-6 w-6 text-[#159A9C]" />
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="bg-purple-100 p-2 rounded-lg">
-                <DollarSign className="w-5 h-5 text-purple-600" />
+          <div className="bg-white rounded-lg shadow-sm border">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-[#002333] flex items-center gap-2">
+                <Target className="w-5 h-5 text-[#159A9C]" />
+                Metas Configuradas
+              </h3>
+              <button
+                onClick={carregarMetas}
+                className="text-sm text-[#159A9C] hover:bg-[#159A9C]/10 px-3 py-1.5 rounded-lg transition-colors"
+                disabled={loading}
+              >
+                Recarregar
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="p-8 text-center text-[#002333]/70">
+                <div className="mx-auto h-10 w-10 border-2 border-[#159A9C] border-t-transparent rounded-full animate-spin" />
+                <p className="mt-3 text-sm">Carregando metas...</p>
               </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Valor Total</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {formatarValor(metas.reduce((acc, meta) => acc + meta.valor, 0))}
+            ) : metasFiltradas.length === 0 ? (
+              <div className="p-10 text-center">
+                <div className="h-12 w-12 rounded-full bg-[#159A9C]/10 text-[#159A9C] flex items-center justify-center mx-auto mb-4">
+                  <Target className="h-6 w-6" />
+                </div>
+                <p className="text-lg font-semibold text-[#002333]">Nenhuma meta configurada</p>
+                <p className="text-sm text-[#002333]/70 mt-1">
+                  Crie sua primeira meta para acompanhar o desempenho comercial.
                 </p>
+                <button
+                  onClick={() => setShowForm(true)}
+                  className="mt-4 px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm font-medium"
+                >
+                  Criar Meta
+                </button>
               </div>
-            </div>
+            ) : (
+              <div className="divide-y">
+                {metasFiltradas.map((meta) => (
+                  <div key={meta.id} className="px-6 py-5 hover:bg-gray-50 transition-colors">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-3">
+                          {renderBadgetTipo(meta.tipo)}
+                          <span className="text-lg font-semibold text-[#002333]">
+                            {formatarValor(Number(meta.valor))}
+                          </span>
+                          <span className="text-sm text-[#002333]/70">
+                            {formatarPeriodo(meta.tipo, meta.periodo)}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-[#002333]/80">
+                          {meta.vendedorId && (
+                            <span className="inline-flex items-center gap-1">
+                              <User className="h-4 w-4" />
+                              Vendedor #{meta.vendedorId}
+                            </span>
+                          )}
+
+                          {meta.regiao && (
+                            <span className="inline-flex items-center gap-1">
+                              <MapPin className="h-4 w-4" />
+                              {meta.regiao}
+                            </span>
+                          )}
+
+                          {!meta.vendedorId && !meta.regiao && (
+                            <span className="inline-flex items-center gap-1 text-[#159A9C]">
+                              <Building2 className="h-4 w-4" />
+                              Meta Geral
+                            </span>
+                          )}
+                        </div>
+
+                        {meta.descricao && (
+                          <p className="text-sm text-[#002333]/70">{meta.descricao}</p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEdit(meta)}
+                          className="p-2 text-[#159A9C] hover:bg-[#159A9C]/10 rounded-lg transition-colors"
+                          title="Editar meta"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(meta.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Excluir meta"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {showForm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[#002333]/60 font-semibold">
+                  {editingMeta ? 'Editar meta' : 'Nova meta'}
+                </p>
+                <h3 className="text-xl font-bold text-[#002333]">Configuração</h3>
+              </div>
+              <button
+                onClick={resetForm}
+                className="p-2 text-[#002333]/70 hover:bg-gray-100 rounded-lg transition-colors"
+                aria-label="Fechar modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="px-6 py-6 space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#002333] mb-2">Tipo</label>
+                  <select
+                    value={formulario.tipo}
+                    onChange={(e) =>
+                      setFormulario((prev) => ({ ...prev, tipo: e.target.value as MetaTipo }))
+                    }
+                    className="w-full border border-[#B4BEC9] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C] text-sm"
+                    required
+                  >
+                    <option value="mensal">Mensal</option>
+                    <option value="trimestral">Trimestral</option>
+                    <option value="anual">Anual</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#002333] mb-2">Período</label>
+                  <input
+                    type={formulario.tipo === 'mensal' ? 'month' : 'text'}
+                    value={formulario.periodo}
+                    onChange={(e) => setFormulario((prev) => ({ ...prev, periodo: e.target.value }))}
+                    placeholder={formulario.tipo === 'trimestral' ? 'Ex: 2025-Q1' : formulario.tipo === 'anual' ? 'Ex: 2025' : ''}
+                    className="w-full border border-[#B4BEC9] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C] text-sm"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#002333] mb-2">Vendedor</label>
+                  <select
+                    value={formulario.vendedorId}
+                    onChange={(e) => setFormulario((prev) => ({ ...prev, vendedorId: e.target.value }))}
+                    className="w-full border border-[#B4BEC9] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C] text-sm"
+                    disabled={loadingVendedores}
+                  >
+                    <option value="todos">{loadingVendedores ? 'Carregando vendedores...' : 'Todos os vendedores'}</option>
+                    {vendedoresDisponiveis.map((vendedor) => (
+                      <option key={vendedor.id} value={vendedor.id}>
+                        {vendedor.nome || `Vendedor #${vendedor.id}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#002333] mb-2">Região</label>
+                  <select
+                    value={formulario.regiao}
+                    onChange={(e) => setFormulario((prev) => ({ ...prev, regiao: e.target.value }))}
+                    className="w-full border border-[#B4BEC9] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C] text-sm"
+                    disabled={loadingRegioes}
+                  >
+                    <option value="todas">{loadingRegioes ? 'Carregando regiões...' : 'Todas as regiões'}</option>
+                    {regioesDisponiveis.map((regiao) => {
+                      const value = regiao;
+                      return (
+                        <option key={value} value={value}>
+                          {regiao}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#002333] mb-2">Valor da Meta</label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-[#B4BEC9] h-4 w-4" />
+                  <input
+                    type="text"
+                    value={formulario.valor}
+                    onChange={(e) => {
+                      const valor = e.target.value.replace(/\D/g, '');
+                      const formatado = new Intl.NumberFormat('pt-BR').format(Number(valor) || 0);
+                      setFormulario((prev) => ({ ...prev, valor: formatado }));
+                    }}
+                    placeholder="450.000"
+                    className="w-full pl-10 pr-3 py-2 border border-[#B4BEC9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C] text-sm"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#002333] mb-2">Descrição (opcional)</label>
+                <textarea
+                  value={formulario.descricao}
+                  onChange={(e) => setFormulario((prev) => ({ ...prev, descricao: e.target.value }))}
+                  placeholder="Contextualize o objetivo desta meta"
+                  rows={3}
+                  className="w-full border border-[#B4BEC9] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C] text-sm"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="px-4 py-2 bg-white text-[#002333] border border-[#B4BEC9] rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                >
+                  {loading ? 'Salvando...' : editingMeta ? 'Atualizar Meta' : 'Criar Meta'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

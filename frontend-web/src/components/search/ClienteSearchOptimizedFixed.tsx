@@ -36,7 +36,7 @@ const ClienteSearchOptimized: React.FC<ClienteSearchOptimizedProps> = ({
   onNewCliente,
   onReloadClientes,
   isLoading = false,
-  className = ''
+  className = '',
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -51,12 +51,13 @@ const ClienteSearchOptimized: React.FC<ClienteSearchOptimizedProps> = ({
     // Busca por múltiplos campos usando o valor debounced
     if (debouncedSearchTerm.trim()) {
       const term = debouncedSearchTerm.toLowerCase().trim();
-      filtered = filtered.filter(cliente =>
-        cliente.nome.toLowerCase().includes(term) ||
-        cliente.documento.replace(/\D/g, '').includes(term.replace(/\D/g, '')) ||
-        cliente.email.toLowerCase().includes(term) ||
-        cliente.telefone.replace(/\D/g, '').includes(term.replace(/\D/g, '')) ||
-        (cliente.cidade && cliente.cidade.toLowerCase().includes(term))
+      filtered = filtered.filter(
+        (cliente) =>
+          cliente.nome.toLowerCase().includes(term) ||
+          cliente.documento.replace(/\D/g, '').includes(term.replace(/\D/g, '')) ||
+          cliente.email.toLowerCase().includes(term) ||
+          cliente.telefone.replace(/\D/g, '').includes(term.replace(/\D/g, '')) ||
+          (cliente.cidade && cliente.cidade.toLowerCase().includes(term)),
       );
     }
 
@@ -115,14 +116,12 @@ const ClienteSearchOptimized: React.FC<ClienteSearchOptimizedProps> = ({
                 <div>
                   <p className="font-medium text-gray-900 text-sm">{selectedCliente.nome}</p>
                   <p className="text-xs text-gray-500">
-                    {selectedCliente.documento} • {selectedCliente.tipoPessoa === 'juridica' ? 'PJ' : 'PF'}
+                    {selectedCliente.documento} •{' '}
+                    {selectedCliente.tipoPessoa === 'juridica' ? 'PJ' : 'PF'}
                   </p>
                 </div>
               </div>
-              <button
-                onClick={clearSelection}
-                className="text-gray-400 hover:text-gray-600"
-              >
+              <button onClick={clearSelection} className="text-gray-400 hover:text-gray-600">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -137,9 +136,7 @@ const ClienteSearchOptimized: React.FC<ClienteSearchOptimizedProps> = ({
             </div>
           )}
           {!searchTerm.trim() && clientes.length > 0 && (
-            <div className="text-xs text-gray-500">
-              {clientes.length} clientes
-            </div>
+            <div className="text-xs text-gray-500">{clientes.length} clientes</div>
           )}
         </div>
 
@@ -172,10 +169,7 @@ const ClienteSearchOptimized: React.FC<ClienteSearchOptimizedProps> = ({
       {isOpen && (
         <>
           {/* Overlay */}
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setIsOpen(false)}
-          />
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
 
           {/* Dropdown Content */}
           <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-80 overflow-hidden">
@@ -190,8 +184,9 @@ const ClienteSearchOptimized: React.FC<ClienteSearchOptimizedProps> = ({
                   <div
                     key={cliente.id}
                     onClick={() => handleClienteSelect(cliente)}
-                    className={`p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors ${selectedCliente?.id === cliente.id ? 'bg-teal-50' : ''
-                      }`}
+                    className={`p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors ${
+                      selectedCliente?.id === cliente.id ? 'bg-teal-50' : ''
+                    }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">

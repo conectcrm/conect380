@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Smartphone, QrCode, Building, Check, X, Clock, AlertCircle } from 'lucide-react';
+import {
+  CreditCard,
+  Smartphone,
+  QrCode,
+  Building,
+  Check,
+  X,
+  Clock,
+  AlertCircle,
+} from 'lucide-react';
 import { Fatura } from '../../services/faturamentoService';
 import { formatarValorCompletoBRL, converterParaNumero } from '../../utils/formatacao';
 
@@ -45,8 +54,8 @@ const METODOS_PAGAMENTO: MetodoPagamento[] = [
     configuracao: {
       bandeiras: ['visa', 'mastercard', 'elo', 'amex'],
       parcelamento: true,
-      maxParcelas: 12
-    }
+      maxParcelas: 12,
+    },
   },
   {
     id: 'pix',
@@ -57,8 +66,8 @@ const METODOS_PAGAMENTO: MetodoPagamento[] = [
     prazoCompensacao: 0,
     ativo: true,
     configuracao: {
-      tempoExpiracao: 30 // minutos
-    }
+      tempoExpiracao: 30, // minutos
+    },
   },
   {
     id: 'boleto',
@@ -69,12 +78,16 @@ const METODOS_PAGAMENTO: MetodoPagamento[] = [
     prazoCompensacao: 3,
     ativo: true,
     configuracao: {
-      diasVencimento: 3
-    }
-  }
+      diasVencimento: 3,
+    },
+  },
 ];
 
-export default function GatewayPagamento({ fatura, onPagamentoConcluido, onFechar }: GatewayPagamentoProps) {
+export default function GatewayPagamento({
+  fatura,
+  onPagamentoConcluido,
+  onFechar,
+}: GatewayPagamentoProps) {
   const [metodoSelecionado, setMetodoSelecionado] = useState<MetodoPagamento | null>(null);
   const [processandoPagamento, setProcessandoPagamento] = useState(false);
   const [transacaoAtual, setTransacaoAtual] = useState<TransacaoPagamento | null>(null);
@@ -83,11 +96,13 @@ export default function GatewayPagamento({ fatura, onPagamentoConcluido, onFecha
     nome: '',
     validade: '',
     cvv: '',
-    parcelas: 1
+    parcelas: 1,
   });
 
   const valorTotal = converterParaNumero(fatura.valorTotal);
-  const valorComTaxa = metodoSelecionado ? valorTotal * (1 + metodoSelecionado.taxa / 100) : valorTotal;
+  const valorComTaxa = metodoSelecionado
+    ? valorTotal * (1 + metodoSelecionado.taxa / 100)
+    : valorTotal;
 
   // Simula processamento de pagamento
   const processarPagamento = async () => {
@@ -96,7 +111,7 @@ export default function GatewayPagamento({ fatura, onPagamentoConcluido, onFecha
     setProcessandoPagamento(true);
 
     // Simula delay do processamento
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     const novaTransacao: TransacaoPagamento = {
       id: `txn_${Date.now()}`,
@@ -105,7 +120,7 @@ export default function GatewayPagamento({ fatura, onPagamentoConcluido, onFecha
       valor: valorComTaxa,
       status: Math.random() > 0.1 ? 'aprovado' : 'rejeitado', // 90% de aprovação
       dataTransacao: new Date(),
-      codigoTransacao: `TXN${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+      codigoTransacao: `TXN${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
     };
 
     // Adiciona dados específicos por método
@@ -148,12 +163,11 @@ export default function GatewayPagamento({ fatura, onPagamentoConcluido, onFecha
         <div className="flex items-center justify-between p-6 border-b">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">Pagamento da Fatura</h2>
-            <p className="text-gray-600">#{fatura.numero} - {formatarValorCompletoBRL(fatura.valorTotal)}</p>
+            <p className="text-gray-600">
+              #{fatura.numero} - {formatarValorCompletoBRL(fatura.valorTotal)}
+            </p>
           </div>
-          <button
-            onClick={onFechar}
-            className="text-gray-400 hover:text-gray-600"
-          >
+          <button onClick={onFechar} className="text-gray-400 hover:text-gray-600">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -163,26 +177,36 @@ export default function GatewayPagamento({ fatura, onPagamentoConcluido, onFecha
             <>
               {/* Seleção de Método de Pagamento */}
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Escolha o método de pagamento</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                  Escolha o método de pagamento
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {METODOS_PAGAMENTO.filter(m => m.ativo).map(metodo => (
+                  {METODOS_PAGAMENTO.filter((m) => m.ativo).map((metodo) => (
                     <button
                       key={metodo.id}
                       onClick={() => setMetodoSelecionado(metodo)}
-                      className={`p-4 border-2 rounded-lg text-left transition-all ${metodoSelecionado?.id === metodo.id
+                      className={`p-4 border-2 rounded-lg text-left transition-all ${
+                        metodoSelecionado?.id === metodo.id
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200 hover:border-gray-300'
-                        }`}
+                      }`}
                     >
                       <div className="flex items-center gap-3 mb-2">
-                        <div className={`${metodoSelecionado?.id === metodo.id ? 'text-blue-600' : 'text-gray-400'}`}>
+                        <div
+                          className={`${metodoSelecionado?.id === metodo.id ? 'text-blue-600' : 'text-gray-400'}`}
+                        >
                           {metodo.icone}
                         </div>
                         <span className="font-medium text-gray-900">{metodo.nome}</span>
                       </div>
                       <div className="text-sm text-gray-600">
                         <div>Taxa: {metodo.taxa}%</div>
-                        <div>Compensação: {metodo.prazoCompensacao === 0 ? 'Imediata' : `${metodo.prazoCompensacao} dia(s)`}</div>
+                        <div>
+                          Compensação:{' '}
+                          {metodo.prazoCompensacao === 0
+                            ? 'Imediata'
+                            : `${metodo.prazoCompensacao} dia(s)`}
+                        </div>
                       </div>
                     </button>
                   ))}
@@ -205,10 +229,12 @@ export default function GatewayPagamento({ fatura, onPagamentoConcluido, onFecha
                         <input
                           type="text"
                           value={dadosCartao.numero}
-                          onChange={(e) => setDadosCartao(prev => ({
-                            ...prev,
-                            numero: formatarNumeroCartao(e.target.value)
-                          }))}
+                          onChange={(e) =>
+                            setDadosCartao((prev) => ({
+                              ...prev,
+                              numero: formatarNumeroCartao(e.target.value),
+                            }))
+                          }
                           placeholder="1234 5678 9012 3456"
                           maxLength={19}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -222,7 +248,12 @@ export default function GatewayPagamento({ fatura, onPagamentoConcluido, onFecha
                         <input
                           type="text"
                           value={dadosCartao.nome}
-                          onChange={(e) => setDadosCartao(prev => ({ ...prev, nome: e.target.value.toUpperCase() }))}
+                          onChange={(e) =>
+                            setDadosCartao((prev) => ({
+                              ...prev,
+                              nome: e.target.value.toUpperCase(),
+                            }))
+                          }
                           placeholder="NOME COMO NO CARTÃO"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
@@ -235,10 +266,12 @@ export default function GatewayPagamento({ fatura, onPagamentoConcluido, onFecha
                         <input
                           type="text"
                           value={dadosCartao.validade}
-                          onChange={(e) => setDadosCartao(prev => ({
-                            ...prev,
-                            validade: formatarValidade(e.target.value)
-                          }))}
+                          onChange={(e) =>
+                            setDadosCartao((prev) => ({
+                              ...prev,
+                              validade: formatarValidade(e.target.value),
+                            }))
+                          }
                           placeholder="MM/AA"
                           maxLength={5}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -246,13 +279,16 @@ export default function GatewayPagamento({ fatura, onPagamentoConcluido, onFecha
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          CVV
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">CVV</label>
                         <input
                           type="text"
                           value={dadosCartao.cvv}
-                          onChange={(e) => setDadosCartao(prev => ({ ...prev, cvv: e.target.value.replace(/\D/g, '') }))}
+                          onChange={(e) =>
+                            setDadosCartao((prev) => ({
+                              ...prev,
+                              cvv: e.target.value.replace(/\D/g, ''),
+                            }))
+                          }
                           placeholder="123"
                           maxLength={4}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -265,13 +301,23 @@ export default function GatewayPagamento({ fatura, onPagamentoConcluido, onFecha
                         </label>
                         <select
                           value={dadosCartao.parcelas}
-                          onChange={(e) => setDadosCartao(prev => ({ ...prev, parcelas: parseInt(e.target.value) }))}
+                          onChange={(e) =>
+                            setDadosCartao((prev) => ({
+                              ...prev,
+                              parcelas: parseInt(e.target.value),
+                            }))
+                          }
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
-                          {Array.from({ length: metodoSelecionado.configuracao.maxParcelas }, (_, i) => i + 1).map(parcela => (
+                          {Array.from(
+                            { length: metodoSelecionado.configuracao.maxParcelas },
+                            (_, i) => i + 1,
+                          ).map((parcela) => (
                             <option key={parcela} value={parcela}>
                               {parcela}x de {formatarValorCompletoBRL(valorComTaxa / parcela)}
-                              {parcela === 1 ? ' à vista' : ` (Total: ${formatarValorCompletoBRL(valorComTaxa)})`}
+                              {parcela === 1
+                                ? ' à vista'
+                                : ` (Total: ${formatarValorCompletoBRL(valorComTaxa)})`}
                             </option>
                           ))}
                         </select>
@@ -292,7 +338,8 @@ export default function GatewayPagamento({ fatura, onPagamentoConcluido, onFecha
                     <div className="text-center">
                       <Building className="w-24 h-24 mx-auto mb-4 text-gray-400" />
                       <p className="text-gray-600">
-                        Será gerado um boleto bancário com vencimento em {metodoSelecionado.configuracao.diasVencimento} dias
+                        Será gerado um boleto bancário com vencimento em{' '}
+                        {metodoSelecionado.configuracao.diasVencimento} dias
                       </p>
                     </div>
                   )}
@@ -309,12 +356,18 @@ export default function GatewayPagamento({ fatura, onPagamentoConcluido, onFecha
                       <span className="font-medium">{formatarValorCompletoBRL(valorTotal)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Taxa do método ({metodoSelecionado.taxa}%):</span>
-                      <span className="font-medium">{formatarValorCompletoBRL(valorTotal * metodoSelecionado.taxa / 100)}</span>
+                      <span className="text-gray-600">
+                        Taxa do método ({metodoSelecionado.taxa}%):
+                      </span>
+                      <span className="font-medium">
+                        {formatarValorCompletoBRL((valorTotal * metodoSelecionado.taxa) / 100)}
+                      </span>
                     </div>
                     <div className="border-t pt-2 flex justify-between">
                       <span className="font-semibold">Total a Pagar:</span>
-                      <span className="font-semibold text-lg">{formatarValorCompletoBRL(valorComTaxa)}</span>
+                      <span className="font-semibold text-lg">
+                        {formatarValorCompletoBRL(valorComTaxa)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -324,7 +377,14 @@ export default function GatewayPagamento({ fatura, onPagamentoConcluido, onFecha
               {metodoSelecionado && (
                 <button
                   onClick={processarPagamento}
-                  disabled={processandoPagamento || (metodoSelecionado.tipo === 'cartao' && (!dadosCartao.numero || !dadosCartao.nome || !dadosCartao.validade || !dadosCartao.cvv))}
+                  disabled={
+                    processandoPagamento ||
+                    (metodoSelecionado.tipo === 'cartao' &&
+                      (!dadosCartao.numero ||
+                        !dadosCartao.nome ||
+                        !dadosCartao.validade ||
+                        !dadosCartao.cvv))
+                  }
                   className="w-full py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-medium"
                 >
                   {processandoPagamento ? (
@@ -350,9 +410,7 @@ export default function GatewayPagamento({ fatura, onPagamentoConcluido, onFecha
                     <Check className="w-8 h-8 text-green-600" />
                   </div>
                   <h3 className="text-xl font-semibold text-green-900">Pagamento Aprovado!</h3>
-                  <p className="text-gray-600">
-                    Transação: {transacaoAtual.codigoTransacao}
-                  </p>
+                  <p className="text-gray-600">Transação: {transacaoAtual.codigoTransacao}</p>
 
                   {transacaoAtual.qrCode && (
                     <div className="bg-gray-50 p-6 rounded-lg">

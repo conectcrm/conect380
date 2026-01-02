@@ -110,14 +110,7 @@ export interface FluxoTriagem {
 
 // ==================== TIPOS DO BUILDER (Frontend) ====================
 
-export type BlockType =
-  | 'start'
-  | 'message'
-  | 'menu'
-  | 'question'
-  | 'condition'
-  | 'action'
-  | 'end';
+export type BlockType = 'start' | 'message' | 'menu' | 'question' | 'condition' | 'action' | 'end';
 
 export interface BlockData {
   label: string;

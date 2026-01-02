@@ -10,7 +10,7 @@ import {
   ExternalLink,
   FileText,
   Trash2,
-  Star
+  Star,
 } from 'lucide-react';
 import { Contato, HistoricoAtendimento, Demanda, NotaCliente } from '../types';
 import { formatarTempoDecorrido, getIconeCanal, resolverNomeExibicao } from '../utils';
@@ -24,7 +24,7 @@ interface ClientePanelProps {
   notas: NotaCliente[];
   onEditarContato: () => void;
   onVincularCliente: () => void;
-  onAbrirDemanda: (tipo: string, descricao: string) => void;
+  onConverterTicket?: () => void;
   onAdicionarNota: (conteudo: string, importante: boolean) => void;
   onExcluirNota: (notaId: string) => void;
   theme: ThemePalette;
@@ -37,10 +37,10 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
   notas,
   onEditarContato,
   onVincularCliente,
-  onAbrirDemanda,
+  onConverterTicket,
   onAdicionarNota,
   onExcluirNota,
-  theme
+  theme,
 }) => {
   const [expandido, setExpandido] = useState(true);
   const [abaAtiva, setAbaAtiva] = useState<'historico' | 'demandas' | 'notas'>('historico');
@@ -51,24 +51,14 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
     { value: 'financeira', label: 'Financeira' },
     { value: 'reclamacao', label: 'Reclamação' },
     { value: 'solicitacao', label: 'Solicitação' },
-    { value: 'outros', label: 'Outros' }
+    { value: 'outros', label: 'Outros' },
   ];
 
   const resolveDemandaTipoLabel = (tipo: Demanda['tipo']) =>
-    demandaTipoOptions.find(option => option.value === tipo)?.label ?? tipo;
+    demandaTipoOptions.find((option) => option.value === tipo)?.label ?? tipo;
 
-  const [tipoDemanda, setTipoDemanda] = useState<Demanda['tipo'] | ''>('');
-  const [descricaoDemanda, setDescricaoDemanda] = useState('');
   const [novaNota, setNovaNota] = useState('');
   const [notaImportante, setNotaImportante] = useState(false);
-
-  const handleAbrirDemanda = () => {
-    if (tipoDemanda && descricaoDemanda.trim()) {
-      onAbrirDemanda(tipoDemanda, descricaoDemanda);
-      setTipoDemanda('');
-      setDescricaoDemanda('');
-    }
-  };
 
   const handleAdicionarNota = () => {
     if (novaNota.trim()) {
@@ -148,12 +138,17 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-2.5">
               <img
-                src={avatarContato || `https://ui-avatars.com/api/?name=${encodeURIComponent(resolverNomeExibicao(contato))}&background=random`}
+                src={
+                  avatarContato ||
+                  `https://ui-avatars.com/api/?name=${encodeURIComponent(resolverNomeExibicao(contato))}&background=random`
+                }
                 alt={resolverNomeExibicao(contato)}
                 className="w-12 h-12 rounded-full object-cover"
               />
               <div>
-                <h4 className="font-semibold text-sm text-gray-900">{resolverNomeExibicao(contato)}</h4>
+                <h4 className="font-semibold text-sm text-gray-900">
+                  {resolverNomeExibicao(contato)}
+                </h4>
                 <p className="text-xs text-gray-500">
                   {contato?.online ? 'Online agora' : 'Offline'}
                 </p>
@@ -204,7 +199,7 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                 onClick={onVincularCliente}
                 style={{
                   borderColor: theme.colors.border,
-                  color: theme.colors.textSecondary
+                  color: theme.colors.textSecondary,
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = theme.colors.primary;
@@ -232,11 +227,9 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
               onClick={() => setAbaAtiva('historico')}
               style={{
                 color: abaAtiva === 'historico' ? theme.colors.primary : '',
-                borderBottomColor: abaAtiva === 'historico' ? theme.colors.primary : ''
+                borderBottomColor: abaAtiva === 'historico' ? theme.colors.primary : '',
               }}
-              className={`flex-1 px-2 py-2 text-xs font-medium transition-colors ${abaAtiva === 'historico'
-                ? 'border-b-2'
-                : 'text-gray-600 hover:text-gray-900'
+              className={`flex-1 px-2 py-2 text-xs font-medium transition-colors ${abaAtiva === 'historico' ? 'border-b-2' : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
               Histórico ({Array.isArray(historico) ? historico.length : 0})
@@ -245,11 +238,9 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
               onClick={() => setAbaAtiva('demandas')}
               style={{
                 color: abaAtiva === 'demandas' ? theme.colors.primary : '',
-                borderBottomColor: abaAtiva === 'demandas' ? theme.colors.primary : ''
+                borderBottomColor: abaAtiva === 'demandas' ? theme.colors.primary : '',
               }}
-              className={`flex-1 px-2 py-2 text-xs font-medium transition-colors ${abaAtiva === 'demandas'
-                ? 'border-b-2'
-                : 'text-gray-600 hover:text-gray-900'
+              className={`flex-1 px-2 py-2 text-xs font-medium transition-colors ${abaAtiva === 'demandas' ? 'border-b-2' : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
               Demandas ({Array.isArray(demandas) ? demandas.length : 0})
@@ -258,11 +249,9 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
               onClick={() => setAbaAtiva('notas')}
               style={{
                 color: abaAtiva === 'notas' ? theme.colors.primary : '',
-                borderBottomColor: abaAtiva === 'notas' ? theme.colors.primary : ''
+                borderBottomColor: abaAtiva === 'notas' ? theme.colors.primary : '',
               }}
-              className={`flex-1 px-2 py-2 text-xs font-medium transition-colors ${abaAtiva === 'notas'
-                ? 'border-b-2'
-                : 'text-gray-600 hover:text-gray-900'
+              className={`flex-1 px-2 py-2 text-xs font-medium transition-colors ${abaAtiva === 'notas' ? 'border-b-2' : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
               Notas ({Array.isArray(notas) ? notas.length : 0})
@@ -280,7 +269,7 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                 </p>
               ) : (
                 <>
-                  {historico.slice(0, 5).map(item => {
+                  {historico.slice(0, 5).map((item) => {
                     const IconeCanal = getIconeCanal(item.canal);
                     return (
                       <div
@@ -289,29 +278,35 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                       >
                         <div className="flex items-start justify-between mb-1.5">
                           <div className="flex items-center gap-1.5">
-                            <div className={`p-1 rounded-full ${item.canal === 'whatsapp' ? 'bg-green-100' :
-                              item.canal === 'telegram' ? 'bg-blue-100' :
-                                item.canal === 'email' ? 'bg-red-100' :
-                                  'bg-gray-100'
-                              }`}>
-                              <IconeCanal className={`w-2.5 h-2.5 ${item.canal === 'whatsapp' ? 'text-green-600' :
-                                item.canal === 'telegram' ? 'text-blue-600' :
-                                  item.canal === 'email' ? 'text-red-600' :
-                                    'text-gray-600'
-                                }`} />
+                            <div
+                              className={`p-1 rounded-full ${item.canal === 'whatsapp'
+                                  ? 'bg-green-100'
+                                  : item.canal === 'telegram'
+                                    ? 'bg-blue-100'
+                                    : item.canal === 'email'
+                                      ? 'bg-red-100'
+                                      : 'bg-gray-100'
+                                }`}
+                            >
+                              <IconeCanal
+                                className={`w-2.5 h-2.5 ${item.canal === 'whatsapp'
+                                    ? 'text-green-600'
+                                    : item.canal === 'telegram'
+                                      ? 'text-blue-600'
+                                      : item.canal === 'email'
+                                        ? 'text-red-600'
+                                        : 'text-gray-600'
+                                  }`}
+                              />
                             </div>
-                            <span className="text-xs font-medium text-gray-700">
-                              {item.numero}
-                            </span>
+                            <span className="text-xs font-medium text-gray-700">{item.numero}</span>
                           </div>
                           <span className="text-xs text-gray-500">
                             {formatarTempoDecorrido(item.dataAbertura)}
                           </span>
                         </div>
                         <p className="text-xs text-gray-900 mb-1">{item.resumo}</p>
-                        <p className="text-xs text-gray-500">
-                          Atendido por {item.atendente}
-                        </p>
+                        <p className="text-xs text-gray-500">Atendido por {item.atendente}</p>
                       </div>
                     );
                   })}
@@ -319,8 +314,10 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                     <button
                       className="w-full py-1.5 text-xs font-medium"
                       style={{ color: theme.colors.primary }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = theme.colors.primaryHover}
-                      onMouseLeave={(e) => e.currentTarget.style.color = theme.colors.primary}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.color = theme.colors.primaryHover)
+                      }
+                      onMouseLeave={(e) => (e.currentTarget.style.color = theme.colors.primary)}
                     >
                       Ver histórico completo ({historico.length} atendimentos)
                     </button>
@@ -330,93 +327,33 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
             </div>
           ) : abaAtiva === 'demandas' ? (
             <div className="space-y-3">
-              {/* Formulário Nova Demanda */}
-              <div className="p-3 rounded-lg space-y-2.5" style={{ backgroundColor: theme.colors.primaryLight }}>
-                <h4 className="text-xs font-semibold text-gray-900">Nova Demanda</h4>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Tipo
-                  </label>
-                  <select
-                    value={tipoDemanda}
-                    onChange={(e) => {
-                      const nextValue = e.target.value as Demanda['tipo'] | '';
-                      setTipoDemanda(nextValue);
-                    }}
-                    style={{ borderColor: theme.colors.border }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.outline = `2px solid ${theme.colors.primary}`;
-                      e.currentTarget.style.borderColor = 'transparent';
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.outline = 'none';
-                      e.currentTarget.style.borderColor = theme.colors.border;
-                    }}
-                    className="w-full px-2.5 py-1.5 border rounded-lg text-xs transition-all"
-                  >
-                    <option value="">Selecione...</option>
-                    {demandaTipoOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Descrição
-                  </label>
-                  <textarea
-                    value={descricaoDemanda}
-                    onChange={(e) => setDescricaoDemanda(e.target.value)}
-                    rows={2}
-                    placeholder="Descreva a demanda..."
-                    style={{ borderColor: theme.colors.border }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.outline = `2px solid ${theme.colors.primary}`;
-                      e.currentTarget.style.borderColor = 'transparent';
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.outline = 'none';
-                      e.currentTarget.style.borderColor = theme.colors.border;
-                    }}
-                    className="w-full px-2.5 py-1.5 border rounded-lg text-xs resize-none transition-all"
-                  />
-                </div>
-
+              {/* Botão Converter Ticket */}
+              {onConverterTicket && (
                 <button
-                  onClick={handleAbrirDemanda}
-                  disabled={!tipoDemanda.trim() || !descricaoDemanda.trim()}
+                  onClick={onConverterTicket}
                   style={{
-                    backgroundColor: (!tipoDemanda.trim() || !descricaoDemanda.trim()) ? '#D1D5DB' : theme.colors.primary,
-                    color: '#FFFFFF'
+                    backgroundColor: theme.colors.primary,
+                    color: '#FFFFFF',
                   }}
                   onMouseEnter={(e) => {
-                    if (tipoDemanda.trim() && descricaoDemanda.trim()) {
-                      e.currentTarget.style.backgroundColor = theme.colors.primaryHover;
-                    }
+                    e.currentTarget.style.backgroundColor = theme.colors.primaryHover;
                   }}
                   onMouseLeave={(e) => {
-                    if (tipoDemanda.trim() && descricaoDemanda.trim()) {
-                      e.currentTarget.style.backgroundColor = theme.colors.primary;
-                    }
+                    e.currentTarget.style.backgroundColor = theme.colors.primary;
                   }}
-                  className="w-full py-1.5 rounded-lg disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                  className="w-full py-2.5 rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
                 >
-                  Abrir Demanda
+                  <FileText className="h-4 w-4" />
+                  Converter Ticket em Demanda
                 </button>
-              </div>
+              )}
 
               {/* Lista de Demandas */}
               <div className="space-y-2">
                 {!Array.isArray(demandas) || demandas.length === 0 ? (
-                  <p className="text-xs text-gray-500 text-center py-3">
-                    Nenhuma demanda aberta
-                  </p>
+                  <p className="text-xs text-gray-500 text-center py-3">Nenhuma demanda vinculada</p>
                 ) : (
-                  demandas.map(demanda => (
+                  demandas.map((demanda) => (
                     <div
                       key={demanda.id}
                       className="p-2.5 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
@@ -425,8 +362,11 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                         <span className="text-xs font-medium text-gray-900">
                           {resolveDemandaTipoLabel(demanda.tipo)}
                         </span>
-                        <span className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium ${getStatusDemandaStyle(demanda.status)
-                          }`}>
+                        <span
+                          className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium ${getStatusDemandaStyle(
+                            demanda.status,
+                          )}`}
+                        >
                           {getStatusDemandaIcon(demanda.status)}
                           {demanda.status.replace('_', ' ')}
                         </span>
@@ -445,7 +385,10 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
             /* Aba de Notas */
             <div className="space-y-3">
               {/* Formulário Nova Nota */}
-              <div className="p-3 rounded-lg space-y-2.5" style={{ backgroundColor: theme.colors.primaryLight }}>
+              <div
+                className="p-3 rounded-lg space-y-2.5"
+                style={{ backgroundColor: theme.colors.primaryLight }}
+              >
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-semibold text-gray-900 flex items-center gap-1.5">
                     <FileText className="w-3.5 h-3.5" />
@@ -455,7 +398,9 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                     onClick={() => setNotaImportante(!notaImportante)}
                     className={`p-1 rounded transition-colors ${notaImportante ? 'bg-yellow-100' : 'hover:bg-gray-100'
                       }`}
-                    title={notaImportante ? 'Remover marcação importante' : 'Marcar como importante'}
+                    title={
+                      notaImportante ? 'Remover marcação importante' : 'Marcar como importante'
+                    }
                   >
                     <Star
                       className={`w-3.5 h-3.5 ${notaImportante ? 'text-yellow-500 fill-yellow-500' : 'text-gray-400'}`}
@@ -487,7 +432,7 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                   disabled={!novaNota.trim()}
                   style={{
                     backgroundColor: !novaNota.trim() ? '#D1D5DB' : theme.colors.primary,
-                    color: '#FFFFFF'
+                    color: '#FFFFFF',
                   }}
                   onMouseEnter={(e) => {
                     if (novaNota.trim()) {
@@ -511,9 +456,7 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                   <div className="text-center py-6">
                     <FileText className="w-10 h-10 text-gray-300 mx-auto mb-1.5" />
                     <p className="text-xs text-gray-500">Nenhuma nota adicionada</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      Adicione notas importantes
-                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">Adicione notas importantes</p>
                   </div>
                 ) : (
                   [...notas]
@@ -523,12 +466,12 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                       if (!a.importante && b.importante) return 1;
                       return new Date(b.dataCriacao).getTime() - new Date(a.dataCriacao).getTime();
                     })
-                    .map(nota => (
+                    .map((nota) => (
                       <div
                         key={nota.id}
                         className={`p-2.5 rounded-lg transition-colors relative group ${nota.importante
-                          ? 'bg-yellow-50 border border-yellow-200'
-                          : 'bg-gray-50 hover:bg-gray-100'
+                            ? 'bg-yellow-50 border border-yellow-200'
+                            : 'bg-gray-50 hover:bg-gray-100'
                           }`}
                       >
                         {/* Badge Importante */}
@@ -558,9 +501,7 @@ export const ClientePanel: React.FC<ClientePanelProps> = ({
                               </span>
                             </div>
                             {nota.dataEdicao && (
-                              <span className="text-xs text-gray-400">
-                                (editado)
-                              </span>
+                              <span className="text-xs text-gray-400">(editado)</span>
                             )}
                           </div>
                         </div>

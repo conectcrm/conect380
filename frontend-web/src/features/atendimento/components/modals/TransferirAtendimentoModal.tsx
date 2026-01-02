@@ -91,8 +91,7 @@ export function TransferirAtendimentoModal({
       // e remover o atendente atual do ticket
       const atendentesDisponiveis = todosAtendentes.filter(
         (a: Atendente) =>
-          a.id !== atendenteAtualId &&
-          (a.status === 'disponivel' || a.status === 'ocupado')
+          a.id !== atendenteAtualId && (a.status === 'disponivel' || a.status === 'ocupado'),
       );
 
       setAtendentes(atendentesDisponiveis);
@@ -112,10 +111,11 @@ export function TransferirAtendimentoModal({
   // ===== FILTRAR ATENDENTES =====
 
   const atendentesFiltrados = buscaAtendente
-    ? atendentes.filter((a) =>
-      a.nome.toLowerCase().includes(buscaAtendente.toLowerCase()) ||
-      a.email.toLowerCase().includes(buscaAtendente.toLowerCase())
-    )
+    ? atendentes.filter(
+        (a) =>
+          a.nome.toLowerCase().includes(buscaAtendente.toLowerCase()) ||
+          a.email.toLowerCase().includes(buscaAtendente.toLowerCase()),
+      )
     : atendentes;
 
   // ===== HANDLERS =====
@@ -156,7 +156,8 @@ export function TransferirAtendimentoModal({
       handleClose();
     } catch (error: any) {
       console.error('❌ Erro ao transferir ticket:', error);
-      const mensagemErro = error.response?.data?.message ||
+      const mensagemErro =
+        error.response?.data?.message ||
         error.response?.data?.error ||
         'Erro ao transferir atendimento';
       setErro(mensagemErro);
@@ -223,9 +224,7 @@ export function TransferirAtendimentoModal({
               <UserCheck className="h-7 w-7 text-[#159A9C]" />
               Transferir Atendimento
             </h2>
-            {ticketNumero && (
-              <p className="text-sm text-gray-500 mt-1">Ticket #{ticketNumero}</p>
-            )}
+            {ticketNumero && <p className="text-sm text-gray-500 mt-1">Ticket #{ticketNumero}</p>}
           </div>
           <button
             onClick={handleClose}
@@ -289,10 +288,11 @@ export function TransferirAtendimentoModal({
                         key={atendente.id}
                         type="button"
                         onClick={() => setAtendenteId(atendente.id)}
-                        className={`w-full p-3 rounded-lg border-2 transition-all text-left ${atendenteId === atendente.id
-                          ? 'border-[#159A9C] bg-[#159A9C]/5'
-                          : 'border-gray-200 hover:border-[#159A9C]/50 bg-white'
-                          }`}
+                        className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                          atendenteId === atendente.id
+                            ? 'border-[#159A9C] bg-[#159A9C]/5'
+                            : 'border-gray-200 hover:border-[#159A9C]/50 bg-white'
+                        }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
@@ -315,7 +315,8 @@ export function TransferirAtendimentoModal({
                               <div className="text-xs text-gray-500">{atendente.email}</div>
                               {atendente.ticketsAtivos !== undefined && (
                                 <div className="text-xs text-gray-400 mt-1">
-                                  {atendente.ticketsAtivos} ticket{atendente.ticketsAtivos !== 1 ? 's' : ''} ativo
+                                  {atendente.ticketsAtivos} ticket
+                                  {atendente.ticketsAtivos !== 1 ? 's' : ''} ativo
                                   {atendente.ticketsAtivos !== 1 ? 's' : ''}
                                 </div>
                               )}
@@ -325,7 +326,7 @@ export function TransferirAtendimentoModal({
                           {/* Status Badge */}
                           <span
                             className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(
-                              atendente.status
+                              atendente.status,
                             )}`}
                           >
                             {getStatusLabel(atendente.status)}

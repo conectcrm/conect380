@@ -35,36 +35,36 @@ const getColorClasses = (color: string) => {
       bg: 'bg-[#DEEFE7]',
       border: 'border-[#B4BEC9]',
       text: 'text-[#002333]',
-      icon: 'text-[#159A9C]'
+      icon: 'text-[#159A9C]',
     },
     green: {
       gradient: 'from-[#159A9C] to-[#0F7B7D]',
       bg: 'bg-[#DEEFE7]',
       border: 'border-[#B4BEC9]',
       text: 'text-[#002333]',
-      icon: 'text-[#159A9C]'
+      icon: 'text-[#159A9C]',
     },
     orange: {
       gradient: 'from-[#159A9C] to-[#0F7B7D]',
       bg: 'bg-[#DEEFE7]',
       border: 'border-[#B4BEC9]',
       text: 'text-[#002333]',
-      icon: 'text-[#159A9C]'
+      icon: 'text-[#159A9C]',
     },
     purple: {
       gradient: 'from-[#159A9C] to-[#0F7B7D]',
       bg: 'bg-[#DEEFE7]',
       border: 'border-[#B4BEC9]',
       text: 'text-[#002333]',
-      icon: 'text-[#159A9C]'
+      icon: 'text-[#159A9C]',
     },
     red: {
       gradient: 'from-[#159A9C] to-[#0F7B7D]',
       bg: 'bg-[#DEEFE7]',
       border: 'border-[#B4BEC9]',
       text: 'text-[#002333]',
-      icon: 'text-[#159A9C]'
-    }
+      icon: 'text-[#159A9C]',
+    },
   };
 
   return colors[color as keyof typeof colors] || colors.blue;
@@ -77,7 +77,7 @@ const getBadgeClasses = (badgeColor: string = 'blue') => {
     green: 'bg-[#DEEFE7] text-[#159A9C]',
     yellow: 'bg-[#B4BEC9] text-[#002333]',
     red: 'bg-[#B4BEC9] text-[#002333]',
-    purple: 'bg-[#DEEFE7] text-[#159A9C]'
+    purple: 'bg-[#DEEFE7] text-[#159A9C]',
   };
 
   return badges[badgeColor as keyof typeof badges] || badges.blue;
@@ -104,7 +104,9 @@ const ModulesScreen: React.FC<ModulesScreenProps> = ({ nucleusData }) => {
     }
     if (module.badge) {
       return (
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBadgeClasses(module.badgeColor)}`}>
+        <span
+          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBadgeClasses(module.badgeColor)}`}
+        >
           {module.badge}
         </span>
       );
@@ -154,10 +156,12 @@ const ModulesScreen: React.FC<ModulesScreenProps> = ({ nucleusData }) => {
                   <div className="flex items-center space-x-2">
                     {/* Badge de notificações */}
                     {module.notifications > 0 && (
-                      <span className={`
+                      <span
+                        className={`
                         inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none
                         bg-red-500 text-white rounded-full min-w-[20px] h-5
-                      `}>
+                      `}
+                      >
                         {module.notifications > 99 ? '99+' : module.notifications}
                       </span>
                     )}
@@ -168,19 +172,13 @@ const ModulesScreen: React.FC<ModulesScreenProps> = ({ nucleusData }) => {
                 </div>
 
                 <div className="mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    {module.name}
-                  </h3>
-                  <p className="text-sm text-gray-600 leading-relaxed">
-                    {module.description}
-                  </p>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{module.name}</h3>
+                  <p className="text-sm text-gray-600 leading-relaxed">{module.description}</p>
                 </div>
 
                 {isClickable && (
                   <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                    <span className="text-sm font-medium text-gray-500">
-                      Acessar módulo
-                    </span>
+                    <span className="text-sm font-medium text-gray-500">Acessar módulo</span>
                     <ChevronRight className="w-4 h-4 text-gray-400" />
                   </div>
                 )}
@@ -188,12 +186,7 @@ const ModulesScreen: React.FC<ModulesScreenProps> = ({ nucleusData }) => {
             );
 
             return isClickable ? (
-              <Link
-                key={module.id}
-                to={module.href}
-                className="block h-full"
-                onClick={() => console.log('DEBUG: Navegando para:', module.href)}
-              >
+              <Link key={module.id} to={module.href} className="block h-full">
                 {moduleCard}
               </Link>
             ) : (
@@ -206,23 +199,25 @@ const ModulesScreen: React.FC<ModulesScreenProps> = ({ nucleusData }) => {
 
         {/* Estatísticas do Núcleo */}
         <div className="mt-12 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Resumo do {nucleusData.title}</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Resumo do {nucleusData.title}
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
               <div className="text-2xl font-bold text-gray-900">
-                {nucleusData.modules.filter(m => m.status === 'active').length}
+                {nucleusData.modules.filter((m) => m.status === 'active').length}
               </div>
               <div className="text-sm text-gray-600">Módulos Ativos</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-yellow-600">
-                {nucleusData.modules.filter(m => m.status === 'beta').length}
+                {nucleusData.modules.filter((m) => m.status === 'beta').length}
               </div>
               <div className="text-sm text-gray-600">Em Beta</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-gray-500">
-                {nucleusData.modules.filter(m => m.status === 'coming_soon').length}
+                {nucleusData.modules.filter((m) => m.status === 'coming_soon').length}
               </div>
               <div className="text-sm text-gray-600">Em Desenvolvimento</div>
             </div>

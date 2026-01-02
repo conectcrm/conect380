@@ -1,17 +1,11 @@
 /**
  * 🎯 StatusActionButtons - Botões de ação rápida para transição de status
- * 
+ *
  * Permite que atendente mude status do ticket com um clique
  */
 
 import React from 'react';
-import {
-  CheckCircle,
-  Clock,
-  MessageSquare,
-  X,
-  RotateCcw
-} from 'lucide-react';
+import { CheckCircle, Clock, MessageSquare, X, RotateCcw } from 'lucide-react';
 import { StatusAtendimentoType } from '../types';
 import { getAvailableActions } from '../utils/statusUtils';
 import { ThemePalette } from '../../../../contexts/ThemeContext';
@@ -29,7 +23,7 @@ export const StatusActionButtons: React.FC<StatusActionButtonsProps> = ({
   onChangeStatus,
   theme,
   disabled = false,
-  loading = false
+  loading = false,
 }) => {
   const [loadingStatus, setLoadingStatus] = React.useState<StatusAtendimentoType | null>(null);
 
@@ -55,7 +49,8 @@ export const StatusActionButtons: React.FC<StatusActionButtonsProps> = ({
 
   // Cores para cada variante
   const getButtonClasses = (variant: string) => {
-    const base = 'flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed';
+    const base =
+      'flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed';
 
     switch (variant) {
       case 'primary':
@@ -91,7 +86,7 @@ export const StatusActionButtons: React.FC<StatusActionButtonsProps> = ({
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      {actions.map(action => {
+      {actions.map((action) => {
         const Icon = getActionIcon(action.status);
         const isLoading = loadingStatus === action.status;
 
@@ -124,7 +119,7 @@ export const StatusActionButtonsCompact: React.FC<StatusActionButtonsProps> = ({
   onChangeStatus,
   theme,
   disabled = false,
-  loading = false
+  loading = false,
 }) => {
   const [loadingStatus, setLoadingStatus] = React.useState<StatusAtendimentoType | null>(null);
 
@@ -181,7 +176,7 @@ export const StatusActionButtonsCompact: React.FC<StatusActionButtonsProps> = ({
 
   return (
     <div className="flex items-center gap-1">
-      {actions.map(action => {
+      {actions.map((action) => {
         const Icon = getActionIcon(action.status);
         const isLoading = loadingStatus === action.status;
 

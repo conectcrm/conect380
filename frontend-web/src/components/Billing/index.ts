@@ -19,5 +19,5 @@ export type {
   Plano,
   ModuloSistema,
   AssinaturaEmpresa,
-  LimitesInfo
+  LimitesInfo,
 } from '../../hooks/useSubscription';

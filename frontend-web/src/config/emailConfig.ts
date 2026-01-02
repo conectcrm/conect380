@@ -21,26 +21,26 @@ export const EMAIL_PROVIDERS: Record<string, EmailProvider> = {
     name: 'Gmail SMTP',
     description: 'Usar sua conta do Gmail para enviar e-mails',
     setup: 'Ativar "Acesso a apps menos seguros" ou usar "Senhas de app"',
-    limits: '500 e-mails/dia (gratuito)'
+    limits: '500 e-mails/dia (gratuito)',
   },
   sendgrid: {
     name: 'SendGrid',
     description: 'Serviço profissional de e-mail marketing',
     setup: 'Criar conta gratuita e obter API Key',
-    limits: '100 e-mails/dia (gratuito)'
+    limits: '100 e-mails/dia (gratuito)',
   },
   'aws-ses': {
     name: 'Amazon SES',
     description: 'Serviço de e-mail da Amazon Web Services',
     setup: 'Conta AWS e configurar SES',
-    limits: '200 e-mails/dia (gratuito nos primeiros 12 meses)'
+    limits: '200 e-mails/dia (gratuito nos primeiros 12 meses)',
   },
   nodemailer: {
     name: 'Nodemailer SMTP',
     description: 'Configuração SMTP personalizada',
     setup: 'Configurar servidor SMTP customizado',
-    limits: 'Depende do provedor SMTP'
-  }
+    limits: 'Depende do provedor SMTP',
+  },
 };
 
 // Configurações padrão para desenvolvimento
@@ -52,17 +52,17 @@ export const EMAIL_CONFIG: Record<string, EmailConfig> = {
       service: 'gmail',
       auth: {
         user: process.env.REACT_APP_EMAIL_USER || 'seu-email@gmail.com',
-        pass: process.env.REACT_APP_EMAIL_PASSWORD || 'sua-senha-de-app'
-      }
-    }
+        pass: process.env.REACT_APP_EMAIL_PASSWORD || 'sua-senha-de-app',
+      },
+    },
   },
 
   // SendGrid - Mais profissional
   sendgrid: {
     provider: 'sendgrid',
     config: {
-      apiKey: process.env.REACT_APP_SENDGRID_API_KEY || 'sua-api-key-sendgrid'
-    }
+      apiKey: process.env.REACT_APP_SENDGRID_API_KEY || 'sua-api-key-sendgrid',
+    },
   },
 
   // AWS SES
@@ -71,8 +71,8 @@ export const EMAIL_CONFIG: Record<string, EmailConfig> = {
     config: {
       accessKeyId: process.env.REACT_APP_AWS_ACCESS_KEY_ID || '',
       secretAccessKey: process.env.REACT_APP_AWS_SECRET_ACCESS_KEY || '',
-      region: process.env.REACT_APP_AWS_REGION || 'us-east-1'
-    }
+      region: process.env.REACT_APP_AWS_REGION || 'us-east-1',
+    },
   },
 
   // SMTP Customizado
@@ -84,10 +84,10 @@ export const EMAIL_CONFIG: Record<string, EmailConfig> = {
       secure: false,
       auth: {
         user: process.env.REACT_APP_SMTP_USER || '',
-        pass: process.env.REACT_APP_SMTP_PASSWORD || ''
-      }
-    }
-  }
+        pass: process.env.REACT_APP_SMTP_PASSWORD || '',
+      },
+    },
+  },
 };
 
 // Template de e-mail para proposta
@@ -236,5 +236,5 @@ export const TEMPLATE_PROPOSTA_EMAIL = `
 export default {
   EMAIL_PROVIDERS,
   EMAIL_CONFIG,
-  TEMPLATE_PROPOSTA_EMAIL
+  TEMPLATE_PROPOSTA_EMAIL,
 };

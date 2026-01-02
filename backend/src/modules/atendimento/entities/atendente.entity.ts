@@ -6,7 +6,10 @@ import {
   UpdateDateColumn,
   DeleteDateColumn,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 export enum StatusAtendente {
   DISPONIVEL = 'DISPONIVEL',
@@ -32,6 +35,10 @@ export class Atendente {
 
   @Column({ type: 'uuid', name: 'empresaId' })
   empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresaId' })
+  empresa: Empresa;
 
   @Column({ type: 'varchar', length: 20, default: 'DISPONIVEL' })
   status: string;

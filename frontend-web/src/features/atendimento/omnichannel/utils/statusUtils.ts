@@ -60,7 +60,7 @@ export const STATUS_CONFIG: Record<StatusAtendimentoType, StatusConfig> = {
  * Obter configuração visual de um status
  */
 export const getStatusConfig = (status: StatusAtendimentoType): StatusConfig => {
-  return STATUS_CONFIG[status] || STATUS_CONFIG.aberto;
+  return STATUS_CONFIG[status] || STATUS_CONFIG.fila;
 };
 
 /**

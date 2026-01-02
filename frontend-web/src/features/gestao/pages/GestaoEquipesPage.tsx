@@ -17,10 +17,8 @@ import {
 } from 'lucide-react';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 import { KPICard } from '../../../components/common/KPICard';
-import equipeService, {
-  Equipe,
-  CreateEquipeDto,
-} from '../../../services/equipeService';
+import equipeService, { Equipe, CreateEquipeDto } from '../../../services/equipeService';
+import { getErrorMessage } from '../../../utils/errorHandling';
 
 interface GestaoEquipesPageProps {
   hideBackButton?: boolean;
@@ -30,7 +28,7 @@ interface GestaoEquipesPageProps {
  * @deprecated Esta página está DEPRECADA desde Janeiro 2025
  * ⚠️ Equipes foram consolidadas em FILAS
  * ✅ Nova página: /atendimento/filas (GestaoFilasPage)
- * 
+ *
  * Motivo: Unificação da arquitetura de atendimento
  * - Equipes = conceito duplicado de Filas
  * - Nova estrutura: Filas com Núcleo + Departamento
@@ -74,12 +72,7 @@ const GestaoEquipesPage: React.FC<GestaoEquipesPageProps> = ({ hideBackButton = 
       setEquipes(Array.isArray(dados) ? dados : []);
     } catch (err: unknown) {
       console.error('Erro ao carregar equipes:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      setError(normalizedMessage || fallbackMessage || 'Erro ao carregar equipes');
+      setError(getErrorMessage(err, 'Erro ao carregar equipes'));
       setEquipes([]);
     } finally {
       setLoading(false);
@@ -120,8 +113,7 @@ const GestaoEquipesPage: React.FC<GestaoEquipesPageProps> = ({ hideBackButton = 
       // Verificar se nome já existe
       const nomeExiste = equipes.some(
         (eq) =>
-          eq.nome.toLowerCase() === formData.nome.toLowerCase() &&
-          eq.id !== editingEquipe?.id,
+          eq.nome.toLowerCase() === formData.nome.toLowerCase() && eq.id !== editingEquipe?.id,
       );
       if (nomeExiste) {
         errors.nome = 'Já existe uma equipe com este nome';
@@ -153,12 +145,7 @@ const GestaoEquipesPage: React.FC<GestaoEquipesPageProps> = ({ hideBackButton = 
       carregarEquipes();
     } catch (err: unknown) {
       console.error('Erro ao salvar equipe:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      const errorMsg = normalizedMessage || fallbackMessage || 'Erro ao salvar equipe';
+      const errorMsg = getErrorMessage(err, 'Erro ao salvar equipe');
       setError(errorMsg);
       toast.error(errorMsg);
     }
@@ -176,39 +163,29 @@ const GestaoEquipesPage: React.FC<GestaoEquipesPageProps> = ({ hideBackButton = 
       carregarEquipes();
     } catch (err: unknown) {
       console.error('Erro ao deletar equipe:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      const errorMsg = normalizedMessage || fallbackMessage || 'Erro ao deletar equipe';
+      const errorMsg = getErrorMessage(err, 'Erro ao deletar equipe');
       setError(errorMsg);
       toast.error(errorMsg);
     }
   };
 
-  const equipesFiltradas = equipes.filter((eq) =>
-    eq.nome?.toLowerCase().includes(busca.toLowerCase()) ||
-    eq.descricao?.toLowerCase().includes(busca.toLowerCase())
+  const equipesFiltradas = equipes.filter(
+    (eq) =>
+      eq.nome?.toLowerCase().includes(busca.toLowerCase()) ||
+      eq.descricao?.toLowerCase().includes(busca.toLowerCase()),
   );
 
   const totalEquipes = equipes.length;
   const equipesAtivas = equipes.filter((eq) => eq.ativo).length;
   const equipesInativas = equipes.filter((eq) => !eq.ativo).length;
-  const totalMembros = equipes.reduce(
-    (acc, eq) => acc + (eq.atendenteEquipes?.length || 0),
-    0
-  );
+  const totalMembros = equipes.reduce((acc, eq) => acc + (eq.atendenteEquipes?.length || 0), 0);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       {/* Header */}
       {!hideBackButton && (
         <div className="bg-white border-b px-6 py-4 -mx-6 -mt-6 mb-6">
-          <BackToNucleus
-            nucleusName="Atendimento"
-            nucleusPath="/nuclei/atendimento"
-          />
+          <BackToNucleus nucleusName="Atendimento" nucleusPath="/nuclei/atendimento" />
         </div>
       )}
 
@@ -224,9 +201,9 @@ const GestaoEquipesPage: React.FC<GestaoEquipesPageProps> = ({ hideBackButton = 
                 ⚠️ Esta página está DEPRECADA
               </h3>
               <p className="mt-2 text-sm text-yellow-700">
-                <strong>Equipes</strong> foram consolidadas em <strong>Filas</strong> (Janeiro 2025).
-                A nova estrutura oferece load balancing inteligente, integração com núcleos e departamentos,
-                e algoritmo de distribuição automática.
+                <strong>Equipes</strong> foram consolidadas em <strong>Filas</strong> (Janeiro
+                2025). A nova estrutura oferece load balancing inteligente, integração com núcleos e
+                departamentos, e algoritmo de distribuição automática.
               </p>
               <div className="mt-4 flex gap-3">
                 <button
@@ -244,7 +221,8 @@ const GestaoEquipesPage: React.FC<GestaoEquipesPageProps> = ({ hideBackButton = 
                 </button>
               </div>
               <p className="mt-3 text-xs text-yellow-600">
-                💡 <strong>Migração automática:</strong> Seus dados de equipes serão migrados automaticamente para filas.
+                💡 <strong>Migração automática:</strong> Seus dados de equipes serão migrados
+                automaticamente para filas.
               </p>
             </div>
             <button
@@ -359,7 +337,10 @@ const GestaoEquipesPage: React.FC<GestaoEquipesPageProps> = ({ hideBackButton = 
       {/* Cards de Equipes */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {equipesFiltradas.map((equipe) => (
-          <div key={equipe.id} className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow duration-300">
+          <div
+            key={equipe.id}
+            className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow duration-300"
+          >
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3 flex-1">
@@ -403,9 +384,7 @@ const GestaoEquipesPage: React.FC<GestaoEquipesPageProps> = ({ hideBackButton = 
               </div>
 
               {equipe.descricao && (
-                <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                  {equipe.descricao}
-                </p>
+                <p className="text-sm text-gray-600 mb-4 line-clamp-2">{equipe.descricao}</p>
               )}
 
               <div className="flex items-center justify-between pt-4 border-t border-gray-200">
@@ -450,9 +429,7 @@ const GestaoEquipesPage: React.FC<GestaoEquipesPageProps> = ({ hideBackButton = 
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nome *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Nome *</label>
                 <input
                   type="text"
                   className={`w-full px-3 py-2 border ${validationErrors.nome ? 'border-red-500' : 'border-gray-300'
@@ -472,15 +449,11 @@ const GestaoEquipesPage: React.FC<GestaoEquipesPageProps> = ({ hideBackButton = 
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Descrição
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
                 <textarea
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent transition-colors"
                   value={formData.descricao}
-                  onChange={(e) =>
-                    setFormData({ ...formData, descricao: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
                   placeholder="Descrição da equipe"
                   rows={3}
                 />
@@ -488,29 +461,21 @@ const GestaoEquipesPage: React.FC<GestaoEquipesPageProps> = ({ hideBackButton = 
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Cor
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Cor</label>
                   <input
                     type="color"
                     className="w-full h-10 rounded-lg cursor-pointer border border-gray-300"
                     value={formData.cor}
-                    onChange={(e) =>
-                      setFormData({ ...formData, cor: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, cor: e.target.value })}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Status
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
                   <select
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent transition-colors"
                     value={formData.ativo ? 'true' : 'false'}
-                    onChange={(e) =>
-                      setFormData({ ...formData, ativo: e.target.value === 'true' })
-                    }
+                    onChange={(e) => setFormData({ ...formData, ativo: e.target.value === 'true' })}
                   >
                     <option value="true">Ativa</option>
                     <option value="false">Inativa</option>
@@ -600,12 +565,7 @@ const MembersDialog: React.FC<MembersDialogProps> = ({ equipeId, onClose }) => {
         ? membrosData
           .filter(Boolean)
           .map((member: any) => ({
-            id:
-              member?.id ||
-              member?.userId ||
-              member?.usuarioId ||
-              member?.atendenteId ||
-              '',
+            id: member?.id || member?.userId || member?.usuarioId || member?.atendenteId || '',
             nome: member?.nome || member?.user?.nome || 'Sem nome informado',
             email: member?.email || member?.user?.email || 'Sem e-mail informado',
           }))
@@ -626,9 +586,9 @@ const MembersDialog: React.FC<MembersDialogProps> = ({ equipeId, onClose }) => {
 
       setMembers(normalizedMembers);
       setAvailableUsers(normalizedAvailable);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Erro ao carregar dados:', err);
-      setError('Erro ao carregar membros e usuários');
+      setError(getErrorMessage(err, 'Erro ao carregar membros e usuários'));
     } finally {
       setLoading(false);
     }
@@ -636,7 +596,8 @@ const MembersDialog: React.FC<MembersDialogProps> = ({ equipeId, onClose }) => {
 
   const handleAddMember = async (atendente: AvailableAtendente) => {
     if (!atendente?.usuarioId) {
-      const errorMsg = 'Atendente sem usuário vinculado. Gere ou associe um usuário antes de adicioná-lo à equipe.';
+      const errorMsg =
+        'Atendente sem usuário vinculado. Gere ou associe um usuário antes de adicioná-lo à equipe.';
       setError(errorMsg);
       toast.error(errorMsg);
       return;
@@ -647,9 +608,9 @@ const MembersDialog: React.FC<MembersDialogProps> = ({ equipeId, onClose }) => {
       await equipeService.adicionarAtendente(equipeId, atendente.usuarioId, 'membro');
       toast.success('Membro adicionado à equipe!');
       await loadData();
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Erro ao adicionar membro:', err);
-      const errorMsg = 'Erro ao adicionar membro à equipe';
+      const errorMsg = getErrorMessage(err, 'Erro ao adicionar membro à equipe');
       setError(errorMsg);
       toast.error(errorMsg);
     }
@@ -661,20 +622,21 @@ const MembersDialog: React.FC<MembersDialogProps> = ({ equipeId, onClose }) => {
       await equipeService.removerAtendente(equipeId, userId);
       toast.success('Membro removido da equipe!');
       await loadData();
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Erro ao remover membro:', err);
-      const errorMsg = 'Erro ao remover membro da equipe';
+      const errorMsg = getErrorMessage(err, 'Erro ao remover membro da equipe');
       setError(errorMsg);
       toast.error(errorMsg);
     }
   };
 
-  const memberIds = new Set(members.map(m => m.id));
+  const memberIds = new Set(members.map((m) => m.id));
   const filteredAvailableUsers = availableUsers
     .filter((u) => u.usuarioId && !memberIds.has(u.usuarioId))
-    .filter((u) =>
-      (u.nome ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (u.email ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+    .filter(
+      (u) =>
+        (u.nome ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (u.email ?? '').toLowerCase().includes(searchTerm.toLowerCase()),
     );
 
   return (
@@ -695,9 +657,7 @@ const MembersDialog: React.FC<MembersDialogProps> = ({ equipeId, onClose }) => {
 
         <div className="flex-1 overflow-y-auto space-y-6">
           <div>
-            <h3 className="font-semibold text-gray-900 mb-3">
-              Membros Atuais ({members.length})
-            </h3>
+            <h3 className="font-semibold text-gray-900 mb-3">Membros Atuais ({members.length})</h3>
             {loading ? (
               <p className="text-sm text-gray-500">Carregando...</p>
             ) : members.length === 0 ? (
@@ -764,8 +724,8 @@ const MembersDialog: React.FC<MembersDialogProps> = ({ equipeId, onClose }) => {
                       onClick={() => handleAddMember(user)}
                       disabled={!user.usuarioId}
                       className={`px-4 py-2 text-sm flex items-center gap-2 rounded-lg transition-colors ${user.usuarioId
-                        ? 'bg-[#9333EA] text-white hover:bg-[#7E22CE]'
-                        : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                          ? 'bg-[#9333EA] text-white hover:bg-[#7E22CE]'
+                          : 'bg-gray-200 text-gray-500 cursor-not-allowed'
                         }`}
                     >
                       <UserPlus className="h-4 w-4" />

@@ -1,9 +1,9 @@
 /**
  * TEMPLATE SIMPLES DE PÁGINA - CONECT CRM
- * 
+ *
  * Use este template para páginas CRUD SIMPLES, sem necessidade de métricas/KPIs.
  * Ideal para: Cadastros básicos, listagens simples, páginas de configuração.
- * 
+ *
  * INSTRUÇÕES DE USO:
  * 1. Copie este arquivo para src/pages/SuaPaginaPage.tsx
  * 2. Substitua todos os comentários [PERSONALIZAR] com seus valores
@@ -11,20 +11,20 @@
  * 4. Remova os comentários de instrução
  * 5. Registre a rota em App.tsx
  * 6. Adicione no menu em menuConfig.ts
- * 
+ *
  * CORES POR MÓDULO (use na cor do ícone principal e botão primary):
  * - Comercial: #159A9C (teal) - Crevasse-2 ⭐
  * - Atendimento: #9333EA (purple)
  * - Financeiro: #16A34A (green)
  * - Gestão: #2563EB (blue)
- * 
+ *
  * QUANDO USAR ESTE TEMPLATE:
  * ✅ Cadastros simples (ex: categorias, tags, status)
  * ✅ Páginas de configuração
  * ✅ Listagens sem métricas
  * ✅ Formulários de edição
  * ✅ Páginas auxiliares
- * 
+ *
  * QUANDO NÃO USAR (use _TemplatePage.tsx):
  * ❌ Dashboards com métricas
  * ❌ Páginas principais de módulos
@@ -168,9 +168,10 @@ const SuaPaginaPage: React.FC = () => {
   };
 
   // Filtrar items
-  const itemsFiltrados = items.filter((item) =>
-    item.nome?.toLowerCase().includes(busca.toLowerCase()) ||
-    item.descricao?.toLowerCase().includes(busca.toLowerCase())
+  const itemsFiltrados = items.filter(
+    (item) =>
+      item.nome?.toLowerCase().includes(busca.toLowerCase()) ||
+      item.descricao?.toLowerCase().includes(busca.toLowerCase()),
   );
 
   return (
@@ -200,7 +201,9 @@ const SuaPaginaPage: React.FC = () => {
                   </h1>
                   <p className="mt-2 text-[#B4BEC9]">
                     {/* [PERSONALIZAR] Descrição curta */}
-                    {loading ? 'Carregando...' : `${items.length} ${items.length === 1 ? 'item' : 'itens'} cadastrado${items.length === 1 ? '' : 's'}`}
+                    {loading
+                      ? 'Carregando...'
+                      : `${items.length} ${items.length === 1 ? 'item' : 'itens'} cadastrado${items.length === 1 ? '' : 's'}`}
                   </p>
                 </div>
                 <div className="mt-4 sm:mt-0 flex items-center gap-3">
@@ -210,7 +213,9 @@ const SuaPaginaPage: React.FC = () => {
                     className="px-4 py-3 border border-[#B4BEC9] rounded-lg hover:bg-[#DEEFE7] transition-colors disabled:opacity-50"
                     title="Atualizar"
                   >
-                    <RefreshCw className={`w-5 h-5 text-[#002333] ${loading ? 'animate-spin' : ''}`} />
+                    <RefreshCw
+                      className={`w-5 h-5 text-[#002333] ${loading ? 'animate-spin' : ''}`}
+                    />
                   </button>
                   <button
                     onClick={() => handleOpenDialog()}
@@ -282,7 +287,8 @@ const SuaPaginaPage: React.FC = () => {
                 <p className="text-[#B4BEC9] mb-8 max-w-md mx-auto">
                   {busca
                     ? 'Tente ajustar os filtros de busca ou remover alguns termos'
-                    : 'Comece criando seu primeiro item para organizar suas informações'} {/* [PERSONALIZAR] */}
+                    : 'Comece criando seu primeiro item para organizar suas informações'}{' '}
+                  {/* [PERSONALIZAR] */}
                 </p>
                 {!busca && (
                   <button
@@ -312,15 +318,14 @@ const SuaPaginaPage: React.FC = () => {
                         {item.nome}
                       </h3>
                       {item.descricao && (
-                        <p className="text-sm text-[#B4BEC9] line-clamp-2 mt-1">
-                          {item.descricao}
-                        </p>
+                        <p className="text-sm text-[#B4BEC9] line-clamp-2 mt-1">{item.descricao}</p>
                       )}
                     </div>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.ativo
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
-                      }`}>
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        item.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
                       {item.ativo ? 'Ativo' : 'Inativo'}
                     </span>
                   </div>
@@ -387,24 +392,18 @@ const SuaPaginaPage: React.FC = () => {
                   type="text"
                   className="w-full px-4 py-3 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
                   value={formData.nome}
-                  onChange={(e) =>
-                    setFormData({ ...formData, nome: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                   placeholder="Digite o nome" // [PERSONALIZAR]
                 />
               </div>
 
               {/* Campo Descrição */}
               <div>
-                <label className="block text-sm font-medium text-[#002333] mb-2">
-                  Descrição
-                </label>
+                <label className="block text-sm font-medium text-[#002333] mb-2">Descrição</label>
                 <textarea
                   className="w-full px-4 py-3 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors resize-none"
                   value={formData.descricao}
-                  onChange={(e) =>
-                    setFormData({ ...formData, descricao: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
                   placeholder="Descrição opcional" // [PERSONALIZAR]
                   rows={4}
                 />
@@ -412,15 +411,11 @@ const SuaPaginaPage: React.FC = () => {
 
               {/* Campo Status */}
               <div>
-                <label className="block text-sm font-medium text-[#002333] mb-2">
-                  Status
-                </label>
+                <label className="block text-sm font-medium text-[#002333] mb-2">Status</label>
                 <select
                   className="w-full px-4 py-3 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors bg-white"
                   value={formData.ativo ? 'true' : 'false'}
-                  onChange={(e) =>
-                    setFormData({ ...formData, ativo: e.target.value === 'true' })
-                  }
+                  onChange={(e) => setFormData({ ...formData, ativo: e.target.value === 'true' })}
                 >
                   <option value="true">Ativo</option>
                   <option value="false">Inativo</option>

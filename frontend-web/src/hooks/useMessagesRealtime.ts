@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Socket } from 'socket.io-client';
 import {
   messagesService,
   Mensagem,
@@ -7,24 +8,40 @@ import {
   TipoMensagem,
 } from '../services/messagesService';
 import { useWebSocket } from './useWebSocket';
+import { resolveSocketBaseUrl } from '../utils/network';
 
-const WS_URL = process.env.REACT_APP_WS_URL || 'http://localhost:3001';
+const SOCKET_BASE_URL = resolveSocketBaseUrl({
+  envUrl: process.env.REACT_APP_WEBSOCKET_URL || process.env.REACT_APP_WS_URL,
+  onEnvIgnored: ({ envUrl, currentHost }) => {
+    console.warn(
+      '⚠️ [WebSocket] Ignorando URL de WS local em acesso via rede:',
+      envUrl,
+      '→ host atual',
+      currentHost,
+    );
+  },
+});
+
+const SOCKET_NAMESPACE_URL = (() => {
+  const base = SOCKET_BASE_URL.endsWith('/') ? SOCKET_BASE_URL.slice(0, -1) : SOCKET_BASE_URL;
+  return `${base}/atendimento`;
+})();
 
 /**
  * Hook customizado para gerenciar mensagens com WebSocket em tempo real
- * 
+ *
  * Adiciona recursos de tempo real ao hook useMessages original:
  * - Recebe mensagens em tempo real via WebSocket
  * - Atualiza lista automaticamente quando nova mensagem chega
  * - Notifica quando usuário está digitando
  * - Entra/sai de salas de tickets automaticamente
- * 
+ *
  * @example
  * ```tsx
- * const { 
- *   mensagens, 
- *   enviarMensagem, 
- *   notificarDigitando 
+ * const {
+ *   mensagens,
+ *   enviarMensagem,
+ *   notificarDigitando
  * } = useMessagesRealtime(ticketId);
  * ```
  */
@@ -47,7 +64,7 @@ export function useMessagesRealtime(ticketId: string | null) {
     emit: wsEmit,
     on: wsOn,
   } = useWebSocket({
-    url: `${WS_URL}/atendimento`,
+    url: SOCKET_NAMESPACE_URL,
     token,
     autoConnect: true,
   });
@@ -56,148 +73,164 @@ export function useMessagesRealtime(ticketId: string | null) {
   const mensagensIdsRef = useRef<Set<string>>(new Set());
 
   // Funções auxiliares para WebSocket
-  const entrarTicket = useCallback((ticketId: string) => {
-    if (wsEmit) {
-      wsEmit('ticket:entrar', { ticketId });
-    }
-  }, [wsEmit]);
+  const entrarTicket = useCallback(
+    (ticketId: string) => {
+      if (wsEmit) {
+        wsEmit('ticket:entrar', { ticketId });
+      }
+    },
+    [wsEmit],
+  );
 
-  const sairTicket = useCallback((ticketId: string) => {
-    if (wsEmit) {
-      wsEmit('ticket:sair', { ticketId });
-    }
-  }, [wsEmit]);
+  const sairTicket = useCallback(
+    (ticketId: string) => {
+      if (wsEmit) {
+        wsEmit('ticket:sair', { ticketId });
+      }
+    },
+    [wsEmit],
+  );
 
-  const wsNotificarDigitando = useCallback((ticketId: string, atendenteId: string) => {
-    if (wsEmit) {
-      wsEmit('mensagem:digitando', { ticketId, atendenteId });
-    }
-  }, [wsEmit]);
+  const wsNotificarDigitando = useCallback(
+    (ticketId: string, atendenteId: string) => {
+      if (wsEmit) {
+        wsEmit('mensagem:digitando', { ticketId, atendenteId });
+      }
+    },
+    [wsEmit],
+  );
 
   /**
    * Carrega mensagens de um ticket
    */
-  const carregarMensagens = useCallback(async (filtros?: Partial<BuscarMensagensFiltros>) => {
-    if (!ticketId) {
-      console.warn('⚠️ useMessagesRealtime: ticketId não fornecido');
-      return;
-    }
-
-    setLoading(true);
-    setErro(null);
-
-    try {
-      const filtrosCompletos: BuscarMensagensFiltros = {
-        ticketId,
-        limit: filtros?.limit || 50,
-        offset: filtros?.offset || 0,
-        ...filtros,
-      };
-
-      console.log('🔄 [Realtime] Carregando mensagens do ticket:', ticketId);
-
-      const resposta = await messagesService.listar(filtrosCompletos);
-
-      if (resposta.success) {
-        setMensagens(resposta.data);
-        setTotal(resposta.total);
-
-        // Atualizar ref com IDs das mensagens carregadas
-        mensagensIdsRef.current = new Set(resposta.data.map(m => m.id));
-
-        console.log(`✅ [Realtime] ${resposta.data.length} mensagens carregadas (total: ${resposta.total})`);
-      } else {
-        setErro('Falha ao carregar mensagens');
+  const carregarMensagens = useCallback(
+    async (filtros?: Partial<BuscarMensagensFiltros>) => {
+      if (!ticketId) {
+        console.warn('⚠️ useMessagesRealtime: ticketId não fornecido');
+        return;
       }
-    } catch (error: any) {
-      console.error('❌ [Realtime] Erro ao carregar mensagens:', error);
-      setErro(error.response?.data?.message || error.message || 'Erro ao carregar mensagens');
-    } finally {
-      setLoading(false);
-    }
-  }, [ticketId]);
+
+      setLoading(true);
+      setErro(null);
+
+      try {
+        const filtrosCompletos: BuscarMensagensFiltros = {
+          ticketId,
+          limit: filtros?.limit || 50,
+          offset: filtros?.offset || 0,
+          ...filtros,
+        };
+
+        console.log('🔄 [Realtime] Carregando mensagens do ticket:', ticketId);
+
+        const resposta = await messagesService.listar(filtrosCompletos);
+
+        if (resposta.success) {
+          setMensagens(resposta.data);
+          setTotal(resposta.total);
+
+          // Atualizar ref com IDs das mensagens carregadas
+          mensagensIdsRef.current = new Set(resposta.data.map((m) => m.id));
+
+          console.log(
+            `✅ [Realtime] ${resposta.data.length} mensagens carregadas (total: ${resposta.total})`,
+          );
+        } else {
+          setErro('Falha ao carregar mensagens');
+        }
+      } catch (error: any) {
+        console.error('❌ [Realtime] Erro ao carregar mensagens:', error);
+        setErro(error.response?.data?.message || error.message || 'Erro ao carregar mensagens');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [ticketId],
+  );
 
   /**
    * Envia uma nova mensagem
    */
-  const enviarMensagem = useCallback(async (
-    conteudo: string,
-    tipo?: TipoMensagem,
-    metadata?: any
-  ) => {
-    if (!ticketId) {
-      console.error('❌ [Realtime] Tentativa de enviar mensagem sem ticketId');
-      return;
-    }
-
-    setEnviando(true);
-    setErro(null);
-
-    try {
-      const dados: CriarMensagemDto = {
-        ticketId,
-        conteudo,
-        tipo: tipo || TipoMensagem.TEXTO,
-        metadata,
-      };
-
-      console.log('📤 [Realtime] Enviando mensagem:', dados);
-
-      const resposta = await messagesService.enviar(dados);
-
-      if (resposta.success) {
-        // A mensagem será adicionada via WebSocket automaticamente
-        // Mas adicionamos aqui também para feedback instantâneo
-        if (!mensagensIdsRef.current.has(resposta.data.id)) {
-          setMensagens((prev) => [...prev, resposta.data]);
-          mensagensIdsRef.current.add(resposta.data.id);
-        }
-        console.log('✅ [Realtime] Mensagem enviada com sucesso');
-        return resposta.data;
+  const enviarMensagem = useCallback(
+    async (conteudo: string, tipo?: TipoMensagem, metadata?: any) => {
+      if (!ticketId) {
+        console.error('❌ [Realtime] Tentativa de enviar mensagem sem ticketId');
+        return;
       }
-    } catch (error: any) {
-      console.error('❌ [Realtime] Erro ao enviar mensagem:', error);
-      setErro(error.response?.data?.message || error.message || 'Erro ao enviar mensagem');
-      throw error;
-    } finally {
-      setEnviando(false);
-    }
-  }, [ticketId]);
+
+      setEnviando(true);
+      setErro(null);
+
+      try {
+        const dados: CriarMensagemDto = {
+          ticketId,
+          conteudo,
+          tipo: tipo || TipoMensagem.TEXTO,
+          metadata,
+        };
+
+        console.log('📤 [Realtime] Enviando mensagem:', dados);
+
+        const resposta = await messagesService.enviar(dados);
+
+        if (resposta.success) {
+          // A mensagem será adicionada via WebSocket automaticamente
+          // Mas adicionamos aqui também para feedback instantâneo
+          if (!mensagensIdsRef.current.has(resposta.data.id)) {
+            setMensagens((prev) => [...prev, resposta.data]);
+            mensagensIdsRef.current.add(resposta.data.id);
+          }
+          console.log('✅ [Realtime] Mensagem enviada com sucesso');
+          return resposta.data;
+        }
+      } catch (error: any) {
+        console.error('❌ [Realtime] Erro ao enviar mensagem:', error);
+        setErro(error.response?.data?.message || error.message || 'Erro ao enviar mensagem');
+        throw error;
+      } finally {
+        setEnviando(false);
+      }
+    },
+    [ticketId],
+  );
 
   /**
    * Faz upload de um arquivo e envia como mensagem
    */
-  const enviarArquivo = useCallback(async (arquivo: File) => {
-    if (!ticketId) {
-      console.error('❌ [Realtime] Tentativa de enviar arquivo sem ticketId');
-      return;
-    }
-
-    setEnviando(true);
-    setErro(null);
-
-    try {
-      console.log('📤 [Realtime] Enviando arquivo:', arquivo.name);
-
-      const resposta = await messagesService.uploadArquivo(ticketId, arquivo);
-
-      if (resposta.success) {
-        // A mensagem será adicionada via WebSocket automaticamente
-        if (!mensagensIdsRef.current.has(resposta.data.id)) {
-          setMensagens((prev) => [...prev, resposta.data]);
-          mensagensIdsRef.current.add(resposta.data.id);
-        }
-        console.log('✅ [Realtime] Arquivo enviado com sucesso');
-        return resposta.data;
+  const enviarArquivo = useCallback(
+    async (arquivo: File) => {
+      if (!ticketId) {
+        console.error('❌ [Realtime] Tentativa de enviar arquivo sem ticketId');
+        return;
       }
-    } catch (error: any) {
-      console.error('❌ [Realtime] Erro ao enviar arquivo:', error);
-      setErro(error.response?.data?.message || error.message || 'Erro ao enviar arquivo');
-      throw error;
-    } finally {
-      setEnviando(false);
-    }
-  }, [ticketId]);
+
+      setEnviando(true);
+      setErro(null);
+
+      try {
+        console.log('📤 [Realtime] Enviando arquivo:', arquivo.name);
+
+        const resposta = await messagesService.uploadArquivo(ticketId, arquivo);
+
+        if (resposta.success) {
+          // A mensagem será adicionada via WebSocket automaticamente
+          if (!mensagensIdsRef.current.has(resposta.data.id)) {
+            setMensagens((prev) => [...prev, resposta.data]);
+            mensagensIdsRef.current.add(resposta.data.id);
+          }
+          console.log('✅ [Realtime] Arquivo enviado com sucesso');
+          return resposta.data;
+        }
+      } catch (error: any) {
+        console.error('❌ [Realtime] Erro ao enviar arquivo:', error);
+        setErro(error.response?.data?.message || error.message || 'Erro ao enviar arquivo');
+        throw error;
+      } finally {
+        setEnviando(false);
+      }
+    },
+    [ticketId],
+  );
 
   /**
    * Marca mensagens como lidas
@@ -212,8 +245,8 @@ export function useMessagesRealtime(ticketId: string | null) {
         // Atualizar mensagens na lista local
         setMensagens((prev) =>
           prev.map((m) =>
-            mensagemIds.includes(m.id) ? { ...m, lida: true, lidaEm: new Date().toISOString() } : m
-          )
+            mensagemIds.includes(m.id) ? { ...m, lida: true, lidaEm: new Date().toISOString() } : m,
+          ),
         );
         console.log('✅ [Realtime] Mensagens marcadas como lidas');
       }
@@ -267,17 +300,20 @@ export function useMessagesRealtime(ticketId: string | null) {
     });
 
     // Listener para digitando
-    const unsubscribeDigitando = wsOn('mensagem:digitando', (data: { ticketId: string; userId: string; timestamp: Date }) => {
-      if (data.ticketId === ticketId) {
-        console.log('⌨️ [Realtime] Usuário digitando:', data.userId);
-        setDigitando({ userId: data.userId, timestamp: data.timestamp });
+    const unsubscribeDigitando = wsOn(
+      'mensagem:digitando',
+      (data: { ticketId: string; userId: string; timestamp: Date }) => {
+        if (data.ticketId === ticketId) {
+          console.log('⌨️ [Realtime] Usuário digitando:', data.userId);
+          setDigitando({ userId: data.userId, timestamp: data.timestamp });
 
-        // Remover indicador de digitando após 3 segundos
-        setTimeout(() => {
-          setDigitando(null);
-        }, 3000);
-      }
-    });
+          // Remover indicador de digitando após 3 segundos
+          setTimeout(() => {
+            setDigitando(null);
+          }, 3000);
+        }
+      },
+    );
 
     // Cleanup: sair da sala e remover listeners
     return () => {

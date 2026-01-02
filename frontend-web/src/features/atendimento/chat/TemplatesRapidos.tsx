@@ -22,7 +22,7 @@ const TEMPLATES_PADRAO: Template[] = [
     texto: 'Olá! Como posso ajudar você hoje?',
     categoria: 'Saudação',
     atalho: '/ola',
-    favorito: true
+    favorito: true,
   },
   {
     id: '2',
@@ -30,83 +30,85 @@ const TEMPLATES_PADRAO: Template[] = [
     texto: 'Por favor, aguarde um momento enquanto verifico isso para você.',
     categoria: 'Processo',
     atalho: '/aguarde',
-    favorito: true
+    favorito: true,
   },
   {
     id: '3',
     titulo: '✅ Problema Resolvido',
     texto: 'Problema resolvido! Há mais alguma coisa em que posso ajudar?',
     categoria: 'Resolução',
-    atalho: '/resolvido'
+    atalho: '/resolvido',
   },
   {
     id: '4',
     titulo: '📧 Envio de Email',
-    texto: 'Enviarei as informações detalhadas por email em alguns instantes. Por favor, verifique sua caixa de entrada.',
+    texto:
+      'Enviarei as informações detalhadas por email em alguns instantes. Por favor, verifique sua caixa de entrada.',
     categoria: 'Processo',
-    atalho: '/email'
+    atalho: '/email',
   },
   {
     id: '5',
     titulo: '🔄 Retorno de Contato',
     texto: 'Retornarei seu contato assim que possível. Nosso prazo é de até 24 horas.',
     categoria: 'Processo',
-    atalho: '/retorno'
+    atalho: '/retorno',
   },
   {
     id: '6',
     titulo: '📞 Solicitar Telefone',
     texto: 'Para prosseguir, preciso que me informe seu número de telefone para contato.',
     categoria: 'Informação',
-    atalho: '/telefone'
+    atalho: '/telefone',
   },
   {
     id: '7',
     titulo: '📧 Solicitar Email',
     texto: 'Para enviar os documentos, preciso que me informe seu endereço de email.',
     categoria: 'Informação',
-    atalho: '/solicitemail'
+    atalho: '/solicitemail',
   },
   {
     id: '8',
     titulo: '🙏 Agradecimento',
     texto: 'Muito obrigado por entrar em contato! Estamos sempre à disposição.',
     categoria: 'Encerramento',
-    atalho: '/obrigado'
+    atalho: '/obrigado',
   },
   {
     id: '9',
     titulo: '👋 Despedida',
     texto: 'Tenha um ótimo dia! Qualquer dúvida, estou à disposição.',
     categoria: 'Encerramento',
-    atalho: '/tchau'
+    atalho: '/tchau',
   },
   {
     id: '10',
     titulo: '⚠️ Fora do Horário',
-    texto: 'No momento estamos fora do horário de atendimento. Nosso expediente é de segunda a sexta, das 9h às 18h. Retornaremos seu contato no próximo dia útil.',
+    texto:
+      'No momento estamos fora do horário de atendimento. Nosso expediente é de segunda a sexta, das 9h às 18h. Retornaremos seu contato no próximo dia útil.',
     categoria: 'Informação',
-    atalho: '/horario'
+    atalho: '/horario',
   },
   {
     id: '11',
     titulo: '🔍 Verificando Informações',
     texto: 'Estou verificando as informações no sistema. Isso pode levar alguns minutos.',
     categoria: 'Processo',
-    atalho: '/verificando'
+    atalho: '/verificando',
   },
   {
     id: '12',
     titulo: '📋 Protocolo Gerado',
     texto: 'Seu protocolo de atendimento foi gerado. Anote para futuras consultas.',
     categoria: 'Informação',
-    atalho: '/protocolo'
-  }
+    atalho: '/protocolo',
+  },
 ];
 
 export const TemplatesRapidos: React.FC<TemplatesRapidosProps> = ({
   onSelecionarTemplate,
-  className = ''
+  className = '',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -135,22 +137,26 @@ export const TemplatesRapidos: React.FC<TemplatesRapidosProps> = ({
   }, [isOpen]);
 
   // Filtrar templates
-  const filteredTemplates = templates.filter(template =>
-    template.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    template.texto.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    template.atalho?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    template.categoria?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredTemplates = templates.filter(
+    (template) =>
+      template.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      template.texto.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      template.atalho?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      template.categoria?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   // Agrupar por categoria
-  const templatesPorCategoria = filteredTemplates.reduce((acc, template) => {
-    const categoria = template.categoria || 'Outros';
-    if (!acc[categoria]) {
-      acc[categoria] = [];
-    }
-    acc[categoria].push(template);
-    return acc;
-  }, {} as Record<string, Template[]>);
+  const templatesPorCategoria = filteredTemplates.reduce(
+    (acc, template) => {
+      const categoria = template.categoria || 'Outros';
+      if (!acc[categoria]) {
+        acc[categoria] = [];
+      }
+      acc[categoria].push(template);
+      return acc;
+    },
+    {} as Record<string, Template[]>,
+  );
 
   const handleSelectTemplate = (template: Template) => {
     onSelecionarTemplate(template.texto);
@@ -163,10 +169,11 @@ export const TemplatesRapidos: React.FC<TemplatesRapidosProps> = ({
       {/* Botão de Trigger */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium transition-all ${isOpen
+        className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium transition-all ${
+          isOpen
             ? 'bg-blue-50 text-blue-700 border-blue-300'
             : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-          }`}
+        }`}
         title="Respostas rápidas (atalho: /)"
       >
         <Zap className="w-4 h-4" />
@@ -191,7 +198,8 @@ export const TemplatesRapidos: React.FC<TemplatesRapidosProps> = ({
               />
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              💡 Dica: Digite <code className="bg-gray-100 px-1 rounded">/</code> seguido do atalho na mensagem
+              💡 Dica: Digite <code className="bg-gray-100 px-1 rounded">/</code> seguido do atalho
+              na mensagem
             </p>
           </div>
 
@@ -245,7 +253,8 @@ export const TemplatesRapidos: React.FC<TemplatesRapidosProps> = ({
           {/* Footer */}
           <div className="p-2 border-t border-gray-200 bg-gray-50">
             <p className="text-xs text-gray-500 text-center">
-              {filteredTemplates.length} template{filteredTemplates.length !== 1 ? 's' : ''} disponível
+              {filteredTemplates.length} template{filteredTemplates.length !== 1 ? 's' : ''}{' '}
+              disponível
               {filteredTemplates.length !== 1 ? 'is' : ''}
             </p>
           </div>
@@ -264,7 +273,7 @@ export const useTemplateShortcuts = (templates: Template[] = TEMPLATES_PADRAO) =
     }
 
     const shortcut = text.toLowerCase();
-    const template = templates.find(t => t.atalho?.toLowerCase() === shortcut);
+    const template = templates.find((t) => t.atalho?.toLowerCase() === shortcut);
 
     if (template) {
       return { found: true, replacement: template.texto };

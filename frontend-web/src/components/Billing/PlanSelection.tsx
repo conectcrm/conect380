@@ -2,16 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import {
-  Check,
-  Crown,
-  Users,
-  UserCheck,
-  Database,
-  Zap,
-  Star,
-  Sparkles
-} from 'lucide-react';
+import { Check, Crown, Users, UserCheck, Database, Zap, Star, Sparkles } from 'lucide-react';
 import { useSubscription, Plano } from '../../hooks/useSubscription';
 import { formatCurrency } from '../../utils/formatters';
 
@@ -24,7 +15,7 @@ interface PlanSelectionProps {
 export const PlanSelection: React.FC<PlanSelectionProps> = ({
   onPlanSelect,
   onClose,
-  showCurrentPlan = true
+  showCurrentPlan = true,
 }) => {
   const { planos, assinatura, loading, alterarPlano } = useSubscription();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
@@ -48,28 +39,40 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
 
   const getPlanIcon = (codigo: string) => {
     switch (codigo) {
-      case 'starter': return <Users className="h-8 w-8" />;
-      case 'professional': return <Star className="h-8 w-8" />;
-      case 'enterprise': return <Crown className="h-8 w-8" />;
-      default: return <Sparkles className="h-8 w-8" />;
+      case 'starter':
+        return <Users className="h-8 w-8" />;
+      case 'professional':
+        return <Star className="h-8 w-8" />;
+      case 'enterprise':
+        return <Crown className="h-8 w-8" />;
+      default:
+        return <Sparkles className="h-8 w-8" />;
     }
   };
 
   const getPlanColor = (codigo: string) => {
     switch (codigo) {
-      case 'starter': return 'text-green-600';
-      case 'professional': return 'text-blue-600';
-      case 'enterprise': return 'text-purple-600';
-      default: return 'text-gray-600';
+      case 'starter':
+        return 'text-green-600';
+      case 'professional':
+        return 'text-blue-600';
+      case 'enterprise':
+        return 'text-purple-600';
+      default:
+        return 'text-gray-600';
     }
   };
 
   const getPlanBorderColor = (codigo: string) => {
     switch (codigo) {
-      case 'starter': return 'border-green-200';
-      case 'professional': return 'border-blue-200';
-      case 'enterprise': return 'border-purple-200';
-      default: return 'border-gray-200';
+      case 'starter':
+        return 'border-green-200';
+      case 'professional':
+        return 'border-blue-200';
+      case 'enterprise':
+        return 'border-purple-200';
+      default:
+        return 'border-gray-200';
     }
   };
 
@@ -98,9 +101,7 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
       {/* Header */}
       <div className="text-center">
         <h2 className="text-3xl font-bold text-gray-900">Escolha o Plano Ideal</h2>
-        <p className="mt-4 text-lg text-gray-600">
-          Planos flexíveis que crescem com sua empresa
-        </p>
+        <p className="mt-4 text-lg text-gray-600">Planos flexíveis que crescem com sua empresa</p>
       </div>
 
       {/* Planos */}
@@ -147,9 +148,7 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
                   <span className="text-gray-600">/mês</span>
                 </div>
 
-                {plano.descricao && (
-                  <p className="mt-2 text-sm text-gray-600">{plano.descricao}</p>
-                )}
+                {plano.descricao && <p className="mt-2 text-sm text-gray-600">{plano.descricao}</p>}
               </CardHeader>
 
               <CardContent className="space-y-4">
@@ -157,9 +156,7 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
                     <Users className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm">
-                      {plano.limiteUsuarios} usuários
-                    </span>
+                    <span className="text-sm">{plano.limiteUsuarios} usuários</span>
                   </div>
 
                   <div className="flex items-center gap-3">
@@ -209,9 +206,7 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
 
                   <div className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">
-                      Suporte {plano.suportePrioridade}
-                    </span>
+                    <span className="text-sm">Suporte {plano.suportePrioridade}</span>
                   </div>
                 </div>
 
@@ -246,8 +241,11 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
                   `}
                   size="lg"
                 >
-                  {isCurrent ? 'Plano Atual' :
-                    assinatura ? 'Alterar para este Plano' : 'Escolher este Plano'}
+                  {isCurrent
+                    ? 'Plano Atual'
+                    : assinatura
+                      ? 'Alterar para este Plano'
+                      : 'Escolher este Plano'}
                 </Button>
               </CardContent>
             </Card>

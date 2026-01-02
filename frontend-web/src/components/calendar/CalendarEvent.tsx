@@ -1,16 +1,16 @@
 import React from 'react';
 import { CalendarEvent, EVENT_COLORS, PRIORITY_COLORS } from '../../types/calendar';
 import { formatDate } from '../../utils/calendarUtils';
-import { 
-  Clock, 
-  MapPin, 
-  Users, 
-  Phone, 
+import {
+  Clock,
+  MapPin,
+  Users,
+  Phone,
   Calendar,
   User,
   AlertCircle,
   CheckCircle,
-  XCircle
+  XCircle,
 } from 'lucide-react';
 
 interface CalendarEventComponentProps {
@@ -32,7 +32,7 @@ export const CalendarEventComponent: React.FC<CalendarEventComponentProps> = ({
   className = '',
   compact = false,
   style = {},
-  isDragging = false
+  isDragging = false,
 }) => {
   const eventColor = EVENT_COLORS[event.type];
   const priorityColor = PRIORITY_COLORS[event.priority];
@@ -101,7 +101,7 @@ export const CalendarEventComponent: React.FC<CalendarEventComponentProps> = ({
       `}
       style={{
         borderLeftColor: eventColor,
-        ...style
+        ...style,
       }}
       onClick={handleClick}
       onDragStart={handleDragStart}
@@ -118,17 +118,18 @@ export const CalendarEventComponent: React.FC<CalendarEventComponentProps> = ({
               {formatDate(event.start, 'time')}
               {!compact && duration > 30 && (
                 <span className="text-gray-400">
-                  {' - '}{formatDate(event.end, 'time')}
+                  {' - '}
+                  {formatDate(event.end, 'time')}
                 </span>
               )}
             </span>
           </div>
-          
+
           <div className="flex items-center space-x-1">
             {getStatusIcon()}
             {event.priority === 'high' && (
-              <div 
-                className="w-2 h-2 rounded-full" 
+              <div
+                className="w-2 h-2 rounded-full"
                 style={{ backgroundColor: priorityColor }}
                 title="Alta prioridade"
               />
@@ -138,21 +139,19 @@ export const CalendarEventComponent: React.FC<CalendarEventComponentProps> = ({
 
         {/* Título */}
         <div className="flex items-start space-x-2">
-          <div className="text-gray-600 mt-0.5">
-            {getTypeIcon()}
-          </div>
+          <div className="text-gray-600 mt-0.5">{getTypeIcon()}</div>
           <div className="flex-1 min-w-0">
-            <h4 className={`font-medium text-gray-900 leading-tight ${
-              compact ? 'text-xs truncate' : 'text-sm'
-            }`}>
+            <h4
+              className={`font-medium text-gray-900 leading-tight ${
+                compact ? 'text-xs truncate' : 'text-sm'
+              }`}
+            >
               {event.title}
             </h4>
-            
+
             {/* Cliente */}
             {event.cliente && !compact && (
-              <p className="text-xs text-gray-600 truncate mt-1">
-                {event.cliente.name}
-              </p>
+              <p className="text-xs text-gray-600 truncate mt-1">{event.cliente.name}</p>
             )}
           </div>
         </div>
@@ -172,7 +171,9 @@ export const CalendarEventComponent: React.FC<CalendarEventComponentProps> = ({
             {event.attendees && event.attendees.length > 0 && (
               <div className="flex items-center space-x-1 text-xs text-gray-500">
                 <Users className="w-3 h-3" />
-                <span>{event.attendees.length} participante{event.attendees.length !== 1 ? 's' : ''}</span>
+                <span>
+                  {event.attendees.length} participante{event.attendees.length !== 1 ? 's' : ''}
+                </span>
               </div>
             )}
 

@@ -36,7 +36,7 @@ ERROR: invalid input syntax for type uuid: "default"  ❌ NÃO DEVE APARECER
 
 ```powershell
 # Verificar se backend está online
-Invoke-WebRequest -Uri "http://localhost:3001/api/atendimento/webhooks/whatsapp?hub.mode=test&hub.verify_token=teste&hub.challenge=123" -Method GET
+Invoke-WebRequest -Uri "http://localhost:3001/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>?hub.mode=test&hub.verify_token=teste&hub.challenge=123" -Method GET
 
 # Esperado: 403 Forbidden (token inválido, mas endpoint respondendo)
 ```

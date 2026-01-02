@@ -26,11 +26,7 @@ interface FilaState {
   listarFilas: (empresaId: string) => Promise<void>;
   buscarFila: (id: string, empresaId: string) => Promise<void>;
   criarFila: (empresaId: string, dto: CreateFilaDto) => Promise<Fila>;
-  atualizarFila: (
-    id: string,
-    empresaId: string,
-    dto: UpdateFilaDto,
-  ) => Promise<Fila>;
+  atualizarFila: (id: string, empresaId: string, dto: UpdateFilaDto) => Promise<Fila>;
   removerFila: (id: string, empresaId: string) => Promise<void>;
 
   // Actions - Gestão de Atendentes
@@ -39,15 +35,8 @@ interface FilaState {
     empresaId: string,
     dto: AddAtendenteFilaDto,
   ) => Promise<FilaAtendente>;
-  removerAtendente: (
-    filaId: string,
-    atendenteId: string,
-    empresaId: string,
-  ) => Promise<void>;
-  listarAtendentes: (
-    filaId: string,
-    empresaId: string,
-  ) => Promise<FilaAtendente[]>;
+  removerAtendente: (filaId: string, atendenteId: string, empresaId: string) => Promise<void>;
+  listarAtendentes: (filaId: string, empresaId: string) => Promise<FilaAtendente[]>;
 
   // Actions - Distribuição de Tickets
   distribuirTicket: (
@@ -88,8 +77,7 @@ export const useFilaStore = create<FilaState>()(
             const filas = await filaService.listar(empresaId);
             set({ filas, loading: false });
           } catch (err: unknown) {
-            const errorMessage =
-              err instanceof Error ? err.message : 'Erro ao listar filas';
+            const errorMessage = err instanceof Error ? err.message : 'Erro ao listar filas';
             set({ error: errorMessage, loading: false });
             throw err;
           }
@@ -101,8 +89,7 @@ export const useFilaStore = create<FilaState>()(
             const fila = await filaService.buscarPorId(id, empresaId);
             set({ filaSelecionada: fila, loading: false });
           } catch (err: unknown) {
-            const errorMessage =
-              err instanceof Error ? err.message : 'Erro ao buscar fila';
+            const errorMessage = err instanceof Error ? err.message : 'Erro ao buscar fila';
             set({ error: errorMessage, loading: false });
             throw err;
           }
@@ -121,25 +108,16 @@ export const useFilaStore = create<FilaState>()(
 
             return novaFila;
           } catch (err: unknown) {
-            const errorMessage =
-              err instanceof Error ? err.message : 'Erro ao criar fila';
+            const errorMessage = err instanceof Error ? err.message : 'Erro ao criar fila';
             set({ error: errorMessage, loading: false });
             throw err;
           }
         },
 
-        atualizarFila: async (
-          id: string,
-          empresaId: string,
-          dto: UpdateFilaDto,
-        ) => {
+        atualizarFila: async (id: string, empresaId: string, dto: UpdateFilaDto) => {
           try {
             set({ loading: true, error: null });
-            const filaAtualizada = await filaService.atualizar(
-              id,
-              empresaId,
-              dto,
-            );
+            const filaAtualizada = await filaService.atualizar(id, empresaId, dto);
 
             // Atualizar na lista local
             set((state) => ({
@@ -147,16 +125,13 @@ export const useFilaStore = create<FilaState>()(
                 .map((f) => (f.id === id ? filaAtualizada : f))
                 .sort((a, b) => a.ordem - b.ordem),
               filaSelecionada:
-                state.filaSelecionada?.id === id
-                  ? filaAtualizada
-                  : state.filaSelecionada,
+                state.filaSelecionada?.id === id ? filaAtualizada : state.filaSelecionada,
               loading: false,
             }));
 
             return filaAtualizada;
           } catch (err: unknown) {
-            const errorMessage =
-              err instanceof Error ? err.message : 'Erro ao atualizar fila';
+            const errorMessage = err instanceof Error ? err.message : 'Erro ao atualizar fila';
             set({ error: errorMessage, loading: false });
             throw err;
           }
@@ -170,94 +145,56 @@ export const useFilaStore = create<FilaState>()(
             // Remover da lista local
             set((state) => ({
               filas: state.filas.filter((f) => f.id !== id),
-              filaSelecionada:
-                state.filaSelecionada?.id === id
-                  ? null
-                  : state.filaSelecionada,
+              filaSelecionada: state.filaSelecionada?.id === id ? null : state.filaSelecionada,
               loading: false,
             }));
           } catch (err: unknown) {
-            const errorMessage =
-              err instanceof Error ? err.message : 'Erro ao remover fila';
+            const errorMessage = err instanceof Error ? err.message : 'Erro ao remover fila';
             set({ error: errorMessage, loading: false });
             throw err;
           }
         },
 
         // Gestão de Atendentes
-        adicionarAtendente: async (
-          filaId: string,
-          empresaId: string,
-          dto: AddAtendenteFilaDto,
-        ) => {
+        adicionarAtendente: async (filaId: string, empresaId: string, dto: AddAtendenteFilaDto) => {
           try {
             set({ loading: true, error: null });
-            const filaAtendente = await filaService.adicionarAtendente(
-              filaId,
-              empresaId,
-              dto,
-            );
+            const filaAtendente = await filaService.adicionarAtendente(filaId, empresaId, dto);
 
             // Recarregar fila para atualizar lista de atendentes
-            const filaAtualizada = await filaService.buscarPorId(
-              filaId,
-              empresaId,
-            );
+            const filaAtualizada = await filaService.buscarPorId(filaId, empresaId);
 
             set((state) => ({
-              filas: state.filas.map((f) =>
-                f.id === filaId ? filaAtualizada : f,
-              ),
+              filas: state.filas.map((f) => (f.id === filaId ? filaAtualizada : f)),
               filaSelecionada:
-                state.filaSelecionada?.id === filaId
-                  ? filaAtualizada
-                  : state.filaSelecionada,
+                state.filaSelecionada?.id === filaId ? filaAtualizada : state.filaSelecionada,
               loading: false,
             }));
 
             return filaAtendente;
           } catch (err: unknown) {
-            const errorMessage =
-              err instanceof Error
-                ? err.message
-                : 'Erro ao adicionar atendente';
+            const errorMessage = err instanceof Error ? err.message : 'Erro ao adicionar atendente';
             set({ error: errorMessage, loading: false });
             throw err;
           }
         },
 
-        removerAtendente: async (
-          filaId: string,
-          atendenteId: string,
-          empresaId: string,
-        ) => {
+        removerAtendente: async (filaId: string, atendenteId: string, empresaId: string) => {
           try {
             set({ loading: true, error: null });
-            await filaService.removerAtendente(
-              filaId,
-              atendenteId,
-              empresaId,
-            );
+            await filaService.removerAtendente(filaId, atendenteId, empresaId);
 
             // Recarregar fila para atualizar lista de atendentes
-            const filaAtualizada = await filaService.buscarPorId(
-              filaId,
-              empresaId,
-            );
+            const filaAtualizada = await filaService.buscarPorId(filaId, empresaId);
 
             set((state) => ({
-              filas: state.filas.map((f) =>
-                f.id === filaId ? filaAtualizada : f,
-              ),
+              filas: state.filas.map((f) => (f.id === filaId ? filaAtualizada : f)),
               filaSelecionada:
-                state.filaSelecionada?.id === filaId
-                  ? filaAtualizada
-                  : state.filaSelecionada,
+                state.filaSelecionada?.id === filaId ? filaAtualizada : state.filaSelecionada,
               loading: false,
             }));
           } catch (err: unknown) {
-            const errorMessage =
-              err instanceof Error ? err.message : 'Erro ao remover atendente';
+            const errorMessage = err instanceof Error ? err.message : 'Erro ao remover atendente';
             set({ error: errorMessage, loading: false });
             throw err;
           }
@@ -266,38 +203,25 @@ export const useFilaStore = create<FilaState>()(
         listarAtendentes: async (filaId: string, empresaId: string) => {
           try {
             set({ loading: true, error: null });
-            const atendentes = await filaService.listarAtendentes(
-              filaId,
-              empresaId,
-            );
+            const atendentes = await filaService.listarAtendentes(filaId, empresaId);
             set({ loading: false });
             return atendentes;
           } catch (err: unknown) {
-            const errorMessage =
-              err instanceof Error
-                ? err.message
-                : 'Erro ao listar atendentes';
+            const errorMessage = err instanceof Error ? err.message : 'Erro ao listar atendentes';
             set({ error: errorMessage, loading: false });
             throw err;
           }
         },
 
         // Distribuição de Tickets
-        distribuirTicket: async (
-          empresaId: string,
-          dto: AtribuirTicketDto,
-        ) => {
+        distribuirTicket: async (empresaId: string, dto: AtribuirTicketDto) => {
           try {
             set({ loading: true, error: null });
-            const resultado = await filaService.distribuirTicket(
-              empresaId,
-              dto,
-            );
+            const resultado = await filaService.distribuirTicket(empresaId, dto);
             set({ loading: false });
             return resultado;
           } catch (err: unknown) {
-            const errorMessage =
-              err instanceof Error ? err.message : 'Erro ao distribuir ticket';
+            const errorMessage = err instanceof Error ? err.message : 'Erro ao distribuir ticket';
             set({ error: errorMessage, loading: false });
             throw err;
           }
@@ -307,10 +231,7 @@ export const useFilaStore = create<FilaState>()(
         obterMetricas: async (filaId: string, empresaId: string) => {
           try {
             set({ loading: true, error: null });
-            const metricas = await filaService.obterMetricas(
-              filaId,
-              empresaId,
-            );
+            const metricas = await filaService.obterMetricas(filaId, empresaId);
 
             set((state) => ({
               metricas: {
@@ -320,8 +241,7 @@ export const useFilaStore = create<FilaState>()(
               loading: false,
             }));
           } catch (err: unknown) {
-            const errorMessage =
-              err instanceof Error ? err.message : 'Erro ao obter métricas';
+            const errorMessage = err instanceof Error ? err.message : 'Erro ao obter métricas';
             set({ error: errorMessage, loading: false });
             throw err;
           }
@@ -365,8 +285,7 @@ export const useFilaStore = create<FilaState>()(
  * Selectors individuais para performance
  */
 export const useFilas = () => useFilaStore((state) => state.filas);
-export const useFilaSelecionada = () =>
-  useFilaStore((state) => state.filaSelecionada);
+export const useFilaSelecionada = () => useFilaStore((state) => state.filaSelecionada);
 export const useFilaLoading = () => useFilaStore((state) => state.loading);
 export const useFilaError = () => useFilaStore((state) => state.error);
 export const useFilaMetricas = () => useFilaStore((state) => state.metricas);

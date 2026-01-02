@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { 
-  Bell, 
-  Search, 
-  Settings, 
-  User, 
-  Menu, 
+import {
+  Bell,
+  Search,
+  Settings,
+  User,
+  Menu,
   X,
   ChevronDown,
   Home,
@@ -13,7 +13,7 @@ import {
   BarChart3,
   CreditCard,
   FileText,
-  LogOut
+  LogOut,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -33,7 +33,7 @@ interface HeaderProps {
 export const HeaderOtimizado: React.FC<HeaderProps> = ({
   userInfo = { name: 'João Silva', role: 'Administrador' },
   onMenuToggle,
-  className = ''
+  className = '',
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -44,7 +44,6 @@ export const HeaderOtimizado: React.FC<HeaderProps> = ({
       {/* Header Principal */}
       <header className={`bg-white border-b border-gray-200 sticky top-0 z-40 ${className}`}>
         <div className="h-16 px-4 flex items-center justify-between gap-4 max-w-full overflow-hidden">
-          
           {/* Seção Esquerda: Logo + Menu Mobile */}
           <div className="flex items-center gap-3 flex-shrink-0 min-w-0">
             {/* Menu Mobile */}
@@ -81,7 +80,6 @@ export const HeaderOtimizado: React.FC<HeaderProps> = ({
 
           {/* Seção Direita: Ações + Usuário */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            
             {/* Busca Mobile */}
             <button className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors">
               <Search className="w-5 h-5 text-gray-600" />
@@ -116,9 +114,7 @@ export const HeaderOtimizado: React.FC<HeaderProps> = ({
                     </div>
                   </div>
                   <div className="p-3 border-t border-gray-100">
-                    <button className="text-sm text-blue-600 hover:text-blue-700">
-                      Ver todas
-                    </button>
+                    <button className="text-sm text-blue-600 hover:text-blue-700">Ver todas</button>
                   </div>
                 </div>
               )}
@@ -139,12 +135,8 @@ export const HeaderOtimizado: React.FC<HeaderProps> = ({
                   <User className="w-4 h-4 text-white" />
                 </div>
                 <div className="hidden sm:block text-left min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {userInfo.name}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {userInfo.role}
-                  </p>
+                  <p className="text-sm font-medium text-gray-900 truncate">{userInfo.name}</p>
+                  <p className="text-xs text-gray-500 truncate">{userInfo.role}</p>
                 </div>
                 <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
               </button>
@@ -212,27 +204,45 @@ export const HeaderOtimizado: React.FC<HeaderProps> = ({
             </div>
 
             <nav className="p-4 space-y-2">
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100">
+              <a
+                href="#"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100"
+              >
                 <Home className="w-5 h-5" />
                 Dashboard
               </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100">
+              <a
+                href="#"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100"
+              >
                 <Users className="w-5 h-5" />
                 Clientes
               </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100">
+              <a
+                href="#"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100"
+              >
                 <Package className="w-5 h-5" />
                 Produtos
               </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100">
+              <a
+                href="#"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100"
+              >
                 <BarChart3 className="w-5 h-5" />
                 Relatórios
               </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100">
+              <a
+                href="#"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100"
+              >
                 <CreditCard className="w-5 h-5" />
                 Financeiro
               </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100">
+              <a
+                href="#"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100"
+              >
                 <FileText className="w-5 h-5" />
                 Propostas
               </a>
@@ -255,7 +265,7 @@ export const HeaderOtimizado: React.FC<HeaderProps> = ({
 
       {/* Overlay para fechar dropdowns */}
       {(showUserMenu || showNotifications) && (
-        <div 
+        <div
           className="fixed inset-0 z-30"
           onClick={() => {
             setShowUserMenu(false);

@@ -3,11 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { ResponsiveDashboardLayout } from '../components/layout/ResponsiveDashboardLayout';
 import ClienteModal from '../components/modals/ClienteModal';
 import { ModalCadastroProduto } from '../components/modals/ModalCadastroProdutoLandscape';
-import { 
-  Users, Package, FileText, ShoppingCart, 
-  TrendingUp, Target, ArrowRight, Plus,
-  CheckCircle, Clock, AlertTriangle, DollarSign,
-  Calendar, MessageSquare, Settings, Activity
+import {
+  Users,
+  Package,
+  FileText,
+  ShoppingCart,
+  TrendingUp,
+  Target,
+  ArrowRight,
+  Plus,
+  CheckCircle,
+  Clock,
+  AlertTriangle,
+  DollarSign,
+  Calendar,
+  MessageSquare,
+  Settings,
+  Activity,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -36,7 +48,7 @@ const CentralOperacoesPage: React.FC = () => {
       icon: Users,
       status: 'current',
       action: 'Novo Cliente',
-      progress: 75
+      progress: 75,
     },
     {
       id: 'produtos',
@@ -44,7 +56,7 @@ const CentralOperacoesPage: React.FC = () => {
       description: 'Definir catálogo de produtos e serviços disponíveis',
       icon: Package,
       status: 'upcoming',
-      action: 'Gerenciar Produtos'
+      action: 'Gerenciar Produtos',
     },
     {
       id: 'proposta',
@@ -52,7 +64,7 @@ const CentralOperacoesPage: React.FC = () => {
       description: 'Montar proposta comercial personalizada',
       icon: FileText,
       status: 'upcoming',
-      action: 'Nova Proposta'
+      action: 'Nova Proposta',
     },
     {
       id: 'negociacao',
@@ -60,7 +72,7 @@ const CentralOperacoesPage: React.FC = () => {
       description: 'Acompanhar o processo de negociação e follow-up',
       icon: MessageSquare,
       status: 'upcoming',
-      action: 'Acompanhar'
+      action: 'Acompanhar',
     },
     {
       id: 'fechamento',
@@ -68,8 +80,8 @@ const CentralOperacoesPage: React.FC = () => {
       description: 'Finalizar venda e gerar documentos contratuais',
       icon: CheckCircle,
       status: 'upcoming',
-      action: 'Finalizar Venda'
-    }
+      action: 'Finalizar Venda',
+    },
   ];
 
   // Métricas de exemplo
@@ -80,7 +92,7 @@ const CentralOperacoesPage: React.FC = () => {
       variacao: '+12%',
       icone: Users,
       cor: 'blue',
-      meta: 'Meta: 1,500'
+      meta: 'Meta: 1,500',
     },
     {
       title: 'Produtos Cadastrados',
@@ -88,7 +100,7 @@ const CentralOperacoesPage: React.FC = () => {
       variacao: '+5',
       icone: Package,
       cor: 'green',
-      meta: 'Meta: 100'
+      meta: 'Meta: 100',
     },
     {
       title: 'Propostas Ativas',
@@ -96,7 +108,7 @@ const CentralOperacoesPage: React.FC = () => {
       variacao: '+8',
       icone: FileText,
       cor: 'orange',
-      meta: 'Em negociação'
+      meta: 'Em negociação',
     },
     {
       title: 'Taxa de Conversão',
@@ -104,8 +116,8 @@ const CentralOperacoesPage: React.FC = () => {
       variacao: '+3%',
       icone: TrendingUp,
       cor: 'purple',
-      meta: 'Meta: 70%'
-    }
+      meta: 'Meta: 70%',
+    },
   ];
 
   // Atividades recentes
@@ -116,7 +128,7 @@ const CentralOperacoesPage: React.FC = () => {
       descricao: 'Cliente "Tech Solutions Ltd" cadastrado com sucesso',
       tempo: '5 min atrás',
       usuario: 'Ana Silva',
-      status: 'success'
+      status: 'success',
     },
     {
       id: 2,
@@ -124,7 +136,7 @@ const CentralOperacoesPage: React.FC = () => {
       descricao: 'Produto "Sistema CRM Premium" atualizado',
       tempo: '12 min atrás',
       usuario: 'Carlos Santos',
-      status: 'info'
+      status: 'info',
     },
     {
       id: 3,
@@ -132,7 +144,7 @@ const CentralOperacoesPage: React.FC = () => {
       descricao: 'Proposta #2024-001 enviada para aprovação',
       tempo: '25 min atrás',
       usuario: 'Maria Costa',
-      status: 'warning'
+      status: 'warning',
     },
     {
       id: 4,
@@ -140,8 +152,8 @@ const CentralOperacoesPage: React.FC = () => {
       descricao: 'Venda de R$ 45.000 confirmada',
       tempo: '1h atrás',
       usuario: 'João Oliveira',
-      status: 'success'
-    }
+      status: 'success',
+    },
   ];
 
   // Handlers para ações
@@ -149,21 +161,20 @@ const CentralOperacoesPage: React.FC = () => {
     setIsLoading(true);
     try {
       // Simular salvamento
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
       toast.success('Cliente cadastrado com sucesso!', {
         icon: '👤',
         duration: 4000,
       });
-      
+
       setShowClienteModal(false);
-      
+
       // Atualizar progress do workflow
       toast.success('Próximo passo: Configurar produtos', {
         icon: '📦',
         duration: 6000,
       });
-      
     } catch (error) {
       toast.error('Erro ao cadastrar cliente');
     } finally {
@@ -175,21 +186,20 @@ const CentralOperacoesPage: React.FC = () => {
     setIsLoading(true);
     try {
       // Simular salvamento
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
       toast.success('Produto cadastrado com sucesso!', {
         icon: '📦',
         duration: 4000,
       });
-      
+
       setShowProdutoModal(false);
-      
+
       // Sugerir próximo passo
       toast.success('Próximo passo: Criar proposta comercial', {
         icon: '📄',
         duration: 6000,
       });
-      
     } catch (error) {
       toast.error('Erro ao cadastrar produto');
     } finally {
@@ -260,7 +270,6 @@ const CentralOperacoesPage: React.FC = () => {
         subtitle="Fluxo completo de vendas - Do cliente à proposta"
       >
         <div className="space-y-8">
-          
           {/* Métricas Principais */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {metricas.map((metrica, index) => {
@@ -269,11 +278,14 @@ const CentralOperacoesPage: React.FC = () => {
                 blue: 'bg-blue-50 text-blue-600',
                 green: 'bg-green-50 text-green-600',
                 orange: 'bg-orange-50 text-orange-600',
-                purple: 'bg-purple-50 text-purple-600'
+                purple: 'bg-purple-50 text-purple-600',
               }[metrica.cor];
 
               return (
-                <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+                <div
+                  key={index}
+                  className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow"
+                >
                   <div className="flex items-center justify-between mb-4">
                     <div className={`p-3 rounded-lg ${corClasses}`}>
                       <IconComponent className="w-6 h-6" />
@@ -311,57 +323,59 @@ const CentralOperacoesPage: React.FC = () => {
                 const IconComponent = step.icon;
                 const isActive = step.status === 'current';
                 const isCompleted = step.status === 'completed';
-                
+
                 return (
-                  <div 
+                  <div
                     key={step.id}
                     className={`relative p-4 rounded-lg border-2 transition-all hover:shadow-md ${
-                      isActive 
-                        ? 'border-blue-500 bg-blue-50' 
-                        : isCompleted 
-                        ? 'border-green-500 bg-green-50'
-                        : 'border-gray-200 bg-gray-50'
+                      isActive
+                        ? 'border-blue-500 bg-blue-50'
+                        : isCompleted
+                          ? 'border-green-500 bg-green-50'
+                          : 'border-gray-200 bg-gray-50'
                     }`}
                   >
                     {/* Connector Line */}
                     {index < workflowSteps.length - 1 && (
                       <div className="hidden lg:block absolute top-6 right-0 w-4 h-0.5 bg-gray-300 translate-x-2"></div>
                     )}
-                    
+
                     <div className="flex items-center space-x-3 mb-3">
-                      <div className={`p-2 rounded-lg ${
-                        isActive 
-                          ? 'bg-blue-100' 
-                          : isCompleted 
-                          ? 'bg-green-100'
-                          : 'bg-gray-100'
-                      }`}>
-                        <IconComponent className={`w-5 h-5 ${
-                          isActive 
-                            ? 'text-blue-600' 
-                            : isCompleted 
-                            ? 'text-green-600'
-                            : 'text-gray-500'
-                        }`} />
+                      <div
+                        className={`p-2 rounded-lg ${
+                          isActive ? 'bg-blue-100' : isCompleted ? 'bg-green-100' : 'bg-gray-100'
+                        }`}
+                      >
+                        <IconComponent
+                          className={`w-5 h-5 ${
+                            isActive
+                              ? 'text-blue-600'
+                              : isCompleted
+                                ? 'text-green-600'
+                                : 'text-gray-500'
+                          }`}
+                        />
                       </div>
                       {getStatusIcon(step.status)}
                     </div>
-                    
+
                     <h3 className="font-semibold text-gray-900 mb-2">{step.title}</h3>
                     <p className="text-sm text-gray-600 mb-4">{step.description}</p>
-                    
+
                     {step.progress && (
                       <div className="mb-3">
                         <div className="w-full bg-gray-200 rounded-full h-1.5">
-                          <div 
-                            className="bg-blue-600 h-1.5 rounded-full transition-all duration-500" 
+                          <div
+                            className="bg-blue-600 h-1.5 rounded-full transition-all duration-500"
                             style={{ width: `${step.progress}%` }}
                           ></div>
                         </div>
-                        <span className="text-xs text-gray-500 mt-1">{step.progress}% completo</span>
+                        <span className="text-xs text-gray-500 mt-1">
+                          {step.progress}% completo
+                        </span>
                       </div>
                     )}
-                    
+
                     {step.action && (
                       <button
                         onClick={() => handleActionClick(step.id)}
@@ -370,8 +384,8 @@ const CentralOperacoesPage: React.FC = () => {
                           isActive || step.id === 'produtos'
                             ? 'bg-blue-600 text-white hover:bg-blue-700'
                             : isCompleted
-                            ? 'bg-green-600 text-white hover:bg-green-700'
-                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              ? 'bg-green-600 text-white hover:bg-green-700'
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         }`}
                       >
                         <Plus className="w-4 h-4" />
@@ -386,7 +400,6 @@ const CentralOperacoesPage: React.FC = () => {
 
           {/* Grid com Atividades e Ações Rápidas */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
             {/* Atividades Recentes */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between mb-6">
@@ -395,10 +408,13 @@ const CentralOperacoesPage: React.FC = () => {
                   Ver todas
                 </button>
               </div>
-              
+
               <div className="space-y-4">
                 {atividadesRecentes.map((atividade) => (
-                  <div key={atividade.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                  <div
+                    key={atividade.id}
+                    className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
                     <div className="flex-shrink-0 p-2 bg-gray-100 rounded-lg">
                       {getActivityIcon(atividade.tipo)}
                     </div>
@@ -418,7 +434,7 @@ const CentralOperacoesPage: React.FC = () => {
             {/* Ações Rápidas */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-6">Ações Rápidas</h3>
-              
+
               <div className="space-y-3">
                 <button
                   onClick={() => setShowClienteModal(true)}
@@ -430,7 +446,7 @@ const CentralOperacoesPage: React.FC = () => {
                     <p className="text-sm text-blue-600">Cadastrar novo cliente no sistema</p>
                   </div>
                 </button>
-                
+
                 <button
                   onClick={() => setShowProdutoModal(true)}
                   className="w-full flex items-center space-x-3 p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors text-left"
@@ -441,7 +457,7 @@ const CentralOperacoesPage: React.FC = () => {
                     <p className="text-sm text-green-600">Adicionar produto ao catálogo</p>
                   </div>
                 </button>
-                
+
                 <button
                   onClick={() => navigate('/propostas')}
                   className="w-full flex items-center space-x-3 p-4 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors text-left"
@@ -452,7 +468,7 @@ const CentralOperacoesPage: React.FC = () => {
                     <p className="text-sm text-orange-600">Criar proposta comercial</p>
                   </div>
                 </button>
-                
+
                 <button
                   onClick={() => navigate('/dashboard')}
                   className="w-full flex items-center space-x-3 p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors text-left"
@@ -466,7 +482,6 @@ const CentralOperacoesPage: React.FC = () => {
               </div>
             </div>
           </div>
-
         </div>
       </ResponsiveDashboardLayout>
 

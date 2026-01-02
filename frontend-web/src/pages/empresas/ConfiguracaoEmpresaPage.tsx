@@ -1,5 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { Settings, Save, RotateCcw, Info, Shield, Users, Mail, MessageSquare, Database, Building2, Send, CheckCircle, XCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Settings,
+  Save,
+  RotateCcw,
+  Info,
+  Shield,
+  Users,
+  Mail,
+  MessageSquare,
+  Database,
+  Building2,
+  Send,
+  CheckCircle,
+  XCircle,
+  Upload,
+  X,
+  ImageIcon,
+} from 'lucide-react';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import { empresaConfigService, ConfiguracoesEmpresa } from '../../services/empresaConfigService';
 import { empresaService, EmpresaResponse } from '../../services/empresaService';
@@ -17,9 +34,17 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
   const [formData, setFormData] = useState<Partial<ConfiguracoesEmpresa>>({});
   const [empresaData, setEmpresaData] = useState<Partial<EmpresaResponse>>({});
   const [testingSMTP, setTestingSMTP] = useState(false);
-  const [smtpTestResult, setSMTPTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [smtpTestResult, setSMTPTestResult] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
   const [executingBackup, setExecutingBackup] = useState(false);
-  const [backupResult, setBackupResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [backupResult, setBackupResult] = useState<{ success: boolean; message: string } | null>(
+    null,
+  );
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 🔐 empresaId removido - backend pega do JWT automaticamente
 
@@ -65,12 +90,12 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
   };
 
   const handleInputChange = (field: keyof ConfiguracoesEmpresa, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
     setHasChanges(true);
   };
 
   const handleEmpresaInputChange = (field: keyof EmpresaResponse, value: any) => {
-    setEmpresaData(prev => ({ ...prev, [field]: value }));
+    setEmpresaData((prev) => ({ ...prev, [field]: value }));
     setHasChanges(true);
   };
 
@@ -85,6 +110,13 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
         throw new Error('Usuário não possui empresa associada');
       }
 
+      console.log('📤 Enviando configurações:', {
+        ...formData,
+        logoUrl: formData.logoUrl
+          ? `${formData.logoUrl.substring(0, 50)}... (${Math.round((formData.logoUrl.length * 3) / 4 / 1024)}KB)`
+          : null,
+      });
+
       // Salvar configurações avançadas (JWT automático)
       const updatedConfig = await empresaConfigService.updateConfig(formData);
       setConfig(updatedConfig);
@@ -96,17 +128,30 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       setEmpresaData(updatedEmpresa);
 
       setHasChanges(false);
-      alert('Configurações salvas!');
-    } catch (err: unknown) {
-      console.error('Erro ao salvar:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao salvar');
+      alert('✅ Configurações salvas com sucesso!');
+    } catch (err: any) {
+      console.error('❌ Erro ao salvar:', err);
+
+      // Extrair mensagem de erro detalhada do backend
+      const errorMessage = err?.response?.data?.message;
+      const detailedError = Array.isArray(errorMessage)
+        ? errorMessage.join(', ')
+        : errorMessage || err.message || 'Erro desconhecido ao salvar';
+
+      setError(detailedError);
+      alert(`❌ Erro ao salvar: ${detailedError}`);
     } finally {
       setSaving(false);
     }
   };
 
   const handleReset = async () => {
-    if (!window.confirm('Tem certeza que deseja restaurar todas as configurações para os valores padrão?')) return;
+    if (
+      !window.confirm(
+        'Tem certeza que deseja restaurar todas as configurações para os valores padrão?',
+      )
+    )
+      return;
     try {
       setSaving(true);
       setError(null);
@@ -124,6 +169,108 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
     }
   };
 
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          // Redimensionar para max 500x500 mantendo proporção
+          const MAX_WIDTH = 500;
+          const MAX_HEIGHT = 500;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height = Math.round((height * MAX_WIDTH) / width);
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width = Math.round((width * MAX_HEIGHT) / height);
+              height = MAX_HEIGHT;
+            }
+          }
+
+          // Criar canvas para redimensionar
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+
+          if (!ctx) {
+            reject(new Error('Erro ao processar imagem'));
+            return;
+          }
+
+          // Desenhar imagem redimensionada
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Converter para base64 com compressão (0.8 = 80% qualidade)
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+
+          // Verificar tamanho final (base64 ~= 1.37x o tamanho em bytes)
+          const sizeInBytes = (compressedBase64.length * 3) / 4;
+          const sizeInKB = Math.round(sizeInBytes / 1024);
+
+          console.log(`✅ Imagem comprimida: ${sizeInKB}KB (${width}x${height})`);
+
+          resolve(compressedBase64);
+        };
+        img.onerror = () => reject(new Error('Erro ao carregar imagem'));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo de arquivo
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione apenas arquivos de imagem.');
+      return;
+    }
+
+    // Validar tamanho original (max 10MB antes da compressão)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('A imagem deve ter no máximo 10MB.');
+      return;
+    }
+
+    setUploadingLogo(true);
+
+    try {
+      // Comprimir e redimensionar imagem
+      const compressedBase64 = await compressImage(file);
+
+      // Atualizar preview e form
+      setLogoPreview(compressedBase64);
+      handleInputChange('logoUrl', compressedBase64);
+
+      // Feedback visual
+      const sizeInKB = Math.round((compressedBase64.length * 3) / 4 / 1024);
+      console.log(`✅ Logo processada com sucesso: ${sizeInKB}KB`);
+    } catch (err) {
+      console.error('Erro ao fazer upload da logo:', err);
+      alert('Erro ao processar a imagem. Tente novamente ou escolha outra imagem.');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoPreview(null);
+    handleInputChange('logoUrl', null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleTestSMTP = async () => {
     setTestingSMTP(true);
     setSMTPTestResult(null);
@@ -131,13 +278,13 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
     try {
       // Simular teste de conexão SMTP
       // TODO: Implementar endpoint real no backend
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Validar campos obrigatórios
       if (!formData.servidorSMTP || !formData.smtpUsuario || !formData.smtpSenha) {
         setSMTPTestResult({
           success: false,
-          message: 'Preencha todos os campos obrigatórios (Servidor, Usuário e Senha)'
+          message: 'Preencha todos os campos obrigatórios (Servidor, Usuário e Senha)',
         });
         return;
       }
@@ -145,13 +292,13 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       // Simular sucesso (em produção, chamar endpoint real)
       setSMTPTestResult({
         success: true,
-        message: 'Conexão SMTP testada com sucesso! Email de teste enviado.'
+        message: 'Conexão SMTP testada com sucesso! Email de teste enviado.',
       });
     } catch (err: unknown) {
       console.error('Erro ao testar SMTP:', err);
       setSMTPTestResult({
         success: false,
-        message: err instanceof Error ? err.message : 'Erro ao testar conexão SMTP'
+        message: err instanceof Error ? err.message : 'Erro ao testar conexão SMTP',
       });
     } finally {
       setTestingSMTP(false);
@@ -165,17 +312,17 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
     try {
       // Simular execução de backup
       // TODO: Implementar endpoint real no backend
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise((resolve) => setTimeout(resolve, 3000));
 
       setBackupResult({
         success: true,
-        message: `Backup executado com sucesso em ${new Date().toLocaleString('pt-BR')}`
+        message: `Backup executado com sucesso em ${new Date().toLocaleString('pt-BR')}`,
       });
     } catch (err: unknown) {
       console.error('Erro ao executar backup:', err);
       setBackupResult({
         success: false,
-        message: err instanceof Error ? err.message : 'Erro ao executar backup'
+        message: err instanceof Error ? err.message : 'Erro ao executar backup',
       });
     } finally {
       setExecutingBackup(false);
@@ -228,7 +375,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm border mb-6">
             <div className="border-b px-6 py-3">
               <div className="flex gap-4 overflow-x-auto">
-                {tabs.map(tab => {
+                {tabs.map((tab) => {
                   const IconComponent = tab.icon;
                   return (
                     <button
@@ -251,11 +398,15 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 pb-3 border-b border-gray-200">
                       <Building2 className="h-5 w-5 text-[#159A9C]" />
-                      <h3 className="text-lg font-semibold text-[#002333]">Informações da Empresa</h3>
+                      <h3 className="text-lg font-semibold text-[#002333]">
+                        Informações da Empresa
+                      </h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Nome da Empresa</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Nome da Empresa
+                        </label>
                         <input
                           type="text"
                           value={empresaData.nome || ''}
@@ -277,7 +428,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                         <p className="text-xs text-gray-500 mt-1">Formato: 00.000.000/0000-00</p>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Email Principal</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Email Principal
+                        </label>
                         <input
                           type="email"
                           value={empresaData.email || ''}
@@ -287,7 +440,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Telefone</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Telefone
+                        </label>
                         <input
                           type="tel"
                           value={empresaData.telefone || ''}
@@ -299,7 +454,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                         <p className="text-xs text-gray-500 mt-1">Formato: (00) 00000-0000</p>
                       </div>
                       <div className="col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Endereço Completo</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Endereço Completo
+                        </label>
                         <input
                           type="text"
                           value={empresaData.endereco || ''}
@@ -309,7 +466,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Cidade
+                        </label>
                         <input
                           type="text"
                           value={empresaData.cidade || ''}
@@ -319,7 +478,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Estado (UF)</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Estado (UF)
+                        </label>
                         <select
                           value={empresaData.estado || ''}
                           onChange={(e) => handleEmpresaInputChange('estado', e.target.value)}
@@ -378,7 +539,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Descrição
+                        </label>
                         <textarea
                           value={formData.descricao || ''}
                           onChange={(e) => handleInputChange('descricao', e.target.value)}
@@ -397,41 +560,186 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                           placeholder="https://exemplo.com.br"
                         />
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Logo URL</label>
-                        <input
-                          type="url"
-                          value={formData.logoUrl || ''}
-                          onChange={(e) => handleInputChange('logoUrl', e.target.value)}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                          placeholder="https://exemplo.com.br/logo.png"
-                        />
+
+                      {/* Upload de Logo */}
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-3">
+                          Logo da Empresa
+                        </label>
+                        <div className="flex items-start gap-6">
+                          {/* Preview da Logo */}
+                          <div className="flex-shrink-0">
+                            {logoPreview || formData.logoUrl ? (
+                              <div className="relative group">
+                                <div className="w-32 h-32 bg-white rounded-lg border-2 border-gray-300 flex items-center justify-center overflow-hidden shadow-sm">
+                                  <img
+                                    src={logoPreview || formData.logoUrl || ''}
+                                    alt="Logo da empresa"
+                                    className="max-w-full max-h-full object-contain"
+                                  />
+                                </div>
+                                <button
+                                  onClick={handleRemoveLogo}
+                                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-600"
+                                  title="Remover logo"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="w-32 h-32 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+                                <ImageIcon className="h-12 w-12 text-gray-400" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Upload Area */}
+                          <div className="flex-1">
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept="image/*"
+                              onChange={handleLogoUpload}
+                              className="hidden"
+                              id="logo-upload"
+                            />
+                            <label
+                              htmlFor="logo-upload"
+                              className="inline-flex items-center px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <Upload className="h-4 w-4 mr-2" />
+                              {uploadingLogo ? 'Enviando...' : 'Fazer Upload'}
+                            </label>
+                            <p className="text-xs text-gray-500 mt-2">
+                              • Formatos aceitos: JPG, PNG, SVG
+                              <br />
+                              • Tamanho máximo: 10MB (será otimizada automaticamente)
+                              <br />
+                              • Recomendado: Imagens quadradas (1:1)
+                              <br />• A imagem será redimensionada para 500x500px mantendo a
+                              proporção
+                            </p>
+                            <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                              <p className="text-xs text-blue-800">
+                                <Info className="h-3 w-3 inline mr-1" />
+                                Esta logo aparecerá em propostas, relatórios e no portal do cliente.
+                                A compressão automática garante carregamento rápido.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Cor Primária</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Cor Primária
+                        </label>
                         <div className="flex items-center gap-3">
                           <input
                             type="color"
                             value={formData.corPrimaria || '#159A9C'}
                             onChange={(e) => handleInputChange('corPrimaria', e.target.value)}
-                            className="h-10 w-20 border border-gray-300 rounded-lg cursor-pointer"
+                            className="h-12 w-20 border border-gray-300 rounded-lg cursor-pointer"
                           />
-                          <span className="text-sm text-gray-600 font-mono">{formData.corPrimaria || '#159A9C'}</span>
+                          <div className="flex-1">
+                            <input
+                              type="text"
+                              value={formData.corPrimaria || '#159A9C'}
+                              onChange={(e) => handleInputChange('corPrimaria', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] font-mono text-sm"
+                              placeholder="#159A9C"
+                              pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+                            />
+                          </div>
+                          <div
+                            className="w-12 h-12 rounded-lg border-2 border-gray-300 shadow-sm"
+                            style={{ backgroundColor: formData.corPrimaria || '#159A9C' }}
+                            title="Preview da cor"
+                          />
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">Cor principal da interface</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Cor principal usada em botões e destaques
+                        </p>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Cor Secundária</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Cor Secundária
+                        </label>
                         <div className="flex items-center gap-3">
                           <input
                             type="color"
                             value={formData.corSecundaria || '#002333'}
                             onChange={(e) => handleInputChange('corSecundaria', e.target.value)}
-                            className="h-10 w-20 border border-gray-300 rounded-lg cursor-pointer"
+                            className="h-12 w-20 border border-gray-300 rounded-lg cursor-pointer"
                           />
-                          <span className="text-sm text-gray-600 font-mono">{formData.corSecundaria || '#002333'}</span>
+                          <div className="flex-1">
+                            <input
+                              type="text"
+                              value={formData.corSecundaria || '#002333'}
+                              onChange={(e) => handleInputChange('corSecundaria', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] font-mono text-sm"
+                              placeholder="#002333"
+                              pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+                            />
+                          </div>
+                          <div
+                            className="w-12 h-12 rounded-lg border-2 border-gray-300 shadow-sm"
+                            style={{ backgroundColor: formData.corSecundaria || '#002333' }}
+                            title="Preview da cor"
+                          />
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">Cor de texto e elementos secundários</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Cor usada em textos e elementos secundários
+                        </p>
+                      </div>
+
+                      {/* Preview de Branding */}
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-3">
+                          Preview do Branding
+                        </label>
+                        <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-6 border-2 border-gray-200">
+                          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md mx-auto">
+                            {/* Cabeçalho com logo */}
+                            <div className="flex items-center justify-between mb-4 pb-4 border-b">
+                              {logoPreview || formData.logoUrl ? (
+                                <div className="h-12 flex items-center">
+                                  <img
+                                    src={logoPreview || formData.logoUrl || ''}
+                                    alt="Logo preview"
+                                    className="max-h-12 w-auto object-contain"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="h-12 w-24 bg-gray-200 rounded flex items-center justify-center">
+                                  <ImageIcon className="h-6 w-6 text-gray-400" />
+                                </div>
+                              )}
+                              <span className="text-xs text-gray-500 font-medium">Preview</span>
+                            </div>
+
+                            {/* Exemplo de botão com cor primária */}
+                            <button
+                              className="w-full px-4 py-2.5 text-white rounded-lg font-medium mb-3 transition-opacity hover:opacity-90 shadow-sm"
+                              style={{ backgroundColor: formData.corPrimaria || '#159A9C' }}
+                              disabled
+                            >
+                              Botão Primário
+                            </button>
+
+                            {/* Exemplo de texto com cor secundária */}
+                            <p
+                              className="text-base font-semibold mb-2"
+                              style={{ color: formData.corSecundaria || '#002333' }}
+                            >
+                              Título de Exemplo
+                            </p>
+                            <p className="text-sm text-gray-600 leading-relaxed">
+                              Esta é uma prévia de como as cores personalizadas e a logo da sua
+                              empresa aparecerão em propostas comerciais, relatórios e documentos
+                              oficiais.
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -441,13 +749,17 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
               {/* Aba Segurança */}
               {activeTab === 'seguranca' && (
                 <div className="space-y-6">
-                  <h2 className="text-xl font-semibold text-[#002333] mb-4">Configurações de Segurança</h2>
+                  <h2 className="text-xl font-semibold text-[#002333] mb-4">
+                    Configurações de Segurança
+                  </h2>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* 2FA */}
                     <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Autenticação 2FA</label>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Autenticação 2FA
+                        </label>
                         <p className="text-xs text-gray-500">Exigir segundo fator para login</p>
                       </div>
                       <input
@@ -468,7 +780,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                         min="5"
                         max="480"
                         value={formData.sessaoExpiracaoMinutos || 30}
-                        onChange={(e) => handleInputChange('sessaoExpiracaoMinutos', parseInt(e.target.value))}
+                        onChange={(e) =>
+                          handleInputChange('sessaoExpiracaoMinutos', parseInt(e.target.value))
+                        }
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
                       />
                       <p className="text-xs text-gray-500 mt-1">Entre 5 e 480 minutos (8 horas)</p>
@@ -493,7 +807,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                     {/* Auditoria */}
                     <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Logs de Auditoria</label>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Logs de Auditoria
+                        </label>
                         <p className="text-xs text-gray-500">Registrar ações dos usuários</p>
                       </div>
                       <input
@@ -507,7 +823,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                     {/* Force SSL */}
                     <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Forçar HTTPS</label>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Forçar HTTPS
+                        </label>
                         <p className="text-xs text-gray-500">Redirecionar HTTP para HTTPS</p>
                       </div>
                       <input
@@ -525,12 +843,19 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                       </label>
                       <textarea
                         value={formData.ipWhitelist?.join('\n') || ''}
-                        onChange={(e) => handleInputChange('ipWhitelist', e.target.value.split('\n').filter(ip => ip.trim()))}
+                        onChange={(e) =>
+                          handleInputChange(
+                            'ipWhitelist',
+                            e.target.value.split('\n').filter((ip) => ip.trim()),
+                          )
+                        }
                         placeholder="192.168.1.1&#10;10.0.0.0/24"
                         rows={3}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
                       />
-                      <p className="text-xs text-gray-500 mt-1">Um IP por linha. Deixe vazio para permitir todos.</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Um IP por linha. Deixe vazio para permitir todos.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -554,7 +879,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                         min="1"
                         max="1000"
                         value={formData.limiteUsuarios || 10}
-                        onChange={(e) => handleInputChange('limiteUsuarios', parseInt(e.target.value))}
+                        onChange={(e) =>
+                          handleInputChange('limiteUsuarios', parseInt(e.target.value))
+                        }
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
                       />
                       <p className="text-xs text-gray-500 mt-1">
@@ -575,7 +902,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                       <input
                         type="checkbox"
                         checked={formData.aprovacaoNovoUsuario || false}
-                        onChange={(e) => handleInputChange('aprovacaoNovoUsuario', e.target.checked)}
+                        onChange={(e) =>
+                          handleInputChange('aprovacaoNovoUsuario', e.target.checked)
+                        }
                         className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer"
                       />
                     </div>
@@ -590,7 +919,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                         min="24"
                         max="168"
                         value={formData.conviteExpiracaoHoras || 72}
-                        onChange={(e) => handleInputChange('conviteExpiracaoHoras', parseInt(e.target.value))}
+                        onChange={(e) =>
+                          handleInputChange('conviteExpiracaoHoras', parseInt(e.target.value))
+                        }
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
                       />
                       <p className="text-xs text-gray-500 mt-1">
@@ -604,7 +935,8 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                       <div>
                         <p className="text-sm font-medium text-[#002333]">Gestão de Permissões</p>
                         <p className="text-xs text-[#002333] mt-1">
-                          Configure perfis e permissões detalhadas na seção "Gestão de Usuários" do menu Administração.
+                          Configure perfis e permissões detalhadas na seção "Gestão de Usuários" do
+                          menu Administração.
                         </p>
                       </div>
                     </div>
@@ -658,9 +990,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                             placeholder="smtp.gmail.com"
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
                           />
-                          <p className="text-xs text-gray-500 mt-1">
-                            Endereço do servidor SMTP
-                          </p>
+                          <p className="text-xs text-gray-500 mt-1">Endereço do servidor SMTP</p>
                         </div>
 
                         {/* Porta SMTP */}
@@ -673,7 +1003,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                             min="1"
                             max="65535"
                             value={formData.portaSMTP || 587}
-                            onChange={(e) => handleInputChange('portaSMTP', parseInt(e.target.value))}
+                            onChange={(e) =>
+                              handleInputChange('portaSMTP', parseInt(e.target.value))
+                            }
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
                           />
                           <p className="text-xs text-gray-500 mt-1">
@@ -710,9 +1042,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                             placeholder="••••••••••••"
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
                           />
-                          <p className="text-xs text-gray-500 mt-1">
-                            Senha ou token de aplicativo
-                          </p>
+                          <p className="text-xs text-gray-500 mt-1">Senha ou token de aplicativo</p>
                         </div>
                       </div>
 
@@ -720,7 +1050,12 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                       <div className="border-t pt-6">
                         <button
                           onClick={handleTestSMTP}
-                          disabled={testingSMTP || !formData.servidorSMTP || !formData.smtpUsuario || !formData.smtpSenha}
+                          disabled={
+                            testingSMTP ||
+                            !formData.servidorSMTP ||
+                            !formData.smtpUsuario ||
+                            !formData.smtpSenha
+                          }
                           className="flex items-center gap-2 px-6 py-3 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                           <Send className="h-4 w-4" />
@@ -729,22 +1064,31 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
 
                         {/* Resultado do Teste */}
                         {smtpTestResult && (
-                          <div className={`mt-4 p-4 rounded-lg flex items-start gap-3 ${smtpTestResult.success
-                            ? 'bg-green-50 border border-green-200'
-                            : 'bg-red-50 border border-red-200'
-                            }`}>
+                          <div
+                            className={`mt-4 p-4 rounded-lg flex items-start gap-3 ${
+                              smtpTestResult.success
+                                ? 'bg-green-50 border border-green-200'
+                                : 'bg-red-50 border border-red-200'
+                            }`}
+                          >
                             {smtpTestResult.success ? (
                               <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                             ) : (
                               <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
                             )}
                             <div>
-                              <p className={`text-sm font-medium ${smtpTestResult.success ? 'text-green-900' : 'text-red-900'
-                                }`}>
+                              <p
+                                className={`text-sm font-medium ${
+                                  smtpTestResult.success ? 'text-green-900' : 'text-red-900'
+                                }`}
+                              >
                                 {smtpTestResult.success ? 'Teste Bem-Sucedido' : 'Falha no Teste'}
                               </p>
-                              <p className={`text-xs mt-1 ${smtpTestResult.success ? 'text-green-700' : 'text-red-700'
-                                }`}>
+                              <p
+                                className={`text-xs mt-1 ${
+                                  smtpTestResult.success ? 'text-green-700' : 'text-red-700'
+                                }`}
+                              >
                                 {smtpTestResult.message}
                               </p>
                             </div>
@@ -758,7 +1102,8 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                         <div>
                           <p className="text-sm font-medium text-amber-900">Configuração Gmail</p>
                           <p className="text-xs text-amber-700 mt-1">
-                            Para Gmail, use <strong>smtp.gmail.com</strong> porta <strong>587</strong> e gere uma
+                            Para Gmail, use <strong>smtp.gmail.com</strong> porta{' '}
+                            <strong>587</strong> e gere uma
                             <a
                               href="https://myaccount.google.com/apppasswords"
                               target="_blank"
@@ -766,7 +1111,8 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                               className="underline ml-1 hover:text-amber-800"
                             >
                               senha de aplicativo
-                            </a>.
+                            </a>
+                            .
                           </p>
                         </div>
                       </div>
@@ -803,7 +1149,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                         <input
                           type="checkbox"
                           checked={formData.whatsappHabilitado || false}
-                          onChange={(e) => handleInputChange('whatsappHabilitado', e.target.checked)}
+                          onChange={(e) =>
+                            handleInputChange('whatsappHabilitado', e.target.checked)
+                          }
                           className="h-5 w-5 text-green-600 rounded focus:ring-green-500 cursor-pointer"
                         />
                       </div>
@@ -831,7 +1179,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                             <input
                               type="password"
                               value={formData.whatsappApiToken || ''}
-                              onChange={(e) => handleInputChange('whatsappApiToken', e.target.value)}
+                              onChange={(e) =>
+                                handleInputChange('whatsappApiToken', e.target.value)
+                              }
                               placeholder="••••••••••••••••••••••••••••"
                               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                             />
@@ -976,8 +1326,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                     <div>
                       <p className="text-sm font-medium text-gray-900">Integração Multi-Canal</p>
                       <p className="text-xs text-gray-700 mt-1">
-                        Configure múltiplos canais de comunicação para aumentar o alcance.
-                        Você pode ativar todos simultaneamente e o sistema escolherá o melhor canal automaticamente.
+                        Configure múltiplos canais de comunicação para aumentar o alcance. Você pode
+                        ativar todos simultaneamente e o sistema escolherá o melhor canal
+                        automaticamente.
                       </p>
                     </div>
                   </div>
@@ -1053,11 +1404,14 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                         min="7"
                         max="365"
                         value={formData.backupRetencaoDias || 30}
-                        onChange={(e) => handleInputChange('backupRetencaoDias', parseInt(e.target.value))}
+                        onChange={(e) =>
+                          handleInputChange('backupRetencaoDias', parseInt(e.target.value))
+                        }
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        Backups mais antigos que este período serão removidos automaticamente (7-365 dias)
+                        Backups mais antigos que este período serão removidos automaticamente (7-365
+                        dias)
                       </p>
                     </div>
                   </div>
@@ -1085,22 +1439,31 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
 
                     {/* Resultado do Backup */}
                     {backupResult && (
-                      <div className={`p-4 rounded-lg flex items-start gap-3 ${backupResult.success
-                        ? 'bg-green-50 border border-green-200'
-                        : 'bg-red-50 border border-red-200'
-                        }`}>
+                      <div
+                        className={`p-4 rounded-lg flex items-start gap-3 ${
+                          backupResult.success
+                            ? 'bg-green-50 border border-green-200'
+                            : 'bg-red-50 border border-red-200'
+                        }`}
+                      >
                         {backupResult.success ? (
                           <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                         ) : (
                           <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
                         )}
                         <div>
-                          <p className={`text-sm font-medium ${backupResult.success ? 'text-green-900' : 'text-red-900'
-                            }`}>
+                          <p
+                            className={`text-sm font-medium ${
+                              backupResult.success ? 'text-green-900' : 'text-red-900'
+                            }`}
+                          >
                             {backupResult.success ? 'Backup Concluído' : 'Falha no Backup'}
                           </p>
-                          <p className={`text-xs mt-1 ${backupResult.success ? 'text-green-700' : 'text-red-700'
-                            }`}>
+                          <p
+                            className={`text-xs mt-1 ${
+                              backupResult.success ? 'text-green-700' : 'text-red-700'
+                            }`}
+                          >
                             {backupResult.message}
                           </p>
                         </div>
@@ -1115,7 +1478,8 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                       <div>
                         <p className="text-sm font-medium text-amber-900">Backup Seguro</p>
                         <p className="text-xs text-amber-700 mt-1">
-                          Todos os backups são criptografados e armazenados em infraestrutura redundante.
+                          Todos os backups são criptografados e armazenados em infraestrutura
+                          redundante.
                         </p>
                       </div>
                     </div>
@@ -1125,7 +1489,8 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                       <div>
                         <p className="text-sm font-medium text-green-900">Recuperação Rápida</p>
                         <p className="text-xs text-green-700 mt-1">
-                          Em caso de necessidade, entre em contato com suporte para restaurar um backup.
+                          Em caso de necessidade, entre em contato com suporte para restaurar um
+                          backup.
                         </p>
                       </div>
                     </div>
@@ -1133,12 +1498,17 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                 </div>
               )}
 
-              {(activeTab !== 'geral' && activeTab !== 'seguranca' && activeTab !== 'usuarios' && activeTab !== 'email' && activeTab !== 'comunicacao' && activeTab !== 'backup') && (
-                <div className="text-center py-12 text-gray-500">
-                  <Info className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p>Aba "{tabs.find(t => t.id === activeTab)?.label}" em desenvolvimento</p>
-                </div>
-              )}
+              {activeTab !== 'geral' &&
+                activeTab !== 'seguranca' &&
+                activeTab !== 'usuarios' &&
+                activeTab !== 'email' &&
+                activeTab !== 'comunicacao' &&
+                activeTab !== 'backup' && (
+                  <div className="text-center py-12 text-gray-500">
+                    <Info className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <p>Aba "{tabs.find((t) => t.id === activeTab)?.label}" em desenvolvimento</p>
+                  </div>
+                )}
             </div>
           </div>
 

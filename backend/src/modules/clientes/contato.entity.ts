@@ -8,6 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Cliente } from './cliente.entity';
+import { Empresa } from '../../empresas/entities/empresa.entity';
 
 /**
  * Entity Contato
@@ -27,6 +28,13 @@ import { Cliente } from './cliente.entity';
 export class Contato {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column({ type: 'varchar', length: 255 })
   nome: string;

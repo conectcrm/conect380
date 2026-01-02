@@ -15,7 +15,7 @@ O webhook do WhatsApp Business API foi configurado com sucesso e está pronto pa
 
 ### **1. Rota do Controller**
 **Problema:** Rota incorreta `/webhooks/whatsapp/:empresaId`  
-**Solução:** Corrigido para `/api/atendimento/webhooks/whatsapp`
+**Solução:** Corrigido para `/api/atendimento/webhooks/whatsapp/:empresaId`
 
 ```typescript
 // Antes
@@ -25,19 +25,20 @@ O webhook do WhatsApp Business API foi configurado com sucesso e está pronto pa
 @Controller('api/atendimento/webhooks/whatsapp')
 ```
 
-### **2. Endpoint GET sem Parâmetro**
-**Problema:** Endpoint só aceitava `:empresaId` obrigatório  
-**Solução:** Adicionado endpoint GET sem parâmetro
+### **2. Endpoint GET com escopo da empresa**
+**Problema:** Precisávamos restringir a verificação por empresa  
+**Solução:** Mantivemos apenas o endpoint `GET /:empresaId`, garantindo lookup seguro do token.
 
 ```typescript
-@Get()
-async verificarWebhook(
+@Get(':empresaId')
+async verificarWebhookEmpresa(
+  @Param('empresaId') empresaId: string,
   @Query('hub.mode') mode: string,
   @Query('hub.verify_token') verifyToken: string,
   @Query('hub.challenge') challenge: string,
   @Res() res: Response,
 ) {
-  // Validação e retorno do challenge
+  // Validação e retorno do challenge por empresa
 }
 ```
 
@@ -65,7 +66,7 @@ async validarTokenVerificacao(empresaId: string, verifyToken: string): Promise<b
 
 ### **Comando Executado:**
 ```powershell
-Invoke-WebRequest -Uri "http://localhost:3001/api/atendimento/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=conectcrm_webhook_token_123&hub.challenge=TEST123" -Method GET
+Invoke-WebRequest -Uri "http://localhost:3001/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>?hub.mode=subscribe&hub.verify_token=conectcrm_webhook_token_123&hub.challenge=TEST123" -Method GET
 ```
 
 ### **Resultado:**
@@ -82,7 +83,7 @@ Content: TEST123
 
 ### **URL Configurada:**
 ```
-https://4f1d295b3b6e.ngrok-free.app/api/atendimento/webhooks/whatsapp
+https://4f1d295b3b6e.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
 ```
 
 ### **Verify Token:**
@@ -94,6 +95,9 @@ conectcrm_webhook_token_123
 - ☑️ messages
 - ☑️ message_status
 
+### **Header Obrigatório:**
+- O Meta envia `X-Hub-Signature-256` (HMAC SHA256 gerado com o App Secret). Configure o secret no app e valide no backend.
+
 ### **Status:**
 ✅ **Webhook verificado com sucesso pelo Meta!**
 
@@ -104,7 +108,7 @@ conectcrm_webhook_token_123
 ```
 Meta Developers
     ↓
-[GET] https://ngrok.../api/atendimento/webhooks/whatsapp
+[GET] https://ngrok.../api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
     ?hub.mode=subscribe
     &hub.verify_token=conectcrm_webhook_token_123
     &hub.challenge=RANDOM_STRING
@@ -158,7 +162,7 @@ Retorna: 200 OK + challenge
 | Backend | ✅ Rodando | http://localhost:3001 |
 | ngrok | ✅ Conectado | https://4f1d295b3b6e.ngrok-free.app |
 | Dashboard | ✅ Aberto | http://127.0.0.1:4040 |
-| Webhook | ✅ Verificado | `/api/atendimento/webhooks/whatsapp` |
+| Webhook | ✅ Verificado | `/api/atendimento/webhooks/whatsapp/:empresaId` |
 
 ---
 

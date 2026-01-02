@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Plus, 
-  Search, 
-  Edit, 
-  Trash2, 
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
   ArrowLeft,
   Package,
   Tag,
   Settings,
   Layers,
   Save,
-  X
+  X,
 } from 'lucide-react';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import ModalCategoria from '../../components/modals/ModalCategoria';
@@ -70,20 +70,20 @@ const mockCategorias: Categoria[] = [
             nome: 'Licença Web Básica',
             descricao: 'Acesso via web, até 5 usuários',
             subcategoriaId: 'sub1',
-            precoBase: 299.00,
+            precoBase: 299.0,
             multiplicador: 1.0,
-            ativa: true
+            ativa: true,
           },
           {
             id: 'conf2',
             nome: 'Licença Web Premium',
             descricao: 'Acesso via web, usuários ilimitados',
             subcategoriaId: 'sub1',
-            precoBase: 449.00,
+            precoBase: 449.0,
             multiplicador: 1.5,
-            ativa: true
-          }
-        ]
+            ativa: true,
+          },
+        ],
       },
       {
         id: 'sub2',
@@ -97,22 +97,22 @@ const mockCategorias: Categoria[] = [
             nome: 'Loja Básica',
             descricao: 'Até 100 produtos',
             subcategoriaId: 'sub2',
-            precoBase: 199.00,
+            precoBase: 199.0,
             multiplicador: 1.0,
-            ativa: true
+            ativa: true,
           },
           {
             id: 'conf4',
             nome: 'Loja Avançada',
             descricao: 'Produtos ilimitados',
             subcategoriaId: 'sub2',
-            precoBase: 399.00,
+            precoBase: 399.0,
             multiplicador: 2.0,
-            ativa: true
-          }
-        ]
-      }
-    ]
+            ativa: true,
+          },
+        ],
+      },
+    ],
   },
   {
     id: 'cat2',
@@ -133,36 +133,38 @@ const mockCategorias: Categoria[] = [
             nome: 'Consultor Júnior',
             descricao: '1-3 anos de experiência',
             subcategoriaId: 'sub3',
-            precoBase: 150.00,
+            precoBase: 150.0,
             multiplicador: 1.0,
-            ativa: true
+            ativa: true,
           },
           {
             id: 'conf6',
             nome: 'Consultor Sênior',
             descricao: '8+ anos de experiência',
             subcategoriaId: 'sub3',
-            precoBase: 300.00,
+            precoBase: 300.0,
             multiplicador: 2.0,
-            ativa: true
-          }
-        ]
-      }
-    ]
-  }
+            ativa: true,
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 const CategoriasProdutosPage: React.FC = () => {
   const navigate = useNavigate();
-  
+
   // Estados
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'categorias' | 'subcategorias' | 'configuracoes'>('categorias');
+  const [activeTab, setActiveTab] = useState<'categorias' | 'subcategorias' | 'configuracoes'>(
+    'categorias',
+  );
   const [selectedCategoria, setSelectedCategoria] = useState<Categoria | null>(null);
   const [selectedSubcategoria, setSelectedSubcategoria] = useState<Subcategoria | null>(null);
-  
+
   // Estados do modal
   const [showModalCategoria, setShowModalCategoria] = useState(false);
   const [showModalSubcategoria, setShowModalSubcategoria] = useState(false);
@@ -178,33 +180,37 @@ const CategoriasProdutosPage: React.FC = () => {
     try {
       setLoading(true);
       const categoriasData = await categoriasProdutosService.listarCategorias();
-      
+
       // Converter para formato da interface local
-      const categoriasConvertidas: Categoria[] = categoriasData.map(cat => ({
+      const categoriasConvertidas: Categoria[] = categoriasData.map((cat) => ({
         id: cat.id,
         nome: cat.nome,
         descricao: cat.descricao,
         cor: cat.cor || 'blue',
         ativa: cat.ativo,
-        subcategorias: cat.subcategorias ? cat.subcategorias.map(sub => ({
-          id: sub.id,
-          nome: sub.nome,
-          descricao: sub.descricao || '',
-          categoriaId: cat.id,
-          ativa: sub.ativo,
-          configuracoes: sub.configuracoes ? sub.configuracoes.map(conf => ({
-            id: conf.id,
-            nome: conf.nome,
-            descricao: conf.descricao || '',
-            subcategoriaId: sub.id,
-            precoBase: conf.precoBase || 0,
-            ativa: conf.ativo
-          })) : []
-        })) : []
+        subcategorias: cat.subcategorias
+          ? cat.subcategorias.map((sub) => ({
+              id: sub.id,
+              nome: sub.nome,
+              descricao: sub.descricao || '',
+              categoriaId: cat.id,
+              ativa: sub.ativo,
+              configuracoes: sub.configuracoes
+                ? sub.configuracoes.map((conf) => ({
+                    id: conf.id,
+                    nome: conf.nome,
+                    descricao: conf.descricao || '',
+                    subcategoriaId: sub.id,
+                    precoBase: conf.precoBase || 0,
+                    ativa: conf.ativo,
+                  }))
+                : [],
+            }))
+          : [],
       }));
-      
+
       setCategorias(categoriasConvertidas);
-      
+
       // Se não há categorias, adicionar algumas padrão
       if (categoriasConvertidas.length === 0) {
         await criarCategoriasIniciais();
@@ -223,13 +229,13 @@ const CategoriasProdutosPage: React.FC = () => {
         { nome: 'Software', descricao: 'Produtos de software', icone: '💻', cor: 'blue' },
         { nome: 'Hardware', descricao: 'Equipamentos e hardware', icone: '🖥️', cor: 'green' },
         { nome: 'Consultoria', descricao: 'Serviços de consultoria', icone: '🎯', cor: 'purple' },
-        { nome: 'Treinamento', descricao: 'Cursos e treinamentos', icone: '📚', cor: 'orange' }
+        { nome: 'Treinamento', descricao: 'Cursos e treinamentos', icone: '📚', cor: 'orange' },
       ];
 
       for (const categoria of categoriasIniciais) {
         await categoriasProdutosService.criarCategoria(categoria);
       }
-      
+
       toast.success('Categorias iniciais criadas!');
       await carregarCategorias();
     } catch (error) {
@@ -241,7 +247,7 @@ const CategoriasProdutosPage: React.FC = () => {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -252,7 +258,7 @@ const CategoriasProdutosPage: React.FC = () => {
     { nome: 'Roxo', valor: 'purple', classe: 'bg-purple-500' },
     { nome: 'Laranja', valor: 'orange', classe: 'bg-orange-500' },
     { nome: 'Vermelho', valor: 'red', classe: 'bg-red-500' },
-    { nome: 'Amarelo', valor: 'yellow', classe: 'bg-yellow-500' }
+    { nome: 'Amarelo', valor: 'yellow', classe: 'bg-yellow-500' },
   ];
 
   // Funções de manipulação
@@ -304,15 +310,13 @@ const CategoriasProdutosPage: React.FC = () => {
           nome: categoriaData.nome,
           descricao: categoriaData.descricao,
           icone: categoriaData.icone,
-          cor: categoriaData.cor
+          cor: categoriaData.cor,
         });
-        
-        setCategorias(prev => prev.map(cat => 
-          cat.id === editingItem.id 
-            ? { ...cat, ...categoriaData }
-            : cat
-        ));
-        
+
+        setCategorias((prev) =>
+          prev.map((cat) => (cat.id === editingItem.id ? { ...cat, ...categoriaData } : cat)),
+        );
+
         toast.success('Categoria atualizada com sucesso!');
       } else {
         // Criar nova categoria
@@ -320,22 +324,22 @@ const CategoriasProdutosPage: React.FC = () => {
           nome: categoriaData.nome,
           descricao: categoriaData.descricao,
           icone: categoriaData.icone || '📁',
-          cor: categoriaData.cor || 'blue'
+          cor: categoriaData.cor || 'blue',
         });
-        
+
         const categoriaNormalizada: Categoria = {
           id: novaCategoria.id,
           nome: novaCategoria.nome,
           descricao: novaCategoria.descricao,
           cor: novaCategoria.cor || 'blue',
           ativa: novaCategoria.ativo,
-          subcategorias: []
+          subcategorias: [],
         };
-        
-        setCategorias(prev => [...prev, categoriaNormalizada]);
+
+        setCategorias((prev) => [...prev, categoriaNormalizada]);
         toast.success('Categoria criada com sucesso!');
       }
-      
+
       setShowModalCategoria(false);
       setEditingItem(null);
     } catch (error) {
@@ -348,26 +352,28 @@ const CategoriasProdutosPage: React.FC = () => {
     try {
       if (editingItem) {
         // Editar subcategoria existente
-        setCategorias(prev => prev.map(cat => ({
-          ...cat,
-          subcategorias: cat.subcategorias.map(sub =>
-            sub.id === editingItem.id
-              ? { ...sub, ...subcategoriaData }
-              : sub
-          )
-        })));
+        setCategorias((prev) =>
+          prev.map((cat) => ({
+            ...cat,
+            subcategorias: cat.subcategorias.map((sub) =>
+              sub.id === editingItem.id ? { ...sub, ...subcategoriaData } : sub,
+            ),
+          })),
+        );
       } else {
         // Criar nova subcategoria
         const novaSubcategoria: Subcategoria = {
           id: Date.now().toString(),
           ...subcategoriaData,
-          configuracoes: []
+          configuracoes: [],
         };
-        setCategorias(prev => prev.map(cat => 
-          cat.id === subcategoriaData.categoriaId
-            ? { ...cat, subcategorias: [...cat.subcategorias, novaSubcategoria] }
-            : cat
-        ));
+        setCategorias((prev) =>
+          prev.map((cat) =>
+            cat.id === subcategoriaData.categoriaId
+              ? { ...cat, subcategorias: [...cat.subcategorias, novaSubcategoria] }
+              : cat,
+          ),
+        );
       }
       setShowModalSubcategoria(false);
       setEditingItem(null);
@@ -380,31 +386,33 @@ const CategoriasProdutosPage: React.FC = () => {
     try {
       if (editingItem) {
         // Editar configuração existente
-        setCategorias(prev => prev.map(cat => ({
-          ...cat,
-          subcategorias: cat.subcategorias.map(sub => ({
-            ...sub,
-            configuracoes: sub.configuracoes.map(conf =>
-              conf.id === editingItem.id
-                ? { ...conf, ...configuracaoData }
-                : conf
-            )
-          }))
-        })));
+        setCategorias((prev) =>
+          prev.map((cat) => ({
+            ...cat,
+            subcategorias: cat.subcategorias.map((sub) => ({
+              ...sub,
+              configuracoes: sub.configuracoes.map((conf) =>
+                conf.id === editingItem.id ? { ...conf, ...configuracaoData } : conf,
+              ),
+            })),
+          })),
+        );
       } else {
         // Criar nova configuração
         const novaConfiguracao: Configuracao = {
           id: Date.now().toString(),
-          ...configuracaoData
+          ...configuracaoData,
         };
-        setCategorias(prev => prev.map(cat => ({
-          ...cat,
-          subcategorias: cat.subcategorias.map(sub =>
-            sub.id === configuracaoData.subcategoriaId
-              ? { ...sub, configuracoes: [...sub.configuracoes, novaConfiguracao] }
-              : sub
-          )
-        })));
+        setCategorias((prev) =>
+          prev.map((cat) => ({
+            ...cat,
+            subcategorias: cat.subcategorias.map((sub) =>
+              sub.id === configuracaoData.subcategoriaId
+                ? { ...sub, configuracoes: [...sub.configuracoes, novaConfiguracao] }
+                : sub,
+            ),
+          })),
+        );
       }
       setShowModalConfiguracao(false);
       setEditingItem(null);
@@ -417,10 +425,10 @@ const CategoriasProdutosPage: React.FC = () => {
   const renderCategorias = () => (
     <div className="space-y-4">
       {categorias
-        .filter(cat => cat.nome.toLowerCase().includes(searchTerm.toLowerCase()))
+        .filter((cat) => cat.nome.toLowerCase().includes(searchTerm.toLowerCase()))
         .map((categoria) => (
-          <div 
-            key={categoria.id} 
+          <div
+            key={categoria.id}
             className={`bg-white rounded-lg p-6 border-l-4 border-${categoria.cor}-500 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${
               selectedCategoria?.id === categoria.id ? 'ring-2 ring-blue-500' : ''
             }`}
@@ -439,11 +447,11 @@ const CategoriasProdutosPage: React.FC = () => {
                     <span className="text-gray-500">
                       {categoria.subcategorias.length} subcategorias
                     </span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      categoria.ativa 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        categoria.ativa ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}
+                    >
                       {categoria.ativa ? 'Ativa' : 'Inativa'}
                     </span>
                   </div>
@@ -481,7 +489,9 @@ const CategoriasProdutosPage: React.FC = () => {
         <div className="text-center py-12">
           <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Selecione uma categoria</h3>
-          <p className="text-gray-500">Escolha uma categoria na aba anterior para ver suas subcategorias</p>
+          <p className="text-gray-500">
+            Escolha uma categoria na aba anterior para ver suas subcategorias
+          </p>
         </div>
       );
     }
@@ -498,9 +508,9 @@ const CategoriasProdutosPage: React.FC = () => {
         </div>
 
         {selectedCategoria.subcategorias
-          .filter(sub => sub.nome.toLowerCase().includes(searchTerm.toLowerCase()))
+          .filter((sub) => sub.nome.toLowerCase().includes(searchTerm.toLowerCase()))
           .map((subcategoria) => (
-            <div 
+            <div
               key={subcategoria.id}
               className={`bg-white rounded-lg p-4 border shadow-sm cursor-pointer hover:shadow-md transition-shadow ${
                 selectedSubcategoria?.id === subcategoria.id ? 'ring-2 ring-green-500' : ''
@@ -515,11 +525,13 @@ const CategoriasProdutosPage: React.FC = () => {
                     <span className="text-gray-500">
                       {subcategoria.configuracoes.length} configurações
                     </span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      subcategoria.ativa 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        subcategoria.ativa
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
+                    >
                       {subcategoria.ativa ? 'Ativa' : 'Inativa'}
                     </span>
                   </div>
@@ -574,7 +586,7 @@ const CategoriasProdutosPage: React.FC = () => {
         </div>
 
         {selectedSubcategoria.configuracoes
-          .filter(conf => conf.nome.toLowerCase().includes(searchTerm.toLowerCase()))
+          .filter((conf) => conf.nome.toLowerCase().includes(searchTerm.toLowerCase()))
           .map((configuracao) => (
             <div key={configuracao.id} className="bg-white rounded-lg p-4 border shadow-sm">
               <div className="flex items-center justify-between">
@@ -588,11 +600,13 @@ const CategoriasProdutosPage: React.FC = () => {
                     <span className="text-gray-700">
                       <strong>Multiplicador:</strong> {configuracao.multiplicador}x
                     </span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      configuracao.ativa 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        configuracao.ativa
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
+                    >
                       {configuracao.ativa ? 'Ativa' : 'Inativa'}
                     </span>
                   </div>
@@ -627,13 +641,15 @@ const CategoriasProdutosPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <BackToNucleus 
+              <BackToNucleus
                 nucleusName="Produtos"
                 nucleusPath="/produtos"
                 currentModuleName="Gestão de Categorias"
               />
               <div>
-                <p className="text-[#B4BEC9]">Configure categorias, subcategorias e tipos de produtos</p>
+                <p className="text-[#B4BEC9]">
+                  Configure categorias, subcategorias e tipos de produtos
+                </p>
               </div>
             </div>
           </div>
@@ -765,11 +781,11 @@ const CategoriasProdutosPage: React.FC = () => {
         onSave={handleSalvarConfiguracao}
         configuracao={editingItem}
         subcategoriaAtual={selectedSubcategoria}
-        subcategorias={categorias.flatMap(cat => 
-          cat.subcategorias.map(sub => ({
+        subcategorias={categorias.flatMap((cat) =>
+          cat.subcategorias.map((sub) => ({
             ...sub,
-            categoria: { nome: cat.nome, cor: cat.cor }
-          }))
+            categoria: { nome: cat.nome, cor: cat.cor },
+          })),
         )}
       />
     </div>

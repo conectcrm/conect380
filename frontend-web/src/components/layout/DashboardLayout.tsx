@@ -1,18 +1,19 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../../contexts/I18nContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useProfile } from '../../contexts/ProfileContext';
 import { useSidebar } from '../../contexts/SidebarContext';
+import { useWebSocketStatus } from '../../contexts/WebSocketContext';
 import { formatCompanyName, formatUserName } from '../../utils/textUtils';
 import HierarchicalNavGroup from '../navigation/HierarchicalNavGroup';
 import { menuConfig, getMenuParaEmpresa } from '../../config/menuConfig';
 import { useModulosAtivos } from '../../hooks/useModuloAtivo';
 import NotificationCenter from '../notifications/NotificationCenter';
-import NotificationIndicator from '../notifications/NotificationIndicator';
 import ConectCRMLogoFinal from '../ui/ConectCRMLogoFinal';
 import LanguageSelector from '../common/LanguageSelector';
+import searchService, { SearchResult } from '../../services/searchService';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -26,13 +27,9 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ShoppingBag,
   Building2,
-  Calendar,
-  Clock,
-  CreditCard,
-  HelpCircle,
-  Mail
+  MessageCircle,
+  Mail,
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -53,10 +50,11 @@ const formatCnpj = (cnpj?: string): string => {
 };
 
 const ROLE_LABELS: Record<string, string> = {
+  superadmin: 'Super Admin',
   admin: 'Administrador',
   manager: 'Gestor',
   vendedor: 'Vendedor',
-  user: 'Usuário'
+  user: 'Usuário',
 };
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
@@ -67,6 +65,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const { user, logout } = useAuth();
   const { t, language, availableLanguages } = useI18n();
+
+  // 🔌 WebSocket Status para NotificationIndicator
+  const { connected: wsConnected, error: wsError, reconnect: wsReconnect } = useWebSocketStatus();
 
   const { currentPalette } = useTheme();
   const { perfilSelecionado, setPerfilSelecionado } = useProfile();
@@ -83,23 +84,33 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   }, [modulosAtivos, loadingModulos]);
 
   const roleKey = (user?.role || '').toLowerCase();
-  const displayRole = ROLE_LABELS[roleKey] || (user?.role ? formatUserName(user.role) : 'Administrador');
+  const displayRole =
+    ROLE_LABELS[roleKey] || (user?.role ? formatUserName(user.role) : 'Administrador');
 
   // Verificação se é admin
-  const isAdmin = roleKey === 'admin' || roleKey === 'manager' || user?.email?.includes('admin');
+  const isAdmin =
+    roleKey === 'superadmin' || roleKey === 'admin' || roleKey === 'manager' || user?.email?.includes('admin');
 
-  const lastLoginRaw = (user as any)?.ultimo_login ?? (user as any)?.ultimoLogin ?? (user as any)?.lastLoginAt ?? (user as any)?.last_login;
+  const lastLoginRaw =
+    (user as any)?.ultimo_login ??
+    (user as any)?.ultimoLogin ??
+    (user as any)?.lastLoginAt ??
+    (user as any)?.last_login;
   const lastLoginDate = lastLoginRaw ? new Date(lastLoginRaw) : null;
-  const lastLoginText = lastLoginDate && !Number.isNaN(lastLoginDate.getTime())
-    ? formatDistanceToNow(lastLoginDate, { addSuffix: true, locale: ptBR })
-    : null;
+  const lastLoginText =
+    lastLoginDate && !Number.isNaN(lastLoginDate.getTime())
+      ? formatDistanceToNow(lastLoginDate, { addSuffix: true, locale: ptBR })
+      : null;
   const lastLoginLabel = lastLoginText
     ? `Último acesso ${lastLoginText}`
     : lastLoginRaw
       ? 'Último acesso indisponível'
       : 'Nunca acessou';
 
-  const rawAppVersion = (typeof window !== 'undefined' && (window as any)?.__APP_VERSION__) ?? process.env.REACT_APP_APP_VERSION ?? process.env.REACT_APP_VERSION;
+  const rawAppVersion =
+    (typeof window !== 'undefined' && (window as any)?.__APP_VERSION__) ??
+    process.env.REACT_APP_APP_VERSION ??
+    process.env.REACT_APP_VERSION;
   const appVersion = rawAppVersion
     ? rawAppVersion.toLowerCase().startsWith('v')
       ? rawAppVersion
@@ -122,54 +133,95 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     {
       id: 'administrador' as const,
       nome: 'Administrador',
-      descricao: 'Acesso total ao sistema'
+      descricao: 'Acesso total ao sistema',
     },
     {
       id: 'gerente' as const,
       nome: 'Gerente',
-      descricao: 'Gestão de equipes e relatórios'
+      descricao: 'Gestão de equipes e relatórios',
     },
     {
       id: 'vendedor' as const,
       nome: 'Vendedor',
-      descricao: 'Gestão de vendas e clientes'
+      descricao: 'Gestão de vendas e clientes',
     },
     {
       id: 'operacional' as const,
       nome: 'Operacional',
-      descricao: 'Operações e processos'
+      descricao: 'Operações e processos',
     },
     {
       id: 'financeiro' as const,
       nome: 'Financeiro',
-      descricao: 'Gestão financeira'
+      descricao: 'Gestão financeira',
     },
     {
       id: 'suporte' as const,
       nome: 'Suporte',
-      descricao: 'Atendimento ao cliente'
-    }
+      descricao: 'Atendimento ao cliente',
+    },
   ];
 
   const getTipoColor = (tipo: string) => {
     switch (tipo) {
-      case 'administrador': return 'bg-red-100 text-red-800';
-      case 'gerente': return 'bg-blue-100 text-blue-800';
-      case 'vendedor': return 'bg-green-100 text-green-800';
-      case 'operacional': return 'bg-purple-100 text-purple-800';
-      case 'financeiro': return 'bg-yellow-100 text-yellow-800';
-      case 'suporte': return 'bg-orange-100 text-orange-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'administrador':
+        return 'bg-red-100 text-red-800';
+      case 'gerente':
+        return 'bg-blue-100 text-blue-800';
+      case 'vendedor':
+        return 'bg-green-100 text-green-800';
+      case 'operacional':
+        return 'bg-purple-100 text-purple-800';
+      case 'financeiro':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'suporte':
+        return 'bg-orange-100 text-orange-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getCurrentProfile = () => {
-    return availableProfiles.find(p => p.id === perfilSelecionado) || availableProfiles[0];
+    return availableProfiles.find((p) => p.id === perfilSelecionado) || availableProfiles[0];
   };
 
   const handleProfileSelect = (profileId: string) => {
     setPerfilSelecionado(profileId as any);
     setShowProfileSelector(false);
+  };
+
+  // ✨ Mac Dock Magnification Effect
+  const [mouseY, setMouseY] = useState<number | null>(null);
+  const sidebarItemsRef = useRef<(HTMLElement | null)[]>([]);
+
+  const handleMouseMoveSidebar = (e: React.MouseEvent<HTMLDivElement>) => {
+    const sidebar = e.currentTarget;
+    const rect = sidebar.getBoundingClientRect();
+    setMouseY(e.clientY - rect.top);
+  };
+
+  const handleMouseLeaveSidebar = () => {
+    setMouseY(null);
+  };
+
+  const getDockScale = (index: number): number => {
+    if (mouseY === null) return 1;
+
+    const element = sidebarItemsRef.current[index];
+    if (!element) return 1;
+
+    const rect = element.getBoundingClientRect();
+    const elementCenter = rect.top + rect.height / 2 - element.closest('.h-full')!.getBoundingClientRect().top;
+
+    const distance = Math.abs(mouseY - elementCenter);
+    const maxDistance = 120; // Distância máxima de influência
+
+    if (distance > maxDistance) return 1;
+
+    // Escala baseada na distância (mais perto = maior)
+    // Hover direto: 1.6x, adjacente: 1.3x, longe: 1.0x
+    const scale = 1 + (1 - distance / maxDistance) * 0.6;
+    return Math.max(1, Math.min(1.6, scale));
   };
 
   // Fechar menus ao clicar fora
@@ -197,235 +249,169 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     const routeMap: Record<string, { title: string; subtitle: string }> = {
       '/dashboard': {
         title: t('navigation.dashboard'),
-        subtitle: t('dashboard.subtitle')
+        subtitle: t('dashboard.subtitle'),
       },
       '/nuclei/principal': {
         title: t('navigation.main'),
-        subtitle: t('navigation.mainModules')
+        subtitle: t('navigation.mainModules'),
       },
       '/nuclei/crm': {
         title: 'CRM',
-        subtitle: t('navigation.customerManagement')
+        subtitle: t('navigation.customerManagement'),
       },
       '/nuclei/vendas': {
         title: t('navigation.sales'),
-        subtitle: t('navigation.salesProposals')
+        subtitle: t('navigation.salesProposals'),
       },
       '/nuclei/financeiro': {
         title: t('navigation.financial'),
-        subtitle: t('navigation.financialControl')
+        subtitle: t('navigation.financialControl'),
       },
       '/nuclei/configuracoes': {
         title: t('navigation.settings'),
-        subtitle: t('navigation.systemSettings')
+        subtitle: t('navigation.systemSettings'),
       },
       '/nuclei/administracao': {
         title: 'Administração',
-        subtitle: 'Gestão empresarial e controle administrativo'
+        subtitle: 'Gestão empresarial e controle administrativo',
       },
       '/clientes': {
         title: 'Clientes',
-        subtitle: 'Gerencie seus clientes e contatos'
+        subtitle: 'Gerencie seus clientes e contatos',
       },
       '/propostas': {
         title: 'Propostas',
-        subtitle: 'Acompanhe suas propostas comerciais'
-      },
-      '/funil-vendas': {
-        title: 'Funil de Vendas',
-        subtitle: 'Pipeline de oportunidades e negociações'
+        subtitle: 'Acompanhe suas propostas comerciais',
       },
       '/produtos': {
         title: 'Produtos',
-        subtitle: 'Catálogo de produtos e serviços'
+        subtitle: 'Catálogo de produtos e serviços',
       },
       '/combos': {
         title: 'Combos',
-        subtitle: 'Gestão de combos e pacotes de produtos'
+        subtitle: 'Gestão de combos e pacotes de produtos',
       },
       '/combos/novo': {
         title: 'Novo Combo',
-        subtitle: 'Criar um novo combo de produtos'
+        subtitle: 'Criar um novo combo de produtos',
       },
       '/financeiro/contas-receber': {
         title: 'Contas a Receber',
-        subtitle: 'Gestão de recebimentos e inadimplência'
+        subtitle: 'Gestão de recebimentos e inadimplência',
       },
       '/financeiro/contas-pagar': {
         title: 'Contas a Pagar',
-        subtitle: 'Controle de pagamentos e fornecedores'
+        subtitle: 'Controle de pagamentos e fornecedores',
       },
       '/financeiro/fluxo-caixa': {
         title: 'Fluxo de Caixa',
-        subtitle: 'Acompanhamento de entradas e saídas'
+        subtitle: 'Acompanhamento de entradas e saídas',
       },
       '/faturamento': {
         title: 'Faturamento',
-        subtitle: 'Gerencie faturas, cobranças e recebimentos'
+        subtitle: 'Gerencie faturas, cobranças e recebimentos',
       },
       '/financeiro/faturamento': {
         title: 'Faturamento',
-        subtitle: 'Gerencie faturas, cobranças e recebimentos'
+        subtitle: 'Gerencie faturas, cobranças e recebimentos',
       },
       '/billing': {
         title: 'Billing & Assinaturas',
-        subtitle: 'Gerencie sua assinatura, planos e faturamento'
+        subtitle: 'Gerencie sua assinatura, planos e faturamento',
       },
       '/atendimento': {
         title: 'Atendimento Omnichannel',
-        subtitle: 'Chat em tempo real • WebSocket • Multi-canal'
+        subtitle: 'Chat em tempo real • WebSocket • Multi-canal',
       },
       '/suporte': {
         title: 'Suporte',
-        subtitle: 'Central de ajuda e atendimento ao cliente'
+        subtitle: 'Central de ajuda e atendimento ao cliente',
       },
       '/configuracoes': {
         title: 'Configurações',
-        subtitle: 'Configurações do sistema'
+        subtitle: 'Configurações do sistema',
       },
       '/admin/empresas': {
         title: 'Gestão de Empresas',
-        subtitle: 'Administração e monitoramento de empresas'
+        subtitle: 'Administração e monitoramento de empresas',
       },
       '/empresas/minhas': {
         title: 'Minhas Empresas',
-        subtitle: 'Gerencie suas empresas e alterne entre elas'
+        subtitle: 'Gerencie suas empresas e alterne entre elas',
       },
       '/configuracoes/empresa': {
         title: 'Configurações da Empresa',
-        subtitle: 'Configurações específicas da empresa ativa'
+        subtitle: 'Configurações específicas da empresa ativa',
       },
       '/configuracoes/departamentos': {
         title: 'Gestão de Departamentos',
-        subtitle: 'Configure departamentos de atendimento e organize sua equipe'
+        subtitle: 'Configure departamentos de atendimento e organize sua equipe',
       },
       '/configuracoes/metas': {
         title: 'Metas Comerciais',
-        subtitle: 'Defina e gerencie metas de vendas por período, vendedor ou região'
+        subtitle: 'Defina e gerencie metas de vendas por período, vendedor ou região',
       },
       '/relatorios/analytics': {
         title: 'Relatórios e Analytics',
-        subtitle: 'Análise detalhada de performance e resultados'
+        subtitle: 'Análise detalhada de performance e resultados',
       },
       '/gestao/usuarios': {
         title: 'Gestão de Usuários',
-        subtitle: 'Gerencie usuários, permissões e atendentes do sistema'
+        subtitle: 'Gerencie usuários, permissões e atendentes do sistema',
       },
       '/sistema/backup': {
         title: 'Backup e Sincronização',
-        subtitle: 'Gerencie backups e sincronize dados entre empresas'
-      }
+        subtitle: 'Gerencie backups e sincronize dados entre empresas',
+      },
     };
 
-    return routeMap[pathname] || {
-      title: 'Conect CRM',
-      subtitle: 'Sistema de gestão empresarial'
-    };
+    return (
+      routeMap[pathname] || {
+        title: 'Conect CRM',
+        subtitle: 'Sistema de gestão empresarial',
+      }
+    );
   };
 
   const currentPage = getPageInfo(location.pathname);
 
   // Estados para funcionalidades da barra superior
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [showCalendar, setShowCalendar] = useState(false);
 
   // Estados para sistema de busca
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [searchResults] = useState([
-    { id: 1, type: 'cliente', title: 'João Silva', subtitle: 'cliente@email.com' },
-    { id: 2, type: 'proposta', title: 'Proposta #001', subtitle: 'R$ 15.000,00' },
-    { id: 3, type: 'contrato', title: 'Contrato #123', subtitle: 'Ativo até 12/2025' }
-  ]);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  // Debounce da busca
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (searchQuery.length >= 2) {
+        setSearchLoading(true);
+        try {
+          const results = await searchService.searchGlobal(searchQuery);
+          setSearchResults(results);
+          setShowSearchResults(true);
+        } catch (error) {
+          console.error('Erro na busca:', error);
+          setSearchResults([]);
+        } finally {
+          setSearchLoading(false);
+        }
+      } else {
+        setSearchResults([]);
+        setShowSearchResults(false);
+      }
+    }, 300); // 300ms de debounce
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const companyName = formatCompanyName(user?.empresa?.nome || 'Sua Empresa Ltda');
   const companyCnpj = formatCnpj(user?.empresa?.cnpj);
   const companyIdentifier = companyCnpj || user?.empresa?.slug?.toUpperCase();
   const companyPlan = user?.empresa?.plano;
-
-  // Estados e dados do calendário
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
-
-  const today = new Date();
-  const currentMonth = currentDate.getMonth();
-  const currentYear = currentDate.getFullYear();
-
-  // Eventos de exemplo para o calendário
-  const [events] = useState([
-    {
-      id: 1,
-      date: new Date(2025, 6, 30),
-      title: 'Reunião com Cliente A',
-      time: '09:00',
-      type: 'meeting',
-      color: 'blue'
-    },
-    {
-      id: 2,
-      date: new Date(2025, 6, 31),
-      title: 'Apresentação Proposta',
-      time: '14:30',
-      type: 'presentation',
-      color: 'green'
-    },
-    {
-      id: 3,
-      date: new Date(2025, 7, 2),
-      title: 'Follow-up Vendas',
-      time: '10:15',
-      type: 'call',
-      color: 'purple'
-    },
-    {
-      id: 4,
-      date: new Date(2025, 7, 5),
-      title: 'Treinamento Equipe',
-      time: '16:00',
-      type: 'training',
-      color: 'orange'
-    }
-  ]);
-
-  // Funções do calendário
-  const getDaysInMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  };
-
-  const getFirstDayOfMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-  };
-
-  const getEventsForDate = (date: Date) => {
-    return events.filter(event =>
-      event.date.toDateString() === date.toDateString()
-    );
-  };
-
-  const isSameDay = (date1: Date, date2: Date) => {
-    return date1.toDateString() === date2.toDateString();
-  };
-
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    setCurrentDate(prev => {
-      const newDate = new Date(prev);
-      if (direction === 'prev') {
-        newDate.setMonth(prev.getMonth() - 1);
-      } else {
-        newDate.setMonth(prev.getMonth() + 1);
-      }
-      return newDate;
-    });
-  };
-
-  const formatDateForDisplay = (date: Date) => {
-    return date.toLocaleDateString('pt-BR', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
 
   const handleLogout = () => {
     logout();
@@ -457,25 +443,23 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       if (showSearchResults && !target.closest('[data-dropdown="search"]')) {
         setShowSearchResults(false);
       }
-
-      if (showCalendar && !target.closest('[data-dropdown="calendar"]')) {
-        setShowCalendar(false);
-      }
     };
 
-    if (showUserMenu || showSearchResults || showCalendar) {
+    if (showUserMenu || showSearchResults) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showUserMenu, showSearchResults, showCalendar]);
+  }, [showUserMenu, showSearchResults]);
 
   // Effect para atalho de teclado da busca
   useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
         event.preventDefault();
-        const searchInput = document.querySelector('input[placeholder*="Buscar"]') as HTMLInputElement;
+        const searchInput = document.querySelector(
+          'input[placeholder*="Buscar"]',
+        ) as HTMLInputElement;
         if (searchInput) {
           searchInput.focus();
         }
@@ -495,7 +479,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     <div className="h-screen flex overflow-hidden bg-[#DEEFE7]">
       {/* Sidebar para mobile */}
       <div className={`fixed inset-0 flex z-40 md:hidden ${sidebarOpen ? '' : 'hidden'}`}>
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
+        <div
+          className="fixed inset-0 bg-gray-600 bg-opacity-75"
+          onClick={() => setSidebarOpen(false)}
+        />
 
         <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white">
           <div className="absolute top-0 right-0 -mr-12 pt-2">
@@ -514,154 +501,82 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               </div>
             </div>
             {/* Navegação Mobile */}
-            <HierarchicalNavGroup
-              menuItems={menuFiltrado}
-              sidebarCollapsed={false}
-            />
+            <HierarchicalNavGroup menuItems={menuFiltrado} sidebarCollapsed={false} />
           </div>
         </div>
       </div>
 
-      {/* Sidebar para desktop */}
-      <div className="hidden md:flex md:flex-shrink-0">
-        <div className={`flex flex-col transition-all duration-300 bg-[#FFFFFF] border-r border-[#DEEFE7] relative overflow-hidden shadow-sm ${sidebarCollapsed ? 'w-16' : 'w-72'}`}>
+      {/* Sidebar para desktop - Duas colunas: Barra fixa + Painel suspenso */}
+      <div className="hidden md:flex md:flex-shrink-0 relative">
+        {/* Barra de Ícones Fixa (Coluna 1) com Efeito Mac Dock */}
+        <div
+          className="flex flex-col w-[75px] bg-[#002333] border-r border-[#001a26] relative z-20 shadow-lg"
+          onMouseMove={handleMouseMoveSidebar}
+          onMouseLeave={handleMouseLeaveSidebar}
+        >
           <div className="flex flex-col h-full">
-            <div className={`flex-1 flex flex-col pt-5 pb-4 min-h-0 ${sidebarCollapsed ? 'overflow-hidden px-2' : 'overflow-y-auto'}`}>
-              {/* Header da Sidebar */}
-              <div className={`sidebar-header-improved flex items-center flex-shrink-0 min-h-[60px] ${sidebarCollapsed ? 'px-2' : 'px-4'}`}>
-                {!sidebarCollapsed ? (
-                  // Layout quando expandida - design melhorado
-                  <div className="flex items-center gap-5 flex-1 min-w-0">
-                    <div className="logo-container-improved relative flex-shrink-0">
-                      <div className="transform transition-all duration-300 hover:scale-110 hover:rotate-2">
-                        <ConectCRMLogoFinal size="sm" variant="icon" />
-                      </div>
-                      {/* Brilho sutil atrás da logo */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-[#159A9C]/10 to-transparent rounded-full blur-xl -z-10 opacity-50"></div>
-                    </div>
-
-                    {/* Separador visual elegante */}
-                    <div className="h-10 w-px bg-gradient-to-b from-transparent via-[#DEEFE7] to-transparent"></div>
-
-                    <div className="text-container-improved min-w-0 flex-1">
-                      <div className="flex flex-col">
-                        <div className="brand-name-container relative">
-                          <span className="brand-conect text-[#002333] font-black text-xl leading-tight tracking-wider">
-                            CONECT
-                          </span>
-                          <div className="brand-highlight absolute -bottom-0.5 left-0 w-full h-0.5 bg-gradient-to-r from-[#159A9C] via-[#1DB5B8] to-transparent rounded-full"></div>
-                        </div>
-                        <span className="brand-crm text-[#159A9C] font-bold text-lg leading-tight tracking-wide -mt-0.5">
-                          CRM
-                        </span>
-                      </div>
-                      <div className="brand-subtitle text-xs text-[#6B7280] font-semibold tracking-wider mt-1.5 uppercase opacity-80">
-                        Gestão Empresarial
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                      className="p-2 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 hover:from-blue-50 hover:to-blue-100 border border-gray-200 hover:border-blue-200 shadow-sm transition-all duration-200 hover:shadow-md flex-shrink-0 group"
-                      title="Recolher sidebar"
-                    >
-                      <ChevronLeft className="h-4 w-4 text-gray-600 group-hover:text-blue-600 transition-colors" />
-                    </button>
-                  </div>
-                ) : (
-                  // Layout quando colapsada - centralizado
-                  <div className="flex flex-col items-center gap-3 w-full">
-                    <div className="relative group">
-                      <div className="transform transition-all duration-300 ease-out hover:scale-110 hover:-translate-y-1">
-                        <ConectCRMLogoFinal
-                          size="sm"
-                          variant="icon"
-                          className="transition-transform duration-300 ease-out group-hover:scale-125"
-                        />
-                      </div>
-                      <div className="tooltip-improved left-full ml-3 opacity-0 group-hover:opacity-100 bg-gray-800 text-white text-xs rounded-md px-3 py-2 whitespace-nowrap z-[60] shadow-lg">
-                        <div className="font-semibold">Conect CRM</div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                      className="p-1.5 rounded-lg bg-gradient-to-r from-gray-50 to-gray-100 hover:from-blue-50 hover:to-blue-100 border border-gray-200 hover:border-blue-200 shadow-sm transition-all duration-300 ease-out hover:shadow-md hover:scale-110 group"
-                      title="Expandir sidebar"
-                    >
-                      <ChevronRight className="h-3 w-3 text-gray-600 group-hover:text-blue-600 transition-colors" />
-                    </button>
-                  </div>
-                )}
+            <div className="flex-1 flex flex-col pt-4 pb-4 overflow-y-auto">
+              {/* Logo no topo com Efeito Dock */}
+              <div className="flex items-center justify-center flex-shrink-0 mb-3 px-2">
+                <div
+                  ref={(el) => {
+                    if (el) sidebarItemsRef.current[0] = el;
+                  }}
+                  style={{
+                    transform: `scale(${getDockScale(0)})`,
+                    transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                  }}
+                >
+                  <ConectCRMLogoFinal size="sm" variant="icon" />
+                </div>
               </div>
 
-              {/* Navegação Hierárquica */}
-              <div className={`${sidebarCollapsed ? 'mt-4' : 'mt-6'} flex-1 flex flex-col`}>
+              {/* Separador sutil */}
+              <div className="mx-3 mb-3 border-t border-white/10"></div>
+
+              {/* Navegação de Ícones Verticais */}
+              <div className="flex-1 flex flex-col">
                 <HierarchicalNavGroup
                   menuItems={menuFiltrado}
-                  sidebarCollapsed={sidebarCollapsed}
+                  sidebarCollapsed={false}
                 />
               </div>
 
-              {/* Ações rápidas e suporte */}
-              {!sidebarCollapsed ? (
-                <div className="mt-6 px-4">
-                  <div className="relative overflow-hidden rounded-2xl border border-[#DEEFE7] bg-gradient-to-br from-white via-[#F5FBFA] to-[#DEEFE7] shadow-sm">
-                    <div className="absolute -right-10 -top-8 h-24 w-24 rounded-full bg-[#159A9C]/10 blur-2xl"></div>
-                    <div className="absolute -left-12 bottom-0 h-24 w-24 rounded-full bg-[#0F7B7D]/5 blur-2xl"></div>
-                    <div className="relative p-4 space-y-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#159A9C]/10 text-[#159A9C]">
-                          <HelpCircle className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-[#002333]">
-                            Precisa de ajuda?
-                          </p>
-                          <p className="text-xs text-[#4B5563]">
-                            Acesse a central ou fale com o nosso time.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-2">
-                        <Link
-                          to="/suporte"
-                          className="flex items-center justify-between rounded-xl border border-[#B4BEC9]/40 bg-white px-3 py-2 text-sm font-medium text-[#159A9C] transition-all hover:border-[#159A9C]/60 hover:bg-[#DEEFE7]"
-                        >
-                          <span>Central de ajuda</span>
-                          <ChevronRight className="h-4 w-4" />
-                        </Link>
-                        <a
-                          href="mailto:suporte@conectcrm.com"
-                          className="flex items-center justify-between rounded-xl border border-transparent bg-[#159A9C] px-3 py-2 text-sm font-semibold text-white transition-all hover:bg-[#0F7B7D]"
-                        >
-                          Abrir chamado
-                          <Mail className="h-4 w-4" />
-                        </a>
-                      </div>
-                    </div>
-                  </div>
+              {/* Ações rápidas - modo ícone com Efeito Dock */}
+              <div className="mt-auto pt-3 px-2 border-t border-white/10">
+                <div className="flex flex-col items-center gap-2">
+                  <Link
+                    to="/suporte"
+                    ref={(el) => {
+                      if (el) sidebarItemsRef.current[1] = el;
+                    }}
+                    className="flex flex-col items-center justify-center w-full py-2 rounded-lg text-white/70 hover:text-white hover:bg-white/5 group"
+                    style={{
+                      transform: `scale(${getDockScale(1)})`,
+                      transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                    }}
+                    title="Central de ajuda"
+                  >
+                    <MessageCircle className="h-5 w-5 mb-1" />
+                    <span className="text-[9px] font-semibold uppercase tracking-wide">Ajuda</span>
+                  </Link>
+                  <a
+                    href="mailto:suporte@conectcrm.com"
+                    ref={(el) => {
+                      if (el) sidebarItemsRef.current[2] = el;
+                    }}
+                    className="flex flex-col items-center justify-center w-full py-2 rounded-lg bg-[#159A9C]/20 text-[#159A9C] hover:bg-[#159A9C]/30 group"
+                    style={{
+                      transform: `scale(${getDockScale(2)})`,
+                      transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                    }}
+                    title="Abrir chamado"
+                  >
+                    <Mail className="h-4 w-4 mb-1" />
+                    <span className="text-[9px] font-semibold uppercase tracking-wide">Suporte</span>
+                  </a>
                 </div>
-              ) : (
-                <div className="mt-4 px-1 pb-1">
-                  <div className="flex flex-col items-center gap-3 rounded-2xl border border-[#DEEFE7] bg-white/80 p-2 shadow-sm">
-                    <Link
-                      to="/suporte"
-                      className="flex h-10 w-10 items-center justify-center rounded-full bg-[#159A9C]/10 text-[#159A9C] hover:bg-[#0F7B7D]/10 hover:text-[#0F7B7D] transition-all"
-                      title="Central de ajuda"
-                    >
-                      <HelpCircle className="h-5 w-5" />
-                    </Link>
-                    <a
-                      href="mailto:suporte@conectcrm.com"
-                      className="flex h-10 w-10 items-center justify-center rounded-full bg-[#159A9C] text-white hover:bg-[#0F7B7D] transition-all"
-                      title="Abrir chamado"
-                    >
-                      <Mail className="h-4 w-4" />
-                    </a>
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
@@ -676,7 +591,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
           <div className="w-full px-4 md:px-6">
             <div className="h-16 flex items-center justify-between">
-
               {/* Lado Esquerdo: Menu Mobile + Breadcrumb + Status */}
               <div className="flex items-center gap-4">
                 <button
@@ -742,199 +656,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 </div>
               </div>
 
-              {/* Lado Direito: Quick Actions + Busca + Notificações + Avatar */}
+              {/* Lado Direito: Busca + Notificações + Avatar */}
               <div className="flex items-center gap-3">
-
-                {/* Quick Actions (apenas em desktop) */}
-                <div className="hidden lg:flex items-center gap-2">
-                  <button
-                    className="p-2 text-gray-500 hover:text-[#159A9C] hover:bg-[#159A9C]/5 rounded-lg transition-all duration-200"
-                    title="Novo cliente"
-                  >
-                    <Users className="h-4 w-4" />
-                  </button>
-                  <button
-                    className="p-2 text-gray-500 hover:text-[#159A9C] hover:bg-[#159A9C]/5 rounded-lg transition-all duration-200"
-                    title="Nova proposta"
-                  >
-                    <ShoppingBag className="h-4 w-4" />
-                  </button>
-
-                  {/* Separador */}
-                  <div className="h-6 w-px bg-gray-200 mx-1"></div>
-
-                  {/* Calendário */}
-                  <div className="relative" data-dropdown="calendar">
-                    <button
-                      onClick={() => setShowCalendar(!showCalendar)}
-                      className="p-2 text-gray-500 hover:text-[#159A9C] hover:bg-[#159A9C]/5 rounded-lg transition-all duration-200 relative group"
-                      title="Calendário"
-                    >
-                      <Calendar className="h-4 w-4" />
-                      {/* Badge de eventos hoje */}
-                      {getEventsForDate(today).length > 0 && (
-                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></div>
-                      )}
-                    </button>
-
-                    {/* Dropdown do Calendário */}
-                    {showCalendar && (
-                      <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border shadow-xl z-50 overflow-hidden">
-                        {/* Header do Calendário */}
-                        <div className="p-4 bg-gradient-to-r from-[#159A9C]/5 to-[#0F7B7D]/5 border-b">
-                          <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-lg font-semibold text-gray-900">
-                              {currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-                            </h3>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => navigateMonth('prev')}
-                                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-                              >
-                                <ChevronLeft className="w-4 h-4 text-gray-600" />
-                              </button>
-                              <button
-                                onClick={() => setCurrentDate(new Date())}
-                                className="px-3 py-1.5 text-xs font-medium text-[#159A9C] hover:bg-[#159A9C]/10 rounded-lg transition-colors"
-                              >
-                                Hoje
-                              </button>
-                              <button
-                                onClick={() => navigateMonth('next')}
-                                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-                              >
-                                <ChevronRight className="w-4 h-4 text-gray-600" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Data Atual */}
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Clock className="w-4 h-4" />
-                            <span>{formatDateForDisplay(today)}</span>
-                          </div>
-                        </div>
-
-                        {/* Grid do Calendário */}
-                        <div className="p-4">
-                          {/* Dias da Semana */}
-                          <div className="grid grid-cols-7 gap-1 mb-2">
-                            {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                              <div key={day} className="text-xs font-medium text-gray-500 text-center py-2">
-                                {day}
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Dias do Mês */}
-                          <div className="grid grid-cols-7 gap-1">
-                            {/* Dias vazios do início do mês */}
-                            {Array.from({ length: getFirstDayOfMonth(currentDate) }).map((_, index) => (
-                              <div key={`empty-${index}`} className="h-8"></div>
-                            ))}
-
-                            {/* Dias do mês */}
-                            {Array.from({ length: getDaysInMonth(currentDate) }).map((_, index) => {
-                              const day = index + 1;
-                              const dateObj = new Date(currentYear, currentMonth, day);
-                              const isToday = isSameDay(dateObj, today);
-                              const isSelected = isSameDay(dateObj, selectedDate);
-                              const dayEvents = getEventsForDate(dateObj);
-                              const hasEvents = dayEvents.length > 0;
-
-                              return (
-                                <button
-                                  key={day}
-                                  onClick={() => setSelectedDate(dateObj)}
-                                  className={`
-                                  relative h-8 w-8 text-xs rounded-lg font-medium transition-all duration-200 hover:bg-gray-100
-                                  ${isToday ? 'bg-[#159A9C] text-white hover:bg-[#0F7B7D]' : ''}
-                                  ${isSelected && !isToday ? 'bg-blue-100 text-blue-700' : ''}
-                                  ${!isToday && !isSelected ? 'text-gray-700 hover:text-gray-900' : ''}
-                                `}
-                                >
-                                  {day}
-                                  {hasEvents && (
-                                    <div className={`absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full ${isToday ? 'bg-white' : 'bg-[#159A9C]'}`}></div>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* Eventos do Dia Selecionado */}
-                        {getEventsForDate(selectedDate).length > 0 && (
-                          <div className="border-t bg-gray-50 p-4">
-                            <div className="flex items-center gap-2 mb-3">
-                              <Calendar className="w-4 h-4 text-[#159A9C]" />
-                              <span className="text-sm font-medium text-gray-700">
-                                Eventos de {selectedDate.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })}
-                              </span>
-                            </div>
-                            <div className="space-y-2 max-h-32 overflow-y-auto">
-                              {getEventsForDate(selectedDate).map(event => (
-                                <div key={event.id} className="flex items-center gap-3 p-2 bg-white rounded-lg border hover:border-gray-300 transition-colors cursor-pointer">
-                                  <div className={`w-3 h-3 rounded-full ${event.color === 'blue' ? 'bg-blue-500' :
-                                    event.color === 'green' ? 'bg-green-500' :
-                                      event.color === 'purple' ? 'bg-purple-500' :
-                                        'bg-orange-500'
-                                    }`}></div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-medium text-gray-900 truncate">
-                                      {event.title}
-                                    </p>
-                                    <div className="flex items-center gap-1 mt-1">
-                                      <Clock className="w-3 h-3 text-gray-400" />
-                                      <span className="text-xs text-gray-500">{event.time}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Resumo de Próximos Eventos */}
-                        <div className="border-t p-4">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                              Próximos Eventos
-                            </span>
-                            <span className="text-xs text-[#159A9C] bg-[#159A9C]/10 px-2 py-1 rounded-full">
-                              {events.filter(event => event.date >= today).length} eventos
-                            </span>
-                          </div>
-
-                          <div className="mt-3 space-y-2">
-                            {events
-                              .filter(event => event.date >= today)
-                              .slice(0, 2)
-                              .map(event => (
-                                <div key={event.id} className="flex items-center gap-2 text-xs">
-                                  <div className={`w-2 h-2 rounded-full ${event.color === 'blue' ? 'bg-blue-500' :
-                                    event.color === 'green' ? 'bg-green-500' :
-                                      event.color === 'purple' ? 'bg-purple-500' :
-                                        'bg-orange-500'
-                                    }`}></div>
-                                  <span className="text-gray-600 truncate flex-1">
-                                    {event.title}
-                                  </span>
-                                  <span className="text-gray-400">
-                                    {event.date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })}
-                                  </span>
-                                </div>
-                              ))}
-                          </div>
-
-                          <button className="w-full mt-3 text-xs text-[#159A9C] hover:text-[#0F7B7D] font-medium transition-colors hover:bg-[#159A9C]/5 rounded-lg py-2">
-                            Ver agenda completa
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>                {/* Campo de Busca Melhorado */}
+                {/* Campo de Busca Melhorado */}
                 <div className="relative hidden md:block" data-dropdown="search">
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -965,29 +689,41 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                         <div className="p-4 border-b bg-gradient-to-r from-gray-50 to-white">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-gray-700">
-                              Resultados para "{searchQuery}"
+                              {searchLoading ? 'Buscando...' : `Resultados para "${searchQuery}"`}
                             </span>
                             <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                              {searchResults.length} encontrado{searchResults.length !== 1 ? 's' : ''}
+                              {searchResults.length} encontrado
+                              {searchResults.length !== 1 ? 's' : ''}
                             </span>
                           </div>
                         </div>
 
                         <div className="max-h-80 overflow-y-auto">
-                          {searchResults
-                            .filter(result =>
-                              result.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                              result.subtitle.toLowerCase().includes(searchQuery.toLowerCase())
-                            )
-                            .map((result) => (
-                              <div key={result.id} className="p-3 hover:bg-gray-50 cursor-pointer transition-colors border-b last:border-b-0 group">
+                          {searchLoading ? (
+                            <div className="p-8 text-center">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#159A9C] mx-auto"></div>
+                              <p className="text-sm text-gray-500 mt-3">Buscando...</p>
+                            </div>
+                          ) : searchResults.length > 0 ? (
+                            searchResults.map((result) => (
+                              <div
+                                key={result.id}
+                                className="p-3 hover:bg-gray-50 cursor-pointer transition-colors border-b last:border-b-0 group"
+                              >
                                 <div className="flex items-center gap-3">
-                                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-white text-xs font-medium transition-transform group-hover:scale-105 ${result.type === 'cliente' ? 'bg-blue-500' :
-                                    result.type === 'proposta' ? 'bg-green-500' :
-                                      'bg-purple-500'
-                                    }`}>
-                                    {result.type === 'cliente' ? 'C' :
-                                      result.type === 'proposta' ? 'P' : 'CT'}
+                                  <div
+                                    className={`w-9 h-9 rounded-lg flex items-center justify-center text-white text-xs font-medium transition-transform group-hover:scale-105 ${result.type === 'cliente'
+                                      ? 'bg-blue-500'
+                                      : result.type === 'proposta'
+                                        ? 'bg-green-500'
+                                        : 'bg-purple-500'
+                                      }`}
+                                  >
+                                    {result.type === 'cliente'
+                                      ? 'C'
+                                      : result.type === 'proposta'
+                                        ? 'P'
+                                        : 'CT'}
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium text-gray-900 truncate group-hover:text-[#159A9C] transition-colors">
@@ -1002,18 +738,18 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                                   </div>
                                 </div>
                               </div>
-                            ))}
-
-                          {searchResults.filter(result =>
-                            result.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            result.subtitle.toLowerCase().includes(searchQuery.toLowerCase())
-                          ).length === 0 && (
-                              <div className="p-8 text-center">
-                                <Search className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                                <p className="text-sm text-gray-500 font-medium">Nenhum resultado encontrado</p>
-                                <p className="text-xs text-gray-400 mt-1">Tente usar outros termos de busca</p>
-                              </div>
-                            )}
+                            ))
+                          ) : (
+                            <div className="p-8 text-center">
+                              <Search className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                              <p className="text-sm text-gray-500 font-medium">
+                                Nenhum resultado encontrado
+                              </p>
+                              <p className="text-xs text-gray-400 mt-1">
+                                Tente usar outros termos de busca
+                              </p>
+                            </div>
+                          )}
                         </div>
 
                         <div className="p-3 border-t bg-gray-50">
@@ -1028,9 +764,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
                 {/* Notificações - Sistema Novo */}
                 <NotificationCenter className="relative" />
-
-                {/* Notificações Tempo Real - WebSocket */}
-                <NotificationIndicator />
 
                 {/* Avatar/Menu do Usuário Melhorado */}
                 <div className="relative" data-dropdown="user-menu">
@@ -1062,7 +795,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
                   {/* Dropdown do Usuário - Design Premium Compacto */}
                   {showUserMenu && (
-                    <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl border shadow-xl z-40 overflow-visible" data-user-menu>
+                    <div
+                      className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl border shadow-xl z-40 overflow-visible"
+                      data-user-menu
+                    >
                       {/* Header do Profile Compacto */}
                       <div className="p-4 bg-gradient-to-r from-[#159A9C]/5 to-[#0F7B7D]/5 border-b">
                         <div className="flex items-center gap-3">
@@ -1077,7 +813,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                               {formatUserName(user?.nome || 'Admin Sistema')}
                             </p>
                             <p className="text-xs text-gray-600 truncate">
-                              {user?.email || 'admin@conectcrm.com'}
+                              {user?.email || 'admin@conectsuite.com.br'}
                             </p>
                             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                               <span className="text-xs text-[#159A9C] font-medium bg-[#159A9C]/10 px-1.5 py-0.5 rounded-full">
@@ -1104,7 +840,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                       {/* SEÇÃO PERFIL */}
                       <div className="py-1">
                         <div className="px-4 py-1.5">
-                          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Perfil</span>
+                          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                            Perfil
+                          </span>
                         </div>
 
                         <Link
@@ -1134,10 +872,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                               <div className="flex-1">
                                 <div className="font-medium text-gray-900 flex items-center gap-1.5 text-sm">
                                   Alterar Perfil
-                                  <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${showProfileSelector ? 'rotate-180' : ''}`} />
+                                  <ChevronDown
+                                    className={`w-3 h-3 text-gray-400 transition-transform ${showProfileSelector ? 'rotate-180' : ''}`}
+                                  />
                                 </div>
                                 <div className="text-xs text-gray-500 flex items-center gap-1">
-                                  <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${getTipoColor(perfilSelecionado)}`}>
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded text-xs font-medium ${getTipoColor(perfilSelecionado)}`}
+                                  >
                                     {getCurrentProfile().nome}
                                   </span>
                                 </div>
@@ -1153,17 +895,23 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                                   display: 'block',
                                   backgroundColor: 'white',
                                   border: '1px solid #e5e7eb',
-                                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                                  boxShadow:
+                                    '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
                                 }}
                               >
                                 {/* Header do dropdown compacto */}
                                 <div className="p-3 bg-gradient-to-r from-[#159A9C]/5 to-[#0F7B7D]/5 border-b">
                                   <div className="flex items-center gap-2">
                                     <Users className="w-4 h-4 text-[#159A9C]" />
-                                    <h3 className="font-semibold text-gray-900 text-sm">Selecionar Perfil</h3>
+                                    <h3 className="font-semibold text-gray-900 text-sm">
+                                      Selecionar Perfil
+                                    </h3>
                                   </div>
                                   <p className="text-xs text-gray-600 mt-1">
-                                    Atual: <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${getTipoColor(perfilSelecionado)}`}>
+                                    Atual:{' '}
+                                    <span
+                                      className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${getTipoColor(perfilSelecionado)}`}
+                                    >
                                       {getCurrentProfile().nome}
                                     </span>
                                   </p>
@@ -1195,7 +943,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                                             {profile.descricao}
                                           </div>
                                         </div>
-                                        <span className={`text-xs px-2 py-0.5 rounded-full ${getTipoColor(profile.id)} ml-2 group-hover:scale-105 transition-transform`}>
+                                        <span
+                                          className={`text-xs px-2 py-0.5 rounded-full ${getTipoColor(profile.id)} ml-2 group-hover:scale-105 transition-transform`}
+                                        >
                                           {profile.nome}
                                         </span>
                                       </div>
@@ -1214,7 +964,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                       {/* SEÇÃO EMPRESA */}
                       <div className="py-1">
                         <div className="px-4 py-1.5">
-                          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Empresa</span>
+                          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                            Empresa
+                          </span>
                         </div>
 
                         <button
@@ -1231,7 +983,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                               {companyCardName || 'Nenhuma empresa vinculada'}
                             </div>
                             {companyCardCnpj && (
-                              <div className="text-[10px] text-gray-400 mt-1">CNPJ {companyCardCnpj}</div>
+                              <div className="text-[10px] text-gray-400 mt-1">
+                                CNPJ {companyCardCnpj}
+                              </div>
                             )}
                           </div>
                           {companyPlanLabel ? (
@@ -1250,7 +1004,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                       {/* SEÇÃO SISTEMA */}
                       <div className="py-1">
                         <div className="px-4 py-1.5">
-                          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Sistema</span>
+                          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                            Sistema
+                          </span>
                         </div>
 
                         <button
@@ -1279,14 +1035,18 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                           >
                             <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shadow-sm">
                               <span className="text-lg">
-                                {availableLanguages.find(lang => lang.code === language)?.flag || '🇧🇷'}
+                                {availableLanguages.find((lang) => lang.code === language)?.flag ||
+                                  '🇧🇷'}
                               </span>
                             </div>
                             <div className="flex-1">
                               <div className="text-sm font-medium text-gray-700">
-                                {availableLanguages.find(lang => lang.code === language)?.nativeName || 'Português (BR)'}
+                                {availableLanguages.find((lang) => lang.code === language)
+                                  ?.nativeName || 'Português (BR)'}
                               </div>
-                              <div className="text-xs text-gray-500">{t('common.systemLanguage')}</div>
+                              <div className="text-xs text-gray-500">
+                                {t('common.systemLanguage')}
+                              </div>
                             </div>
                             <ChevronDown className="w-3 h-3 text-gray-400 group-hover:text-gray-600 transition-colors" />
                           </button>
@@ -1294,14 +1054,16 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
                         <Link
                           to="/suporte"
-                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gradient-to-r hover:from-green-50 hover:to-green-25 flex items-center gap-3 transition-all duration-200 group"
+                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-25 flex items-center gap-3 transition-all duration-200 group"
                           onClick={() => setShowUserMenu(false)}
                         >
-                          <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center group-hover:bg-green-100 group-hover:scale-105 transition-all duration-200">
-                            <HelpCircle className="w-4 h-4 text-green-600" />
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 group-hover:scale-105 transition-all duration-200">
+                            <MessageCircle className="w-4 h-4 text-blue-600" />
                           </div>
                           <div className="flex-1">
-                            <div className="font-medium text-gray-900 text-sm">{t('common.helpSupport')}</div>
+                            <div className="font-medium text-gray-900 text-sm">
+                              {t('common.helpSupport')}
+                            </div>
                             <div className="text-xs text-gray-500">{t('common.helpCenter')}</div>
                           </div>
                         </Link>
@@ -1320,7 +1082,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                             <LogOut className="w-4 h-4 text-red-600" />
                           </div>
                           <div className="flex-1">
-                            <div className="font-medium text-red-600 text-sm">{t('auth.logout')}</div>
+                            <div className="font-medium text-red-600 text-sm">
+                              {t('auth.logout')}
+                            </div>
                             <div className="text-xs text-red-400">{t('common.endSession')}</div>
                           </div>
                         </button>
@@ -1328,25 +1092,22 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                     </div>
                   )}
                 </div>
-
               </div>
             </div>
           </div>
         </header>
 
         {/* Conteúdo da página */}
-        <main className={`flex-1 relative focus:outline-none ${(location.pathname === '/atendimento' || location.pathname === '/atendimento/chat') ? 'overflow-hidden' : 'overflow-y-auto'}`}>
-          {(location.pathname === '/atendimento' || location.pathname === '/atendimento/chat') ? (
+        <main
+          className={`flex-1 relative focus:outline-none ${location.pathname === '/atendimento' || location.pathname === '/atendimento/chat' ? 'overflow-hidden' : 'overflow-y-auto'}`}
+        >
+          {location.pathname === '/atendimento' || location.pathname === '/atendimento/chat' ? (
             // Para as rotas de atendimento, não aplicar padding para usar tela completa
-            <div className="h-full w-full">
-              {children}
-            </div>
+            <div className="h-full w-full">{children}</div>
           ) : (
             // Para outras rotas, usar toda a largura disponível
             <div className="py-6">
-              <div className="w-full px-4 sm:px-6">
-                {children}
-              </div>
+              <div className="w-full px-4 sm:px-6">{children}</div>
             </div>
           )}
         </main>
@@ -1354,10 +1115,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
       {/* Modal de Seleção de Idioma */}
       {showLanguageSelector && (
-        <LanguageSelector
-          showAsModal={true}
-          onClose={() => setShowLanguageSelector(false)}
-        />
+        <LanguageSelector showAsModal={true} onClose={() => setShowLanguageSelector(false)} />
       )}
     </div>
   );

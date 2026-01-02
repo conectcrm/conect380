@@ -18,7 +18,7 @@ export const useModalKeyboardShortcuts = ({
   onSave,
   onClose,
   canSave = true,
-  enabled = true
+  enabled = true,
 }: UseModalKeyboardShortcutsOptions) => {
   useEffect(() => {
     if (!isOpen || !enabled) {
@@ -57,7 +57,7 @@ export const useModalKeyboardShortcuts = ({
   return {
     shortcuts: [
       { key: 'Ctrl+S', description: 'Salvar', enabled: canSave },
-      { key: 'Esc', description: 'Fechar', enabled: true }
-    ]
+      { key: 'Esc', description: 'Fechar', enabled: true },
+    ],
   };
 };

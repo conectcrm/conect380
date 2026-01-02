@@ -23,6 +23,13 @@ export class Atividade {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa_rel: Empresa;
+
   @Column({
     type: 'enum',
     enum: TipoAtividade,

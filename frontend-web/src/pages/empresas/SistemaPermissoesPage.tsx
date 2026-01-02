@@ -31,7 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  Checkbox
+  Checkbox,
 } from '../../components/ui';
 import { useEmpresas } from '../../contexts/EmpresaContextAPIReal';
 import {
@@ -51,7 +51,7 @@ import {
   EyeOff,
   Crown,
   UserCheck,
-  Clock
+  Clock,
 } from 'lucide-react';
 
 interface Usuario {
@@ -90,37 +90,145 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
   const [usuarioSelecionado, setUsuarioSelecionado] = useState<Usuario | null>(null);
 
   // Empresa para gerenciar permissões
-  const empresa = empresas.find(e => e.id === empresaId) || empresaAtiva;
+  const empresa = empresas.find((e) => e.id === empresaId) || empresaAtiva;
 
   // Permissões disponíveis no sistema
   const permissoesDisponiveis: Permissao[] = [
     // Clientes
-    { id: 'clientes.ver', nome: 'Visualizar Clientes', descricao: 'Ver lista e detalhes dos clientes', categoria: 'Clientes', nivel: 'leitura' },
-    { id: 'clientes.criar', nome: 'Criar Clientes', descricao: 'Cadastrar novos clientes', categoria: 'Clientes', nivel: 'escrita' },
-    { id: 'clientes.editar', nome: 'Editar Clientes', descricao: 'Modificar dados dos clientes', categoria: 'Clientes', nivel: 'escrita' },
-    { id: 'clientes.excluir', nome: 'Excluir Clientes', descricao: 'Remover clientes do sistema', categoria: 'Clientes', nivel: 'admin' },
+    {
+      id: 'clientes.ver',
+      nome: 'Visualizar Clientes',
+      descricao: 'Ver lista e detalhes dos clientes',
+      categoria: 'Clientes',
+      nivel: 'leitura',
+    },
+    {
+      id: 'clientes.criar',
+      nome: 'Criar Clientes',
+      descricao: 'Cadastrar novos clientes',
+      categoria: 'Clientes',
+      nivel: 'escrita',
+    },
+    {
+      id: 'clientes.editar',
+      nome: 'Editar Clientes',
+      descricao: 'Modificar dados dos clientes',
+      categoria: 'Clientes',
+      nivel: 'escrita',
+    },
+    {
+      id: 'clientes.excluir',
+      nome: 'Excluir Clientes',
+      descricao: 'Remover clientes do sistema',
+      categoria: 'Clientes',
+      nivel: 'admin',
+    },
 
     // Propostas
-    { id: 'propostas.ver', nome: 'Visualizar Propostas', descricao: 'Ver lista e detalhes das propostas', categoria: 'Propostas', nivel: 'leitura' },
-    { id: 'propostas.criar', nome: 'Criar Propostas', descricao: 'Gerar novas propostas', categoria: 'Propostas', nivel: 'escrita' },
-    { id: 'propostas.editar', nome: 'Editar Propostas', descricao: 'Modificar propostas existentes', categoria: 'Propostas', nivel: 'escrita' },
-    { id: 'propostas.aprovar', nome: 'Aprovar Propostas', descricao: 'Aprovar ou rejeitar propostas', categoria: 'Propostas', nivel: 'admin' },
+    {
+      id: 'propostas.ver',
+      nome: 'Visualizar Propostas',
+      descricao: 'Ver lista e detalhes das propostas',
+      categoria: 'Propostas',
+      nivel: 'leitura',
+    },
+    {
+      id: 'propostas.criar',
+      nome: 'Criar Propostas',
+      descricao: 'Gerar novas propostas',
+      categoria: 'Propostas',
+      nivel: 'escrita',
+    },
+    {
+      id: 'propostas.editar',
+      nome: 'Editar Propostas',
+      descricao: 'Modificar propostas existentes',
+      categoria: 'Propostas',
+      nivel: 'escrita',
+    },
+    {
+      id: 'propostas.aprovar',
+      nome: 'Aprovar Propostas',
+      descricao: 'Aprovar ou rejeitar propostas',
+      categoria: 'Propostas',
+      nivel: 'admin',
+    },
 
     // Relatórios
-    { id: 'relatorios.ver', nome: 'Visualizar Relatórios', descricao: 'Acessar relatórios básicos', categoria: 'Relatórios', nivel: 'leitura' },
-    { id: 'relatorios.avancados', nome: 'Relatórios Avançados', descricao: 'Acessar relatórios detalhados', categoria: 'Relatórios', nivel: 'escrita' },
-    { id: 'relatorios.exportar', nome: 'Exportar Relatórios', descricao: 'Fazer download de relatórios', categoria: 'Relatórios', nivel: 'escrita' },
+    {
+      id: 'relatorios.ver',
+      nome: 'Visualizar Relatórios',
+      descricao: 'Acessar relatórios básicos',
+      categoria: 'Relatórios',
+      nivel: 'leitura',
+    },
+    {
+      id: 'relatorios.avancados',
+      nome: 'Relatórios Avançados',
+      descricao: 'Acessar relatórios detalhados',
+      categoria: 'Relatórios',
+      nivel: 'escrita',
+    },
+    {
+      id: 'relatorios.exportar',
+      nome: 'Exportar Relatórios',
+      descricao: 'Fazer download de relatórios',
+      categoria: 'Relatórios',
+      nivel: 'escrita',
+    },
 
     // Configurações
-    { id: 'config.ver', nome: 'Ver Configurações', descricao: 'Visualizar configurações da empresa', categoria: 'Configurações', nivel: 'leitura' },
-    { id: 'config.editar', nome: 'Editar Configurações', descricao: 'Modificar configurações gerais', categoria: 'Configurações', nivel: 'admin' },
-    { id: 'config.usuarios', nome: 'Gerenciar Usuários', descricao: 'Adicionar, editar e remover usuários', categoria: 'Configurações', nivel: 'admin' },
-    { id: 'config.permissoes', nome: 'Gerenciar Permissões', descricao: 'Definir permissões de usuários', categoria: 'Configurações', nivel: 'admin' },
+    {
+      id: 'config.ver',
+      nome: 'Ver Configurações',
+      descricao: 'Visualizar configurações da empresa',
+      categoria: 'Configurações',
+      nivel: 'leitura',
+    },
+    {
+      id: 'config.editar',
+      nome: 'Editar Configurações',
+      descricao: 'Modificar configurações gerais',
+      categoria: 'Configurações',
+      nivel: 'admin',
+    },
+    {
+      id: 'config.usuarios',
+      nome: 'Gerenciar Usuários',
+      descricao: 'Adicionar, editar e remover usuários',
+      categoria: 'Configurações',
+      nivel: 'admin',
+    },
+    {
+      id: 'config.permissoes',
+      nome: 'Gerenciar Permissões',
+      descricao: 'Definir permissões de usuários',
+      categoria: 'Configurações',
+      nivel: 'admin',
+    },
 
     // Sistema
-    { id: 'sistema.backup', nome: 'Gerenciar Backups', descricao: 'Executar e restaurar backups', categoria: 'Sistema', nivel: 'admin' },
-    { id: 'sistema.logs', nome: 'Visualizar Logs', descricao: 'Acessar logs do sistema', categoria: 'Sistema', nivel: 'admin' },
-    { id: 'sistema.integracoes', nome: 'Gerenciar Integrações', descricao: 'Configurar integrações externas', categoria: 'Sistema', nivel: 'admin' }
+    {
+      id: 'sistema.backup',
+      nome: 'Gerenciar Backups',
+      descricao: 'Executar e restaurar backups',
+      categoria: 'Sistema',
+      nivel: 'admin',
+    },
+    {
+      id: 'sistema.logs',
+      nome: 'Visualizar Logs',
+      descricao: 'Acessar logs do sistema',
+      categoria: 'Sistema',
+      nivel: 'admin',
+    },
+    {
+      id: 'sistema.integracoes',
+      nome: 'Gerenciar Integrações',
+      descricao: 'Configurar integrações externas',
+      categoria: 'Sistema',
+      nivel: 'admin',
+    },
   ];
 
   // Usuários mockados para demonstração
@@ -135,7 +243,7 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
       ultimoAcesso: new Date('2024-01-15T10:30:00'),
       dataCriacao: new Date('2024-01-01'),
       empresaId: empresa?.id || '',
-      criadoPor: 'Sistema'
+      criadoPor: 'Sistema',
     },
     {
       id: '2',
@@ -143,11 +251,17 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
       email: 'maria@empresa.com',
       cargo: 'supervisor',
       status: 'ativo',
-      permissoes: ['clientes.ver', 'clientes.editar', 'propostas.ver', 'propostas.criar', 'relatorios.ver'],
+      permissoes: [
+        'clientes.ver',
+        'clientes.editar',
+        'propostas.ver',
+        'propostas.criar',
+        'relatorios.ver',
+      ],
       ultimoAcesso: new Date('2024-01-15T09:15:00'),
       dataCriacao: new Date('2024-01-02'),
       empresaId: empresa?.id || '',
-      criadoPor: 'João Silva'
+      criadoPor: 'João Silva',
     },
     {
       id: '3',
@@ -159,7 +273,7 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
       ultimoAcesso: new Date('2024-01-14T16:45:00'),
       dataCriacao: new Date('2024-01-03'),
       empresaId: empresa?.id || '',
-      criadoPor: 'João Silva'
+      criadoPor: 'João Silva',
     },
     {
       id: '4',
@@ -171,8 +285,8 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
       ultimoAcesso: new Date('2024-01-10T14:20:00'),
       dataCriacao: new Date('2024-01-10'),
       empresaId: empresa?.id || '',
-      criadoPor: 'João Silva'
-    }
+      criadoPor: 'João Silva',
+    },
   ];
 
   // Estados para novo usuário
@@ -180,7 +294,7 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
     nome: '',
     email: '',
     cargo: 'vendedor' as any,
-    permissoes: [] as string[]
+    permissoes: [] as string[],
   });
 
   useEffect(() => {
@@ -196,7 +310,7 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
       ativo: { variant: 'default' as const, icon: CheckCircle, color: 'text-green-600' },
       inativo: { variant: 'secondary' as const, icon: XCircle, color: 'text-gray-600' },
       pendente: { variant: 'outline' as const, icon: Clock, color: 'text-orange-600' },
-      bloqueado: { variant: 'destructive' as const, icon: Lock, color: 'text-red-600' }
+      bloqueado: { variant: 'destructive' as const, icon: Lock, color: 'text-red-600' },
     };
 
     const config = variants[status];
@@ -215,7 +329,7 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
       administrador: { variant: 'default' as const, icon: Crown, color: 'text-purple-600' },
       supervisor: { variant: 'secondary' as const, icon: UserCheck, color: 'text-blue-600' },
       vendedor: { variant: 'outline' as const, icon: Users, color: 'text-green-600' },
-      suporte: { variant: 'outline' as const, icon: Settings, color: 'text-orange-600' }
+      suporte: { variant: 'outline' as const, icon: Settings, color: 'text-orange-600' },
     };
 
     const config = variants[cargo];
@@ -231,7 +345,7 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
 
   const getPermissoesPorCategoria = () => {
     const categorias: { [key: string]: Permissao[] } = {};
-    permissoesDisponiveis.forEach(permissao => {
+    permissoesDisponiveis.forEach((permissao) => {
       if (!categorias[permissao.categoria]) {
         categorias[permissao.categoria] = [];
       }
@@ -251,10 +365,10 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
       ultimoAcesso: new Date(),
       dataCriacao: new Date(),
       empresaId: empresa?.id || '',
-      criadoPor: 'Usuário Atual'
+      criadoPor: 'Usuário Atual',
     };
 
-    setUsuarios(prev => [...prev, novoUsuarioObj]);
+    setUsuarios((prev) => [...prev, novoUsuarioObj]);
     setModalNovoUsuario(false);
     setNovoUsuario({ nome: '', email: '', cargo: 'vendedor', permissoes: [] });
   };
@@ -262,18 +376,22 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
   const handleEditarPermissoes = (permissoes: string[]) => {
     if (!usuarioSelecionado) return;
 
-    setUsuarios(prev => prev.map(usuario =>
-      usuario.id === usuarioSelecionado.id
-        ? { ...usuario, permissoes }
-        : usuario
-    ));
+    setUsuarios((prev) =>
+      prev.map((usuario) =>
+        usuario.id === usuarioSelecionado.id ? { ...usuario, permissoes } : usuario,
+      ),
+    );
     setModalEditarPermissoes(false);
     setUsuarioSelecionado(null);
   };
 
-  const togglePermissao = (permissaoId: string, lista: string[], setLista: (permissoes: string[]) => void) => {
+  const togglePermissao = (
+    permissaoId: string,
+    lista: string[],
+    setLista: (permissoes: string[]) => void,
+  ) => {
     if (lista.includes(permissaoId)) {
-      setLista(lista.filter(p => p !== permissaoId));
+      setLista(lista.filter((p) => p !== permissaoId));
     } else {
       setLista([...lista, permissaoId]);
     }
@@ -300,9 +418,7 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
           <h1 className="text-2xl font-bold text-gray-900">
             Sistema de Permissões - {empresa.nome}
           </h1>
-          <p className="text-gray-600 mt-1">
-            Gerencie usuários e suas permissões de acesso
-          </p>
+          <p className="text-gray-600 mt-1">Gerencie usuários e suas permissões de acesso</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -324,7 +440,9 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
                     <Input
                       id="nome"
                       value={novoUsuario.nome}
-                      onChange={(e) => setNovoUsuario(prev => ({ ...prev, nome: e.target.value }))}
+                      onChange={(e) =>
+                        setNovoUsuario((prev) => ({ ...prev, nome: e.target.value }))
+                      }
                       placeholder="Digite o nome completo"
                     />
                   </div>
@@ -335,7 +453,9 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
                       id="email"
                       type="email"
                       value={novoUsuario.email}
-                      onChange={(e) => setNovoUsuario(prev => ({ ...prev, email: e.target.value }))}
+                      onChange={(e) =>
+                        setNovoUsuario((prev) => ({ ...prev, email: e.target.value }))
+                      }
                       placeholder="email@exemplo.com"
                     />
                   </div>
@@ -344,7 +464,9 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
                     <Label htmlFor="cargo">Cargo</Label>
                     <Select
                       value={novoUsuario.cargo}
-                      onValueChange={(value: any) => setNovoUsuario(prev => ({ ...prev, cargo: value }))}
+                      onValueChange={(value: any) =>
+                        setNovoUsuario((prev) => ({ ...prev, cargo: value }))
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -365,16 +487,19 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
                     <div key={categoria} className="space-y-2">
                       <h4 className="font-medium text-sm text-gray-700">{categoria}</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {permissoes.map(permissao => (
+                        {permissoes.map((permissao) => (
                           <div key={permissao.id} className="flex items-center space-x-2">
                             <Checkbox
                               id={permissao.id}
                               checked={novoUsuario.permissoes.includes(permissao.id)}
-                              onCheckedChange={() => togglePermissao(
-                                permissao.id,
-                                novoUsuario.permissoes,
-                                (permissoes) => setNovoUsuario(prev => ({ ...prev, permissoes }))
-                              )}
+                              onCheckedChange={() =>
+                                togglePermissao(
+                                  permissao.id,
+                                  novoUsuario.permissoes,
+                                  (permissoes) =>
+                                    setNovoUsuario((prev) => ({ ...prev, permissoes })),
+                                )
+                              }
                             />
                             <Label htmlFor={permissao.id} className="text-sm">
                               {permissao.nome}
@@ -387,10 +512,7 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
                 </div>
 
                 <div className="flex justify-end gap-2 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setModalNovoUsuario(false)}
-                  >
+                  <Button variant="outline" onClick={() => setModalNovoUsuario(false)}>
                     Cancelar
                   </Button>
                   <Button
@@ -430,7 +552,7 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
               </div>
               <div>
                 <p className="text-2xl font-bold">
-                  {usuarios.filter(u => u.status === 'ativo').length}
+                  {usuarios.filter((u) => u.status === 'ativo').length}
                 </p>
                 <p className="text-sm text-gray-600">Usuários Ativos</p>
               </div>
@@ -446,7 +568,7 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
               </div>
               <div>
                 <p className="text-2xl font-bold">
-                  {usuarios.filter(u => u.status === 'pendente').length}
+                  {usuarios.filter((u) => u.status === 'pendente').length}
                 </p>
                 <p className="text-sm text-gray-600">Aguardando Aprovação</p>
               </div>
@@ -462,7 +584,7 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
               </div>
               <div>
                 <p className="text-2xl font-bold">
-                  {usuarios.filter(u => u.cargo === 'administrador').length}
+                  {usuarios.filter((u) => u.cargo === 'administrador').length}
                 </p>
                 <p className="text-sm text-gray-600">Administradores</p>
               </div>
@@ -518,19 +640,14 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
                           <p className="text-sm text-gray-600">{usuario.email}</p>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        {getCargoBadge(usuario.cargo)}
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(usuario.status)}
-                      </TableCell>
+                      <TableCell>{getCargoBadge(usuario.cargo)}</TableCell>
+                      <TableCell>{getStatusBadge(usuario.status)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline">
                             {usuario.permissoes.includes('*')
                               ? 'Todas'
-                              : `${usuario.permissoes.length} permissões`
-                            }
+                              : `${usuario.permissoes.length} permissões`}
                           </Badge>
                           <Button
                             variant="ghost"
@@ -582,7 +699,7 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
                   <div key={categoria} className="space-y-3">
                     <h3 className="text-lg font-semibold text-gray-900">{categoria}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {permissoes.map(permissao => (
+                      {permissoes.map((permissao) => (
                         <Card key={permissao.id} className="p-4">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
@@ -590,8 +707,11 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
                               <p className="text-xs text-gray-600 mt-1">{permissao.descricao}</p>
                               <Badge
                                 variant={
-                                  permissao.nivel === 'admin' ? 'destructive' :
-                                    permissao.nivel === 'escrita' ? 'default' : 'secondary'
+                                  permissao.nivel === 'admin'
+                                    ? 'destructive'
+                                    : permissao.nivel === 'escrita'
+                                      ? 'default'
+                                      : 'secondary'
                                 }
                                 className="mt-2"
                               >
@@ -631,7 +751,7 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
                   <div className="space-y-2">
                     <Badge variant="default">Todas as permissões</Badge>
                     <p className="text-xs text-gray-500">
-                      {usuarios.filter(u => u.cargo === 'administrador').length} usuários
+                      {usuarios.filter((u) => u.cargo === 'administrador').length} usuários
                     </p>
                   </div>
                 </Card>
@@ -647,7 +767,7 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
                   <div className="space-y-2">
                     <Badge variant="secondary">Gestão comercial</Badge>
                     <p className="text-xs text-gray-500">
-                      {usuarios.filter(u => u.cargo === 'supervisor').length} usuários
+                      {usuarios.filter((u) => u.cargo === 'supervisor').length} usuários
                     </p>
                   </div>
                 </Card>
@@ -663,7 +783,7 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
                   <div className="space-y-2">
                     <Badge variant="outline">Operacional</Badge>
                     <p className="text-xs text-gray-500">
-                      {usuarios.filter(u => u.cargo === 'vendedor').length} usuários
+                      {usuarios.filter((u) => u.cargo === 'vendedor').length} usuários
                     </p>
                   </div>
                 </Card>
@@ -677,9 +797,7 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
       <Dialog open={modalEditarPermissoes} onOpenChange={setModalEditarPermissoes}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              Editar Permissões - {usuarioSelecionado?.nome}
-            </DialogTitle>
+            <DialogTitle>Editar Permissões - {usuarioSelecionado?.nome}</DialogTitle>
           </DialogHeader>
           <div className="space-y-6 py-4">
             {usuarioSelecionado && (
@@ -700,29 +818,43 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
                     <div key={categoria} className="space-y-3">
                       <h4 className="font-medium text-gray-900">{categoria}</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {permissoes.map(permissao => (
-                          <div key={permissao.id} className="flex items-start space-x-3 p-3 border rounded-lg">
+                        {permissoes.map((permissao) => (
+                          <div
+                            key={permissao.id}
+                            className="flex items-start space-x-3 p-3 border rounded-lg"
+                          >
                             <Checkbox
                               id={`edit-${permissao.id}`}
-                              checked={usuarioSelecionado.permissoes.includes(permissao.id) || usuarioSelecionado.permissoes.includes('*')}
+                              checked={
+                                usuarioSelecionado.permissoes.includes(permissao.id) ||
+                                usuarioSelecionado.permissoes.includes('*')
+                              }
                               disabled={usuarioSelecionado.permissoes.includes('*')}
                               onCheckedChange={() => {
-                                const novasPermissoes = usuarioSelecionado.permissoes.includes(permissao.id)
-                                  ? usuarioSelecionado.permissoes.filter(p => p !== permissao.id)
+                                const novasPermissoes = usuarioSelecionado.permissoes.includes(
+                                  permissao.id,
+                                )
+                                  ? usuarioSelecionado.permissoes.filter((p) => p !== permissao.id)
                                   : [...usuarioSelecionado.permissoes, permissao.id];
 
                                 handleEditarPermissoes(novasPermissoes);
                               }}
                             />
                             <div className="flex-1">
-                              <Label htmlFor={`edit-${permissao.id}`} className="text-sm font-medium">
+                              <Label
+                                htmlFor={`edit-${permissao.id}`}
+                                className="text-sm font-medium"
+                              >
                                 {permissao.nome}
                               </Label>
                               <p className="text-xs text-gray-600 mt-1">{permissao.descricao}</p>
                               <Badge
                                 variant={
-                                  permissao.nivel === 'admin' ? 'destructive' :
-                                    permissao.nivel === 'escrita' ? 'default' : 'secondary'
+                                  permissao.nivel === 'admin'
+                                    ? 'destructive'
+                                    : permissao.nivel === 'escrita'
+                                      ? 'default'
+                                      : 'secondary'
                                 }
                                 className="mt-1"
                               >
@@ -737,15 +869,10 @@ export const SistemaPermissoesPage: React.FC<SistemaPermissoesPageProps> = ({ em
                 </div>
 
                 <div className="flex justify-end gap-2 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setModalEditarPermissoes(false)}
-                  >
+                  <Button variant="outline" onClick={() => setModalEditarPermissoes(false)}>
                     Cancelar
                   </Button>
-                  <Button
-                    onClick={() => handleEditarPermissoes(usuarioSelecionado.permissoes)}
-                  >
+                  <Button onClick={() => handleEditarPermissoes(usuarioSelecionado.permissoes)}>
                     Salvar Permissões
                   </Button>
                 </div>

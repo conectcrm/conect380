@@ -1,5 +1,10 @@
 import { useState, useCallback } from 'react';
-import { clientesService, NotaCliente, CreateNotaDto, UpdateNotaDto } from '../services/clientesService';
+import {
+  clientesService,
+  NotaCliente,
+  CreateNotaDto,
+  UpdateNotaDto,
+} from '../services/clientesService';
 
 interface UseNotasReturn {
   notas: NotaCliente[];
@@ -15,7 +20,7 @@ interface UseNotasReturn {
 
 /**
  * Hook para gerenciar notas de clientes
- * 
+ *
  * Funcionalidades:
  * - Carregar notas por cliente, ticket ou telefone
  * - Criar nova nota
@@ -23,20 +28,20 @@ interface UseNotasReturn {
  * - Marcar/desmarcar como importante
  * - Deletar nota
  * - Contar notas (total e importantes)
- * 
+ *
  * @example
  * ```tsx
  * const { notas, loading, error, carregarNotas, criarNota } = useNotas();
- * 
+ *
  * useEffect(() => {
  *   carregarNotas(clienteId);
  * }, [clienteId]);
- * 
+ *
  * const handleCriar = async () => {
- *   await criarNota({ 
- *     clienteId, 
+ *   await criarNota({
+ *     clienteId,
  *     conteudo: 'Nova nota',
- *     importante: false 
+ *     importante: false
  *   });
  * };
  * ```
@@ -50,38 +55,39 @@ export const useNotas = (): UseNotasReturn => {
    * Carregar notas (por cliente, ticket ou telefone)
    * Prioridade: clienteId > ticketId > telefone
    */
-  const carregarNotas = useCallback(async (
-    clienteId?: string,
-    ticketId?: string,
-    telefone?: string,
-  ) => {
-    try {
-      setLoading(true);
-      setError(null);
+  const carregarNotas = useCallback(
+    async (clienteId?: string, ticketId?: string, telefone?: string) => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      let notasCarregadas: NotaCliente[] = [];
+        let notasCarregadas: NotaCliente[] = [];
 
-      if (clienteId) {
-        notasCarregadas = await clientesService.listarNotasCliente(clienteId);
-      } else if (ticketId) {
-        notasCarregadas = await clientesService.listarNotasTicket(ticketId);
-      } else if (telefone) {
-        notasCarregadas = await clientesService.listarNotasPorTelefone(telefone);
-      } else {
-        console.warn('⚠️ useNotas: Nenhum identificador fornecido (clienteId, ticketId ou telefone)');
-        notasCarregadas = [];
+        if (clienteId) {
+          notasCarregadas = await clientesService.listarNotasCliente(clienteId);
+        } else if (ticketId) {
+          notasCarregadas = await clientesService.listarNotasTicket(ticketId);
+        } else if (telefone) {
+          notasCarregadas = await clientesService.listarNotasPorTelefone(telefone);
+        } else {
+          console.warn(
+            '⚠️ useNotas: Nenhum identificador fornecido (clienteId, ticketId ou telefone)',
+          );
+          notasCarregadas = [];
+        }
+
+        setNotas(notasCarregadas);
+      } catch (err: unknown) {
+        console.error('❌ Erro ao carregar notas:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Erro ao carregar notas';
+        setError(errorMessage);
+        setNotas([]);
+      } finally {
+        setLoading(false);
       }
-
-      setNotas(notasCarregadas);
-    } catch (err: unknown) {
-      console.error('❌ Erro ao carregar notas:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Erro ao carregar notas';
-      setError(errorMessage);
-      setNotas([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   /**
    * Criar nova nota
@@ -92,7 +98,7 @@ export const useNotas = (): UseNotasReturn => {
       const novaNota = await clientesService.criarNota(nota);
 
       // Adicionar nota ao estado local
-      setNotas(prev => [novaNota, ...prev]);
+      setNotas((prev) => [novaNota, ...prev]);
 
       return novaNota;
     } catch (err: unknown) {
@@ -106,43 +112,36 @@ export const useNotas = (): UseNotasReturn => {
   /**
    * Atualizar nota existente
    */
-  const atualizarNota = useCallback(async (
-    notaId: string,
-    nota: UpdateNotaDto,
-  ): Promise<NotaCliente | null> => {
-    try {
-      setError(null);
-      const notaAtualizada = await clientesService.atualizarNota(notaId, nota);
+  const atualizarNota = useCallback(
+    async (notaId: string, nota: UpdateNotaDto): Promise<NotaCliente | null> => {
+      try {
+        setError(null);
+        const notaAtualizada = await clientesService.atualizarNota(notaId, nota);
 
-      // Atualizar nota no estado local
-      setNotas(prev =>
-        prev.map(n => (n.id === notaId ? notaAtualizada : n)),
-      );
+        // Atualizar nota no estado local
+        setNotas((prev) => prev.map((n) => (n.id === notaId ? notaAtualizada : n)));
 
-      return notaAtualizada;
-    } catch (err: unknown) {
-      console.error('❌ Erro ao atualizar nota:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Erro ao atualizar nota';
-      setError(errorMessage);
-      return null;
-    }
-  }, []);
+        return notaAtualizada;
+      } catch (err: unknown) {
+        console.error('❌ Erro ao atualizar nota:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Erro ao atualizar nota';
+        setError(errorMessage);
+        return null;
+      }
+    },
+    [],
+  );
 
   /**
    * Marcar/desmarcar nota como importante
    */
-  const toggleImportante = useCallback(async (
-    notaId: string,
-    importante: boolean,
-  ) => {
+  const toggleImportante = useCallback(async (notaId: string, importante: boolean) => {
     try {
       setError(null);
       const notaAtualizada = await clientesService.toggleImportante(notaId, importante);
 
       // Atualizar nota no estado local
-      setNotas(prev =>
-        prev.map(n => (n.id === notaId ? notaAtualizada : n)),
-      );
+      setNotas((prev) => prev.map((n) => (n.id === notaId ? notaAtualizada : n)));
     } catch (err: unknown) {
       console.error('❌ Erro ao marcar nota como importante:', err);
       const errorMessage = err instanceof Error ? err.message : 'Erro ao marcar nota';
@@ -159,7 +158,7 @@ export const useNotas = (): UseNotasReturn => {
       await clientesService.deletarNota(notaId);
 
       // Remover nota do estado local
-      setNotas(prev => prev.filter(n => n.id !== notaId));
+      setNotas((prev) => prev.filter((n) => n.id !== notaId));
     } catch (err: unknown) {
       console.error('❌ Erro ao deletar nota:', err);
       const errorMessage = err instanceof Error ? err.message : 'Erro ao deletar nota';

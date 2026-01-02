@@ -25,7 +25,7 @@ interface UseNotificacoesDesktopReturn {
 
 /**
  * Hook para gerenciar notificações desktop do navegador
- * 
+ *
  * Funcionalidades:
  * - Solicitar permissão do usuário
  * - Exibir notificações desktop
@@ -33,20 +33,20 @@ interface UseNotificacoesDesktopReturn {
  * - Callbacks ao clicar na notificação
  * - Gerenciar tags para evitar duplicatas
  * - Badge count no título da página
- * 
+ *
  * @example
  * ```tsx
- * const { 
- *   permissao, 
- *   solicitarPermissao, 
- *   mostrarNotificacao 
+ * const {
+ *   permissao,
+ *   solicitarPermissao,
+ *   mostrarNotificacao
  * } = useNotificacoesDesktop();
- * 
+ *
  * // Solicitar permissão
  * if (permissao === 'default') {
  *   await solicitarPermissao();
  * }
- * 
+ *
  * // Exibir notificação
  * mostrarNotificacao({
  *   titulo: 'Nova Mensagem',
@@ -178,7 +178,7 @@ export function useNotificacoesDesktop(): UseNotificacoesDesktopReturn {
         console.error('❌ Erro ao exibir notificação:', error);
       }
     },
-    [suportado, atualizarBadgeCount]
+    [suportado, atualizarBadgeCount],
   );
 
   // ===== FECHAR NOTIFICAÇÃO =====

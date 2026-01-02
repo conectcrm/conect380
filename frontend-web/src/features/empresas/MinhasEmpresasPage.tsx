@@ -30,7 +30,7 @@ import {
   Target,
   ChevronRight,
   Crown,
-  Activity
+  Activity,
 } from 'lucide-react';
 
 export const MinhasEmpresasPage: React.FC = () => {
@@ -43,21 +43,31 @@ export const MinhasEmpresasPage: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'ativa': return 'text-green-600 bg-green-100';
-      case 'trial': return 'text-yellow-600 bg-yellow-100';
-      case 'suspensa': return 'text-orange-600 bg-orange-100';
-      case 'inativa': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'ativa':
+        return 'text-green-600 bg-green-100';
+      case 'trial':
+        return 'text-yellow-600 bg-yellow-100';
+      case 'suspensa':
+        return 'text-orange-600 bg-orange-100';
+      case 'inativa':
+        return 'text-red-600 bg-red-100';
+      default:
+        return 'text-gray-600 bg-gray-100';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'ativa': return <CheckCircle className="w-4 h-4" />;
-      case 'trial': return <Clock className="w-4 h-4" />;
-      case 'suspensa': return <AlertCircle className="w-4 h-4" />;
-      case 'inativa': return <XCircle className="w-4 h-4" />;
-      default: return <AlertCircle className="w-4 h-4" />;
+      case 'ativa':
+        return <CheckCircle className="w-4 h-4" />;
+      case 'trial':
+        return <Clock className="w-4 h-4" />;
+      case 'suspensa':
+        return <AlertCircle className="w-4 h-4" />;
+      case 'inativa':
+        return <XCircle className="w-4 h-4" />;
+      default:
+        return <AlertCircle className="w-4 h-4" />;
     }
   };
 
@@ -92,7 +102,7 @@ export const MinhasEmpresasPage: React.FC = () => {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -100,7 +110,7 @@ export const MinhasEmpresasPage: React.FC = () => {
     return new Intl.DateTimeFormat('pt-BR', {
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric'
+      year: 'numeric',
     }).format(date);
   };
 
@@ -112,7 +122,6 @@ export const MinhasEmpresasPage: React.FC = () => {
       setTimeout(() => {
         navigate('/dashboard');
       }, 1500);
-
     } catch (error) {
       // Erro já é tratado no contexto
     }
@@ -157,15 +166,21 @@ export const MinhasEmpresasPage: React.FC = () => {
               <div className="flex bg-gray-100 rounded-lg p-1">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${viewMode === 'grid' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-                    }`}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                    viewMode === 'grid'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
                 >
                   Grid
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${viewMode === 'list' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-                    }`}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
                 >
                   Lista
                 </button>
@@ -185,7 +200,6 @@ export const MinhasEmpresasPage: React.FC = () => {
 
       {/* Conteúdo Principal */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
         {/* Resumo Geral */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-xl p-6 border border-gray-200">
@@ -207,7 +221,7 @@ export const MinhasEmpresasPage: React.FC = () => {
               </div>
               <div>
                 <p className="text-2xl font-bold text-gray-900">
-                  {empresas.filter(e => e.status === 'ativa').length}
+                  {empresas.filter((e) => e.status === 'ativa').length}
                 </p>
                 <p className="text-sm text-gray-600">Empresas Ativas</p>
               </div>
@@ -249,16 +263,25 @@ export const MinhasEmpresasPage: React.FC = () => {
             {empresas.map((empresa) => (
               <div
                 key={empresa.id}
-                className={`bg-white rounded-xl border-2 transition-all duration-200 hover:shadow-lg ${empresa.isActive ? 'border-[#159A9C] shadow-md' : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                className={`bg-white rounded-xl border-2 transition-all duration-200 hover:shadow-lg ${
+                  empresa.isActive
+                    ? 'border-[#159A9C] shadow-md'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
               >
                 {/* Header do Card */}
                 <div className="p-6 border-b border-gray-100">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg ${empresa.plano.nome === 'Enterprise' ? 'bg-purple-500' :
-                        empresa.plano.nome === 'Professional' ? 'bg-blue-500' : 'bg-green-500'
-                        }`}>
+                      <div
+                        className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg ${
+                          empresa.plano.nome === 'Enterprise'
+                            ? 'bg-purple-500'
+                            : empresa.plano.nome === 'Professional'
+                              ? 'bg-blue-500'
+                              : 'bg-green-500'
+                        }`}
+                      >
                         {empresa.nome.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -277,7 +300,9 @@ export const MinhasEmpresasPage: React.FC = () => {
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(empresa.status)}`}>
+                    <div
+                      className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(empresa.status)}`}
+                    >
                       {getStatusIcon(empresa.status)}
                       {empresa.status.charAt(0).toUpperCase() + empresa.status.slice(1)}
                     </div>
@@ -289,11 +314,15 @@ export const MinhasEmpresasPage: React.FC = () => {
                 <div className="p-6 border-b border-gray-100">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center">
-                      <p className="text-xl font-bold text-gray-900">{Math.floor(Math.random() * 50) + 10}</p>
+                      <p className="text-xl font-bold text-gray-900">
+                        {Math.floor(Math.random() * 50) + 10}
+                      </p>
                       <p className="text-xs text-gray-600">Usuários Ativos</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-xl font-bold text-gray-900">{Math.floor(Math.random() * 500) + 100}</p>
+                      <p className="text-xl font-bold text-gray-900">
+                        {Math.floor(Math.random() * 500) + 100}
+                      </p>
                       <p className="text-xs text-gray-600">Clientes</p>
                     </div>
                   </div>
@@ -301,7 +330,9 @@ export const MinhasEmpresasPage: React.FC = () => {
                   <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">Próximo vencimento:</span>
-                      <span className="font-medium text-gray-900">{formatDate(empresa.dataVencimento)}</span>
+                      <span className="font-medium text-gray-900">
+                        {formatDate(empresa.dataVencimento)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -386,12 +417,21 @@ export const MinhasEmpresasPage: React.FC = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {empresas.map((empresa) => (
-                    <tr key={empresa.id} className={empresa.isActive ? 'bg-[#159A9C]/5' : 'hover:bg-gray-50'}>
+                    <tr
+                      key={empresa.id}
+                      className={empresa.isActive ? 'bg-[#159A9C]/5' : 'hover:bg-gray-50'}
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold ${empresa.plano.nome === 'Enterprise' ? 'bg-purple-500' :
-                            empresa.plano.nome === 'Professional' ? 'bg-blue-500' : 'bg-green-500'
-                            }`}>
+                          <div
+                            className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold ${
+                              empresa.plano.nome === 'Enterprise'
+                                ? 'bg-purple-500'
+                                : empresa.plano.nome === 'Professional'
+                                  ? 'bg-blue-500'
+                                  : 'bg-green-500'
+                            }`}
+                          >
                             {empresa.nome.charAt(0).toUpperCase()}
                           </div>
                           <div>
@@ -409,7 +449,9 @@ export const MinhasEmpresasPage: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(empresa.status)}`}>
+                        <div
+                          className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(empresa.status)}`}
+                        >
                           {getStatusIcon(empresa.status)}
                           {empresa.status.charAt(0).toUpperCase() + empresa.status.slice(1)}
                         </div>
@@ -419,12 +461,18 @@ export const MinhasEmpresasPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm">
-                          <p className="font-medium text-gray-900">{Math.floor(Math.random() * 30) + 5} ativos</p>
-                          <p className="text-gray-600">de {Math.floor(Math.random() * 50) + 20} total</p>
+                          <p className="font-medium text-gray-900">
+                            {Math.floor(Math.random() * 30) + 5} ativos
+                          </p>
+                          <p className="text-gray-600">
+                            de {Math.floor(Math.random() * 50) + 20} total
+                          </p>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <p className="text-sm font-medium text-gray-900">{formatDate(empresa.dataVencimento)}</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {formatDate(empresa.dataVencimento)}
+                        </p>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
@@ -462,10 +510,7 @@ export const MinhasEmpresasPage: React.FC = () => {
       </div>
 
       {/* Modal Nova Empresa */}
-      <ModalNovaEmpresa
-        isOpen={showAddEmpresa}
-        onClose={() => setShowAddEmpresa(false)}
-      />
+      <ModalNovaEmpresa isOpen={showAddEmpresa} onClose={() => setShowAddEmpresa(false)} />
     </div>
   );
 };

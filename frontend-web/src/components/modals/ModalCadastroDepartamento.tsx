@@ -9,7 +9,7 @@ import {
   UpdateDepartamentoDto,
   TIPOS_DISTRIBUICAO,
   CORES_DEPARTAMENTO,
-  ICONES_DEPARTAMENTO
+  ICONES_DEPARTAMENTO,
 } from '../../types/departamentoTypes';
 
 interface ModalCadastroDepartamentoProps {
@@ -23,7 +23,7 @@ const ModalCadastroDepartamento: React.FC<ModalCadastroDepartamentoProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  departamentoEdicao
+  departamentoEdicao,
 }) => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'config'>('dados');
@@ -51,16 +51,13 @@ const ModalCadastroDepartamento: React.FC<ModalCadastroDepartamentoProps> = ({
     nucleos,
     loading: loadingNucleos,
     error: erroNucleos,
-    recarregar: recarregarNucleos
+    recarregar: recarregarNucleos,
   } = useNucleos({
     apenasAtivos: true,
-    incluirTodos: false
+    incluirTodos: false,
   });
 
-  const nucleosOptions = useMemo(
-    () => (Array.isArray(nucleos) ? nucleos : []),
-    [nucleos]
-  );
+  const nucleosOptions = useMemo(() => (Array.isArray(nucleos) ? nucleos : []), [nucleos]);
 
   useEffect(() => {
     if (departamentoEdicao) {
@@ -187,20 +184,22 @@ const ModalCadastroDepartamento: React.FC<ModalCadastroDepartamentoProps> = ({
           <div className="flex">
             <button
               onClick={() => setActiveTab('dados')}
-              className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${activeTab === 'dados'
-                ? 'border-b-2 border-[#159A9C] text-[#159A9C] bg-white'
-                : 'text-gray-600 hover:text-gray-900'
-                }`}
+              className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'dados'
+                  ? 'border-b-2 border-[#159A9C] text-[#159A9C] bg-white'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
             >
               <Building2 className="w-4 h-4 inline mr-2" />
               Dados Básicos
             </button>
             <button
               onClick={() => setActiveTab('config')}
-              className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${activeTab === 'config'
-                ? 'border-b-2 border-[#159A9C] text-[#159A9C] bg-white'
-                : 'text-gray-600 hover:text-gray-900'
-                }`}
+              className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'config'
+                  ? 'border-b-2 border-[#159A9C] text-[#159A9C] bg-white'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
             >
               <Settings className="w-4 h-4 inline mr-2" />
               Configurações
@@ -270,9 +269,7 @@ const ModalCadastroDepartamento: React.FC<ModalCadastroDepartamentoProps> = ({
 
                 {/* Descrição */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Descrição
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
                   <textarea
                     value={descricao}
                     onChange={(e) => setDescricao(e.target.value)}
@@ -300,17 +297,16 @@ const ModalCadastroDepartamento: React.FC<ModalCadastroDepartamentoProps> = ({
                 {/* Cor e Ícone */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Cor
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Cor</label>
                     <div className="flex gap-2 flex-wrap">
                       {CORES_DEPARTAMENTO.map((corOpcao) => (
                         <button
                           key={corOpcao}
                           type="button"
                           onClick={() => setCor(corOpcao)}
-                          className={`w-10 h-10 rounded-lg transition-all ${cor === corOpcao ? 'ring-2 ring-offset-2 ring-gray-400' : ''
-                            }`}
+                          className={`w-10 h-10 rounded-lg transition-all ${
+                            cor === corOpcao ? 'ring-2 ring-offset-2 ring-gray-400' : ''
+                          }`}
                           style={{ backgroundColor: corOpcao }}
                         />
                       ))}
@@ -318,9 +314,7 @@ const ModalCadastroDepartamento: React.FC<ModalCadastroDepartamentoProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Ícone
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Ícone</label>
                     <select
                       value={icone}
                       onChange={(e) => setIcone(e.target.value)}
@@ -441,7 +435,9 @@ const ModalCadastroDepartamento: React.FC<ModalCadastroDepartamentoProps> = ({
                   <input
                     type="number"
                     value={slaRespostaMinutos || ''}
-                    onChange={(e) => setSlaRespostaMinutos(e.target.value ? Number(e.target.value) : undefined)}
+                    onChange={(e) =>
+                      setSlaRespostaMinutos(e.target.value ? Number(e.target.value) : undefined)
+                    }
                     placeholder="Deixe vazio para herdar do núcleo"
                     min={1}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
@@ -456,7 +452,9 @@ const ModalCadastroDepartamento: React.FC<ModalCadastroDepartamentoProps> = ({
                   <input
                     type="number"
                     value={slaResolucaoHoras || ''}
-                    onChange={(e) => setSlaResolucaoHoras(e.target.value ? Number(e.target.value) : undefined)}
+                    onChange={(e) =>
+                      setSlaResolucaoHoras(e.target.value ? Number(e.target.value) : undefined)
+                    }
                     placeholder="Deixe vazio para herdar do núcleo"
                     min={1}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"

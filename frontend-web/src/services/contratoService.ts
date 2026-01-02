@@ -72,7 +72,7 @@ class ContratoService {
           statusText: backendError.response?.statusText,
           data: backendError.response?.data,
           message: backendError.message,
-          url: backendError.config?.url
+          url: backendError.config?.url,
         });
 
         // Fallback: criar contrato mock
@@ -86,7 +86,7 @@ class ContratoService {
             email: 'cliente@sistema.com',
             telefone: '',
             documento: '',
-            endereco: ''
+            endereco: '',
           },
           valor: dados.valorTotal,
           status: 'rascunho',
@@ -96,13 +96,13 @@ class ContratoService {
           vendedor: {
             id: dados.usuarioResponsavelId.toString(),
             nome: 'Vendedor Sistema',
-            email: 'vendedor@sistema.com'
+            email: 'vendedor@sistema.com',
           },
-          observacoes: dados.observacoes
+          observacoes: dados.observacoes,
         };
 
         // Simular delay do servidor
-        await new Promise(resolve => setTimeout(resolve, 800));
+        await new Promise((resolve) => setTimeout(resolve, 800));
 
         console.log('✅ Contrato mock criado:', contratoMock);
         return contratoMock;
@@ -123,8 +123,8 @@ class ContratoService {
 
       const response = await api.get('/contratos', {
         params: {
-          empresaId: empresaId
-        }
+          empresaId: empresaId,
+        },
       });
 
       console.log('✅ [FRONTEND] Contratos recebidos:', response.data);
@@ -158,14 +158,16 @@ class ContratoService {
         statusText: error.response?.statusText,
         data: error.response?.data,
         message: error.message,
-        url: error.config?.url
+        url: error.config?.url,
       });
       throw error;
     }
   }
 
   // Enviar contrato para assinatura
-  async enviarParaAssinatura(contratoId: string): Promise<{ success: boolean; linkAssinatura: string }> {
+  async enviarParaAssinatura(
+    contratoId: string,
+  ): Promise<{ success: boolean; linkAssinatura: string }> {
     try {
       console.log('✍️ Enviando contrato para assinatura:', contratoId);
 
@@ -178,7 +180,10 @@ class ContratoService {
   }
 
   // Assinar contrato digitalmente
-  async assinarContrato(contratoId: string, dados: { token: string; tipo: 'cliente' | 'empresa' }): Promise<Contrato> {
+  async assinarContrato(
+    contratoId: string,
+    dados: { token: string; tipo: 'cliente' | 'empresa' },
+  ): Promise<Contrato> {
     try {
       console.log('✅ Assinando contrato:', contratoId);
 
@@ -194,7 +199,7 @@ class ContratoService {
   async baixarPDF(contratoId: string): Promise<Blob> {
     try {
       const response = await api.get(`/contratos/${contratoId}/pdf`, {
-        responseType: 'blob'
+        responseType: 'blob',
       });
       return response.data;
     } catch (error) {

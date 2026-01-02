@@ -1,15 +1,15 @@
 /**
  * Componente NotificationIndicator
- * 
+ *
  * Indicador visual de conexão WebSocket e notificações
  * Exibe status da conexão (conectado/desconectado/erro)
- * 
+ *
  * Features:
  * - Badge de status com cores (verde/cinza/vermelho)
  * - Animação de pulso quando conectado
  * - Tooltip com informações
  * - Click para reconectar manualmente
- * 
+ *
  * @author ConectCRM
  * @date 2025-11-18
  */
@@ -92,9 +92,7 @@ const NotificationIndicator: React.FC<NotificationIndicatorProps> = ({
       </div>
 
       {/* Texto do status */}
-      <span className={`text-xs font-medium ${status.textColor}`}>
-        {status.text}
-      </span>
+      <span className={`text-xs font-medium ${status.textColor}`}>{status.text}</span>
 
       {/* Indicador de erro */}
       {error && (

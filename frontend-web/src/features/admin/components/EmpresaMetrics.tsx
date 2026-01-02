@@ -9,7 +9,7 @@ import {
   CheckCircle,
   Clock,
   Ban,
-  Activity
+  Activity,
 } from 'lucide-react';
 
 interface Empresa {
@@ -46,38 +46,36 @@ interface EmpresaMetricsProps {
   isLoading?: boolean;
 }
 
-export const EmpresaMetrics: React.FC<EmpresaMetricsProps> = ({ 
-  empresas, 
-  isLoading = false 
-}) => {
+export const EmpresaMetrics: React.FC<EmpresaMetricsProps> = ({ empresas, isLoading = false }) => {
   // Calcular métricas a partir da lista de empresas
   const calculateMetrics = (): MetricData => {
     const now = new Date();
     const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
+
     const totalEmpresas = empresas.length;
-    const empresasAtivas = empresas.filter(e => e.status === 'ativa').length;
-    const empresasTrial = empresas.filter(e => e.status === 'trial').length;
-    const empresasSuspensas = empresas.filter(e => e.status === 'suspensa').length;
-    const empresasInativas = empresas.filter(e => e.status === 'inativa').length;
-    
+    const empresasAtivas = empresas.filter((e) => e.status === 'ativa').length;
+    const empresasTrial = empresas.filter((e) => e.status === 'trial').length;
+    const empresasSuspensas = empresas.filter((e) => e.status === 'suspensa').length;
+    const empresasInativas = empresas.filter((e) => e.status === 'inativa').length;
+
     const receitaMensal = empresas
-      .filter(e => e.status === 'ativa')
+      .filter((e) => e.status === 'ativa')
       .reduce((sum, e) => sum + e.valorMensal, 0);
-    
+
     const totalUsuarios = empresas.reduce((sum, e) => sum + e.usuariosAtivos, 0);
     const mediaUsuariosPorEmpresa = totalEmpresas > 0 ? totalUsuarios / totalEmpresas : 0;
-    
-    const empresasExpirandoSemana = empresas.filter(e => 
-      e.dataExpiracao && e.dataExpiracao <= oneWeekFromNow
+
+    const empresasExpirandoSemana = empresas.filter(
+      (e) => e.dataExpiracao && e.dataExpiracao <= oneWeekFromNow,
     ).length;
-    
+
     // Simular dados que normalmente viriam da API
     const novasEmpresasMes = Math.round(totalEmpresas * 0.15);
     const cancelamentosMes = Math.round(totalEmpresas * 0.05);
-    const taxaConversaoTrial = empresasTrial > 0 ? (empresasAtivas / (empresasAtivas + empresasTrial)) * 100 : 0;
-    
+    const taxaConversaoTrial =
+      empresasTrial > 0 ? (empresasAtivas / (empresasAtivas + empresasTrial)) * 100 : 0;
+
     return {
       totalEmpresas,
       empresasAtivas,
@@ -90,7 +88,7 @@ export const EmpresaMetrics: React.FC<EmpresaMetricsProps> = ({
       empresasExpirandoSemana,
       novasEmpresasMes,
       cancelamentosMes,
-      taxaConversaoTrial
+      taxaConversaoTrial,
     };
   };
 
@@ -98,7 +96,7 @@ export const EmpresaMetrics: React.FC<EmpresaMetricsProps> = ({
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -137,18 +135,19 @@ export const EmpresaMetrics: React.FC<EmpresaMetricsProps> = ({
           <div>
             <p className="text-sm font-medium text-gray-600">{title}</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
-            {subtitle && (
-              <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
-            )}
+            {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
             {trend && (
-              <div className={`flex items-center mt-2 ${
-                trend.isPositive ? 'text-green-600' : 'text-red-600'
-              }`}>
-                <TrendingUp className={`w-4 h-4 mr-1 ${
-                  !trend.isPositive ? 'transform rotate-180' : ''
-                }`} />
+              <div
+                className={`flex items-center mt-2 ${
+                  trend.isPositive ? 'text-green-600' : 'text-red-600'
+                }`}
+              >
+                <TrendingUp
+                  className={`w-4 h-4 mr-1 ${!trend.isPositive ? 'transform rotate-180' : ''}`}
+                />
                 <span className="text-sm font-medium">
-                  {trend.isPositive ? '+' : ''}{trend.value.toFixed(1)}%
+                  {trend.isPositive ? '+' : ''}
+                  {trend.value.toFixed(1)}%
                 </span>
               </div>
             )}
@@ -172,15 +171,13 @@ export const EmpresaMetrics: React.FC<EmpresaMetricsProps> = ({
     empresasAtivas: Math.round(data.empresasAtivas * 0.95),
     receitaMensal: data.receitaMensal * 0.92,
     totalUsuarios: Math.round(data.totalUsuarios * 0.98),
-    novasEmpresas: Math.round(data.novasEmpresasMes * 0.85)
+    novasEmpresas: Math.round(data.novasEmpresasMes * 0.85),
   };
 
   return (
     <div className="mb-8">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">
-          Métricas do Sistema
-        </h2>
+        <h2 className="text-xl font-semibold text-gray-900">Métricas do Sistema</h2>
         <div className="flex items-center space-x-2 text-sm text-gray-500">
           <Activity className="w-4 h-4" />
           <span>Atualizado agora</span>
@@ -292,7 +289,12 @@ export const EmpresaMetrics: React.FC<EmpresaMetricsProps> = ({
               <p className="text-2xl font-bold text-green-600">{data.novasEmpresasMes}</p>
               <div className="flex items-center mt-1">
                 <span className="text-sm text-green-600 font-medium">
-                  +{calculateGrowthRate(data.novasEmpresasMes, previousMonthData.novasEmpresas).value.toFixed(1)}%
+                  +
+                  {calculateGrowthRate(
+                    data.novasEmpresasMes,
+                    previousMonthData.novasEmpresas,
+                  ).value.toFixed(1)}
+                  %
                 </span>
                 <span className="text-sm text-gray-500 ml-1">vs mês anterior</span>
               </div>
@@ -317,9 +319,7 @@ export const EmpresaMetrics: React.FC<EmpresaMetricsProps> = ({
 
       {/* Barra de status distribuição */}
       <div className="bg-white p-6 rounded-lg border border-gray-200 mt-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Distribuição por Status
-        </h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Distribuição por Status</h3>
         <div className="space-y-3">
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center space-x-2">
@@ -327,7 +327,8 @@ export const EmpresaMetrics: React.FC<EmpresaMetricsProps> = ({
               <span>Ativas</span>
             </div>
             <span className="font-medium">
-              {data.empresasAtivas} ({((data.empresasAtivas / data.totalEmpresas) * 100).toFixed(1)}%)
+              {data.empresasAtivas} ({((data.empresasAtivas / data.totalEmpresas) * 100).toFixed(1)}
+              %)
             </span>
           </div>
           <div className="flex items-center justify-between text-sm">
@@ -345,7 +346,8 @@ export const EmpresaMetrics: React.FC<EmpresaMetricsProps> = ({
               <span>Suspensas</span>
             </div>
             <span className="font-medium">
-              {data.empresasSuspensas} ({((data.empresasSuspensas / data.totalEmpresas) * 100).toFixed(1)}%)
+              {data.empresasSuspensas} (
+              {((data.empresasSuspensas / data.totalEmpresas) * 100).toFixed(1)}%)
             </span>
           </div>
           <div className="flex items-center justify-between text-sm">
@@ -354,29 +356,30 @@ export const EmpresaMetrics: React.FC<EmpresaMetricsProps> = ({
               <span>Inativas</span>
             </div>
             <span className="font-medium">
-              {data.empresasInativas} ({((data.empresasInativas / data.totalEmpresas) * 100).toFixed(1)}%)
+              {data.empresasInativas} (
+              {((data.empresasInativas / data.totalEmpresas) * 100).toFixed(1)}%)
             </span>
           </div>
         </div>
-        
+
         {/* Barra de progresso visual */}
         <div className="mt-4">
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div className="flex h-2 rounded-full overflow-hidden">
-              <div 
-                className="bg-green-500" 
+              <div
+                className="bg-green-500"
                 style={{ width: `${(data.empresasAtivas / data.totalEmpresas) * 100}%` }}
               ></div>
-              <div 
-                className="bg-blue-500" 
+              <div
+                className="bg-blue-500"
                 style={{ width: `${(data.empresasTrial / data.totalEmpresas) * 100}%` }}
               ></div>
-              <div 
-                className="bg-yellow-500" 
+              <div
+                className="bg-yellow-500"
                 style={{ width: `${(data.empresasSuspensas / data.totalEmpresas) * 100}%` }}
               ></div>
-              <div 
-                className="bg-red-500" 
+              <div
+                className="bg-red-500"
                 style={{ width: `${(data.empresasInativas / data.totalEmpresas) * 100}%` }}
               ></div>
             </div>

@@ -6,7 +6,10 @@ import {
   UpdateDateColumn,
   DeleteDateColumn,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 export enum TipoMensagem {
   TEXTO = 'TEXTO',
@@ -36,9 +39,17 @@ export enum StatusMensagem {
 
 @Entity('atendimento_mensagens')
 @Index(['ticketId'])
+@Index(['empresaId'])
 export class Mensagem {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column({ type: 'uuid', name: 'ticket_id' })
   ticketId: string;

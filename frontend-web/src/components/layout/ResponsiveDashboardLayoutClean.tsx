@@ -3,10 +3,16 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../hooks/useAuth';
 import { formatCompanyName, formatUserName } from '../../utils/textUtils';
 import LanguageSelector from '../common/LanguageSelector';
-import { 
-  Bell, Wifi, WifiOff, Search, 
-  Settings, HelpCircle, LogOut,
-  User, ChevronDown
+import {
+  Bell,
+  Wifi,
+  WifiOff,
+  Search,
+  Settings,
+  MessageCircle,
+  LogOut,
+  User,
+  ChevronDown,
 } from 'lucide-react';
 
 interface ResponsiveDashboardLayoutProps {
@@ -30,7 +36,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
   const [notifications] = useState([
     { id: 1, type: 'info', message: 'Nova proposta recebida', time: '2 min' },
     { id: 2, type: 'warning', message: 'Cliente aguarda retorno', time: '15 min' },
-    { id: 3, type: 'success', message: 'Venda concluída', time: '1h' }
+    { id: 3, type: 'success', message: 'Venda concluída', time: '1h' },
   ]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -39,10 +45,10 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
@@ -53,11 +59,11 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
-      
+
       if (showNotifications && !target.closest('[data-dropdown="notifications"]')) {
         setShowNotifications(false);
       }
-      
+
       if (showUserMenu && !target.closest('[data-dropdown="user-menu"]')) {
         setShowUserMenu(false);
       }
@@ -66,7 +72,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
     if (showNotifications || showUserMenu) {
       document.addEventListener('mousedown', handleClickOutside);
     }
-    
+
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showNotifications, showUserMenu]);
 
@@ -80,7 +86,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
             <div className="flex items-center gap-6">
               {/* Logo do Sistema */}
               <div className="flex items-center gap-3">
-                <div 
+                <div
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
                   style={{ backgroundColor: currentPalette.colors.primary }}
                 >
@@ -88,21 +94,15 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                 </div>
                 <h1 className="text-lg font-bold text-gray-900">Fênix CRM</h1>
               </div>
-              
+
               {/* Separador + Título da Página */}
               <div className="hidden md:flex items-center gap-4">
                 <div className="w-px h-6 bg-gray-300"></div>
                 <div>
-                  <h2 
-                    id={headingId}
-                    className="text-lg font-semibold text-gray-800"
-                    tabIndex={0}
-                  >
+                  <h2 id={headingId} className="text-lg font-semibold text-gray-800" tabIndex={0}>
                     {title}
                   </h2>
-                  {subtitle && (
-                    <p className="text-sm text-gray-600">{subtitle}</p>
-                  )}
+                  {subtitle && <p className="text-sm text-gray-600">{subtitle}</p>}
                 </div>
               </div>
             </div>
@@ -116,13 +116,11 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                 ) : (
                   <WifiOff className="w-3 h-3 text-red-600" />
                 )}
-                <span className="text-xs text-gray-600">
-                  {isOnline ? 'Online' : 'Offline'}
-                </span>
+                <span className="text-xs text-gray-600">{isOnline ? 'Online' : 'Offline'}</span>
               </div>
 
               {/* Busca Global */}
-              <button 
+              <button
                 className="hidden sm:flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-gray-600"
                 title="Busca rápida"
               >
@@ -132,7 +130,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
 
               {/* Notificações - ÚNICO */}
               <div className="relative" data-dropdown="notifications">
-                <button 
+                <button
                   onClick={() => setShowNotifications(!showNotifications)}
                   className="relative p-2 rounded-lg hover:bg-gray-50 transition-colors"
                 >
@@ -150,16 +148,19 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                     <div className="p-4 border-b">
                       <h3 className="font-semibold text-gray-900">Notificações</h3>
                     </div>
-                    
+
                     <div className="max-h-64 overflow-y-auto">
                       {notifications.map((notification) => (
-                        <div key={notification.id} className="p-3 border-b last:border-b-0 hover:bg-gray-50">
+                        <div
+                          key={notification.id}
+                          className="p-3 border-b last:border-b-0 hover:bg-gray-50"
+                        >
                           <p className="text-sm text-gray-900">{notification.message}</p>
                           <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
                         </div>
                       ))}
                     </div>
-                    
+
                     <div className="p-3 border-t">
                       <button className="text-sm text-blue-600 hover:underline">Ver todas</button>
                     </div>
@@ -172,7 +173,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
 
               {/* Menu do Usuário - ÚNICO */}
               <div className="relative" data-dropdown="user-menu">
-                <button 
+                <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 transition-colors"
                 >
@@ -211,20 +212,20 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="p-2">
                       <button className="w-full flex items-center gap-3 p-2 text-left hover:bg-gray-50 rounded-lg transition-colors">
                         <Settings className="w-4 h-4 text-gray-600" />
                         <span className="text-sm text-gray-700">Configurações</span>
                       </button>
                       <button className="w-full flex items-center gap-3 p-2 text-left hover:bg-gray-50 rounded-lg transition-colors">
-                        <HelpCircle className="w-4 h-4 text-gray-600" />
+                        <MessageCircle className="w-4 h-4 text-gray-600" />
                         <span className="text-sm text-gray-700">Ajuda</span>
                       </button>
                     </div>
-                    
+
                     <div className="p-2 border-t">
-                      <button 
+                      <button
                         onClick={logout}
                         className="w-full flex items-center gap-3 p-2 text-left hover:bg-red-50 rounded-lg transition-colors text-red-600"
                       >
@@ -241,7 +242,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
       </header>
 
       {/* Content */}
-      <main 
+      <main
         id={mainId}
         className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-4 sm:py-6 lg:py-8"
         role="main"

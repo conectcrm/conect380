@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { API_BASE_URL } from '../services/api';
 
 // Interfaces
 export interface DashboardKPIs {
@@ -72,6 +73,12 @@ interface DashboardData {
   kpis: DashboardKPIs | null;
   vendedoresRanking: VendedorRanking[];
   alertas: AlertaInteligente[];
+  chartsData?: {
+    vendasMensais?: Array<{ mes: string; valor: number; meta: number }>;
+    propostasPorStatus?: Array<{ status: string; valor: number; color: string }>;
+    atividadesTimeline?: Array<{ mes: string; reunioes: number; ligacoes: number; emails: number }>;
+    funilVendas?: Array<{ etapa: string; quantidade: number; valor: number }>;
+  };
   metadata: {
     periodo: string;
     vendedorId?: string;
@@ -100,8 +107,6 @@ interface UseDashboardReturn {
   updateFilters: (filters: Partial<UseDashboardOptions>) => void;
 }
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
-
 /**
  * Hook customizado para gerenciar dados do dashboard
  * Consome APIs reais do backend e gerencia estado
@@ -112,7 +117,7 @@ export const useDashboard = (options: UseDashboardOptions = {}): UseDashboardRet
     vendedorId,
     regiao,
     autoRefresh = true,
-    refreshInterval = 15 * 60 * 1000 // 15 minutos
+    refreshInterval = 15 * 60 * 1000, // 15 minutos
   } = options;
 
   // Estados
@@ -120,7 +125,8 @@ export const useDashboard = (options: UseDashboardOptions = {}): UseDashboardRet
     kpis: null,
     vendedoresRanking: [],
     alertas: [],
-    metadata: null
+    chartsData: undefined,
+    metadata: null,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -145,9 +151,9 @@ export const useDashboard = (options: UseDashboardOptions = {}): UseDashboardRet
           'Content-Type': 'application/json',
           // Adicionar token de autenticação se necessário
           ...(localStorage.getItem('token') && {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          })
-        }
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          }),
+        },
       });
 
       if (!response.ok) {
@@ -159,7 +165,7 @@ export const useDashboard = (options: UseDashboardOptions = {}): UseDashboardRet
       // Converter timestamps dos alertas
       const alertasComData = result.alertas.map((alerta: any) => ({
         ...alerta,
-        timestamp: new Date(alerta.timestamp)
+        timestamp: new Date(alerta.timestamp),
       }));
 
       const metadataDefaults = {
@@ -168,29 +174,34 @@ export const useDashboard = (options: UseDashboardOptions = {}): UseDashboardRet
         regiao: filters.regiao,
         atualizadoEm: new Date().toISOString(),
         proximaAtualizacao: new Date(Date.now() + refreshInterval).toISOString(),
-        periodosDisponiveis: ['semanal', 'mensal', 'trimestral', 'semestral', 'anual']
+        periodosDisponiveis: ['semanal', 'mensal', 'trimestral', 'semestral', 'anual'],
       };
 
       const metadata = result.metadata
         ? {
           ...metadataDefaults,
           ...result.metadata,
-          periodosDisponiveis: result.metadata.periodosDisponiveis ?? metadataDefaults.periodosDisponiveis,
-          vendedoresDisponiveis: result.metadata.vendedoresDisponiveis ?? result.vendedoresRanking?.map(({ id, nome }: VendedorRanking) => ({ id, nome })),
-          regioesDisponiveis: result.metadata.regioesDisponiveis
+          periodosDisponiveis:
+            result.metadata.periodosDisponiveis ?? metadataDefaults.periodosDisponiveis,
+          vendedoresDisponiveis:
+            result.metadata.vendedoresDisponiveis ??
+            result.vendedoresRanking?.map(({ id, nome }: VendedorRanking) => ({ id, nome })),
+          regioesDisponiveis: result.metadata.regioesDisponiveis,
         }
         : {
           ...metadataDefaults,
-          vendedoresDisponiveis: result.vendedoresRanking?.map(({ id, nome }: VendedorRanking) => ({ id, nome }))
+          vendedoresDisponiveis: result.vendedoresRanking?.map(
+            ({ id, nome }: VendedorRanking) => ({ id, nome }),
+          ),
         };
 
       setData({
         kpis: result.kpis,
         vendedoresRanking: result.vendedoresRanking,
         alertas: alertasComData,
-        metadata
+        chartsData: result.chartsData,
+        metadata,
       });
-
     } catch (err) {
       console.error('❌ Erro ao buscar dados do dashboard:', err);
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
@@ -200,13 +211,13 @@ export const useDashboard = (options: UseDashboardOptions = {}): UseDashboardRet
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, refreshInterval]);
 
   // Função para atualizar filtros
   const updateFilters = useCallback((newFilters: Partial<UseDashboardOptions>) => {
-    setFilters(prev => ({
+    setFilters((prev) => ({
       ...prev,
-      ...newFilters
+      ...newFilters,
     }));
   }, []);
 
@@ -236,14 +247,18 @@ export const useDashboard = (options: UseDashboardOptions = {}): UseDashboardRet
     loading,
     error,
     refresh,
-    updateFilters
+    updateFilters,
   };
 };
 
 /**
  * Hook específico para KPIs
  */
-export const useDashboardKPIs = (periodo: string = 'mensal', vendedorId?: string, regiao?: string) => {
+export const useDashboardKPIs = (
+  periodo: string = 'mensal',
+  vendedorId?: string,
+  regiao?: string,
+) => {
   const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -262,9 +277,9 @@ export const useDashboardKPIs = (periodo: string = 'mensal', vendedorId?: string
         headers: {
           'Content-Type': 'application/json',
           ...(localStorage.getItem('token') && {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          })
-        }
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          }),
+        },
       });
 
       if (!response.ok) {
@@ -273,7 +288,6 @@ export const useDashboardKPIs = (periodo: string = 'mensal', vendedorId?: string
 
       const result = await response.json();
       setKpis(result);
-
     } catch (err) {
       console.error('❌ Erro ao buscar KPIs:', err);
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
@@ -306,9 +320,9 @@ export const useDashboardAlertas = () => {
         headers: {
           'Content-Type': 'application/json',
           ...(localStorage.getItem('token') && {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          })
-        }
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          }),
+        },
       });
 
       if (!response.ok) {
@@ -318,11 +332,10 @@ export const useDashboardAlertas = () => {
       const result = await response.json();
       const alertasComData = result.map((alerta: any) => ({
         ...alerta,
-        timestamp: new Date(alerta.timestamp)
+        timestamp: new Date(alerta.timestamp),
       }));
 
       setAlertas(alertasComData);
-
     } catch (err) {
       console.error('❌ Erro ao buscar alertas:', err);
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
@@ -332,13 +345,13 @@ export const useDashboardAlertas = () => {
   }, []);
 
   const marcarComoLido = useCallback((alertaId: string) => {
-    setAlertas(prev => prev.map(alerta =>
-      alerta.id === alertaId ? { ...alerta, lido: true } : alerta
-    ));
+    setAlertas((prev) =>
+      prev.map((alerta) => (alerta.id === alertaId ? { ...alerta, lido: true } : alerta)),
+    );
   }, []);
 
   const fecharAlerta = useCallback((alertaId: string) => {
-    setAlertas(prev => prev.filter(alerta => alerta.id !== alertaId));
+    setAlertas((prev) => prev.filter((alerta) => alerta.id !== alertaId));
   }, []);
 
   useEffect(() => {
@@ -351,7 +364,7 @@ export const useDashboardAlertas = () => {
     error,
     refresh: fetchAlertas,
     marcarComoLido,
-    fecharAlerta
+    fecharAlerta,
   };
 };
 
@@ -361,11 +374,15 @@ const getMockData = (): DashboardData => ({
     faturamentoTotal: { valor: 487650, meta: 450000, variacao: 24, periodo: 'vs mês anterior' },
     ticketMedio: { valor: 23420, variacao: 8.7, periodo: 'vs mês anterior' },
     vendasFechadas: { quantidade: 34, variacao: 18, periodo: 'vs mês anterior' },
-    emNegociacao: { valor: 285400, quantidade: 22, propostas: ['PROP-001', 'PROP-002', 'PROP-003'] },
+    emNegociacao: {
+      valor: 285400,
+      quantidade: 22,
+      propostas: ['PROP-001', 'PROP-002', 'PROP-003'],
+    },
     novosClientesMes: { quantidade: 248, variacao: 12.5 },
     leadsQualificados: { quantidade: 32, variacao: 8.3 },
     propostasEnviadas: { valor: 125000, variacao: 15.2 },
-    taxaSucessoGeral: { percentual: 68, variacao: -2.1 }
+    taxaSucessoGeral: { percentual: 68, variacao: -2.1 },
   },
   vendedoresRanking: [
     {
@@ -376,8 +393,8 @@ const getMockData = (): DashboardData => ({
       variacao: 25,
       posicao: 1,
       badges: ['top_performer', 'goal_crusher'],
-      cor: '#10B981'
-    }
+      cor: '#10B981',
+    },
   ],
   alertas: [
     {
@@ -387,9 +404,10 @@ const getMockData = (): DashboardData => ({
       titulo: 'Meta Superada! 🎉',
       descricao: 'Parabéns! A meta mensal foi superada em 8%!',
       timestamp: new Date(),
-      lido: false
-    }
+      lido: false,
+    },
   ],
+  chartsData: undefined,
   metadata: {
     periodo: 'mensal',
     vendedorId: undefined,
@@ -397,11 +415,9 @@ const getMockData = (): DashboardData => ({
     atualizadoEm: new Date().toISOString(),
     proximaAtualizacao: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
     periodosDisponiveis: ['semanal', 'mensal', 'trimestral', 'semestral', 'anual'],
-    vendedoresDisponiveis: [
-      { id: '1', nome: 'João Silva' }
-    ],
-    regioesDisponiveis: ['Todas', 'Norte', 'Nordeste', 'Centro-Oeste', 'Sudeste', 'Sul']
-  }
+    vendedoresDisponiveis: [{ id: '1', nome: 'João Silva' }],
+    regioesDisponiveis: ['Todas', 'Norte', 'Nordeste', 'Centro-Oeste', 'Sudeste', 'Sul'],
+  },
 });
 
 export default useDashboard;

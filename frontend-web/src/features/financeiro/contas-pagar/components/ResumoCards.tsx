@@ -1,12 +1,5 @@
 import React from 'react';
-import {
-  Clock,
-  AlertTriangle,
-  DollarSign,
-  CheckCircle,
-  TrendingUp,
-  Calendar
-} from 'lucide-react';
+import { Clock, AlertTriangle, DollarSign, CheckCircle, TrendingUp, Calendar } from 'lucide-react';
 
 interface ResumoFinanceiro {
   totalVencendoHoje: number;
@@ -37,9 +30,7 @@ const Card: React.FC<CardProps> = ({ title, value, count, icon, colorClass, tren
     <div className="flex items-center justify-between">
       <div className="flex-1">
         <div className="flex items-center gap-3 mb-3">
-          <div className={`p-2 rounded-lg ${colorClass}`}>
-            {icon}
-          </div>
+          <div className={`p-2 rounded-lg ${colorClass}`}>{icon}</div>
           <h3 className="text-sm font-medium text-gray-600 uppercase tracking-wide">{title}</h3>
         </div>
         <div className="space-y-1">
@@ -63,7 +54,7 @@ export const ResumoCards: React.FC<ResumoCardsProps> = ({ resumo }) => {
   const formatMoney = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -76,7 +67,7 @@ export const ResumoCards: React.FC<ResumoCardsProps> = ({ resumo }) => {
         count={resumo.quantidadeVencendoHoje}
         icon={<Clock className="w-5 h-5 text-orange-600" />}
         colorClass="bg-orange-100"
-        trend={resumo.quantidadeVencendoHoje === 0 ? "Em dia!" : undefined}
+        trend={resumo.quantidadeVencendoHoje === 0 ? 'Em dia!' : undefined}
       />
 
       {/* Em Atraso */}

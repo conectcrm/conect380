@@ -11,13 +11,13 @@ export const ConectCRMLogo: React.FC<ConectCRMLogoProps> = ({
   className = '',
   size = 'md',
   variant = 'full',
-  theme = 'light'
+  theme = 'light',
 }) => {
   const sizeClasses = {
     sm: { container: 'h-8', icon: 'w-8 h-8', text: 'text-lg' },
     md: { container: 'h-10', icon: 'w-10 h-10', text: 'text-xl' },
     lg: { container: 'h-12', icon: 'w-12 h-12', text: 'text-2xl' },
-    xl: { container: 'h-16', icon: 'w-16 h-16', text: 'text-3xl' }
+    xl: { container: 'h-16', icon: 'w-16 h-16', text: 'text-3xl' },
   };
 
   const themeClasses = {
@@ -27,7 +27,7 @@ export const ConectCRMLogo: React.FC<ConectCRMLogoProps> = ({
       accent: '#FF6B35',
       text: '#1F2937',
       iconBg: '#FFFFFF', // Fundo branco para o ícone
-      iconBorder: '#E2E8F0' // Borda cinza clara
+      iconBorder: '#E2E8F0', // Borda cinza clara
     },
     dark: {
       primary: '#FFFFFF', // Branco para tema escuro
@@ -35,8 +35,8 @@ export const ConectCRMLogo: React.FC<ConectCRMLogoProps> = ({
       accent: '#F59E0B',
       text: '#F9FAFB',
       iconBg: '#1E293B', // Fundo escuro para o ícone
-      iconBorder: '#475569' // Borda cinza escura
-    }
+      iconBorder: '#475569', // Borda cinza escura
+    },
   };
 
   const colors = themeClasses[theme];
@@ -66,7 +66,7 @@ export const ConectCRMLogo: React.FC<ConectCRMLogoProps> = ({
             <stop offset="100%" stopColor="#FF8A65" />
           </linearGradient>
         </defs>
-        
+
         {/* Círculo principal */}
         <circle
           cx="30"
@@ -76,7 +76,7 @@ export const ConectCRMLogo: React.FC<ConectCRMLogoProps> = ({
           stroke={colors.iconBorder}
           strokeWidth="2"
         />
-        
+
         {/* Símbolo de conexão central - letra "C" estilizada */}
         <path
           d="M20 30 C20 20, 30 15, 40 20"
@@ -92,12 +92,12 @@ export const ConectCRMLogo: React.FC<ConectCRMLogoProps> = ({
           strokeLinecap="round"
           fill="none"
         />
-        
+
         {/* Pontos de conexão */}
         <circle cx="18" cy="30" r="3" fill={colors.primary} />
         <circle cx="42" cy="22" r="2.5" fill="url(#accentGradient)" />
         <circle cx="42" cy="38" r="2.5" fill="url(#accentGradient)" />
-        
+
         {/* Linhas de conexão dinâmicas */}
         <path
           d="M42 22 L48 16"
@@ -111,12 +111,7 @@ export const ConectCRMLogo: React.FC<ConectCRMLogoProps> = ({
           strokeWidth="2.5"
           strokeLinecap="round"
         />
-        <path
-          d="M18 30 L12 30"
-          stroke={colors.primary}
-          strokeWidth="2.5"
-          strokeLinecap="round"
-        />
+        <path d="M18 30 L12 30" stroke={colors.primary} strokeWidth="2.5" strokeLinecap="round" />
       </svg>
     </div>
   );
@@ -132,10 +127,7 @@ export const ConectCRMLogo: React.FC<ConectCRMLogoProps> = ({
   if (variant === 'text') {
     return (
       <div className={`${className} flex items-center`}>
-        <span 
-          className={`font-bold ${sizes.text}`}
-          style={{ color: colors.text }}
-        >
+        <span className={`font-bold ${sizes.text}`} style={{ color: colors.text }}>
           <span style={{ color: colors.primary }}>Conect</span>{' '}
           <span style={{ color: colors.secondary }}>CRM</span>
         </span>
@@ -146,10 +138,7 @@ export const ConectCRMLogo: React.FC<ConectCRMLogoProps> = ({
   return (
     <div className={`${className} ${sizes.container} flex items-center gap-3`}>
       <ConectIcon />
-      <span 
-        className={`font-bold ${sizes.text} whitespace-nowrap`}
-        style={{ color: colors.text }}
-      >
+      <span className={`font-bold ${sizes.text} whitespace-nowrap`} style={{ color: colors.text }}>
         <span style={{ color: colors.primary }}>Conect</span>{' '}
         <span style={{ color: colors.secondary }}>CRM</span>
       </span>

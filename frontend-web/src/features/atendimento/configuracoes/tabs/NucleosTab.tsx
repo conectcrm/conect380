@@ -83,7 +83,7 @@ export const NucleosTab: React.FC = () => {
             console.error(`Erro ao carregar departamentos do núcleo ${nucleo.id}:`, error);
             return { ...nucleo, departamentos: [] };
           }
-        })
+        }),
       );
 
       setNucleos(nucleosComDepts);
@@ -305,10 +305,9 @@ export const NucleosTab: React.FC = () => {
                       />
                       <CardTitle className="text-[#002333]">{nucleo.nome}</CardTitle>
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${nucleo.ativo
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                          }`}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          nucleo.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}
                       >
                         {nucleo.ativo ? 'Ativo' : 'Inativo'}
                       </span>
@@ -346,7 +345,9 @@ export const NucleosTab: React.FC = () => {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                     <div>
                       <p className="text-xs text-[#64748B]">Tipo de Distribuição</p>
-                      <p className="text-sm font-medium text-[#002333] capitalize">{nucleo.tipoDistribuicao.replace('_', ' ')}</p>
+                      <p className="text-sm font-medium text-[#002333] capitalize">
+                        {nucleo.tipoDistribuicao.replace('_', ' ')}
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs text-[#64748B]">Prioridade</p>
@@ -429,9 +430,7 @@ export const NucleosTab: React.FC = () => {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#002333] mb-1">
-                    Nome *
-                  </label>
+                  <label className="block text-sm font-medium text-[#002333] mb-1">Nome *</label>
                   <input
                     type="text"
                     required
@@ -442,9 +441,7 @@ export const NucleosTab: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-[#002333] mb-1">
-                    Código *
-                  </label>
+                  <label className="block text-sm font-medium text-[#002333] mb-1">Código *</label>
                   <input
                     type="text"
                     required
@@ -456,9 +453,7 @@ export const NucleosTab: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-[#002333] mb-1">
-                    Descrição
-                  </label>
+                  <label className="block text-sm font-medium text-[#002333] mb-1">Descrição</label>
                   <textarea
                     value={formData.descricao}
                     onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
@@ -469,9 +464,7 @@ export const NucleosTab: React.FC = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-[#002333] mb-1">
-                      Cor
-                    </label>
+                    <label className="block text-sm font-medium text-[#002333] mb-1">Cor</label>
                     <input
                       type="color"
                       value={formData.cor}

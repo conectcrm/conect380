@@ -1,12 +1,12 @@
 /**
  * 🏪 Store Centralizada de Atendimento (Zustand)
- * 
+ *
  * Gerencia o estado global do módulo de atendimento:
  * - Tickets (lista, selecionado, loading, error)
  * - Mensagens (por ticket)
  * - Cliente selecionado
  * - Histórico do cliente
- * 
+ *
  * Benefícios:
  * - Estado sincronizado entre todos os componentes
  * - Sem duplicação de estado
@@ -18,6 +18,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage, devtools } from 'zustand/middleware';
 import { Ticket, Mensagem } from '../features/atendimento/omnichannel/types';
+
+const chaveMensagem = (m: Mensagem) => m.id || m.idExterno || `${m.ticketId}-${m.timestamp}`;
 
 // ===== INTERFACES =====
 
@@ -142,7 +144,8 @@ export const useAtendimentoStore = create<AtendimentoStore>()(
 
         setTickets: (tickets) => set({ tickets }, false, 'setTickets'),
 
-        setTicketsLoading: (loading) => set({ ticketsLoading: loading }, false, 'setTicketsLoading'),
+        setTicketsLoading: (loading) =>
+          set({ ticketsLoading: loading }, false, 'setTicketsLoading'),
 
         setTicketsError: (error) => set({ ticketsError: error }, false, 'setTicketsError'),
 
@@ -155,123 +158,193 @@ export const useAtendimentoStore = create<AtendimentoStore>()(
           }
         },
 
-        adicionarTicket: (ticket) => set((state) => ({
-          tickets: [ticket, ...state.tickets],
-        }), false, 'adicionarTicket'),
+        adicionarTicket: (ticket) =>
+          set(
+            (state) => ({
+              tickets: [ticket, ...(Array.isArray(state.tickets) ? state.tickets : [])],
+            }),
+            false,
+            'adicionarTicket',
+          ),
 
-        atualizarTicket: (ticketId, dados) => set((state) => {
-          const ticketsAtualizados = state.tickets.map(t =>
-            t.id === ticketId ? { ...t, ...dados } : t
-          );
+        atualizarTicket: (ticketId, dados) =>
+          set(
+            (state) => {
+              const tickets = Array.isArray(state.tickets) ? state.tickets : [];
+              const ticketsAtualizados = tickets.map((t) =>
+                t.id === ticketId ? { ...t, ...dados } : t,
+              );
 
-          const ticketSelecionadoAtualizado =
-            state.ticketSelecionado?.id === ticketId
-              ? { ...state.ticketSelecionado, ...dados }
-              : state.ticketSelecionado;
+              const ticketSelecionadoAtualizado =
+                state.ticketSelecionado?.id === ticketId
+                  ? { ...state.ticketSelecionado, ...dados }
+                  : state.ticketSelecionado;
 
-          return {
-            tickets: ticketsAtualizados,
-            ticketSelecionado: ticketSelecionadoAtualizado,
-          };
-        }, false, 'atualizarTicket'),
+              return {
+                tickets: ticketsAtualizados,
+                ticketSelecionado: ticketSelecionadoAtualizado,
+              };
+            },
+            false,
+            'atualizarTicket',
+          ),
 
-        removerTicket: (ticketId) => set((state) => ({
-          tickets: state.tickets.filter(t => t.id !== ticketId),
-          ticketSelecionado:
-            state.ticketSelecionado?.id === ticketId
-              ? null
-              : state.ticketSelecionado,
-        }), false, 'removerTicket'),
+        removerTicket: (ticketId) =>
+          set(
+            (state) => {
+              const tickets = Array.isArray(state.tickets) ? state.tickets : [];
+              return {
+                tickets: tickets.filter((t) => t.id !== ticketId),
+                ticketSelecionado:
+                  state.ticketSelecionado?.id === ticketId ? null : state.ticketSelecionado,
+              };
+            },
+            false,
+            'removerTicket',
+          ),
 
         // ===== MENSAGENS =====
 
-        setMensagens: (ticketId, mensagens) => set((state) => ({
-          mensagens: {
-            ...state.mensagens,
-            [ticketId]: mensagens,
-          },
-        }), false, 'setMensagens'),
+        setMensagens: (ticketId, mensagens) =>
+          set(
+            (state) => {
+              const mapa = new Map<string, Mensagem>();
+              mensagens.forEach((m) => {
+                const key = chaveMensagem(m);
+                if (!mapa.has(key)) {
+                  // Default de status para 'enviado' se vier vazio
+                  mapa.set(key, { ...m, status: (m.status as any) || 'enviado' });
+                }
+              });
 
-        adicionarMensagem: (ticketId, mensagem) => set((state) => {
-          const mensagensExistentes = state.mensagens[ticketId] || [];
-
-          // Evitar duplicatas (verificar por ID)
-          const jaExiste = mensagensExistentes.some(m => m.id === mensagem.id);
-          if (jaExiste) {
-            console.warn(`⚠️ Mensagem ${mensagem.id} já existe no ticket ${ticketId}, ignorando duplicata`);
-            return state;
-          }
-
-          return {
-            mensagens: {
-              ...state.mensagens,
-              [ticketId]: [...mensagensExistentes, mensagem],
+              return {
+                mensagens: {
+                  ...state.mensagens,
+                  [ticketId]: Array.from(mapa.values()),
+                },
+              };
             },
-          };
-        }, false, 'adicionarMensagem'),
+            false,
+            'setMensagens',
+          ),
 
-        atualizarMensagem: (ticketId, mensagemId, dados) => set((state) => {
-          const mensagensExistentes = state.mensagens[ticketId] || [];
+        adicionarMensagem: (ticketId, mensagem) =>
+          set(
+            (state) => {
+              const mensagensExistentes = state.mensagens[ticketId] || [];
+              const novaChave = chaveMensagem(mensagem);
 
-          const mensagensAtualizadas = mensagensExistentes.map(m =>
-            m.id === mensagemId ? { ...m, ...dados } : m
-          );
+              const jaExiste = mensagensExistentes.some((m) => chaveMensagem(m) === novaChave);
+              if (jaExiste) {
+                console.warn(
+                  `⚠️ Mensagem ${mensagem.id || mensagem.idExterno} já existe no ticket ${ticketId}, ignorando duplicata`,
+                );
+                return state;
+              }
 
-          return {
-            mensagens: {
-              ...state.mensagens,
-              [ticketId]: mensagensAtualizadas,
+              return {
+                mensagens: {
+                  ...state.mensagens,
+                  [ticketId]: [
+                    ...mensagensExistentes,
+                    { ...mensagem, status: (mensagem.status as any) || 'enviado' },
+                  ],
+                },
+              };
             },
-          };
-        }, false, 'atualizarMensagem'),
+            false,
+            'adicionarMensagem',
+          ),
 
-        setMensagensLoading: (ticketId, loading) => set((state) => ({
-          mensagensLoading: {
-            ...state.mensagensLoading,
-            [ticketId]: loading,
-          },
-        }), false, 'setMensagensLoading'),
+        atualizarMensagem: (ticketId, mensagemId, dados) =>
+          set(
+            (state) => {
+              const mensagensExistentes = state.mensagens[ticketId] || [];
 
-        setMensagensError: (ticketId, error) => set((state) => ({
-          mensagensError: {
-            ...state.mensagensError,
-            [ticketId]: error,
-          },
-        }), false, 'setMensagensError'),
+              const mensagensAtualizadas = mensagensExistentes.map((m) =>
+                m.id === mensagemId || m.idExterno === mensagemId ? { ...m, ...dados } : m,
+              );
 
-        limparMensagens: (ticketId) => set((state) => {
-          const novasMensagens = { ...state.mensagens };
-          delete novasMensagens[ticketId];
+              return {
+                mensagens: {
+                  ...state.mensagens,
+                  [ticketId]: mensagensAtualizadas,
+                },
+              };
+            },
+            false,
+            'atualizarMensagem',
+          ),
 
-          const novoLoading = { ...state.mensagensLoading };
-          delete novoLoading[ticketId];
+        setMensagensLoading: (ticketId, loading) =>
+          set(
+            (state) => ({
+              mensagensLoading: {
+                ...state.mensagensLoading,
+                [ticketId]: loading,
+              },
+            }),
+            false,
+            'setMensagensLoading',
+          ),
 
-          const novoError = { ...state.mensagensError };
-          delete novoError[ticketId];
+        setMensagensError: (ticketId, error) =>
+          set(
+            (state) => ({
+              mensagensError: {
+                ...state.mensagensError,
+                [ticketId]: error,
+              },
+            }),
+            false,
+            'setMensagensError',
+          ),
 
-          return {
-            mensagens: novasMensagens,
-            mensagensLoading: novoLoading,
-            mensagensError: novoError,
-          };
-        }, false, 'limparMensagens'),
+        limparMensagens: (ticketId) =>
+          set(
+            (state) => {
+              const novasMensagens = { ...state.mensagens };
+              delete novasMensagens[ticketId];
+
+              const novoLoading = { ...state.mensagensLoading };
+              delete novoLoading[ticketId];
+
+              const novoError = { ...state.mensagensError };
+              delete novoError[ticketId];
+
+              return {
+                mensagens: novasMensagens,
+                mensagensLoading: novoLoading,
+                mensagensError: novoError,
+              };
+            },
+            false,
+            'limparMensagens',
+          ),
 
         // ===== CLIENTE =====
 
-        setClienteSelecionado: (cliente) => set({ clienteSelecionado: cliente }, false, 'setClienteSelecionado'),
+        setClienteSelecionado: (cliente) =>
+          set({ clienteSelecionado: cliente }, false, 'setClienteSelecionado'),
 
-        setHistoricoCliente: (historico) => set({ historicoCliente: historico }, false, 'setHistoricoCliente'),
+        setHistoricoCliente: (historico) =>
+          set({ historicoCliente: historico }, false, 'setHistoricoCliente'),
 
         // ===== RESET =====
 
         resetStore: () => set(stateInicial, false, 'resetStore'),
 
-        resetTickets: () => set({
-          tickets: [],
-          ticketsLoading: false,
-          ticketsError: null,
-          ticketSelecionado: null,
-        }, false, 'resetTickets'),
+        resetTickets: () =>
+          set(
+            {
+              tickets: [],
+              ticketsLoading: false,
+              ticketsError: null,
+              ticketSelecionado: null,
+            },
+            false,
+            'resetTickets',
+          ),
       }),
       {
         name: 'conectcrm-atendimento-storage', // Nome da chave no localStorage
@@ -298,8 +371,8 @@ export const useAtendimentoStore = create<AtendimentoStore>()(
     {
       name: 'AtendimentoStore', // Nome exibido no Redux DevTools
       enabled: process.env.NODE_ENV === 'development', // Apenas em dev
-    }
-  )
+    },
+  ),
 );
 
 // ===== SELETORES (Helpers) =====
@@ -346,5 +419,5 @@ export const getTotalMensagensNaoLidas = (): number => {
  */
 export const getTicketById = (ticketId: string): Ticket | undefined => {
   const state = useAtendimentoStore.getState();
-  return state.tickets.find(t => t.id === ticketId);
+  return state.tickets.find((t) => t.id === ticketId);
 };

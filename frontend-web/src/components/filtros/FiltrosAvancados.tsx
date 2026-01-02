@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Filter, X, Calendar, DollarSign, User, Tag, Save, Star, Trash2 } from 'lucide-react';
-import { StatusFatura, TipoFatura, FormaPagamento, FiltrosFatura } from '../../services/faturamentoService';
+import {
+  StatusFatura,
+  TipoFatura,
+  FormaPagamento,
+  FiltrosFatura,
+} from '../../services/faturamentoService';
 
 interface FiltroAvancado extends FiltrosFatura {
   nome?: string;
@@ -34,7 +39,7 @@ export default function FiltrosAvancados({
   isOpen,
   onClose,
   onAplicarFiltros,
-  filtrosAtuais
+  filtrosAtuais,
 }: FiltrosAvancadosProps) {
   const [filtros, setFiltros] = useState<FiltroAvancado>(filtrosAtuais);
   const [filtrosSalvos, setFiltrosSalvos] = useState<FiltroSalvo[]>([]);
@@ -54,7 +59,7 @@ export default function FiltrosAvancados({
       try {
         const filtrosParsed = JSON.parse(salvos).map((f: any) => ({
           ...f,
-          criadoEm: new Date(f.criadoEm)
+          criadoEm: new Date(f.criadoEm),
         }));
         setFiltrosSalvos(filtrosParsed);
       } catch (error) {
@@ -79,7 +84,7 @@ export default function FiltrosAvancados({
       nome: nomeFiltroSalvar.trim(),
       filtro: { ...filtros },
       criadoEm: new Date(),
-      favorito: false
+      favorito: false,
     };
 
     const novos = [...filtrosSalvos, novoFiltro];
@@ -95,15 +100,13 @@ export default function FiltrosAvancados({
 
   const handleExcluirFiltro = (id: string) => {
     if (confirm('Tem certeza que deseja excluir este filtro?')) {
-      const novos = filtrosSalvos.filter(f => f.id !== id);
+      const novos = filtrosSalvos.filter((f) => f.id !== id);
       salvarFiltrosSalvos(novos);
     }
   };
 
   const handleToggleFavorito = (id: string) => {
-    const novos = filtrosSalvos.map(f =>
-      f.id === id ? { ...f, favorito: !f.favorito } : f
-    );
+    const novos = filtrosSalvos.map((f) => (f.id === id ? { ...f, favorito: !f.favorito } : f));
     salvarFiltrosSalvos(novos);
   };
 
@@ -113,7 +116,7 @@ export default function FiltrosAvancados({
   };
 
   const contarFiltrosAtivos = () => {
-    return Object.keys(filtros).filter(key => {
+    return Object.keys(filtros).filter((key) => {
       const valor = filtros[key as keyof FiltroAvancado];
       return valor !== undefined && valor !== '' && valor !== null;
     }).length;
@@ -136,14 +139,9 @@ export default function FiltrosAvancados({
               <Filter className="w-6 h-6 text-blue-600" />
               Filtros Avançados
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              {contarFiltrosAtivos()} filtro(s) ativo(s)
-            </p>
+            <p className="text-sm text-gray-600 mt-1">{contarFiltrosAtivos()} filtro(s) ativo(s)</p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
@@ -152,20 +150,22 @@ export default function FiltrosAvancados({
         <div className="flex border-b">
           <button
             onClick={() => setAbaSelecionada('filtros')}
-            className={`px-6 py-3 font-medium text-sm transition-colors ${abaSelecionada === 'filtros'
+            className={`px-6 py-3 font-medium text-sm transition-colors ${
+              abaSelecionada === 'filtros'
                 ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
                 : 'text-gray-600 hover:text-gray-800'
-              }`}
+            }`}
           >
             <Filter className="w-4 h-4 inline mr-2" />
             Configurar Filtros
           </button>
           <button
             onClick={() => setAbaSelecionada('salvos')}
-            className={`px-6 py-3 font-medium text-sm transition-colors ${abaSelecionada === 'salvos'
+            className={`px-6 py-3 font-medium text-sm transition-colors ${
+              abaSelecionada === 'salvos'
                 ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
                 : 'text-gray-600 hover:text-gray-800'
-              }`}
+            }`}
           >
             <Save className="w-4 h-4 inline mr-2" />
             Filtros Salvos ({filtrosSalvos.length})
@@ -184,10 +184,12 @@ export default function FiltrosAvancados({
                   </label>
                   <select
                     value={filtros.status || ''}
-                    onChange={(e) => setFiltros(prev => ({
-                      ...prev,
-                      status: e.target.value as StatusFatura || undefined
-                    }))}
+                    onChange={(e) =>
+                      setFiltros((prev) => ({
+                        ...prev,
+                        status: (e.target.value as StatusFatura) || undefined,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Todos os Status</option>
@@ -207,10 +209,12 @@ export default function FiltrosAvancados({
                   </label>
                   <select
                     value={filtros.tipo || ''}
-                    onChange={(e) => setFiltros(prev => ({
-                      ...prev,
-                      tipo: e.target.value as TipoFatura || undefined
-                    }))}
+                    onChange={(e) =>
+                      setFiltros((prev) => ({
+                        ...prev,
+                        tipo: (e.target.value as TipoFatura) || undefined,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Todos os Tipos</option>
@@ -235,10 +239,12 @@ export default function FiltrosAvancados({
                       step="0.01"
                       placeholder="Valor mínimo"
                       value={filtros.valorMinimo || ''}
-                      onChange={(e) => setFiltros(prev => ({
-                        ...prev,
-                        valorMinimo: parseFloat(e.target.value) || undefined
-                      }))}
+                      onChange={(e) =>
+                        setFiltros((prev) => ({
+                          ...prev,
+                          valorMinimo: parseFloat(e.target.value) || undefined,
+                        }))
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
@@ -248,10 +254,12 @@ export default function FiltrosAvancados({
                       step="0.01"
                       placeholder="Valor máximo"
                       value={filtros.valorMaximo || ''}
-                      onChange={(e) => setFiltros(prev => ({
-                        ...prev,
-                        valorMaximo: parseFloat(e.target.value) || undefined
-                      }))}
+                      onChange={(e) =>
+                        setFiltros((prev) => ({
+                          ...prev,
+                          valorMaximo: parseFloat(e.target.value) || undefined,
+                        }))
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
@@ -269,10 +277,12 @@ export default function FiltrosAvancados({
                     <input
                       type="date"
                       value={filtros.dataInicioEmissao || ''}
-                      onChange={(e) => setFiltros(prev => ({
-                        ...prev,
-                        dataInicioEmissao: e.target.value || undefined
-                      }))}
+                      onChange={(e) =>
+                        setFiltros((prev) => ({
+                          ...prev,
+                          dataInicioEmissao: e.target.value || undefined,
+                        }))
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                     <p className="text-xs text-gray-500 mt-1">Data inicial</p>
@@ -281,10 +291,12 @@ export default function FiltrosAvancados({
                     <input
                       type="date"
                       value={filtros.dataFimEmissao || ''}
-                      onChange={(e) => setFiltros(prev => ({
-                        ...prev,
-                        dataFimEmissao: e.target.value || undefined
-                      }))}
+                      onChange={(e) =>
+                        setFiltros((prev) => ({
+                          ...prev,
+                          dataFimEmissao: e.target.value || undefined,
+                        }))
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                     <p className="text-xs text-gray-500 mt-1">Data final</p>
@@ -303,10 +315,12 @@ export default function FiltrosAvancados({
                     <input
                       type="date"
                       value={filtros.dataInicioVencimento || ''}
-                      onChange={(e) => setFiltros(prev => ({
-                        ...prev,
-                        dataInicioVencimento: e.target.value || undefined
-                      }))}
+                      onChange={(e) =>
+                        setFiltros((prev) => ({
+                          ...prev,
+                          dataInicioVencimento: e.target.value || undefined,
+                        }))
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                     <p className="text-xs text-gray-500 mt-1">Vencimento inicial</p>
@@ -315,10 +329,12 @@ export default function FiltrosAvancados({
                     <input
                       type="date"
                       value={filtros.dataFimVencimento || ''}
-                      onChange={(e) => setFiltros(prev => ({
-                        ...prev,
-                        dataFimVencimento: e.target.value || undefined
-                      }))}
+                      onChange={(e) =>
+                        setFiltros((prev) => ({
+                          ...prev,
+                          dataFimVencimento: e.target.value || undefined,
+                        }))
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                     <p className="text-xs text-gray-500 mt-1">Vencimento final</p>
@@ -337,10 +353,12 @@ export default function FiltrosAvancados({
                     type="text"
                     placeholder="Digite o nome do cliente"
                     value={filtros.clienteNome || ''}
-                    onChange={(e) => setFiltros(prev => ({
-                      ...prev,
-                      clienteNome: e.target.value || undefined
-                    }))}
+                    onChange={(e) =>
+                      setFiltros((prev) => ({
+                        ...prev,
+                        clienteNome: e.target.value || undefined,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -353,10 +371,12 @@ export default function FiltrosAvancados({
                     type="text"
                     placeholder="Ex: CT-2025-001"
                     value={filtros.contratoNumero || ''}
-                    onChange={(e) => setFiltros(prev => ({
-                      ...prev,
-                      contratoNumero: e.target.value || undefined
-                    }))}
+                    onChange={(e) =>
+                      setFiltros((prev) => ({
+                        ...prev,
+                        contratoNumero: e.target.value || undefined,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -369,10 +389,12 @@ export default function FiltrosAvancados({
                     type="text"
                     placeholder="Ex: FT2025000001"
                     value={filtros.numeroFatura || ''}
-                    onChange={(e) => setFiltros(prev => ({
-                      ...prev,
-                      numeroFatura: e.target.value || undefined
-                    }))}
+                    onChange={(e) =>
+                      setFiltros((prev) => ({
+                        ...prev,
+                        numeroFatura: e.target.value || undefined,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -407,7 +429,9 @@ export default function FiltrosAvancados({
                 <div className="text-center py-12">
                   <Save className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum filtro salvo</h3>
-                  <p className="text-gray-600">Configure e salve filtros para reutilizar rapidamente</p>
+                  <p className="text-gray-600">
+                    Configure e salve filtros para reutilizar rapidamente
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -421,10 +445,15 @@ export default function FiltrosAvancados({
                         <div className="flex items-center gap-3">
                           <button
                             onClick={() => handleToggleFavorito(filtroSalvo.id)}
-                            className={`p-1 rounded-full transition-colors ${filtroSalvo.favorito ? 'text-yellow-500' : 'text-gray-400 hover:text-yellow-500'
-                              }`}
+                            className={`p-1 rounded-full transition-colors ${
+                              filtroSalvo.favorito
+                                ? 'text-yellow-500'
+                                : 'text-gray-400 hover:text-yellow-500'
+                            }`}
                           >
-                            <Star className={`w-4 h-4 ${filtroSalvo.favorito ? 'fill-current' : ''}`} />
+                            <Star
+                              className={`w-4 h-4 ${filtroSalvo.favorito ? 'fill-current' : ''}`}
+                            />
                           </button>
                           <div>
                             <h4 className="font-medium text-gray-900">{filtroSalvo.nome}</h4>

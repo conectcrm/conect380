@@ -1,15 +1,15 @@
 import React from 'react';
-import { 
-  Activity, 
-  Clock, 
-  User, 
-  UserPlus, 
-  UserMinus, 
-  Settings, 
+import {
+  Activity,
+  Clock,
+  User,
+  UserPlus,
+  UserMinus,
+  Settings,
   Shield,
   Eye,
   Calendar,
-  AlertCircle
+  AlertCircle,
 } from 'lucide-react';
 import { Atividade } from '../hooks/useAtividadesUsuarios';
 
@@ -23,7 +23,7 @@ interface DashboardAtividadesProps {
 export const DashboardAtividades: React.FC<DashboardAtividadesProps> = ({
   atividades,
   loading = false,
-  error = null
+  error = null,
 }) => {
   const getIconeAtividade = (tipo: Atividade['tipo']) => {
     switch (tipo) {
@@ -78,11 +78,11 @@ export const DashboardAtividades: React.FC<DashboardAtividadesProps> = ({
     if (minutos < 60) return `${minutos}m atrás`;
     if (horas < 24) return `${horas}h atrás`;
     if (dias < 7) return `${dias}d atrás`;
-    
+
     return timestamp.toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric'
+      year: 'numeric',
     });
   };
 
@@ -141,10 +141,8 @@ export const DashboardAtividades: React.FC<DashboardAtividadesProps> = ({
               className={`p-3 rounded-lg border ${getCorAtividade(atividade.tipo)} transition-colors hover:shadow-sm`}
             >
               <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0 mt-0.5">
-                  {getIconeAtividade(atividade.tipo)}
-                </div>
-                
+                <div className="flex-shrink-0 mt-0.5">{getIconeAtividade(atividade.tipo)}</div>
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
@@ -167,21 +165,17 @@ export const DashboardAtividades: React.FC<DashboardAtividadesProps> = ({
                         {atividade.usuario.nome}
                       </span>
                     </div>
-                    
+
                     <div className="flex items-center text-xs text-gray-500">
                       <Clock className="w-3 h-3 mr-1" />
                       {formatarTempo(atividade.timestamp)}
                     </div>
                   </div>
-                  
-                  <p className="text-sm text-gray-700 mt-1">
-                    {atividade.descricao}
-                  </p>
-                  
+
+                  <p className="text-sm text-gray-700 mt-1">{atividade.descricao}</p>
+
                   {atividade.detalhes && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      {atividade.detalhes}
-                    </p>
+                    <p className="text-xs text-gray-500 mt-1">{atividade.detalhes}</p>
                   )}
                 </div>
               </div>

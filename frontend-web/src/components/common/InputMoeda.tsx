@@ -24,7 +24,7 @@ interface InputMoedaProps {
 
 /**
  * InputMoeda - Componente padrão para campos de valor monetário
- * 
+ *
  * Características:
  * - Formatação automática em tempo real (padrão brasileiro)
  * - Separador de milhares: ponto (.)
@@ -32,9 +32,9 @@ interface InputMoedaProps {
  * - Sempre exibe 2 casas decimais
  * - inputMode="numeric" para mobile
  * - Conversão transparente para número
- * 
+ *
  * Exemplos de uso:
- * 
+ *
  * ```tsx
  * // Básico
  * <InputMoeda
@@ -42,7 +42,7 @@ interface InputMoedaProps {
  *   onChange={setValor}
  *   label="Valor"
  * />
- * 
+ *
  * // Completo
  * <InputMoeda
  *   value={formData.valor}
@@ -54,7 +54,7 @@ interface InputMoedaProps {
  *   hint="Digite apenas números • Formatação automática"
  * />
  * ```
- * 
+ *
  * @param value - Valor numérico (ex: 1234.56)
  * @param onChange - Callback com o valor numérico atualizado
  * @param label - Label do campo
@@ -116,10 +116,12 @@ const InputMoeda: React.FC<InputMoedaProps> = ({
   // Atualizar valor formatado quando prop value mudar
   useEffect(() => {
     if (value > 0) {
-      setValorFormatado(value.toLocaleString('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }));
+      setValorFormatado(
+        value.toLocaleString('pt-BR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+      );
     } else {
       setValorFormatado('');
     }
@@ -164,20 +166,15 @@ const InputMoeda: React.FC<InputMoedaProps> = ({
           value={valorFormatado}
           onChange={handleChange}
           placeholder={placeholder}
-          className={`w-full pl-12 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm font-medium transition-colors ${error
-              ? 'border-red-300 bg-red-50'
-              : 'border-[#B4BEC9] bg-white'
-            }`}
+          className={`w-full pl-12 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm font-medium transition-colors ${
+            error ? 'border-red-300 bg-red-50' : 'border-[#B4BEC9] bg-white'
+          }`}
           required={required}
           disabled={disabled}
         />
       </div>
 
-      {hint && !error && (
-        <p className="mt-1 text-xs text-[#002333]/60">
-          {hint}
-        </p>
-      )}
+      {hint && !error && <p className="mt-1 text-xs text-[#002333]/60">{hint}</p>}
 
       {error && (
         <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
@@ -197,12 +194,12 @@ export default InputMoeda;
 
 /**
  * EXEMPLO 1: Formulário de Oportunidade
- * 
+ *
  * ```tsx
  * import InputMoeda from '../components/common/InputMoeda';
- * 
+ *
  * const [valor, setValor] = useState(0);
- * 
+ *
  * <InputMoeda
  *   value={valor}
  *   onChange={setValor}
@@ -215,12 +212,12 @@ export default InputMoeda;
 
 /**
  * EXEMPLO 2: Formulário de Produto
- * 
+ *
  * ```tsx
  * import InputMoeda from '../components/common/InputMoeda';
- * 
+ *
  * const [formData, setFormData] = useState({ preco: 0 });
- * 
+ *
  * <InputMoeda
  *   value={formData.preco}
  *   onChange={(val) => setFormData(prev => ({ ...prev, preco: val }))}
@@ -232,12 +229,12 @@ export default InputMoeda;
 
 /**
  * EXEMPLO 3: Formulário de Fatura
- * 
+ *
  * ```tsx
  * import InputMoeda from '../components/common/InputMoeda';
- * 
+ *
  * const [valorTotal, setValorTotal] = useState(0);
- * 
+ *
  * <InputMoeda
  *   value={valorTotal}
  *   onChange={setValorTotal}

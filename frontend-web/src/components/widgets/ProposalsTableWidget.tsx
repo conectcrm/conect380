@@ -16,7 +16,7 @@ const mockProposals: Proposal[] = [
     valor: 125000,
     status: 'pending',
     data: '2025-07-15',
-    vendedor: 'João Silva'
+    vendedor: 'João Silva',
   },
   {
     id: 'PROP-002',
@@ -24,7 +24,7 @@ const mockProposals: Proposal[] = [
     valor: 85000,
     status: 'approved',
     data: '2025-07-14',
-    vendedor: 'Maria Santos'
+    vendedor: 'Maria Santos',
   },
   {
     id: 'PROP-003',
@@ -32,7 +32,7 @@ const mockProposals: Proposal[] = [
     valor: 45000,
     status: 'in-review',
     data: '2025-07-13',
-    vendedor: 'Carlos Oliveira'
+    vendedor: 'Carlos Oliveira',
   },
   {
     id: 'PROP-004',
@@ -40,7 +40,7 @@ const mockProposals: Proposal[] = [
     valor: 200000,
     status: 'rejected',
     data: '2025-07-12',
-    vendedor: 'Ana Costa'
+    vendedor: 'Ana Costa',
   },
   {
     id: 'PROP-005',
@@ -48,8 +48,8 @@ const mockProposals: Proposal[] = [
     valor: 35000,
     status: 'pending',
     data: '2025-07-11',
-    vendedor: 'Pedro Lima'
-  }
+    vendedor: 'Pedro Lima',
+  },
 ];
 
 export const ProposalsTableWidget: React.FC = () => {
@@ -85,7 +85,7 @@ export const ProposalsTableWidget: React.FC = () => {
       pending: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-800' },
       approved: { label: 'Aprovada', color: 'bg-green-100 text-green-800' },
       rejected: { label: 'Rejeitada', color: 'bg-red-100 text-red-800' },
-      'in-review': { label: 'Em Análise', color: 'bg-blue-100 text-blue-800' }
+      'in-review': { label: 'Em Análise', color: 'bg-blue-100 text-blue-800' },
     };
 
     const config = statusConfig[status];
@@ -99,7 +99,7 @@ export const ProposalsTableWidget: React.FC = () => {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -116,46 +116,44 @@ export const ProposalsTableWidget: React.FC = () => {
     <div className="bg-white rounded-lg shadow p-4 h-full">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold text-gray-900">Propostas Recentes</h3>
-        <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-          Ver todas
-        </button>
+        <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">Ver todas</button>
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200">
-              <th 
+              <th
                 className="text-left py-2 px-1 font-medium text-gray-700 cursor-pointer hover:bg-gray-50"
                 onClick={() => handleSort('id')}
               >
                 ID {getSortIcon('id')}
               </th>
-              <th 
+              <th
                 className="text-left py-2 px-1 font-medium text-gray-700 cursor-pointer hover:bg-gray-50"
                 onClick={() => handleSort('cliente')}
               >
                 Cliente {getSortIcon('cliente')}
               </th>
-              <th 
+              <th
                 className="text-left py-2 px-1 font-medium text-gray-700 cursor-pointer hover:bg-gray-50"
                 onClick={() => handleSort('valor')}
               >
                 Valor {getSortIcon('valor')}
               </th>
-              <th 
+              <th
                 className="text-left py-2 px-1 font-medium text-gray-700 cursor-pointer hover:bg-gray-50"
                 onClick={() => handleSort('status')}
               >
                 Status {getSortIcon('status')}
               </th>
-              <th 
+              <th
                 className="text-left py-2 px-1 font-medium text-gray-700 cursor-pointer hover:bg-gray-50"
                 onClick={() => handleSort('data')}
               >
                 Data {getSortIcon('data')}
               </th>
-              <th 
+              <th
                 className="text-left py-2 px-1 font-medium text-gray-700 cursor-pointer hover:bg-gray-50"
                 onClick={() => handleSort('vendedor')}
               >
@@ -165,28 +163,18 @@ export const ProposalsTableWidget: React.FC = () => {
           </thead>
           <tbody>
             {sortedProposals.map((proposal) => (
-              <tr 
+              <tr
                 key={proposal.id}
                 className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
               >
-                <td className="py-2 px-1 font-mono text-xs">
-                  {proposal.id}
-                </td>
-                <td className="py-2 px-1 font-medium">
-                  {proposal.cliente}
-                </td>
+                <td className="py-2 px-1 font-mono text-xs">{proposal.id}</td>
+                <td className="py-2 px-1 font-medium">{proposal.cliente}</td>
                 <td className="py-2 px-1 font-medium text-green-600">
                   {formatCurrency(proposal.valor)}
                 </td>
-                <td className="py-2 px-1">
-                  {getStatusBadge(proposal.status)}
-                </td>
-                <td className="py-2 px-1 text-gray-600">
-                  {formatDate(proposal.data)}
-                </td>
-                <td className="py-2 px-1">
-                  {proposal.vendedor}
-                </td>
+                <td className="py-2 px-1">{getStatusBadge(proposal.status)}</td>
+                <td className="py-2 px-1 text-gray-600">{formatDate(proposal.data)}</td>
+                <td className="py-2 px-1">{proposal.vendedor}</td>
               </tr>
             ))}
           </tbody>

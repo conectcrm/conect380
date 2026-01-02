@@ -1,4 +1,5 @@
-import { api } from './api';
+import { api, apiPublic } from './api';
+import { getErrorMessage } from '../utils/errorHandling';
 
 // ===========================
 // Interfaces e Types
@@ -135,7 +136,7 @@ export interface ImportLeadResult {
   detalhes?: Array<{
     linha: number;
     erro: string;
-    dados?: any;
+    dados?: Record<string, unknown>;
   }>;
 }
 
@@ -145,52 +146,86 @@ export interface ImportLeadResult {
 
 class LeadsService {
   private readonly baseUrl = '/leads';
+  private readonly errorPrefix = '[LeadsService]';
+
+  private buildQueryString(params: Record<string, unknown> = {}): string {
+    const searchParams = new URLSearchParams();
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') {
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        value.forEach((item) => searchParams.append(key, String(item)));
+        return;
+      }
+
+      searchParams.append(key, String(value));
+    });
+
+    const query = searchParams.toString();
+    return query ? `?${query}` : '';
+  }
+
+  private async handleRequest<T>(request: () => Promise<{ data: T }>, context: string): Promise<T> {
+    try {
+      const response = await request();
+      return response.data;
+    } catch (err: unknown) {
+      console.error(`${this.errorPrefix} ${context}:`, err);
+      throw new Error(getErrorMessage(err, context));
+    }
+  }
+
+  private async handleVoidRequest(request: () => Promise<unknown>, context: string): Promise<void> {
+    try {
+      await request();
+    } catch (err: unknown) {
+      console.error(`${this.errorPrefix} ${context}:`, err);
+      throw new Error(getErrorMessage(err, context));
+    }
+  }
 
   private sanitizePayload<T extends object>(data: T): Partial<T> {
-    return Object.entries(data as Record<string, unknown>).reduce<Partial<T>>((acc, [key, value]) => {
-      if (value === undefined || value === null) {
-        return acc;
-      }
-
-      if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (trimmed === '') {
+    return Object.entries(data as Record<string, unknown>).reduce<Partial<T>>(
+      (acc, [key, value]) => {
+        if (value === undefined || value === null) {
           return acc;
         }
-        (acc as Record<string, unknown>)[key] = trimmed;
-        return acc;
-      }
 
-      (acc as Record<string, unknown>)[key] = value;
-      return acc;
-    }, {});
+        if (typeof value === 'string') {
+          const trimmed = value.trim();
+          if (trimmed === '') {
+            return acc;
+          }
+          (acc as Record<string, unknown>)[key] = trimmed;
+          return acc;
+        }
+
+        (acc as Record<string, unknown>)[key] = value;
+        return acc;
+      },
+      {},
+    );
   }
 
   /**
    * Lista todos os leads com filtros e paginação
    */
   async listar(filters: LeadFilters = {}): Promise<PaginatedLeads> {
-    const params = new URLSearchParams();
-
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.append(key, value.toString());
-      }
-    });
-
-    const queryString = params.toString();
-    const url = queryString ? `${this.baseUrl}?${queryString}` : this.baseUrl;
-
-    const response = await api.get<PaginatedLeads>(url);
-    return response.data;
+    const query = this.buildQueryString(filters);
+    return this.handleRequest<PaginatedLeads>(
+      () => api.get(`${this.baseUrl}${query}`),
+      'listar leads',
+    );
   }
 
   /**
    * Busca um lead específico por ID
    */
   async buscarPorId(id: string): Promise<Lead> {
-    const response = await api.get<Lead>(`${this.baseUrl}/${id}`);
-    return response.data;
+    return this.handleRequest<Lead>(() => api.get(`${this.baseUrl}/${id}`), `buscar lead ${id}`);
   }
 
   /**
@@ -198,8 +233,7 @@ class LeadsService {
    */
   async criar(data: CreateLeadDto): Promise<Lead> {
     const payload = this.sanitizePayload(data);
-    const response = await api.post<Lead>(this.baseUrl, payload);
-    return response.data;
+    return this.handleRequest<Lead>(() => api.post(this.baseUrl, payload), 'criar lead');
   }
 
   /**
@@ -207,42 +241,50 @@ class LeadsService {
    */
   async atualizar(id: string, data: UpdateLeadDto): Promise<Lead> {
     const payload = this.sanitizePayload(data);
-    const response = await api.patch<Lead>(`${this.baseUrl}/${id}`, payload);
-    return response.data;
+    return this.handleRequest<Lead>(
+      () => api.patch(`${this.baseUrl}/${id}`, payload),
+      `atualizar lead ${id}`,
+    );
   }
 
   /**
    * Deleta um lead
    */
   async deletar(id: string): Promise<void> {
-    await api.delete(`${this.baseUrl}/${id}`);
+    await this.handleVoidRequest(() => api.delete(`${this.baseUrl}/${id}`), `deletar lead ${id}`);
   }
 
   /**
    * Busca estatísticas dos leads
    */
   async getEstatisticas(): Promise<LeadEstatisticas> {
-    const response = await api.get<LeadEstatisticas>(`${this.baseUrl}/estatisticas`);
-    return response.data;
+    return this.handleRequest<LeadEstatisticas>(
+      () => api.get(`${this.baseUrl}/estatisticas`),
+      'buscar estatísticas de leads',
+    );
   }
 
   /**
    * Converte um lead em oportunidade
    */
   async converter(id: string, data: ConvertLeadDto = {}): Promise<Lead> {
-    const response = await api.post<Lead>(`${this.baseUrl}/${id}/converter`, data);
-    return response.data;
+    return this.handleRequest<Lead>(
+      () => api.post(`${this.baseUrl}/${id}/converter`, data),
+      `converter lead ${id}`,
+    );
   }
 
   /**
    * Captura lead de formulário público (endpoint sem autenticação)
    */
-  async capturarPublico(data: CaptureLeadDto): Promise<{ success: boolean; message: string; lead_id?: string }> {
-    const response = await api.post<{ success: boolean; message: string; lead_id?: string }>(
-      `${this.baseUrl}/capture`,
-      data
+  async capturarPublico(
+    data: CaptureLeadDto,
+  ): Promise<{ success: boolean; message: string; lead_id?: string }> {
+    const payload = this.sanitizePayload(data);
+    return this.handleRequest<{ success: boolean; message: string; lead_id?: string }>(
+      () => apiPublic.post(`${this.baseUrl}/capture`, payload),
+      'capturar lead público',
     );
-    return response.data;
   }
 
   /**
@@ -253,45 +295,51 @@ class LeadsService {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await api.post<ImportLeadResult>(
-      `${this.baseUrl}/import`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
+    return this.handleRequest<ImportLeadResult>(
+      () =>
+        api.post(`${this.baseUrl}/import`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }),
+      'importar leads via CSV',
     );
-
-    return response.data;
   }
 
   /**
    * Atualiza o score de um lead (recalcula baseado em critérios)
    */
   async recalcularScore(id: string): Promise<Lead> {
-    const response = await api.post<Lead>(`${this.baseUrl}/${id}/recalcular-score`);
-    return response.data;
+    return this.handleRequest<Lead>(
+      () => api.post(`${this.baseUrl}/${id}/recalcular-score`),
+      `recalcular score do lead ${id}`,
+    );
   }
 
   /**
    * Atribui um responsável a um lead
    */
   async atribuirResponsavel(id: string, responsavel_id: string): Promise<Lead> {
-    const response = await api.patch<Lead>(`${this.baseUrl}/${id}`, {
-      responsavel_id,
-    });
-    return response.data;
+    return this.handleRequest<Lead>(
+      () =>
+        api.patch(`${this.baseUrl}/${id}`, {
+          responsavel_id,
+        }),
+      `atribuir responsável ao lead ${id}`,
+    );
   }
 
   /**
    * Busca leads por email (útil para detectar duplicatas)
    */
   async buscarPorEmail(email: string): Promise<Lead[]> {
-    const response = await api.get<Lead[]>(`${this.baseUrl}`, {
-      params: { search: email },
-    });
-    return response.data;
+    const sanitizedEmail = email.trim();
+    const query = this.buildQueryString({ search: sanitizedEmail });
+
+    return this.handleRequest<Lead[]>(
+      () => api.get(`${this.baseUrl}${query}`),
+      `buscar lead por email ${sanitizedEmail}`,
+    );
   }
 
   /**

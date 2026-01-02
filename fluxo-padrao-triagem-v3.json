@@ -1,0 +1,416 @@
+{
+  "nome": "Fluxo Padrão - Triagem Inteligente v3.0",
+  "descricao": "Fluxo otimizado com verificação automática de contato, coleta inteligente de dados e menus dinâmicos",
+  "tipo": "arvore_decisao",
+  "ativo": true,
+  "publicado": false,
+  "estrutura": {
+    "etapaInicial": "verificar-contato",
+    "versao": "3.0",
+    "metadata": {
+      "autor": "GitHub Copilot + Equipe ConectCRM",
+      "dataCriacao": "2025-10-29",
+      "features": [
+        "Verificação automática de contato",
+        "Coleta inteligente de dados",
+        "Menus dinâmicos (núcleos e departamentos)",
+        "Validações robustas",
+        "Mensagens personalizadas",
+        "Opção de voltar"
+      ]
+    },
+    "etapas": {
+      "verificar-contato": {
+        "id": "verificar-contato",
+        "tipo": "condicional",
+        "mensagem": "🔍 Verificando seu cadastro...",
+        "condicao": {
+          "variavel": "contatoExiste",
+          "operador": "igual",
+          "valor": true
+        },
+        "nomeExibicao": "Verificação de Contato",
+        "descricao": "Backend busca contato por telefone WhatsApp automaticamente",
+        "acaoSeVerdadeiro": "verificar-dados-atualizados",
+        "acaoSeFalso": "boas-vindas-novo-cliente",
+        "metadata": {
+          "automático": true,
+          "buscarPor": "telefone_whatsapp"
+        }
+      },
+      "boas-vindas-novo-cliente": {
+        "id": "boas-vindas-novo-cliente",
+        "tipo": "mensagem",
+        "mensagem": "👋 Olá! Seja muito bem-vindo(a) ao *ConectCRM*!\n\nVejo que é seu primeiro contato conosco. Que ótimo ter você aqui! 😊\n\nPara melhor atendê-lo(a), vou precisar de algumas informações rápidas.",
+        "nomeExibicao": "Boas-vindas Novo Cliente",
+        "proximaEtapa": "coleta-primeiro-nome",
+        "metadata": {
+          "tom": "caloroso",
+          "emoji": true
+        }
+      },
+      "coleta-primeiro-nome": {
+        "id": "coleta-primeiro-nome",
+        "tipo": "input",
+        "mensagem": "📝 Qual é o seu *primeiro nome*?",
+        "variavel": "primeiroNome",
+        "validacao": {
+          "tipo": "texto",
+          "minLength": 2,
+          "maxLength": 50,
+          "obrigatorio": true,
+          "mensagemErro": "Por favor, informe um nome válido (mínimo 2 caracteres)."
+        },
+        "coletaDados": true,
+        "nomeExibicao": "Coleta Primeiro Nome",
+        "proximaEtapa": "coleta-sobrenome",
+        "metadata": {
+          "dica": "Apenas o primeiro nome, ex: João, Maria"
+        }
+      },
+      "coleta-sobrenome": {
+        "id": "coleta-sobrenome",
+        "tipo": "input",
+        "mensagem": "📝 E o seu *sobrenome* (último nome)?",
+        "variavel": "sobrenome",
+        "validacao": {
+          "tipo": "texto",
+          "minLength": 2,
+          "maxLength": 50,
+          "obrigatorio": true,
+          "mensagemErro": "Por favor, informe seu sobrenome (mínimo 2 caracteres)."
+        },
+        "coletaDados": true,
+        "nomeExibicao": "Coleta Sobrenome",
+        "proximaEtapa": "coleta-empresa",
+        "metadata": {
+          "dica": "Apenas o último nome, ex: Silva, Santos"
+        }
+      },
+      "coleta-empresa": {
+        "id": "coleta-empresa",
+        "tipo": "input",
+        "mensagem": "🏢 Qual o nome da *empresa* onde você trabalha?\n\n_Digite o nome da empresa ou \"Não trabalho\" se for pessoa física._",
+        "variavel": "empresa",
+        "validacao": {
+          "tipo": "texto",
+          "minLength": 2,
+          "maxLength": 100,
+          "obrigatorio": false,
+          "mensagemErro": "Nome da empresa inválido."
+        },
+        "coletaDados": true,
+        "nomeExibicao": "Coleta Empresa",
+        "proximaEtapa": "coleta-email-novo-cliente",
+        "metadata": {
+          "opcional": true,
+          "exemplo": "Empresa XYZ Ltda"
+        }
+      },
+      "coleta-email-novo-cliente": {
+        "id": "coleta-email-novo-cliente",
+        "tipo": "input",
+        "mensagem": "📧 Por último, qual o seu *e-mail*?\n\n_Exemplo: seuemail@empresa.com_",
+        "variavel": "email",
+        "validacao": {
+          "tipo": "email",
+          "obrigatorio": true,
+          "mensagemErro": "❌ E-mail inválido. Por favor, informe um e-mail válido.\n\nExemplo: nome@empresa.com"
+        },
+        "coletaDados": true,
+        "nomeExibicao": "Coleta E-mail (Novo Cliente)",
+        "proximaEtapa": "confirmar-dados-novo-cliente",
+        "metadata": {
+          "formatoEsperado": "email@dominio.com"
+        }
+      },
+      "confirmar-dados-novo-cliente": {
+        "id": "confirmar-dados-novo-cliente",
+        "tipo": "menu",
+        "mensagem": "✅ *Confirmação de Dados*\n\n📋 Por favor, confira seus dados:\n\n👤 *Nome:* {{primeiroNome}} {{sobrenome}}\n🏢 *Empresa:* {{empresa}}\n📧 *E-mail:* {{email}}\n📱 *WhatsApp:* {{telefone}}\n\n✔️ Os dados estão corretos?",
+        "opcoes": [
+          {
+            "id": "confirmar_sim",
+            "texto": "✅ Sim, estão corretos",
+            "valor": "sim",
+            "proximaEtapa": "salvar-novo-cliente"
+          },
+          {
+            "id": "confirmar_nao",
+            "texto": "❌ Não, quero corrigir",
+            "valor": "nao",
+            "proximaEtapa": "coleta-primeiro-nome"
+          }
+        ],
+        "usarBotoes": true,
+        "nomeExibicao": "Confirmar Dados (Novo Cliente)",
+        "metadata": {
+          "formatacaoEspecial": "confirmacao_dados_novo_cliente",
+          "permitirVoltar": true
+        }
+      },
+      "salvar-novo-cliente": {
+        "id": "salvar-novo-cliente",
+        "tipo": "acao",
+        "acao": "salvar_contato",
+        "mensagem": "💾 Salvando seus dados...\n\n✅ Cadastro realizado com sucesso!\n\nAgora vamos te direcionar para o atendimento. 😊",
+        "nomeExibicao": "Salvar Novo Cliente",
+        "proximaEtapa": "boas-vindas",
+        "metadata": {
+          "timeout": 2000,
+          "criarContato": true,
+          "dadosObrigatorios": [
+            "primeiroNome",
+            "sobrenome",
+            "telefone",
+            "email"
+          ]
+        }
+      },
+      "verificar-dados-atualizados": {
+        "id": "verificar-dados-atualizados",
+        "tipo": "menu",
+        "mensagem": "👋 Olá, *{{primeiroNome}}*! Que bom ter você de volta ao *ConectCRM*! 😊\n\n✅ *Dados Cadastrados*\n\n👤 *Nome:* {{primeiroNome}} {{sobrenome}}\n🏢 *Empresa:* {{empresa}}\n📧 *E-mail:* {{email}}\n🔑 *Cargo:* {{cargo}}\n📱 *Telefone:* {{telefone}}\n\n✔️ Os dados estão corretos?\n\n_Digite o número ou clique na opção:_",
+        "opcoes": [
+          {
+            "id": "dados_ok",
+            "texto": "Sim, está certo",
+            "valor": "sim",
+            "proximaEtapa": "boas-vindas"
+          },
+          {
+            "id": "dados_desatualizados",
+            "texto": "Corrigir dados",
+            "valor": "nao",
+            "proximaEtapa": "atualizar-dados"
+          }
+        ],
+        "usarBotoes": true,
+        "tipoBotao": "reply",
+        "nomeExibicao": "Verificar Dados Cadastrados",
+        "metadata": {
+          "formatacaoEspecial": "confirmacao_dados_existente",
+          "maxOpcoes": 2,
+          "fallbackWeb": true,
+          "aceitarTexto": true,
+          "keywords": {
+            "sim": "boas-vindas",
+            "1": "boas-vindas",
+            "certo": "boas-vindas",
+            "confirmar": "boas-vindas",
+            "ok": "boas-vindas",
+            "nao": "atualizar-dados",
+            "não": "atualizar-dados",
+            "2": "atualizar-dados",
+            "corrigir": "atualizar-dados",
+            "atualizar": "atualizar-dados"
+          }
+        }
+      },
+      "atualizar-dados": {
+        "id": "atualizar-dados",
+        "tipo": "menu",
+        "mensagem": "🔄 *Atualização de Dados*\n\nQual informação você deseja atualizar?",
+        "opcoes": [
+          {
+            "id": "atualizar_nome",
+            "texto": "👤 Nome",
+            "valor": "nome",
+            "proximaEtapa": "coleta-primeiro-nome"
+          },
+          {
+            "id": "atualizar_empresa",
+            "texto": "🏢 Empresa",
+            "valor": "empresa",
+            "proximaEtapa": "coleta-empresa"
+          },
+          {
+            "id": "atualizar_email",
+            "texto": "📧 E-mail",
+            "valor": "email",
+            "proximaEtapa": "coleta-email-atualizado"
+          },
+          {
+            "id": "atualizar_todos",
+            "texto": "📝 Todos os dados",
+            "valor": "todos",
+            "proximaEtapa": "coleta-primeiro-nome"
+          }
+        ],
+        "usarBotoes": true,
+        "nomeExibicao": "Menu Atualizar Dados"
+      },
+      "coleta-email-atualizado": {
+        "id": "coleta-email-atualizado",
+        "tipo": "input",
+        "mensagem": "📧 Informe seu *novo e-mail*:\n\n_Exemplo: seuemail@empresa.com_",
+        "variavel": "email",
+        "validacao": {
+          "tipo": "email",
+          "obrigatorio": true,
+          "mensagemErro": "❌ E-mail inválido. Tente novamente."
+        },
+        "coletaDados": true,
+        "nomeExibicao": "Atualizar E-mail",
+        "proximaEtapa": "salvar-dados-atualizados"
+      },
+      "salvar-dados-atualizados": {
+        "id": "salvar-dados-atualizados",
+        "tipo": "acao",
+        "acao": "atualizar_contato",
+        "mensagem": "💾 Salvando alterações...\n\n✅ Dados atualizados com sucesso!",
+        "nomeExibicao": "Salvar Dados Atualizados",
+        "proximaEtapa": "boas-vindas",
+        "metadata": {
+          "timeout": 2000,
+          "atualizarContato": true
+        }
+      },
+      "boas-vindas": {
+        "id": "boas-vindas",
+        "tipo": "menu",
+        "mensagem": "🎯 Como posso ajudá-lo(a) hoje, *{{primeiroNome}}*?\n\nSelecione o *setor* que deseja atendimento:",
+        "opcoes": [],
+        "usarBotoes": true,
+        "nomeExibicao": "Menu de Núcleos (Dinâmico)",
+        "proximaEtapa": "escolha-departamento",
+        "metadata": {
+          "buscaDinamica": true,
+          "fonte": "nucleos",
+          "ordenarPor": "nome",
+          "filtrarAtivos": true
+        }
+      },
+      "escolha-departamento": {
+        "id": "escolha-departamento",
+        "tipo": "menu",
+        "mensagem": "🏢 *{{nucleoNome}}*\n\nAgora escolha o *departamento* específico:\n\n_💡 Dica: Escolha a área que melhor atende sua necessidade_",
+        "opcoes": [],
+        "usarBotoes": true,
+        "nomeExibicao": "Escolha de Departamento (Dinâmico)",
+        "proximaEtapa": "transferir-atendimento",
+        "opcoesExtras": [
+          {
+            "id": "voltar_nucleos",
+            "texto": "⬅️ Voltar aos setores",
+            "valor": "voltar",
+            "proximaEtapa": "boas-vindas"
+          }
+        ],
+        "metadata": {
+          "buscaDinamica": true,
+          "fonte": "departamentos",
+          "filtrarPorNucleo": true,
+          "ordenarPor": "nome",
+          "permitirVoltar": true,
+          "proximaEtapaDepartamento": "coleta-detalhes-atendimento"
+        }
+      },
+      "coleta-detalhes-atendimento": {
+        "id": "coleta-detalhes-atendimento",
+        "tipo": "input",
+        "mensagem": "📝 Para agilizar o atendimento em *{{departamentoNome}}*, conte rapidamente como podemos ajudar:",
+        "variavel": "resumoAtendimento",
+        "validacao": {
+          "tipo": "text",
+          "minimo": 5,
+          "maximo": 500,
+          "mensagemErro": "Digite um resumo breve (mínimo 5 caracteres)."
+        },
+        "coletaDados": true,
+        "nomeExibicao": "Coleta Detalhes Atendimento",
+        "proximaEtapa": "confirmar-detalhes-atendimento",
+        "metadata": {
+          "dica": "Explique em 1 ou 2 frases o motivo do contato"
+        }
+      },
+      "confirmar-detalhes-atendimento": {
+        "id": "confirmar-detalhes-atendimento",
+        "tipo": "menu",
+        "mensagem": "✅ *Resumo do Atendimento*\n\n🏢 *Departamento:* {{departamentoNome}}\n🗒️ *Resumo:* {{resumoAtendimento}}\n\nAs informações estão corretas?",
+        "opcoes": [
+          {
+            "id": "detalhes_confirmar",
+            "texto": "� Está correto",
+            "valor": "confirmar",
+            "proximaEtapa": "mensagem-pre-transferencia"
+          },
+          {
+            "id": "detalhes_ajustar",
+            "texto": "✏️ Quero editar o resumo",
+            "valor": "ajustar",
+            "proximaEtapa": "coleta-detalhes-atendimento"
+          },
+          {
+            "id": "detalhes_voltar",
+            "texto": "⬅️ Escolher outro departamento",
+            "valor": "voltar",
+            "proximaEtapa": "escolha-departamento"
+          }
+        ],
+        "usarBotoes": true,
+        "nomeExibicao": "Confirmar Detalhes Atendimento",
+        "metadata": {
+          "permitirVoltar": true,
+          "keywords": {
+            "sim": "mensagem-pre-transferencia",
+            "1": "mensagem-pre-transferencia",
+            "confirmar": "mensagem-pre-transferencia",
+            "ok": "mensagem-pre-transferencia",
+            "ajustar": "coleta-detalhes-atendimento",
+            "editar": "coleta-detalhes-atendimento",
+            "2": "coleta-detalhes-atendimento",
+            "voltar": "escolha-departamento",
+            "trocar": "escolha-departamento",
+            "3": "escolha-departamento"
+          }
+        }
+      },
+      "mensagem-pre-transferencia": {
+        "id": "mensagem-pre-transferencia",
+        "tipo": "mensagem",
+        "mensagem": "✅ Perfeito! Vou repassar seu atendimento para *{{departamentoNome}}* com o resumo informado. \n\n🔁 Preparando sua transferência...",
+        "aguardarResposta": false,
+        "proximaEtapa": "transferir-atendimento",
+        "nomeExibicao": "Preparar Transferência",
+        "metadata": {
+          "autoAvanco": true
+        }
+      },
+      "transferir-atendimento": {
+        "id": "transferir-atendimento",
+        "tipo": "acao",
+        "acao": "transferir",
+        "mensagem": "⏳ Encaminhando você para *{{departamentoNome}}*...\n\n🗒️ *Resumo:* {{resumoAtendimento}}\n👤 Em instantes um de nossos especialistas irá atendê-lo(a)!\n\n_Aguarde na linha, por favor._",
+        "finalizar": true,
+        "nomeExibicao": "Transferir para Atendimento",
+        "metadata": {
+          "prioridade": "normal",
+          "distribuicao": "round-robin",
+          "salvarHistorico": true,
+          "notificarAgente": true,
+          "contextoTransferencia": {
+            "nome": "{{nomeCompleto}}",
+            "empresa": "{{empresa}}",
+            "email": "{{email}}",
+            "telefone": "{{telefone}}",
+            "nucleoEscolhido": "{{nucleoNome}}",
+            "departamentoEscolhido": "{{departamentoNome}}",
+            "resumo": "{{resumoAtendimento}}"
+          }
+        }
+      },
+      "horario-fora-expediente": {
+        "id": "horario-fora-expediente",
+        "tipo": "mensagem",
+        "mensagem": "🕐 *Horário de Atendimento*\n\nNo momento estamos *fora do horário de atendimento*.\n\n📅 *Horário de funcionamento:*\nSegunda a Sexta: 08h às 18h\nSábado: 08h às 12h\nDomingo: Fechado\n\n📧 Se preferir, envie um e-mail para:\ncontato@conectcrm.com\n\nRetornaremos assim que possível!",
+        "finalizar": true,
+        "nomeExibicao": "Horário Fora de Expediente",
+        "metadata": {
+          "opcional": true,
+          "usarSeForaHorario": true
+        }
+      }
+    }
+  }
+}

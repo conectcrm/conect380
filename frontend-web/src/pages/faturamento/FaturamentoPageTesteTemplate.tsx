@@ -13,15 +13,15 @@ export const FaturamentoPageTesteTemplate: React.FC = () => {
       value: 'R$ 125.340,00',
       subtitle: '+12% vs mês anterior',
       icon: DollarSign,
-      color: 'green'
+      color: 'green',
     },
     {
       title: 'Faturas Emitidas',
       value: '84',
       subtitle: 'Este mês',
       icon: FileText,
-      color: 'blue'
-    }
+      color: 'blue',
+    },
   ];
 
   return (
@@ -33,7 +33,7 @@ export const FaturamentoPageTesteTemplate: React.FC = () => {
         placeholder: 'Buscar faturas...',
         value: searchValue,
         onChange: setSearchValue,
-        onSearch: () => console.log('Busca:', searchValue)
+        onSearch: () => console.log('Busca:', searchValue),
       }}
     >
       <div className="p-4 bg-white rounded-lg shadow">

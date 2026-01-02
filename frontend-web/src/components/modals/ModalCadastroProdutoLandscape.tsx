@@ -16,7 +16,11 @@ import { useAutoSave } from '../../hooks/useAutoSave';
 import { useModalKeyboardShortcuts } from '../../hooks/useModalKeyboardShortcuts';
 import { SaveStatus } from '../SaveStatus';
 import { useProdutoSoftware } from '../../hooks/useProdutoSoftware';
-import { camposSoftware, precisaCamposSoftware, validarDadosSoftware } from '../../config/camposSoftware';
+import {
+  camposSoftware,
+  precisaCamposSoftware,
+  validarDadosSoftware,
+} from '../../config/camposSoftware';
 import { categoriasProdutosService } from '../../services/categoriasProdutosService';
 
 // Tipos de dados
@@ -57,9 +61,7 @@ const schema = yup.object().shape({
     .string()
     .required('Tipo do item é obrigatório')
     .oneOf(['produto', 'servico', 'licenca', 'modulo', 'aplicativo'], 'Tipo inválido'),
-  categoria: yup
-    .string()
-    .required('Categoria é obrigatória'),
+  categoria: yup.string().required('Categoria é obrigatória'),
   precoUnitario: yup
     .number()
     .required('Preço unitário é obrigatório')
@@ -72,45 +74,29 @@ const schema = yup.object().shape({
     .string()
     .required('Unidade de medida é obrigatória')
     .oneOf(['unidade', 'saca', 'hectare', 'pacote', 'licenca'], 'Unidade inválida'),
-  status: yup
-    .boolean()
-    .required('Status é obrigatório'),
-  descricao: yup
-    .string()
-    .optional(),
-  tags: yup
-    .array()
-    .of(yup.string())
-    .default([]),
-  variacoes: yup
-    .array()
-    .of(yup.string())
-    .default([]),
+  status: yup.boolean().required('Status é obrigatório'),
+  descricao: yup.string().optional(),
+  tags: yup.array().of(yup.string()).default([]),
+  variacoes: yup.array().of(yup.string()).default([]),
   // Validação condicional para campos de software
-  tipoLicenciamento: yup
-    .string()
-    .when('tipoItem', {
-      is: (tipoItem: string) => ['licenca', 'modulo', 'aplicativo'].includes(tipoItem),
-      then: (schema) => schema.required('Tipo de licenciamento é obrigatório para produtos de software'),
-      otherwise: (schema) => schema.optional()
-    }),
-  periodicidadeLicenca: yup
-    .string()
-    .when('tipoItem', {
-      is: (tipoItem: string) => ['licenca', 'modulo', 'aplicativo'].includes(tipoItem),
-      then: (schema) => schema.required('Periodicidade da licença é obrigatória para produtos de software'),
-      otherwise: (schema) => schema.optional()
-    }),
-  renovacaoAutomatica: yup
-    .boolean()
-    .optional(),
-  quantidadeLicencas: yup
-    .number()
-    .when('tipoItem', {
-      is: (tipoItem: string) => ['licenca', 'modulo', 'aplicativo'].includes(tipoItem),
-      then: (schema) => schema.min(1, 'Quantidade de licenças deve ser maior que zero'),
-      otherwise: (schema) => schema.optional()
-    })
+  tipoLicenciamento: yup.string().when('tipoItem', {
+    is: (tipoItem: string) => ['licenca', 'modulo', 'aplicativo'].includes(tipoItem),
+    then: (schema) =>
+      schema.required('Tipo de licenciamento é obrigatório para produtos de software'),
+    otherwise: (schema) => schema.optional(),
+  }),
+  periodicidadeLicenca: yup.string().when('tipoItem', {
+    is: (tipoItem: string) => ['licenca', 'modulo', 'aplicativo'].includes(tipoItem),
+    then: (schema) =>
+      schema.required('Periodicidade da licença é obrigatória para produtos de software'),
+    otherwise: (schema) => schema.optional(),
+  }),
+  renovacaoAutomatica: yup.boolean().optional(),
+  quantidadeLicencas: yup.number().when('tipoItem', {
+    is: (tipoItem: string) => ['licenca', 'modulo', 'aplicativo'].includes(tipoItem),
+    then: (schema) => schema.min(1, 'Quantidade de licenças deve ser maior que zero'),
+    otherwise: (schema) => schema.optional(),
+  }),
 });
 
 // Opções
@@ -119,13 +105,13 @@ const tiposItem = [
   { value: 'servico', label: 'Serviço' },
   { value: 'licenca', label: 'Licença' },
   { value: 'modulo', label: 'Módulo' },
-  { value: 'aplicativo', label: 'Aplicativo' }
+  { value: 'aplicativo', label: 'Aplicativo' },
 ];
 
 const frequencias = [
   { value: 'unico', label: 'Único' },
   { value: 'mensal', label: 'Mensal' },
-  { value: 'anual', label: 'Anual' }
+  { value: 'anual', label: 'Anual' },
 ];
 
 const unidadesMedida = [
@@ -133,7 +119,7 @@ const unidadesMedida = [
   { value: 'saca', label: 'Saca' },
   { value: 'hectare', label: 'Hectare' },
   { value: 'pacote', label: 'Pacote' },
-  { value: 'licenca', label: 'Licença' }
+  { value: 'licenca', label: 'Licença' },
 ];
 
 export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
@@ -141,7 +127,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
   onClose,
   onSubmit,
   produtoEditando,
-  loading = false
+  loading = false,
 }) => {
   // Hook de internacionalização
   const { t } = useI18n();
@@ -163,7 +149,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
       try {
         setLoadingCategorias(true);
         const categoriasData = await categoriasProdutosService.listarCategorias();
-        const categoriasNomes = categoriasData.map(cat => cat.nome);
+        const categoriasNomes = categoriasData.map((cat) => cat.nome);
 
         // Se há categorias cadastradas, usa elas
         if (categoriasNomes.length > 0) {
@@ -178,7 +164,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
             'Vendas',
             'Suporte',
             'Treinamento',
-            'Licenciamento'
+            'Licenciamento',
           ]);
         }
       } catch (error) {
@@ -192,7 +178,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
           'Vendas',
           'Suporte',
           'Treinamento',
-          'Licenciamento'
+          'Licenciamento',
         ]);
       } finally {
         setLoadingCategorias(false);
@@ -209,7 +195,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
     setValue,
     watch,
     reset,
-    formState: { errors, isValid, isSubmitting, isDirty }
+    formState: { errors, isValid, isSubmitting, isDirty },
   } = useForm<ProdutoFormData>({
     resolver: yupResolver(schema),
     mode: 'onChange',
@@ -228,14 +214,17 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
       tipoLicenciamento: '',
       periodicidadeLicenca: '',
       renovacaoAutomatica: false,
-      quantidadeLicencas: 1
-    }
+      quantidadeLicencas: 1,
+    },
   });
 
   // Hook para produtos de software (após declaração do watch)
   const tipoAtual = watch('tipoItem') || 'produto';
   const tipoGeral = watch('tipo'); // Para capturar se tipo === "software"
-  const { campos, isSoftware, TIPOS_LICENCIAMENTO, PERIODICIDADES_LICENCA } = useProdutoSoftware(tipoAtual, tipoGeral);
+  const { campos, isSoftware, TIPOS_LICENCIAMENTO, PERIODICIDADES_LICENCA } = useProdutoSoftware(
+    tipoAtual,
+    tipoGeral,
+  );
 
   const watchedFields = watch();
 
@@ -272,7 +261,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
       }
     },
     hasUnsavedChanges,
-    isFormValid: isValid
+    isFormValid: isValid,
   });
 
   // Hook de Atalhos de Teclado
@@ -284,7 +273,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
       }
     },
     onClose: handleClose,
-    canSave: isValid && !isSubmitting
+    canSave: isValid && !isSubmitting,
   });
 
   // Efeito para detectar mudanças - só após inicialização
@@ -316,7 +305,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
           status: produtoEditando.status ?? true,
           descricao: produtoEditando.descricao || '',
           tags: produtoEditando.tags || [],
-          variacoes: produtoEditando.variacoes || []
+          variacoes: produtoEditando.variacoes || [],
         });
       } else {
         reset({
@@ -329,7 +318,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
           status: true,
           descricao: '',
           tags: [],
-          variacoes: []
+          variacoes: [],
         });
       }
 
@@ -358,7 +347,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
   };
 
   const removerTag = (tagParaRemover: string) => {
-    const tagsFiltradas = watchedFields.tags?.filter(tag => tag !== tagParaRemover) || [];
+    const tagsFiltradas = watchedFields.tags?.filter((tag) => tag !== tagParaRemover) || [];
     setValue('tags', tagsFiltradas, { shouldValidate: true });
   };
 
@@ -373,9 +362,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
             <div className="p-6">
               <div className="flex items-center mb-4">
                 <AlertTriangle className="w-6 h-6 text-amber-500 mr-3" />
-                <h3 className="text-lg font-medium text-gray-900">
-                  Alterações não salvas
-                </h3>
+                <h3 className="text-lg font-medium text-gray-900">Alterações não salvas</h3>
               </div>
               <p className="text-gray-600 mb-6">
                 Você tem alterações não salvas no produto. Deseja realmente sair sem salvar?
@@ -420,9 +407,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                   <h2 className="text-xl font-semibold text-gray-900">
                     {produtoEditando ? 'Editar Produto' : 'Novo Produto'}
                   </h2>
-                  <p className="text-sm text-gray-500">
-                    Preencha as informações do produto
-                  </p>
+                  <p className="text-sm text-gray-500">Preencha as informações do produto</p>
                 </div>
               </div>
 
@@ -430,7 +415,13 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                 <SaveStatus
                   isDirty={hasUnsavedChanges}
                   isSaving={isSubmitting}
-                  lastSaved={isFormInitialized ? undefined : (lastSaveAttempt ? new Date(lastSaveAttempt) : undefined)}
+                  lastSaved={
+                    isFormInitialized
+                      ? undefined
+                      : lastSaveAttempt
+                        ? new Date(lastSaveAttempt)
+                        : undefined
+                  }
                 />
                 <button
                   onClick={handleClose}
@@ -444,8 +435,9 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
             {/* Formulário em Grid */}
             <form onSubmit={handleSubmit(onFormSubmit)} className="p-4 sm:p-6">
-              <div className={`grid grid-cols-1 gap-6 ${isSoftware ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
-
+              <div
+                className={`grid grid-cols-1 gap-6 ${isSoftware ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}
+              >
                 {/* Coluna 1: Informações Básicas */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium text-gray-900 flex items-center">
@@ -472,7 +464,10 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                   {/* Tipo */}
                   <div>
-                    <label htmlFor="tipoItem" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label
+                      htmlFor="tipoItem"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
                       Tipo *
                     </label>
                     <select
@@ -493,7 +488,10 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                   {/* Categoria */}
                   <div>
-                    <label htmlFor="categoria" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label
+                      htmlFor="categoria"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
                       Categoria *
                     </label>
                     {loadingCategorias ? (
@@ -521,7 +519,10 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                   {/* Preço */}
                   <div>
-                    <label htmlFor="precoUnitario" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label
+                      htmlFor="precoUnitario"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
                       Preço Unitário *
                     </label>
                     <Controller
@@ -532,8 +533,9 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                           value={field.value}
                           onChange={field.onChange}
                           placeholder="R$ 0,00"
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.precoUnitario ? 'border-red-300' : 'border-gray-300'
-                            }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                            errors.precoUnitario ? 'border-red-300' : 'border-gray-300'
+                          }`}
                         />
                       )}
                     />
@@ -552,7 +554,10 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                   {/* Frequência */}
                   <div>
-                    <label htmlFor="frequencia" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label
+                      htmlFor="frequencia"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
                       {t('common.frequency')} *
                     </label>
                     <select
@@ -573,7 +578,10 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                   {/* Unidade de Medida */}
                   <div>
-                    <label htmlFor="unidadeMedida" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label
+                      htmlFor="unidadeMedida"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
                       Unidade de Medida *
                     </label>
                     <select
@@ -594,9 +602,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                   {/* Status */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Status *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
                     <Controller
                       name="status"
                       control={control}
@@ -630,7 +636,10 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                   {/* Descrição */}
                   <div>
-                    <label htmlFor="descricao" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label
+                      htmlFor="descricao"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
                       Descrição
                     </label>
                     <textarea
@@ -663,7 +672,10 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                     {/* Tipo de Licenciamento */}
                     <div>
-                      <label htmlFor="tipoLicenciamento" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label
+                        htmlFor="tipoLicenciamento"
+                        className="block text-sm font-medium text-gray-700 mb-1"
+                      >
                         Tipo de Licenciamento *
                       </label>
                       <select
@@ -679,13 +691,18 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                         ))}
                       </select>
                       {errors.tipoLicenciamento && (
-                        <p className="mt-1 text-sm text-red-600">{errors.tipoLicenciamento.message}</p>
+                        <p className="mt-1 text-sm text-red-600">
+                          {errors.tipoLicenciamento.message}
+                        </p>
                       )}
                     </div>
 
                     {/* Periodicidade da Licença */}
                     <div>
-                      <label htmlFor="periodicidadeLicenca" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label
+                        htmlFor="periodicidadeLicenca"
+                        className="block text-sm font-medium text-gray-700 mb-1"
+                      >
                         Periodicidade da Licença *
                       </label>
                       <select
@@ -695,25 +712,34 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                       >
                         <option value="">Selecione a periodicidade</option>
                         {PERIODICIDADES_LICENCA.map((periodo) => (
-                          <option key={periodo.value} value={periodo.value} title={periodo.descricao}>
+                          <option
+                            key={periodo.value}
+                            value={periodo.value}
+                            title={periodo.descricao}
+                          >
                             {periodo.label}
                           </option>
                         ))}
                       </select>
                       {errors.periodicidadeLicenca && (
-                        <p className="mt-1 text-sm text-red-600">{errors.periodicidadeLicenca.message}</p>
+                        <p className="mt-1 text-sm text-red-600">
+                          {errors.periodicidadeLicenca.message}
+                        </p>
                       )}
                     </div>
 
                     {/* Quantidade de Licenças */}
                     <div>
-                      <label htmlFor="quantidadeLicencas" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label
+                        htmlFor="quantidadeLicencas"
+                        className="block text-sm font-medium text-gray-700 mb-1"
+                      >
                         {campos.labelQuantidade}
                       </label>
                       <input
                         {...register('quantidadeLicencas', {
                           valueAsNumber: true,
-                          setValueAs: (value) => value === '' ? undefined : Number(value)
+                          setValueAs: (value) => (value === '' ? undefined : Number(value)),
                         })}
                         type="number"
                         id="quantidadeLicencas"
@@ -722,7 +748,9 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                         placeholder="Ex: 10"
                       />
                       {errors.quantidadeLicencas && (
-                        <p className="mt-1 text-sm text-red-600">{errors.quantidadeLicencas.message}</p>
+                        <p className="mt-1 text-sm text-red-600">
+                          {errors.quantidadeLicencas.message}
+                        </p>
                       )}
                       {campos.tooltipInfo && (
                         <p className="mt-1 text-xs text-gray-500">{campos.tooltipInfo}</p>
@@ -776,15 +804,15 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                   {/* Tags */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tags
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tags</label>
                     <div className="flex gap-2 mb-2">
                       <input
                         type="text"
                         value={tagInput}
                         onChange={(e) => setTagInput(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), adicionarTag())}
+                        onKeyPress={(e) =>
+                          e.key === 'Enter' && (e.preventDefault(), adicionarTag())
+                        }
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="Digite uma tag e pressione Enter"
                       />
@@ -838,9 +866,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                       Salvando...
                     </>
                   ) : (
-                    <>
-                      {produtoEditando ? t('common.update') : t('common.saveProduct')}
-                    </>
+                    <>{produtoEditando ? t('common.update') : t('common.saveProduct')}</>
                   )}
                 </button>
               </div>

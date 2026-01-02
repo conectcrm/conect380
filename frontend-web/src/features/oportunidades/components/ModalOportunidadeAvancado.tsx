@@ -25,7 +25,7 @@ import {
   Users,
   FileText,
   Save,
-  Loader2
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -41,7 +41,7 @@ import {
   Oportunidade,
   EstagioOportunidade,
   PrioridadeOportunidade,
-  OrigemOportunidade
+  OrigemOportunidade,
 } from '../../../types/oportunidades/index';
 
 // Interfaces
@@ -76,9 +76,7 @@ const oportunidadeSchema = yup.object({
     .required('Título é obrigatório')
     .min(3, 'Título deve ter pelo menos 3 caracteres')
     .max(100, 'Título deve ter no máximo 100 caracteres'),
-  descricao: yup
-    .string()
-    .max(500, 'Descrição deve ter no máximo 500 caracteres'),
+  descricao: yup.string().max(500, 'Descrição deve ter no máximo 500 caracteres'),
   valor: yup
     .number()
     .transform((value, originalValue) => {
@@ -99,24 +97,21 @@ const oportunidadeSchema = yup.object({
     .date()
     .required('Data de fechamento esperada é obrigatória')
     .min(new Date(), 'Data deve ser futura'),
-  nomeContato: yup
-    .string()
-    .when('clienteId', {
-      is: (val: any) => !val,
-      then: (schema) => schema.required('Nome do contato é obrigatório quando cliente não selecionado'),
-      otherwise: (schema) => schema
-    }),
+  nomeContato: yup.string().when('clienteId', {
+    is: (val: any) => !val,
+    then: (schema) =>
+      schema.required('Nome do contato é obrigatório quando cliente não selecionado'),
+    otherwise: (schema) => schema,
+  }),
   emailContato: yup
     .string()
     .email('Email inválido')
     .when('clienteId', {
       is: (val: any) => !val,
       then: (schema) => schema.required('Email é obrigatório quando cliente não selecionado'),
-      otherwise: (schema) => schema
+      otherwise: (schema) => schema,
     }),
-  telefoneContato: yup
-    .string()
-    .matches(/^[\d\s\(\)\-\+]+$/, 'Telefone inválido')
+  telefoneContato: yup.string().matches(/^[\d\s\(\)\-\+]+$/, 'Telefone inválido'),
 });
 
 type OportunidadeFormData = yup.InferType<typeof oportunidadeSchema> & {
@@ -133,7 +128,7 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
   isOpen,
   onClose,
   oportunidade,
-  onSuccess
+  onSuccess,
 }) => {
   const { criarOportunidade, atualizarOportunidade } = useOportunidades();
 
@@ -145,7 +140,7 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
   const [showClienteForm, setShowClienteForm] = useState(false);
   const [responsaveis] = useState<Responsavel[]>([
     { id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479', nome: 'Admin Teste', email: 'admin@teste.com' },
-    { id: '2', nome: 'Maria Santos', email: 'maria@empresa.com' }
+    { id: '2', nome: 'Maria Santos', email: 'maria@empresa.com' },
   ]);
 
   const isEdit = !!oportunidade;
@@ -156,7 +151,7 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
     handleSubmit,
     watch,
     setValue,
-    formState: { errors, isValid }
+    formState: { errors, isValid },
   } = useForm<OportunidadeFormData>({
     resolver: yupResolver(oportunidadeSchema),
     defaultValues: {
@@ -167,7 +162,7 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
       estagio: oportunidade?.estagio || EstagioOportunidade.LEADS,
       prioridade: oportunidade?.prioridade || PrioridadeOportunidade.MEDIA,
       origem: oportunidade?.origem || OrigemOportunidade.WEBSITE,
-      clienteId: oportunidade?.cliente?.id ? String(oportunidade.cliente.id) : undefined,  // Converter para string se existir
+      clienteId: oportunidade?.cliente?.id ? String(oportunidade.cliente.id) : undefined, // Converter para string se existir
       responsavelId: oportunidade?.responsavel?.id || 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
       nomeContato: oportunidade?.nomeContato || '',
       emailContato: oportunidade?.emailContato || '',
@@ -176,9 +171,9 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
       tags: oportunidade?.tags || [],
       dataFechamentoEsperado: oportunidade?.dataFechamentoEsperado
         ? new Date(oportunidade.dataFechamentoEsperado)
-        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     },
-    mode: 'onChange'
+    mode: 'onChange',
   });
 
   const watchedValues = watch();
@@ -191,25 +186,38 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
 
         // Debug: Verificar se algum cliente tem propriedades como objeto
         response.data.forEach((cliente, index) => {
-          if (typeof cliente.nome === 'object' || typeof cliente.email === 'object' || typeof cliente.telefone === 'object') {
+          if (
+            typeof cliente.nome === 'object' ||
+            typeof cliente.email === 'object' ||
+            typeof cliente.telefone === 'object'
+          ) {
             console.warn(`🚨 CLIENTE ${index} TEM PROPRIEDADES COMO OBJETO:`, {
               id: cliente.id,
               nome: cliente.nome,
               email: cliente.email,
               telefone: cliente.telefone,
-              documento: cliente.documento
+              documento: cliente.documento,
             });
           }
         });
 
-        const clientesFormatados = response.data.map(cliente => ({
+        const clientesFormatados = response.data.map((cliente) => ({
           id: cliente.id || '', // Manter como string UUID
           nome: typeof cliente.nome === 'string' ? cliente.nome : String(cliente.nome || ''),
           email: typeof cliente.email === 'string' ? cliente.email : String(cliente.email || ''),
-          telefone: typeof cliente.telefone === 'string' ? cliente.telefone : String(cliente.telefone || ''),
-          empresa: typeof cliente.empresa === 'string' ? cliente.empresa : String(cliente.empresa || ''),
-          documento: typeof cliente.documento === 'string' ? cliente.documento : String(cliente.documento || ''),
-          tipoPessoa: (cliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica') as 'fisica' | 'juridica'
+          telefone:
+            typeof cliente.telefone === 'string'
+              ? cliente.telefone
+              : String(cliente.telefone || ''),
+          empresa:
+            typeof cliente.empresa === 'string' ? cliente.empresa : String(cliente.empresa || ''),
+          documento:
+            typeof cliente.documento === 'string'
+              ? cliente.documento
+              : String(cliente.documento || ''),
+          tipoPessoa: (cliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica') as
+            | 'fisica'
+            | 'juridica',
         }));
         console.log('Clientes carregados:', clientesFormatados);
         setClientes(clientesFormatados);
@@ -224,9 +232,10 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
   }, [isOpen]);
 
   // Filtrar clientes baseado na busca
-  const clientesFiltrados = clientes.filter(cliente =>
-    cliente.nome.toLowerCase().includes(clientesBusca.toLowerCase()) ||
-    cliente.email?.toLowerCase().includes(clientesBusca.toLowerCase())
+  const clientesFiltrados = clientes.filter(
+    (cliente) =>
+      cliente.nome.toLowerCase().includes(clientesBusca.toLowerCase()) ||
+      cliente.email?.toLowerCase().includes(clientesBusca.toLowerCase()),
   );
 
   // Configurações dos estágios
@@ -234,34 +243,34 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
     [EstagioOportunidade.LEADS]: {
       nome: 'Leads',
       cor: 'bg-gray-100 text-gray-800',
-      probabilidade: 10
+      probabilidade: 10,
     },
     [EstagioOportunidade.QUALIFICACAO]: {
       nome: 'Qualificação',
       cor: 'bg-blue-100 text-blue-800',
-      probabilidade: 25
+      probabilidade: 25,
     },
     [EstagioOportunidade.PROPOSTA]: {
       nome: 'Proposta',
       cor: 'bg-yellow-100 text-yellow-800',
-      probabilidade: 50
+      probabilidade: 50,
     },
     [EstagioOportunidade.NEGOCIACAO]: {
       nome: 'Negociação',
       cor: 'bg-orange-100 text-orange-800',
-      probabilidade: 75
+      probabilidade: 75,
     },
     [EstagioOportunidade.FECHAMENTO]: {
       nome: 'Fechamento',
       cor: 'bg-green-100 text-green-800',
-      probabilidade: 90
-    }
+      probabilidade: 90,
+    },
   };
 
   const prioridadesConfig = {
     [PrioridadeOportunidade.BAIXA]: { nome: 'Baixa', cor: 'bg-green-100 text-green-800' },
     [PrioridadeOportunidade.MEDIA]: { nome: 'Média', cor: 'bg-yellow-100 text-yellow-800' },
-    [PrioridadeOportunidade.ALTA]: { nome: 'Alta', cor: 'bg-red-100 text-red-800' }
+    [PrioridadeOportunidade.ALTA]: { nome: 'Alta', cor: 'bg-red-100 text-red-800' },
   };
 
   const origensConfig = {
@@ -271,7 +280,7 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
     [OrigemOportunidade.REDES_SOCIAIS]: { nome: 'Redes Sociais', icone: Users },
     [OrigemOportunidade.INDICACAO]: { nome: 'Indicação', icone: Star },
     [OrigemOportunidade.EVENTO]: { nome: 'Evento', icone: Calendar },
-    [OrigemOportunidade.PARCEIRO]: { nome: 'Parceiro', icone: Briefcase }
+    [OrigemOportunidade.PARCEIRO]: { nome: 'Parceiro', icone: Briefcase },
   };
 
   // Handlers
@@ -320,8 +329,8 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
           nomeContato: data.nomeContato,
           emailContato: data.emailContato,
           telefoneContato: data.telefoneContato,
-          empresaContato: data.empresaContato
-        }).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+          empresaContato: data.empresaContato,
+        }).filter(([_, v]) => v !== undefined && v !== null && v !== ''),
       );
 
       console.log('Dados limpos a serem enviados:', oportunidadeData);
@@ -329,7 +338,7 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
       if (isEdit && oportunidade) {
         await atualizarOportunidade({
           id: oportunidade.id,
-          ...oportunidadeData
+          ...oportunidadeData,
         });
         toast.success('Oportunidade atualizada com sucesso!');
       } else {
@@ -350,7 +359,7 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -374,7 +383,9 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
                     {isEdit ? 'Editar Oportunidade' : 'Nova Oportunidade'}
                   </h2>
                   <p className="text-sm text-gray-500">
-                    {isEdit ? 'Atualize as informações da oportunidade' : 'Preencha os dados da nova oportunidade'}
+                    {isEdit
+                      ? 'Atualize as informações da oportunidade'
+                      : 'Preencha os dados da nova oportunidade'}
                   </p>
                 </div>
               </div>
@@ -393,7 +404,7 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
                   { number: 1, title: 'Informações Básicas', icon: FileText },
                   { number: 2, title: 'Contato & Cliente', icon: User },
                   { number: 3, title: 'Configurações', icon: Target },
-                  { number: 4, title: 'Revisão', icon: Check }
+                  { number: 4, title: 'Revisão', icon: Check },
                 ].map((stepItem) => {
                   const StepIcon = stepItem.icon;
                   const isActive = step === stepItem.number;
@@ -401,19 +412,35 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
 
                   return (
                     <div key={stepItem.number} className="flex items-center space-x-2">
-                      <div className={`
+                      <div
+                        className={`
                       w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
-                      ${isActive ? 'bg-[#159A9C] text-white' :
-                          isCompleted ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}
-                    `}>
+                      ${
+                        isActive
+                          ? 'bg-[#159A9C] text-white'
+                          : isCompleted
+                            ? 'bg-green-500 text-white'
+                            : 'bg-gray-200 text-gray-600'
+                      }
+                    `}
+                      >
                         {isCompleted ? <Check className="w-4 h-4" /> : stepItem.number}
                       </div>
-                      <span className={`text-sm font-medium ${isActive ? 'text-[#159A9C]' : isCompleted ? 'text-green-600' : 'text-gray-500'
-                        }`}>
+                      <span
+                        className={`text-sm font-medium ${
+                          isActive
+                            ? 'text-[#159A9C]'
+                            : isCompleted
+                              ? 'text-green-600'
+                              : 'text-gray-500'
+                        }`}
+                      >
                         {stepItem.title}
                       </span>
                       {stepItem.number < 4 && (
-                        <div className={`w-8 h-px ${isCompleted ? 'bg-green-500' : 'bg-gray-200'}`} />
+                        <div
+                          className={`w-8 h-px ${isCompleted ? 'bg-green-500' : 'bg-gray-200'}`}
+                        />
                       )}
                     </div>
                   );
@@ -440,8 +467,9 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
                               {...field}
                               type="text"
                               placeholder="Ex: Implementação de CRM para empresa X"
-                              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.titulo ? 'border-red-300' : 'border-gray-300'
-                                }`}
+                              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                                errors.titulo ? 'border-red-300' : 'border-gray-300'
+                              }`}
                             />
                           )}
                         />
@@ -472,8 +500,9 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
                                   const numValue = parseFloat(e.target.value);
                                   onChange(isNaN(numValue) ? undefined : numValue);
                                 }}
-                                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.valor ? 'border-red-300' : 'border-gray-300'
-                                  }`}
+                                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                                  errors.valor ? 'border-red-300' : 'border-gray-300'
+                                }`}
                               />
                               <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500">
                                 {value && !isNaN(value) ? formatCurrency(value) : 'R$ 0,00'}
@@ -499,16 +528,23 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
                               <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                               <input
                                 type="date"
-                                value={value instanceof Date ? value.toISOString().split('T')[0] : value}
+                                value={
+                                  value instanceof Date ? value.toISOString().split('T')[0] : value
+                                }
                                 onChange={(e) => onChange(new Date(e.target.value))}
-                                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.dataFechamentoEsperado ? 'border-red-300' : 'border-gray-300'
-                                  }`}
+                                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                                  errors.dataFechamentoEsperado
+                                    ? 'border-red-300'
+                                    : 'border-gray-300'
+                                }`}
                               />
                             </div>
                           )}
                         />
                         {errors.dataFechamentoEsperado && (
-                          <p className="mt-1 text-sm text-red-600">{errors.dataFechamentoEsperado.message}</p>
+                          <p className="mt-1 text-sm text-red-600">
+                            {errors.dataFechamentoEsperado.message}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -526,8 +562,9 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
                             {...field}
                             rows={4}
                             placeholder="Descreva os detalhes da oportunidade..."
-                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent resize-none ${errors.descricao ? 'border-red-300' : 'border-gray-300'
-                              }`}
+                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent resize-none ${
+                              errors.descricao ? 'border-red-300' : 'border-gray-300'
+                            }`}
                           />
                         )}
                       />
@@ -601,8 +638,9 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
                               {...field}
                               type="text"
                               placeholder="Nome completo"
-                              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.nomeContato ? 'border-red-300' : 'border-gray-300'
-                                }`}
+                              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                                errors.nomeContato ? 'border-red-300' : 'border-gray-300'
+                              }`}
                             />
                           )}
                         />
@@ -623,8 +661,9 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
                               {...field}
                               type="email"
                               placeholder="email@exemplo.com"
-                              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.emailContato ? 'border-red-300' : 'border-gray-300'
-                                }`}
+                              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                                errors.emailContato ? 'border-red-300' : 'border-gray-300'
+                              }`}
                             />
                           )}
                         />
@@ -645,13 +684,16 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
                               {...field}
                               type="tel"
                               placeholder="(11) 99999-9999"
-                              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.telefoneContato ? 'border-red-300' : 'border-gray-300'
-                                }`}
+                              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                                errors.telefoneContato ? 'border-red-300' : 'border-gray-300'
+                              }`}
                             />
                           )}
                         />
                         {errors.telefoneContato && (
-                          <p className="mt-1 text-sm text-red-600">{errors.telefoneContato.message}</p>
+                          <p className="mt-1 text-sm text-red-600">
+                            {errors.telefoneContato.message}
+                          </p>
                         )}
                       </div>
 
@@ -697,15 +739,18 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
                                   onClick={() => handleEstagioChange(key as EstagioOportunidade)}
                                   className={`
                                   p-3 rounded-lg border-2 text-left transition-all
-                                  ${field.value === key
+                                  ${
+                                    field.value === key
                                       ? 'border-[#159A9C] bg-[#159A9C]/5'
                                       : 'border-gray-200 hover:border-gray-300'
-                                    }
+                                  }
                                 `}
                                 >
                                   <div className="flex items-center justify-between">
                                     <span className="font-medium">{config.nome}</span>
-                                    <span className={`px-2 py-1 text-xs rounded-full ${config.cor}`}>
+                                    <span
+                                      className={`px-2 py-1 text-xs rounded-full ${config.cor}`}
+                                    >
                                       {config.probabilidade}%
                                     </span>
                                   </div>
@@ -762,10 +807,11 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
                                   onClick={() => field.onChange(key)}
                                   className={`
                                   flex-1 p-3 rounded-lg border-2 text-center transition-all
-                                  ${field.value === key
+                                  ${
+                                    field.value === key
                                       ? 'border-[#159A9C] bg-[#159A9C]/5'
                                       : 'border-gray-200 hover:border-gray-300'
-                                    }
+                                  }
                                 `}
                                 >
                                   <span className={`px-2 py-1 rounded-full text-sm ${config.cor}`}>
@@ -819,10 +865,11 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
                                   onClick={() => field.onChange(responsavel.id)}
                                   className={`
                                   p-4 rounded-lg border-2 text-left transition-all
-                                  ${field.value === responsavel.id
+                                  ${
+                                    field.value === responsavel.id
                                       ? 'border-[#159A9C] bg-[#159A9C]/5'
                                       : 'border-gray-200 hover:border-gray-300'
-                                    }
+                                  }
                                 `}
                                 >
                                   <div className="flex items-center space-x-3">
@@ -831,7 +878,9 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
                                     </div>
                                     <div>
                                       <div className="font-medium">{responsavel.nome}</div>
-                                      <div className="text-sm text-gray-500">{responsavel.email}</div>
+                                      <div className="text-sm text-gray-500">
+                                        {responsavel.email}
+                                      </div>
                                     </div>
                                   </div>
                                 </button>
@@ -848,7 +897,9 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
                 {step === 4 && (
                   <div className="space-y-6">
                     <div className="bg-gray-50 rounded-lg p-6">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Revisão da Oportunidade</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Revisão da Oportunidade
+                      </h3>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-4">
@@ -860,12 +911,16 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
                           <div>
                             <label className="text-sm font-medium text-gray-500">Valor</label>
                             <p className="text-2xl font-bold text-[#159A9C]">
-                              {watchedValues.valor && !isNaN(watchedValues.valor) ? formatCurrency(watchedValues.valor) : 'R$ 0,00'}
+                              {watchedValues.valor && !isNaN(watchedValues.valor)
+                                ? formatCurrency(watchedValues.valor)
+                                : 'R$ 0,00'}
                             </p>
                           </div>
 
                           <div>
-                            <label className="text-sm font-medium text-gray-500">Probabilidade</label>
+                            <label className="text-sm font-medium text-gray-500">
+                              Probabilidade
+                            </label>
                             <p className="text-gray-900">{watchedValues.probabilidade}%</p>
                           </div>
                         </div>
@@ -879,16 +934,22 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
 
                           <div>
                             <label className="text-sm font-medium text-gray-500">Estágio</label>
-                            <span className={`inline-block px-3 py-1 rounded-full text-sm ${estagiosConfig[watchedValues.estagio].cor
-                              }`}>
+                            <span
+                              className={`inline-block px-3 py-1 rounded-full text-sm ${
+                                estagiosConfig[watchedValues.estagio].cor
+                              }`}
+                            >
                               {estagiosConfig[watchedValues.estagio].nome}
                             </span>
                           </div>
 
                           <div>
                             <label className="text-sm font-medium text-gray-500">Prioridade</label>
-                            <span className={`inline-block px-3 py-1 rounded-full text-sm ${prioridadesConfig[watchedValues.prioridade].cor
-                              }`}>
+                            <span
+                              className={`inline-block px-3 py-1 rounded-full text-sm ${
+                                prioridadesConfig[watchedValues.prioridade].cor
+                              }`}
+                            >
                               {prioridadesConfig[watchedValues.prioridade].nome}
                             </span>
                           </div>
@@ -928,7 +989,12 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
                       type="button"
                       onClick={() => setStep(step + 1)}
                       disabled={
-                        (step === 1 && (!watchedValues.titulo || !watchedValues.valor || isNaN(watchedValues.valor) || watchedValues.valor <= 0 || !watchedValues.dataFechamentoEsperado)) ||
+                        (step === 1 &&
+                          (!watchedValues.titulo ||
+                            !watchedValues.valor ||
+                            isNaN(watchedValues.valor) ||
+                            watchedValues.valor <= 0 ||
+                            !watchedValues.dataFechamentoEsperado)) ||
                         (step === 2 && (!watchedValues.nomeContato || !watchedValues.emailContato))
                       }
                       className="flex items-center px-6 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#138A8C] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"

@@ -130,15 +130,9 @@ const ContasReceber: React.FC = () => {
                   <div className="text-sm font-medium text-gray-900">João Silva</div>
                   <div className="text-sm text-gray-500">joao@exemplo.com</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  NF-001
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  R$ 2.500,00
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  15/07/2025
-                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">NF-001</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">R$ 2.500,00</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">15/07/2025</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
                     Vencido

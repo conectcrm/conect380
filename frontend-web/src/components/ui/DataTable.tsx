@@ -11,11 +11,11 @@ interface DataTableProps<T> {
   onRowClick?: (item: T) => void;
 }
 
-export function DataTable<T extends { id: string }>({ 
-  data, 
-  columns, 
+export function DataTable<T extends { id: string }>({
+  data,
+  columns,
   loading = false,
-  onRowClick 
+  onRowClick,
 }: DataTableProps<T>) {
   if (loading) {
     return (
@@ -52,10 +52,9 @@ export function DataTable<T extends { id: string }>({
                   key={String(column.key)}
                   className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
                 >
-                  {column.render 
+                  {column.render
                     ? column.render(item[column.key], item)
-                    : String(item[column.key] || '')
-                  }
+                    : String(item[column.key] || '')}
                 </td>
               ))}
             </tr>
@@ -63,9 +62,7 @@ export function DataTable<T extends { id: string }>({
         </tbody>
       </table>
       {data.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
-          Nenhum item encontrado
-        </div>
+        <div className="text-center py-8 text-gray-500">Nenhum item encontrado</div>
       )}
     </div>
   );

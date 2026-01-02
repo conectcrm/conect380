@@ -15,7 +15,12 @@ const DashboardRouter: React.FC = () => {
   const perfilOriginal = (user as any)?.perfil || 'administrador';
 
   // Verificar se é administrador
-  const isAdmin = perfilOriginal === 'administrador' || (user as any)?.tipo === 'admin' || (user as any)?.role === 'admin';
+  const isAdmin =
+    perfilOriginal === 'administrador' ||
+    (user as any)?.tipo === 'admin' ||
+    (user as any)?.role === 'admin' ||
+    (user as any)?.role === 'superadmin' ||
+    (user as any)?.tipo === 'superadmin';
 
   // O perfil ativo é o selecionado (se admin) ou o original
   const perfilAtivo = isAdmin ? perfilSelecionado : perfilOriginal;

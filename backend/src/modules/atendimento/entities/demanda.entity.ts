@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from '../../users/user.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 /**
  * Entity para demandas/tarefas relacionadas a clientes
@@ -53,6 +54,10 @@ export class Demanda {
 
   @Column({ name: 'empresa_id', type: 'uuid', nullable: false })
   empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column({ type: 'varchar', length: 200, nullable: false })
   titulo: string;

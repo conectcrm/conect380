@@ -2,14 +2,14 @@ import 'react';
 
 declare module 'react-icons/fi' {
   import { IconType } from 'react-icons';
-  
+
   export interface IconProps {
     className?: string;
     size?: string | number;
     color?: string;
     style?: React.CSSProperties;
   }
-  
+
   export const FiPlus: React.FC<IconProps>;
   export const FiSearch: React.FC<IconProps>;
   export const FiFilter: React.FC<IconProps>;

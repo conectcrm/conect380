@@ -187,8 +187,8 @@ O sistema de atendimento omnichannel **JÁ ESTÁ 85% IMPLEMENTADO**! Muito além
 
 **Endpoints**:
 ```typescript
-✅ GET  /api/atendimento/webhooks/whatsapp        // Verificação Meta
-✅ POST /api/atendimento/webhooks/whatsapp        // Receber mensagens
+✅ GET  /api/atendimento/webhooks/whatsapp/:empresaId        // Verificação Meta
+✅ POST /api/atendimento/webhooks/whatsapp/:empresaId        // Receber mensagens (com `X-Hub-Signature-256`)
 ```
 
 **Status**: ✅ **100% funcional e testado** (ontem 23:57:17 - sucesso completo!)

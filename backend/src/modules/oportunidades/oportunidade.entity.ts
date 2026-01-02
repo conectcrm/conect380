@@ -45,6 +45,13 @@ export class Oportunidade {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa_rel: Empresa;
+
   @Column({ length: 255 })
   titulo: string;
 

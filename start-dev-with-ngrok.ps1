@@ -190,7 +190,7 @@ Write-Host "   🌐 Backend Público:   $ngrokUrl" -ForegroundColor White
 Write-Host "   📊 Dashboard ngrok:   http://127.0.0.1:4040`n" -ForegroundColor White
 
 Write-Host "🔗 Webhooks para Configurar:" -ForegroundColor Yellow
-Write-Host "   📱 WhatsApp: $ngrokUrl/api/atendimento/webhooks/whatsapp" -ForegroundColor Gray
+Write-Host "   📱 WhatsApp: $ngrokUrl/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>" -ForegroundColor Gray
 Write-Host "   💬 Telegram: $ngrokUrl/api/atendimento/webhooks/telegram" -ForegroundColor Gray
 Write-Host "   📞 Twilio:   $ngrokUrl/api/atendimento/webhooks/twilio`n" -ForegroundColor Gray
 

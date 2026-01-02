@@ -5,15 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import {
-  X,
-  Users,
-  Clock,
-  TrendingUp,
-  AlertCircle,
-  CheckCircle,
-  RefreshCw,
-} from 'lucide-react';
+import { X, Users, Clock, TrendingUp, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { useFilaStore } from '../../stores/filaStore';
 import { Fila, EstrategiaDistribuicao } from '../../services/filaService';
 import { useAuth } from '../../hooks/useAuth';
@@ -187,10 +179,7 @@ export const SelecionarFilaModal: React.FC<SelecionarFilaModalProps> = ({
             <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6 flex items-center gap-2">
               <AlertCircle className="h-5 w-5 flex-shrink-0" />
               <span className="text-sm">{error}</span>
-              <button
-                onClick={resetError}
-                className="ml-auto text-red-600 hover:text-red-800"
-              >
+              <button onClick={resetError} className="ml-auto text-red-600 hover:text-red-800">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -200,9 +189,7 @@ export const SelecionarFilaModal: React.FC<SelecionarFilaModalProps> = ({
           {!loading && filasAtivas.length === 0 && (
             <div className="text-center py-12">
               <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Nenhuma fila ativa
-              </h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma fila ativa</h3>
               <p className="text-gray-500 mb-6">
                 Crie pelo menos uma fila ativa para distribuir tickets
               </p>
@@ -219,9 +206,7 @@ export const SelecionarFilaModal: React.FC<SelecionarFilaModalProps> = ({
               <p className="text-green-800">
                 Atribuído para: <span className="font-medium">{atendenteAtribuido}</span>
               </p>
-              <p className="text-sm text-green-600 mt-2">
-                Fechando automaticamente...
-              </p>
+              <p className="text-sm text-green-600 mt-2">Fechando automaticamente...</p>
             </div>
           )}
 
@@ -236,17 +221,16 @@ export const SelecionarFilaModal: React.FC<SelecionarFilaModalProps> = ({
                   <div
                     key={fila.id}
                     onClick={() => setSelectedFilaId(fila.id)}
-                    className={`border rounded-lg p-4 cursor-pointer transition-all ${isSelected
-                      ? 'border-[#159A9C] bg-[#159A9C]/5 ring-2 ring-[#159A9C]/20'
-                      : 'border-gray-200 hover:border-[#159A9C] hover:bg-gray-50'
-                      }`}
+                    className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                      isSelected
+                        ? 'border-[#159A9C] bg-[#159A9C]/5 ring-2 ring-[#159A9C]/20'
+                        : 'border-gray-200 hover:border-[#159A9C] hover:bg-gray-50'
+                    }`}
                   >
                     {/* Header do Card */}
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
-                        <h3 className="font-bold text-[#002333] mb-1">
-                          {fila.nome}
-                        </h3>
+                        <h3 className="font-bold text-[#002333] mb-1">{fila.nome}</h3>
                         {fila.descricao && (
                           <p className="text-sm text-gray-600">{fila.descricao}</p>
                         )}

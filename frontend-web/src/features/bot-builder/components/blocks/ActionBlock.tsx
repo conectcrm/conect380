@@ -38,9 +38,11 @@ export const ActionBlock: React.FC<NodeProps<BlockData>> = ({ data, selected }) 
   };
 
   return (
-    <div className={`relative bg-white rounded-lg shadow-md border-2 ${selected ? 'border-orange-500' : 'border-gray-300'
-      } transition-all hover:shadow-lg min-w-[200px] max-w-[280px]`}>
-
+    <div
+      className={`relative bg-white rounded-lg shadow-md border-2 ${
+        selected ? 'border-orange-500' : 'border-gray-300'
+      } transition-all hover:shadow-lg min-w-[200px] max-w-[280px]`}
+    >
       {/* Handle de entrada (top) */}
       <Handle
         type="target"
@@ -56,9 +58,7 @@ export const ActionBlock: React.FC<NodeProps<BlockData>> = ({ data, selected }) 
 
       {/* Body */}
       <div className="p-3">
-        <p className="text-sm font-medium text-gray-800">
-          {getActionLabel()}
-        </p>
+        <p className="text-sm font-medium text-gray-800">{getActionLabel()}</p>
         {etapa?.mensagem && (
           <p className="text-xs text-gray-500 mt-1">
             {etapa.mensagem.substring(0, 60)}

@@ -51,7 +51,7 @@ INSERT INTO users (
 ) VALUES (
   gen_random_uuid(),
   'Administrador',
-  'admin@conectcrm.com',
+  'admin@conectsuite.com.br',
   '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', -- admin123
   'admin',
   true,
@@ -152,7 +152,7 @@ ORDER BY u.role DESC;
 -- ==========================================
 -- 
 -- 👑 ADMINISTRADOR:
---    Email: admin@conectcrm.com
+--    Email: admin@conectsuite.com.br
 --    Senha: admin123
 --    Permissões: Todas (gerenciar sistema, usuários, empresas)
 --

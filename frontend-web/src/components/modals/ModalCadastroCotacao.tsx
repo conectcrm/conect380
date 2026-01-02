@@ -16,7 +16,7 @@ import {
   Calculator,
   CheckCircle,
   AlertCircle,
-  Loader2
+  Loader2,
 } from 'lucide-react';
 import { cotacaoService } from '../../services/cotacaoService';
 import { fornecedorService } from '../../services/fornecedorService';
@@ -30,7 +30,7 @@ import {
   StatusCotacao,
   PrioridadeCotacao,
   OrigemCotacao,
-  ItemCotacao
+  ItemCotacao,
 } from '../../types/cotacaoTypes';
 
 // Interface para os dados do formulário de solicitação de cotação
@@ -54,26 +54,44 @@ interface CotacaoFormData {
 // Schema de validação para solicitação de cotação
 const schemaValidacao = yup.object({
   fornecedorId: yup.string().required('Fornecedor é obrigatório'),
-  titulo: yup.string().required('Título é obrigatório').min(3, 'Título deve ter pelo menos 3 caracteres'),
+  titulo: yup
+    .string()
+    .required('Título é obrigatório')
+    .min(3, 'Título deve ter pelo menos 3 caracteres'),
   descricao: yup.string(),
-  prioridade: yup.string().oneOf(['baixa', 'media', 'alta', 'urgente']).required('Prioridade é obrigatória'),
+  prioridade: yup
+    .string()
+    .oneOf(['baixa', 'media', 'alta', 'urgente'])
+    .required('Prioridade é obrigatória'),
   prazoResposta: yup.string().optional(),
   observacoes: yup.string(),
   condicoesPagamento: yup.string(),
   prazoEntrega: yup.string(),
   validadeOrcamento: yup.number().positive('Validade deve ser um número positivo'),
-  origem: yup.string().oneOf(['manual', 'website', 'email', 'telefone', 'whatsapp', 'indicacao']).required('Origem é obrigatória'),
+  origem: yup
+    .string()
+    .oneOf(['manual', 'website', 'email', 'telefone', 'whatsapp', 'indicacao'])
+    .required('Origem é obrigatória'),
   tags: yup.array().of(yup.string()),
   aprovadorId: yup.string().optional(),
-  itens: yup.array().of(
-    yup.object({
-      descricao: yup.string().required('Descrição do item é obrigatória'),
-      quantidade: yup.number().positive('Quantidade deve ser positiva').required('Quantidade é obrigatória'),
-      unidade: yup.string().required('Unidade é obrigatória'),
-      valorUnitario: yup.number().positive('Valor deve ser positivo').required('Valor unitário é obrigatório'),
-      observacoes: yup.string()
-    })
-  ).min(1, 'Deve ter pelo menos 1 item')
+  itens: yup
+    .array()
+    .of(
+      yup.object({
+        descricao: yup.string().required('Descrição do item é obrigatória'),
+        quantidade: yup
+          .number()
+          .positive('Quantidade deve ser positiva')
+          .required('Quantidade é obrigatória'),
+        unidade: yup.string().required('Unidade é obrigatória'),
+        valorUnitario: yup
+          .number()
+          .positive('Valor deve ser positivo')
+          .required('Valor unitário é obrigatório'),
+        observacoes: yup.string(),
+      }),
+    )
+    .min(1, 'Deve ter pelo menos 1 item'),
 });
 
 interface ModalCadastroCotacaoProps {
@@ -87,7 +105,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
   isOpen,
   onClose,
   cotacao,
-  onSave
+  onSave,
 }) => {
   const { user: usuarioLogado } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -108,16 +126,25 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
     watch,
     reset,
     getValues,
-    control
+    control,
   } = useForm<CotacaoFormData>({
     resolver: yupResolver(schemaValidacao),
     defaultValues: {
       prioridade: PrioridadeCotacao.MEDIA,
       origem: OrigemCotacao.MANUAL,
       tags: [],
-      itens: [{ descricao: '', quantidade: 1, unidade: 'un', valorUnitario: 0, observacoes: '', ordem: 1 }],
-      validadeOrcamento: 30
-    }
+      itens: [
+        {
+          descricao: '',
+          quantidade: 1,
+          unidade: 'un',
+          valorUnitario: 0,
+          observacoes: '',
+          ordem: 1,
+        },
+      ],
+      validadeOrcamento: 30,
+    },
   });
 
   const watchedItens = watch('itens');
@@ -149,15 +176,15 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
         origem: cotacao.origem,
         tags: cotacao.tags || [],
         aprovadorId: cotacao.aprovadorId || '',
-        itens: cotacao.itens.map(item => ({
+        itens: cotacao.itens.map((item) => ({
           produtoId: item.produtoId,
           descricao: item.descricao,
           quantidade: item.quantidade,
           unidade: item.unidade,
           valorUnitario: item.valorUnitario,
           observacoes: item.observacoes,
-          ordem: item.ordem
-        }))
+          ordem: item.ordem,
+        })),
       };
 
       reset(dadosFormulario);
@@ -166,8 +193,17 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
         prioridade: PrioridadeCotacao.MEDIA,
         origem: OrigemCotacao.MANUAL,
         tags: [],
-        itens: [{ descricao: '', quantidade: 1, unidade: 'un', valorUnitario: 0, observacoes: '', ordem: 1 }],
-        validadeOrcamento: 30
+        itens: [
+          {
+            descricao: '',
+            quantidade: 1,
+            unidade: 'un',
+            valorUnitario: 0,
+            observacoes: '',
+            ordem: 1,
+          },
+        ],
+        validadeOrcamento: 30,
       });
     }
   }, [cotacao, isEditing, reset]);
@@ -200,7 +236,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
 
   const calcularValorTotal = () => {
     return watchedItens.reduce((total, item) => {
-      return total + (item.quantidade * item.valorUnitario);
+      return total + item.quantidade * item.valorUnitario;
     }, 0);
   };
 
@@ -214,15 +250,18 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
         unidade: 'un',
         valorUnitario: 0,
         observacoes: '',
-        ordem: itensAtuais.length + 1
-      }
+        ordem: itensAtuais.length + 1,
+      },
     ]);
   };
 
   const removerItem = (index: number) => {
     const itensAtuais = getValues('itens');
     if (itensAtuais.length > 1) {
-      setValue('itens', itensAtuais.filter((_, i) => i !== index));
+      setValue(
+        'itens',
+        itensAtuais.filter((_, i) => i !== index),
+      );
     }
   };
 
@@ -234,7 +273,10 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
   };
 
   const removerTag = (tag: string) => {
-    setValue('tags', watchedTags.filter(t => t !== tag));
+    setValue(
+      'tags',
+      watchedTags.filter((t) => t !== tag),
+    );
   };
 
   const onSubmit = async (data: CotacaoFormData) => {
@@ -255,7 +297,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
           validadeOrcamento: data.validadeOrcamento,
           aprovadorId: data.aprovadorId || undefined, // Enviar apenas se selecionado
           tags: data.tags,
-          itens: data.itens
+          itens: data.itens,
         };
 
         novaCotacao = await cotacaoService.atualizar(cotacao.id, dadosAtualizacao);
@@ -275,7 +317,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
           origem: data.origem,
           tags: data.tags,
           aprovadorId: data.aprovadorId || undefined, // Enviar apenas se selecionado
-          itens: data.itens
+          itens: data.itens,
         };
 
         novaCotacao = await cotacaoService.criar(dadosCriacao);
@@ -299,7 +341,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
       baixa: 'bg-green-100 text-green-800',
       media: 'bg-yellow-100 text-yellow-800',
       alta: 'bg-orange-100 text-orange-800',
-      urgente: 'bg-red-100 text-red-800'
+      urgente: 'bg-red-100 text-red-800',
     };
     return colors[prioridade] || colors.media;
   };
@@ -315,10 +357,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
               {isEditing ? 'Editar Cotação' : 'Nova Cotação'}
             </h2>
           </div>
-          <button
-            onClick={onClose}
-            className="text-white hover:text-gray-200 transition-colors"
-          >
+          <button onClick={onClose} className="text-white hover:text-gray-200 transition-colors">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -329,15 +368,16 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
             {[
               { id: 'dados', label: 'Dados Básicos', icon: FileText },
               { id: 'itens', label: 'Itens', icon: Calculator },
-              { id: 'configuracoes', label: 'Configurações', icon: Tag }
+              { id: 'configuracoes', label: 'Configurações', icon: Tag },
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id as any)}
-                className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${activeTab === id
-                  ? 'border-[#159A9C] text-[#159A9C]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
+                className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === id
+                    ? 'border-[#159A9C] text-[#159A9C]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
               >
                 <div className="flex items-center space-x-2">
                   <Icon className="w-4 h-4" />
@@ -362,12 +402,13 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                     </label>
                     <select
                       {...register('fornecedorId')}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.fornecedorId ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                        errors.fornecedorId ? 'border-red-300' : 'border-gray-300'
+                      }`}
                       disabled={loadingFornecedores}
                     >
                       <option value="">Selecione um fornecedor</option>
-                      {fornecedores.map(fornecedor => (
+                      {fornecedores.map((fornecedor) => (
                         <option key={fornecedor.id} value={fornecedor.id}>
                           {fornecedor.nome}
                         </option>
@@ -390,7 +431,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                       disabled={loadingUsuarios}
                     >
                       <option value="">Nenhum (sem aprovação)</option>
-                      {usuarios.map(usuario => (
+                      {usuarios.map((usuario) => (
                         <option key={usuario.id} value={usuario.id}>
                           {usuario.nome} ({usuario.email})
                         </option>
@@ -408,8 +449,9 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                     </label>
                     <select
                       {...register('prioridade')}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.prioridade ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                        errors.prioridade ? 'border-red-300' : 'border-gray-300'
+                      }`}
                     >
                       <option value={PrioridadeCotacao.BAIXA}>Baixa</option>
                       <option value={PrioridadeCotacao.MEDIA}>Média</option>
@@ -423,14 +465,13 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
 
                   {/* Título */}
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Título *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Título *</label>
                     <input
                       type="text"
                       {...register('titulo')}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.titulo ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                        errors.titulo ? 'border-red-300' : 'border-gray-300'
+                      }`}
                       placeholder="Ex: Sistema ERP para Empresa ABC"
                     />
                     {errors.titulo && (
@@ -459,8 +500,9 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                     <input
                       type="date"
                       {...register('prazoResposta')}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.prazoResposta ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                        errors.prazoResposta ? 'border-red-300' : 'border-gray-300'
+                      }`}
                     />
                     {errors.prazoResposta && (
                       <p className="text-red-500 text-sm mt-1">{errors.prazoResposta.message}</p>
@@ -469,13 +511,12 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
 
                   {/* Origem */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Origem *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Origem *</label>
                     <select
                       {...register('origem')}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.origem ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                        errors.origem ? 'border-red-300' : 'border-gray-300'
+                      }`}
                       disabled={isEditing}
                     >
                       <option value={OrigemCotacao.MANUAL}>Manual</option>
@@ -608,7 +649,10 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                           <div className="text-right">
                             <span className="text-sm text-gray-500">Valor Total: </span>
                             <span className="font-medium text-lg text-[#159A9C]">
-                              R$ {(item.quantidade * item.valorUnitario).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              R${' '}
+                              {(item.quantidade * item.valorUnitario).toLocaleString('pt-BR', {
+                                minimumFractionDigits: 2,
+                              })}
                             </span>
                           </div>
                         </div>
@@ -623,7 +667,8 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                     <div className="text-right">
                       <span className="text-lg text-gray-700">Valor Total da Cotação: </span>
                       <span className="font-bold text-2xl text-[#159A9C]">
-                        R$ {calcularValorTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        R${' '}
+                        {calcularValorTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                   </div>
@@ -678,9 +723,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
 
                 {/* Tags */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tags
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
                   <div className="flex flex-wrap gap-2 mb-3">
                     {watchedTags.map((tag, index) => (
                       <span
@@ -738,7 +781,8 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
             <div className="text-sm text-gray-500">
               {activeTab === 'itens' && (
                 <span>
-                  Total: R$ {calcularValorTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  Total: R${' '}
+                  {calcularValorTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </span>
               )}
             </div>

@@ -2,7 +2,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, Crown, Eye, Settings, HelpCircle } from 'lucide-react';
 import { safeGetBoundingClientRect, safeGetWindowDimensions } from '../../utils/dom-helper';
 
-export type PerfilUsuario = 'gerente' | 'vendedor' | 'operacional' | 'financeiro' | 'suporte' | 'administrador';
+export type PerfilUsuario =
+  | 'gerente'
+  | 'vendedor'
+  | 'operacional'
+  | 'financeiro'
+  | 'suporte'
+  | 'administrador';
 
 interface ProfileData {
   value: PerfilUsuario;
@@ -18,43 +24,43 @@ const PERFIS_DISPONIVEIS: ProfileData[] = [
     label: 'Gestor',
     icon: <Crown className="w-4 h-4" />,
     description: 'Visão executiva completa',
-    avatarBg: 'bg-purple-500'
+    avatarBg: 'bg-purple-500',
   },
   {
     value: 'vendedor',
     label: 'Vendedor',
     icon: <Eye className="w-4 h-4" />,
     description: 'Foco em vendas e relacionamentos',
-    avatarBg: 'bg-blue-500'
+    avatarBg: 'bg-blue-500',
   },
   {
     value: 'operacional',
     label: 'Operacional',
     icon: <Settings className="w-4 h-4" />,
     description: 'Gestão de processos e operações',
-    avatarBg: 'bg-green-500'
+    avatarBg: 'bg-green-500',
   },
   {
     value: 'financeiro',
     label: 'Financeiro',
     icon: <Eye className="w-4 h-4" />,
     description: 'Controle financeiro e faturamento',
-    avatarBg: 'bg-orange-500'
+    avatarBg: 'bg-orange-500',
   },
   {
     value: 'suporte',
     label: 'Suporte',
     icon: <HelpCircle className="w-4 h-4" />,
     description: 'Atendimento e suporte técnico',
-    avatarBg: 'bg-emerald-500'
+    avatarBg: 'bg-emerald-500',
   },
   {
     value: 'administrador',
     label: 'Admin',
     icon: <Settings className="w-4 h-4" />,
     description: 'Acesso total ao sistema',
-    avatarBg: 'bg-indigo-500'
-  }
+    avatarBg: 'bg-indigo-500',
+  },
 ];
 
 interface ProfileSelectorButtonProps {
@@ -64,13 +70,13 @@ interface ProfileSelectorButtonProps {
 
 const ProfileSelectorButton: React.FC<ProfileSelectorButtonProps> = ({
   currentProfile,
-  onProfileChange
+  onProfileChange,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
-  const currentProfileData = PERFIS_DISPONIVEIS.find(p => p.value === currentProfile);
+  const currentProfileData = PERFIS_DISPONIVEIS.find((p) => p.value === currentProfile);
 
   const handleProfileSelect = (profile: PerfilUsuario) => {
     onProfileChange(profile);
@@ -108,7 +114,7 @@ const ProfileSelectorButton: React.FC<ProfileSelectorButtonProps> = ({
         return {
           bottom: '100%',
           left: '0',
-          marginBottom: '8px'
+          marginBottom: '8px',
         };
       }
     } catch (error) {
@@ -119,7 +125,7 @@ const ProfileSelectorButton: React.FC<ProfileSelectorButtonProps> = ({
     return {
       top: '100%',
       left: '0',
-      marginTop: '8px'
+      marginTop: '8px',
     };
   };
 
@@ -133,8 +139,9 @@ const ProfileSelectorButton: React.FC<ProfileSelectorButtonProps> = ({
         title="Alternar perfil de visualização"
       >
         <ChevronLeft
-          className={`w-3 h-3 text-[#159A9C] transition-transform duration-200 ${isOpen ? 'rotate-90' : '-rotate-90'
-            } group-hover:scale-110`}
+          className={`w-3 h-3 text-[#159A9C] transition-transform duration-200 ${
+            isOpen ? 'rotate-90' : '-rotate-90'
+          } group-hover:scale-110`}
         />
       </button>
 
@@ -154,10 +161,14 @@ const ProfileSelectorButton: React.FC<ProfileSelectorButtonProps> = ({
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-semibold text-gray-900">Alternar Perfil</h3>
-                  <p className="text-xs text-gray-600">Visualize o sistema de diferentes perspectivas</p>
+                  <p className="text-xs text-gray-600">
+                    Visualize o sistema de diferentes perspectivas
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className={`w-8 h-8 ${currentProfileData?.avatarBg} rounded-lg flex items-center justify-center shadow-sm`}>
+                  <div
+                    className={`w-8 h-8 ${currentProfileData?.avatarBg} rounded-lg flex items-center justify-center shadow-sm`}
+                  >
                     <span className="text-white text-sm font-bold">
                       {currentProfileData?.label.charAt(0)}
                     </span>
@@ -172,28 +183,33 @@ const ProfileSelectorButton: React.FC<ProfileSelectorButtonProps> = ({
                 <button
                   key={perfil.value}
                   onClick={() => handleProfileSelect(perfil.value)}
-                  className={`w-full flex items-center gap-3 p-4 text-left transition-all duration-200 hover:bg-gray-50 ${currentProfile === perfil.value
-                    ? 'bg-[#159A9C]/5 border-r-4 border-r-[#159A9C]'
-                    : ''
-                    }`}
+                  className={`w-full flex items-center gap-3 p-4 text-left transition-all duration-200 hover:bg-gray-50 ${
+                    currentProfile === perfil.value
+                      ? 'bg-[#159A9C]/5 border-r-4 border-r-[#159A9C]'
+                      : ''
+                  }`}
                 >
                   {/* Avatar do perfil */}
-                  <div className={`w-10 h-10 ${perfil.avatarBg} rounded-lg flex items-center justify-center transition-all duration-200 ${currentProfile === perfil.value ? 'shadow-lg scale-110' : 'shadow-sm hover:shadow-md hover:scale-105'
-                    }`}>
-                    <span className="text-white text-sm font-bold">
-                      {perfil.label.charAt(0)}
-                    </span>
+                  <div
+                    className={`w-10 h-10 ${perfil.avatarBg} rounded-lg flex items-center justify-center transition-all duration-200 ${
+                      currentProfile === perfil.value
+                        ? 'shadow-lg scale-110'
+                        : 'shadow-sm hover:shadow-md hover:scale-105'
+                    }`}
+                  >
+                    <span className="text-white text-sm font-bold">{perfil.label.charAt(0)}</span>
                   </div>
 
                   {/* Informações do perfil */}
                   <div className="flex-1 min-w-0">
-                    <div className={`text-sm font-semibold ${currentProfile === perfil.value ? 'text-[#159A9C]' : 'text-gray-900'
-                      }`}>
+                    <div
+                      className={`text-sm font-semibold ${
+                        currentProfile === perfil.value ? 'text-[#159A9C]' : 'text-gray-900'
+                      }`}
+                    >
                       {perfil.label}
                     </div>
-                    <div className="text-xs text-gray-500 truncate">
-                      {perfil.description}
-                    </div>
+                    <div className="text-xs text-gray-500 truncate">{perfil.description}</div>
                   </div>
 
                   {/* Indicador de seleção */}
@@ -215,7 +231,8 @@ const ProfileSelectorButton: React.FC<ProfileSelectorButtonProps> = ({
                   <span className="text-yellow-600 text-xs">💡</span>
                 </div>
                 <span>
-                  <strong className="text-yellow-700">Modo Admin:</strong> Teste diferentes visões do sistema
+                  <strong className="text-yellow-700">Modo Admin:</strong> Teste diferentes visões
+                  do sistema
                 </span>
               </div>
             </div>

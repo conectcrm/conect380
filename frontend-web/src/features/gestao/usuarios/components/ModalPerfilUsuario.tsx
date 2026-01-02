@@ -12,9 +12,10 @@ import {
   Save,
   Calendar,
   Clock,
-  Info
+  Info,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { getErrorMessage } from '../../../../utils/errorHandling';
 
 interface ModalPerfilUsuarioProps {
   isOpen: boolean;
@@ -27,15 +28,15 @@ export const ModalPerfilUsuario: React.FC<ModalPerfilUsuarioProps> = ({
   isOpen,
   onClose,
   usuario,
-  onSave
+  onSave,
 }) => {
   const idiomaLabels: Record<string, string> = {
     'pt-BR': 'Português (Brasil)',
     'en-US': 'English (US)',
-    'es-ES': 'Español (ES)'
+    'es-ES': 'Español (ES)',
   };
 
-  const [loading, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [dadosUsuario, setDadosUsuario] = useState<Partial<Usuario>>({
     nome: usuario.nome,
     email: usuario.email,
@@ -45,27 +46,27 @@ export const ModalPerfilUsuario: React.FC<ModalPerfilUsuarioProps> = ({
       tema: usuario.configuracoes?.tema || 'light',
       notificacoes: {
         email: usuario.configuracoes?.notificacoes?.email ?? true,
-        push: usuario.configuracoes?.notificacoes?.push ?? true
-      }
-    }
+        push: usuario.configuracoes?.notificacoes?.push ?? true,
+      },
+    },
   });
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
 
   // Funções para formatação de data
-  const formatarData = (data: string | Date) => {
+  const formatarData = (data: string | Date): string => {
     const dataObj = typeof data === 'string' ? new Date(data) : data;
     return dataObj.toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
-  const formatarDataRelativa = (data: string | Date) => {
+  const formatarDataRelativa = (data: string | Date): string => {
     const agora = new Date();
     const dataObj = typeof data === 'string' ? new Date(data) : data;
     const diff = agora.getTime() - dataObj.getTime();
@@ -82,36 +83,38 @@ export const ModalPerfilUsuario: React.FC<ModalPerfilUsuarioProps> = ({
     return `${Math.floor(dias / 365)} anos atrás`;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
-    setSaving(true);
+    setLoading(true);
 
     try {
       // Validação de senhas se fornecidas
       if (novaSenha || confirmarSenha) {
         if (novaSenha !== confirmarSenha) {
           toast.error('As senhas não coincidem');
-          setSaving(false);
+          setLoading(false);
           return;
         }
         if (novaSenha.length < 6) {
           toast.error('A senha deve ter pelo menos 6 caracteres');
-          setSaving(false);
+          setLoading(false);
           return;
         }
       }
 
       const dadosParaSalvar = {
         ...dadosUsuario,
-        ...(novaSenha && { senha: novaSenha })
+        ...(novaSenha && { senha: novaSenha }),
       };
 
-  await onSave(dadosParaSalvar);
+      await onSave(dadosParaSalvar);
       onClose();
-    } catch (error) {
-      toast.error('Erro ao atualizar perfil');
+    } catch (err) {
+      const mensagem = getErrorMessage(err, 'Erro ao atualizar perfil');
+      console.error('Erro ao atualizar perfil de usuário:', err);
+      toast.error(mensagem);
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
@@ -126,10 +129,7 @@ export const ModalPerfilUsuario: React.FC<ModalPerfilUsuarioProps> = ({
             <User className="w-5 h-5 mr-2 text-[#159A9C]" />
             Meu Perfil
           </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -162,7 +162,7 @@ export const ModalPerfilUsuario: React.FC<ModalPerfilUsuarioProps> = ({
           {/* Dados Pessoais */}
           <div className="space-y-4">
             <h4 className="text-md font-medium text-gray-900 border-b pb-2">Dados Pessoais</h4>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -173,7 +173,7 @@ export const ModalPerfilUsuario: React.FC<ModalPerfilUsuarioProps> = ({
                   <input
                     type="text"
                     value={dadosUsuario.nome || ''}
-                    onChange={(e) => setDadosUsuario(prev => ({ ...prev, nome: e.target.value }))}
+                    onChange={(e) => setDadosUsuario((prev) => ({ ...prev, nome: e.target.value }))}
                     className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C]"
                     required
                   />
@@ -181,15 +181,15 @@ export const ModalPerfilUsuario: React.FC<ModalPerfilUsuarioProps> = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <input
                     type="email"
                     value={dadosUsuario.email || ''}
-                    onChange={(e) => setDadosUsuario(prev => ({ ...prev, email: e.target.value }))}
+                    onChange={(e) =>
+                      setDadosUsuario((prev) => ({ ...prev, email: e.target.value }))
+                    }
                     className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C]"
                     required
                   />
@@ -197,34 +197,38 @@ export const ModalPerfilUsuario: React.FC<ModalPerfilUsuarioProps> = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Telefone
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <input
                     type="tel"
                     value={dadosUsuario.telefone || ''}
-                    onChange={(e) => setDadosUsuario(prev => ({ ...prev, telefone: e.target.value }))}
+                    onChange={(e) =>
+                      setDadosUsuario((prev) => ({ ...prev, telefone: e.target.value }))
+                    }
                     className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Idioma
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Idioma</label>
                 <div className="relative">
                   <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <input
                     type="text"
-                    value={idiomaLabels[dadosUsuario.idioma_preferido || 'pt-BR'] || dadosUsuario.idioma_preferido || 'Português (Brasil)'}
+                    value={
+                      idiomaLabels[dadosUsuario.idioma_preferido || 'pt-BR'] ||
+                      dadosUsuario.idioma_preferido ||
+                      'Português (Brasil)'
+                    }
                     readOnly
                     className="pl-10 w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-600 focus:outline-none cursor-not-allowed"
                   />
                 </div>
-                <p className="text-xs text-gray-400 mt-1">Alteração de idioma será disponibilizada em Configurações.</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Alteração de idioma será disponibilizada em Configurações.
+                </p>
               </div>
             </div>
           </div>
@@ -235,16 +239,14 @@ export const ModalPerfilUsuario: React.FC<ModalPerfilUsuarioProps> = ({
               <Info className="w-4 h-4 mr-2 text-[#159A9C]" />
               Informações do Sistema
             </h4>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-gray-50 p-3 rounded-lg">
                 <div className="flex items-center text-sm font-medium text-gray-700 mb-1">
                   <Calendar className="w-4 h-4 mr-2 text-gray-500" />
                   Cadastrado em
                 </div>
-                <div className="text-sm text-gray-600">
-                  {formatarData(usuario.created_at)}
-                </div>
+                <div className="text-sm text-gray-600">{formatarData(usuario.created_at)}</div>
                 <div className="text-xs text-gray-500 mt-1">
                   {formatarDataRelativa(usuario.created_at)}
                 </div>
@@ -270,9 +272,7 @@ export const ModalPerfilUsuario: React.FC<ModalPerfilUsuarioProps> = ({
                   <User className="w-4 h-4 mr-2 text-gray-500" />
                   ID do Usuário
                 </div>
-                <div className="text-xs text-gray-600 font-mono">
-                  {usuario.id}
-                </div>
+                <div className="text-xs text-gray-600 font-mono">{usuario.id}</div>
               </div>
 
               <div className="bg-gray-50 p-3 rounded-lg">
@@ -294,12 +294,10 @@ export const ModalPerfilUsuario: React.FC<ModalPerfilUsuarioProps> = ({
           {/* Alterar Senha */}
           <div className="space-y-4">
             <h4 className="text-md font-medium text-gray-900 border-b pb-2">Alterar Senha</h4>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nova Senha
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nova Senha</label>
                 <div className="relative">
                   <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <input
@@ -342,7 +340,8 @@ export const ModalPerfilUsuario: React.FC<ModalPerfilUsuarioProps> = ({
             <h4 className="text-md font-medium text-gray-900 border-b pb-2">Personalização</h4>
             <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4">
               <p className="text-sm text-gray-600">
-                Ajustes de tema e notificações serão centralizados na área de Configurações em uma próxima atualização.
+                Ajustes de tema e notificações serão centralizados na área de Configurações em uma
+                próxima atualização.
               </p>
             </div>
           </div>

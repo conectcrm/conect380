@@ -49,7 +49,7 @@ export const formatDocumentForExport = (document: string): string => {
 export const exportToCSV = (
   data: any[],
   columns: ExportColumn[],
-  filename: string = 'export'
+  filename: string = 'export',
 ): void => {
   if (!data || data.length === 0) {
     alert('Não há dados para exportar');
@@ -57,11 +57,11 @@ export const exportToCSV = (
   }
 
   // Criar cabeçalho
-  const headers = columns.map(col => col.label);
+  const headers = columns.map((col) => col.label);
 
   // Processar dados
-  const processedData = data.map(item => {
-    return columns.map(col => {
+  const processedData = data.map((item) => {
+    return columns.map((col) => {
       const value = getNestedValue(item, col.key);
       const formatter = col.transform ?? col.format;
       return formatter ? formatter(value) : value || '';
@@ -70,7 +70,7 @@ export const exportToCSV = (
 
   // Combinar cabeçalho com dados
   const csvContent = [headers, ...processedData]
-    .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+    .map((row) => row.map((field) => `"${String(field).replace(/"/g, '""')}"`).join(','))
     .join('\n');
 
   // Adicionar BOM para suporte a UTF-8
@@ -93,7 +93,7 @@ export const exportToExcel = (
   data: any[],
   columns: ExportColumn[],
   filename: string = 'export',
-  sheetName: string = 'Dados'
+  sheetName: string = 'Dados',
 ): void => {
   if (!data || data.length === 0) {
     alert('Não há dados para exportar');
@@ -101,9 +101,9 @@ export const exportToExcel = (
   }
 
   // Processar dados
-  const processedData = data.map(item => {
+  const processedData = data.map((item) => {
     const row: { [key: string]: any } = {};
-    columns.forEach(col => {
+    columns.forEach((col) => {
       const value = getNestedValue(item, col.key);
       const formatter = col.transform ?? col.format;
       row[col.label] = formatter ? formatter(value) : value || '';
@@ -116,8 +116,8 @@ export const exportToExcel = (
   const ws = XLSX.utils.json_to_sheet(processedData);
 
   // Ajustar largura das colunas
-  const colWidths = columns.map(col => ({
-    wch: Math.max(col.label.length, 15)
+  const colWidths = columns.map((col) => ({
+    wch: Math.max(col.label.length, 15),
   }));
   ws['!cols'] = colWidths;
 
@@ -177,7 +177,7 @@ export const prepareFornecedoresForExport = (fornecedores: any[]): ExportColumn[
     { key: 'contato', label: 'Contato' },
     { key: 'ativo', label: 'Status', transform: formatStatusForExport },
     { key: 'criadoEm', label: 'Data de Cadastro', transform: formatDateForExport },
-    { key: 'atualizadoEm', label: 'Última Atualização', transform: formatDateForExport }
+    { key: 'atualizadoEm', label: 'Última Atualização', transform: formatDateForExport },
   ];
 };
 
@@ -190,5 +190,5 @@ export default {
   formatDocumentForExport,
   generateFilenameWithTimestamp,
   validateExportData,
-  prepareFornecedoresForExport
+  prepareFornecedoresForExport,
 };

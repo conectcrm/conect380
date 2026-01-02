@@ -10,11 +10,7 @@ interface WhatsAppPreviewProps {
 /**
  * 📱 Preview de como a mensagem ficará no WhatsApp
  */
-export const WhatsAppPreview: React.FC<WhatsAppPreviewProps> = ({
-  selectedNode,
-  nodes,
-  edges,
-}) => {
+export const WhatsAppPreview: React.FC<WhatsAppPreviewProps> = ({ selectedNode, nodes, edges }) => {
   const previewData = useMemo(() => {
     if (!selectedNode) {
       return null;
@@ -79,17 +75,12 @@ export const WhatsAppPreview: React.FC<WhatsAppPreviewProps> = ({
               Selecione uma opção:
             </div>
             {opcoes.slice(0, 3).map((opcao: any, index: number) => (
-              <div
-                key={index}
-                className="px-3 py-2 border-b last:border-b-0 hover:bg-gray-50"
-              >
+              <div key={index} className="px-3 py-2 border-b last:border-b-0 hover:bg-gray-50">
                 <div className="font-medium text-gray-800">
                   {opcao.texto || `Opção ${index + 1}`}
                 </div>
                 {opcao.descricao && (
-                  <div className="text-gray-500 mt-0.5 text-[10px]">
-                    {opcao.descricao}
-                  </div>
+                  <div className="text-gray-500 mt-0.5 text-[10px]">{opcao.descricao}</div>
                 )}
               </div>
             ))}
@@ -129,13 +120,9 @@ export const WhatsAppPreview: React.FC<WhatsAppPreviewProps> = ({
       <div className="bg-white border-b px-4 py-3">
         <div className="flex items-center gap-2 mb-2">
           <Smartphone className="h-5 w-5 text-gray-600" />
-          <span className="font-semibold text-gray-800">
-            Preview WhatsApp
-          </span>
+          <span className="font-semibold text-gray-800">Preview WhatsApp</span>
         </div>
-        <p className="text-xs text-gray-500">
-          Visualização aproximada da mensagem no WhatsApp
-        </p>
+        <p className="text-xs text-gray-500">Visualização aproximada da mensagem no WhatsApp</p>
       </div>
 
       {/* Corpo do preview - simulação do WhatsApp */}
@@ -179,9 +166,7 @@ export const WhatsAppPreview: React.FC<WhatsAppPreviewProps> = ({
 
               {/* Nome do bloco (desenvolvimento) */}
               <div className="mt-1 px-2">
-                <span className="text-[10px] text-gray-500 italic">
-                  Etapa: {previewData.nome}
-                </span>
+                <span className="text-[10px] text-gray-500 italic">Etapa: {previewData.nome}</span>
               </div>
             </div>
           </div>

@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { DropdownContatos } from '../../features/atendimento/chat/DropdownContatos';
 import { useAuth } from '../../hooks/useAuth';
+import { API_BASE_URL } from '../../services/api';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_URL = API_BASE_URL;
 
 // ========================================
 // INTERFACES E TIPOS
@@ -97,7 +98,9 @@ export function PainelContextoCliente({
       const empresaId = user?.empresa?.id;
 
       // Determinar se clienteId é um UUID ou telefone
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clienteId);
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        clienteId,
+      );
 
       let url: string;
       if (isUUID) {
@@ -114,8 +117,7 @@ export function PainelContextoCliente({
           Authorization: `Bearer ${token}`,
         },
         params: { empresaId },
-      }
-      );
+      });
 
       setContexto(response.data);
       console.log('✅ Contexto do cliente carregado:', response.data);
@@ -153,10 +155,7 @@ export function PainelContextoCliente({
         <div className="p-4 border-b flex items-center justify-between">
           <h2 className="text-lg font-semibold">📊 Contexto</h2>
           {onClose && (
-            <button
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 transition"
-            >
+            <button onClick={onClose} className="text-gray-500 hover:text-gray-700 transition">
               ×
             </button>
           )}
@@ -209,8 +208,8 @@ export function PainelContextoCliente({
       <div className="flex border-b bg-gray-50">
         <button
           className={`flex-1 py-3 text-sm font-medium transition ${abaAtiva === 'info'
-            ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
-            : 'text-gray-600 hover:text-gray-800'
+              ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+              : 'text-gray-600 hover:text-gray-800'
             }`}
           onClick={() => setAbaAtiva('info')}
         >
@@ -218,8 +217,8 @@ export function PainelContextoCliente({
         </button>
         <button
           className={`flex-1 py-3 text-sm font-medium transition ${abaAtiva === 'historico'
-            ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
-            : 'text-gray-600 hover:text-gray-800'
+              ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+              : 'text-gray-600 hover:text-gray-800'
             }`}
           onClick={() => setAbaAtiva('historico')}
         >
@@ -227,8 +226,8 @@ export function PainelContextoCliente({
         </button>
         <button
           className={`flex-1 py-3 text-sm font-medium transition ${abaAtiva === 'acoes'
-            ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
-            : 'text-gray-600 hover:text-gray-800'
+              ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+              : 'text-gray-600 hover:text-gray-800'
             }`}
           onClick={() => setAbaAtiva('acoes')}
         >
@@ -285,10 +284,10 @@ function AbaInfo({ contexto }: { contexto: ContextoCliente }) {
         <h3 className="text-sm font-semibold text-gray-700 mb-2">Segmento</h3>
         <span
           className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${cliente.segmento === 'VIP'
-            ? 'bg-yellow-100 text-yellow-800'
-            : cliente.segmento === 'Novo'
-              ? 'bg-green-100 text-green-800'
-              : 'bg-gray-100 text-gray-800'
+              ? 'bg-yellow-100 text-yellow-800'
+              : cliente.segmento === 'Novo'
+                ? 'bg-green-100 text-green-800'
+                : 'bg-gray-100 text-gray-800'
             }`}
         >
           {cliente.segmento === 'VIP' && '⭐ '}
@@ -323,12 +322,7 @@ function AbaInfo({ contexto }: { contexto: ContextoCliente }) {
             valor={`R$ ${estatisticas.valorTotalGasto.toFixed(2)}`}
             cor="green"
           />
-          <StatCard
-            icon="🎫"
-            label="Tickets"
-            valor={`${estatisticas.totalTickets}`}
-            cor="blue"
-          />
+          <StatCard icon="🎫" label="Tickets" valor={`${estatisticas.totalTickets}`} cor="blue" />
           <StatCard
             icon="✅"
             label="Resolvidos"
@@ -349,11 +343,7 @@ function AbaInfo({ contexto }: { contexto: ContextoCliente }) {
             label="Avaliação"
             valor={`${estatisticas.avaliacaoMedia.toFixed(1)} / 5.0`}
           />
-          <InfoItem
-            icon="⚡"
-            label="Tempo Médio"
-            valor={estatisticas.tempoMedioResposta}
-          />
+          <InfoItem icon="⚡" label="Tempo Médio" valor={estatisticas.tempoMedioResposta} />
         </div>
       </div>
 
@@ -394,10 +384,7 @@ function AbaHistorico({ contexto }: { contexto: ContextoCliente }) {
         ) : (
           <div className="space-y-2">
             {historico.propostas.map((proposta: any, index: number) => (
-              <div
-                key={index}
-                className="p-2 bg-gray-50 rounded border border-gray-200 text-xs"
-              >
+              <div key={index} className="p-2 bg-gray-50 rounded border border-gray-200 text-xs">
                 <div className="font-medium">#{proposta.numero}</div>
                 <div className="text-gray-600">{proposta.titulo}</div>
               </div>
@@ -416,10 +403,7 @@ function AbaHistorico({ contexto }: { contexto: ContextoCliente }) {
         ) : (
           <div className="space-y-2">
             {historico.faturas.map((fatura: any, index: number) => (
-              <div
-                key={index}
-                className="p-2 bg-gray-50 rounded border border-gray-200 text-xs"
-              >
+              <div key={index} className="p-2 bg-gray-50 rounded border border-gray-200 text-xs">
                 <div className="font-medium">#{fatura.numero}</div>
                 <div className="text-gray-600">{fatura.descricao}</div>
               </div>
@@ -446,8 +430,8 @@ function AbaHistorico({ contexto }: { contexto: ContextoCliente }) {
                   <span className="font-medium">Ticket #{ticket.numero}</span>
                   <span
                     className={`px-2 py-0.5 rounded text-xs ${ticket.status === 'RESOLVIDO'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-800'
                       }`}
                   >
                     {ticket.status}

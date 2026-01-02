@@ -25,7 +25,7 @@ export const AbrirDemandaModal: React.FC<AbrirDemandaModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  ticketAtual
+  ticketAtual,
 }) => {
   const { currentPalette } = useTheme();
   const [tipo, setTipo] = useState<'bug' | 'feature' | 'suporte' | 'melhoria'>('suporte');
@@ -39,14 +39,14 @@ export const AbrirDemandaModal: React.FC<AbrirDemandaModalProps> = ({
     { value: 'bug', label: '🐛 Bug', cor: '#EF4444' },
     { value: 'feature', label: '✨ Feature', cor: '#8B5CF6' },
     { value: 'suporte', label: '🎧 Suporte', cor: '#10B981' },
-    { value: 'melhoria', label: '🚀 Melhoria', cor: '#F59E0B' }
+    { value: 'melhoria', label: '🚀 Melhoria', cor: '#F59E0B' },
   ];
 
   const prioridades = [
     { value: 'baixa', label: 'Baixa', cor: '#10B981' },
     { value: 'media', label: 'Média', cor: '#F59E0B' },
     { value: 'alta', label: 'Alta', cor: '#EF4444' },
-    { value: 'urgente', label: 'Urgente', cor: '#DC2626' }
+    { value: 'urgente', label: 'Urgente', cor: '#DC2626' },
   ];
 
   const handleConfirmar = () => {
@@ -61,7 +61,7 @@ export const AbrirDemandaModal: React.FC<AbrirDemandaModalProps> = ({
       descricao: descricao.trim(),
       prioridade,
       responsavelId: responsavel || undefined,
-      prazo: prazo ? new Date(prazo) : undefined
+      prazo: prazo ? new Date(prazo) : undefined,
     };
 
     onConfirm(dados);
@@ -97,7 +97,9 @@ export const AbrirDemandaModal: React.FC<AbrirDemandaModalProps> = ({
             <div>
               <h2 className="text-xl font-semibold text-gray-900">Abrir Demanda</h2>
               {ticketAtual && (
-                <p className="text-sm text-gray-500">Vinculada ao atendimento de {ticketAtual.contato.nome}</p>
+                <p className="text-sm text-gray-500">
+                  Vinculada ao atendimento de {ticketAtual.contato.nome}
+                </p>
               )}
             </div>
           </div>
@@ -115,8 +117,9 @@ export const AbrirDemandaModal: React.FC<AbrirDemandaModalProps> = ({
                   <button
                     key={t.value}
                     onClick={() => setTipo(t.value as any)}
-                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${tipo === t.value ? 'text-white' : 'bg-gray-100 text-gray-700'
-                      }`}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                      tipo === t.value ? 'text-white' : 'bg-gray-100 text-gray-700'
+                    }`}
                     style={{ backgroundColor: tipo === t.value ? t.cor : undefined }}
                   >
                     {t.label}
@@ -156,8 +159,9 @@ export const AbrirDemandaModal: React.FC<AbrirDemandaModalProps> = ({
                   <button
                     key={p.value}
                     onClick={() => setPrioridade(p.value as any)}
-                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${prioridade === p.value ? 'text-white' : 'bg-gray-100 text-gray-700'
-                      }`}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                      prioridade === p.value ? 'text-white' : 'bg-gray-100 text-gray-700'
+                    }`}
                     style={{ backgroundColor: prioridade === p.value ? p.cor : undefined }}
                   >
                     {p.label}

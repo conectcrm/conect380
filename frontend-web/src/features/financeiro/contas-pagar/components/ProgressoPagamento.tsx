@@ -13,7 +13,7 @@ export const ProgressoPagamento: React.FC<ProgressoPagamentoProps> = ({
   valorPago,
   className = '',
   showValues = true,
-  size = 'md'
+  size = 'md',
 }) => {
   const porcentagem = valorTotal > 0 ? (valorPago / valorTotal) * 100 : 0;
   const valorRestante = valorTotal - valorPago;
@@ -21,7 +21,7 @@ export const ProgressoPagamento: React.FC<ProgressoPagamentoProps> = ({
   const formatMoney = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -34,17 +34,23 @@ export const ProgressoPagamento: React.FC<ProgressoPagamentoProps> = ({
 
   const getBarHeight = () => {
     switch (size) {
-      case 'sm': return 'h-2';
-      case 'lg': return 'h-4';
-      default: return 'h-3';
+      case 'sm':
+        return 'h-2';
+      case 'lg':
+        return 'h-4';
+      default:
+        return 'h-3';
     }
   };
 
   const getTextSize = () => {
     switch (size) {
-      case 'sm': return 'text-xs';
-      case 'lg': return 'text-sm';
-      default: return 'text-xs';
+      case 'sm':
+        return 'text-xs';
+      case 'lg':
+        return 'text-sm';
+      default:
+        return 'text-xs';
     }
   };
 
@@ -77,7 +83,8 @@ export const ProgressoPagamento: React.FC<ProgressoPagamentoProps> = ({
           </span>
           {valorRestante > 0 && (
             <span>
-              Restante: <span className="font-medium text-red-600">{formatMoney(valorRestante)}</span>
+              Restante:{' '}
+              <span className="font-medium text-red-600">{formatMoney(valorRestante)}</span>
             </span>
           )}
         </div>
@@ -88,9 +95,11 @@ export const ProgressoPagamento: React.FC<ProgressoPagamentoProps> = ({
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${getBarColor().replace('bg-', 'bg-')}`}></div>
           <span className={`${getTextSize()} font-medium`}>
-            {porcentagem === 100 ? 'Pago integralmente' :
-              porcentagem > 0 ? 'Pagamento parcial' :
-                'Não pago'}
+            {porcentagem === 100
+              ? 'Pago integralmente'
+              : porcentagem > 0
+                ? 'Pagamento parcial'
+                : 'Não pago'}
           </span>
         </div>
       )}

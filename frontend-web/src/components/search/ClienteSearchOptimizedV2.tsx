@@ -9,9 +9,9 @@ interface Cliente {
   telefone: string;
   documento: string;
   endereco?: string; // Tornando opcional para compatibilidade
-  cidade?: string;   // Tornando opcional para compatibilidade
-  estado?: string;   // Tornando opcional para compatibilidade
-  cep?: string;      // Tornando opcional para compatibilidade
+  cidade?: string; // Tornando opcional para compatibilidade
+  estado?: string; // Tornando opcional para compatibilidade
+  cep?: string; // Tornando opcional para compatibilidade
   observacoes?: string;
   ativo?: boolean;
   createdAt?: string;
@@ -36,7 +36,7 @@ export default function ClienteSearchOptimized({
   onNewCliente,
   onReloadClientes,
   isLoading = false,
-  className = ''
+  className = '',
 }: ClienteSearchOptimizedProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -47,11 +47,12 @@ export default function ClienteSearchOptimized({
     // Filtro por busca
     if (debouncedSearchTerm) {
       const term = debouncedSearchTerm.toLowerCase();
-      filtered = filtered.filter(cliente =>
-        cliente.nome.toLowerCase().includes(term) ||
-        cliente.documento.toLowerCase().includes(term) ||
-        (cliente.email && cliente.email.toLowerCase().includes(term)) ||
-        (cliente.telefone && cliente.telefone.toLowerCase().includes(term))
+      filtered = filtered.filter(
+        (cliente) =>
+          cliente.nome.toLowerCase().includes(term) ||
+          cliente.documento.toLowerCase().includes(term) ||
+          (cliente.email && cliente.email.toLowerCase().includes(term)) ||
+          (cliente.telefone && cliente.telefone.toLowerCase().includes(term)),
       );
     }
 
@@ -63,9 +64,12 @@ export default function ClienteSearchOptimized({
     return clientesFiltrados.slice(0, 10);
   }, [clientesFiltrados]);
 
-  const handleClienteSelect = useCallback((cliente: Cliente) => {
-    onClienteSelect(cliente);
-  }, [onClienteSelect]);
+  const handleClienteSelect = useCallback(
+    (cliente: Cliente) => {
+      onClienteSelect(cliente);
+    },
+    [onClienteSelect],
+  );
 
   const clearSearch = useCallback(() => {
     setSearchTerm('');
@@ -83,9 +87,7 @@ export default function ClienteSearchOptimized({
               </div>
               <div>
                 <p className="font-medium text-teal-900 text-sm">{selectedCliente.nome}</p>
-                <p className="text-xs text-teal-600">
-                  {selectedCliente.documento}
-                </p>
+                <p className="text-xs text-teal-600">{selectedCliente.documento}</p>
               </div>
             </div>
             <button
@@ -169,16 +171,15 @@ export default function ClienteSearchOptimized({
               <div
                 key={cliente.id}
                 onClick={() => handleClienteSelect(cliente)}
-                className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${selectedCliente?.id === cliente.id ? 'bg-teal-50 border-l-4 border-teal-500' : ''
-                  }`}
+                className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
+                  selectedCliente?.id === cliente.id ? 'bg-teal-50 border-l-4 border-teal-500' : ''
+                }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <User className="w-4 h-4 text-gray-400" />
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-gray-900 text-sm truncate">
-                        {cliente.nome}
-                      </p>
+                      <p className="font-medium text-gray-900 text-sm truncate">{cliente.nome}</p>
                       <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1">
                         <span>{cliente.documento}</span>
                         {cliente.cidade && (
@@ -189,9 +190,7 @@ export default function ClienteSearchOptimized({
                         )}
                       </div>
                       {cliente.email && (
-                        <p className="text-xs text-gray-400 mt-1 truncate">
-                          {cliente.email}
-                        </p>
+                        <p className="text-xs text-gray-400 mt-1 truncate">{cliente.email}</p>
                       )}
                     </div>
                   </div>

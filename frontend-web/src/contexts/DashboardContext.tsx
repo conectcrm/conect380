@@ -15,11 +15,7 @@ export const DashboardProvider: React.FC<DashboardProviderProps> = ({ children }
     // Implementação futura do contexto
   };
 
-  return (
-    <DashboardContext.Provider value={value}>
-      {children}
-    </DashboardContext.Provider>
-  );
+  return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;
 };
 
 export const useDashboard = () => {

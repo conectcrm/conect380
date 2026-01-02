@@ -17,7 +17,7 @@ const SimpleChart: React.FC<SimpleChartProps> = ({
   data,
   type,
   height = 200,
-  showLabels = true
+  showLabels = true,
 }) => {
   // Guard: Se data for undefined/null/vazio, retornar estado vazio
   const safeData = data || [];
@@ -30,7 +30,7 @@ const SimpleChart: React.FC<SimpleChartProps> = ({
     );
   }
 
-  const maxValue = Math.max(...safeData.map(d => d.value));
+  const maxValue = Math.max(...safeData.map((d) => d.value));
 
   if (type === 'bar') {
     return (
@@ -42,21 +42,17 @@ const SimpleChart: React.FC<SimpleChartProps> = ({
 
             return (
               <div key={index} className="flex flex-col items-center">
-                <div className="text-xs font-medium mb-1">
-                  {item.value.toLocaleString('pt-BR')}
-                </div>
+                <div className="text-xs font-medium mb-1">{item.value.toLocaleString('pt-BR')}</div>
                 <div
                   className="w-12 transition-all duration-500 ease-out"
                   style={{
                     height: barHeight,
                     backgroundColor: color,
-                    borderRadius: '4px 4px 0 0'
+                    borderRadius: '4px 4px 0 0',
                   }}
                 />
                 {showLabels && (
-                  <div className="text-xs text-gray-600 mt-2 text-center w-16">
-                    {item.label}
-                  </div>
+                  <div className="text-xs text-gray-600 mt-2 text-center w-16">{item.label}</div>
                 )}
               </div>
             );
@@ -67,11 +63,13 @@ const SimpleChart: React.FC<SimpleChartProps> = ({
   }
 
   if (type === 'line') {
-    const points = safeData.map((item, index) => {
-      const x = (index / (safeData.length - 1)) * 100;
-      const y = 100 - (item.value / maxValue) * 80;
-      return `${x},${y}`;
-    }).join(' ');
+    const points = safeData
+      .map((item, index) => {
+        const x = (index / (safeData.length - 1)) * 100;
+        const y = 100 - (item.value / maxValue) * 80;
+        return `${x},${y}`;
+      })
+      .join(' ');
 
     return (
       <div className="w-full" style={{ height }}>
@@ -87,14 +85,7 @@ const SimpleChart: React.FC<SimpleChartProps> = ({
             const x = (index / (safeData.length - 1)) * 100;
             const y = 100 - (item.value / maxValue) * 80;
             return (
-              <circle
-                key={index}
-                cx={x}
-                cy={y}
-                r="3"
-                fill="#3B82F6"
-                className="drop-shadow-sm"
-              />
+              <circle key={index} cx={x} cy={y} r="3" fill="#3B82F6" className="drop-shadow-sm" />
             );
           })}
         </svg>
@@ -138,27 +129,14 @@ const SimpleChart: React.FC<SimpleChartProps> = ({
                 `M ${center} ${center}`,
                 `L ${x1} ${y1}`,
                 `A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`,
-                'Z'
+                'Z',
               ].join(' ');
 
               cumulativePercentage += percentage;
 
-              return (
-                <path
-                  key={index}
-                  d={pathData}
-                  fill={color}
-                  className="drop-shadow-sm"
-                />
-              );
+              return <path key={index} d={pathData} fill={color} className="drop-shadow-sm" />;
             })}
-            <circle
-              cx={center}
-              cy={center}
-              r="20"
-              fill="white"
-              className="drop-shadow-sm"
-            />
+            <circle cx={center} cy={center} r="20" fill="white" className="drop-shadow-sm" />
           </svg>
 
           {showLabels && (
@@ -179,10 +157,7 @@ const SimpleChart: React.FC<SimpleChartProps> = ({
 
               return (
                 <div key={index} className="flex items-center gap-2 text-sm">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: color }}
-                  />
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
                   <span className="text-gray-700">{item.label}</span>
                   <span className="text-gray-500">({percentage}%)</span>
                 </div>

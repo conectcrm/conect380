@@ -1,34 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { Usuario, ROLE_LABELS, ROLE_COLORS } from '../../../../types/usuarios/index';
 import { ModalDetalhesUsuario } from './ModalDetalhesUsuario';
-import { 
-  Edit, 
-  Trash2, 
-  MoreVertical, 
-  UserCheck, 
-  UserX, 
-  Key,
+import {
+  Trash2,
+  UserCheck,
+  UserX,
   Mail,
   Phone,
-  Calendar,
   CheckSquare,
   Square,
   Users,
-  AlertTriangle,
-  Eye,
-  MessageSquare,
-  UserCircle,
-  Shield,
-  Copy,
-  Download,
   Settings,
-  FileText,
-  Lock,
-  Unlock,
-  Edit3,
-  Clock,
-  Printer
 } from 'lucide-react';
 
 interface TabelaUsuariosProps {
@@ -41,52 +24,37 @@ interface TabelaUsuariosProps {
   onAcaoMassa?: (acao: 'ativar' | 'desativar' | 'excluir', usuarios: Usuario[]) => void;
 }
 
+type StatusSelecionados = {
+  todosAtivos: boolean;
+  todosInativos: boolean;
+  mixtos: boolean;
+  ativos: number;
+  inativos: number;
+  total: number;
+};
+
 export const TabelaUsuarios: React.FC<TabelaUsuariosProps> = ({
   usuarios,
   onEditarUsuario,
   onExcluirUsuario,
-  onAlterarStatus,
-  onResetSenha,
-  onVisualizarPerfil,
-  onAcaoMassa
+  onAlterarStatus: _onAlterarStatus,
+  onResetSenha: _onResetSenha,
+  onVisualizarPerfil: _onVisualizarPerfil,
+  onAcaoMassa,
 }) => {
   const [usuariosSelecionados, setUsuariosSelecionados] = useState<string[]>([]);
-  const [mostrarAcoesMassa, setMostrarAcoesMassa] = useState(false);
   const [modalDetalheAberto, setModalDetalheAberto] = useState(false);
   const [usuarioSelecionado, setUsuarioSelecionado] = useState<Usuario | null>(null);
 
-  // Função para formatar telefone para WhatsApp
-  const formatarTelefoneWhatsApp = (telefone: string): string => {
-    // Remove todos os caracteres não numéricos
-    const numeroLimpo = telefone.replace(/\D/g, '');
-    
-    // Se não começar com 55 (código do Brasil), adiciona
-    if (!numeroLimpo.startsWith('55')) {
-      return `55${numeroLimpo}`;
-    }
-    
-    return numeroLimpo;
-  };
-
-  // Função para abrir WhatsApp
-  const abrirWhatsApp = (usuario: Usuario) => {
-    if (usuario.telefone) {
-      const numeroFormatado = formatarTelefoneWhatsApp(usuario.telefone);
-      const mensagem = encodeURIComponent(`Olá ${usuario.nome}, como posso ajudá-lo hoje?`);
-      const url = `https://wa.me/${numeroFormatado}?text=${mensagem}`;
-      window.open(url, '_blank');
-    }
-  };
-
   // Funções para analisar status dos usuários selecionados
-  const getUsuariosSelecionadosData = () => {
-    return usuarios.filter(usuario => usuariosSelecionados.includes(usuario.id));
+  const getUsuariosSelecionadosData = (): Usuario[] => {
+    return usuarios.filter((usuario) => usuariosSelecionados.includes(usuario.id));
   };
 
-  const getStatusUsuariosSelecionados = () => {
+  const getStatusUsuariosSelecionados = (): StatusSelecionados => {
     const usuariosData = getUsuariosSelecionadosData();
-    const ativos = usuariosData.filter(u => u.ativo).length;
-    const inativos = usuariosData.filter(u => !u.ativo).length;
+    const ativos = usuariosData.filter((u) => u.ativo).length;
+    const inativos = usuariosData.filter((u) => !u.ativo).length;
     const total = usuariosData.length;
 
     return {
@@ -95,99 +63,66 @@ export const TabelaUsuarios: React.FC<TabelaUsuariosProps> = ({
       mixtos: ativos > 0 && inativos > 0,
       ativos,
       inativos,
-      total
+      total,
     };
   };
 
-  // Função para copiar informações do usuário
-  const copiarInformacoes = (usuario: Usuario) => {
-    const info = `Nome: ${usuario.nome}\nEmail: ${usuario.email}\nPerfil: ${ROLE_LABELS[usuario.role]}\nStatus: ${usuario.ativo ? 'Ativo' : 'Inativo'}${usuario.telefone ? `\nTelefone: ${usuario.telefone}` : ''}`;
-    navigator.clipboard.writeText(info);
-    toast.success('Informações copiadas para a área de transferência!');
-  };
-
-  // Função para enviar email
-  const enviarEmail = (usuario: Usuario) => {
-    const subject = encodeURIComponent('Contato via CRM');
-    const body = encodeURIComponent(`Olá ${usuario.nome},\n\n`);
-    window.open(`mailto:${usuario.email}?subject=${subject}&body=${body}`, '_blank');
-  };
-
   // Função para abrir modal de detalhes
-  const abrirModalDetalhes = (usuario: Usuario) => {
+  const abrirModalDetalhes = (usuario: Usuario): void => {
+    if (_onVisualizarPerfil) {
+      _onVisualizarPerfil(usuario);
+    }
     setUsuarioSelecionado(usuario);
     setModalDetalheAberto(true);
   };
 
+  const handleModalStatusChange = (usuario: Usuario, novoStatus: boolean): void => {
+    _onAlterarStatus({ ...usuario, ativo: novoStatus });
+  };
+
   // Funções de seleção múltipla
-  const toggleSelecaoUsuario = (usuarioId: string) => {
-    setUsuariosSelecionados(prev => 
-      prev.includes(usuarioId) 
-        ? prev.filter(id => id !== usuarioId)
-        : [...prev, usuarioId]
+  const toggleSelecaoUsuario = (usuarioId: string): void => {
+    setUsuariosSelecionados((prev) =>
+      prev.includes(usuarioId) ? prev.filter((id) => id !== usuarioId) : [...prev, usuarioId],
     );
   };
 
-  const selecionarTodos = () => {
+  const selecionarTodos = (): void => {
     if (usuariosSelecionados.length === usuarios.length) {
       setUsuariosSelecionados([]);
     } else {
-      setUsuariosSelecionados(usuarios.map(u => u.id));
+      setUsuariosSelecionados(usuarios.map((u) => u.id));
     }
   };
 
-  const executarAcaoMassa = (acao: 'ativar' | 'desativar' | 'excluir') => {
+  const executarAcaoMassa = (acao: 'ativar' | 'desativar' | 'excluir'): void => {
     if (onAcaoMassa && usuariosSelecionados.length > 0) {
-      let usuariosParaAcao = usuarios.filter(u => usuariosSelecionados.includes(u.id));
-      
+      let usuariosParaAcao = usuarios.filter((u) => usuariosSelecionados.includes(u.id));
+
       // Filtrar usuários baseado na ação e status atual
       if (acao === 'ativar') {
         // Apenas usuários inativos podem ser ativados
-        usuariosParaAcao = usuariosParaAcao.filter(u => !u.ativo);
+        usuariosParaAcao = usuariosParaAcao.filter((u) => !u.ativo);
       } else if (acao === 'desativar') {
         // Apenas usuários ativos podem ser desativados
-        usuariosParaAcao = usuariosParaAcao.filter(u => u.ativo);
+        usuariosParaAcao = usuariosParaAcao.filter((u) => u.ativo);
       }
-      
+
       // Se não há usuários elegíveis para a ação
       if (usuariosParaAcao.length === 0 && acao !== 'excluir') {
-        toast.error(`Nenhum usuário selecionado pode ser ${acao === 'ativar' ? 'ativado' : 'desativado'}`, {
-          icon: '⚠️',
-          duration: 3000
-        });
+        toast.error(
+          `Nenhum usuário selecionado pode ser ${acao === 'ativar' ? 'ativado' : 'desativado'}`,
+          {
+            icon: '⚠️',
+            duration: 3000,
+          },
+        );
         return;
       }
 
       onAcaoMassa(acao, usuariosParaAcao);
       setUsuariosSelecionados([]);
-      setMostrarAcoesMassa(false);
     }
-  };
-  const formatarData = (data: Date) => {
-    if (!data) return '-';
-    const d = new Date(data);
-    if (isNaN(d.getTime())) return '-';
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(d);
-  };
-
-  const formatarDataRelativa = (data: Date) => {
-    if (!data) return '-';
-    const d = new Date(data);
-    if (isNaN(d.getTime())) return '-';
-    const diff = new Date().getTime() - d.getTime();
-    const dias = Math.floor(diff / (1000 * 60 * 60 * 24));
-    if (dias === 0) return 'Hoje';
-    if (dias === 1) return 'Ontem';
-    if (dias < 7) return `${dias} dias atrás`;
-    if (dias < 30) return `${Math.floor(dias / 7)} semanas atrás`;
-    if (dias < 365) return `${Math.floor(dias / 30)} meses atrás`;
-    return `${Math.floor(dias / 365)} anos atrás`;
   };
 
   if (usuarios.length === 0) {
@@ -195,7 +130,12 @@ export const TabelaUsuarios: React.FC<TabelaUsuariosProps> = ({
       <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
         <div className="text-gray-400 mb-4">
           <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+            />
           </svg>
         </div>
         <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum usuário encontrado</h3>
@@ -250,11 +190,15 @@ export const TabelaUsuarios: React.FC<TabelaUsuariosProps> = ({
                       key="ativar"
                       onClick={() => executarAcaoMassa('ativar')}
                       className="px-3 py-1.5 text-sm bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors flex items-center space-x-1"
-                      title={status.mixtos ? `Ativar ${status.inativos} usuário(s) inativo(s)` : `Ativar ${status.total} usuário(s)`}
+                      title={
+                        status.mixtos
+                          ? `Ativar ${status.inativos} usuário(s) inativo(s)`
+                          : `Ativar ${status.total} usuário(s)`
+                      }
                     >
                       <UserCheck className="w-4 h-4" />
                       <span>Ativar{status.mixtos ? ` (${status.inativos})` : ''}</span>
-                    </button>
+                    </button>,
                   );
                 }
 
@@ -265,11 +209,15 @@ export const TabelaUsuarios: React.FC<TabelaUsuariosProps> = ({
                       key="desativar"
                       onClick={() => executarAcaoMassa('desativar')}
                       className="px-3 py-1.5 text-sm bg-yellow-100 text-yellow-700 rounded-md hover:bg-yellow-200 transition-colors flex items-center space-x-1"
-                      title={status.mixtos ? `Desativar ${status.ativos} usuário(s) ativo(s)` : `Desativar ${status.total} usuário(s)`}
+                      title={
+                        status.mixtos
+                          ? `Desativar ${status.ativos} usuário(s) ativo(s)`
+                          : `Desativar ${status.total} usuário(s)`
+                      }
                     >
                       <UserX className="w-4 h-4" />
                       <span>Desativar{status.mixtos ? ` (${status.ativos})` : ''}</span>
-                    </button>
+                    </button>,
                   );
                 }
 
@@ -358,17 +306,15 @@ export const TabelaUsuarios: React.FC<TabelaUsuariosProps> = ({
                       ) : (
                         <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
                           <span className="text-xs font-medium text-gray-600">
-                            {usuario.nome ? usuario.nome.charAt(0).toUpperCase() : "?"}
+                            {usuario.nome ? usuario.nome.charAt(0).toUpperCase() : '?'}
                           </span>
                         </div>
                       )}
                     </div>
                     <div className="ml-3">
-                      <div className="text-sm font-medium text-gray-900">
-                        {usuario.nome}
-                      </div>
+                      <div className="text-sm font-medium text-gray-900">{usuario.nome}</div>
                       <div className="text-xs text-gray-500">
-                        ID: {usuario.id ? usuario.id.substring(0, 8) + "..." : "ID inválido"}
+                        ID: {usuario.id ? usuario.id.substring(0, 8) + '...' : 'ID inválido'}
                       </div>
                     </div>
                   </div>
@@ -388,7 +334,9 @@ export const TabelaUsuarios: React.FC<TabelaUsuariosProps> = ({
                   </div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${ROLE_COLORS[usuario.role]}`}>
+                  <span
+                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${ROLE_COLORS[usuario.role]}`}
+                  >
                     {ROLE_LABELS[usuario.role]}
                   </span>
                 </td>
@@ -413,7 +361,6 @@ export const TabelaUsuarios: React.FC<TabelaUsuariosProps> = ({
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        console.log('🔧 CLIQUE DIRETO NO MODAL - Usuario:', usuario.nome, 'ID:', usuario.id);
                         abrirModalDetalhes(usuario);
                       }}
                       className="flex items-center justify-center w-8 h-8 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
@@ -440,10 +387,7 @@ export const TabelaUsuarios: React.FC<TabelaUsuariosProps> = ({
           usuario={usuarioSelecionado}
           onSalvarUsuario={onEditarUsuario}
           onExcluirUsuario={onExcluirUsuario}
-          onAlterarStatus={(usuario, novoStatus) => {
-            // Implementar lógica de alteração de status se necessário
-            console.log('Alterar status:', usuario, novoStatus);
-          }}
+          onAlterarStatus={handleModalStatusChange}
         />
       )}
     </div>

@@ -12,7 +12,7 @@ import {
   CheckCircle,
   AlertTriangle,
   Clock,
-  Settings
+  Settings,
 } from 'lucide-react';
 
 const NotificationsPage: React.FC = () => {
@@ -25,15 +25,18 @@ const NotificationsPage: React.FC = () => {
     removeNotification,
     clearAll,
     reminders,
-    removeReminder
+    removeReminder,
   } = useNotifications();
 
   const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'success' | 'error' | 'warning' | 'info'>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'success' | 'error' | 'warning' | 'info'>(
+    'all',
+  );
 
   // Filtrar notificações
-  const filteredNotifications = notifications.filter(notification => {
-    const statusMatch = filter === 'all' ||
+  const filteredNotifications = notifications.filter((notification) => {
+    const statusMatch =
+      filter === 'all' ||
       (filter === 'read' && notification.read) ||
       (filter === 'unread' && !notification.read);
 
@@ -44,20 +47,29 @@ const NotificationsPage: React.FC = () => {
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'success': return <CheckCircle className="w-5 h-5 text-green-500" />;
-      case 'error': return <AlertCircle className="w-5 h-5 text-red-500" />;
-      case 'warning': return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
-      case 'info': return <Info className="w-5 h-5 text-blue-500" />;
-      default: return <Bell className="w-5 h-5 text-gray-500" />;
+      case 'success':
+        return <CheckCircle className="w-5 h-5 text-green-500" />;
+      case 'error':
+        return <AlertCircle className="w-5 h-5 text-red-500" />;
+      case 'warning':
+        return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
+      case 'info':
+        return <Info className="w-5 h-5 text-blue-500" />;
+      default:
+        return <Bell className="w-5 h-5 text-gray-500" />;
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'border-l-red-500';
-      case 'medium': return 'border-l-yellow-500';
-      case 'low': return 'border-l-green-500';
-      default: return 'border-l-gray-300';
+      case 'high':
+        return 'border-l-red-500';
+      case 'medium':
+        return 'border-l-yellow-500';
+      case 'low':
+        return 'border-l-green-500';
+      default:
+        return 'border-l-gray-300';
     }
   };
 
@@ -141,9 +153,7 @@ const NotificationsPage: React.FC = () => {
 
               {/* Filtro por Status */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
                 <select
                   value={filter}
                   onChange={(e) => setFilter(e.target.value as any)}
@@ -157,9 +167,7 @@ const NotificationsPage: React.FC = () => {
 
               {/* Filtro por Tipo */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tipo
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
                 <select
                   value={typeFilter}
                   onChange={(e) => setTypeFilter(e.target.value as any)}
@@ -204,9 +212,11 @@ const NotificationsPage: React.FC = () => {
               <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-gray-900">
-                    {filter === 'all' ? 'Todas as Notificações' :
-                      filter === 'unread' ? 'Notificações Não Lidas' :
-                        'Notificações Lidas'}
+                    {filter === 'all'
+                      ? 'Todas as Notificações'
+                      : filter === 'unread'
+                        ? 'Notificações Não Lidas'
+                        : 'Notificações Lidas'}
                   </h2>
                   <span className="text-sm text-gray-500">
                     {filteredNotifications.length} de {notifications.length} notificações
@@ -220,27 +230,30 @@ const NotificationsPage: React.FC = () => {
                   filteredNotifications.map((notification) => (
                     <div
                       key={notification.id}
-                      className={`p-6 hover:bg-gray-50 transition-colors border-l-4 ${getPriorityColor(notification.priority)} ${!notification.read ? 'bg-blue-50' : ''
-                        }`}
+                      className={`p-6 hover:bg-gray-50 transition-colors border-l-4 ${getPriorityColor(notification.priority)} ${
+                        !notification.read ? 'bg-blue-50' : ''
+                      }`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex items-start space-x-4 flex-1">
                           {/* Ícone do Tipo */}
-                          <div className="flex-shrink-0 mt-1">
-                            {getTypeIcon(notification.type)}
-                          </div>
+                          <div className="flex-shrink-0 mt-1">{getTypeIcon(notification.type)}</div>
 
                           {/* Conteúdo */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center space-x-2 mb-1">
-                              <h3 className={`text-lg font-semibold ${!notification.read ? 'text-gray-900' : 'text-gray-700'}`}>
+                              <h3
+                                className={`text-lg font-semibold ${!notification.read ? 'text-gray-900' : 'text-gray-700'}`}
+                              >
                                 {notification.title}
                               </h3>
                               {!notification.read && (
                                 <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                               )}
                             </div>
-                            <p className={`text-sm ${!notification.read ? 'text-gray-800' : 'text-gray-600'} mb-2`}>
+                            <p
+                              className={`text-sm ${!notification.read ? 'text-gray-800' : 'text-gray-600'} mb-2`}
+                            >
                               {notification.message}
                             </p>
                             <div className="flex items-center space-x-4 text-xs text-gray-500">
@@ -284,7 +297,9 @@ const NotificationsPage: React.FC = () => {
                   <div className="p-12 text-center">
                     <Bell className="w-12 h-12 mx-auto text-gray-300 mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      {filter === 'unread' ? 'Nenhuma notificação não lida' : 'Nenhuma notificação encontrada'}
+                      {filter === 'unread'
+                        ? 'Nenhuma notificação não lida'
+                        : 'Nenhuma notificação encontrada'}
                     </h3>
                     <p className="text-gray-500">
                       {filter === 'unread'

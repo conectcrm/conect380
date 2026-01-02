@@ -63,30 +63,30 @@ interface TableState<T> {
   originalData: T[];
   filteredData: T[];
   paginatedData: T[];
-  
+
   // Paginação
   currentPage: number;
   totalPages: number;
   pageSize: number;
   totalItems: number;
-  
+
   // Ordenação
   sortBy: string | null;
   sortOrder: 'asc' | 'desc';
   multiSortConfig: Array<{ field: string; order: 'asc' | 'desc' }>;
-  
+
   // Filtros
   globalFilter: string;
   columnFilters: Record<string, any>;
-  
+
   // Seleção
   selectedItems: T[];
   selectedItemIds: Set<string>;
-  
+
   // Estados de UI
   isLoading: boolean;
   isExporting: boolean;
-  
+
   // Configuração de colunas
   visibleColumns: string[];
   columnWidths: Record<string, string>;
@@ -98,50 +98,51 @@ interface TableActions<T> {
   changePageSize: (size: number) => void;
   nextPage: () => void;
   previousPage: () => void;
-  
+
   // Ordenação
   sortBy: (field: string) => void;
   addSort: (field: string, order: 'asc' | 'desc') => void;
   clearSort: () => void;
-  
+
   // Filtros
   setGlobalFilter: (value: string) => void;
   setColumnFilter: (column: string, value: any) => void;
   clearFilters: () => void;
-  
+
   // Seleção
   selectItem: (item: T, selected: boolean) => void;
   selectAll: (selected: boolean) => void;
   clearSelection: () => void;
-  
+
   // Colunas
   toggleColumn: (columnKey: string) => void;
   resizeColumn: (columnKey: string, width: string) => void;
   resetColumns: () => void;
-  
+
   // Exportação
   exportData: (format: 'csv' | 'excel' | 'pdf', selectedOnly?: boolean) => Promise<void>;
-  
+
   // Utilitários
   refreshData: () => Promise<void>;
   getSelectedData: () => T[];
 }
 
 export function useDataTable<T extends { id: string }>(
-  options: DataTableOptions<T>
+  options: DataTableOptions<T>,
 ): [TableState<T>, TableActions<T>] {
-  
   // Estados locais
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(options.pagination?.pageSize || 25);
   const [sortBy, setSortBy] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [multiSortConfig, setMultiSortConfig] = useState<Array<{ field: string; order: 'asc' | 'desc' }>>([]);
+  const [multiSortConfig, setMultiSortConfig] = useState<
+    Array<{ field: string; order: 'asc' | 'desc' }>
+  >([]);
   const [globalFilter, setGlobalFilter] = useState('');
   const [columnFilters, setColumnFilters] = useState<Record<string, any>>({});
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
-    options.columns.filter(col => !col.hidden).map(col => col.key as string)
+    options.columns.filter((col) => !col.hidden).map((col) => col.key as string),
   );
   const [columnWidths, setColumnWidths] = useState<Record<string, string>>({});
   const [isExporting, setIsExporting] = useState(false);
@@ -150,7 +151,7 @@ export function useDataTable<T extends { id: string }>(
   const {
     data: queryData,
     isLoading,
-    refetch
+    refetch,
   } = useQuery({
     queryKey: options.queryKey || ['table-data'],
     queryFn: options.queryFn || (() => Promise.resolve([])),
@@ -167,21 +168,21 @@ export function useDataTable<T extends { id: string }>(
     // Filtro global
     if (globalFilter && options.filtering?.globalSearch) {
       const searchTerm = globalFilter.toLowerCase();
-      data = data.filter(item =>
-        options.columns.some(col => {
+      data = data.filter((item) =>
+        options.columns.some((col) => {
           if (!col.filterable) return false;
           const value = getNestedValue(item, col.key as string);
           return value?.toString().toLowerCase().includes(searchTerm);
-        })
+        }),
       );
     }
 
     // Filtros por coluna
     Object.entries(columnFilters).forEach(([column, filterValue]) => {
       if (filterValue !== null && filterValue !== '' && filterValue !== undefined) {
-        data = data.filter(item => {
+        data = data.filter((item) => {
           const value = getNestedValue(item, column);
-          
+
           // Diferentes tipos de filtro
           if (typeof filterValue === 'string') {
             return value?.toString().toLowerCase().includes(filterValue.toLowerCase());
@@ -196,7 +197,7 @@ export function useDataTable<T extends { id: string }>(
               (filterValue.max === undefined || numValue <= filterValue.max)
             );
           }
-          
+
           return true;
         });
       }
@@ -217,7 +218,7 @@ export function useDataTable<T extends { id: string }>(
         for (const { field, order } of multiSortConfig) {
           const aValue = getNestedValue(a, field);
           const bValue = getNestedValue(b, field);
-          
+
           const comparison = compareValues(aValue, bValue);
           if (comparison !== 0) {
             return order === 'asc' ? comparison : -comparison;
@@ -230,7 +231,7 @@ export function useDataTable<T extends { id: string }>(
       data.sort((a, b) => {
         const aValue = getNestedValue(a, sortBy);
         const bValue = getNestedValue(b, sortBy);
-        
+
         const comparison = compareValues(aValue, bValue);
         return sortOrder === 'asc' ? comparison : -comparison;
       });
@@ -253,7 +254,7 @@ export function useDataTable<T extends { id: string }>(
 
   // Itens selecionados
   const selectedItems = useMemo(() => {
-    return originalData.filter(item => selectedItemIds.has(item.id));
+    return originalData.filter((item) => selectedItemIds.has(item.id));
   }, [originalData, selectedItemIds]);
 
   // Estado consolidado
@@ -275,15 +276,18 @@ export function useDataTable<T extends { id: string }>(
     isLoading,
     isExporting,
     visibleColumns,
-    columnWidths
+    columnWidths,
   };
 
   // Ações
   const actions: TableActions<T> = {
     // Paginação
-    goToPage: useCallback((page: number) => {
-      setCurrentPage(Math.max(1, Math.min(page, totalPages)));
-    }, [totalPages]),
+    goToPage: useCallback(
+      (page: number) => {
+        setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+      },
+      [totalPages],
+    ),
 
     changePageSize: useCallback((size: number) => {
       setPageSize(size);
@@ -303,19 +307,22 @@ export function useDataTable<T extends { id: string }>(
     }, [currentPage]),
 
     // Ordenação
-    sortBy: useCallback((field: string) => {
-      if (sortBy === field) {
-        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-      } else {
-        setSortBy(field);
-        setSortOrder('asc');
-      }
-      setCurrentPage(1);
-    }, [sortBy, sortOrder]),
+    sortBy: useCallback(
+      (field: string) => {
+        if (sortBy === field) {
+          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+        } else {
+          setSortBy(field);
+          setSortOrder('asc');
+        }
+        setCurrentPage(1);
+      },
+      [sortBy, sortOrder],
+    ),
 
     addSort: useCallback((field: string, order: 'asc' | 'desc') => {
-      setMultiSortConfig(prev => {
-        const existing = prev.findIndex(s => s.field === field);
+      setMultiSortConfig((prev) => {
+        const existing = prev.findIndex((s) => s.field === field);
         if (existing >= 0) {
           const updated = [...prev];
           updated[existing] = { field, order };
@@ -338,9 +345,9 @@ export function useDataTable<T extends { id: string }>(
     }, []),
 
     setColumnFilter: useCallback((column: string, value: any) => {
-      setColumnFilters(prev => ({
+      setColumnFilters((prev) => ({
         ...prev,
-        [column]: value
+        [column]: value,
       }));
       setCurrentPage(1);
     }, []),
@@ -353,7 +360,7 @@ export function useDataTable<T extends { id: string }>(
 
     // Seleção
     selectItem: useCallback((item: T, selected: boolean) => {
-      setSelectedItemIds(prev => {
+      setSelectedItemIds((prev) => {
         const newSet = new Set(prev);
         if (selected) {
           newSet.add(item.id);
@@ -364,13 +371,16 @@ export function useDataTable<T extends { id: string }>(
       });
     }, []),
 
-    selectAll: useCallback((selected: boolean) => {
-      if (selected) {
-        setSelectedItemIds(new Set(paginatedData.map(item => item.id)));
-      } else {
-        setSelectedItemIds(new Set());
-      }
-    }, [paginatedData]),
+    selectAll: useCallback(
+      (selected: boolean) => {
+        if (selected) {
+          setSelectedItemIds(new Set(paginatedData.map((item) => item.id)));
+        } else {
+          setSelectedItemIds(new Set());
+        }
+      },
+      [paginatedData],
+    ),
 
     clearSelection: useCallback(() => {
       setSelectedItemIds(new Set());
@@ -378,9 +388,9 @@ export function useDataTable<T extends { id: string }>(
 
     // Colunas
     toggleColumn: useCallback((columnKey: string) => {
-      setVisibleColumns(prev => {
+      setVisibleColumns((prev) => {
         if (prev.includes(columnKey)) {
-          return prev.filter(key => key !== columnKey);
+          return prev.filter((key) => key !== columnKey);
         } else {
           return [...prev, columnKey];
         }
@@ -388,35 +398,39 @@ export function useDataTable<T extends { id: string }>(
     }, []),
 
     resizeColumn: useCallback((columnKey: string, width: string) => {
-      setColumnWidths(prev => ({
+      setColumnWidths((prev) => ({
         ...prev,
-        [columnKey]: width
+        [columnKey]: width,
       }));
     }, []),
 
     resetColumns: useCallback(() => {
-      setVisibleColumns(options.columns.filter(col => !col.hidden).map(col => col.key as string));
+      setVisibleColumns(
+        options.columns.filter((col) => !col.hidden).map((col) => col.key as string),
+      );
       setColumnWidths({});
     }, [options.columns]),
 
     // Exportação
-    exportData: useCallback(async (format: 'csv' | 'excel' | 'pdf', selectedOnly = false) => {
-      setIsExporting(true);
-      try {
-        const dataToExport = selectedOnly ? selectedItems : filteredData;
-        
-        // TODO: Implementar exportação real
-        console.log(`Exporting ${dataToExport.length} items as ${format}`);
-        
-        // Simular delay de exportação
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-      } catch (error) {
-        console.error('Export error:', error);
-      } finally {
-        setIsExporting(false);
-      }
-    }, [selectedItems, filteredData]),
+    exportData: useCallback(
+      async (format: 'csv' | 'excel' | 'pdf', selectedOnly = false) => {
+        setIsExporting(true);
+        try {
+          const dataToExport = selectedOnly ? selectedItems : filteredData;
+
+          // TODO: Implementar exportação real
+          console.log(`Exporting ${dataToExport.length} items as ${format}`);
+
+          // Simular delay de exportação
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        } catch (error) {
+          console.error('Export error:', error);
+        } finally {
+          setIsExporting(false);
+        }
+      },
+      [selectedItems, filteredData],
+    ),
 
     // Utilitários
     refreshData: useCallback(async () => {
@@ -427,7 +441,7 @@ export function useDataTable<T extends { id: string }>(
 
     getSelectedData: useCallback(() => {
       return selectedItems;
-    }, [selectedItems])
+    }, [selectedItems]),
   };
 
   return [state, actions];

@@ -1,14 +1,15 @@
 /**
  * Service de Auto-Distribuição de Filas
- * 
+ *
  * Gerencia a distribuição automática de tickets para atendentes
  * baseada em diferentes estratégias (Round-Robin, Menor Carga, Prioridade)
- * 
+ *
  * @author ConectCRM
  * @date 07/11/2025
  */
 
 import api from './api';
+import { getErrorMessage } from '../utils/errorHandling';
 
 // ============================================================
 // INTERFACES E TYPES
@@ -18,9 +19,9 @@ import api from './api';
  * Estratégias de distribuição disponíveis
  */
 export enum EstrategiaDistribuicao {
-  ROUND_ROBIN = 'ROUND_ROBIN',      // Revezamento circular
-  MENOR_CARGA = 'MENOR_CARGA',       // Atendente com menos tickets
-  PRIORIDADE = 'PRIORIDADE',         // Baseado em prioridade configurada
+  ROUND_ROBIN = 'ROUND_ROBIN', // Revezamento circular
+  MENOR_CARGA = 'MENOR_CARGA', // Atendente com menos tickets
+  PRIORIDADE = 'PRIORIDADE', // Baseado em prioridade configurada
 }
 
 /**
@@ -94,13 +95,11 @@ export interface EstatisticasDistribuicao {
 
 /**
  * Distribui um ticket específico para um atendente disponível
- * 
+ *
  * @param ticketId - ID do ticket a ser distribuído
  * @returns Resultado da distribuição
  */
-export const distribuirTicket = async (
-  ticketId: string
-): Promise<ResultadoDistribuicao> => {
+export const distribuirTicket = async (ticketId: string): Promise<ResultadoDistribuicao> => {
   try {
     const response = await api.post(`/atendimento/distribuicao/${ticketId}`);
 
@@ -114,32 +113,24 @@ export const distribuirTicket = async (
   } catch (error: unknown) {
     console.error('Erro ao distribuir ticket:', error);
 
-    const errorMessage = (error as any)?.response?.data?.message
-      || (error as Error)?.message
-      || 'Erro ao distribuir ticket';
-
     return {
       ticketId,
       atendenteId: null,
       sucesso: false,
-      mensagem: errorMessage,
+      mensagem: getErrorMessage(error, 'Erro ao distribuir ticket'),
     };
   }
 };
 
 /**
  * Redistribui todos os tickets pendentes de uma fila
- * 
+ *
  * @param filaId - ID da fila
  * @returns Resultado da redistribuição
  */
-export const redistribuirFila = async (
-  filaId: string
-): Promise<ResultadoRedistribuicao> => {
+export const redistribuirFila = async (filaId: string): Promise<ResultadoRedistribuicao> => {
   try {
-    const response = await api.post(
-      `/atendimento/distribuicao/fila/${filaId}/redistribuir`
-    );
+    const response = await api.post(`/atendimento/distribuicao/fila/${filaId}/redistribuir`);
 
     return {
       filaId,
@@ -151,38 +142,31 @@ export const redistribuirFila = async (
   } catch (error: unknown) {
     console.error('Erro ao redistribuir fila:', error);
 
-    const errorMessage = (error as any)?.response?.data?.message
-      || (error as Error)?.message
-      || 'Erro ao redistribuir fila';
-
     return {
       filaId,
       distribuidos: 0,
       total: 0,
       sucesso: false,
-      mensagem: errorMessage,
+      mensagem: getErrorMessage(error, 'Erro ao redistribuir fila'),
     };
   }
 };
 
 /**
  * Busca a configuração de distribuição automática de uma fila
- * 
+ *
  * @param filaId - ID da fila
  * @param empresaId - ID da empresa
  * @returns Configuração da distribuição
  */
 export const buscarConfiguracao = async (
   filaId: string,
-  empresaId: string
+  empresaId: string,
 ): Promise<ConfiguracaoDistribuicao | null> => {
   try {
-    const response = await api.get(
-      `/atendimento/distribuicao/configuracao/${filaId}`,
-      {
-        params: { empresaId },
-      }
-    );
+    const response = await api.get(`/atendimento/distribuicao/configuracao/${filaId}`, {
+      params: { empresaId },
+    });
 
     if (response.data && response.data.success) {
       const data = response.data.data;
@@ -205,7 +189,7 @@ export const buscarConfiguracao = async (
 
 /**
  * Atualiza a configuração de distribuição automática de uma fila
- * 
+ *
  * @param filaId - ID da fila
  * @param empresaId - ID da empresa
  * @param configuracao - Nova configuração
@@ -214,17 +198,14 @@ export const buscarConfiguracao = async (
 export const atualizarConfiguracao = async (
   filaId: string,
   empresaId: string,
-  configuracao: Partial<ConfiguracaoDistribuicao>
+  configuracao: Partial<ConfiguracaoDistribuicao>,
 ): Promise<boolean> => {
   try {
-    const response = await api.patch(
-      `/atendimento/distribuicao/configuracao/${filaId}`,
-      {
-        empresaId,
-        autoDistribuicao: configuracao.distribuicaoAutomatica,
-        algoritmo: configuracao.estrategiaDistribuicao,
-      }
-    );
+    const response = await api.patch(`/atendimento/distribuicao/configuracao/${filaId}`, {
+      empresaId,
+      autoDistribuicao: configuracao.distribuicaoAutomatica,
+      algoritmo: configuracao.estrategiaDistribuicao,
+    });
 
     return response.data && response.data.success;
   } catch (error: unknown) {
@@ -235,12 +216,12 @@ export const atualizarConfiguracao = async (
 
 /**
  * Busca estatísticas de distribuição
- * 
+ *
  * @param empresaId - ID da empresa
  * @returns Estatísticas da distribuição
  */
 export const buscarEstatisticas = async (
-  empresaId: string
+  empresaId: string,
 ): Promise<EstatisticasDistribuicao | null> => {
   try {
     const response = await api.get(`/atendimento/distribuicao/estatisticas`, {
@@ -272,22 +253,23 @@ export const buscarEstatisticas = async (
  * @param empresaId - ID da empresa
  * @returns Lista de filas ativas
  */
-export const listarFilas = async (empresaId: string) => {
+interface FilaDistribuicao {
+  id: string;
+  nome: string;
+  autoDistribuicao: boolean;
+  algoritmo: EstrategiaDistribuicao | string;
+}
+
+export const listarFilas = async (empresaId: string): Promise<FilaDistribuicao[]> => {
   try {
-    const response = await api.get('/atendimento/distribuicao/filas', {
-      params: { empresaId },
-    });
+    const response = await api.get<{ success: boolean; data: FilaDistribuicao[] }>(
+      '/atendimento/distribuicao/filas',
+      {
+        params: { empresaId },
+      },
+    );
 
-    if (response.data && response.data.success) {
-      return response.data.data as Array<{
-        id: string;
-        nome: string;
-        autoDistribuicao: boolean;
-        algoritmo: string;
-      }>;
-    }
-
-    return [];
+    return response.data?.success ? response.data.data : [];
   } catch (error: unknown) {
     console.error('Erro ao listar filas:', error);
     return [];
@@ -297,9 +279,7 @@ export const listarFilas = async (empresaId: string) => {
 /**
  * Helper: Descrição amigável de cada estratégia
  */
-export const descricaoEstrategia = (
-  estrategia: EstrategiaDistribuicao
-): string => {
+export const descricaoEstrategia = (estrategia: EstrategiaDistribuicao): string => {
   switch (estrategia) {
     case EstrategiaDistribuicao.ROUND_ROBIN:
       return 'Revezamento circular entre atendentes';
@@ -315,9 +295,7 @@ export const descricaoEstrategia = (
 /**
  * Helper: Ícone para cada estratégia
  */
-export const iconeEstrategia = (
-  estrategia: EstrategiaDistribuicao
-): string => {
+export const iconeEstrategia = (estrategia: EstrategiaDistribuicao): string => {
   switch (estrategia) {
     case EstrategiaDistribuicao.ROUND_ROBIN:
       return '🔄';

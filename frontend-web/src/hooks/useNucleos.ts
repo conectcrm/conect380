@@ -23,18 +23,18 @@ interface UseNucleosOptions {
 
 /**
  * Hook para carregar e gerenciar núcleos de atendimento
- * 
+ *
  * @example
  * // Carregar apenas núcleos ativos
  * const { nucleos, loading } = useNucleos({ apenasAtivos: true });
- * 
+ *
  * @example
  * // Carregar todos os núcleos com opção "Todos"
- * const { nucleos, loading } = useNucleos({ 
- *   apenasAtivos: false, 
- *   incluirTodos: true 
+ * const { nucleos, loading } = useNucleos({
+ *   apenasAtivos: false,
+ *   incluirTodos: true
  * });
- * 
+ *
  * @example
  * // Controle manual do carregamento
  * const { nucleos, loading, recarregar } = useNucleos({ autoLoad: false });
@@ -42,11 +42,7 @@ interface UseNucleosOptions {
  * recarregar();
  */
 export function useNucleos(options: UseNucleosOptions = {}) {
-  const {
-    apenasAtivos = true,
-    incluirTodos = false,
-    autoLoad = true
-  } = options;
+  const { apenasAtivos = true, incluirTodos = false, autoLoad = true } = options;
 
   const [nucleos, setNucleos] = useState<Nucleo[]>([]);
   const [loading, setLoading] = useState(autoLoad);
@@ -80,7 +76,7 @@ export function useNucleos(options: UseNucleosOptions = {}) {
             ativo: true,
             prioridade: 999,
           } as any,
-          ...nucleosCarregados
+          ...nucleosCarregados,
         ];
       }
 
@@ -106,6 +102,6 @@ export function useNucleos(options: UseNucleosOptions = {}) {
     nucleos,
     loading,
     error,
-    recarregar: carregarNucleos
+    recarregar: carregarNucleos,
   };
 }

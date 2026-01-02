@@ -7,11 +7,9 @@ const TesteCurrencyInput = () => {
   return (
     <div className="p-4 border border-gray-300 rounded-lg bg-white max-w-md">
       <h3 className="text-lg font-medium text-gray-900 mb-4">Teste Input Moeda</h3>
-      
+
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Preço Unitário
-        </label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Preço Unitário</label>
         <input
           type="text"
           value={displayValue}
@@ -22,13 +20,17 @@ const TesteCurrencyInput = () => {
       </div>
 
       <div className="text-sm text-gray-600">
-        <p><strong>Valor numérico:</strong> {value}</p>
-        <p><strong>Display formatado:</strong> {displayValue}</p>
+        <p>
+          <strong>Valor numérico:</strong> {value}
+        </p>
+        <p>
+          <strong>Display formatado:</strong> {displayValue}
+        </p>
       </div>
 
       <div className="mt-4 space-x-2">
         <button
-          onClick={() => setValue(10.50)}
+          onClick={() => setValue(10.5)}
           className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
         >
           Testar R$ 10,50

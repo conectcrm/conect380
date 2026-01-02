@@ -316,9 +316,11 @@ POST /api/atendimento/atendentes
 ```typescript
 // Configurar webhook URL:
 https://seu-dominio.com/api/atendimento/webhooks/whatsapp/:canalId
+// Toda solicitação deve enviar o header X-Hub-Signature-256
 
 // No WhatsApp Business Manager:
 Webhook URL: https://seu-dominio.com/api/atendimento/webhooks/whatsapp/uuid-canal
+Headers obrigatórios: X-Hub-Signature-256 (sha256=...)
 Verify Token: seu-token-secreto
 ```
 
@@ -334,11 +336,13 @@ Verify Token: seu-token-secreto
 ✅ Sem limites de empresas
 ✅ Sem vendor lock-in
 
-### **vs Zendesk/Intercom:**
+### **vs Zendesk/Intercom (comparação técnica apenas):**
+> ⚠️ **Nota de Posicionamento**: ConectCRM compete com HubSpot/Zoho (suites all-in-one), não apenas com ferramentas de atendimento. Esta seção compara features técnicas do módulo omnichannel. Ver [VISAO_SISTEMA_2025.md](../../VISAO_SISTEMA_2025.md) para posicionamento correto.
+
 ✅ Código aberto
 ✅ Custo por IA (não por agente)
 ✅ Multi-tenant nativo
-✅ Integrado com CRM existente
+✅ Integrado com CRM existente (backend único)
 ✅ Analytics avançado
 
 ---

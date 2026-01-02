@@ -28,14 +28,14 @@ interface FormFieldProps {
 export const FormField: React.FC<FormFieldProps> = ({
   name,
   label,
-  type = "text",
+  type = 'text',
   mask,
   required = false,
   error,
   register,
   placeholder,
   disabled = false,
-  className = "",
+  className = '',
   options,
   rows,
   accept,
@@ -49,9 +49,7 @@ export const FormField: React.FC<FormFieldProps> = ({
   ...props
 }) => {
   const baseInputClasses = `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-    error 
-      ? 'border-red-500 focus:ring-red-200' 
-      : 'border-gray-300 hover:border-gray-400'
+    error ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 hover:border-gray-400'
   } ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'} ${className}`;
 
   const renderInput = () => {
@@ -129,11 +127,8 @@ export const FormField: React.FC<FormFieldProps> = ({
   return (
     <div className="mb-4">
       {/* Label */}
-      <label 
-        htmlFor={name}
-        className="block text-sm font-medium text-gray-700 mb-1"
-      >
-        {label} 
+      <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">
+        {label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
 
@@ -141,22 +136,16 @@ export const FormField: React.FC<FormFieldProps> = ({
       {renderInput()}
 
       {/* Help text */}
-      {helpText && !error && (
-        <p className="mt-1 text-xs text-gray-500">{helpText}</p>
-      )}
+      {helpText && !error && <p className="mt-1 text-xs text-gray-500">{helpText}</p>}
 
       {/* Error message */}
       {error && (
         <p className="mt-1 text-sm text-red-600 flex items-center">
-          <svg 
-            className="w-4 h-4 mr-1 flex-shrink-0" 
-            fill="currentColor" 
-            viewBox="0 0 20 20"
-          >
-            <path 
-              fillRule="evenodd" 
-              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" 
-              clipRule="evenodd" 
+          <svg className="w-4 h-4 mr-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+              clipRule="evenodd"
             />
           </svg>
           {error.message}
@@ -173,10 +162,10 @@ interface AddressFieldsProps {
   prefix?: string;
 }
 
-export const AddressFields: React.FC<AddressFieldsProps> = ({ 
-  register, 
-  errors, 
-  prefix = "endereco" 
+export const AddressFields: React.FC<AddressFieldsProps> = ({
+  register,
+  errors,
+  prefix = 'endereco',
 }) => {
   return (
     <div className="space-y-4">
@@ -241,11 +230,7 @@ interface DocumentFieldProps {
   watchTipo: string;
 }
 
-export const DocumentField: React.FC<DocumentFieldProps> = ({ 
-  register, 
-  errors, 
-  watchTipo 
-}) => {
+export const DocumentField: React.FC<DocumentFieldProps> = ({ register, errors, watchTipo }) => {
   if (watchTipo === 'pessoa_fisica') {
     return (
       <FormField
@@ -297,7 +282,7 @@ export const TagsField: React.FC<TagsFieldProps> = ({
   onChange,
   error,
   availableTags = ['Premium', 'VIP', 'Startup', 'Corporativo', 'Lead Quente'],
-  placeholder = "Digite uma tag e pressione Enter"
+  placeholder = 'Digite uma tag e pressione Enter',
 }) => {
   const [inputValue, setInputValue] = React.useState('');
 
@@ -309,7 +294,7 @@ export const TagsField: React.FC<TagsFieldProps> = ({
   };
 
   const removeTag = (tagToRemove: string) => {
-    onChange(value.filter(tag => tag !== tagToRemove));
+    onChange(value.filter((tag) => tag !== tagToRemove));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -321,9 +306,7 @@ export const TagsField: React.FC<TagsFieldProps> = ({
 
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label}
-      </label>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
 
       {/* Tags existentes */}
       {value.length > 0 && (
@@ -365,7 +348,7 @@ export const TagsField: React.FC<TagsFieldProps> = ({
           <p className="text-xs text-gray-500 mb-1">Tags sugeridas:</p>
           <div className="flex flex-wrap gap-1">
             {availableTags
-              .filter(tag => !value.includes(tag))
+              .filter((tag) => !value.includes(tag))
               .map((tag) => (
                 <button
                   key={tag}
@@ -382,14 +365,10 @@ export const TagsField: React.FC<TagsFieldProps> = ({
       )}
 
       {/* Limite de tags */}
-      <p className="mt-1 text-xs text-gray-500">
-        {value.length}/10 tags
-      </p>
+      <p className="mt-1 text-xs text-gray-500">{value.length}/10 tags</p>
 
       {/* Error message */}
-      {error && (
-        <p className="mt-1 text-sm text-red-600">{error.message}</p>
-      )}
+      {error && <p className="mt-1 text-sm text-red-600">{error.message}</p>}
     </div>
   );
 };

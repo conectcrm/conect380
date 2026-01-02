@@ -99,7 +99,9 @@ describe('ResponsiveDashboardLayout', () => {
   it('mantém elementos interativos principais visíveis', () => {
     render(<ResponsiveDashboardLayout {...defaultProps} />);
 
-    expect(screen.getByPlaceholderText('Buscar clientes, propostas, contratos...')).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText('Buscar clientes, propostas, contratos...'),
+    ).toBeInTheDocument();
     expect(screen.getByText('Online')).toBeInTheDocument();
     expect(screen.getByTitle('Notificações')).toBeInTheDocument();
   });

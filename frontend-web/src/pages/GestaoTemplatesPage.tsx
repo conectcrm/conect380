@@ -5,18 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import {
-  RefreshCw,
-  Plus,
-  Edit2,
-  Trash2,
-  Search,
-  X,
-  FileText,
-  Eye,
-  Copy,
-  Zap,
-} from 'lucide-react';
+import { RefreshCw, Plus, Edit2, Trash2, Search, X, FileText, Eye, Copy, Zap } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
 import messageTemplateService, {
@@ -132,11 +121,16 @@ const GestaoTemplatesPage: React.FC = () => {
 
       if (editingTemplate) {
         // 🔐 empresaId vem do JWT no backend
-        await messageTemplateService.atualizar(editingTemplate.id, dataToSend as UpdateMessageTemplateDto);
+        await messageTemplateService.atualizar(
+          editingTemplate.id,
+          dataToSend as UpdateMessageTemplateDto,
+        );
         toast.success('Template atualizado com sucesso!');
       } else {
         // 🔐 empresaId vem do JWT no backend
-        const novoTemplate = await messageTemplateService.criar(dataToSend as CreateMessageTemplateDto);
+        const novoTemplate = await messageTemplateService.criar(
+          dataToSend as CreateMessageTemplateDto,
+        );
         console.log('✅ Template criado:', novoTemplate);
         toast.success('Template criado com sucesso!');
       }
@@ -145,7 +139,7 @@ const GestaoTemplatesPage: React.FC = () => {
       setEditingTemplate(null);
 
       // Aguardar um momento antes de recarregar para garantir que o banco processou
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 300));
       await carregarDados();
     } catch (err: unknown) {
       console.error('Erro ao salvar template:', err);
@@ -201,7 +195,8 @@ const GestaoTemplatesPage: React.FC = () => {
 
   // Filtros
   const templatesFiltrados = templates.filter((template) => {
-    const matchBusca = template.nome.toLowerCase().includes(busca.toLowerCase()) ||
+    const matchBusca =
+      template.nome.toLowerCase().includes(busca.toLowerCase()) ||
       template.conteudo.toLowerCase().includes(busca.toLowerCase()) ||
       (template.atalho && template.atalho.toLowerCase().includes(busca.toLowerCase()));
 
@@ -216,10 +211,7 @@ const GestaoTemplatesPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header com BackToNucleus */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusName="Atendimento"
-          nucleusPath="/nuclei/atendimento"
-        />
+        <BackToNucleus nucleusName="Atendimento" nucleusPath="/nuclei/atendimento" />
       </div>
 
       {/* Container principal */}
@@ -231,9 +223,7 @@ const GestaoTemplatesPage: React.FC = () => {
               <div className="flex items-center">
                 <FileText className="h-8 w-8 mr-3 text-[#9333EA]" />
                 <div>
-                  <h1 className="text-3xl font-bold text-[#002333]">
-                    Templates de Mensagens
-                  </h1>
+                  <h1 className="text-3xl font-bold text-[#002333]">Templates de Mensagens</h1>
                   <p className="text-sm text-[#B4BEC9] mt-1">
                     Gerencie mensagens rápidas para atendimento
                   </p>
@@ -263,9 +253,7 @@ const GestaoTemplatesPage: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-[#002333] mb-2">
-                  Buscar
-                </label>
+                <label className="block text-sm font-medium text-[#002333] mb-2">Buscar</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#B4BEC9]" />
                   <input
@@ -278,9 +266,7 @@ const GestaoTemplatesPage: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#002333] mb-2">
-                  Categoria
-                </label>
+                <label className="block text-sm font-medium text-[#002333] mb-2">Categoria</label>
                 <select
                   value={categoriaFiltro}
                   onChange={(e) => setCategoriaFiltro(e.target.value)}
@@ -317,7 +303,9 @@ const GestaoTemplatesPage: React.FC = () => {
             <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
               <FileText className="h-16 w-16 text-[#B4BEC9] mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-[#002333] mb-2">
-                {busca || categoriaFiltro ? 'Nenhum template encontrado' : 'Nenhum template cadastrado'}
+                {busca || categoriaFiltro
+                  ? 'Nenhum template encontrado'
+                  : 'Nenhum template cadastrado'}
               </h3>
               <p className="text-[#B4BEC9] mb-6">
                 {busca || categoriaFiltro
@@ -346,9 +334,7 @@ const GestaoTemplatesPage: React.FC = () => {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-[#002333] mb-1">
-                        {template.nome}
-                      </h3>
+                      <h3 className="text-lg font-semibold text-[#002333] mb-1">{template.nome}</h3>
                       {template.categoria && (
                         <span className="inline-block px-2 py-1 text-xs font-medium bg-[#9333EA]/10 text-[#9333EA] rounded">
                           {template.categoria}
@@ -356,10 +342,9 @@ const GestaoTemplatesPage: React.FC = () => {
                       )}
                     </div>
                     <span
-                      className={`px-2 py-1 text-xs font-medium rounded ${template.ativo
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-800'
-                        }`}
+                      className={`px-2 py-1 text-xs font-medium rounded ${
+                        template.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}
                     >
                       {template.ativo ? 'Ativo' : 'Inativo'}
                     </span>
@@ -374,9 +359,7 @@ const GestaoTemplatesPage: React.FC = () => {
                     </div>
                   )}
 
-                  <p className="text-sm text-[#B4BEC9] mb-4 line-clamp-3">
-                    {template.conteudo}
-                  </p>
+                  <p className="text-sm text-[#B4BEC9] mb-4 line-clamp-3">{template.conteudo}</p>
 
                   {template.variaveis && template.variaveis.length > 0 && (
                     <div className="mb-4">
@@ -463,9 +446,7 @@ const GestaoTemplatesPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-[#002333] mb-2">
-                    Atalho
-                  </label>
+                  <label className="block text-sm font-medium text-[#002333] mb-2">Atalho</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#B4BEC9]">
                       /
@@ -481,9 +462,7 @@ const GestaoTemplatesPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-[#002333] mb-2">
-                    Categoria
-                  </label>
+                  <label className="block text-sm font-medium text-[#002333] mb-2">Categoria</label>
                   <input
                     type="text"
                     value={formData.categoria}
@@ -581,9 +560,7 @@ const GestaoTemplatesPage: React.FC = () => {
 
               {previewTemplate.variaveis && previewTemplate.variaveis.length > 0 && (
                 <div>
-                  <h4 className="text-sm font-medium text-[#002333] mb-2">
-                    Variáveis utilizadas:
-                  </h4>
+                  <h4 className="text-sm font-medium text-[#002333] mb-2">Variáveis utilizadas:</h4>
                   <div className="flex flex-wrap gap-2">
                     {previewTemplate.variaveis.map((v, idx) => (
                       <code key={idx} className="text-xs bg-gray-100 px-2 py-1 rounded">
@@ -597,7 +574,9 @@ const GestaoTemplatesPage: React.FC = () => {
               {previewTemplate.atalho && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <p className="text-sm text-blue-800">
-                    <strong>Atalho:</strong> Digite <code className="bg-white px-2 py-1 rounded">/{previewTemplate.atalho}</code> no chat
+                    <strong>Atalho:</strong> Digite{' '}
+                    <code className="bg-white px-2 py-1 rounded">/{previewTemplate.atalho}</code> no
+                    chat
                   </p>
                 </div>
               )}

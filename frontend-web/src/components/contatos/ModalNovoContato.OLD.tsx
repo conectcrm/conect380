@@ -13,7 +13,7 @@ import {
   Star,
   Calendar,
   Plus,
-  Trash2
+  Trash2,
 } from 'lucide-react';
 import { Contato } from '../../features/contatos/services/contatosService';
 
@@ -28,7 +28,7 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
   contato,
   isOpen,
   onClose,
-  onSave
+  onSave,
 }) => {
   const [formData, setFormData] = useState<Partial<Contato>>({
     nome: '',
@@ -46,19 +46,19 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
       cidade: '',
       estado: '',
       cep: '',
-      pais: 'Brasil'
+      pais: 'Brasil',
     },
     redes_sociais: {
       linkedin: '',
       twitter: '',
       facebook: '',
-      instagram: ''
+      instagram: '',
     },
     tags: [],
     pontuacao_lead: 0,
     valor_potencial: 0,
     notas: '',
-    categoria: 'Geral'
+    categoria: 'Geral',
   });
 
   const [newTag, setNewTag] = useState('');
@@ -73,14 +73,14 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
           cidade: '',
           estado: '',
           cep: '',
-          pais: 'Brasil'
+          pais: 'Brasil',
         },
         redes_sociais: contato.redes_sociais || {
           linkedin: '',
           twitter: '',
           facebook: '',
-          instagram: ''
-        }
+          instagram: '',
+        },
       });
     } else {
       setFormData({
@@ -99,19 +99,19 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
           cidade: '',
           estado: '',
           cep: '',
-          pais: 'Brasil'
+          pais: 'Brasil',
         },
         redes_sociais: {
           linkedin: '',
           twitter: '',
           facebook: '',
-          instagram: ''
+          instagram: '',
         },
         tags: [],
         pontuacao_lead: 0,
         valor_potencial: 0,
         notas: '',
-        categoria: 'Geral'
+        categoria: 'Geral',
       });
     }
     setErrors({});
@@ -153,14 +153,14 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
   };
 
   const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
 
     // Limpar erro quando o campo for preenchido
     if (errors[field] && value?.toString().trim()) {
-      setErrors(prev => {
+      setErrors((prev) => {
         const newErrors = { ...prev };
         delete newErrors[field];
         return newErrors;
@@ -169,39 +169,39 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
   };
 
   const handleEnderecoChange = (field: string, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       endereco: {
         ...prev.endereco,
-        [field]: value
-      }
+        [field]: value,
+      },
     }));
   };
 
   const handleRedesSociaisChange = (platform: string, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       redes_sociais: {
         ...prev.redes_sociais,
-        [platform]: value
-      }
+        [platform]: value,
+      },
     }));
   };
 
   const addTag = () => {
     if (newTag.trim() && !formData.tags?.includes(newTag.trim())) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        tags: [...(prev.tags || []), newTag.trim()]
+        tags: [...(prev.tags || []), newTag.trim()],
       }));
       setNewTag('');
     }
   };
 
   const removeTag = (tagToRemove: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      tags: prev.tags?.filter(tag => tag !== tagToRemove) || []
+      tags: prev.tags?.filter((tag) => tag !== tagToRemove) || [],
     }));
   };
 
@@ -230,10 +230,8 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
         <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-120px)]">
           <div className="p-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
               {/* Coluna Esquerda */}
               <div className="space-y-6">
-
                 {/* Informações Básicas */}
                 <div className="bg-gray-50 rounded-lg p-6">
                   <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
@@ -243,15 +241,14 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
 
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Nome *
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
                       <input
                         type="text"
                         value={formData.nome || ''}
                         onChange={(e) => handleInputChange('nome', e.target.value)}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.nome ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                          errors.nome ? 'border-red-300' : 'border-gray-300'
+                        }`}
                         placeholder="Nome completo"
                       />
                       {errors.nome && <p className="text-red-500 text-sm mt-1">{errors.nome}</p>}
@@ -266,11 +263,14 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                           type="email"
                           value={formData.email || ''}
                           onChange={(e) => handleInputChange('email', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.email ? 'border-red-300' : 'border-gray-300'
-                            }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                            errors.email ? 'border-red-300' : 'border-gray-300'
+                          }`}
                           placeholder="email@exemplo.com"
                         />
-                        {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+                        {errors.email && (
+                          <p className="text-red-500 text-sm mt-1">{errors.email}</p>
+                        )}
                       </div>
 
                       <div>
@@ -281,11 +281,14 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                           type="tel"
                           value={formData.telefone || ''}
                           onChange={(e) => handleInputChange('telefone', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.telefone ? 'border-red-300' : 'border-gray-300'
-                            }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                            errors.telefone ? 'border-red-300' : 'border-gray-300'
+                          }`}
                           placeholder="(11) 99999-9999"
                         />
-                        {errors.telefone && <p className="text-red-500 text-sm mt-1">{errors.telefone}</p>}
+                        {errors.telefone && (
+                          <p className="text-red-500 text-sm mt-1">{errors.telefone}</p>
+                        )}
                       </div>
                     </div>
 
@@ -298,11 +301,14 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                           type="text"
                           value={formData.empresa || ''}
                           onChange={(e) => handleInputChange('empresa', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.empresa ? 'border-red-300' : 'border-gray-300'
-                            }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                            errors.empresa ? 'border-red-300' : 'border-gray-300'
+                          }`}
                           placeholder="Nome da empresa"
                         />
-                        {errors.empresa && <p className="text-red-500 text-sm mt-1">{errors.empresa}</p>}
+                        {errors.empresa && (
+                          <p className="text-red-500 text-sm mt-1">{errors.empresa}</p>
+                        )}
                       </div>
 
                       <div>
@@ -342,9 +348,7 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Status
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                       <select
                         value={formData.status || 'prospecto'}
                         onChange={(e) => handleInputChange('status', e.target.value)}
@@ -359,9 +363,7 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Tipo
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
                       <select
                         value={formData.tipo || 'lead'}
                         onChange={(e) => handleInputChange('tipo', e.target.value)}
@@ -376,9 +378,7 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Fonte
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Fonte</label>
                       <select
                         value={formData.fonte || ''}
                         onChange={(e) => handleInputChange('fonte', e.target.value)}
@@ -440,7 +440,9 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                         min="0"
                         max="100"
                         value={formData.pontuacao_lead || 0}
-                        onChange={(e) => handleInputChange('pontuacao_lead', parseInt(e.target.value) || 0)}
+                        onChange={(e) =>
+                          handleInputChange('pontuacao_lead', parseInt(e.target.value) || 0)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                       />
                     </div>
@@ -454,7 +456,9 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                         min="0"
                         step="0.01"
                         value={formData.valor_potencial || 0}
-                        onChange={(e) => handleInputChange('valor_potencial', parseFloat(e.target.value) || 0)}
+                        onChange={(e) =>
+                          handleInputChange('valor_potencial', parseFloat(e.target.value) || 0)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                         placeholder="0,00"
                       />
@@ -465,7 +469,6 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
 
               {/* Coluna Direita */}
               <div className="space-y-6">
-
                 {/* Endereço */}
                 <div className="bg-gray-50 rounded-lg p-6">
                   <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
@@ -475,9 +478,7 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
 
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Rua
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Rua</label>
                       <input
                         type="text"
                         value={formData.endereco?.rua || ''}
@@ -517,9 +518,7 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          CEP
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
                         <input
                           type="text"
                           value={formData.endereco?.cep || ''}
@@ -530,9 +529,7 @@ export const ModalNovoContato: React.FC<ModalNovoContatoProps> = ({
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          País
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">País</label>
                         <input
                           type="text"
                           value={formData.endereco?.pais || 'Brasil'}

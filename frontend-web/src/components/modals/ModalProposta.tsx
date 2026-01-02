@@ -11,7 +11,14 @@ import * as yup from 'yup';
 import toast from 'react-hot-toast';
 import { Save, FileText, DollarSign, Calendar, User, Target } from 'lucide-react';
 import { MoneyInput } from '../common/MoneyInput';
-import { BaseModal, FormField, FormInput, FormTextarea, FormSelect, ModalButton } from './BaseModal';
+import {
+  BaseModal,
+  FormField,
+  FormInput,
+  FormTextarea,
+  FormSelect,
+  ModalButton,
+} from './BaseModal';
 
 interface PropostaFormData {
   titulo: string;
@@ -40,13 +47,9 @@ const schema = yup.object({
     .min(5, 'Título deve ter pelo menos 5 caracteres')
     .max(100, 'Título deve ter no máximo 100 caracteres'),
 
-  cliente: yup
-    .string()
-    .required('Cliente é obrigatório'),
+  cliente: yup.string().required('Cliente é obrigatório'),
 
-  vendedor: yup
-    .string()
-    .required('Vendedor é obrigatório'),
+  vendedor: yup.string().required('Vendedor é obrigatório'),
 
   valor: yup
     .number()
@@ -74,17 +77,11 @@ const schema = yup.object({
     .min(0, 'Probabilidade mínima é 0%')
     .max(100, 'Probabilidade máxima é 100%'),
 
-  categoria: yup
-    .string()
-    .required('Categoria é obrigatória'),
+  categoria: yup.string().required('Categoria é obrigatória'),
 
-  data_vencimento: yup
-    .string()
-    .required('Data de vencimento é obrigatória'),
+  data_vencimento: yup.string().required('Data de vencimento é obrigatória'),
 
-  observacoes: yup
-    .string()
-    .max(300, 'Observações devem ter no máximo 300 caracteres')
+  observacoes: yup.string().max(300, 'Observações devem ter no máximo 300 caracteres'),
 });
 
 export const ModalProposta: React.FC<ModalPropostaProps> = ({
@@ -92,7 +89,7 @@ export const ModalProposta: React.FC<ModalPropostaProps> = ({
   onClose,
   onSave,
   proposta,
-  isLoading = false
+  isLoading = false,
 }) => {
   const {
     register,
@@ -101,7 +98,7 @@ export const ModalProposta: React.FC<ModalPropostaProps> = ({
     formState: { errors, isValid },
     reset,
     setValue,
-    watch
+    watch,
   } = useForm<PropostaFormData>({
     resolver: yupResolver(schema),
     mode: 'onChange',
@@ -114,8 +111,8 @@ export const ModalProposta: React.FC<ModalPropostaProps> = ({
       probabilidade: 50,
       categoria: 'consultoria',
       data_vencimento: '',
-      observacoes: ''
-    }
+      observacoes: '',
+    },
   });
 
   // Opções para os selects
@@ -127,14 +124,14 @@ export const ModalProposta: React.FC<ModalPropostaProps> = ({
     { value: 'treinamento', label: 'Treinamento' },
     { value: 'suporte', label: 'Suporte' },
     { value: 'licenca', label: 'Licença' },
-    { value: 'outros', label: 'Outros' }
+    { value: 'outros', label: 'Outros' },
   ];
 
   const vendedores = [
     { value: 'João Silva', label: 'João Silva' },
     { value: 'Maria Santos', label: 'Maria Santos' },
     { value: 'Pedro Costa', label: 'Pedro Costa' },
-    { value: 'Ana Oliveira', label: 'Ana Oliveira' }
+    { value: 'Ana Oliveira', label: 'Ana Oliveira' },
   ];
 
   // Reset form quando modal abre/fecha
@@ -152,34 +149,28 @@ export const ModalProposta: React.FC<ModalPropostaProps> = ({
           probabilidade: 50,
           categoria: 'consultoria',
           data_vencimento: '',
-          observacoes: ''
+          observacoes: '',
         });
       }
     }
   }, [proposta, reset, isOpen]);
 
   const onSubmit = async (data: PropostaFormData) => {
-    const toastId = toast.loading(
-      proposta ? 'Atualizando proposta...' : 'Criando proposta...'
-    );
+    const toastId = toast.loading(proposta ? 'Atualizando proposta...' : 'Criando proposta...');
 
     try {
       await onSave(data);
 
       toast.success(
         proposta ? 'Proposta atualizada com sucesso!' : 'Proposta criada com sucesso!',
-        { id: toastId }
+        { id: toastId },
       );
 
       setTimeout(() => {
         handleClose();
       }, 1000);
-
     } catch (error) {
-      toast.error(
-        'Erro ao salvar proposta. Tente novamente.',
-        { id: toastId }
-      );
+      toast.error('Erro ao salvar proposta. Tente novamente.', { id: toastId });
     }
   };
 
@@ -192,11 +183,7 @@ export const ModalProposta: React.FC<ModalPropostaProps> = ({
 
   const footerContent = (
     <div className="flex items-center justify-end gap-3">
-      <ModalButton
-        type="button"
-        variant="secondary"
-        onClick={handleClose}
-      >
+      <ModalButton type="button" variant="secondary" onClick={handleClose}>
         Cancelar
       </ModalButton>
       <ModalButton
@@ -230,11 +217,7 @@ export const ModalProposta: React.FC<ModalPropostaProps> = ({
               Informações Básicas
             </h3>
 
-            <FormField
-              label="Título da Proposta"
-              required
-              error={errors.titulo?.message}
-            >
+            <FormField label="Título da Proposta" required error={errors.titulo?.message}>
               <FormInput
                 {...register('titulo')}
                 type="text"
@@ -243,11 +226,7 @@ export const ModalProposta: React.FC<ModalPropostaProps> = ({
               />
             </FormField>
 
-            <FormField
-              label="Cliente"
-              required
-              error={errors.cliente?.message}
-            >
+            <FormField label="Cliente" required error={errors.cliente?.message}>
               <FormInput
                 {...register('cliente')}
                 type="text"
@@ -256,11 +235,7 @@ export const ModalProposta: React.FC<ModalPropostaProps> = ({
               />
             </FormField>
 
-            <FormField
-              label="Vendedor Responsável"
-              required
-              error={errors.vendedor?.message}
-            >
+            <FormField label="Vendedor Responsável" required error={errors.vendedor?.message}>
               <FormSelect
                 {...register('vendedor')}
                 options={vendedores}
@@ -269,11 +244,7 @@ export const ModalProposta: React.FC<ModalPropostaProps> = ({
               />
             </FormField>
 
-            <FormField
-              label="Categoria"
-              required
-              error={errors.categoria?.message}
-            >
+            <FormField label="Categoria" required error={errors.categoria?.message}>
               <FormSelect
                 {...register('categoria')}
                 options={categorias}
@@ -289,11 +260,7 @@ export const ModalProposta: React.FC<ModalPropostaProps> = ({
               Valores e Prazos
             </h3>
 
-            <FormField
-              label="Valor da Proposta"
-              required
-              error={errors.valor?.message}
-            >
+            <FormField label="Valor da Proposta" required error={errors.valor?.message}>
               <Controller
                 name="valor"
                 control={control}
@@ -330,11 +297,7 @@ export const ModalProposta: React.FC<ModalPropostaProps> = ({
               </div>
             </FormField>
 
-            <FormField
-              label="Data de Vencimento"
-              required
-              error={errors.data_vencimento?.message}
-            >
+            <FormField label="Data de Vencimento" required error={errors.data_vencimento?.message}>
               <FormInput
                 {...register('data_vencimento')}
                 type="date"
@@ -346,11 +309,7 @@ export const ModalProposta: React.FC<ModalPropostaProps> = ({
         </div>
 
         {/* Descrição - Full Width */}
-        <FormField
-          label="Descrição da Proposta"
-          required
-          error={errors.descricao?.message}
-        >
+        <FormField label="Descrição da Proposta" required error={errors.descricao?.message}>
           <FormTextarea
             {...register('descricao')}
             rows={4}
@@ -360,10 +319,7 @@ export const ModalProposta: React.FC<ModalPropostaProps> = ({
         </FormField>
 
         {/* Observações */}
-        <FormField
-          label="Observações Internas"
-          error={errors.observacoes?.message}
-        >
+        <FormField label="Observações Internas" error={errors.observacoes?.message}>
           <FormTextarea
             {...register('observacoes')}
             rows={3}

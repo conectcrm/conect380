@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, PieChart, TrendingUp, Download, Calendar, Filter, RefreshCw } from 'lucide-react';
+import {
+  BarChart3,
+  PieChart,
+  TrendingUp,
+  Download,
+  Calendar,
+  Filter,
+  RefreshCw,
+} from 'lucide-react';
 import { Fatura, StatusFatura } from '../../services/faturamentoService';
 import { formatarValorCompletoBRL, converterParaNumero } from '../../utils/formatacao';
 
@@ -16,8 +24,12 @@ interface RelatoriosAvancadosProps {
 }
 
 export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosAvancadosProps) {
-  const [periodoSelecionado, setPeriodoSelecionado] = useState<'7dias' | '30dias' | '90dias' | '1ano'>('30dias');
-  const [tipoRelatorio, setTipoRelatorio] = useState<'faturamento' | 'inadimplencia' | 'clientes' | 'produtos'>('faturamento');
+  const [periodoSelecionado, setPeriodoSelecionado] = useState<
+    '7dias' | '30dias' | '90dias' | '1ano'
+  >('30dias');
+  const [tipoRelatorio, setTipoRelatorio] = useState<
+    'faturamento' | 'inadimplencia' | 'clientes' | 'produtos'
+  >('faturamento');
   const [dadosProcessados, setDadosProcessados] = useState<RelatorioMetrica[]>([]);
 
   // Filtra faturas por período
@@ -40,7 +52,7 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
         break;
     }
 
-    return faturas.filter(fatura => {
+    return faturas.filter((fatura) => {
       const dataFatura = new Date(fatura.dataEmissao);
       return dataFatura >= dataLimite;
     });
@@ -72,15 +84,18 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
   const processarFaturamento = (faturas: Fatura[]): RelatorioMetrica[] => {
     const totalGeral = faturas.reduce((acc, f) => acc + converterParaNumero(f.valorTotal), 0);
 
-    const agrupado = faturas.reduce((acc, fatura) => {
-      const status = fatura.status;
-      if (!acc[status]) {
-        acc[status] = { total: 0, count: 0 };
-      }
-      acc[status].total += converterParaNumero(fatura.valorTotal);
-      acc[status].count++;
-      return acc;
-    }, {} as Record<string, { total: number; count: number }>);
+    const agrupado = faturas.reduce(
+      (acc, fatura) => {
+        const status = fatura.status;
+        if (!acc[status]) {
+          acc[status] = { total: 0, count: 0 };
+        }
+        acc[status].total += converterParaNumero(fatura.valorTotal);
+        acc[status].count++;
+        return acc;
+      },
+      {} as Record<string, { total: number; count: number }>,
+    );
 
     const cores = {
       [StatusFatura.PAGA]: '#10B981',
@@ -88,20 +103,20 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
       [StatusFatura.VENCIDA]: '#EF4444',
       [StatusFatura.CANCELADA]: '#6B7280',
       [StatusFatura.ENVIADA]: '#3B82F6',
-      [StatusFatura.PARCIALMENTE_PAGA]: '#8B5CF6'
+      [StatusFatura.PARCIALMENTE_PAGA]: '#8B5CF6',
     };
 
     return Object.entries(agrupado).map(([status, dados]) => ({
       label: status,
       valor: dados.total,
       percentual: totalGeral > 0 ? (dados.total / totalGeral) * 100 : 0,
-      cor: cores[status as StatusFatura] || '#8B5CF6'
+      cor: cores[status as StatusFatura] || '#8B5CF6',
     }));
   };
 
   const processarInadimplencia = (faturas: Fatura[]): RelatorioMetrica[] => {
     const hoje = new Date();
-    const vencidas = faturas.filter(f => {
+    const vencidas = faturas.filter((f) => {
       const dataVencimento = new Date(f.dataVencimento);
       return dataVencimento < hoje && f.status !== StatusFatura.PAGA;
     });
@@ -111,10 +126,10 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
 
     // Agrupa por faixas de atraso
     const faixas = {
-      '1-30 dias': vencidas.filter(f => getDiasAtraso(f) <= 30),
-      '31-60 dias': vencidas.filter(f => getDiasAtraso(f) > 30 && getDiasAtraso(f) <= 60),
-      '61-90 dias': vencidas.filter(f => getDiasAtraso(f) > 60 && getDiasAtraso(f) <= 90),
-      'Mais de 90 dias': vencidas.filter(f => getDiasAtraso(f) > 90)
+      '1-30 dias': vencidas.filter((f) => getDiasAtraso(f) <= 30),
+      '31-60 dias': vencidas.filter((f) => getDiasAtraso(f) > 30 && getDiasAtraso(f) <= 60),
+      '61-90 dias': vencidas.filter((f) => getDiasAtraso(f) > 60 && getDiasAtraso(f) <= 90),
+      'Mais de 90 dias': vencidas.filter((f) => getDiasAtraso(f) > 90),
     };
 
     const cores = ['#EF4444', '#F59E0B', '#8B5CF6', '#6B7280'];
@@ -125,21 +140,24 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
         label: faixa,
         valor,
         percentual: totalVencido > 0 ? (valor / totalVencido) * 100 : 0,
-        cor: cores[index]
+        cor: cores[index],
       };
     });
   };
 
   const processarClientes = (faturas: Fatura[]): RelatorioMetrica[] => {
-    const clientesAgrupados = faturas.reduce((acc, fatura) => {
-      const cliente = fatura.cliente?.nome || 'Cliente não informado';
-      if (!acc[cliente]) {
-        acc[cliente] = { total: 0, count: 0 };
-      }
-      acc[cliente].total += converterParaNumero(fatura.valorTotal);
-      acc[cliente].count++;
-      return acc;
-    }, {} as Record<string, { total: number; count: number }>);
+    const clientesAgrupados = faturas.reduce(
+      (acc, fatura) => {
+        const cliente = fatura.cliente?.nome || 'Cliente não informado';
+        if (!acc[cliente]) {
+          acc[cliente] = { total: 0, count: 0 };
+        }
+        acc[cliente].total += converterParaNumero(fatura.valorTotal);
+        acc[cliente].count++;
+        return acc;
+      },
+      {} as Record<string, { total: number; count: number }>,
+    );
 
     const totalGeral = Object.values(clientesAgrupados).reduce((acc, c) => acc + c.total, 0);
 
@@ -154,7 +172,7 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
       label: cliente,
       valor: dados.total,
       percentual: totalGeral > 0 ? (dados.total / totalGeral) * 100 : 0,
-      cor: cores[index]
+      cor: cores[index],
     }));
   };
 
@@ -165,7 +183,7 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
       'Plano Premium',
       'Consultoria',
       'Suporte Técnico',
-      'Treinamento'
+      'Treinamento',
     ];
 
     const totalGeral = faturas.reduce((acc, f) => acc + converterParaNumero(f.valorTotal), 0);
@@ -180,7 +198,7 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
         label: produto,
         valor,
         percentual: fator * 100,
-        cor: cores[index]
+        cor: cores[index],
       };
     });
   };
@@ -204,9 +222,7 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
           <div className="flex flex-wrap gap-4">
             {/* Seletor de Período */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Período
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Período</label>
               <select
                 value={periodoSelecionado}
                 onChange={(e) => setPeriodoSelecionado(e.target.value as any)}
@@ -267,9 +283,7 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center gap-2 mb-4">
           <PieChart className="w-5 h-5 text-blue-600" />
-          <h3 className="text-lg font-medium text-gray-900">
-            Distribuição - {tipoRelatorio}
-          </h3>
+          <h3 className="text-lg font-medium text-gray-900">Distribuição - {tipoRelatorio}</h3>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -302,12 +316,8 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
               {/* Centro do gráfico */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-900">
-                    {dadosProcessados.length}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    Itens
-                  </div>
+                  <div className="text-2xl font-bold text-gray-900">{dadosProcessados.length}</div>
+                  <div className="text-sm text-gray-500">Itens</div>
                 </div>
               </div>
             </div>
@@ -316,23 +326,19 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
           {/* Legenda */}
           <div className="space-y-3">
             {dadosProcessados.map((item, index) => (
-              <div key={item.label} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div
+                key={item.label}
+                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+              >
                 <div className="flex items-center gap-3">
-                  <div
-                    className="w-4 h-4 rounded"
-                    style={{ backgroundColor: item.cor }}
-                  ></div>
-                  <span className="text-sm font-medium text-gray-900">
-                    {item.label}
-                  </span>
+                  <div className="w-4 h-4 rounded" style={{ backgroundColor: item.cor }}></div>
+                  <span className="text-sm font-medium text-gray-900">{item.label}</span>
                 </div>
                 <div className="text-right">
                   <div className="text-sm font-bold text-gray-900">
                     {formatarValorCompletoBRL(item.valor)}
                   </div>
-                  <div className="text-xs text-gray-500">
-                    {item.percentual.toFixed(1)}%
-                  </div>
+                  <div className="text-xs text-gray-500">{item.percentual.toFixed(1)}%</div>
                 </div>
               </div>
             ))}
@@ -350,7 +356,7 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
             <div>
               <div className="text-2xl font-bold text-gray-900">
                 {formatarValorCompletoBRL(
-                  dadosProcessados.reduce((acc, item) => acc + item.valor, 0)
+                  dadosProcessados.reduce((acc, item) => acc + item.valor, 0),
                 )}
               </div>
               <div className="text-sm text-gray-500">Total do Período</div>
@@ -364,9 +370,7 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
               <TrendingUp className="w-6 h-6 text-green-600" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-gray-900">
-                {dadosProcessados.length}
-              </div>
+              <div className="text-2xl font-bold text-gray-900">{dadosProcessados.length}</div>
               <div className="text-sm text-gray-500">Categorias</div>
             </div>
           </div>
@@ -379,9 +383,13 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
             </div>
             <div>
               <div className="text-2xl font-bold text-gray-900">
-                {periodoSelecionado === '7dias' ? '7' :
-                  periodoSelecionado === '30dias' ? '30' :
-                    periodoSelecionado === '90dias' ? '90' : '365'}
+                {periodoSelecionado === '7dias'
+                  ? '7'
+                  : periodoSelecionado === '30dias'
+                    ? '30'
+                    : periodoSelecionado === '90dias'
+                      ? '90'
+                      : '365'}
               </div>
               <div className="text-sm text-gray-500">Dias Analisados</div>
             </div>

@@ -8,6 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Fornecedor } from './fornecedor.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 export type StatusContaPagar = 'pendente' | 'paga' | 'vencida' | 'cancelada';
 
@@ -47,6 +48,10 @@ export class ContaPagar {
 
   @Column({ name: 'empresa_id' })
   empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa_rel: Empresa;
 
   @Column({ nullable: true })
   observacoes?: string;

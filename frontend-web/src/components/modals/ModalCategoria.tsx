@@ -24,9 +24,12 @@ interface ModalCategoriaProps {
 // Schema de validação
 const categoriaSchema = yup.object().shape({
   nome: yup.string().required('Nome é obrigatório').min(2, 'Nome deve ter pelo menos 2 caracteres'),
-  descricao: yup.string().required('Descrição é obrigatória').min(10, 'Descrição deve ter pelo menos 10 caracteres'),
+  descricao: yup
+    .string()
+    .required('Descrição é obrigatória')
+    .min(10, 'Descrição deve ter pelo menos 10 caracteres'),
   cor: yup.string().required('Cor é obrigatória'),
-  ativa: yup.boolean()
+  ativa: yup.boolean(),
 });
 
 // Cores disponíveis
@@ -38,7 +41,7 @@ const coresDisponiveis = [
   { nome: 'Vermelho', valor: 'red', classe: 'bg-red-500', classeHover: 'hover:bg-red-600' },
   { nome: 'Amarelo', valor: 'yellow', classe: 'bg-yellow-500', classeHover: 'hover:bg-yellow-600' },
   { nome: 'Rosa', valor: 'pink', classe: 'bg-pink-500', classeHover: 'hover:bg-pink-600' },
-  { nome: 'Índigo', valor: 'indigo', classe: 'bg-indigo-500', classeHover: 'hover:bg-indigo-600' }
+  { nome: 'Índigo', valor: 'indigo', classe: 'bg-indigo-500', classeHover: 'hover:bg-indigo-600' },
 ];
 
 const ModalCategoria: React.FC<ModalCategoriaProps> = ({
@@ -46,18 +49,23 @@ const ModalCategoria: React.FC<ModalCategoriaProps> = ({
   onClose,
   onSave,
   categoria,
-  isLoading = false
+  isLoading = false,
 }) => {
   const [isSaving, setIsSaving] = useState(false);
 
-  const { control, handleSubmit, reset, formState: { errors } } = useForm<Categoria>({
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<Categoria>({
     resolver: yupResolver(categoriaSchema),
     defaultValues: {
       nome: '',
       descricao: '',
       cor: 'blue',
-      ativa: true
-    }
+      ativa: true,
+    },
   });
 
   // Reset form quando categoria muda
@@ -67,14 +75,14 @@ const ModalCategoria: React.FC<ModalCategoriaProps> = ({
         nome: categoria.nome,
         descricao: categoria.descricao,
         cor: categoria.cor,
-        ativa: categoria.ativa
+        ativa: categoria.ativa,
       });
     } else {
       reset({
         nome: '',
         descricao: '',
         cor: 'blue',
-        ativa: true
+        ativa: true,
       });
     }
   }, [categoria, reset, isOpen]);
@@ -82,10 +90,10 @@ const ModalCategoria: React.FC<ModalCategoriaProps> = ({
   const onSubmit = async (data: Categoria) => {
     try {
       setIsSaving(true);
-      
+
       const categoriaData: Categoria = {
         ...data,
-        id: categoria?.id
+        id: categoria?.id,
       };
 
       await onSave(categoriaData);
@@ -129,7 +137,9 @@ const ModalCategoria: React.FC<ModalCategoriaProps> = ({
                     {categoria ? 'Editar Categoria' : 'Nova Categoria'}
                   </h3>
                   <p className="text-sm text-gray-500">
-                    {categoria ? 'Atualize as informações da categoria' : 'Crie uma nova categoria de produtos'}
+                    {categoria
+                      ? 'Atualize as informações da categoria'
+                      : 'Crie uma nova categoria de produtos'}
                   </p>
                 </div>
               </div>
@@ -161,16 +171,12 @@ const ModalCategoria: React.FC<ModalCategoriaProps> = ({
                     />
                   )}
                 />
-                {errors.nome && (
-                  <p className="text-red-500 text-sm mt-1">{errors.nome.message}</p>
-                )}
+                {errors.nome && <p className="text-red-500 text-sm mt-1">{errors.nome.message}</p>}
               </div>
 
               {/* Descrição */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Descrição *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição *</label>
                 <Controller
                   name="descricao"
                   control={control}
@@ -205,9 +211,10 @@ const ModalCategoria: React.FC<ModalCategoriaProps> = ({
                           onClick={() => field.onChange(cor.valor)}
                           className={`
                             flex items-center justify-center p-3 rounded-lg border-2 transition-all
-                            ${field.value === cor.valor 
-                              ? 'border-gray-400 ring-2 ring-blue-500' 
-                              : 'border-gray-200 hover:border-gray-300'
+                            ${
+                              field.value === cor.valor
+                                ? 'border-gray-400 ring-2 ring-blue-500'
+                                : 'border-gray-200 hover:border-gray-300'
                             }
                           `}
                         >
@@ -218,9 +225,7 @@ const ModalCategoria: React.FC<ModalCategoriaProps> = ({
                     </div>
                   )}
                 />
-                {errors.cor && (
-                  <p className="text-red-500 text-sm mt-1">{errors.cor.message}</p>
-                )}
+                {errors.cor && <p className="text-red-500 text-sm mt-1">{errors.cor.message}</p>}
               </div>
 
               {/* Status */}

@@ -3,7 +3,7 @@
 
 param(
   [string]$BackendUrl = "http://localhost:3001",
-  [string]$Email = "admin@conectcrm.com",
+  [string]$Email = "admin@conectsuite.com.br",
   [string]$Password = "admin123"
 )
 

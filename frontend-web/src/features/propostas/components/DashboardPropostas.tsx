@@ -13,7 +13,7 @@ import {
   XCircle,
   AlertCircle,
   Send,
-  FileText
+  FileText,
 } from 'lucide-react';
 
 interface MetricasPropostas {
@@ -55,20 +55,30 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
   const formatarMoeda = (valor: number): string => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(valor);
   };
 
   const getStatusConfig = (status: string) => {
     switch (status) {
       case 'aprovada':
-        return { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50', label: 'Aprovadas' };
+        return {
+          icon: CheckCircle,
+          color: 'text-green-600',
+          bg: 'bg-green-50',
+          label: 'Aprovadas',
+        };
       case 'rejeitada':
         return { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', label: 'Rejeitadas' };
       case 'enviada':
         return { icon: Send, color: 'text-blue-600', bg: 'bg-blue-50', label: 'Enviadas' };
       case 'negociacao':
-        return { icon: AlertCircle, color: 'text-yellow-600', bg: 'bg-yellow-50', label: 'Em Negociação' };
+        return {
+          icon: AlertCircle,
+          color: 'text-yellow-600',
+          bg: 'bg-yellow-50',
+          label: 'Em Negociação',
+        };
       default:
         return { icon: FileText, color: 'text-gray-600', bg: 'bg-gray-50', label: 'Rascunhos' };
     }
@@ -115,7 +125,9 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border kip-card">
           <div className="flex items-center justify-between">
             <div className="text-container mr-3">
-              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total de Propostas</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">
+                Total de Propostas
+              </p>
               <p className="currency-value font-bold text-gray-900 number-display">
                 {metricas.totalPropostas}
               </p>
@@ -129,7 +141,9 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border kip-card">
           <div className="flex items-center justify-between">
             <div className="text-container mr-3">
-              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Pipeline Total</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">
+                Pipeline Total
+              </p>
               <p className="currency-value font-bold text-gray-900 number-display">
                 {formatarMoeda(metricas.valorTotalPipeline)}
               </p>
@@ -145,7 +159,11 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
             <div className="text-container mr-3">
               <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Valor Médio</p>
               <p className="currency-value font-bold text-gray-900 number-display">
-                {formatarMoeda(metricas.totalPropostas > 0 ? metricas.valorTotalPipeline / metricas.totalPropostas : 0)}
+                {formatarMoeda(
+                  metricas.totalPropostas > 0
+                    ? metricas.valorTotalPipeline / metricas.totalPropostas
+                    : 0,
+                )}
               </p>
             </div>
             <div className="h-8 w-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0 card-icon">
@@ -157,7 +175,9 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border kip-card">
           <div className="flex items-center justify-between">
             <div className="text-container mr-3">
-              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Taxa de Conversão</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">
+                Taxa de Conversão
+              </p>
               <p className="currency-value font-bold text-gray-900 number-display">
                 {metricas.taxaConversao.toFixed(1)}%
               </p>
@@ -181,11 +201,17 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
             {Object.entries(metricas.estatisticasPorStatus).map(([status, quantidade]) => {
               const config = getStatusConfig(status);
               const Icon = config.icon;
-              const valorEstimado = quantidade * (metricas.valorTotalPipeline / metricas.totalPropostas);
+              const valorEstimado =
+                quantidade * (metricas.valorTotalPipeline / metricas.totalPropostas);
               return (
-                <div key={status} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg border stacked-card-content">
+                <div
+                  key={status}
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg border stacked-card-content"
+                >
                   <div className="flex items-center">
-                    <div className={`h-8 w-8 ${config.bg} rounded-full flex items-center justify-center mr-3 flex-shrink-0`}>
+                    <div
+                      className={`h-8 w-8 ${config.bg} rounded-full flex items-center justify-center mr-3 flex-shrink-0`}
+                    >
                       <Icon className={`h-4 w-4 ${config.color}`} />
                     </div>
                     <div className="text-container">
@@ -198,7 +224,10 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
                       {formatarMoeda(valorEstimado)}
                     </p>
                     <p className="text-sm text-gray-500">
-                      {metricas.totalPropostas > 0 ? ((quantidade / metricas.totalPropostas) * 100).toFixed(1) : 0}%
+                      {metricas.totalPropostas > 0
+                        ? ((quantidade / metricas.totalPropostas) * 100).toFixed(1)
+                        : 0}
+                      %
                     </p>
                   </div>
                 </div>
@@ -215,9 +244,13 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
               .sort((a, b) => b[1] - a[1])
               .slice(0, 5)
               .map(([vendedorNome, quantidade]) => {
-                const valorEstimado = quantidade * (metricas.valorTotalPipeline / metricas.totalPropostas);
+                const valorEstimado =
+                  quantidade * (metricas.valorTotalPipeline / metricas.totalPropostas);
                 return (
-                  <div key={vendedorNome} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg border stacked-card-content">
+                  <div
+                    key={vendedorNome}
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg border stacked-card-content"
+                  >
                     <div className="flex items-center">
                       <div className="h-8 w-8 bg-indigo-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
                         <Users className="h-4 w-4 text-indigo-600" />
@@ -260,7 +293,9 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
                 </div>
               </div>
               <div className="text-left sm:text-right ml-11 sm:ml-0">
-                <p className="text-xl sm:text-2xl font-bold text-green-600">{metricas.propostasAprovadas}</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-600">
+                  {metricas.propostasAprovadas}
+                </p>
                 <p className="text-sm text-gray-500">de {metricas.totalPropostas}</p>
               </div>
             </div>
@@ -281,12 +316,12 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
                 </div>
               </div>
               <div className="text-left sm:text-right ml-13 sm:ml-0">
-                <p className={`text-xl sm:text-2xl font-bold ${metricas.taxaConversao >= 60 ? 'text-green-600' : 'text-orange-600'}`}>
+                <p
+                  className={`text-xl sm:text-2xl font-bold ${metricas.taxaConversao >= 60 ? 'text-green-600' : 'text-orange-600'}`}
+                >
                   {metricas.taxaConversao >= 60 ? '✓' : '○'}
                 </p>
-                <p className="text-sm text-gray-500">
-                  {metricas.taxaConversao.toFixed(1)}% atual
-                </p>
+                <p className="text-sm text-gray-500">{metricas.taxaConversao.toFixed(1)}% atual</p>
               </div>
             </div>
           </div>

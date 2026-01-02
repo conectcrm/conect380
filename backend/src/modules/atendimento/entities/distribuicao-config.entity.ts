@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Fila } from './fila.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 /**
  * Configuração de Distribuição Automática de Tickets
@@ -19,6 +20,13 @@ import { Fila } from './fila.entity';
 export class DistribuicaoConfig {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column('uuid')
   filaId: string;

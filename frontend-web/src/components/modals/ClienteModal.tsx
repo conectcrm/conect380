@@ -24,7 +24,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
   onClose,
   onSave,
   cliente,
-  isLoading = false
+  isLoading = false,
 }) => {
   const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
   const [isFormInitialized, setIsFormInitialized] = useState(false);
@@ -37,7 +37,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
     watch,
     reset,
     setValue,
-    formState: { errors, isValid, isSubmitting }
+    formState: { errors, isValid, isSubmitting },
   } = useForm<ClienteFormData>({
     resolver: yupResolver(clienteValidationSchema),
     mode: 'onChange', // Validação em tempo real
@@ -61,8 +61,8 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
       },
       observacoes: '',
       status: 'lead',
-      tags: []
-    }
+      tags: [],
+    },
   });
 
   const watchedFields = watch();
@@ -80,7 +80,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
       }
     },
     hasUnsavedChanges,
-    isFormValid: isValid
+    isFormValid: isValid,
   });
 
   // Função para fechar o modal
@@ -109,7 +109,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
       }
     },
     onClose: handleClose,
-    canSave: isValid && !isSubmitting
+    canSave: isValid && !isSubmitting,
   });
 
   // Detectar mudanças no formulário para alertar sobre alterações não salvas
@@ -152,7 +152,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
           },
           observacoes: cliente.observacoes || '',
           status: cliente.status || 'lead',
-          tags: cliente.tags || []
+          tags: cliente.tags || [],
         });
       } else {
         // Modo criação - limpar formulário
@@ -176,7 +176,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
           },
           observacoes: '',
           status: 'lead',
-          tags: []
+          tags: [],
         });
       }
 
@@ -220,11 +220,9 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
         documento: data.tipo === 'pessoa_fisica' ? data.cpf! : data.cnpj!,
         empresa: data.empresa || '',
         cargo: data.cargo || '',
-        endereco: [
-          data.endereco?.logradouro,
-          data.endereco?.numero,
-          data.endereco?.bairro
-        ].filter(Boolean).join(', '),
+        endereco: [data.endereco?.logradouro, data.endereco?.numero, data.endereco?.bairro]
+          .filter(Boolean)
+          .join(', '),
         cidade: data.endereco?.cidade || '',
         estado: data.endereco?.estado || '',
         cep: data.endereco?.cep || '',
@@ -236,7 +234,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
         data_nascimento: '',
         genero: '',
         profissao: '',
-        renda: 0
+        renda: 0,
       };
 
       await onSave(clienteData);
@@ -270,9 +268,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
             <div className="p-6">
               <div className="flex items-center mb-4">
                 <AlertTriangle className="w-6 h-6 text-amber-500 mr-3" />
-                <h3 className="text-lg font-medium text-gray-900">
-                  Alterações não salvas
-                </h3>
+                <h3 className="text-lg font-medium text-gray-900">Alterações não salvas</h3>
               </div>
               <p className="text-gray-600 mb-6">
                 Você tem alterações não salvas. Deseja realmente sair sem salvar?
@@ -309,9 +305,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
                 <h2 className="text-xl font-semibold text-gray-900">
                   {cliente ? 'Editar Cliente' : 'Novo Cliente'}
                 </h2>
-                <p className="text-sm text-gray-500">
-                  Preencha as informações do cliente
-                </p>
+                <p className="text-sm text-gray-500">Preencha as informações do cliente</p>
               </div>
             </div>
 
@@ -319,7 +313,13 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
               <SaveStatus
                 isDirty={hasUnsavedChanges}
                 isSaving={isSubmitting}
-                lastSaved={isFormInitialized ? undefined : (lastSaveAttempt ? new Date(lastSaveAttempt) : undefined)}
+                lastSaved={
+                  isFormInitialized
+                    ? undefined
+                    : lastSaveAttempt
+                      ? new Date(lastSaveAttempt)
+                      : undefined
+                }
               />
               <button
                 type="button"
@@ -336,7 +336,6 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
           <form onSubmit={handleSubmit(onFormSubmit)} className="flex-1 overflow-y-auto">
             <div className="p-4">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
                 {/* Coluna 1: Dados Básicos */}
                 <div className="space-y-3">
                   <div className="flex items-center mb-3">
@@ -381,16 +380,12 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
                     error={errors.tipo}
                     options={[
                       { value: 'pessoa_fisica', label: 'Pessoa Física' },
-                      { value: 'pessoa_juridica', label: 'Pessoa Jurídica' }
+                      { value: 'pessoa_juridica', label: 'Pessoa Jurídica' },
                     ]}
                   />
 
                   {/* Documentos compactos */}
-                  <DocumentField
-                    register={register}
-                    errors={errors}
-                    watchTipo={watchTipo}
-                  />
+                  <DocumentField register={register} errors={errors} watchTipo={watchTipo} />
 
                   <FormField
                     name="status"
@@ -403,7 +398,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
                       { value: 'lead', label: 'Lead' },
                       { value: 'cliente_ativo', label: 'Cliente Ativo' },
                       { value: 'cliente_inativo', label: 'Cliente Inativo' },
-                      { value: 'prospecto', label: 'Prospecto' }
+                      { value: 'prospecto', label: 'Prospecto' },
                     ]}
                   />
 
@@ -417,7 +412,14 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
                         value={field.value || []}
                         onChange={field.onChange}
                         error={errors.tags as any}
-                        availableTags={['Premium', 'VIP', 'Startup', 'Corporativo', 'Lead Quente', 'Indicação']}
+                        availableTags={[
+                          'Premium',
+                          'VIP',
+                          'Startup',
+                          'Corporativo',
+                          'Lead Quente',
+                          'Indicação',
+                        ]}
                       />
                     )}
                   />
@@ -443,11 +445,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
                   />
 
                   {/* Campos de endereço compactos */}
-                  <AddressFields
-                    register={register}
-                    errors={errors}
-                    prefix="endereco"
-                  />
+                  <AddressFields register={register} errors={errors} prefix="endereco" />
                 </div>
 
                 {/* Coluna 3: Observações e Status */}
@@ -472,21 +470,37 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <h4 className="text-sm font-medium text-gray-700 mb-2">Status do Formulário</h4>
                     <div className="space-y-1 text-xs">
-                      <div className={`flex items-center ${errors.nome ? 'text-red-600' : 'text-green-600'}`}>
-                        <div className={`w-2 h-2 rounded-full mr-2 ${errors.nome ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                      <div
+                        className={`flex items-center ${errors.nome ? 'text-red-600' : 'text-green-600'}`}
+                      >
+                        <div
+                          className={`w-2 h-2 rounded-full mr-2 ${errors.nome ? 'bg-red-500' : 'bg-green-500'}`}
+                        ></div>
                         Nome {errors.nome ? 'obrigatório' : 'preenchido'}
                       </div>
-                      <div className={`flex items-center ${errors.email ? 'text-red-600' : 'text-green-600'}`}>
-                        <div className={`w-2 h-2 rounded-full mr-2 ${errors.email ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                      <div
+                        className={`flex items-center ${errors.email ? 'text-red-600' : 'text-green-600'}`}
+                      >
+                        <div
+                          className={`w-2 h-2 rounded-full mr-2 ${errors.email ? 'bg-red-500' : 'bg-green-500'}`}
+                        ></div>
                         E-mail {errors.email ? 'inválido' : 'válido'}
                       </div>
-                      <div className={`flex items-center ${errors.tipo ? 'text-red-600' : 'text-green-600'}`}>
-                        <div className={`w-2 h-2 rounded-full mr-2 ${errors.tipo ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                      <div
+                        className={`flex items-center ${errors.tipo ? 'text-red-600' : 'text-green-600'}`}
+                      >
+                        <div
+                          className={`w-2 h-2 rounded-full mr-2 ${errors.tipo ? 'bg-red-500' : 'bg-green-500'}`}
+                        ></div>
                         Tipo {errors.tipo ? 'obrigatório' : 'selecionado'}
                       </div>
-                      <div className={`flex items-center ${(errors.cpf || errors.cnpj) ? 'text-red-600' : 'text-green-600'}`}>
-                        <div className={`w-2 h-2 rounded-full mr-2 ${(errors.cpf || errors.cnpj) ? 'bg-red-500' : 'bg-green-500'}`}></div>
-                        Documento {(errors.cpf || errors.cnpj) ? 'inválido' : 'válido'}
+                      <div
+                        className={`flex items-center ${errors.cpf || errors.cnpj ? 'text-red-600' : 'text-green-600'}`}
+                      >
+                        <div
+                          className={`w-2 h-2 rounded-full mr-2 ${errors.cpf || errors.cnpj ? 'bg-red-500' : 'bg-green-500'}`}
+                        ></div>
+                        Documento {errors.cpf || errors.cnpj ? 'inválido' : 'válido'}
                       </div>
                     </div>
                   </div>
@@ -524,9 +538,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
                   disabled={!isValid || isSubmitting || isLoading}
                   className="px-6 py-2 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  {(isSubmitting || isLoading) && (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  )}
+                  {(isSubmitting || isLoading) && <Loader2 className="w-4 h-4 animate-spin" />}
                   {cliente ? 'Atualizar' : 'Criar'} Cliente
                 </button>
               </div>

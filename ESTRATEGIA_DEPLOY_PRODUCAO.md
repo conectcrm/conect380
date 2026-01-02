@@ -315,7 +315,7 @@ curl https://app.conectcrm.com.br
 # Testar login
 curl -X POST https://api.conectcrm.com.br/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@conectcrm.com.br","password":"senha"}'
+  -d '{"email":"admin@conectsuite.com.br","password":"senha"}'
 ```
 
 #### 6.2. Verificar Logs

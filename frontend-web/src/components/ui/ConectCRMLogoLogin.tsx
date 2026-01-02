@@ -9,14 +9,14 @@ interface ConectCRMLogoLoginProps {
 const ConectCRMLogoLogin: React.FC<ConectCRMLogoLoginProps> = ({
   size = 'md',
   variant = 'full',
-  className = ''
+  className = '',
 }) => {
   const sizes = {
     sm: 'h-8',
     md: 'h-10',
     lg: 'h-12',
     xl: 'h-16',
-    '2xl': 'h-20'
+    '2xl': 'h-20',
   };
 
   const iconSize = {
@@ -24,7 +24,7 @@ const ConectCRMLogoLogin: React.FC<ConectCRMLogoLoginProps> = ({
     md: 40,
     lg: 48,
     xl: 64,
-    '2xl': 80
+    '2xl': 80,
   };
 
   const textSizes = {
@@ -32,7 +32,7 @@ const ConectCRMLogoLogin: React.FC<ConectCRMLogoLoginProps> = ({
     md: 'text-xl',
     lg: 'text-2xl',
     xl: 'text-3xl',
-    '2xl': 'text-4xl'
+    '2xl': 'text-4xl',
   };
 
   if (variant === 'icon') {
@@ -46,40 +46,40 @@ const ConectCRMLogoLogin: React.FC<ConectCRMLogoLoginProps> = ({
           xmlns="http://www.w3.org/2000/svg"
           className="drop-shadow-lg"
         >
-        <defs>
-          <linearGradient id="loginPrimaryGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#159A9C" />
-            <stop offset="100%" stopColor="#0F7B7D" />
-          </linearGradient>
-          
-          <filter id="loginGlow">
-            <feDropShadow dx="0" dy="4" stdDeviation="8" floodColor="rgba(21, 154, 156, 0.3)" />
-            <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="rgba(255, 255, 255, 0.6)" />
-          </filter>
-          
-          <filter id="iconBorder">
-            <feDropShadow dx="0" dy="0" stdDeviation="1" floodColor="rgba(255, 255, 255, 0.8)" />
-          </filter>
-        </defs>
-        
-        {/* Círculo de fundo com gradiente e borda */}
-        <circle
-          cx="24"
-          cy="24"
-          r="23"
-          fill="none"
-          stroke="rgba(255, 255, 255, 0.4)"
-          strokeWidth="1"
-        />
-        <circle
-          cx="24"
-          cy="24"
-          r="22"
-          fill="url(#loginPrimaryGradient)"
-          filter="url(#loginGlow)"
-          stroke="rgba(255, 255, 255, 0.6)"
-          strokeWidth="0.5"
-        />          {/* Símbolo "C" em branco */}
+          <defs>
+            <linearGradient id="loginPrimaryGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#159A9C" />
+              <stop offset="100%" stopColor="#0F7B7D" />
+            </linearGradient>
+
+            <filter id="loginGlow">
+              <feDropShadow dx="0" dy="4" stdDeviation="8" floodColor="rgba(21, 154, 156, 0.3)" />
+              <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="rgba(255, 255, 255, 0.6)" />
+            </filter>
+
+            <filter id="iconBorder">
+              <feDropShadow dx="0" dy="0" stdDeviation="1" floodColor="rgba(255, 255, 255, 0.8)" />
+            </filter>
+          </defs>
+          {/* Círculo de fundo com gradiente e borda */}
+          <circle
+            cx="24"
+            cy="24"
+            r="23"
+            fill="none"
+            stroke="rgba(255, 255, 255, 0.4)"
+            strokeWidth="1"
+          />
+          <circle
+            cx="24"
+            cy="24"
+            r="22"
+            fill="url(#loginPrimaryGradient)"
+            filter="url(#loginGlow)"
+            stroke="rgba(255, 255, 255, 0.6)"
+            strokeWidth="0.5"
+          />{' '}
+          {/* Símbolo "C" em branco */}
           <g>
             <path
               d="M16 24 C16 16, 20 12, 28 12 C32 12, 35 14, 37 16"
@@ -95,7 +95,7 @@ const ConectCRMLogoLogin: React.FC<ConectCRMLogoLoginProps> = ({
               strokeLinecap="round"
               fill="none"
             />
-            
+
             {/* Pontos de conexão */}
             <circle cx="37" cy="16" r="2.5" fill="white" />
             <circle cx="37" cy="32" r="2.5" fill="white" />
@@ -109,14 +109,21 @@ const ConectCRMLogoLogin: React.FC<ConectCRMLogoLoginProps> = ({
   if (variant === 'text') {
     return (
       <div className={`inline-flex items-center ${className}`}>
-        <span 
+        <span
           className={`font-bold ${textSizes[size]} bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] bg-clip-text text-transparent drop-shadow-lg`}
           style={{
-            filter: 'drop-shadow(0 2px 4px rgba(255,255,255,0.6)) drop-shadow(0 1px 2px rgba(21,154,156,0.2))',
-            textShadow: '0 1px 2px rgba(255,255,255,0.8)'
+            filter:
+              'drop-shadow(0 2px 4px rgba(255,255,255,0.6)) drop-shadow(0 1px 2px rgba(21,154,156,0.2))',
+            textShadow: '0 1px 2px rgba(255,255,255,0.8)',
           }}
         >
-          Conect<span className="text-[#002333]" style={{ textShadow: '0 1px 2px rgba(255,255,255,0.8)' }}>CRM</span>
+          Conect
+          <span
+            className="text-[#002333]"
+            style={{ textShadow: '0 1px 2px rgba(255,255,255,0.8)' }}
+          >
+            CRM
+          </span>
         </span>
       </div>
     );
@@ -138,17 +145,17 @@ const ConectCRMLogoLogin: React.FC<ConectCRMLogoLoginProps> = ({
             <stop offset="0%" stopColor="#159A9C" />
             <stop offset="100%" stopColor="#0F7B7D" />
           </linearGradient>
-          
+
           <filter id="loginFullGlow">
             <feDropShadow dx="0" dy="4" stdDeviation="8" floodColor="rgba(21, 154, 156, 0.3)" />
             <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="rgba(255, 255, 255, 0.6)" />
           </filter>
-          
+
           <filter id="iconFullBorder">
             <feDropShadow dx="0" dy="0" stdDeviation="1" floodColor="rgba(255, 255, 255, 0.8)" />
           </filter>
         </defs>
-        
+
         {/* Círculo de fundo com gradiente e borda dupla */}
         <circle
           cx="24"
@@ -167,7 +174,7 @@ const ConectCRMLogoLogin: React.FC<ConectCRMLogoLoginProps> = ({
           stroke="rgba(255, 255, 255, 0.6)"
           strokeWidth="0.5"
         />
-        
+
         {/* Símbolo "C" em branco com efeito de borda */}
         <g filter="url(#iconFullBorder)">
           <path
@@ -184,29 +191,54 @@ const ConectCRMLogoLogin: React.FC<ConectCRMLogoLoginProps> = ({
             strokeLinecap="round"
             fill="none"
           />
-          
+
           {/* Pontos de conexão com borda clara */}
-          <circle cx="37" cy="16" r="3" fill="white" stroke="rgba(255,255,255,0.8)" strokeWidth="0.5" />
-          <circle cx="37" cy="32" r="3" fill="white" stroke="rgba(255,255,255,0.8)" strokeWidth="0.5" />
-          <circle cx="24" cy="24" r="2.5" fill="white" stroke="rgba(255,255,255,0.8)" strokeWidth="0.5" />
+          <circle
+            cx="37"
+            cy="16"
+            r="3"
+            fill="white"
+            stroke="rgba(255,255,255,0.8)"
+            strokeWidth="0.5"
+          />
+          <circle
+            cx="37"
+            cy="32"
+            r="3"
+            fill="white"
+            stroke="rgba(255,255,255,0.8)"
+            strokeWidth="0.5"
+          />
+          <circle
+            cx="24"
+            cy="24"
+            r="2.5"
+            fill="white"
+            stroke="rgba(255,255,255,0.8)"
+            strokeWidth="0.5"
+          />
         </g>
       </svg>
-      
+
       {/* Texto com sombra clara */}
-      <span 
+      <span
         className={`font-bold ${textSizes[size]} bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] bg-clip-text text-transparent`}
         style={{
-          filter: 'drop-shadow(0 2px 4px rgba(255,255,255,0.6)) drop-shadow(0 1px 2px rgba(21,154,156,0.2))',
-          textShadow: '0 1px 2px rgba(255,255,255,0.8)'
+          filter:
+            'drop-shadow(0 2px 4px rgba(255,255,255,0.6)) drop-shadow(0 1px 2px rgba(21,154,156,0.2))',
+          textShadow: '0 1px 2px rgba(255,255,255,0.8)',
         }}
       >
-        Conect<span 
-          className="text-[#002333]" 
-          style={{ 
-            textShadow: '0 1px 2px rgba(255,255,255,0.8)', 
-            filter: 'drop-shadow(0 1px 2px rgba(255,255,255,0.6))' 
+        Conect
+        <span
+          className="text-[#002333]"
+          style={{
+            textShadow: '0 1px 2px rgba(255,255,255,0.8)',
+            filter: 'drop-shadow(0 1px 2px rgba(255,255,255,0.6))',
           }}
-        >CRM</span>
+        >
+          CRM
+        </span>
       </span>
     </div>
   );

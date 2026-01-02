@@ -3,7 +3,7 @@ import { CanalTipo, Contato } from './types';
 
 /**
  * 🎯 Resolve o nome do CONTATO para exibição
- * 
+ *
  * Usado em: Sidebar, Header do Chat, Lista de Tickets
  * SEMPRE retorna o nome do contato (pessoa conversando), não do cliente
  */
@@ -21,7 +21,7 @@ export const resolverNomeExibicao = (contato: Contato | null | undefined): strin
 
 /**
  * 🏢 Resolve o nome do CLIENTE vinculado ao contato
- * 
+ *
  * Usado em: Painel "Informações do Cliente" (lado direito)
  * Retorna o nome do cliente CRM se estiver vinculado, ou null
  */

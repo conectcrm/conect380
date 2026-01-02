@@ -66,13 +66,11 @@ const ModalExport: React.FC<ModalExportProps> = ({
           <div>
             <h2 className="text-xl font-bold text-[#002333]">Exportar Oportunidades</h2>
             <p className="text-sm text-[#002333]/60 mt-1">
-              {totalOportunidades} oportunidade{totalOportunidades !== 1 ? 's' : ''} será{totalOportunidades !== 1 ? 'ão' : ''} exportada{totalOportunidades !== 1 ? 's' : ''}
+              {totalOportunidades} oportunidade{totalOportunidades !== 1 ? 's' : ''} será
+              {totalOportunidades !== 1 ? 'ão' : ''} exportada{totalOportunidades !== 1 ? 's' : ''}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <X className="h-5 w-5 text-[#002333]/60" />
           </button>
         </div>
@@ -91,10 +89,11 @@ const ModalExport: React.FC<ModalExportProps> = ({
               <button
                 key={formato.id}
                 onClick={() => setFormatoSelecionado(formato.id)}
-                className={`w-full p-4 rounded-xl border-2 transition-all text-left ${selecionado
+                className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
+                  selecionado
                     ? 'border-[#159A9C] bg-[#159A9C]/5'
                     : 'border-[#DEEFE7] hover:border-[#B4BEC9] bg-white'
-                  }`}
+                }`}
               >
                 <div className="flex items-center gap-4">
                   <div className={`p-3 rounded-lg ${formato.corFundo}`}>
@@ -103,9 +102,7 @@ const ModalExport: React.FC<ModalExportProps> = ({
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-[#002333]">{formato.nome}</h3>
-                      {selecionado && (
-                        <div className="h-2 w-2 rounded-full bg-[#159A9C]"></div>
-                      )}
+                      {selecionado && <div className="h-2 w-2 rounded-full bg-[#159A9C]"></div>}
                     </div>
                     <p className="text-sm text-[#002333]/60">{formato.descricao}</p>
                   </div>

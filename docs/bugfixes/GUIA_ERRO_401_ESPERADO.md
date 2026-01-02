@@ -111,7 +111,7 @@ GET http://localhost:3000/api/atendimento/canais 401 (Unauthorized)
 
 #### 👑 Administrador (Recomendado)
 ```
-Email: admin@conectcrm.com
+Email: admin@conectsuite.com.br
 Senha: admin123
 ```
 
@@ -135,7 +135,7 @@ Quando você fizer login, o sistema:
    ```javascript
    POST /auth/login
    Body: {
-     "email": "admin@conectcrm.com",
+     "email": "admin@conectsuite.com.br",
      "senha": "admin123"
    }
    ```
@@ -147,7 +147,7 @@ Quando você fizer login, o sistema:
      "user": {
        "id": "...",
        "nome": "Administrador",
-       "email": "admin@conectcrm.com",
+       "email": "admin@conectsuite.com.br",
        "role": "admin"
      }
    }
@@ -369,7 +369,7 @@ npm run start:dev
 ```bash
 curl -X POST http://localhost:3001/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@conectcrm.com","senha":"admin123"}'
+  -d '{"email":"admin@conectsuite.com.br","senha":"admin123"}'
 ```
 
 **Resposta esperada:**

@@ -1,8 +1,23 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useWebSocket } from './useWebSocket';
 import { atendimentoService, Ticket, Mensagem } from '../services/atendimentoService';
+import { resolveSocketBaseUrl } from '../utils/network';
 
-const WEBSOCKET_URL = process.env.REACT_APP_WEBSOCKET_URL || 'http://localhost:3001/atendimento';
+const SOCKET_BASE_URL = resolveSocketBaseUrl({
+  envUrl: process.env.REACT_APP_WEBSOCKET_URL || process.env.REACT_APP_WS_URL,
+  onEnvIgnored: ({ envUrl, currentHost }) => {
+    console.warn(
+      '⚠️ [WhatsApp] Ignorando URL de WebSocket local em acesso via rede:',
+      envUrl,
+      '→ host atual',
+      currentHost,
+    );
+  },
+});
+
+const WEBSOCKET_URL = SOCKET_BASE_URL.endsWith('/')
+  ? `${SOCKET_BASE_URL}atendimento`
+  : `${SOCKET_BASE_URL}/atendimento`;
 
 interface UseWhatsAppOptions {
   empresaId: string;
@@ -50,33 +65,40 @@ export function useWhatsApp(options: UseWhatsAppOptions) {
   /**
    * Carregar tickets da empresa
    */
-  const carregarTickets = useCallback(async (filtros?: {
-    status?: string[];
-    atendenteId?: string;
-    busca?: string;
-  }) => {
-    try {
-      setLoading(true);
-      setErro(null);
+  const carregarTickets = useCallback(
+    async (filtros?: { status?: string[]; atendenteId?: string; busca?: string }) => {
+      try {
+        setLoading(true);
+        setErro(null);
 
-      // ✅ CORREÇÃO: Se não passar filtros de status, incluir apenas tickets ativos (ABERTO, EM_ATENDIMENTO, AGUARDANDO)
-      // Isso garante que tickets recém-criados apareçam após reload, mas evita carregar todos os históricos fechados
-      const filtrosComStatus = {
-        ...filtros,
-        status: filtros?.status || ['ABERTO', 'EM_ATENDIMENTO', 'AGUARDANDO']
-      };
+        // ✅ CORREÇÃO: Se não passar filtros de status, incluir apenas tickets ativos (ABERTO, EM_ATENDIMENTO, AGUARDANDO)
+        // Isso garante que tickets recém-criados apareçam após reload, mas evita carregar todos os históricos fechados
+        const filtrosComStatus = {
+          ...filtros,
+          status: filtros?.status || ['ABERTO', 'EM_ATENDIMENTO', 'AGUARDANDO'],
+        };
 
-      const ticketsCarregados = await atendimentoService.listarTickets(empresaId, filtrosComStatus);
-      setTickets(ticketsCarregados);
+        const ticketsCarregados = await atendimentoService.listarTickets(
+          empresaId,
+          filtrosComStatus,
+        );
+        setTickets(ticketsCarregados);
 
-      console.log('[WhatsApp] Tickets carregados:', ticketsCarregados.length, 'com filtros:', filtrosComStatus);
-    } catch (error: any) {
-      console.error('[WhatsApp] Erro ao carregar tickets:', error);
-      setErro(error.message || 'Erro ao carregar tickets');
-    } finally {
-      setLoading(false);
-    }
-  }, [empresaId]);
+        console.log(
+          '[WhatsApp] Tickets carregados:',
+          ticketsCarregados.length,
+          'com filtros:',
+          filtrosComStatus,
+        );
+      } catch (error: any) {
+        console.error('[WhatsApp] Erro ao carregar tickets:', error);
+        setErro(error.message || 'Erro ao carregar tickets');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [empresaId],
+  );
 
   /**
    * Carregar mensagens de um ticket
@@ -94,7 +116,12 @@ export function useWhatsApp(options: UseWhatsAppOptions) {
         return novo;
       });
 
-      console.log('[WhatsApp] Mensagens carregadas:', mensagensCarregadas.length, 'para ticket', ticketId);
+      console.log(
+        '[WhatsApp] Mensagens carregadas:',
+        mensagensCarregadas.length,
+        'para ticket',
+        ticketId,
+      );
     } catch (error: any) {
       console.error('[WhatsApp] Erro ao carregar mensagens:', error);
       setErro(error.message || 'Erro ao carregar mensagens');
@@ -106,55 +133,47 @@ export function useWhatsApp(options: UseWhatsAppOptions) {
   /**
    * Enviar mensagem via WhatsApp
    */
-  const enviarMensagem = useCallback(async (
-    ticketId: string,
-    telefone: string,
-    mensagem: string
-  ) => {
-    try {
-      setEnviandoMensagem(true);
-      setErro(null);
+  const enviarMensagem = useCallback(
+    async (ticketId: string, telefone: string, mensagem: string) => {
+      try {
+        setEnviandoMensagem(true);
+        setErro(null);
 
-      const resultado = await atendimentoService.enviarMensagemWhatsApp(empresaId, {
-        ticketId,
-        telefone,
-        mensagem,
-      });
+        const resultado = await atendimentoService.enviarMensagemWhatsApp(empresaId, {
+          ticketId,
+          telefone,
+          mensagem,
+        });
 
-      console.log('[WhatsApp] Mensagem enviada com sucesso:', resultado);
+        console.log('[WhatsApp] Mensagem enviada com sucesso:', resultado);
 
-      // Atualizar status do ticket localmente
-      setTickets((prev) =>
-        prev.map((t) =>
-          t.id === ticketId
-            ? { ...t, status: resultado.ticketStatus as Ticket['status'] }
-            : t
-        )
-      );
+        // Atualizar status do ticket localmente
+        setTickets((prev) =>
+          prev.map((t) =>
+            t.id === ticketId ? { ...t, status: resultado.ticketStatus as Ticket['status'] } : t,
+          ),
+        );
 
-      return resultado;
-    } catch (error: any) {
-      console.error('[WhatsApp] Erro ao enviar mensagem:', error);
-      setErro(error.message || 'Erro ao enviar mensagem');
-      throw error;
-    } finally {
-      setEnviandoMensagem(false);
-    }
-  }, [empresaId]);
+        return resultado;
+      } catch (error: any) {
+        console.error('[WhatsApp] Erro ao enviar mensagem:', error);
+        setErro(error.message || 'Erro ao enviar mensagem');
+        throw error;
+      } finally {
+        setEnviandoMensagem(false);
+      }
+    },
+    [empresaId],
+  );
 
   /**
    * Atualizar status do ticket
    */
-  const atualizarStatus = useCallback(async (
-    ticketId: string,
-    status: Ticket['status']
-  ) => {
+  const atualizarStatus = useCallback(async (ticketId: string, status: Ticket['status']) => {
     try {
       const ticketAtualizado = await atendimentoService.atualizarStatusTicket(ticketId, status);
 
-      setTickets((prev) =>
-        prev.map((t) => (t.id === ticketId ? ticketAtualizado : t))
-      );
+      setTickets((prev) => prev.map((t) => (t.id === ticketId ? ticketAtualizado : t)));
 
       console.log('[WhatsApp] Status do ticket atualizado:', status);
     } catch (error: any) {
@@ -167,16 +186,11 @@ export function useWhatsApp(options: UseWhatsAppOptions) {
   /**
    * Atribuir ticket para atendente
    */
-  const atribuirTicket = useCallback(async (
-    ticketId: string,
-    atendenteId: string
-  ) => {
+  const atribuirTicket = useCallback(async (ticketId: string, atendenteId: string) => {
     try {
       const ticketAtualizado = await atendimentoService.atribuirTicket(ticketId, atendenteId);
 
-      setTickets((prev) =>
-        prev.map((t) => (t.id === ticketId ? ticketAtualizado : t))
-      );
+      setTickets((prev) => prev.map((t) => (t.id === ticketId ? ticketAtualizado : t)));
 
       console.log('[WhatsApp] Ticket atribuído para:', atendenteId);
     } catch (error: any) {
@@ -206,10 +220,8 @@ export function useWhatsApp(options: UseWhatsAppOptions) {
       // Atualizar timestamp do ticket
       setTickets((prev) =>
         prev.map((t) =>
-          t.id === data.ticketId
-            ? { ...t, ultimaMensagemEm: data.mensagem.criadoEm }
-            : t
-        )
+          t.id === data.ticketId ? { ...t, ultimaMensagemEm: data.mensagem.criadoEm } : t,
+        ),
       );
 
       // Mover ticket para o topo da lista se não for o ativo
@@ -217,10 +229,7 @@ export function useWhatsApp(options: UseWhatsAppOptions) {
         const ticket = prev.find((t) => t.id === data.ticketId);
         if (!ticket) return prev;
 
-        return [
-          ticket,
-          ...prev.filter((t) => t.id !== data.ticketId),
-        ];
+        return [ticket, ...prev.filter((t) => t.id !== data.ticketId)];
       });
     });
 
@@ -240,38 +249,34 @@ export function useWhatsApp(options: UseWhatsAppOptions) {
 
     // Ticket atualizado
     // ✅ CORRIGIDO: 'ticket_atualizado' com underscore (compatível com backend)
-    const unsubTicketAtualizado = on('ticket_atualizado', (data: { ticketId: string;[key: string]: any }) => {
-      console.log('[WhatsApp] Ticket atualizado via WebSocket:', data);
+    const unsubTicketAtualizado = on(
+      'ticket_atualizado',
+      (data: { ticketId: string;[key: string]: any }) => {
+        console.log('[WhatsApp] Ticket atualizado via WebSocket:', data);
 
-      setTickets((prev) =>
-        prev.map((t) =>
-          t.id === data.ticketId
-            ? { ...t, ...data }
-            : t
-        )
-      );
-    });
+        setTickets((prev) => prev.map((t) => (t.id === data.ticketId ? { ...t, ...data } : t)));
+      },
+    );
 
     // Status online/offline atualizado
-    const unsubStatusAtualizado = on('contato:status:atualizado', (data: {
-      telefone: string;
-      online: boolean;
-      lastActivity: string
-    }) => {
-      console.log('[WhatsApp] Status de contato atualizado via WebSocket:', data);
+    const unsubStatusAtualizado = on(
+      'contato:status:atualizado',
+      (data: { telefone: string; online: boolean; lastActivity: string }) => {
+        console.log('[WhatsApp] Status de contato atualizado via WebSocket:', data);
 
-      setTickets((prev) =>
-        prev.map((t) =>
-          t.contatoTelefone === data.telefone
-            ? {
-              ...t,
-              contatoOnline: data.online,
-              contatoLastActivity: data.lastActivity
-            }
-            : t
-        )
-      );
-    });
+        setTickets((prev) =>
+          prev.map((t) =>
+            t.contatoTelefone === data.telefone
+              ? {
+                ...t,
+                contatoOnline: data.online,
+                contatoLastActivity: data.lastActivity,
+              }
+              : t,
+          ),
+        );
+      },
+    );
 
     // Cleanup
     return () => {

@@ -5,11 +5,7 @@ import * as yup from 'yup';
 import toast from 'react-hot-toast';
 import { CalendarEvent } from '../../types/calendar';
 import { useResponsive, useBodyOverflow } from '../../hooks/useResponsive';
-import {
-  ResponsiveModal,
-  AdaptiveColumns,
-  ResponsiveCard
-} from '../layout/ResponsiveLayout';
+import { ResponsiveModal, AdaptiveColumns, ResponsiveCard } from '../layout/ResponsiveLayout';
 import {
   FormField,
   BaseInput,
@@ -17,11 +13,11 @@ import {
   BaseTextarea,
   BaseButton,
   StatusPanel,
-  StatusBadge
+  StatusBadge,
 } from '../base';
-import { 
-  Save, 
-  X, 
+import {
+  Save,
+  X,
   Calendar,
   Clock,
   MapPin,
@@ -43,7 +39,7 @@ import {
   UserCheck,
   UserX,
   Eye,
-  Settings
+  Settings,
 } from 'lucide-react';
 
 // Interface para participantes (estilo Google)
@@ -121,47 +117,36 @@ const googleEventSchema = yup.object({
     .required('Título é obrigatório')
     .min(1, 'Título é obrigatório')
     .max(255, 'Título deve ter no máximo 255 caracteres'),
-    
-  start: yup
-    .string()
-    .required('Data de início é obrigatória'),
-    
+
+  start: yup.string().required('Data de início é obrigatória'),
+
   end: yup
     .string()
     .required('Data de fim é obrigatória')
-    .test('end-after-start', 'Data de fim deve ser posterior ao início', function(value) {
+    .test('end-after-start', 'Data de fim deve ser posterior ao início', function (value) {
       const { start } = this.parent;
       return !start || !value || new Date(value) > new Date(start);
     }),
-    
-  location: yup
-    .string()
-    .max(255, 'Local deve ter no máximo 255 caracteres'),
-    
-  description: yup
-    .string()
-    .max(8192, 'Descrição deve ter no máximo 8192 caracteres'),
-    
-  participants: yup
-    .array()
-    .of(yup.object({
+
+  location: yup.string().max(255, 'Local deve ter no máximo 255 caracteres'),
+
+  description: yup.string().max(8192, 'Descrição deve ter no máximo 8192 caracteres'),
+
+  participants: yup.array().of(
+    yup.object({
       email: yup.string().email('Email inválido').required('Email é obrigatório'),
-      name: yup.string().required('Nome é obrigatório')
-    })),
-    
-  calendar: yup
-    .string()
-    .required('Calendário é obrigatório'),
-    
+      name: yup.string().required('Nome é obrigatório'),
+    }),
+  ),
+
+  calendar: yup.string().required('Calendário é obrigatório'),
+
   visibility: yup
     .string()
     .oneOf(['public', 'private', 'confidential'])
     .required('Visibilidade é obrigatória'),
-    
-  priority: yup
-    .string()
-    .oneOf(['low', 'normal', 'high'])
-    .required('Prioridade é obrigatória')
+
+  priority: yup.string().oneOf(['low', 'normal', 'high']).required('Prioridade é obrigatória'),
 });
 
 // Cores padrão do Google Calendar
@@ -174,7 +159,7 @@ const EVENT_COLORS = [
   { id: 'pink', name: 'Rosa', value: '#e91e63', bg: 'bg-pink-500' },
   { id: 'cyan', name: 'Ciano', value: '#00acc1', bg: 'bg-cyan-500' },
   { id: 'brown', name: 'Marrom', value: '#8d6e63', bg: 'bg-amber-700' },
-  { id: 'gray', name: 'Cinza', value: '#616161', bg: 'bg-gray-500' }
+  { id: 'gray', name: 'Cinza', value: '#616161', bg: 'bg-gray-500' },
 ];
 
 // Opções de timezone
@@ -184,7 +169,7 @@ const TIMEZONES = [
   { value: 'America/Los_Angeles', label: '(GMT-8) Los Angeles' },
   { value: 'Europe/London', label: '(GMT+0) Londres' },
   { value: 'Europe/Paris', label: '(GMT+1) Paris' },
-  { value: 'Asia/Tokyo', label: '(GMT+9) Tóquio' }
+  { value: 'Asia/Tokyo', label: '(GMT+9) Tóquio' },
 ];
 
 // Opções de notificação
@@ -197,12 +182,12 @@ const NOTIFICATION_OPTIONS = [
   { minutes: 60, label: '1 hora antes' },
   { minutes: 120, label: '2 horas antes' },
   { minutes: 1440, label: '1 dia antes' },
-  { minutes: 10080, label: '1 semana antes' }
+  { minutes: 10080, label: '1 semana antes' },
 ];
 
 /**
  * GoogleEventModal - Modal de evento estilo Google Calendar Otimizado
- * 
+ *
  * Modal avançado com layout otimizado que aproveita melhor o espaço:
  * - Interface expandida com campos maiores
  * - Layout responsivo com melhor uso do espaço
@@ -221,7 +206,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
     { id: 'work', name: 'Trabalho', color: '#137333' },
     { id: 'personal', name: 'Pessoal', color: '#9334e6' },
     { id: 'meetings', name: 'Reuniões', color: '#d93025' },
-    { id: 'events', name: 'Eventos', color: '#f57c00' }
+    { id: 'events', name: 'Eventos', color: '#f57c00' },
   ],
   currentUser = {
     id: 'current-user',
@@ -231,8 +216,8 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
     role: 'organizer',
     canModifyEvent: true,
     canInviteOthers: true,
-    canSeeGuestList: true
-  }
+    canSeeGuestList: true,
+  },
 }) => {
   const { isMobile, isTablet } = useResponsive();
   const { lockScroll, unlockScroll } = useBodyOverflow();
@@ -249,7 +234,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
     reset,
     watch,
     setValue,
-    getValues
+    getValues,
   } = useForm<GoogleEventFormData>({
     resolver: yupResolver(googleEventSchema),
     mode: 'onChange',
@@ -262,12 +247,10 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
       timezone: 'America/Sao_Paulo',
       allDay: false,
       participants: [currentUser],
-      notifications: [
-        { id: '1', type: 'popup', time: 10, timeUnit: 'minutes' }
-      ],
+      notifications: [{ id: '1', type: 'popup', time: 10, timeUnit: 'minutes' }],
       recurrence: {
         frequency: 'none',
-        endType: 'never'
+        endType: 'never',
       },
       visibility: 'private',
       calendar: 'primary',
@@ -276,8 +259,8 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
       priority: 'normal',
       collaborator: '',
       category: '',
-      tags: []
-    }
+      tags: [],
+    },
   });
 
   // Watchers
@@ -311,12 +294,10 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
           timezone: 'America/Sao_Paulo',
           allDay: event.allDay || false,
           participants: [currentUser],
-          notifications: [
-            { id: '1', type: 'popup', time: 10, timeUnit: 'minutes' }
-          ],
+          notifications: [{ id: '1', type: 'popup', time: 10, timeUnit: 'minutes' }],
           recurrence: {
             frequency: 'none',
-            endType: 'never'
+            endType: 'never',
           },
           visibility: 'private',
           calendar: 'primary',
@@ -325,7 +306,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
           priority: 'normal',
           collaborator: event.collaborator || '',
           category: event.category || '',
-          tags: []
+          tags: [],
         };
         reset(eventData);
       } else {
@@ -333,7 +314,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
         const now = new Date();
         const nextHour = new Date(now);
         nextHour.setHours(now.getHours() + 1, 0, 0, 0);
-        
+
         reset({
           title: '',
           description: '',
@@ -343,12 +324,10 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
           timezone: 'America/Sao_Paulo',
           allDay: false,
           participants: [currentUser],
-          notifications: [
-            { id: '1', type: 'popup', time: 10, timeUnit: 'minutes' }
-          ],
+          notifications: [{ id: '1', type: 'popup', time: 10, timeUnit: 'minutes' }],
           recurrence: {
             frequency: 'none',
-            endType: 'never'
+            endType: 'never',
           },
           visibility: 'private',
           calendar: 'primary',
@@ -357,7 +336,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
           priority: 'normal',
           collaborator: '',
           category: '',
-          tags: []
+          tags: [],
         });
       }
       setActiveTab('details');
@@ -379,13 +358,13 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
       role: 'attendee',
       canModifyEvent: false,
       canInviteOthers: false,
-      canSeeGuestList: true
+      canSeeGuestList: true,
     };
 
     const currentParticipants = getValues('participants') || [];
-    
+
     // Verificar se email já existe
-    if (currentParticipants.some(p => p.email === participantEmail)) {
+    if (currentParticipants.some((p) => p.email === participantEmail)) {
       toast.error('Este email já foi adicionado');
       return;
     }
@@ -398,8 +377,8 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
 
   const removeParticipant = (participantId: string) => {
     const currentParticipants = getValues('participants') || [];
-    const participant = currentParticipants.find(p => p.id === participantId);
-    
+    const participant = currentParticipants.find((p) => p.id === participantId);
+
     if (participant?.role === 'organizer') {
       toast.error('Não é possível remover o organizador');
       return;
@@ -407,10 +386,10 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
 
     setValue(
       'participants',
-      currentParticipants.filter(p => p.id !== participantId),
-      { shouldValidate: true }
+      currentParticipants.filter((p) => p.id !== participantId),
+      { shouldValidate: true },
     );
-    
+
     toast.success('Participante removido!');
   };
 
@@ -424,28 +403,21 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
 
   // Submissão do formulário
   const onSubmit = async (data: GoogleEventFormData) => {
-    const toastId = toast.loading(
-      event ? 'Atualizando evento...' : 'Criando evento...'
-    );
+    const toastId = toast.loading(event ? 'Atualizando evento...' : 'Criando evento...');
 
     try {
       await onSave(data);
-      
-      toast.success(
-        event ? 'Evento atualizado com sucesso!' : 'Evento criado com sucesso!',
-        { id: toastId }
-      );
-      
+
+      toast.success(event ? 'Evento atualizado com sucesso!' : 'Evento criado com sucesso!', {
+        id: toastId,
+      });
+
       setTimeout(() => {
         handleClose();
       }, 1000);
-      
     } catch (error) {
       console.error('Erro ao salvar evento:', error);
-      toast.error(
-        event ? 'Erro ao atualizar evento' : 'Erro ao criar evento',
-        { id: toastId }
-      );
+      toast.error(event ? 'Erro ao atualizar evento' : 'Erro ao criar evento', { id: toastId });
     }
   };
 
@@ -471,7 +443,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
 
     const initials = participant.name
       .split(' ')
-      .map(n => n[0])
+      .map((n) => n[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
@@ -480,7 +452,9 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
     const colorIndex = participant.id.length % colors.length;
 
     return (
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-semibold ${colors[colorIndex]}`}>
+      <div
+        className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-semibold ${colors[colorIndex]}`}
+      >
         {initials}
       </div>
     );
@@ -501,8 +475,8 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
             {[
               { id: 'details', label: 'Detalhes', icon: Edit3 },
               { id: 'participants', label: 'Participantes', icon: Users },
-              { id: 'options', label: 'Opções', icon: Settings }
-            ].map(tab => {
+              { id: 'options', label: 'Opções', icon: Settings },
+            ].map((tab) => {
               const Icon = tab.icon;
               return (
                 <button
@@ -545,11 +519,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                     Informações Básicas
                   </h3>
                   <div className="space-y-6">
-                    <FormField
-                      label="Título do Evento"
-                      error={errors.title?.message}
-                      required
-                    >
+                    <FormField label="Título do Evento" error={errors.title?.message} required>
                       <BaseInput
                         {...register('title')}
                         placeholder="Ex: Reunião de Planejamento"
@@ -558,17 +528,13 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                       />
                     </FormField>
 
-                    <FormField
-                      label="Calendário"
-                      error={errors.calendar?.message}
-                      required
-                    >
+                    <FormField label="Calendário" error={errors.calendar?.message} required>
                       <BaseSelect
                         {...register('calendar')}
                         error={!!errors.calendar}
-                        options={availableCalendars.map(cal => ({
+                        options={availableCalendars.map((cal) => ({
                           value: cal.id,
-                          label: cal.name
+                          label: cal.name,
                         }))}
                         className="w-full h-14 text-base"
                       />
@@ -591,13 +557,15 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                     {/* Cor do evento - Mais espaçosa */}
                     <FormField label="Cor do Evento">
                       <div className="flex flex-wrap gap-3">
-                        {EVENT_COLORS.map(color => (
+                        {EVENT_COLORS.map((color) => (
                           <button
                             key={color.id}
                             type="button"
                             onClick={() => setValue('color', color.id)}
                             className={`w-10 h-10 rounded-xl ${color.bg} transition-all hover:scale-110 hover:shadow-lg ${
-                              selectedColor === color.id ? 'ring-3 ring-gray-400 ring-offset-2 scale-110' : ''
+                              selectedColor === color.id
+                                ? 'ring-3 ring-gray-400 ring-offset-2 scale-110'
+                                : ''
                             }`}
                             title={color.name}
                           />
@@ -629,10 +597,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                       />
                     </FormField>
 
-                    <FormField
-                      label="Videoconferência"
-                      hint="Link da reunião online"
-                    >
+                    <FormField label="Videoconferência" hint="Link da reunião online">
                       <div className="space-y-4">
                         <BaseInput
                           {...register('conferenceLink')}
@@ -652,33 +617,27 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
 
                     {/* Visibilidade e Prioridade */}
                     <div className="grid grid-cols-2 gap-6">
-                      <FormField
-                        label="Visibilidade"
-                        error={errors.visibility?.message}
-                      >
+                      <FormField label="Visibilidade" error={errors.visibility?.message}>
                         <BaseSelect
                           {...register('visibility')}
                           error={!!errors.visibility}
                           options={[
                             { value: 'public', label: '🌍 Público' },
                             { value: 'private', label: '🔒 Privado' },
-                            { value: 'confidential', label: '👁️ Confidencial' }
+                            { value: 'confidential', label: '👁️ Confidencial' },
                           ]}
                           className="w-full h-14 text-base"
                         />
                       </FormField>
 
-                      <FormField
-                        label="Prioridade"
-                        error={errors.priority?.message}
-                      >
+                      <FormField label="Prioridade" error={errors.priority?.message}>
                         <BaseSelect
                           {...register('priority')}
                           error={!!errors.priority}
                           options={[
                             { value: 'low', label: '🔽 Baixa' },
                             { value: 'normal', label: '➖ Normal' },
-                            { value: 'high', label: '🔴 Alta' }
+                            { value: 'high', label: '🔴 Alta' },
                           ]}
                           className="w-full h-14 text-base"
                         />
@@ -705,11 +664,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                         Evento de dia inteiro
                       </label>
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          {...register('allDay')}
-                          className="sr-only peer"
-                        />
+                        <input type="checkbox" {...register('allDay')} className="sr-only peer" />
                         <div className="w-14 h-8 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-7 after:w-7 after:transition-all peer-checked:bg-purple-600"></div>
                       </label>
                     </div>
@@ -728,11 +683,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                         />
                       </FormField>
 
-                      <FormField
-                        label="Data e Hora de Fim"
-                        error={errors.end?.message}
-                        required
-                      >
+                      <FormField label="Data e Hora de Fim" error={errors.end?.message} required>
                         <BaseInput
                           {...register('end')}
                           type={allDay ? 'date' : 'datetime-local'}
@@ -742,10 +693,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                       </FormField>
                     </div>
 
-                    <FormField
-                      label="Fuso Horário"
-                      error={errors.timezone?.message}
-                    >
+                    <FormField label="Fuso Horário" error={errors.timezone?.message}>
                       <BaseSelect
                         {...register('timezone')}
                         error={!!errors.timezone}
@@ -785,7 +733,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                           { value: 'conferencia', label: '🎤 Conferência' },
                           { value: 'entrevista', label: '👥 Entrevista' },
                           { value: 'social', label: '🎉 Social' },
-                          { value: 'outro', label: '📋 Outro' }
+                          { value: 'outro', label: '📋 Outro' },
                         ]}
                         className="w-full h-14 text-base"
                       />
@@ -799,18 +747,21 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                             Calendário Selecionado
                           </label>
                           <div className="mt-2 flex items-center gap-3">
-                            <div 
-                              className="w-4 h-4 rounded-full" 
-                              style={{ 
-                                backgroundColor: availableCalendars.find(c => c.id === currentCalendar)?.color || '#159A9C' 
-                              }} 
+                            <div
+                              className="w-4 h-4 rounded-full"
+                              style={{
+                                backgroundColor:
+                                  availableCalendars.find((c) => c.id === currentCalendar)?.color ||
+                                  '#159A9C',
+                              }}
                             />
                             <span className="text-base text-gray-700 font-medium">
-                              {availableCalendars.find(c => c.id === currentCalendar)?.name || 'Principal'}
+                              {availableCalendars.find((c) => c.id === currentCalendar)?.name ||
+                                'Principal'}
                             </span>
                           </div>
                         </div>
-                        
+
                         <div>
                           <label className="text-sm font-medium text-gray-500 uppercase tracking-wide">
                             Participantes
@@ -855,7 +806,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                       className="w-full h-14 px-4 text-base"
                     />
                   </FormField>
-                  
+
                   <FormField label="Email" required>
                     <BaseInput
                       type="email"
@@ -865,7 +816,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                       className="w-full h-14 px-4 text-base"
                     />
                   </FormField>
-                  
+
                   <div className="flex items-end">
                     <BaseButton
                       type="button"
@@ -888,7 +839,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                   </div>
                   Participantes Convidados ({participants.length})
                 </h3>
-                
+
                 <div className="space-y-4">
                   {participants.map((participant) => (
                     <div
@@ -897,7 +848,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                     >
                       <div className="flex items-center gap-4 flex-1 min-w-0">
                         {renderParticipantAvatar(participant)}
-                        
+
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3">
                             <p className="font-semibold text-gray-900 truncate text-lg">
@@ -913,26 +864,39 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                             {participant.email}
                           </p>
                           {participant.phone && (
-                            <p className="text-sm text-gray-400 mt-1">
-                              {participant.phone}
-                            </p>
+                            <p className="text-sm text-gray-400 mt-1">{participant.phone}</p>
                           )}
                         </div>
 
                         <div className="flex items-center gap-3">
-                          <span className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium ${
-                            participant.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                            participant.status === 'declined' ? 'bg-red-100 text-red-800' :
-                            participant.status === 'tentative' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {participant.status === 'accepted' && <UserCheck className="w-4 h-4 mr-2" />}
-                            {participant.status === 'declined' && <UserX className="w-4 h-4 mr-2" />}
-                            {participant.status === 'tentative' && <AlertTriangle className="w-4 h-4 mr-2" />}
+                          <span
+                            className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium ${
+                              participant.status === 'accepted'
+                                ? 'bg-green-100 text-green-800'
+                                : participant.status === 'declined'
+                                  ? 'bg-red-100 text-red-800'
+                                  : participant.status === 'tentative'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {participant.status === 'accepted' && (
+                              <UserCheck className="w-4 h-4 mr-2" />
+                            )}
+                            {participant.status === 'declined' && (
+                              <UserX className="w-4 h-4 mr-2" />
+                            )}
+                            {participant.status === 'tentative' && (
+                              <AlertTriangle className="w-4 h-4 mr-2" />
+                            )}
                             {participant.status === 'pending' && <Clock className="w-4 h-4 mr-2" />}
-                            {participant.status === 'accepted' ? 'Confirmado' :
-                             participant.status === 'declined' ? 'Recusou' :
-                             participant.status === 'tentative' ? 'Tentativo' : 'Pendente'}
+                            {participant.status === 'accepted'
+                              ? 'Confirmado'
+                              : participant.status === 'declined'
+                                ? 'Recusou'
+                                : participant.status === 'tentative'
+                                  ? 'Tentativo'
+                                  : 'Pendente'}
                           </span>
                         </div>
                       </div>
@@ -970,47 +934,56 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                 </div>
                 Notificações e Opções Avançadas
               </h3>
-              
+
               <div className="space-y-8">
                 <FormField label="Notificações do Evento">
                   <div className="space-y-4">
                     {notifications.map((notification) => (
-                      <div key={notification.id} className="flex items-center gap-4 p-4 bg-white rounded-xl border">
+                      <div
+                        key={notification.id}
+                        className="flex items-center gap-4 p-4 bg-white rounded-xl border"
+                      >
                         <BaseSelect
                           value={notification.type}
                           onChange={(e) => {
-                            const updatedNotifications = notifications.map(n =>
-                              n.id === notification.id ? { ...n, type: e.target.value as 'popup' | 'email' } : n
+                            const updatedNotifications = notifications.map((n) =>
+                              n.id === notification.id
+                                ? { ...n, type: e.target.value as 'popup' | 'email' }
+                                : n,
                             );
                             setValue('notifications', updatedNotifications);
                           }}
                           options={[
                             { value: 'popup', label: '💬 Notificação Popup' },
-                            { value: 'email', label: '📧 Email' }
+                            { value: 'email', label: '📧 Email' },
                           ]}
                           className="flex-1 h-12 text-base"
                         />
-                        
+
                         <BaseSelect
                           value={`${notification.time}`}
                           onChange={(e) => {
-                            const updatedNotifications = notifications.map(n =>
-                              n.id === notification.id ? { ...n, time: parseInt(e.target.value) } : n
+                            const updatedNotifications = notifications.map((n) =>
+                              n.id === notification.id
+                                ? { ...n, time: parseInt(e.target.value) }
+                                : n,
                             );
                             setValue('notifications', updatedNotifications);
                           }}
-                          options={NOTIFICATION_OPTIONS.map(opt => ({
+                          options={NOTIFICATION_OPTIONS.map((opt) => ({
                             value: `${opt.minutes}`,
-                            label: opt.label
+                            label: opt.label,
                           }))}
                           className="flex-1 h-12 text-base"
                         />
-                        
+
                         {notifications.length > 1 && (
                           <button
                             type="button"
                             onClick={() => {
-                              const updatedNotifications = notifications.filter(n => n.id !== notification.id);
+                              const updatedNotifications = notifications.filter(
+                                (n) => n.id !== notification.id,
+                              );
                               setValue('notifications', updatedNotifications);
                             }}
                             className="p-3 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
@@ -1020,7 +993,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                         )}
                       </div>
                     ))}
-                    
+
                     <button
                       type="button"
                       onClick={() => {
@@ -1028,7 +1001,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                           id: Date.now().toString(),
                           type: 'popup',
                           time: 10,
-                          timeUnit: 'minutes'
+                          timeUnit: 'minutes',
                         };
                         setValue('notifications', [...notifications, newNotification]);
                       }}
@@ -1042,8 +1015,10 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
 
                 {/* Configurações de Convidados */}
                 <div className="bg-white p-6 rounded-xl border">
-                  <h4 className="font-semibold text-lg text-gray-900 mb-6">Configurações de Convidados</h4>
-                  
+                  <h4 className="font-semibold text-lg text-gray-900 mb-6">
+                    Configurações de Convidados
+                  </h4>
+
                   <div className="space-y-4">
                     <label className="flex items-center gap-3 text-base cursor-pointer">
                       <input
@@ -1053,7 +1028,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                       />
                       <span>Convidados podem ver lista de participantes</span>
                     </label>
-                    
+
                     <label className="flex items-center gap-3 text-base cursor-pointer">
                       <input
                         type="checkbox"
@@ -1061,7 +1036,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
                       />
                       <span>Convidados podem convidar outros</span>
                     </label>
-                    
+
                     <label className="flex items-center gap-3 text-base cursor-pointer">
                       <input
                         type="checkbox"
@@ -1089,7 +1064,7 @@ export const GoogleEventModal: React.FC<GoogleEventModalProps> = ({
             >
               Cancelar
             </BaseButton>
-            
+
             <BaseButton
               type="submit"
               variant="primary"

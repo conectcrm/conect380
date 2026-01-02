@@ -11,6 +11,7 @@ import {
 import { Contrato } from '../../contratos/entities/contrato.entity';
 import { User } from '../../users/user.entity';
 import { Fatura } from './fatura.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 export enum StatusPlanoCobranca {
   ATIVO = 'ativo',
@@ -31,6 +32,13 @@ export enum TipoRecorrencia {
 export class PlanoCobranca {
   @PrimaryGeneratedColumn()
   id: number;
+
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column({ unique: true })
   codigo: string;

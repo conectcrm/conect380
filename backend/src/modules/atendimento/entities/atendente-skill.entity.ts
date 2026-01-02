@@ -7,6 +7,7 @@ import {
   CreateDateColumn,
 } from 'typeorm';
 import { User } from '../../users/user.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 /**
  * Skills/Habilidades de Atendentes
@@ -25,6 +26,13 @@ import { User } from '../../users/user.entity';
 export class AtendenteSkill {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column('uuid')
   atendenteId: string;

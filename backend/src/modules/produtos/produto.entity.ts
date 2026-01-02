@@ -14,6 +14,13 @@ export class Produto {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
+
   @Column({ type: 'varchar', length: 255 })
   nome: string;
 
@@ -71,13 +78,6 @@ export class Produto {
   // Variações como JSON
   @Column({ type: 'json', nullable: true })
   variacoes?: string[];
-
-  @Column({ type: 'uuid' })
-  empresa_id: string;
-
-  @ManyToOne(() => Empresa)
-  @JoinColumn({ name: 'empresa_id' })
-  empresa: Empresa;
 
   @CreateDateColumn()
   criadoEm: Date;

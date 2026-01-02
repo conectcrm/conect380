@@ -23,7 +23,7 @@ const goals: Goal[] = [
     period: 'Julho 2025',
     progress: 86,
     trend: 'up',
-    color: 'blue'
+    color: 'blue',
   },
   {
     id: '2',
@@ -34,7 +34,7 @@ const goals: Goal[] = [
     period: 'Este mês',
     progress: 80,
     trend: 'up',
-    color: 'green'
+    color: 'green',
   },
   {
     id: '3',
@@ -45,7 +45,7 @@ const goals: Goal[] = [
     period: 'Este mês',
     progress: 90,
     trend: 'up',
-    color: 'purple'
+    color: 'purple',
   },
   {
     id: '4',
@@ -56,8 +56,8 @@ const goals: Goal[] = [
     period: 'Trimestre',
     progress: 91,
     trend: 'stable',
-    color: 'orange'
-  }
+    color: 'orange',
+  },
 ];
 
 const formatValue = (value: number, unit: string) => {
@@ -66,14 +66,14 @@ const formatValue = (value: number, unit: string) => {
       style: 'currency',
       currency: 'BRL',
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      maximumFractionDigits: 0,
     }).format(value);
   }
-  
+
   if (unit === '%') {
     return `${value}%`;
   }
-  
+
   return `${value.toLocaleString('pt-BR')} ${unit}`;
 };
 
@@ -82,9 +82,9 @@ const getProgressColor = (color: string, progress: number) => {
     blue: progress >= 90 ? 'bg-blue-500' : progress >= 70 ? 'bg-blue-400' : 'bg-blue-300',
     green: progress >= 90 ? 'bg-green-500' : progress >= 70 ? 'bg-green-400' : 'bg-green-300',
     purple: progress >= 90 ? 'bg-purple-500' : progress >= 70 ? 'bg-purple-400' : 'bg-purple-300',
-    orange: progress >= 90 ? 'bg-orange-500' : progress >= 70 ? 'bg-orange-400' : 'bg-orange-300'
+    orange: progress >= 90 ? 'bg-orange-500' : progress >= 70 ? 'bg-orange-400' : 'bg-orange-300',
   };
-  
+
   return baseColors[color as keyof typeof baseColors] || 'bg-gray-400';
 };
 
@@ -106,10 +106,7 @@ interface GoalsWidgetProps {
   isLoading?: boolean;
 }
 
-export const GoalsWidget: React.FC<GoalsWidgetProps> = ({
-  className = '',
-  isLoading = false
-}) => {
+export const GoalsWidget: React.FC<GoalsWidgetProps> = ({ className = '', isLoading = false }) => {
   if (isLoading) {
     return (
       <div className={`bg-white rounded-xl shadow-sm border p-6 ${className}`}>
@@ -133,7 +130,7 @@ export const GoalsWidget: React.FC<GoalsWidgetProps> = ({
   }
 
   return (
-    <div 
+    <div
       className={`bg-white rounded-xl shadow-sm border p-6 ${className}`}
       role="region"
       aria-label="Metas e objetivos do período"
@@ -143,7 +140,7 @@ export const GoalsWidget: React.FC<GoalsWidgetProps> = ({
           <Target className="w-5 h-5 text-gray-600" />
           Metas & Objetivos
         </h3>
-        <button 
+        <button
           className="text-sm text-blue-600 hover:text-blue-800 hover:underline focus:outline-none focus:underline"
           aria-label="Ver detalhes das metas"
         >
@@ -162,16 +159,14 @@ export const GoalsWidget: React.FC<GoalsWidgetProps> = ({
             {/* Header da meta */}
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <h4 className="text-sm font-semibold text-gray-900 mb-1">
-                  {goal.title}
-                </h4>
+                <h4 className="text-sm font-semibold text-gray-900 mb-1">{goal.title}</h4>
                 <div className="flex items-center gap-2 text-xs text-gray-500">
                   <Calendar className="w-3 h-3" />
                   <span>{goal.period}</span>
                   {getTrendIcon(goal.trend)}
                 </div>
               </div>
-              
+
               <div className="text-right">
                 <div className="text-sm font-bold text-gray-900">
                   {formatValue(goal.current, goal.unit)}
@@ -185,16 +180,12 @@ export const GoalsWidget: React.FC<GoalsWidgetProps> = ({
             {/* Barra de progresso */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-gray-600">
-                  Progresso
-                </span>
-                <span className="text-xs font-bold text-gray-900">
-                  {goal.progress}%
-                </span>
+                <span className="text-xs font-medium text-gray-600">Progresso</span>
+                <span className="text-xs font-bold text-gray-900">{goal.progress}%</span>
               </div>
-              
+
               <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
+                <div
                   className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(goal.color, goal.progress)}`}
                   style={{ width: `${Math.min(goal.progress, 100)}%` }}
                   role="progressbar"
@@ -209,23 +200,28 @@ export const GoalsWidget: React.FC<GoalsWidgetProps> = ({
             {/* Status da meta */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
-                {goal.progress >= 90 && (
-                  <Award className="w-4 h-4 text-yellow-500" />
-                )}
-                <span className={`text-xs font-medium ${
-                  goal.progress >= 90 ? 'text-green-600' : 
-                  goal.progress >= 70 ? 'text-yellow-600' : 'text-gray-600'
-                }`}>
-                  {goal.progress >= 90 ? 'Excelente!' : 
-                   goal.progress >= 70 ? 'No caminho certo' : 'Precisa acelerar'}
+                {goal.progress >= 90 && <Award className="w-4 h-4 text-yellow-500" />}
+                <span
+                  className={`text-xs font-medium ${
+                    goal.progress >= 90
+                      ? 'text-green-600'
+                      : goal.progress >= 70
+                        ? 'text-yellow-600'
+                        : 'text-gray-600'
+                  }`}
+                >
+                  {goal.progress >= 90
+                    ? 'Excelente!'
+                    : goal.progress >= 70
+                      ? 'No caminho certo'
+                      : 'Precisa acelerar'}
                 </span>
               </div>
-              
+
               <span className="text-xs text-gray-500">
-                {goal.target - goal.current > 0 ? 
-                  `Faltam ${formatValue(goal.target - goal.current, goal.unit).replace('-', '')}` : 
-                  'Meta atingida!'
-                }
+                {goal.target - goal.current > 0
+                  ? `Faltam ${formatValue(goal.target - goal.current, goal.unit).replace('-', '')}`
+                  : 'Meta atingida!'}
               </span>
             </div>
           </div>
@@ -235,9 +231,7 @@ export const GoalsWidget: React.FC<GoalsWidgetProps> = ({
       {/* Footer com resumo */}
       <div className="mt-6 pt-4 border-t border-gray-200">
         <div className="text-center">
-          <div className="text-sm text-gray-600 mb-2">
-            Performance geral do período
-          </div>
+          <div className="text-sm text-gray-600 mb-2">Performance geral do período</div>
           <div className="flex items-center justify-center gap-2">
             <div className="w-16 h-16 relative">
               <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 64 64">

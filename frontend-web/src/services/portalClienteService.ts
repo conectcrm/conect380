@@ -4,9 +4,7 @@
  */
 
 import { gerarTokenNumerico } from '../utils/tokenUtils';
-
-// Configuração da API - será integrada com o sistema existente
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+import { API_BASE_URL } from './api';
 
 const api = {
   get: async (url: string) => {
@@ -31,7 +29,7 @@ const api = {
     });
     if (!response.ok) throw new Error('Request failed');
     return { data: await response.json() };
-  }
+  },
 };
 
 export interface PropostaPublica {
@@ -91,7 +89,6 @@ interface LogAcao {
 }
 
 class PortalClienteService {
-
   /**
    * Obtém uma proposta pelo token público ou número da proposta
    * Inclui fallback para tokens armazenados localmente
@@ -128,7 +125,6 @@ class PortalClienteService {
         dataEnvio: new Date(data.dataEnvio),
         dataValidade: new Date(data.dataValidade),
       };
-
     } catch (error) {
       console.warn('API não disponível, verificando tokens locais:', error);
 
@@ -150,36 +146,36 @@ class PortalClienteService {
       titulo: `Proposta Comercial - ${numeroMock}`,
       cliente: {
         nome: 'João Silva',
-        email: 'joao@exemplo.com'
+        email: 'joao@exemplo.com',
       },
       empresa: {
         nome: 'ConectCRM',
         endereco: 'Goiânia/GO',
         telefone: '(62) 99668-9991',
-        email: 'conectcrm@gmail.com'
+        email: 'conectcrm@gmail.com',
       },
       vendedor: {
         nome: 'Vendedor Demo',
         email: 'vendedor@conectcrm.com',
-        telefone: '(62) 99668-9991'
+        telefone: '(62) 99668-9991',
       },
       produtos: [
         {
           nome: 'Sistema CRM Premium',
           descricao: 'Solução completa de gestão de relacionamento com cliente',
           quantidade: 1,
-          valorUnitario: 2500.00,
-          valorTotal: 2500.00
+          valorUnitario: 2500.0,
+          valorTotal: 2500.0,
         },
         {
           nome: 'Treinamento e Suporte',
           descricao: 'Capacitação da equipe e suporte técnico por 12 meses',
           quantidade: 1,
-          valorUnitario: 800.00,
-          valorTotal: 800.00
-        }
+          valorUnitario: 800.0,
+          valorTotal: 800.0,
+        },
       ],
-      valorTotal: 3000.00,
+      valorTotal: 3000.0,
       status: 'enviada',
       dataEnvio: new Date(Date.now() - 24 * 60 * 60 * 1000), // Ontem
       dataValidade: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 dias
@@ -188,8 +184,8 @@ class PortalClienteService {
         formaPagamento: 'Cartão de Crédito ou Boleto (12x sem juros)',
         prazoEntrega: '15 dias úteis após aprovação',
         garantia: '12 meses',
-        observacoes: 'Proposta válida por 15 dias. Entre em contato para esclarecimentos.'
-      }
+        observacoes: 'Proposta válida por 15 dias. Entre em contato para esclarecimentos.',
+      },
     };
   }
 
@@ -213,7 +209,7 @@ class PortalClienteService {
         token: tokenLocal,
         propostaId,
         criadoEm: new Date().toISOString(),
-        validoAte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 dias
+        validoAte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 dias
       };
 
       // Armazena no localStorage para simulação
@@ -233,7 +229,7 @@ class PortalClienteService {
     console.log('🔄 Iniciando atualização de status:', { token, novoStatus });
 
     try {
-      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+      const API_URL = API_BASE_URL;
 
       // 1. Atualizar via endpoint do portal
       console.log('📡 Atualizando via portal endpoint...');
@@ -246,7 +242,7 @@ class PortalClienteService {
           status: novoStatus,
           timestamp: new Date().toISOString(),
           ip: await this.obterIP(),
-          userAgent: navigator.userAgent
+          userAgent: navigator.userAgent,
         }),
       });
 
@@ -261,7 +257,7 @@ class PortalClienteService {
           status: novoStatus,
           observacoes: `Proposta ${novoStatus} via portal do cliente`,
           dataAceite: new Date().toISOString(),
-          fonte: 'portal'
+          fonte: 'portal',
         }),
       });
 
@@ -271,9 +267,11 @@ class PortalClienteService {
         await this.registrarAcao(token, novoStatus);
 
         // Emitir evento para atualizar o grid em tempo real
-        window.dispatchEvent(new CustomEvent('propostaAtualizada', {
-          detail: { propostaId: token, novoStatus, fonte: 'portal' }
-        }));
+        window.dispatchEvent(
+          new CustomEvent('propostaAtualizada', {
+            detail: { propostaId: token, novoStatus, fonte: 'portal' },
+          }),
+        );
 
         return;
       }
@@ -285,7 +283,6 @@ class PortalClienteService {
       // Se pelo menos um funcionou, considerar sucesso parcial
       console.warn('⚠️ Sincronização parcial - alguns endpoints falharam');
       await this.registrarAcao(token, novoStatus);
-
     } catch (error) {
       console.warn('❌ Erro na API, usando fallback local:', error);
       await this.atualizarStatusLocal(token, novoStatus);
@@ -295,7 +292,10 @@ class PortalClienteService {
   /**
    * Atualiza status localmente como fallback
    */
-  private async atualizarStatusLocal(token: string, novoStatus: 'aprovada' | 'rejeitada'): Promise<void> {
+  private async atualizarStatusLocal(
+    token: string,
+    novoStatus: 'aprovada' | 'rejeitada',
+  ): Promise<void> {
     try {
       // Atualizar no localStorage como simulação
       const propostas = JSON.parse(localStorage.getItem('propostas') || '[]');
@@ -304,8 +304,8 @@ class PortalClienteService {
       // Encontrar proposta pelo token
       const tokenInfo = tokenData.find((t: any) => t.token === token);
       if (tokenInfo) {
-        const propostaIndex = propostas.findIndex((p: any) =>
-          p.numero === tokenInfo.propostaId || p.id === tokenInfo.propostaId
+        const propostaIndex = propostas.findIndex(
+          (p: any) => p.numero === tokenInfo.propostaId || p.id === tokenInfo.propostaId,
         );
 
         if (propostaIndex >= 0) {
@@ -318,7 +318,6 @@ class PortalClienteService {
 
       // Registrar para sincronização futura
       await this.registrarParaSincronizacao(token, novoStatus);
-
     } catch (error) {
       console.error('Erro na atualização local:', error);
     }
@@ -329,7 +328,7 @@ class PortalClienteService {
    */
   async sincronizarComCRM(propostaId: string, novoStatus: string): Promise<any> {
     try {
-      const CRM_API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+      const CRM_API_URL = API_BASE_URL;
 
       const response = await fetch(`${CRM_API_URL}/propostas/${propostaId}/status`, {
         method: 'PUT',
@@ -339,7 +338,7 @@ class PortalClienteService {
         body: JSON.stringify({
           status: novoStatus,
           updatedAt: new Date().toISOString(),
-          source: 'portal-cliente'
+          source: 'portal-cliente',
         }),
       });
 
@@ -366,7 +365,7 @@ class PortalClienteService {
         token,
         status,
         timestamp: Date.now(),
-        type: 'status_update'
+        type: 'status_update',
       });
       localStorage.setItem('pendentSync', JSON.stringify(pending));
       console.log('📋 Ação registrada para sincronização futura');
@@ -380,13 +379,13 @@ class PortalClienteService {
    */
   private async registrarVisualizacao(token: string): Promise<void> {
     try {
-      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+      const API_URL = API_BASE_URL;
 
       const log: LogVisualizacao = {
         propostaId: token,
         ip: await this.obterIP(),
         userAgent: navigator.userAgent,
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
       // ✅ CORRIGIDO: Usar o endpoint correto do portal
@@ -400,12 +399,11 @@ class PortalClienteService {
           userAgent: log.userAgent,
           timestamp: log.timestamp.toISOString(),
           resolucaoTela: `${window.screen.width}x${window.screen.height}`,
-          referrer: document.referrer
+          referrer: document.referrer,
         }),
       });
 
       console.log(`✅ Visualização registrada para token: ${token}`);
-
     } catch (error) {
       // Log de visualização não deve bloquear a experiência
       console.warn('⚠️ Erro ao registrar visualização:', error);
@@ -415,7 +413,11 @@ class PortalClienteService {
   /**
    * Registra uma ação realizada na proposta
    */
-  private async registrarAcao(token: string, acao: LogAcao['acao'], observacoes?: string): Promise<void> {
+  private async registrarAcao(
+    token: string,
+    acao: LogAcao['acao'],
+    observacoes?: string,
+  ): Promise<void> {
     try {
       const log: LogAcao = {
         propostaId: token,
@@ -423,7 +425,7 @@ class PortalClienteService {
         ip: await this.obterIP(),
         userAgent: navigator.userAgent,
         timestamp: new Date(),
-        observacoes
+        observacoes,
       };
 
       await fetch('/api/portal/log/acao', {
@@ -433,7 +435,6 @@ class PortalClienteService {
         },
         body: JSON.stringify(log),
       });
-
     } catch (error) {
       console.warn('Erro ao registrar ação:', error);
     }
@@ -488,11 +489,14 @@ class PortalClienteService {
   /**
    * Envia proposta por email com link do portal
    */
-  async enviarPropostaPorEmail(propostaId: string, dadosEnvio: {
-    emailDestino: string;
-    mensagemPersonalizada?: string;
-    incluirAnexo?: boolean;
-  }): Promise<void> {
+  async enviarPropostaPorEmail(
+    propostaId: string,
+    dadosEnvio: {
+      emailDestino: string;
+      mensagemPersonalizada?: string;
+      incluirAnexo?: boolean;
+    },
+  ): Promise<void> {
     try {
       // Gerar token se necessário
       const token = await this.gerarTokenPublico(propostaId);
@@ -503,13 +507,12 @@ class PortalClienteService {
         propostaId,
         token,
         urlPortal,
-        ...dadosEnvio
+        ...dadosEnvio,
       });
 
       if (!response.data.sucesso) {
         throw new Error(response.data.erro || 'Erro ao enviar email');
       }
-
     } catch (error) {
       console.error('Erro ao enviar proposta por email:', error);
       throw error;
@@ -530,12 +533,13 @@ class PortalClienteService {
       const response = await api.get(`/propostas/${propostaId}/estatisticas`);
       return {
         ...response.data,
-        ultimaVisualizacao: response.data.ultimaVisualizacao ?
-          new Date(response.data.ultimaVisualizacao) : undefined,
+        ultimaVisualizacao: response.data.ultimaVisualizacao
+          ? new Date(response.data.ultimaVisualizacao)
+          : undefined,
         acoes: response.data.acoes.map((acao: any) => ({
           ...acao,
-          timestamp: new Date(acao.timestamp)
-        }))
+          timestamp: new Date(acao.timestamp),
+        })),
       };
     } catch (error) {
       console.error('Erro ao obter estatísticas:', error);
@@ -549,7 +553,7 @@ class PortalClienteService {
   async agendarLembrete(propostaId: string, diasApos: number = 7): Promise<void> {
     try {
       await api.post(`/propostas/${propostaId}/agendar-lembrete`, {
-        diasApos
+        diasApos,
       });
     } catch (error) {
       console.error('Erro ao agendar lembrete:', error);
@@ -582,7 +586,7 @@ class PortalClienteService {
   async reativarProposta(propostaId: string, novaDataValidade: Date): Promise<string> {
     try {
       const response = await api.post(`/propostas/${propostaId}/reativar`, {
-        novaDataValidade: novaDataValidade.toISOString()
+        novaDataValidade: novaDataValidade.toISOString(),
       });
 
       return response.data.novoToken;
@@ -615,13 +619,14 @@ class PortalClienteService {
         ...response.data,
         criacaoEm: new Date(response.data.criacaoEm),
         envioEm: response.data.envioEm ? new Date(response.data.envioEm) : undefined,
-        primeiraVisualizacaoEm: response.data.primeiraVisualizacaoEm ?
-          new Date(response.data.primeiraVisualizacaoEm) : undefined,
+        primeiraVisualizacaoEm: response.data.primeiraVisualizacaoEm
+          ? new Date(response.data.primeiraVisualizacaoEm)
+          : undefined,
         decisaoEm: response.data.decisaoEm ? new Date(response.data.decisaoEm) : undefined,
         log: response.data.log.map((item: any) => ({
           ...item,
-          data: new Date(item.data)
-        }))
+          data: new Date(item.data),
+        })),
       };
     } catch (error) {
       console.error('Erro ao obter histórico:', error);

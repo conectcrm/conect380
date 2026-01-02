@@ -82,9 +82,10 @@ ngrok config add-authtoken SEU_TOKEN_AQUI
 #### WhatsApp (Meta Developers)
 1. Acesse: https://developers.facebook.com/apps
 2. WhatsApp > Configuration
-3. **Callback URL:** `https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp`
+3. **Callback URL:** `https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>`
 4. **Verify Token:** `conectcrm_webhook_token_123`
-5. Inscrever-se em eventos: messages, message_status
+5. **Header obrigatório:** `X-Hub-Signature-256` (HMAC SHA256 com o App Secret)
+6. Inscrever-se em eventos: messages, message_status
 
 #### Telegram
 ```powershell
@@ -177,7 +178,7 @@ curl -X POST "https://api.telegram.org/botSEU_TOKEN/setWebhook" `
 - API ngrok: http://127.0.0.1:4040/api/tunnels
 
 ### **Webhooks (com ngrok)**
-- WhatsApp: `https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp`
+- WhatsApp: `https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>`
 - Telegram: `https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/telegram`
 - Twilio: `https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/twilio`
 

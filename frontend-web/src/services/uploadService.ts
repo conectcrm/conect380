@@ -1,6 +1,6 @@
 /**
  * 📁 Upload Service - Sistema de Upload de Arquivos
- * 
+ *
  * Funcionalidades:
  * - Upload de avatar de usuários
  * - Upload de anexos de clientes
@@ -44,20 +44,23 @@ class UploadService {
       avatar: {
         maxSize: 2,
         allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-        category: 'avatar'
+        category: 'avatar',
       },
       'client-attachment': {
         maxSize: 10,
         allowedTypes: [
-          'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+          'image/jpeg',
+          'image/png',
+          'image/gif',
+          'image/webp',
           'application/pdf',
           'application/msword',
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
           'application/vnd.ms-excel',
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'text/plain'
+          'text/plain',
         ],
-        category: 'client-attachment'
+        category: 'client-attachment',
       },
       document: {
         maxSize: 50,
@@ -67,15 +70,15 @@ class UploadService {
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
           'application/vnd.ms-excel',
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'text/plain'
+          'text/plain',
         ],
-        category: 'document'
+        category: 'document',
       },
       system: {
         maxSize: 100,
         allowedTypes: ['*'],
-        category: 'system'
-      }
+        category: 'system',
+      },
     };
 
     return configs[category] || configs.system;
@@ -88,7 +91,7 @@ class UploadService {
     if (file.size > maxSizeBytes) {
       return {
         valid: false,
-        error: `Arquivo muito grande. Máximo permitido: ${options.maxSize || this.MAX_FILE_SIZE}MB`
+        error: `Arquivo muito grande. Máximo permitido: ${options.maxSize || this.MAX_FILE_SIZE}MB`,
       };
     }
 
@@ -97,7 +100,7 @@ class UploadService {
       if (!options.allowedTypes.includes(file.type)) {
         return {
           valid: false,
-          error: 'Tipo de arquivo não permitido'
+          error: 'Tipo de arquivo não permitido',
         };
       }
     }
@@ -107,12 +110,12 @@ class UploadService {
 
   // Upload único com progress
   async uploadFile(
-    file: File, 
+    file: File,
     category: string,
-    onProgress?: (progress: UploadProgress) => void
+    onProgress?: (progress: UploadProgress) => void,
   ): Promise<UploadResult> {
     const config = this.getConfig(category);
-    
+
     // Validar arquivo
     const validation = this.validateFile(file, config);
     if (!validation.valid) {
@@ -128,7 +131,7 @@ class UploadService {
     return new Promise((resolve, reject) => {
       let progress = 0;
       const fileName = file.name;
-      
+
       const interval = setInterval(() => {
         progress += Math.random() * 30;
         if (progress > 100) progress = 100;
@@ -136,12 +139,12 @@ class UploadService {
         onProgress?.({
           fileName,
           progress,
-          status: 'uploading'
+          status: 'uploading',
         });
 
         if (progress >= 100) {
           clearInterval(interval);
-          
+
           // Simular resultado do upload
           const result: UploadResult = {
             id: `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -151,7 +154,7 @@ class UploadService {
             type: file.type,
             url: URL.createObjectURL(file), // Em produção seria a URL do servidor
             category,
-            uploadedAt: new Date()
+            uploadedAt: new Date(),
           };
 
           // Salvar no localStorage para persistência
@@ -160,7 +163,7 @@ class UploadService {
           onProgress?.({
             fileName,
             progress: 100,
-            status: 'success'
+            status: 'success',
           });
 
           setTimeout(() => resolve(result), 500);
@@ -175,7 +178,7 @@ class UploadService {
             fileName,
             progress: 0,
             status: 'error',
-            error: 'Erro simulado de upload'
+            error: 'Erro simulado de upload',
           });
           reject(new Error('Erro simulado de upload'));
         }, 1000);
@@ -187,12 +190,10 @@ class UploadService {
   async uploadMultiple(
     files: File[],
     category: string,
-    onProgress?: (fileName: string, progress: UploadProgress) => void
+    onProgress?: (fileName: string, progress: UploadProgress) => void,
   ): Promise<UploadResult[]> {
-    const promises = files.map(file => 
-      this.uploadFile(file, category, (progress) => 
-        onProgress?.(file.name, progress)
-      )
+    const promises = files.map((file) =>
+      this.uploadFile(file, category, (progress) => onProgress?.(file.name, progress)),
     );
 
     return Promise.all(promises);
@@ -203,7 +204,7 @@ class UploadService {
     const key = `conectcrm_uploads`;
     const stored = localStorage.getItem(key);
     const uploads: UploadResult[] = stored ? JSON.parse(stored) : [];
-    
+
     uploads.push(result);
     localStorage.setItem(key, JSON.stringify(uploads));
   }
@@ -213,11 +214,11 @@ class UploadService {
     const key = `conectcrm_uploads`;
     const stored = localStorage.getItem(key);
     const uploads: UploadResult[] = stored ? JSON.parse(stored) : [];
-    
+
     if (category) {
-      return uploads.filter(upload => upload.category === category);
+      return uploads.filter((upload) => upload.category === category);
     }
-    
+
     return uploads;
   }
 
@@ -226,10 +227,10 @@ class UploadService {
     const key = `conectcrm_uploads`;
     const stored = localStorage.getItem(key);
     const uploads: UploadResult[] = stored ? JSON.parse(stored) : [];
-    
-    const filteredUploads = uploads.filter(upload => upload.id !== uploadId);
+
+    const filteredUploads = uploads.filter((upload) => upload.id !== uploadId);
     localStorage.setItem(key, JSON.stringify(filteredUploads));
-    
+
     return true;
   }
 
@@ -252,7 +253,7 @@ class UploadService {
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '📊',
       'text/plain': '📄',
       'video/': '🎥',
-      'audio/': '🎵'
+      'audio/': '🎵',
     };
 
     for (const [key, icon] of Object.entries(iconMap)) {
@@ -267,11 +268,11 @@ class UploadService {
   // Formatar tamanho do arquivo
   formatFileSize(bytes: number): string {
     if (bytes === 0) return '0 Bytes';
-    
+
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
+
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 }

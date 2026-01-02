@@ -24,7 +24,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
   onDragEnd,
   onDrop,
   draggedEvent,
-  dropTarget
+  dropTarget,
 }) => {
   const calendarDays = generateCalendarDays(date, events);
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -66,19 +66,15 @@ export const MonthView: React.FC<MonthViewProps> = ({
       {/* Grid do calendário */}
       <div className="grid grid-cols-7">
         {calendarDays.map((day, index) => {
-          const isDropTarget = dropTarget && 
-            dropTarget.toDateString() === day.date.toDateString();
-          
+          const isDropTarget = dropTarget && dropTarget.toDateString() === day.date.toDateString();
+
           return (
             <div
               key={index}
               className={`
                 min-h-[120px] border-r border-b last:border-r-0 p-2 cursor-pointer
                 transition-colors duration-200 relative
-                ${day.isCurrentMonth 
-                  ? 'bg-white hover:bg-gray-50' 
-                  : 'bg-gray-50 text-gray-400'
-                }
+                ${day.isCurrentMonth ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 text-gray-400'}
                 ${day.isToday ? 'bg-blue-50 border-blue-200' : ''}
                 ${day.isWeekend && day.isCurrentMonth ? 'bg-gray-50' : ''}
                 ${isDropTarget ? 'bg-green-50 border-green-300' : ''}
@@ -89,16 +85,21 @@ export const MonthView: React.FC<MonthViewProps> = ({
             >
               {/* Número do dia */}
               <div className="flex justify-between items-center mb-2">
-                <span className={`
+                <span
+                  className={`
                   text-sm font-medium
-                  ${day.isToday 
-                    ? 'w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs' 
-                    : day.isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
+                  ${
+                    day.isToday
+                      ? 'w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs'
+                      : day.isCurrentMonth
+                        ? 'text-gray-900'
+                        : 'text-gray-400'
                   }
-                `}>
+                `}
+                >
                   {day.date.getDate()}
                 </span>
-                
+
                 {/* Indicador de eventos */}
                 {day.events.length > 3 && (
                   <span className="text-xs text-gray-500 bg-gray-200 px-1 rounded">
@@ -114,7 +115,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
                     key={event.id}
                     className="calendar-event"
                     style={{
-                      opacity: draggedEvent === event.id ? 0.3 : 1
+                      opacity: draggedEvent === event.id ? 0.3 : 1,
                     }}
                   >
                     <CalendarEventComponent
@@ -128,7 +129,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
                     />
                   </div>
                 ))}
-                
+
                 {/* Eventos ocultos - mostrar apenas dots */}
                 {day.events.length > 3 && (
                   <div className="flex space-x-1 mt-1">
@@ -147,9 +148,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
               {/* Indicador de drop zone */}
               {isDropTarget && (
                 <div className="absolute inset-0 border-2 border-dashed border-green-400 rounded-lg bg-green-50/50 flex items-center justify-center">
-                  <span className="text-green-600 text-sm font-medium">
-                    Soltar aqui
-                  </span>
+                  <span className="text-green-600 text-sm font-medium">Soltar aqui</span>
                 </div>
               )}
             </div>

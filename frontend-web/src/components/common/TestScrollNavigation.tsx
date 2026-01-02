@@ -7,7 +7,6 @@ import { scrollToTop } from '../../hooks/useScrollToTop';
  * entre navegações de páginas.
  */
 const TestScrollNavigation: React.FC = () => {
-
   const testarScrollProgramatico = () => {
     scrollToTop(); // Teste manual do scroll
   };
@@ -19,8 +18,8 @@ const TestScrollNavigation: React.FC = () => {
           ✅ Scroll Automático Implementado!
         </h2>
         <p className="text-blue-700 text-sm">
-          Navegue entre as páginas usando os links abaixo.
-          Você verá que cada página sempre inicia no topo.
+          Navegue entre as páginas usando os links abaixo. Você verá que cada página sempre inicia
+          no topo.
         </p>
       </div>
 
@@ -95,17 +94,15 @@ const TestScrollNavigation: React.FC = () => {
         {Array.from({ length: 20 }, (_, i) => (
           <div key={i} className="p-4 bg-gray-100 rounded-lg">
             <p className="text-gray-700">
-              Parágrafo de demonstração #{i + 1}. Role para baixo para ver mais conteúdo
-              e depois navegue para outra página para testar o scroll automático.
+              Parágrafo de demonstração #{i + 1}. Role para baixo para ver mais conteúdo e depois
+              navegue para outra página para testar o scroll automático.
             </p>
           </div>
         ))}
       </div>
 
       <div className="mt-8 p-4 bg-green-50 border border-green-200 rounded-lg">
-        <h3 className="font-medium text-green-800 mb-2">
-          ✅ Funcionalidades Implementadas:
-        </h3>
+        <h3 className="font-medium text-green-800 mb-2">✅ Funcionalidades Implementadas:</h3>
         <ul className="text-sm text-green-700 space-y-1">
           <li>• Scroll automático em todas as navegações</li>
           <li>• Animação suave (smooth scrolling)</li>

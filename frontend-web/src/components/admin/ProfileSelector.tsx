@@ -11,7 +11,7 @@ import {
   ChevronDown,
   Check,
   LogOut,
-  Globe
+  Globe,
 } from 'lucide-react';
 
 type PerfilUsuario = 'gestor' | 'admin' | 'vendedor' | 'operacional' | 'financeiro' | 'suporte';
@@ -34,7 +34,7 @@ const PERFIS_DISPONIVEIS: PerfilOption[] = [
     icon: <Crown className="w-4 h-4" />,
     color: 'text-purple-600',
     bgColor: 'bg-purple-100',
-    avatarBg: 'bg-purple-500'
+    avatarBg: 'bg-purple-500',
   },
   {
     value: 'gestor',
@@ -43,7 +43,7 @@ const PERFIS_DISPONIVEIS: PerfilOption[] = [
     icon: <Shield className="w-4 h-4" />,
     color: 'text-blue-600',
     bgColor: 'bg-blue-100',
-    avatarBg: 'bg-blue-500'
+    avatarBg: 'bg-blue-500',
   },
   {
     value: 'vendedor',
@@ -52,7 +52,7 @@ const PERFIS_DISPONIVEIS: PerfilOption[] = [
     icon: <User className="w-4 h-4" />,
     color: 'text-green-600',
     bgColor: 'bg-green-100',
-    avatarBg: 'bg-green-500'
+    avatarBg: 'bg-green-500',
   },
   {
     value: 'operacional',
@@ -61,7 +61,7 @@ const PERFIS_DISPONIVEIS: PerfilOption[] = [
     icon: <Settings className="w-4 h-4" />,
     color: 'text-orange-600',
     bgColor: 'bg-orange-100',
-    avatarBg: 'bg-orange-500'
+    avatarBg: 'bg-orange-500',
   },
   {
     value: 'financeiro',
@@ -70,7 +70,7 @@ const PERFIS_DISPONIVEIS: PerfilOption[] = [
     icon: <DollarSign className="w-4 h-4" />,
     color: 'text-emerald-600',
     bgColor: 'bg-emerald-100',
-    avatarBg: 'bg-emerald-500'
+    avatarBg: 'bg-emerald-500',
   },
   {
     value: 'suporte',
@@ -79,8 +79,8 @@ const PERFIS_DISPONIVEIS: PerfilOption[] = [
     icon: <HeadphonesIcon className="w-4 h-4" />,
     color: 'text-indigo-600',
     bgColor: 'bg-indigo-100',
-    avatarBg: 'bg-indigo-500'
-  }
+    avatarBg: 'bg-indigo-500',
+  },
 ];
 
 interface ProfileSelectorProps {
@@ -92,16 +92,22 @@ interface ProfileSelectorProps {
 const ProfileSelector: React.FC<ProfileSelectorProps> = ({
   currentProfile,
   onProfileChange,
-  className = ''
+  className = '',
 }) => {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Verificar se o usuário é administrador
-  const isAdmin = (user as any)?.perfil === 'admin' || (user as any)?.tipo === 'admin' || (user as any)?.role === 'admin';
+  const isAdmin =
+    (user as any)?.perfil === 'admin' ||
+    (user as any)?.perfil === 'superadmin' ||
+    (user as any)?.tipo === 'admin' ||
+    (user as any)?.tipo === 'superadmin' ||
+    (user as any)?.role === 'admin' ||
+    (user as any)?.role === 'superadmin';
 
-  const currentProfileData = PERFIS_DISPONIVEIS.find(p => p.value === currentProfile);
+  const currentProfileData = PERFIS_DISPONIVEIS.find((p) => p.value === currentProfile);
 
   const handleProfileSelect = (profile: PerfilUsuario) => {
     onProfileChange(profile);
@@ -135,7 +141,9 @@ const ProfileSelector: React.FC<ProfileSelectorProps> = ({
         className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors w-full min-w-[280px]"
       >
         {/* Avatar com iniciais */}
-        <div className={`w-10 h-10 ${currentProfileData?.avatarBg || 'bg-gray-500'} rounded-full flex items-center justify-center text-white font-bold text-sm`}>
+        <div
+          className={`w-10 h-10 ${currentProfileData?.avatarBg || 'bg-gray-500'} rounded-full flex items-center justify-center text-white font-bold text-sm`}
+        >
           {currentProfileData?.label.substring(0, 2).toUpperCase() || 'SA'}
         </div>
 
@@ -144,13 +152,13 @@ const ProfileSelector: React.FC<ProfileSelectorProps> = ({
           <div className="font-semibold text-gray-900">
             {currentProfileData?.label || 'Super-Admin'}
           </div>
-          <div className="text-sm text-gray-500">
-            Multsoft (estrutura de árvore)
-          </div>
+          <div className="text-sm text-gray-500">Multsoft (estrutura de árvore)</div>
         </div>
 
         {/* Ícone dropdown */}
-        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        />
       </button>
 
       {/* Dropdown Menu - Estilo da imagem */}
@@ -184,20 +192,16 @@ const ProfileSelector: React.FC<ProfileSelectorProps> = ({
                   ${currentProfile === perfil.value ? 'bg-blue-50 border-r-2 border-blue-500' : ''}
                 `}
               >
-                <div className={`w-6 h-6 ${perfil.avatarBg} rounded-full flex items-center justify-center text-white text-xs`}>
+                <div
+                  className={`w-6 h-6 ${perfil.avatarBg} rounded-full flex items-center justify-center text-white text-xs`}
+                >
                   {perfil.icon}
                 </div>
                 <div className="flex-1">
-                  <div className="font-medium text-gray-900">
-                    {perfil.label}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {perfil.description}
-                  </div>
+                  <div className="font-medium text-gray-900">{perfil.label}</div>
+                  <div className="text-xs text-gray-500">{perfil.description}</div>
                 </div>
-                {currentProfile === perfil.value && (
-                  <Check className="w-4 h-4 text-blue-500" />
-                )}
+                {currentProfile === perfil.value && <Check className="w-4 h-4 text-blue-500" />}
               </button>
             ))}
           </div>

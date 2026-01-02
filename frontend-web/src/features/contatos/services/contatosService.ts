@@ -89,7 +89,7 @@ class ContatosService {
         setTimeout(() => {
           const novoContato: Contato = {
             ...contato,
-            id: Date.now().toString()
+            id: Date.now().toString(),
           };
           resolve(novoContato);
         }, 1000);
@@ -107,7 +107,7 @@ class ContatosService {
         setTimeout(() => {
           const contatoAtualizado: Contato = {
             id,
-            ...contato
+            ...contato,
           } as Contato;
           resolve(contatoAtualizado);
         }, 1000);
@@ -145,7 +145,7 @@ class ContatosService {
             valorPotencial: 0,
             pontuacaoMedia: 0,
             novosMes: 0,
-            taxaConversao: 0
+            taxaConversao: 0,
           });
         }, 500);
       });

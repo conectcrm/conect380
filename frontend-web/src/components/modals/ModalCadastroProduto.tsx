@@ -1029,3 +1029,5 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 };
 
 export default ModalCadastroProduto;
+
+

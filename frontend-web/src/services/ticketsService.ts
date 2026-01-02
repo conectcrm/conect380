@@ -51,8 +51,6 @@ export const tipoTicketColors: Record<TipoTicket, string> = {
   outros: 'gray'
 };
 
-export
-
 /**
  * Interface para filtros ao listar tickets
  * Sprint 1: Adicionado filtro por tipo
@@ -189,6 +187,37 @@ export interface AtualizarPrioridadeDto {
  */
 export interface AtribuirAtendenteDto {
   atendenteId: string;
+}
+
+/**
+ * DTO para criar um novo ticket
+ * Sprint 2 - Fase 8: CRUD Forms
+ */
+export interface CriarTicketDto {
+  titulo: string;
+  descricao: string;
+  tipo: TipoTicket;
+  prioridade: PrioridadeTicket | PrioridadeTicketApi;
+  dataVencimento?: string;
+  canalId?: string;
+  clienteId?: string;
+  atendenteId?: string;
+}
+
+/**
+ * DTO para atualizar um ticket
+ * Sprint 2 - Fase 8: CRUD Forms
+ */
+export interface AtualizarTicketDto {
+  titulo?: string;
+  descricao?: string;
+  tipo?: TipoTicket;
+  prioridade?: PrioridadeTicket | PrioridadeTicketApi;
+  status?: StatusTicketApi;
+  dataVencimento?: string;
+  responsavelId?: string;
+  atendenteId?: string;
+  clienteId?: string;
 }
 
 export interface EscalarTicketDto {
@@ -339,7 +368,7 @@ class TicketsService {
         params.append('pagina', filtros.pagina.toString());
       }
 
-      const response = await api.get<ApiListResponse<Ticket[]>>('/api/atendimento/tickets', {
+      const response = await api.get<ApiListResponse<Ticket[]>>('/atendimento/tickets', {
         params: Object.fromEntries(params),
       });
 
@@ -359,12 +388,110 @@ class TicketsService {
   }
 
   /**
+   * Cria um novo ticket
+   * Sprint 2 - Fase 8: CRUD Forms
+   */
+  async criar(empresaId: string, dados: CriarTicketDto): Promise<BuscarTicketResposta> {
+    try {
+      const prioridadeApi = normalizarPrioridadeParaApi(dados.prioridade);
+      if (!prioridadeApi) {
+        throw new Error('Prioridade inválida');
+      }
+
+      const response = await api.post<ApiListResponse<Ticket>>(
+        '/atendimento/tickets',
+        {
+          ...dados,
+          prioridade: prioridadeApi,
+          empresaId,
+        },
+      );
+
+      const ticket = response.data?.data;
+
+      if (!ticket) {
+        throw new Error('Resposta inválida ao criar ticket');
+      }
+
+      return {
+        success: response.data?.success ?? true,
+        data: ticket,
+      };
+    } catch (err: unknown) {
+      console.error('❌ Erro ao criar ticket:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao criar ticket'));
+    }
+  }
+
+  /**
+   * Atualiza um ticket existente
+   * Sprint 2 - Fase 8: CRUD Forms
+   */
+  async atualizar(ticketId: string, empresaId: string, dados: AtualizarTicketDto): Promise<BuscarTicketResposta> {
+    try {
+      // Normalizar prioridade se fornecida
+      const dadosNormalizados: any = { ...dados };
+      if (dados.prioridade) {
+        const prioridadeApi = normalizarPrioridadeParaApi(dados.prioridade);
+        if (!prioridadeApi) {
+          throw new Error('Prioridade inválida');
+        }
+        dadosNormalizados.prioridade = prioridadeApi;
+      }
+
+      const response = await api.put<ApiListResponse<Ticket>>(
+        `/atendimento/tickets/${ticketId}`,
+        {
+          ...dadosNormalizados,
+          empresaId,
+        },
+      );
+
+      const ticket = response.data?.data;
+
+      if (!ticket) {
+        throw new Error('Resposta inválida ao atualizar ticket');
+      }
+
+      return {
+        success: response.data?.success ?? true,
+        data: ticket,
+      };
+    } catch (err: unknown) {
+      console.error('❌ Erro ao atualizar ticket:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao atualizar ticket'));
+    }
+  }
+
+  /**
+   * Deleta um ticket
+   * Sprint 2 - Fase 8: CRUD Forms
+   */
+  async deletar(ticketId: string, empresaId: string): Promise<{ success: boolean }> {
+    try {
+      const response = await api.delete<{ success: boolean }>(
+        `/atendimento/tickets/${ticketId}`,
+        {
+          params: { empresaId },
+        },
+      );
+
+      return {
+        success: response.data?.success ?? true,
+      };
+    } catch (err: unknown) {
+      console.error('❌ Erro ao deletar ticket:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao deletar ticket'));
+    }
+  }
+
+  /**
    * Busca um ticket específico por ID
    */
   async buscar(ticketId: string, empresaId: string): Promise<BuscarTicketResposta> {
     try {
       const response = await api.get<ApiListResponse<Ticket>>(
-        `/api/atendimento/tickets/${ticketId}`,
+        `/atendimento/tickets/${ticketId}`,
         {
           params: { empresaId },
         },
@@ -401,7 +528,7 @@ class TicketsService {
       }
 
       const response = await api.patch<ApiListResponse<Ticket>>(
-        `/api/atendimento/tickets/${ticketId}/status`,
+        `/atendimento/tickets/${ticketId}/status`,
         {
           ...dados,
           status: statusApi,
@@ -440,7 +567,7 @@ class TicketsService {
       }
 
       const response = await api.patch<ApiListResponse<Ticket>>(
-        `/api/atendimento/tickets/${ticketId}/prioridade`,
+        `/atendimento/tickets/${ticketId}/prioridade`,
         {
           ...dados,
           prioridade: prioridadeApi,
@@ -474,7 +601,7 @@ class TicketsService {
   ): Promise<BuscarTicketResposta> {
     try {
       const response = await api.patch<ApiListResponse<Ticket>>(
-        `/api/atendimento/tickets/${ticketId}/atribuir`,
+        `/atendimento/tickets/${ticketId}/atribuir`,
         {
           ...dados,
           empresaId,
@@ -504,7 +631,7 @@ class TicketsService {
   ): Promise<BuscarTicketResposta> {
     try {
       const response = await api.post<ApiListResponse<Ticket>>(
-        `/api/atendimento/tickets/${ticketId}/escalar`,
+        `/atendimento/tickets/${ticketId}/escalar`,
         {
           ...dados,
           level: normalizarNivelParaApi(dados.level),
@@ -536,7 +663,7 @@ class TicketsService {
   ): Promise<BuscarTicketResposta> {
     try {
       const response = await api.post<ApiListResponse<Ticket>>(
-        `/api/atendimento/tickets/${ticketId}/desescalar`,
+        `/atendimento/tickets/${ticketId}/desescalar`,
         {
           ...dados,
           empresaId,
@@ -566,7 +693,7 @@ class TicketsService {
   ): Promise<BuscarTicketResposta> {
     try {
       const response = await api.patch<ApiListResponse<Ticket>>(
-        `/api/atendimento/tickets/${ticketId}/reatribuir`,
+        `/atendimento/tickets/${ticketId}/reatribuir`,
         {
           ...dados,
           assignedLevel: normalizarNivelParaApi(dados.assignedLevel),
@@ -604,7 +731,7 @@ class TicketsService {
   ): Promise<BuscarTicketResposta> {
     try {
       const response = await api.post<ApiListResponse<Ticket>>(
-        `/api/atendimento/tickets/${ticketId}/transferir`,
+        `/atendimento/tickets/${ticketId}/transferir`,
         dados,
       );
 
@@ -623,7 +750,113 @@ class TicketsService {
       throw new Error(getErrorMessage(err, 'Erro ao transferir ticket'));
     }
   }
+
+  // ============================================================================
+  // 📦 Métodos para Operações em Lote (Batch Operations)
+  // ============================================================================
+
+  /**
+   * Atribuir múltiplos tickets em lote
+   */
+  async atribuirLote(
+    ticketIds: string[],
+    atendenteId?: string,
+    filaId?: string,
+    observacoes?: string,
+  ): Promise<{ success: boolean; total: number; successful: number; failed: number; errors: any[] }> {
+    try {
+      const response = await api.post('/atendimento/tickets/batch/atribuir', {
+        ticketIds,
+        atendenteId,
+        filaId,
+        observacoes,
+      });
+
+      return response.data.data;
+    } catch (err: unknown) {
+      console.error('❌ Erro ao atribuir tickets em lote:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao atribuir tickets em lote'));
+    }
+  }
+
+  /**
+   * Mudar status de múltiplos tickets em lote
+   */
+  async mudarStatusLote(
+    ticketIds: string[],
+    status: StatusTicketApi,
+    observacoes?: string,
+  ): Promise<{ success: boolean; total: number; successful: number; failed: number; errors: any[] }> {
+    try {
+      const response = await api.post('/atendimento/tickets/batch/status', {
+        ticketIds,
+        status,
+        observacoes,
+      });
+
+      return response.data.data;
+    } catch (err: unknown) {
+      console.error('❌ Erro ao mudar status em lote:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao mudar status em lote'));
+    }
+  }
+
+  /**
+   * Adicionar tags em múltiplos tickets
+   */
+  async adicionarTagsLote(
+    ticketIds: string[],
+    tagIds: string[],
+  ): Promise<{ success: boolean; total: number; successful: number; failed: number; errors: any[] }> {
+    try {
+      const response = await api.post('/atendimento/tickets/batch/tags', {
+        ticketIds,
+        tagIds,
+      });
+
+      return response.data.data;
+    } catch (err: unknown) {
+      console.error('❌ Erro ao adicionar tags em lote:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao adicionar tags em lote'));
+    }
+  }
+
+  /**
+   * Deletar múltiplos tickets
+   */
+  async deletarLote(
+    ticketIds: string[],
+    softDelete: boolean = true,
+  ): Promise<{ success: boolean; total: number; successful: number; failed: number; errors: any[] }> {
+    try {
+      const response = await api.delete('/atendimento/tickets/batch/delete', {
+        data: { ticketIds, softDelete },
+      });
+
+      return response.data.data;
+    } catch (err: unknown) {
+      console.error('❌ Erro ao deletar tickets em lote:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao deletar tickets em lote'));
+    }
+  }
+
+  /**
+   * Exportar tickets para CSV
+   */
+  async exportarCSV(filtros: any): Promise<string> {
+    try {
+      const response = await api.get('/atendimento/tickets/export', {
+        params: filtros,
+      });
+
+      return response.data.data;
+    } catch (err: unknown) {
+      console.error('❌ Erro ao exportar tickets:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao exportar tickets'));
+    }
+  }
 }
 
 // Exportar instância única (singleton)
 export const ticketsService = new TicketsService();
+

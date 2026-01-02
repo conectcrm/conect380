@@ -1,25 +1,19 @@
 /**
  * Dashboard de Auto-Distribuição de Filas
- * 
+ *
  * Exibe métricas e KPIs sobre distribuição automática de tickets,
  * performance dos atendentes e eficiência do sistema.
- * 
+ *
  * @author ConectCRM
  * @date 07/11/2025
  */
 
 import React, { useState, useEffect } from 'react';
-import {
-  RefreshCw,
-  Users,
-  Zap,
-  TrendingUp,
-  Activity,
-  BarChart3,
-  Clock,
-} from 'lucide-react';
+import { RefreshCw, Users, Zap, TrendingUp, Activity, BarChart3, Clock } from 'lucide-react';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
-import distribuicaoService, { type EstatisticasDistribuicao } from '../../../services/distribuicaoService';
+import distribuicaoService, {
+  type EstatisticasDistribuicao,
+} from '../../../services/distribuicaoService';
 
 interface KpiCard {
   label: string;
@@ -168,9 +162,7 @@ const DashboardDistribuicaoPage: React.FC = () => {
                       onChange={(e) => setAutoRefresh(e.target.checked)}
                       className="w-4 h-4 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
                     />
-                    <span className="text-sm text-gray-600">
-                      Auto-atualizar (30s)
-                    </span>
+                    <span className="text-sm text-gray-600">Auto-atualizar (30s)</span>
                   </label>
 
                   {/* Botão Atualizar */}
@@ -206,12 +198,8 @@ const DashboardDistribuicaoPage: React.FC = () => {
                     <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
                       {kpi.label}
                     </p>
-                    <p className="mt-2 text-3xl font-bold text-[#002333]">
-                      {kpi.value}
-                    </p>
-                    <p className="mt-3 text-sm text-[#002333]/70">
-                      {kpi.description}
-                    </p>
+                    <p className="mt-2 text-3xl font-bold text-[#002333]">{kpi.value}</p>
+                    <p className="mt-3 text-sm text-[#002333]/70">{kpi.description}</p>
                   </div>
                   <div className="h-12 w-12 rounded-2xl bg-[#9333EA]/10 flex items-center justify-center shadow-sm">
                     <kpi.icon className="h-6 w-6 text-[#9333EA]" />
@@ -222,43 +210,47 @@ const DashboardDistribuicaoPage: React.FC = () => {
           </div>
 
           {/* Distribuição por Atendente */}
-          {estatisticas?.distribuicaoPorAtendente && estatisticas.distribuicaoPorAtendente.length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm border mb-6">
-              <div className="p-6">
-                <h2 className="text-xl font-bold text-[#002333] mb-4 flex items-center">
-                  <Activity className="h-5 w-5 mr-2 text-[#9333EA]" />
-                  Distribuição por Atendente
-                </h2>
+          {estatisticas?.distribuicaoPorAtendente &&
+            estatisticas.distribuicaoPorAtendente.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm border mb-6">
+                <div className="p-6">
+                  <h2 className="text-xl font-bold text-[#002333] mb-4 flex items-center">
+                    <Activity className="h-5 w-5 mr-2 text-[#9333EA]" />
+                    Distribuição por Atendente
+                  </h2>
 
-                {/* Gráfico de Barras Simples (CSS-based) */}
-                <div className="space-y-4">
-                  {estatisticas.distribuicaoPorAtendente.map((atendente, index) => {
-                    const maxTickets = Math.max(...estatisticas.distribuicaoPorAtendente!.map(a => a.quantidade));
-                    const percentage = maxTickets > 0 ? (atendente.quantidade / maxTickets) * 100 : 0;
+                  {/* Gráfico de Barras Simples (CSS-based) */}
+                  <div className="space-y-4">
+                    {estatisticas.distribuicaoPorAtendente.map((atendente, index) => {
+                      const maxTickets = Math.max(
+                        ...estatisticas.distribuicaoPorAtendente!.map((a) => a.quantidade),
+                      );
+                      const percentage =
+                        maxTickets > 0 ? (atendente.quantidade / maxTickets) * 100 : 0;
 
-                    return (
-                      <div key={index} className="space-y-1">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="font-medium text-gray-700">
-                            {atendente.atendenteNome}
-                          </span>
-                          <span className="text-gray-600">
-                            {atendente.quantidade} tickets ({atendente.percentual.toFixed(1)}%)
-                          </span>
+                      return (
+                        <div key={index} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-medium text-gray-700">
+                              {atendente.atendenteNome}
+                            </span>
+                            <span className="text-gray-600">
+                              {atendente.quantidade} tickets ({atendente.percentual.toFixed(1)}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-3">
+                            <div
+                              className="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full transition-all duration-500"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-3">
-                          <div
-                            className="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full transition-all duration-500"
-                            style={{ width: `${percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Estado Vazio */}
           {!loading && (!estatisticas || !estatisticas.distribuicaoPorAtendente?.length) && (
@@ -271,7 +263,7 @@ const DashboardDistribuicaoPage: React.FC = () => {
                 Configure a auto-distribuição em uma fila para começar a ver métricas aqui.
               </p>
               <button
-                onClick={() => window.location.href = '/atendimento/distribuicao'}
+                onClick={() => (window.location.href = '/atendimento/distribuicao')}
                 className="px-4 py-2 bg-[#9333EA] text-white rounded-lg hover:bg-[#7E22CE] transition-colors text-sm font-medium"
               >
                 Configurar Auto-Distribuição

@@ -13,13 +13,13 @@ import {
   PlayCircle,
   CheckCircle,
   ArrowRight,
-  Clock
+  Clock,
 } from 'lucide-react';
 import { emailServiceReal } from '../../../services/emailServiceReal';
 import { PropostaCompleta } from '../services/propostasService';
 import { clientesService } from '../../../services/clientesService';
-import ModalEnviarWhatsApp from '../../../components/whatsapp/ModalEnviarWhatsApp';
 import { pdfPropostasService } from '../../../services/pdfPropostasService';
+import ModalEnviarWhatsApp from '../../../components/whatsapp/ModalEnviarWhatsApp';
 import { faturamentoService } from '../../../services/faturamentoService';
 import { contratoService } from '../../../services/contratoService';
 import { faturamentoAPI } from '../../../services/faturamentoAPI';
@@ -33,7 +33,10 @@ type ClienteContatoData = {
 
 const CLIENTE_DETAILS_TTL = 5 * 60 * 1000; // 5 minutos
 const CLIENTE_DETAILS_COOLDOWN_TTL = 30 * 1000; // Evita loop de erros
-const clienteDetailsCache = new Map<string, { data: ClienteContatoData | null; expiresAt: number }>();
+const clienteDetailsCache = new Map<
+  string,
+  { data: ClienteContatoData | null; expiresAt: number }
+>();
 const clienteDetailsPending = new Map<string, Promise<ClienteContatoData | null>>();
 
 const normalizarNomeCliente = (nome: string) => nome.trim().toLowerCase();
@@ -42,7 +45,7 @@ const armazenarNoCache = (nome: string, data: ClienteContatoData | null, ttl: nu
   const normalizado = normalizarNomeCliente(nome);
   clienteDetailsCache.set(normalizado, {
     data,
-    expiresAt: Date.now() + ttl
+    expiresAt: Date.now() + ttl,
   });
 };
 
@@ -81,15 +84,34 @@ const buscarClienteComCache = async (nome: string): Promise<ClienteContatoData |
 
   const promessa = (async () => {
     try {
+      if (clientesService.isSearchRateLimited()) {
+        const cooldownMs = Math.max(
+          CLIENTE_DETAILS_COOLDOWN_TTL,
+          clientesService.getSearchCooldownRemaining(),
+        );
+        console.warn(
+          `⚠️ Busca de clientes em cooldown (${cooldownMs}ms restantes). Ignorando requisição para "${nome}".`,
+        );
+        armazenarNoCache(nome, null, cooldownMs);
+        return null;
+      }
+
       let clientes = await clientesService.searchClientes(nome);
 
       if ((!clientes || clientes.length === 0) && nome.includes(' ')) {
         const partes = nome
           .split(' ')
-          .map(parte => parte.trim())
-          .filter(parte => parte.length >= 3);
+          .map((parte) => parte.trim())
+          .filter((parte) => parte.length >= 3);
 
         for (const parte of partes) {
+          if (clientesService.isSearchRateLimited()) {
+            console.warn(
+              `⚠️ Busca de clientes interrompida por cooldown durante variação do nome "${nome}".`,
+            );
+            break;
+          }
+
           clientes = await clientesService.searchClientes(parte);
           if (clientes && clientes.length > 0) {
             break;
@@ -98,8 +120,8 @@ const buscarClienteComCache = async (nome: string): Promise<ClienteContatoData |
       }
 
       if (clientes && clientes.length > 0) {
-        const clienteExato = clientes.find(c =>
-          c.nome?.toLowerCase().trim() === nome.toLowerCase().trim()
+        const clienteExato = clientes.find(
+          (c) => c.nome?.toLowerCase().trim() === nome.toLowerCase().trim(),
         );
 
         const clienteEncontrado = clienteExato || clientes[0];
@@ -107,7 +129,7 @@ const buscarClienteComCache = async (nome: string): Promise<ClienteContatoData |
         const data: ClienteContatoData = {
           nome: clienteEncontrado.nome || nome,
           email: clienteEncontrado.email || '',
-          telefone: clienteEncontrado.telefone || ''
+          telefone: clienteEncontrado.telefone || '',
         };
 
         armazenarNoCache(nome, data, CLIENTE_DETAILS_TTL);
@@ -119,8 +141,14 @@ const buscarClienteComCache = async (nome: string): Promise<ClienteContatoData |
     } catch (error) {
       const status = (error as any)?.response?.status;
       if (status === 429) {
-        console.warn(`⚠️ Limite de requisições atingido ao buscar cliente "${nome}". Aplicando cooldown curto.`);
-        armazenarNoCache(nome, null, CLIENTE_DETAILS_COOLDOWN_TTL);
+        console.warn(
+          `⚠️ Limite de requisições atingido ao buscar cliente "${nome}". Aplicando cooldown curto.`,
+        );
+        const cooldownMs = Math.max(
+          CLIENTE_DETAILS_COOLDOWN_TTL,
+          clientesService.getSearchCooldownRemaining() || CLIENTE_DETAILS_COOLDOWN_TTL,
+        );
+        armazenarNoCache(nome, null, cooldownMs);
       }
       return null;
     } finally {
@@ -160,12 +188,16 @@ interface PropostaActionsProps {
 const PropostaActions: React.FC<PropostaActionsProps> = ({
   proposta,
   onViewProposta,
-  className = "",
-  showLabels = false
+  className = '',
+  showLabels = false,
 }) => {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
-  const [clienteData, setClienteData] = useState<{ nome: string, email: string, telefone: string } | null>(null);
+  const [clienteData, setClienteData] = useState<{
+    nome: string;
+    email: string;
+    telefone: string;
+  } | null>(null);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [propostaPdfBuffer, setPropostaPdfBuffer] = useState<Uint8Array | null>(null);
 
@@ -186,7 +218,13 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     }
 
     if (isPropostaCompleta(proposta)) {
-      return proposta.id || proposta.numero || proposta.cliente?.id || proposta.cliente?.nome || 'proposta_completa';
+      return (
+        proposta.id ||
+        proposta.numero ||
+        proposta.cliente?.id ||
+        proposta.cliente?.nome ||
+        'proposta_completa'
+      );
     }
 
     return proposta.id || proposta.numero || proposta.cliente;
@@ -218,7 +256,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       const telefone = proposta.cliente?.telefone || '';
 
       // 🚨 VERIFICAR SE EMAIL É FICTÍCIO E BUSCAR DADOS REAIS
-      const isEmailFicticio = email.includes('@cliente.com') ||
+      const isEmailFicticio =
+        email.includes('@cliente.com') ||
         email.includes('@cliente.temp') ||
         email.includes('@email.com');
 
@@ -229,7 +268,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           return {
             nome: dadosReais.nome,
             email: dadosReais.email || email,
-            telefone: dadosReais.telefone || telefone
+            telefone: dadosReais.telefone || telefone,
           };
         }
       }
@@ -261,7 +300,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           return {
             nome: dadosReais.nome,
             email: dadosReais.email || email,
-            telefone: dadosReais.telefone || telefone
+            telefone: dadosReais.telefone || telefone,
           };
         }
       }
@@ -276,9 +315,11 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       return {
         numero: proposta.numero || 'N/A',
         total: proposta.total || 0,
-        dataValidade: proposta.dataValidade ? proposta.dataValidade.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        dataValidade: proposta.dataValidade
+          ? proposta.dataValidade.toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0],
         titulo: proposta.titulo || 'Proposta comercial',
-        status: proposta.status || 'rascunho'
+        status: proposta.status || 'rascunho',
       };
     } else {
       return {
@@ -286,7 +327,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         total: proposta.valor || 0,
         dataValidade: proposta.data_vencimento || new Date().toISOString().split('T')[0],
         titulo: proposta.titulo || 'Proposta comercial',
-        status: proposta.status || 'rascunho'
+        status: proposta.status || 'rascunho',
       };
     }
   };
@@ -333,14 +374,16 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         valorTotal: propostaData.total,
         dataInicio: new Date().toISOString().split('T')[0], // Data de hoje
         dataFim: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 1 ano
-        dataVencimento: propostaData.dataValidade || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        dataVencimento:
+          propostaData.dataValidade ||
+          new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         observacoes: `Contrato gerado automaticamente a partir da proposta ${propostaData.numero}`,
         condicoesPagamento: {
           parcelas: 1,
           formaPagamento: 'À vista',
           diaVencimento: 10,
-          valorParcela: propostaData.total
-        }
+          valorParcela: propostaData.total,
+        },
       };
 
       // Usar o serviço de contratos
@@ -356,8 +399,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             novoStatus: 'contrato_gerado',
             acao: 'contrato_gerado',
             contratoId: contrato.id,
-            timestamp: new Date().toISOString()
-          }
+            timestamp: new Date().toISOString(),
+          },
         });
         window.dispatchEvent(eventoAtualizacao);
 
@@ -388,7 +431,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
       const faturaData = {
         contratoId: propostaData.numero, // Temporário até ter contrato real
-        clienteId: propostaData.numero, // Temporário 
+        clienteId: propostaData.numero, // Temporário
         usuarioResponsavelId: 'user_temp', // Temporário
         tipo: 'entrada' as const,
         descricao: `Fatura referente à proposta ${propostaData.numero} - ${propostaData.titulo}`,
@@ -398,9 +441,9 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             descricao: propostaData.titulo,
             quantidade: 1,
             valorUnitario: propostaData.total,
-            valorDesconto: 0
-          }
-        ]
+            valorDesconto: 0,
+          },
+        ],
       };
 
       // Usar o serviço de faturamento
@@ -416,8 +459,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             novoStatus: 'fatura_criada',
             acao: 'fatura_criada',
             faturaId: fatura.numero,
-            timestamp: new Date().toISOString()
-          }
+            timestamp: new Date().toISOString(),
+          },
         });
         window.dispatchEvent(eventoAtualizacao);
 
@@ -489,11 +532,10 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           propostaId: propostaData.numero,
           novoStatus: novoStatus,
           acao: proximaAcao,
-          timestamp: new Date().toISOString()
-        }
+          timestamp: new Date().toISOString(),
+        },
       });
       window.dispatchEvent(eventoAtualizacao);
-
     } catch (error) {
       console.error('❌ Erro ao avançar fluxo:', error);
       toast.error('Erro ao avançar fluxo. Tente novamente.');
@@ -505,7 +547,6 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   // Enviar proposta por email
   const handleSendEmail = async () => {
     const clienteData = await getClienteData();
-
 
     if (!clienteData.email) {
       toast.error('Cliente não possui email cadastrado');
@@ -520,7 +561,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     }
 
     // 🚨 DETECÇÃO DE EMAIL FICTÍCIO - Solicitar email real
-    const isEmailFicticio = clienteData.email.includes('@cliente.com') ||
+    const isEmailFicticio =
+      clienteData.email.includes('@cliente.com') ||
       clienteData.email.includes('@cliente.temp') ||
       clienteData.email.includes('@email.com') ||
       clienteData.email.includes('@exemplo.com') ||
@@ -531,9 +573,10 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     let emailFinal = clienteData.email;
 
     if (isEmailFicticio) {
-
       // Solicitar email real do usuário
-      const emailReal = prompt(`O email cadastrado "${clienteData.email}" é fictício.\n\nPor favor, digite o email REAL do cliente "${clienteData.nome}":\n\n(Ex: dhonlenofreitas@hotmail.com)`);
+      const emailReal = prompt(
+        `O email cadastrado "${clienteData.email}" é fictício.\n\nPor favor, digite o email REAL do cliente "${clienteData.nome}":\n\n(Ex: dhonlenofreitas@hotmail.com)`,
+      );
 
       if (!emailReal) {
         toast.error('Envio cancelado - Email real é obrigatório');
@@ -557,26 +600,26 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       const emailData = {
         cliente: {
           nome: clienteData.nome,
-          email: emailFinal  // ✅ Usar email real corrigido pelo usuário
+          email: emailFinal, // ✅ Usar email real corrigido pelo usuário
         },
         proposta: {
           numero: propostaData.numero,
           valorTotal: propostaData.total,
           dataValidade: propostaData.dataValidade,
-          token: token
+          token: token,
         },
         vendedor: {
           nome: 'Vendedor',
           email: 'vendedor@conectcrm.com',
-          telefone: '(62) 99668-9991'
+          telefone: '(62) 99668-9991',
         },
         empresa: {
           nome: 'ConectCRM',
           email: 'conectcrm@gmail.com',
           telefone: '(62) 99668-9991',
-          endereco: 'Goiânia/GO'
+          endereco: 'Goiânia/GO',
         },
-        portalUrl: `${window.location.origin}/portal`
+        portalUrl: `${window.location.origin}/portal`,
       };
 
       const resultado = await emailServiceReal.enviarPropostaParaCliente(emailData);
@@ -589,8 +632,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             propostaId: propostaData.numero,
             novoStatus: 'enviada', // Status automaticamente alterado pelo backend
             fonte: 'email',
-            timestamp: new Date().toISOString()
-          }
+            timestamp: new Date().toISOString(),
+          },
         });
 
         // Disparar o evento globalmente
@@ -598,7 +641,6 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
         // ⚡ OTIMIZADO: Remover segundo evento desnecessário para evitar auto-refresh
         // O evento único acima já é suficiente para atualizar a interface
-
       } else {
         toast.error(`❌ Erro ao enviar email: ${resultado.error}`);
       }
@@ -628,11 +670,11 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         cliente: {
           nome: clienteData.nome,
           email: clienteData.email || '',
-          telefone: clienteData.telefone
+          telefone: clienteData.telefone,
         },
         vendedor: {
           nome: 'ConectCRM',
-          email: 'vendedor@conectcrm.com'
+          email: 'vendedor@conectcrm.com',
         },
         empresa: { nome: 'ConectCRM' },
         valorTotal: propostaData.total,
@@ -642,7 +684,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         garantia: '12 meses',
         validadeProposta: '30 dias',
         condicoesGerais: [],
-        observacoes: propostaData.titulo
+        observacoes: propostaData.titulo,
       });
 
       // Converter Blob para Uint8Array
@@ -662,23 +704,33 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const handleDownloadPdf = async () => {
     setDownloadingPdf(true);
     try {
-      // Simular geração de PDF (implementar com biblioteca real)
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Criar um blob fake para demonstração
       const clienteData = await getClienteData();
       const propostaData = getPropostaData();
-      const pdfContent = `Proposta ${propostaData.numero} - ${clienteData.nome}`;
-      const blob = new Blob([pdfContent], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
 
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Proposta_${propostaData.numero}_${clienteData.nome.replace(/\s+/g, '_')}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      // Usar serviço real de PDF
+      const dadosPDF = {
+        numeroProposta: propostaData.numero,
+        titulo: propostaData.titulo || 'Proposta Comercial',
+        cliente: {
+          nome: clienteData.nome,
+          email: clienteData.email || '',
+          telefone: clienteData.telefone,
+          empresa: clienteData.empresa,
+        },
+        vendedor: {
+          nome: 'Admin',
+          email: 'admin@conectcrm.com',
+          telefone: '(11) 99999-9999',
+        },
+        itens: propostaData.produtos || [],
+        subtotal: propostaData.subtotal || 0,
+        valorTotal: propostaData.total || 0,
+        formaPagamento: propostaData.formaPagamento || 'À vista',
+        prazoEntrega: '30 dias',
+        validadeProposta: `${propostaData.validadeDias || 30} dias`,
+      };
+
+      await pdfPropostasService.downloadPdf('comercial', dadosPDF);
 
       toast.success(`📄 PDF da proposta ${propostaData.numero} baixado`);
     } catch (error) {
@@ -701,7 +753,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         await navigator.share({
           title: `Proposta ${propostaData.numero} - ConectCRM`,
           text: `Proposta comercial para ${clienteData.nome}`,
-          url: shareUrl
+          url: shareUrl,
         });
         toast.success('🔗 Proposta compartilhada');
       } catch (error) {
@@ -717,8 +769,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   };
 
   const buttonClass = showLabels
-    ? "flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-md transition-colors"
-    : "p-2 rounded-md transition-colors";
+    ? 'flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-md transition-colors'
+    : 'p-2 rounded-md transition-colors';
 
   return (
     <div className={`flex items-center space-x-1 ${className}`}>
@@ -737,13 +789,9 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         onClick={handleSendEmail}
         disabled={sendingEmail || !clienteData?.email}
         className={`${buttonClass} text-green-600 hover:text-green-900 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed`}
-        title={clienteData?.email ? "Enviar por email" : "Cliente sem email"}
+        title={clienteData?.email ? 'Enviar por email' : 'Cliente sem email'}
       >
-        {sendingEmail ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : (
-          <Mail className="w-4 h-4" />
-        )}
+        {sendingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
         {showLabels && <span>Email</span>}
       </button>
 
@@ -752,7 +800,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         onClick={handleSendWhatsApp}
         disabled={!clienteData?.telefone}
         className={`${buttonClass} text-green-500 hover:text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed`}
-        title={clienteData?.telefone ? "Enviar por WhatsApp" : "Cliente sem telefone"}
+        title={clienteData?.telefone ? 'Enviar por WhatsApp' : 'Cliente sem telefone'}
       >
         <MessageSquare className="w-4 h-4" />
         {showLabels && <span>WhatsApp</span>}
@@ -848,12 +896,12 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             cliente: {
               nome: clienteData.nome,
               whatsapp: clienteData.telefone,
-              telefone: clienteData.telefone
+              telefone: clienteData.telefone,
             },
             valorTotal: getPropostaData().total,
             empresa: {
-              nome: 'ConectCRM'
-            }
+              nome: 'ConectCRM',
+            },
           }}
           pdfBuffer={propostaPdfBuffer}
           onSuccess={() => {

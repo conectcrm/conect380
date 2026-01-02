@@ -19,7 +19,7 @@
 
 ### Usuário Administrador
 ```
-Email: admin@conectcrm.com
+Email: admin@conectsuite.com.br
 Senha: admin123
 Role: admin
 ```
@@ -194,7 +194,7 @@ SELECT * FROM users;
 
 ### 1. Teste de Login (via curl/PowerShell)
 ```powershell
-$body = @{ email = "admin@conectcrm.com"; senha = "admin123" } | ConvertTo-Json
+$body = @{ email = "admin@conectsuite.com.br"; senha = "admin123" } | ConvertTo-Json
 Invoke-RestMethod -Uri "http://56.124.63.239:3500/auth/login" -Method Post -Body $body -ContentType "application/json"
 ```
 
@@ -207,7 +207,7 @@ Invoke-RestMethod -Uri "http://56.124.63.239:3500/auth/login" -Method Post -Body
     "user": {
       "id": "00000000-0000-0000-0000-000000000001",
       "nome": "Administrador",
-      "email": "admin@conectcrm.com",
+      "email": "admin@conectsuite.com.br",
       "role": "admin",
       "empresa": { ... }
     }
@@ -221,7 +221,7 @@ Invoke-RestMethod -Uri "http://56.124.63.239:3500/auth/login" -Method Post -Body
 # 1. Fazer login e salvar token
 TOKEN=$(curl -s -X POST http://56.124.63.239:3500/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@conectcrm.com","senha":"admin123"}' \
+  -d '{"email":"admin@conectsuite.com.br","senha":"admin123"}' \
   | jq -r '.data.access_token')
 
 # 2. Usar token em requisição
@@ -232,7 +232,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 ### 3. Teste de Frontend
 1. Abrir navegador: http://56.124.63.239:3000
 2. Verificar se tela de login aparece
-3. Inserir credenciais: `admin@conectcrm.com` / `admin123`
+3. Inserir credenciais: `admin@conectsuite.com.br` / `admin123`
 4. Clicar em "Entrar"
 5. Verificar se redireciona para dashboard
 
@@ -434,7 +434,7 @@ cd /home/ubuntu/apps && docker-compose -f docker-compose.prod.yml restart backen
 1. Verificar se senha está correta: `admin123`
 2. Verificar hash no banco:
    ```sql
-   SELECT email, senha FROM users WHERE email = 'admin@conectcrm.com';
+   SELECT email, senha FROM users WHERE email = 'admin@conectsuite.com.br';
    ```
 3. Testar hash:
    ```bash

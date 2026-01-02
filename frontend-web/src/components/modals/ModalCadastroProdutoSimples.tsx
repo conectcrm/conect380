@@ -4,16 +4,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import toast from 'react-hot-toast';
 import { SelectField } from '../common/SelectField';
-import {
-  X,
-  Package,
-  Tag,
-  FileText,
-  CheckCircle,
-  AlertCircle,
-  Plus,
-  Trash2
-} from 'lucide-react';
+import { X, Package, Tag, FileText, CheckCircle, AlertCircle, Plus, Trash2 } from 'lucide-react';
 
 // Interface para os dados do formulário
 interface ProdutoFormData {
@@ -54,25 +45,22 @@ const produtoSchema = yup.object({
   codigo: yup
     .string()
     .required('Código é obrigatório')
-    .matches(/^[A-Z0-9-_]+$/, 'Código deve conter apenas letras maiúsculas, números, hífen e underscore')
+    .matches(
+      /^[A-Z0-9-_]+$/,
+      'Código deve conter apenas letras maiúsculas, números, hífen e underscore',
+    )
     .max(20, 'Código deve ter no máximo 20 caracteres'),
 
-  categoria: yup
-    .string()
-    .required('Categoria é obrigatória'),
+  categoria: yup.string().required('Categoria é obrigatória'),
 
   preco: yup
     .number()
     .required('Preço é obrigatório')
     .min(0, 'Preço deve ser maior ou igual a zero'),
 
-  custoUnitario: yup
-    .number()
-    .min(0, 'Custo unitário deve ser maior ou igual a zero'),
+  custoUnitario: yup.number().min(0, 'Custo unitário deve ser maior ou igual a zero'),
 
-  unidadeMedida: yup
-    .string()
-    .required('Unidade de medida é obrigatória'),
+  unidadeMedida: yup.string().required('Unidade de medida é obrigatória'),
 
   status: yup
     .string()
@@ -80,51 +68,33 @@ const produtoSchema = yup.object({
     .oneOf(['ativo', 'inativo', 'descontinuado'], 'Status inválido'),
 
   // Estoque - Opcionais
-  controlarEstoque: yup
-    .boolean(),
+  controlarEstoque: yup.boolean(),
 
-  estoqueMinimo: yup
-    .number()
-    .when('controlarEstoque', {
-      is: true,
-      then: (schema) => schema.min(0, 'Estoque mínimo deve ser maior ou igual a zero'),
-      otherwise: (schema) => schema.notRequired()
-    }),
+  estoqueMinimo: yup.number().when('controlarEstoque', {
+    is: true,
+    then: (schema) => schema.min(0, 'Estoque mínimo deve ser maior ou igual a zero'),
+    otherwise: (schema) => schema.notRequired(),
+  }),
 
-  estoqueAtual: yup
-    .number()
-    .when('controlarEstoque', {
-      is: true,
-      then: (schema) => schema.min(0, 'Estoque atual deve ser maior ou igual a zero'),
-      otherwise: (schema) => schema.notRequired()
-    }),
+  estoqueAtual: yup.number().when('controlarEstoque', {
+    is: true,
+    then: (schema) => schema.min(0, 'Estoque atual deve ser maior ou igual a zero'),
+    otherwise: (schema) => schema.notRequired(),
+  }),
 
   // Detalhes - Opcionais
-  descricao: yup
-    .string()
-    .max(500, 'Descrição deve ter no máximo 500 caracteres'),
+  descricao: yup.string().max(500, 'Descrição deve ter no máximo 500 caracteres'),
 
-  observacoes: yup
-    .string()
-    .max(1000, 'Observações deve ter no máximo 1000 caracteres'),
+  observacoes: yup.string().max(1000, 'Observações deve ter no máximo 1000 caracteres'),
 
-  tags: yup
-    .array()
-    .of(yup.string())
-    .max(10, 'Máximo de 10 tags permitidas'),
+  tags: yup.array().of(yup.string()).max(10, 'Máximo de 10 tags permitidas'),
 
   // Configurações específicas - Opcionais
-  tipoPlano: yup
-    .string()
-    .oneOf(['basico', 'premium', 'enterprise'], 'Tipo de plano inválido'),
+  tipoPlano: yup.string().oneOf(['basico', 'premium', 'enterprise'], 'Tipo de plano inválido'),
 
-  modulos: yup
-    .array()
-    .of(yup.string()),
+  modulos: yup.array().of(yup.string()),
 
-  licencas: yup
-    .array()
-    .of(yup.string())
+  licencas: yup.array().of(yup.string()),
 });
 
 interface ModalCadastroProdutoSimplesProps {
@@ -140,10 +110,12 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
   onClose,
   onSave,
   produto,
-  isLoading = false
+  isLoading = false,
 }) => {
   // Estados locais
-  const [currentTab, setCurrentTab] = useState<'dados' | 'estoque' | 'detalhes' | 'configuracoes'>('dados');
+  const [currentTab, setCurrentTab] = useState<'dados' | 'estoque' | 'detalhes' | 'configuracoes'>(
+    'dados',
+  );
   const [tagInput, setTagInput] = useState('');
   const [moduloInput, setModuloInput] = useState('');
   const [licencaInput, setLicencaInput] = useState('');
@@ -155,7 +127,7 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
     { value: 'servico', label: 'Serviços' },
     { value: 'consultoria', label: 'Consultoria' },
     { value: 'hardware', label: 'Hardware' },
-    { value: 'outro', label: 'Outro' }
+    { value: 'outro', label: 'Outro' },
   ];
 
   const unidadesMedida = [
@@ -164,23 +136,34 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
     { value: 'mes', label: 'Mês' },
     { value: 'ano', label: 'Ano' },
     { value: 'hora', label: 'Hora' },
-    { value: 'dia', label: 'Dia' }
+    { value: 'dia', label: 'Dia' },
   ];
 
   const tiposPlano = [
     { value: 'basico', label: 'Básico' },
     { value: 'premium', label: 'Premium' },
-    { value: 'enterprise', label: 'Enterprise' }
+    { value: 'enterprise', label: 'Enterprise' },
   ];
 
   const modulosDisponiveis = [
-    'Confinamento', 'Reprodutivo', 'Agrícola', 'Financeiro',
-    'Contratos', 'Relatórios', 'Dashboard', 'API'
+    'Confinamento',
+    'Reprodutivo',
+    'Agrícola',
+    'Financeiro',
+    'Contratos',
+    'Relatórios',
+    'Dashboard',
+    'API',
   ];
 
   const licencasDisponiveis = [
-    'MB Task', 'MB Curral', 'MB Web', 'MB Mobile',
-    'Licença Admin', 'Licença Usuário', 'Licença Viewer'
+    'MB Task',
+    'MB Curral',
+    'MB Web',
+    'MB Mobile',
+    'Licença Admin',
+    'Licença Usuário',
+    'Licença Viewer',
   ];
 
   // Configuração do React Hook Form
@@ -191,7 +174,7 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
     setValue,
     watch,
     reset,
-    trigger
+    trigger,
   } = useForm<ProdutoFormData>({
     resolver: yupResolver(produtoSchema),
     mode: 'onChange',
@@ -211,8 +194,8 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
       tags: [],
       tipoPlano: 'basico',
       modulos: [],
-      licencas: []
-    }
+      licencas: [],
+    },
   });
 
   // Observar mudanças nos campos
@@ -244,7 +227,7 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
           tags: produto.tags || [],
           tipoPlano: produto.tipoPlano || 'basico',
           modulos: produto.modulos || [],
-          licencas: produto.licencas || []
+          licencas: produto.licencas || [],
         });
       } else {
         // Modo criação
@@ -264,7 +247,7 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
           tags: [],
           tipoPlano: 'basico',
           modulos: [],
-          licencas: []
+          licencas: [],
         });
       }
       setCurrentTab('dados');
@@ -274,7 +257,7 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
   // Submissão do formulário
   const onSubmit = async (data: ProdutoFormData) => {
     const loadingToastId = toast.loading(
-      produto ? 'Atualizando produto...' : 'Cadastrando produto...'
+      produto ? 'Atualizando produto...' : 'Cadastrando produto...',
     );
 
     try {
@@ -282,19 +265,17 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
 
       toast.success(
         produto ? 'Produto atualizado com sucesso!' : 'Produto cadastrado com sucesso!',
-        { id: loadingToastId }
+        { id: loadingToastId },
       );
 
       setTimeout(() => {
         handleClose();
       }, 1000);
-
     } catch (error) {
       console.error('Erro ao salvar produto:', error);
-      toast.error(
-        produto ? 'Erro ao atualizar produto' : 'Erro ao cadastrar produto',
-        { id: loadingToastId }
-      );
+      toast.error(produto ? 'Erro ao atualizar produto' : 'Erro ao cadastrar produto', {
+        id: loadingToastId,
+      });
     }
   };
 
@@ -320,7 +301,7 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
 
   // Remover tag
   const removerTag = (tag: string) => {
-    const novasTags = watchedTags.filter(t => t !== tag);
+    const novasTags = watchedTags.filter((t) => t !== tag);
     setValue('tags', novasTags);
     trigger('tags');
   };
@@ -336,7 +317,7 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
 
   // Remover módulo
   const removerModulo = (modulo: string) => {
-    const novosModulos = watchedModulos.filter(m => m !== modulo);
+    const novosModulos = watchedModulos.filter((m) => m !== modulo);
     setValue('modulos', novosModulos);
   };
 
@@ -351,7 +332,7 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
 
   // Remover licença
   const removerLicenca = (licenca: string) => {
-    const novasLicencas = watchedLicencas.filter(l => l !== licenca);
+    const novasLicencas = watchedLicencas.filter((l) => l !== licenca);
     setValue('licencas', novasLicencas);
   };
 
@@ -375,7 +356,10 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center p-4">
         {/* Overlay */}
-        <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={handleClose}></div>
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+          onClick={handleClose}
+        ></div>
 
         {/* Modal */}
         <div className="relative bg-white rounded-lg shadow-xl w-[calc(100%-2rem)] sm:w-[600px] md:w-[700px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] max-h-[90vh] overflow-hidden">
@@ -390,7 +374,9 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                   {produto ? 'Editar Produto' : 'Novo Produto'}
                 </h2>
                 <p className="text-sm text-gray-500">
-                  {produto ? 'Atualize as informações do produto' : 'Preencha os dados do novo produto'}
+                  {produto
+                    ? 'Atualize as informações do produto'
+                    : 'Preencha os dados do novo produto'}
                 </p>
               </div>
             </div>
@@ -409,15 +395,16 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                 { key: 'dados', label: 'Dados Básicos', icon: Package },
                 { key: 'estoque', label: 'Estoque', icon: Tag },
                 { key: 'detalhes', label: 'Detalhes', icon: FileText },
-                { key: 'configuracoes', label: 'Configurações', icon: CheckCircle }
+                { key: 'configuracoes', label: 'Configurações', icon: CheckCircle },
               ].map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
                   onClick={() => setCurrentTab(key as any)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${currentTab === key
+                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    currentTab === key
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
+                  }`}
                 >
                   <div className="flex items-center gap-2">
                     <Icon className="w-4 h-4" />
@@ -443,8 +430,9 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                       <input
                         {...register('nome')}
                         type="text"
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.nome ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          errors.nome ? 'border-red-300' : 'border-gray-300'
+                        }`}
                         placeholder="Ex: Sistema Completo Agronegócio"
                       />
                       {errors.nome && (
@@ -461,8 +449,9 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                         <input
                           {...register('codigo')}
                           type="text"
-                          className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.codigo ? 'border-red-300' : 'border-gray-300'
-                            }`}
+                          className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                            errors.codigo ? 'border-red-300' : 'border-gray-300'
+                          }`}
                           placeholder="Ex: SCA_PREMIUM"
                           style={{ textTransform: 'uppercase' }}
                         />
@@ -506,7 +495,7 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                         options={[
                           { value: 'ativo', label: 'Ativo' },
                           { value: 'inativo', label: 'Inativo' },
-                          { value: 'descontinuado', label: 'Descontinuado' }
+                          { value: 'descontinuado', label: 'Descontinuado' },
                         ]}
                         error={!!errors.status}
                       />
@@ -527,8 +516,9 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                           type="number"
                           step="0.01"
                           min="0"
-                          className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.preco ? 'border-red-300' : 'border-gray-300'
-                            }`}
+                          className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                            errors.preco ? 'border-red-300' : 'border-gray-300'
+                          }`}
                           placeholder="0,00"
                         />
                       </div>
@@ -549,8 +539,9 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                           type="number"
                           step="0.01"
                           min="0"
-                          className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.custoUnitario ? 'border-red-300' : 'border-gray-300'
-                            }`}
+                          className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                            errors.custoUnitario ? 'border-red-300' : 'border-gray-300'
+                          }`}
                           placeholder="0,00"
                         />
                       </div>
@@ -581,7 +572,8 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                       <div className="flex items-center gap-2">
                         <AlertCircle className="w-5 h-5 text-yellow-600" />
                         <p className="text-sm text-yellow-800">
-                          Produtos descontinuados não aparecerão nas vendas e não poderão ser comercializados.
+                          Produtos descontinuados não aparecerão nas vendas e não poderão ser
+                          comercializados.
                         </p>
                       </div>
                     </div>
@@ -616,12 +608,15 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                           {...register('estoqueMinimo', { valueAsNumber: true })}
                           type="number"
                           min="0"
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.estoqueMinimo ? 'border-red-300' : 'border-gray-300'
-                            }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                            errors.estoqueMinimo ? 'border-red-300' : 'border-gray-300'
+                          }`}
                           placeholder="0"
                         />
                         {errors.estoqueMinimo && (
-                          <p className="mt-1 text-sm text-red-600">{errors.estoqueMinimo.message}</p>
+                          <p className="mt-1 text-sm text-red-600">
+                            {errors.estoqueMinimo.message}
+                          </p>
                         )}
                         <p className="mt-1 text-xs text-gray-500">
                           Quantidade mínima para alertas de reposição
@@ -637,8 +632,9 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                           {...register('estoqueAtual', { valueAsNumber: true })}
                           type="number"
                           min="0"
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.estoqueAtual ? 'border-red-300' : 'border-gray-300'
-                            }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                            errors.estoqueAtual ? 'border-red-300' : 'border-gray-300'
+                          }`}
                           placeholder="0"
                         />
                         {errors.estoqueAtual && (
@@ -656,7 +652,8 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                       <div className="flex items-center gap-2">
                         <Package className="w-5 h-5 text-blue-600" />
                         <p className="text-sm text-blue-800">
-                          O estoque não será controlado para este produto. Ideal para serviços ou produtos digitais.
+                          O estoque não será controlado para este produto. Ideal para serviços ou
+                          produtos digitais.
                         </p>
                       </div>
                     </div>
@@ -675,8 +672,9 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                     <textarea
                       {...register('descricao')}
                       rows={4}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none ${errors.descricao ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none ${
+                        errors.descricao ? 'border-red-300' : 'border-gray-300'
+                      }`}
                       placeholder="Descreva as características e funcionalidades do produto..."
                     />
                     {errors.descricao && (
@@ -686,9 +684,7 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
 
                   {/* Tags */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tags
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tags</label>
                     <div className="flex gap-2 mb-2">
                       <input
                         type="text"
@@ -750,8 +746,9 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                     <textarea
                       {...register('observacoes')}
                       rows={3}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none ${errors.observacoes ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none ${
+                        errors.observacoes ? 'border-red-300' : 'border-gray-300'
+                      }`}
                       placeholder="Informações internas sobre o produto..."
                     />
                     {errors.observacoes && (
@@ -775,10 +772,7 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Tipo de Plano
                         </label>
-                        <SelectField
-                          {...register('tipoPlano')}
-                          options={tiposPlano}
-                        />
+                        <SelectField {...register('tipoPlano')} options={tiposPlano} />
                       </div>
 
                       {/* Módulos */}
@@ -791,8 +785,8 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                             value={moduloInput}
                             onChange={(e) => setModuloInput(e.target.value)}
                             options={modulosDisponiveis
-                              .filter(modulo => !watchedModulos.includes(modulo))
-                              .map(modulo => ({ value: modulo, label: modulo }))}
+                              .filter((modulo) => !watchedModulos.includes(modulo))
+                              .map((modulo) => ({ value: modulo, label: modulo }))}
                             placeholder="Selecione um módulo..."
                             className="flex-1"
                           />
@@ -838,8 +832,8 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                             value={licencaInput}
                             onChange={(e) => setLicencaInput(e.target.value)}
                             options={licencasDisponiveis
-                              .filter(licenca => !watchedLicencas.includes(licenca))
-                              .map(licenca => ({ value: licenca, label: licenca }))}
+                              .filter((licenca) => !watchedLicencas.includes(licenca))
+                              .map((licenca) => ({ value: licenca, label: licenca }))}
                             placeholder="Selecione uma licença..."
                             className="flex-1"
                           />
@@ -881,7 +875,8 @@ const ModalCadastroProdutoSimples: React.FC<ModalCadastroProdutoSimplesProps> = 
                     <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center">
                       <Package className="w-12 h-12 text-gray-400 mx-auto mb-2" />
                       <p className="text-sm text-gray-600">
-                        Configurações específicas estão disponíveis apenas para produtos da categoria "Software/Sistema"
+                        Configurações específicas estão disponíveis apenas para produtos da
+                        categoria "Software/Sistema"
                       </p>
                     </div>
                   )}

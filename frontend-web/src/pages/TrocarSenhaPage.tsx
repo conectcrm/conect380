@@ -41,7 +41,8 @@ const TrocarSenhaPage: React.FC = () => {
     preenchido: senhaAntiga.length > 0 && senhaNova.length > 0 && senhaConfirmacao.length > 0,
   };
 
-  const formularioValido = validacoes.tamanhoMinimo && validacoes.senhasIguais && validacoes.preenchido;
+  const formularioValido =
+    validacoes.tamanhoMinimo && validacoes.senhasIguais && validacoes.preenchido;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,13 +77,14 @@ const TrocarSenhaPage: React.FC = () => {
             state: {
               message: 'Senha alterada! Faça login com sua nova senha.',
               email: emailUsuario,
-            }
+            },
           });
         }, 2000);
       }
     } catch (err: unknown) {
       console.error('Erro ao trocar senha:', err);
-      const errorMessage = (err as any)?.response?.data?.message ||
+      const errorMessage =
+        (err as any)?.response?.data?.message ||
         (err instanceof Error ? err.message : 'Erro ao trocar senha');
       setErro(errorMessage);
       toast.error(errorMessage);
@@ -120,15 +122,11 @@ const TrocarSenhaPage: React.FC = () => {
           <div className="bg-blue-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
             <KeyRound className="h-8 w-8 text-blue-600" />
           </div>
-          <h1 className="text-3xl font-bold text-[#002333] mb-2">
-            Trocar Senha
-          </h1>
+          <h1 className="text-3xl font-bold text-[#002333] mb-2">Trocar Senha</h1>
           <p className="text-gray-600">
             Olá, <strong>{nomeUsuario}</strong>! Este é seu primeiro acesso.
           </p>
-          <p className="text-sm text-gray-500 mt-1">
-            Por segurança, troque sua senha temporária.
-          </p>
+          <p className="text-sm text-gray-500 mt-1">Por segurança, troque sua senha temporária.</p>
         </div>
 
         {/* Erro */}
@@ -189,7 +187,11 @@ const TrocarSenhaPage: React.FC = () => {
                   onClick={() => setMostrarSenhaAntiga(!mostrarSenhaAntiga)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                 >
-                  {mostrarSenhaAntiga ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  {mostrarSenhaAntiga ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
                 </button>
               </div>
             </div>
@@ -197,9 +199,7 @@ const TrocarSenhaPage: React.FC = () => {
 
           {/* Nova Senha */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nova Senha
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Nova Senha</label>
             <div className="relative">
               <input
                 type={mostrarSenhaNova ? 'text' : 'password'}
@@ -219,16 +219,21 @@ const TrocarSenhaPage: React.FC = () => {
             </div>
             {/* Validação tamanho */}
             <div className="flex items-center mt-2">
-              {senhaNova.length > 0 && (
-                validacoes.tamanhoMinimo ? (
+              {senhaNova.length > 0 &&
+                (validacoes.tamanhoMinimo ? (
                   <CheckCircle2 className="h-4 w-4 text-green-600 mr-2" />
                 ) : (
                   <AlertCircle className="h-4 w-4 text-red-600 mr-2" />
-                )
-              )}
-              <p className={`text-xs ${senhaNova.length === 0 ? 'text-gray-500' :
-                validacoes.tamanhoMinimo ? 'text-green-600' : 'text-red-600'
-                }`}>
+                ))}
+              <p
+                className={`text-xs ${
+                  senhaNova.length === 0
+                    ? 'text-gray-500'
+                    : validacoes.tamanhoMinimo
+                      ? 'text-green-600'
+                      : 'text-red-600'
+                }`}
+              >
                 Mínimo de 6 caracteres
               </p>
             </div>
@@ -253,7 +258,11 @@ const TrocarSenhaPage: React.FC = () => {
                 onClick={() => setMostrarSenhaConfirmacao(!mostrarSenhaConfirmacao)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
               >
-                {mostrarSenhaConfirmacao ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                {mostrarSenhaConfirmacao ? (
+                  <EyeOff className="h-5 w-5" />
+                ) : (
+                  <Eye className="h-5 w-5" />
+                )}
               </button>
             </div>
             {/* Validação senhas iguais */}
@@ -264,8 +273,11 @@ const TrocarSenhaPage: React.FC = () => {
                 ) : (
                   <AlertCircle className="h-4 w-4 text-red-600 mr-2" />
                 )}
-                <p className={`text-xs ${validacoes.senhasIguais ? 'text-green-600' : 'text-red-600'
-                  }`}>
+                <p
+                  className={`text-xs ${
+                    validacoes.senhasIguais ? 'text-green-600' : 'text-red-600'
+                  }`}
+                >
                   {validacoes.senhasIguais ? 'Senhas conferem' : 'Senhas não conferem'}
                 </p>
               </div>
@@ -276,10 +288,11 @@ const TrocarSenhaPage: React.FC = () => {
           <button
             type="submit"
             disabled={!formularioValido || loading}
-            className={`w-full py-3 rounded-lg font-semibold transition-all ${formularioValido && !loading
-              ? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
+            className={`w-full py-3 rounded-lg font-semibold transition-all ${
+              formularioValido && !loading
+                ? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
           >
             {loading ? 'Alterando senha...' : 'Trocar Senha'}
           </button>

@@ -13,18 +13,14 @@ export const ListView: React.FC<ListViewProps> = ({
   oportunidades,
   onVisualizarOportunidade,
   onEditarOportunidade,
-  onExcluirOportunidade
+  onExcluirOportunidade,
 }) => {
   if (oportunidades.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-sm p-8 text-center">
         <List className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">
-          Nenhuma oportunidade encontrada
-        </h3>
-        <p className="text-gray-600">
-          Tente ajustar os filtros ou criar uma nova oportunidade
-        </p>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma oportunidade encontrada</h3>
+        <p className="text-gray-600">Tente ajustar os filtros ou criar uma nova oportunidade</p>
       </div>
     );
   }
@@ -64,9 +60,7 @@ export const ListView: React.FC<ListViewProps> = ({
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {oportunidade.titulo}
-                      </div>
+                      <div className="text-sm font-medium text-gray-900">{oportunidade.titulo}</div>
                       <div className="text-sm text-gray-500">
                         {oportunidade.probabilidade}% probabilidade
                       </div>
@@ -87,11 +81,15 @@ export const ListView: React.FC<ListViewProps> = ({
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    oportunidade.estagio === 'won' ? 'bg-green-100 text-green-800' :
-                    oportunidade.estagio === 'lost' ? 'bg-red-100 text-red-800' :
-                    'bg-blue-100 text-blue-800'
-                  }`}>
+                  <span
+                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      oportunidade.estagio === 'won'
+                        ? 'bg-green-100 text-green-800'
+                        : oportunidade.estagio === 'lost'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-blue-100 text-blue-800'
+                    }`}
+                  >
                     {oportunidade.estagio}
                   </span>
                 </td>
@@ -100,16 +98,13 @@ export const ListView: React.FC<ListViewProps> = ({
                     <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-2">
                       <User className="w-4 h-4 text-gray-500" />
                     </div>
-                    <div className="text-sm text-gray-900">
-                      {oportunidade.responsavel.nome}
-                    </div>
+                    <div className="text-sm text-gray-900">{oportunidade.responsavel.nome}</div>
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {oportunidade.dataFechamentoEsperado 
+                  {oportunidade.dataFechamentoEsperado
                     ? new Date(oportunidade.dataFechamentoEsperado).toLocaleDateString('pt-BR')
-                    : 'N/A'
-                  }
+                    : 'N/A'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end space-x-2">

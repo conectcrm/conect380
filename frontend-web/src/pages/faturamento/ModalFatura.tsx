@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Calculator, FileText, DollarSign } from 'lucide-react';
-import { NovaFatura, ItemFatura, TipoFatura, FormaPagamento, Fatura } from '../../services/faturamentoService';
+import {
+  NovaFatura,
+  ItemFatura,
+  TipoFatura,
+  FormaPagamento,
+  Fatura,
+} from '../../services/faturamentoService';
 import ClienteSelect, { ClienteSelectValue } from '../../components/selects/ClienteSelect';
 import ContratoSelect from '../../components/selects/ContratoSelect';
 import MoneyInput from '../../components/inputs/MoneyInput';
@@ -17,7 +23,13 @@ interface ModalFaturaProps {
   isLoading?: boolean;
 }
 
-export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading = false }: ModalFaturaProps) {
+export default function ModalFatura({
+  isOpen,
+  onClose,
+  onSave,
+  fatura,
+  isLoading = false,
+}: ModalFaturaProps) {
   const [formData, setFormData] = useState<NovaFatura>({
     contratoId: '',
     clienteId: '', // UUID string, não número
@@ -28,7 +40,7 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
     observacoes: '',
     percentualDesconto: 0,
     valorDesconto: 0,
-    itens: []
+    itens: [],
   });
 
   const [novoItem, setNovoItem] = useState<Omit<ItemFatura, 'id' | 'valorTotal'>>({
@@ -38,13 +50,13 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
     unidade: 'un',
     codigoProduto: '',
     percentualDesconto: 0,
-    valorDesconto: 0
+    valorDesconto: 0,
   });
 
   const [totais, setTotais] = useState({
     subtotal: 0,
     desconto: 0,
-    total: 0
+    total: 0,
   });
 
   const [erros, setErros] = useState<{
@@ -86,15 +98,15 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
         observacoes: fatura.observacoes || '',
         percentualDesconto: fatura.percentualDesconto || 0,
         valorDesconto: fatura.valorDesconto || 0,
-        itens: fatura.itens.map(item => ({
+        itens: fatura.itens.map((item) => ({
           descricao: item.descricao,
           quantidade: item.quantidade,
           valorUnitario: item.valorUnitario,
           unidade: item.unidade,
           codigoProduto: item.codigoProduto,
           percentualDesconto: item.percentualDesconto,
-          valorDesconto: item.valorDesconto
-        }))
+          valorDesconto: item.valorDesconto,
+        })),
       });
 
       // TODO: Carregar dados do cliente e contrato quando editando
@@ -105,7 +117,7 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
           email: fatura.cliente?.email,
           telefone: fatura.cliente?.telefone,
           documento: fatura.cliente?.documento,
-          tipo: fatura.cliente?.tipo
+          tipo: fatura.cliente?.tipo,
         });
       }
 
@@ -113,7 +125,7 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
         setContratoSelecionado({
           id: String(fatura.contratoId),
           numero: `CT${fatura.contratoId}`,
-          cliente: fatura.cliente
+          cliente: fatura.cliente,
         });
       }
     } else {
@@ -128,7 +140,7 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
         observacoes: '',
         percentualDesconto: 0,
         valorDesconto: 0,
-        itens: []
+        itens: [],
       });
       setClienteSelecionado(null);
       setContratoSelecionado(null);
@@ -138,26 +150,26 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
   // Handlers para mudança dos selects
   const handleClienteChange = (cliente: typeof clienteSelecionado) => {
     setClienteSelecionado(cliente);
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      clienteId: cliente?.id || '' // UUID string
+      clienteId: cliente?.id || '', // UUID string
     }));
 
     // Limpar contrato se mudou o cliente
     if (contratoSelecionado && cliente?.id !== contratoSelecionado.cliente?.id) {
       setContratoSelecionado(null);
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        contratoId: ''
+        contratoId: '',
       }));
     }
   };
 
   const handleContratoChange = (contrato: typeof contratoSelecionado) => {
     setContratoSelecionado(contrato);
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      contratoId: contrato ? contrato.id : ''
+      contratoId: contrato ? contrato.id : '',
     }));
   };
 
@@ -167,23 +179,25 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
 
   const calcularTotais = () => {
     const subtotal = formData.itens.reduce((acc, item) => {
-      return acc + (item.quantidade * item.valorUnitario);
+      return acc + item.quantidade * item.valorUnitario;
     }, 0);
 
     const descontoItens = formData.itens.reduce((acc, item) => {
       const subtotalItem = item.quantidade * item.valorUnitario;
-      const descontoItem = item.valorDesconto || (subtotalItem * (item.percentualDesconto || 0)) / 100;
+      const descontoItem =
+        item.valorDesconto || (subtotalItem * (item.percentualDesconto || 0)) / 100;
       return acc + descontoItem;
     }, 0);
 
-    const descontoGeral = formData.valorDesconto || (subtotal * (formData.percentualDesconto || 0)) / 100;
+    const descontoGeral =
+      formData.valorDesconto || (subtotal * (formData.percentualDesconto || 0)) / 100;
     const descontoTotal = descontoItens + descontoGeral;
     const total = subtotal - descontoTotal;
 
     setTotais({
       subtotal,
       desconto: descontoTotal,
-      total: Math.max(0, total)
+      total: Math.max(0, total),
     });
   };
 
@@ -194,9 +208,9 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
     }
 
     const item = { ...novoItem };
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      itens: [...prev.itens, item]
+      itens: [...prev.itens, item],
     }));
 
     setNovoItem({
@@ -206,23 +220,21 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
       unidade: 'un',
       codigoProduto: '',
       percentualDesconto: 0,
-      valorDesconto: 0
+      valorDesconto: 0,
     });
   };
 
   const removerItem = (index: number) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      itens: prev.itens.filter((_, i) => i !== index)
+      itens: prev.itens.filter((_, i) => i !== index),
     }));
   };
 
   const atualizarItem = (index: number, campo: string, valor: any) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      itens: prev.itens.map((item, i) =>
-        i === index ? { ...item, [campo]: valor } : item
-      )
+      itens: prev.itens.map((item, i) => (i === index ? { ...item, [campo]: valor } : item)),
     }));
   };
 
@@ -251,8 +263,8 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
     if (formData.itens.length === 0) {
       novosErros.itens = 'Pelo menos um item é obrigatório';
     } else {
-      const itemInvalido = formData.itens.find(item =>
-        !item.descricao.trim() || item.quantidade <= 0 || item.valorUnitario <= 0
+      const itemInvalido = formData.itens.find(
+        (item) => !item.descricao.trim() || item.quantidade <= 0 || item.valorUnitario <= 0,
       );
       if (itemInvalido) {
         novosErros.itens = 'Todos os itens devem ter descrição, quantidade e valor válidos';
@@ -297,10 +309,7 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
               {fatura ? 'Editar Fatura' : 'Nova Fatura'}
             </h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -311,12 +320,8 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
             <div className="bg-red-50 border border-red-200 rounded-md p-4">
               <div className="flex">
                 <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
-                    Erro ao salvar fatura
-                  </h3>
-                  <div className="mt-2 text-sm text-red-700">
-                    {erros.geral}
-                  </div>
+                  <h3 className="text-sm font-medium text-red-800">Erro ao salvar fatura</h3>
+                  <div className="mt-2 text-sm text-red-700">{erros.geral}</div>
                 </div>
               </div>
             </div>
@@ -331,9 +336,7 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
                 required={true}
                 className="w-full"
               />
-              {erros.clienteId && (
-                <p className="text-sm text-red-600 mt-1">{erros.clienteId}</p>
-              )}
+              {erros.clienteId && <p className="text-sm text-red-600 mt-1">{erros.clienteId}</p>}
 
               <ContratoSelect
                 value={contratoSelecionado}
@@ -347,7 +350,6 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
 
           {/* Informações Básicas */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Data de Vencimento *
@@ -355,9 +357,12 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
               <input
                 type="date"
                 value={formData.dataVencimento}
-                onChange={(e) => setFormData(prev => ({ ...prev, dataVencimento: e.target.value }))}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${erros.dataVencimento ? 'border-red-300' : 'border-gray-300'
-                  }`}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, dataVencimento: e.target.value }))
+                }
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  erros.dataVencimento ? 'border-red-300' : 'border-gray-300'
+                }`}
                 required
               />
               {erros.dataVencimento && (
@@ -371,7 +376,9 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
               </label>
               <select
                 value={formData.tipo}
-                onChange={(e) => setFormData(prev => ({ ...prev, tipo: e.target.value as TipoFatura }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, tipo: e.target.value as TipoFatura }))
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value={TipoFatura.UNICA}>Única</option>
@@ -387,7 +394,12 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
               </label>
               <select
                 value={formData.formaPagamento}
-                onChange={(e) => setFormData(prev => ({ ...prev, formaPagamento: e.target.value as FormaPagamento }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    formaPagamento: e.target.value as FormaPagamento,
+                  }))
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value={FormaPagamento.PIX}>PIX</option>
@@ -427,7 +439,8 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
                   <tbody>
                     {formData.itens.map((item, index) => {
                       const subtotal = item.quantidade * item.valorUnitario;
-                      const desconto = item.valorDesconto || (subtotal * (item.percentualDesconto || 0)) / 100;
+                      const desconto =
+                        item.valorDesconto || (subtotal * (item.percentualDesconto || 0)) / 100;
                       const total = subtotal - desconto;
 
                       return (
@@ -451,14 +464,18 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
                           <td className="py-2 text-right">
                             <MoneyInputNoPrefix
                               value={item.valorUnitario}
-                              onValueChange={(value) => atualizarItem(index, 'valorUnitario', value)}
+                              onValueChange={(value) =>
+                                atualizarItem(index, 'valorUnitario', value)
+                              }
                               className="w-24 text-sm text-right px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             />
                           </td>
                           <td className="py-2 text-right">
                             <MoneyInputNoPrefix
                               value={item.valorDesconto || 0}
-                              onValueChange={(value) => atualizarItem(index, 'valorDesconto', value)}
+                              onValueChange={(value) =>
+                                atualizarItem(index, 'valorDesconto', value)
+                              }
                               className="w-20 text-sm text-right px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             />
                           </td>
@@ -486,13 +503,11 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
             <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
               {/* Descrição - col-span-2 em md, col-span-1 em mobile */}
               <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Descrição *
-                </label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Descrição *</label>
                 <input
                   type="text"
                   value={novoItem.descricao}
-                  onChange={(e) => setNovoItem(prev => ({ ...prev, descricao: e.target.value }))}
+                  onChange={(e) => setNovoItem((prev) => ({ ...prev, descricao: e.target.value }))}
                   className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                   placeholder="Ex: Produto/Serviço"
                 />
@@ -500,12 +515,12 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
 
               {/* Quantidade - col-span-1 */}
               <div className="md:col-span-1">
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Quantidade *
-                </label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Quantidade *</label>
                 <NumberInput
                   value={novoItem.quantidade}
-                  onValueChange={(value) => setNovoItem(prev => ({ ...prev, quantidade: value || 0 }))}
+                  onValueChange={(value) =>
+                    setNovoItem((prev) => ({ ...prev, quantidade: value || 0 }))
+                  }
                   allowDecimals={false}
                   placeholder="1"
                   className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -519,7 +534,9 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
                 </label>
                 <MoneyInputNoPrefix
                   value={novoItem.valorUnitario}
-                  onValueChange={(value) => setNovoItem(prev => ({ ...prev, valorUnitario: value }))}
+                  onValueChange={(value) =>
+                    setNovoItem((prev) => ({ ...prev, valorUnitario: value }))
+                  }
                   placeholder="0,00"
                   className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
@@ -527,13 +544,11 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
 
               {/* Unidade - col-span-1 */}
               <div className="md:col-span-1">
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Unidade
-                </label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Unidade</label>
                 <input
                   type="text"
                   value={novoItem.unidade}
-                  onChange={(e) => setNovoItem(prev => ({ ...prev, unidade: e.target.value }))}
+                  onChange={(e) => setNovoItem((prev) => ({ ...prev, unidade: e.target.value }))}
                   className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="un"
                 />
@@ -541,12 +556,12 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
 
               {/* Desconto - col-span-1 */}
               <div className="md:col-span-1">
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Desconto
-                </label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Desconto</label>
                 <MoneyInputNoPrefix
                   value={novoItem.valorDesconto || 0}
-                  onValueChange={(value) => setNovoItem(prev => ({ ...prev, valorDesconto: value }))}
+                  onValueChange={(value) =>
+                    setNovoItem((prev) => ({ ...prev, valorDesconto: value }))
+                  }
                   placeholder="0,00"
                   className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
@@ -569,12 +584,10 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
           {/* Desconto Geral e Totais */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Observações
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
               <textarea
                 value={formData.observacoes}
-                onChange={(e) => setFormData(prev => ({ ...prev, observacoes: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, observacoes: e.target.value }))}
                 rows={4}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Informações adicionais sobre a fatura..."
@@ -586,7 +599,13 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
                 <MoneyInput
                   label="Desconto Geral (R$)"
                   value={formData.valorDesconto || 0}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, valorDesconto: value, percentualDesconto: 0 }))}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      valorDesconto: value,
+                      percentualDesconto: 0,
+                    }))
+                  }
                   placeholder="0,00"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
@@ -596,7 +615,13 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
                 <PercentInput
                   label="Ou Desconto Geral (%)"
                   value={formData.percentualDesconto || 0}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, percentualDesconto: value, valorDesconto: 0 }))}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      percentualDesconto: value,
+                      valorDesconto: 0,
+                    }))
+                  }
                   placeholder="0%"
                   max={100}
                 />
@@ -609,7 +634,9 @@ export default function ModalFatura({ isOpen, onClose, onSave, fatura, isLoading
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Desconto:</span>
-                  <span className="text-red-600">- R$ {formatarValorMonetario(totais.desconto)}</span>
+                  <span className="text-red-600">
+                    - R$ {formatarValorMonetario(totais.desconto)}
+                  </span>
                 </div>
                 <div className="flex justify-between text-lg font-semibold border-t pt-2">
                   <span>Total:</span>

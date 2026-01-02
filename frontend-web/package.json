@@ -6,6 +6,7 @@
   "dependencies": {
     "@hello-pangea/dnd": "18.0.1",
     "@hookform/resolvers": "2.9.11",
+    "@sentry/react": "10.30.0",
     "@tanstack/react-query": "5.84.2",
     "@types/jest": "^27.5.2",
     "@types/node": "^16.11.64",
@@ -59,12 +60,14 @@
   "proxy": "http://localhost:3001",
   "scripts": {
     "start": "set PORT=3000 && set NODE_OPTIONS=--max_old_space_size=4096 && craco start",
+    "start:network": "set PORT=3000 && set HOST=0.0.0.0 && set NODE_OPTIONS=--max_old_space_size=4096 && set REACT_APP_API_URL=http://172.23.192.1:3001 && set REACT_APP_WS_URL=ws://172.23.192.1:3001 && craco start",
     "start:low-memory": "set PORT=3000 && set NODE_OPTIONS=--max_old_space_size=2048 && craco start",
     "build": "set DISABLE_ESLINT_PLUGIN=true && craco build",
     "test": "craco test",
     "eject": "react-scripts eject",
     "serve": "node server.js",
     "start:craco": "set PORT=3000 && craco start",
+    "start:docker": "craco start",
     "create-modal": "node ../scripts/create-modal.js",
     "deps:check": "node ../scripts/check-dependencies.js",
     "deps:audit": "npm audit --audit-level high",

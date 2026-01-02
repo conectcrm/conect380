@@ -3,9 +3,21 @@ import { useI18n } from '../../contexts/I18nContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { KPICard } from '../../components/common/KPICard';
 import {
-  DollarSign, TrendingUp, TrendingDown, CreditCard, Calendar,
-  AlertTriangle, CheckSquare, Clock, FileText, PiggyBank,
-  ArrowUp, ArrowDown, RefreshCw, BarChart3, Target
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  CreditCard,
+  Calendar,
+  AlertTriangle,
+  CheckSquare,
+  Clock,
+  FileText,
+  PiggyBank,
+  ArrowUp,
+  ArrowDown,
+  RefreshCw,
+  BarChart3,
+  Target,
 } from 'lucide-react';
 
 const FinanceiroDashboard: React.FC = () => {
@@ -18,25 +30,25 @@ const FinanceiroDashboard: React.FC = () => {
       saldoAtual: 485000,
       entradas: 125000,
       saidas: 89000,
-      projecao30dias: 521000
+      projecao30dias: 521000,
     },
     contasReceber: {
       total: 245000,
       vencidas: 12000,
       vencem30dias: 87000,
-      inadimplencia: 2.3
+      inadimplencia: 2.3,
     },
     contasPagar: {
       total: 156000,
       vencidas: 5000,
       vencem30dias: 45000,
-      desconto: 1200
+      desconto: 1200,
     },
     metas: {
       receitaMensal: 800000,
       receitaAtual: 625000,
-      percentual: 78.1
-    }
+      percentual: 78.1,
+    },
   };
 
   const contasVencidas = [
@@ -47,7 +59,7 @@ const FinanceiroDashboard: React.FC = () => {
       valor: 15000,
       vencimento: '2025-07-28',
       dias: 7,
-      status: 'vencida'
+      status: 'vencida',
     },
     {
       id: 'CP001',
@@ -56,7 +68,7 @@ const FinanceiroDashboard: React.FC = () => {
       valor: 3500,
       vencimento: '2025-08-01',
       dias: 3,
-      status: 'vencida'
+      status: 'vencida',
     },
     {
       id: 'CR002',
@@ -65,8 +77,8 @@ const FinanceiroDashboard: React.FC = () => {
       valor: 22000,
       vencimento: '2025-08-05',
       dias: 1,
-      status: 'vence_hoje'
-    }
+      status: 'vence_hoje',
+    },
   ];
 
   const indicadoresFinanceiros = [
@@ -75,37 +87,41 @@ const FinanceiroDashboard: React.FC = () => {
       valor: 2.45,
       sufixo: 'x',
       tendencia: 'positiva',
-      descricao: 'Capacidade de pagamento'
+      descricao: 'Capacidade de pagamento',
     },
     {
       titulo: 'Margem Bruta',
       valor: 67.8,
       sufixo: '%',
       tendencia: 'positiva',
-      descricao: 'Rentabilidade das vendas'
+      descricao: 'Rentabilidade das vendas',
     },
     {
       titulo: 'ROI Mensal',
       valor: 18.5,
       sufixo: '%',
       tendencia: 'positiva',
-      descricao: 'Retorno sobre investimento'
+      descricao: 'Retorno sobre investimento',
     },
     {
       titulo: 'Break-even',
       valor: 15,
       sufixo: ' dias',
       tendencia: 'negativa',
-      descricao: 'Ponto de equilíbrio'
-    }
+      descricao: 'Ponto de equilíbrio',
+    },
   ];
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'vencida': return 'bg-red-100 text-red-800 border-red-200';
-      case 'vence_hoje': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'a_vencer': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'vencida':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'vence_hoje':
+        return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'a_vencer':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -113,7 +129,7 @@ const FinanceiroDashboard: React.FC = () => {
     return value.toLocaleString('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-      minimumFractionDigits: 0
+      minimumFractionDigits: 0,
     });
   };
 
@@ -134,11 +150,15 @@ const FinanceiroDashboard: React.FC = () => {
             </div>
             <div className="mt-4 sm:mt-0 flex items-center space-x-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-emerald-900">{formatCurrency(financeiroData.fluxoCaixa.saldoAtual)}</div>
+                <div className="text-2xl font-bold text-emerald-900">
+                  {formatCurrency(financeiroData.fluxoCaixa.saldoAtual)}
+                </div>
                 <div className="text-sm text-emerald-600">Saldo Atual</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-emerald-900">{financeiroData.metas.percentual}%</div>
+                <div className="text-2xl font-bold text-emerald-900">
+                  {financeiroData.metas.percentual}%
+                </div>
                 <div className="text-sm text-emerald-600">Meta Mensal</div>
               </div>
               <button className="px-4 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg transition-colors flex items-center space-x-2">
@@ -161,9 +181,7 @@ const FinanceiroDashboard: React.FC = () => {
                 <div className="text-2xl font-bold text-gray-900 mt-1">
                   {formatCurrency(financeiroData.fluxoCaixa.saldoAtual)}
                 </div>
-                <div className="text-sm text-gray-500">
-                  Saldo atual em caixa
-                </div>
+                <div className="text-sm text-gray-500">Saldo atual em caixa</div>
               </div>
               <div className="p-3 bg-green-100 rounded-lg">
                 <PiggyBank className="h-8 w-8 text-green-600" />
@@ -185,9 +203,7 @@ const FinanceiroDashboard: React.FC = () => {
                 <div className="text-2xl font-bold text-gray-900 mt-1">
                   {formatCurrency(financeiroData.contasReceber.total)}
                 </div>
-                <div className="text-sm text-gray-500">
-                  Total em aberto
-                </div>
+                <div className="text-sm text-gray-500">Total em aberto</div>
               </div>
               <div className="p-3 bg-blue-100 rounded-lg">
                 <CreditCard className="h-8 w-8 text-blue-600" />
@@ -209,9 +225,7 @@ const FinanceiroDashboard: React.FC = () => {
                 <div className="text-2xl font-bold text-gray-900 mt-1">
                   {formatCurrency(financeiroData.contasPagar.total)}
                 </div>
-                <div className="text-sm text-gray-500">
-                  Total em aberto
-                </div>
+                <div className="text-sm text-gray-500">Total em aberto</div>
               </div>
               <div className="p-3 bg-orange-100 rounded-lg">
                 <FileText className="h-8 w-8 text-orange-600" />
@@ -234,7 +248,8 @@ const FinanceiroDashboard: React.FC = () => {
                   {financeiroData.metas.percentual}%
                 </div>
                 <div className="text-sm text-gray-500">
-                  {formatCurrency(financeiroData.metas.receitaAtual)} de {formatCurrency(financeiroData.metas.receitaMensal)}
+                  {formatCurrency(financeiroData.metas.receitaAtual)} de{' '}
+                  {formatCurrency(financeiroData.metas.receitaMensal)}
                 </div>
               </div>
               <div className="p-3 bg-purple-100 rounded-lg">
@@ -269,7 +284,9 @@ const FinanceiroDashboard: React.FC = () => {
                         <span className="font-medium text-gray-900">
                           {conta.tipo === 'receber' ? conta.cliente : conta.fornecedor}
                         </span>
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(conta.status)}`}>
+                        <span
+                          className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(conta.status)}`}
+                        >
                           {conta.status === 'vencida' ? 'VENCIDA' : 'VENCE HOJE'}
                         </span>
                       </div>
@@ -299,9 +316,7 @@ const FinanceiroDashboard: React.FC = () => {
               {indicadoresFinanceiros.map((indicador, index) => (
                 <div key={index} className="p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-gray-900">
-                      {indicador.titulo}
-                    </span>
+                    <span className="text-sm font-medium text-gray-900">{indicador.titulo}</span>
                     {indicador.tendencia === 'positiva' ? (
                       <ArrowUp className="w-4 h-4 text-green-600" />
                     ) : (
@@ -309,11 +324,10 @@ const FinanceiroDashboard: React.FC = () => {
                     )}
                   </div>
                   <div className="text-xl font-bold text-gray-900">
-                    {indicador.valor}{indicador.sufixo}
+                    {indicador.valor}
+                    {indicador.sufixo}
                   </div>
-                  <div className="text-xs text-gray-500">
-                    {indicador.descricao}
-                  </div>
+                  <div className="text-xs text-gray-500">{indicador.descricao}</div>
                 </div>
               ))}
             </div>
@@ -329,7 +343,7 @@ const FinanceiroDashboard: React.FC = () => {
             trend={{
               value: 8,
               isPositive: true,
-              label: "vs mês anterior"
+              label: 'vs mês anterior',
             }}
           />
 
@@ -340,7 +354,7 @@ const FinanceiroDashboard: React.FC = () => {
             trend={{
               value: 3,
               isPositive: false,
-              label: "vs mês anterior"
+              label: 'vs mês anterior',
             }}
           />
 
@@ -351,7 +365,7 @@ const FinanceiroDashboard: React.FC = () => {
             trend={{
               value: 0.5,
               isPositive: false,
-              label: "vs mês anterior"
+              label: 'vs mês anterior',
             }}
           />
 
@@ -362,7 +376,7 @@ const FinanceiroDashboard: React.FC = () => {
             trend={{
               value: 15,
               isPositive: true,
-              label: "vs mês anterior"
+              label: 'vs mês anterior',
             }}
           />
         </div>
@@ -387,10 +401,20 @@ const FinanceiroDashboard: React.FC = () => {
             </div>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
               <div className="text-2xl font-bold text-blue-600">
-                {formatCurrency(financeiroData.fluxoCaixa.entradas - financeiroData.fluxoCaixa.saidas)}
+                {formatCurrency(
+                  financeiroData.fluxoCaixa.entradas - financeiroData.fluxoCaixa.saidas,
+                )}
               </div>
               <div className="text-sm text-gray-600">Resultado Líquido</div>
-              <div className="text-xs text-blue-600 mt-1">+{((financeiroData.fluxoCaixa.entradas - financeiroData.fluxoCaixa.saidas) / financeiroData.fluxoCaixa.saidas * 100).toFixed(1)}%</div>
+              <div className="text-xs text-blue-600 mt-1">
+                +
+                {(
+                  ((financeiroData.fluxoCaixa.entradas - financeiroData.fluxoCaixa.saidas) /
+                    financeiroData.fluxoCaixa.saidas) *
+                  100
+                ).toFixed(1)}
+                %
+              </div>
             </div>
           </div>
         </div>

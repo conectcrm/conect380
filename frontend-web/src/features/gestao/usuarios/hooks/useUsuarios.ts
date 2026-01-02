@@ -7,10 +7,32 @@ import {
   AtualizarUsuario,
   FiltrosUsuarios,
   EstatisticasUsuarios,
-  UserRole
 } from '../../../../types/usuarios/index';
+import { getErrorMessage } from '../../../../utils/errorHandling';
 
-export const useUsuarios = () => {
+type UseUsuariosResult = {
+  usuarios: Usuario[];
+  loading: boolean;
+  error: string | null;
+  filtros: FiltrosUsuarios;
+  carregarUsuarios: (mostrarLoading?: boolean) => Promise<void>;
+  criarUsuario: (dados: NovoUsuario) => Promise<Usuario | null>;
+  atualizarUsuario: (dados: AtualizarUsuario) => Promise<Usuario | null>;
+  excluirUsuario: (id: string) => Promise<boolean>;
+  alterarStatusUsuario: (id: string, ativo: boolean) => Promise<boolean>;
+  resetarSenha: (id: string) => Promise<string | null>;
+  aplicarFiltros: (novosFiltros: Partial<FiltrosUsuarios>) => void;
+  limparFiltros: () => void;
+};
+
+type UseEstatisticasUsuariosResult = {
+  estatisticas: EstatisticasUsuarios | null;
+  loading: boolean;
+  error: string | null;
+  carregarEstatisticas: () => Promise<void>;
+};
+
+export const useUsuarios = (): UseUsuariosResult => {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,21 +46,25 @@ export const useUsuarios = () => {
     pagina: 1,
   });
 
-  const carregarUsuarios = useCallback(async (mostrarLoading = true) => {
-    try {
-      if (mostrarLoading) setLoading(true);
-      setError(null);
+  const carregarUsuarios = useCallback(
+    async (mostrarLoading = true): Promise<void> => {
+      try {
+        if (mostrarLoading) setLoading(true);
+        setError(null);
 
-      const resposta = await usuariosService.listarUsuarios(filtros);
-      setUsuarios(resposta.usuarios);
-    } catch (error: any) {
-      console.error('Erro ao carregar usuários:', error);
-      setError(error.message || 'Erro ao carregar usuários');
-      toast.error('Erro ao carregar usuários');
-    } finally {
-      if (mostrarLoading) setLoading(false);
-    }
-  }, [filtros]);
+        const resposta = await usuariosService.listarUsuarios(filtros);
+        setUsuarios(resposta.usuarios);
+      } catch (err) {
+        const message = getErrorMessage(err, 'Erro ao carregar usuários');
+        console.error('Erro ao carregar usuários:', err);
+        setError(message);
+        toast.error(message);
+      } finally {
+        if (mostrarLoading) setLoading(false);
+      }
+    },
+    [filtros],
+  );
 
   const criarUsuario = async (dados: NovoUsuario): Promise<Usuario | null> => {
     try {
@@ -47,9 +73,9 @@ export const useUsuarios = () => {
       await carregarUsuarios(false);
       toast.success('Usuário criado com sucesso!');
       return novoUsuario;
-    } catch (error: any) {
-      console.error('Erro ao criar usuário:', error);
-      const mensagem = error.response?.data?.message || error.message || 'Erro ao criar usuário';
+    } catch (err) {
+      const mensagem = getErrorMessage(err, 'Erro ao criar usuário');
+      console.error('Erro ao criar usuário:', err);
       toast.error(mensagem);
       return null;
     }
@@ -58,16 +84,15 @@ export const useUsuarios = () => {
   const atualizarUsuario = async (dados: AtualizarUsuario): Promise<Usuario | null> => {
     try {
       const usuarioAtualizado = await usuariosService.atualizarUsuario(dados);
-      setUsuarios(prev =>
-        prev.map(usuario =>
-          usuario.id === dados.id ? usuarioAtualizado : usuario
-        )
+      setUsuarios((prev) =>
+        prev.map((usuario) => (usuario.id === dados.id ? usuarioAtualizado : usuario)),
       );
       toast.success('Usuário atualizado com sucesso!');
       return usuarioAtualizado;
-    } catch (error: any) {
-      console.error('Erro ao atualizar usuário:', error);
-      toast.error(error.response?.data?.message || 'Erro ao atualizar usuário');
+    } catch (err) {
+      const mensagem = getErrorMessage(err, 'Erro ao atualizar usuário');
+      console.error('Erro ao atualizar usuário:', err);
+      toast.error(mensagem);
       return null;
     }
   };
@@ -75,12 +100,13 @@ export const useUsuarios = () => {
   const excluirUsuario = async (id: string): Promise<boolean> => {
     try {
       await usuariosService.excluirUsuario(id);
-      setUsuarios(prev => prev.filter(usuario => usuario.id !== id));
+      setUsuarios((prev) => prev.filter((usuario) => usuario.id !== id));
       toast.success('Usuário excluído com sucesso!');
       return true;
-    } catch (error: any) {
-      console.error('Erro ao excluir usuário:', error);
-      toast.error(error.response?.data?.message || 'Erro ao excluir usuário');
+    } catch (err) {
+      const mensagem = getErrorMessage(err, 'Erro ao excluir usuário');
+      console.error('Erro ao excluir usuário:', err);
+      toast.error(mensagem);
       return false;
     }
   };
@@ -88,16 +114,15 @@ export const useUsuarios = () => {
   const alterarStatusUsuario = async (id: string, ativo: boolean): Promise<boolean> => {
     try {
       const usuarioAtualizado = await usuariosService.alterarStatusUsuario(id, ativo);
-      setUsuarios(prev =>
-        prev.map(usuario =>
-          usuario.id === id ? usuarioAtualizado : usuario
-        )
+      setUsuarios((prev) =>
+        prev.map((usuario) => (usuario.id === id ? usuarioAtualizado : usuario)),
       );
       toast.success(`Usuário ${ativo ? 'ativado' : 'desativado'} com sucesso!`);
       return true;
-    } catch (error: any) {
-      console.error('Erro ao alterar status do usuário:', error);
-      toast.error(error.response?.data?.message || 'Erro ao alterar status do usuário');
+    } catch (err) {
+      const mensagem = getErrorMessage(err, 'Erro ao alterar status do usuário');
+      console.error('Erro ao alterar status do usuário:', err);
+      toast.error(mensagem);
       return false;
     }
   };
@@ -107,15 +132,16 @@ export const useUsuarios = () => {
       const resultado = await usuariosService.resetarSenha(id);
       toast.success('Senha resetada com sucesso!');
       return resultado.novaSenha;
-    } catch (error: any) {
-      console.error('Erro ao resetar senha:', error);
-      toast.error(error.response?.data?.message || 'Erro ao resetar senha');
+    } catch (err) {
+      const mensagem = getErrorMessage(err, 'Erro ao resetar senha');
+      console.error('Erro ao resetar senha:', err);
+      toast.error(mensagem);
       return null;
     }
   };
 
   const aplicarFiltros = useCallback((novosFiltros: Partial<FiltrosUsuarios>) => {
-    setFiltros(prev => ({ ...prev, ...novosFiltros }));
+    setFiltros((prev) => ({ ...prev, ...novosFiltros }));
   }, []);
 
   const limparFiltros = useCallback(() => {
@@ -146,25 +172,26 @@ export const useUsuarios = () => {
     alterarStatusUsuario,
     resetarSenha,
     aplicarFiltros,
-    limparFiltros
+    limparFiltros,
   };
 };
 
-export const useEstatisticasUsuarios = () => {
+export const useEstatisticasUsuarios = (): UseEstatisticasUsuariosResult => {
   const [estatisticas, setEstatisticas] = useState<EstatisticasUsuarios | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const carregarEstatisticas = useCallback(async () => {
+  const carregarEstatisticas = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
       setError(null);
 
       const estatisticasData = await usuariosService.obterEstatisticas();
       setEstatisticas(estatisticasData);
-    } catch (error: any) {
-      console.error('Erro ao carregar estatísticas:', error);
-      setError(error.message || 'Erro ao carregar estatísticas');
+    } catch (err) {
+      const mensagem = getErrorMessage(err, 'Erro ao carregar estatísticas');
+      console.error('Erro ao carregar estatísticas:', err);
+      setError(mensagem);
     } finally {
       setLoading(false);
     }
@@ -178,6 +205,6 @@ export const useEstatisticasUsuarios = () => {
     estatisticas,
     loading,
     error,
-    carregarEstatisticas
+    carregarEstatisticas,
   };
 };

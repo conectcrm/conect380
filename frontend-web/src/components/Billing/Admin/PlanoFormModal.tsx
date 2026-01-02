@@ -6,9 +6,22 @@ import { Label } from '../../ui/label';
 import { Textarea } from '../../ui/textarea';
 import { Switch } from '../../ui/switch';
 import {
-  X, Save, DollarSign, Package, Users, Database,
-  Zap, Crown, HeadphonesIcon, Eye, Info, Sparkles,
-  Settings, ChevronDown, AlertCircle, CheckCircle2
+  X,
+  Save,
+  DollarSign,
+  Package,
+  Users,
+  Database,
+  Zap,
+  Crown,
+  HeadphonesIcon,
+  Eye,
+  Info,
+  Sparkles,
+  Settings,
+  ChevronDown,
+  AlertCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import { Plano } from '../../../hooks/useSubscription';
 
@@ -33,11 +46,7 @@ interface FormData {
   ordem: number;
 }
 
-export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
-  plano,
-  onSave,
-  onClose
-}) => {
+export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({ plano, onSave, onClose }) => {
   const [formData, setFormData] = useState<FormData>({
     nome: '',
     codigo: '',
@@ -50,7 +59,7 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
     whiteLabel: false,
     suportePrioritario: false,
     ativo: true,
-    ordem: 0
+    ordem: 0,
   });
 
   const [loading, setLoading] = useState(false);
@@ -70,17 +79,17 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
         whiteLabel: Boolean((plano as any).whiteLabel),
         suportePrioritario: Boolean((plano as any).suportePrioritario),
         ativo: plano.ativo !== false,
-        ordem: (plano as any).ordem || 0
+        ordem: (plano as any).ordem || 0,
       });
     }
   }, [plano]);
 
   const handleChange = (field: keyof FormData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
 
     // Limpar erro do campo quando usuário começar a digitar
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
+      setErrors((prev) => ({ ...prev, [field]: '' }));
     }
   };
 
@@ -145,7 +154,7 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
         limiteClientes: Number(formData.limiteClientes),
         limiteStorage: Number(formData.limiteStorage),
         limiteApiCalls: Number(formData.limiteApiCalls),
-        ordem: Number(formData.ordem)
+        ordem: Number(formData.ordem),
       };
 
       console.log('FormData antes de enviar:', sanitizedData);
@@ -156,7 +165,7 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
         limiteUsuarios: typeof sanitizedData.limiteUsuarios,
         limiteClientes: typeof sanitizedData.limiteClientes,
         limiteStorage: typeof sanitizedData.limiteStorage,
-        limiteApiCalls: typeof sanitizedData.limiteApiCalls
+        limiteApiCalls: typeof sanitizedData.limiteApiCalls,
       });
       await onSave(sanitizedData);
     } catch (error: any) {
@@ -189,7 +198,9 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
                     {plano ? 'Editar Plano' : 'Novo Plano'}
                   </CardTitle>
                   <p className="text-blue-100 text-sm">
-                    {plano ? 'Modifique as configurações do plano' : 'Configure um novo plano de assinatura'}
+                    {plano
+                      ? 'Modifique as configurações do plano'
+                      : 'Configure um novo plano de assinatura'}
                   </p>
                 </div>
               </div>
@@ -217,7 +228,10 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="nome" className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                    <Label
+                      htmlFor="nome"
+                      className="text-sm font-medium text-gray-700 flex items-center gap-1"
+                    >
                       Nome do Plano <span className="text-red-500">*</span>
                     </Label>
                     <div className="relative">
@@ -226,8 +240,11 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
                         value={formData.nome}
                         onChange={(e) => handleChange('nome', e.target.value)}
                         placeholder="Ex: Professional"
-                        className={`pl-4 pr-4 py-3 border-2 rounded-lg transition-all focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.nome ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:border-gray-300'
-                          }`}
+                        className={`pl-4 pr-4 py-3 border-2 rounded-lg transition-all focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          errors.nome
+                            ? 'border-red-300 bg-red-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
                       />
                       {errors.nome && (
                         <div className="flex items-center gap-1 mt-2 text-red-600">
@@ -239,7 +256,10 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="codigo" className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                    <Label
+                      htmlFor="codigo"
+                      className="text-sm font-medium text-gray-700 flex items-center gap-1"
+                    >
                       Código <span className="text-red-500">*</span>
                     </Label>
                     <div className="relative">
@@ -248,8 +268,11 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
                         value={formData.codigo}
                         onChange={(e) => handleChange('codigo', e.target.value.toLowerCase())}
                         placeholder="Ex: professional"
-                        className={`pl-4 pr-4 py-3 border-2 rounded-lg transition-all focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.codigo ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:border-gray-300'
-                          }`}
+                        className={`pl-4 pr-4 py-3 border-2 rounded-lg transition-all focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          errors.codigo
+                            ? 'border-red-300 bg-red-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
                       />
                       {errors.codigo && (
                         <div className="flex items-center gap-1 mt-2 text-red-600">
@@ -275,7 +298,10 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="preco" className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                    <Label
+                      htmlFor="preco"
+                      className="text-sm font-medium text-gray-700 flex items-center gap-1"
+                    >
                       Preço Mensal (R$) <span className="text-red-500">*</span>
                     </Label>
                     <div className="relative">
@@ -288,8 +314,11 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
                         value={formData.preco}
                         onChange={(e) => handleChange('preco', parseFloat(e.target.value) || 0)}
                         placeholder="0.00"
-                        className={`pl-10 pr-4 py-3 border-2 rounded-lg transition-all focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.preco ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:border-gray-300'
-                          }`}
+                        className={`pl-10 pr-4 py-3 border-2 rounded-lg transition-all focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          errors.preco
+                            ? 'border-red-300 bg-red-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
                       />
                       {errors.preco && (
                         <div className="flex items-center gap-1 mt-2 text-red-600">
@@ -320,7 +349,10 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="limiteUsuarios" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Label
+                      htmlFor="limiteUsuarios"
+                      className="text-sm font-medium text-gray-700 flex items-center gap-2"
+                    >
                       <Users className="h-4 w-4 text-gray-500" />
                       Limite de Usuários <span className="text-red-500">*</span>
                     </Label>
@@ -328,9 +360,14 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
                       id="limiteUsuarios"
                       type="number"
                       value={formData.limiteUsuarios}
-                      onChange={(e) => handleChange('limiteUsuarios', parseInt(e.target.value) || 1)}
-                      className={`pl-4 pr-4 py-3 border-2 rounded-lg transition-all focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.limiteUsuarios ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:border-gray-300'
-                        }`}
+                      onChange={(e) =>
+                        handleChange('limiteUsuarios', parseInt(e.target.value) || 1)
+                      }
+                      className={`pl-4 pr-4 py-3 border-2 rounded-lg transition-all focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.limiteUsuarios
+                          ? 'border-red-300 bg-red-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
                     />
                     {errors.limiteUsuarios && (
                       <div className="flex items-center gap-1 mt-2 text-red-600">
@@ -341,7 +378,10 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="limiteClientes" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Label
+                      htmlFor="limiteClientes"
+                      className="text-sm font-medium text-gray-700 flex items-center gap-2"
+                    >
                       <Users className="h-4 w-4 text-gray-500" />
                       Limite de Clientes <span className="text-red-500">*</span>
                     </Label>
@@ -349,9 +389,14 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
                       id="limiteClientes"
                       type="number"
                       value={formData.limiteClientes}
-                      onChange={(e) => handleChange('limiteClientes', parseInt(e.target.value) || 1)}
-                      className={`pl-4 pr-4 py-3 border-2 rounded-lg transition-all focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.limiteClientes ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:border-gray-300'
-                        }`}
+                      onChange={(e) =>
+                        handleChange('limiteClientes', parseInt(e.target.value) || 1)
+                      }
+                      className={`pl-4 pr-4 py-3 border-2 rounded-lg transition-all focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.limiteClientes
+                          ? 'border-red-300 bg-red-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
                     />
                     {errors.limiteClientes && (
                       <div className="flex items-center gap-1 mt-2 text-red-600">
@@ -362,7 +407,10 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="limiteStorage" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Label
+                      htmlFor="limiteStorage"
+                      className="text-sm font-medium text-gray-700 flex items-center gap-2"
+                    >
                       <Database className="h-4 w-4 text-gray-500" />
                       Storage (MB) <span className="text-red-500">*</span>
                     </Label>
@@ -370,9 +418,14 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
                       id="limiteStorage"
                       type="number"
                       value={formData.limiteStorage}
-                      onChange={(e) => handleChange('limiteStorage', parseInt(e.target.value) || 1024)}
-                      className={`pl-4 pr-4 py-3 border-2 rounded-lg transition-all focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.limiteStorage ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:border-gray-300'
-                        }`}
+                      onChange={(e) =>
+                        handleChange('limiteStorage', parseInt(e.target.value) || 1024)
+                      }
+                      className={`pl-4 pr-4 py-3 border-2 rounded-lg transition-all focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.limiteStorage
+                          ? 'border-red-300 bg-red-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
                     />
                     <div className="flex items-center gap-1 mt-1">
                       <CheckCircle2 className="h-3 w-3 text-green-500" />
@@ -389,7 +442,10 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="limiteApiCalls" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Label
+                      htmlFor="limiteApiCalls"
+                      className="text-sm font-medium text-gray-700 flex items-center gap-2"
+                    >
                       <Zap className="h-4 w-4 text-gray-500" />
                       API Calls/dia <span className="text-red-500">*</span>
                     </Label>
@@ -397,9 +453,14 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
                       id="limiteApiCalls"
                       type="number"
                       value={formData.limiteApiCalls}
-                      onChange={(e) => handleChange('limiteApiCalls', parseInt(e.target.value) || 1000)}
-                      className={`pl-4 pr-4 py-3 border-2 rounded-lg transition-all focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.limiteApiCalls ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:border-gray-300'
-                        }`}
+                      onChange={(e) =>
+                        handleChange('limiteApiCalls', parseInt(e.target.value) || 1000)
+                      }
+                      className={`pl-4 pr-4 py-3 border-2 rounded-lg transition-all focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.limiteApiCalls
+                          ? 'border-red-300 bg-red-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
                     />
                     {errors.limiteApiCalls && (
                       <div className="flex items-center gap-1 mt-2 text-red-600">
@@ -428,7 +489,9 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
                       </div>
                       <div>
                         <Label className="text-sm font-medium text-gray-900">White Label</Label>
-                        <p className="text-sm text-gray-600">Permite personalização completa de marca</p>
+                        <p className="text-sm text-gray-600">
+                          Permite personalização completa de marca
+                        </p>
                       </div>
                     </div>
                     <Switch
@@ -444,7 +507,9 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
                         <HeadphonesIcon className="h-5 w-5 text-green-600" />
                       </div>
                       <div>
-                        <Label className="text-sm font-medium text-gray-900">Suporte Prioritário</Label>
+                        <Label className="text-sm font-medium text-gray-900">
+                          Suporte Prioritário
+                        </Label>
                         <p className="text-sm text-gray-600">Atendimento com prioridade máxima</p>
                       </div>
                     </div>
@@ -462,7 +527,9 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
                       </div>
                       <div>
                         <Label className="text-sm font-medium text-gray-900">Plano Ativo</Label>
-                        <p className="text-sm text-gray-600">Disponível para contratação no sistema</p>
+                        <p className="text-sm text-gray-600">
+                          Disponível para contratação no sistema
+                        </p>
                       </div>
                     </div>
                     <Switch
@@ -484,7 +551,10 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="ordem" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Label
+                    htmlFor="ordem"
+                    className="text-sm font-medium text-gray-700 flex items-center gap-2"
+                  >
                     <ChevronDown className="h-4 w-4 text-gray-500" />
                     Ordem de Exibição
                   </Label>
@@ -498,9 +568,7 @@ export const PlanoFormModal: React.FC<PlanoFormModalProps> = ({
                   />
                   <div className="flex items-center gap-1 mt-1">
                     <Info className="h-3 w-3 text-blue-500" />
-                    <p className="text-xs text-gray-500">
-                      Ordem crescente (0 = primeiro na lista)
-                    </p>
+                    <p className="text-xs text-gray-500">Ordem crescente (0 = primeiro na lista)</p>
                   </div>
                 </div>
               </div>

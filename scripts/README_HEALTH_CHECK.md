@@ -230,7 +230,7 @@ $result = .\scripts\health-check.ps1 -Json | ConvertFrom-Json
 
 if (-not $result.Overall) {
     Send-MailMessage `
-        -To "admin@conectcrm.com" `
+        -To "admin@conectsuite.com.br" `
         -Subject "⚠️ Sistema com problemas" `
         -Body "Verifique o dashboard de monitoramento" `
         -SmtpServer "smtp.exemplo.com"

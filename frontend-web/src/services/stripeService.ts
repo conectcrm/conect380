@@ -1,4 +1,5 @@
 import { loadStripe, Stripe, StripeError } from '@stripe/stripe-js';
+import { API_BASE_URL } from './api';
 
 interface StripeCustomer {
   id: string;
@@ -57,7 +58,7 @@ interface CreateSubscriptionParams {
 
 class StripeService {
   private stripe: Stripe | null = null;
-  private apiBaseUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api`;
+  private apiBaseUrl = `${API_BASE_URL}/api`;
 
   constructor() {
     this.initializeStripe();
@@ -67,7 +68,9 @@ class StripeService {
     const publishableKey = process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
 
     if (!publishableKey) {
-      console.warn('⚠️ Stripe publishable key não encontrada. Funcionalidades de pagamento podem não funcionar.');
+      console.warn(
+        '⚠️ Stripe publishable key não encontrada. Funcionalidades de pagamento podem não funcionar.',
+      );
       return;
     }
 
@@ -94,7 +97,7 @@ class StripeService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
+          Authorization: `Bearer ${this.getAuthToken()}`,
         },
         body: JSON.stringify({
           email: dados.email,
@@ -104,9 +107,9 @@ class StripeService {
           metadata: {
             source: 'conectcrm',
             created_at: new Date().toISOString(),
-            ...dados.metadata
-          }
-        })
+            ...dados.metadata,
+          },
+        }),
       });
 
       if (!response.ok) {
@@ -133,7 +136,7 @@ class StripeService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
+          Authorization: `Bearer ${this.getAuthToken()}`,
         },
         body: JSON.stringify({
           amount: Math.round(params.amount * 100), // Converter para centavos
@@ -143,12 +146,12 @@ class StripeService {
           metadata: {
             source: 'conectcrm',
             created_at: new Date().toISOString(),
-            ...params.metadata
+            ...params.metadata,
           },
           automatic_payment_methods: params.automatic_payment_methods || {
-            enabled: true
-          }
-        })
+            enabled: true,
+          },
+        }),
       });
 
       if (!response.ok) {
@@ -175,22 +178,24 @@ class StripeService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
+          Authorization: `Bearer ${this.getAuthToken()}`,
         },
         body: JSON.stringify({
           customer: params.customerId,
-          items: [{
-            price: params.priceId
-          }],
+          items: [
+            {
+              price: params.priceId,
+            },
+          ],
           payment_behavior: 'default_incomplete',
           payment_settings: { save_default_payment_method: 'on_subscription' },
           expand: ['latest_invoice.payment_intent'],
           metadata: {
             source: 'conectcrm',
             created_at: new Date().toISOString(),
-            ...params.metadata
-          }
-        })
+            ...params.metadata,
+          },
+        }),
       });
 
       if (!response.ok) {
@@ -209,7 +214,10 @@ class StripeService {
   }
 
   // Confirmar pagamento no frontend
-  async confirmarPagamento(clientSecret: string, elementos: any): Promise<{ error?: StripeError; paymentIntent?: any }> {
+  async confirmarPagamento(
+    clientSecret: string,
+    elementos: any,
+  ): Promise<{ error?: StripeError; paymentIntent?: any }> {
     if (!this.stripe) {
       throw new Error('Stripe não foi inicializado');
     }
@@ -220,8 +228,8 @@ class StripeService {
       const result = await this.stripe.confirmPayment({
         elements: elementos,
         confirmParams: {
-          return_url: `${window.location.origin}/billing/success`
-        }
+          return_url: `${window.location.origin}/billing/success`,
+        },
       });
 
       if (result.error) {
@@ -238,7 +246,10 @@ class StripeService {
   }
 
   // Cancelar assinatura
-  async cancelarAssinatura(subscriptionId: string, cancelImediatamente: boolean = false): Promise<StripeSubscription> {
+  async cancelarAssinatura(
+    subscriptionId: string,
+    cancelImediatamente: boolean = false,
+  ): Promise<StripeSubscription> {
     try {
       console.log('🔄 Cancelando assinatura:', subscriptionId);
 
@@ -246,11 +257,11 @@ class StripeService {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
+          Authorization: `Bearer ${this.getAuthToken()}`,
         },
         body: JSON.stringify({
-          cancel_at_period_end: !cancelImediatamente
-        })
+          cancel_at_period_end: !cancelImediatamente,
+        }),
       });
 
       if (!response.ok) {
@@ -273,13 +284,16 @@ class StripeService {
     try {
       console.log('🔄 Reativando assinatura:', subscriptionId);
 
-      const response = await fetch(`${this.apiBaseUrl}/stripe/subscriptions/${subscriptionId}/reactivate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      });
+      const response = await fetch(
+        `${this.apiBaseUrl}/stripe/subscriptions/${subscriptionId}/reactivate`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.getAuthToken()}`,
+          },
+        },
+      );
 
       if (!response.ok) {
         const error = await response.json();
@@ -299,11 +313,14 @@ class StripeService {
   // Listar assinaturas de um cliente
   async listarAssinaturas(customerId: string): Promise<StripeSubscription[]> {
     try {
-      const response = await fetch(`${this.apiBaseUrl}/stripe/customers/${customerId}/subscriptions`, {
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      });
+      const response = await fetch(
+        `${this.apiBaseUrl}/stripe/customers/${customerId}/subscriptions`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.getAuthToken()}`,
+          },
+        },
+      );
 
       if (!response.ok) {
         const error = await response.json();
@@ -323,8 +340,8 @@ class StripeService {
     try {
       const response = await fetch(`${this.apiBaseUrl}/stripe/payment-intents/${paymentIntentId}`, {
         headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
+          Authorization: `Bearer ${this.getAuthToken()}`,
+        },
       });
 
       if (!response.ok) {
@@ -376,36 +393,44 @@ class StripeService {
     console.log('✅ Pagamento bem-sucedido:', paymentIntent.id);
 
     // Disparar evento personalizado
-    window.dispatchEvent(new CustomEvent('stripe:payment:success', {
-      detail: { paymentIntent }
-    }));
+    window.dispatchEvent(
+      new CustomEvent('stripe:payment:success', {
+        detail: { paymentIntent },
+      }),
+    );
   }
 
   private async handlePagamentoFalhou(paymentIntent: any): Promise<void> {
     console.log('❌ Pagamento falhou:', paymentIntent.id);
 
     // Disparar evento personalizado
-    window.dispatchEvent(new CustomEvent('stripe:payment:failed', {
-      detail: { paymentIntent }
-    }));
+    window.dispatchEvent(
+      new CustomEvent('stripe:payment:failed', {
+        detail: { paymentIntent },
+      }),
+    );
   }
 
   private async handleAssinaturaAtualizada(subscription: any): Promise<void> {
     console.log('🔄 Assinatura atualizada:', subscription.id);
 
     // Disparar evento personalizado
-    window.dispatchEvent(new CustomEvent('stripe:subscription:updated', {
-      detail: { subscription }
-    }));
+    window.dispatchEvent(
+      new CustomEvent('stripe:subscription:updated', {
+        detail: { subscription },
+      }),
+    );
   }
 
   private async handleAssinaturaCancelada(subscription: any): Promise<void> {
     console.log('❌ Assinatura cancelada:', subscription.id);
 
     // Disparar evento personalizado
-    window.dispatchEvent(new CustomEvent('stripe:subscription:cancelled', {
-      detail: { subscription }
-    }));
+    window.dispatchEvent(
+      new CustomEvent('stripe:subscription:cancelled', {
+        detail: { subscription },
+      }),
+    );
   }
 
   // Utilitários
@@ -416,7 +441,7 @@ class StripeService {
   public formatarValor(valor: number, moeda: string = 'BRL'): string {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: moeda
+      currency: moeda,
     }).format(valor);
   }
 

@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
   Badge,
-  Progress
+  Progress,
 } from '../../components/ui';
 import { useEmpresas } from '../../contexts/EmpresaContextAPIReal';
 import {
@@ -35,7 +35,7 @@ import {
   Clock,
   CheckCircle,
   AlertTriangle,
-  Activity
+  Activity,
 } from 'lucide-react';
 import {
   LineChart,
@@ -51,7 +51,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
 } from 'recharts';
 
 interface RelatoriosAnalyticsPageProps {
@@ -66,7 +66,7 @@ export const RelatoriosAnalyticsPage: React.FC<RelatoriosAnalyticsPageProps> = (
   const [estatisticas, setEstatisticas] = useState<any>(null);
 
   // Empresa para relatórios (passada por parâmetro ou empresa ativa)
-  const empresa = empresas.find(e => e.id === empresaId) || empresaAtiva;
+  const empresa = empresas.find((e) => e.id === empresaId) || empresaAtiva;
 
   // Carregar estatísticas
   useEffect(() => {
@@ -96,14 +96,14 @@ export const RelatoriosAnalyticsPage: React.FC<RelatoriosAnalyticsPageProps> = (
     { mes: 'Mar', vendas: 18000, meta: 15000, clientes: 35 },
     { mes: 'Abr', vendas: 22000, meta: 20000, clientes: 42 },
     { mes: 'Mai', vendas: 19000, meta: 20000, clientes: 38 },
-    { mes: 'Jun', vendas: 25000, meta: 20000, clientes: 48 }
+    { mes: 'Jun', vendas: 25000, meta: 20000, clientes: 48 },
   ];
 
   const dadosConversao = [
     { nome: 'Leads Qualificados', valor: 245, percentual: 85 },
     { nome: 'Propostas Enviadas', valor: 180, percentual: 73 },
     { nome: 'Propostas Aprovadas', valor: 95, percentual: 53 },
-    { nome: 'Contratos Fechados', valor: 67, percentual: 70 }
+    { nome: 'Contratos Fechados', valor: 67, percentual: 70 },
   ];
 
   const dadosOrigem = [
@@ -111,14 +111,14 @@ export const RelatoriosAnalyticsPage: React.FC<RelatoriosAnalyticsPageProps> = (
     { nome: 'Indicação', valor: 89, cor: '#10b981' },
     { nome: 'Redes Sociais', valor: 67, cor: '#f59e0b' },
     { nome: 'Email Marketing', valor: 45, cor: '#ef4444' },
-    { nome: 'Outros', valor: 23, cor: '#8b5cf6' }
+    { nome: 'Outros', valor: 23, cor: '#8b5cf6' },
   ];
 
   const dadosPerformanceUsuarios = [
     { usuario: 'João Silva', vendas: 12, meta: 15, conversao: 68 },
     { usuario: 'Maria Santos', vendas: 18, meta: 15, conversao: 82 },
     { usuario: 'Pedro Costa', vendas: 9, meta: 12, conversao: 55 },
-    { usuario: 'Ana Lima', vendas: 14, meta: 15, conversao: 71 }
+    { usuario: 'Ana Lima', vendas: 14, meta: 15, conversao: 71 },
   ];
 
   if (!empresa) {
@@ -141,9 +141,7 @@ export const RelatoriosAnalyticsPage: React.FC<RelatoriosAnalyticsPageProps> = (
           <h1 className="text-2xl font-bold text-gray-900">
             Relatórios e Analytics - {empresa.nome}
           </h1>
-          <p className="text-gray-600 mt-1">
-            Análise detalhada de performance e resultados
-          </p>
+          <p className="text-gray-600 mt-1">Análise detalhada de performance e resultados</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -315,7 +313,7 @@ export const RelatoriosAnalyticsPage: React.FC<RelatoriosAnalyticsPageProps> = (
                       <span className="text-sm font-medium">{item.nome}</span>
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-600">{item.valor}</span>
-                        <Badge variant={item.percentual >= 70 ? "default" : "secondary"}>
+                        <Badge variant={item.percentual >= 70 ? 'default' : 'secondary'}>
                           {item.percentual}%
                         </Badge>
                       </div>
@@ -456,12 +454,7 @@ export const RelatoriosAnalyticsPage: React.FC<RelatoriosAnalyticsPageProps> = (
                     <XAxis dataKey="mes" />
                     <YAxis />
                     <Tooltip />
-                    <Line
-                      type="monotone"
-                      dataKey="clientes"
-                      stroke="#10b981"
-                      strokeWidth={2}
-                    />
+                    <Line type="monotone" dataKey="clientes" stroke="#10b981" strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -511,7 +504,10 @@ export const RelatoriosAnalyticsPage: React.FC<RelatoriosAnalyticsPageProps> = (
             <CardContent>
               <div className="space-y-3">
                 {[1, 2, 3, 4, 5].map((item) => (
-                  <div key={item} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div
+                    key={item}
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                         <span className="text-sm font-medium text-blue-600">{item}</span>
@@ -632,11 +628,17 @@ export const RelatoriosAnalyticsPage: React.FC<RelatoriosAnalyticsPageProps> = (
             <CardContent>
               <div className="space-y-4">
                 {dadosPerformanceUsuarios.map((usuario, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-4 border rounded-lg"
+                  >
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                         <span className="font-medium text-blue-600">
-                          {usuario.usuario.split(' ').map(n => n[0]).join('')}
+                          {usuario.usuario
+                            .split(' ')
+                            .map((n) => n[0])
+                            .join('')}
                         </span>
                       </div>
                       <div>
@@ -660,10 +662,8 @@ export const RelatoriosAnalyticsPage: React.FC<RelatoriosAnalyticsPageProps> = (
                         </p>
                       </div>
 
-                      <Badge
-                        variant={usuario.vendas >= usuario.meta ? "default" : "secondary"}
-                      >
-                        {usuario.vendas >= usuario.meta ? "Meta atingida" : "Abaixo da meta"}
+                      <Badge variant={usuario.vendas >= usuario.meta ? 'default' : 'secondary'}>
+                        {usuario.vendas >= usuario.meta ? 'Meta atingida' : 'Abaixo da meta'}
                       </Badge>
                     </div>
                   </div>

@@ -1,9 +1,9 @@
 /**
  * 🤖 Fechamento Automático de Tickets por Inatividade
- * 
+ *
  * Permite configurar fechamento automático de tickets que ficam inativos
  * por determinado período de tempo.
- * 
+ *
  * Features:
  * - Configuração global (empresa) ou por departamento
  * - Tempo de timeout configurável
@@ -35,7 +35,7 @@ import configuracaoInactividadeService from '../services/configuracaoInactividad
 import type {
   ConfiguracaoInatividade,
   ConfiguracaoInactivityDto,
-  Departamento
+  Departamento,
 } from '../services/configuracaoInactividadeService';
 
 const FechamentoAutomaticoPage: React.FC = () => {
@@ -59,7 +59,8 @@ const FechamentoAutomaticoPage: React.FC = () => {
     timeoutMinutos: 1440, // 24 horas
     enviarAviso: true,
     avisoMinutosAntes: 60, // 1 hora antes
-    mensagemAviso: 'Olá! Notamos que este atendimento está inativo há algum tempo. Este ticket será fechado automaticamente em breve se não houver resposta.',
+    mensagemAviso:
+      'Olá! Notamos que este atendimento está inativo há algum tempo. Este ticket será fechado automaticamente em breve se não houver resposta.',
     mensagemFechamento: 'Este ticket foi fechado automaticamente devido à inatividade.',
     ativo: false,
     statusAplicaveis: ['AGUARDANDO', 'EM_ATENDIMENTO'],
@@ -94,7 +95,6 @@ const FechamentoAutomaticoPage: React.FC = () => {
 
       // Carregar configuração global inicial
       await carregarConfiguracao();
-
     } catch (err: unknown) {
       console.error('Erro ao carregar dados:', err);
       handleError(err, 'Erro ao carregar configurações');
@@ -160,7 +160,6 @@ const FechamentoAutomaticoPage: React.FC = () => {
 
       // Limpar mensagem de sucesso após 3s
       setTimeout(() => setSuccess(null), 3000);
-
     } catch (err: unknown) {
       console.error('Erro ao salvar:', err);
       handleError(err, 'Erro ao salvar configuração');
@@ -170,7 +169,11 @@ const FechamentoAutomaticoPage: React.FC = () => {
   };
 
   const handleVerificarAgora = async () => {
-    if (!window.confirm('Deseja executar a verificação de inatividade AGORA? Isso pode fechar tickets inativos imediatamente.')) {
+    if (
+      !window.confirm(
+        'Deseja executar a verificação de inatividade AGORA? Isso pode fechar tickets inativos imediatamente.',
+      )
+    ) {
       return;
     }
 
@@ -185,13 +188,17 @@ const FechamentoAutomaticoPage: React.FC = () => {
       }
       const departamentoId = modoConfig === 'departamento' ? departamentoSelecionado : undefined;
 
-      const resultado = await configuracaoInactividadeService.verificarAgora(empresaId, departamentoId);
+      const resultado = await configuracaoInactividadeService.verificarAgora(
+        empresaId,
+        departamentoId,
+      );
 
       if (resultado.sucesso) {
         const { processados, fechados, avisados } = resultado.resultado;
-        setSuccess(`✅ Verificação concluída!\n\n📊 Resultados:\n• ${processados} tickets processados\n• ${avisados} avisos enviados\n• ${fechados} tickets fechados`);
+        setSuccess(
+          `✅ Verificação concluída!\n\n📊 Resultados:\n• ${processados} tickets processados\n• ${avisados} avisos enviados\n• ${fechados} tickets fechados`,
+        );
       }
-
     } catch (err: unknown) {
       console.error('Erro ao verificar:', err);
       handleError(err, 'Erro ao executar verificação');
@@ -231,16 +238,12 @@ const FechamentoAutomaticoPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header com BackToNucleus */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusName="Atendimento"
-          nucleusPath="/atendimento"
-        />
+        <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
       </div>
 
       {/* Container principal */}
       <div className="p-6">
         <div className="max-w-5xl mx-auto">
-
           {/* Header da página */}
           <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
             <div className="flex items-center justify-between">
@@ -282,8 +285,12 @@ const FechamentoAutomaticoPage: React.FC = () => {
                     {formData.ativo ? 'Monitoramento funcionando' : 'Monitoramento pausado'}
                   </p>
                 </div>
-                <div className={`h-12 w-12 rounded-2xl ${formData.ativo ? 'bg-green-500/10' : 'bg-gray-500/10'} flex items-center justify-center shadow-sm`}>
-                  <CheckCircle className={`h-6 w-6 ${formData.ativo ? 'text-green-600' : 'text-gray-600'}`} />
+                <div
+                  className={`h-12 w-12 rounded-2xl ${formData.ativo ? 'bg-green-500/10' : 'bg-gray-500/10'} flex items-center justify-center shadow-sm`}
+                >
+                  <CheckCircle
+                    className={`h-6 w-6 ${formData.ativo ? 'text-green-600' : 'text-gray-600'}`}
+                  />
                 </div>
               </div>
             </div>
@@ -298,9 +305,7 @@ const FechamentoAutomaticoPage: React.FC = () => {
                   <p className="mt-2 text-3xl font-bold text-[#002333]">
                     {formatarTempo(formData.timeoutMinutos)}
                   </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    Após este período sem atividade
-                  </p>
+                  <p className="mt-3 text-sm text-[#002333]/70">Após este período sem atividade</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-[#9333EA]/10 flex items-center justify-center shadow-sm">
                   <Clock className="h-6 w-6 text-[#9333EA]" />
@@ -316,14 +321,20 @@ const FechamentoAutomaticoPage: React.FC = () => {
                     Aviso Prévio
                   </p>
                   <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {formData.enviarAviso ? formatarTempo(formData.avisoMinutosAntes) : 'Desativado'}
+                    {formData.enviarAviso
+                      ? formatarTempo(formData.avisoMinutosAntes)
+                      : 'Desativado'}
                   </p>
                   <p className="mt-3 text-sm text-[#002333]/70">
                     {formData.enviarAviso ? 'Antes do fechamento' : 'Sem aviso prévio'}
                   </p>
                 </div>
-                <div className={`h-12 w-12 rounded-2xl ${formData.enviarAviso ? 'bg-yellow-500/10' : 'bg-gray-500/10'} flex items-center justify-center shadow-sm`}>
-                  <AlertCircle className={`h-6 w-6 ${formData.enviarAviso ? 'text-yellow-600' : 'text-gray-600'}`} />
+                <div
+                  className={`h-12 w-12 rounded-2xl ${formData.enviarAviso ? 'bg-yellow-500/10' : 'bg-gray-500/10'} flex items-center justify-center shadow-sm`}
+                >
+                  <AlertCircle
+                    className={`h-6 w-6 ${formData.enviarAviso ? 'text-yellow-600' : 'text-gray-600'}`}
+                  />
                 </div>
               </div>
             </div>
@@ -374,18 +385,19 @@ const FechamentoAutomaticoPage: React.FC = () => {
                   setModoConfig('global');
                   setDepartamentoSelecionado('');
                 }}
-                className={`p-4 rounded-lg border-2 transition-all text-left ${modoConfig === 'global'
-                  ? 'border-[#9333EA] bg-[#9333EA]/5'
-                  : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                className={`p-4 rounded-lg border-2 transition-all text-left ${
+                  modoConfig === 'global'
+                    ? 'border-[#9333EA] bg-[#9333EA]/5'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
               >
                 <div className="flex items-start">
-                  <Building2 className={`h-6 w-6 mr-3 ${modoConfig === 'global' ? 'text-[#9333EA]' : 'text-gray-400'}`} />
+                  <Building2
+                    className={`h-6 w-6 mr-3 ${modoConfig === 'global' ? 'text-[#9333EA]' : 'text-gray-400'}`}
+                  />
                   <div>
                     <h3 className="font-semibold text-[#002333]">Global (Empresa)</h3>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Aplica-se a todos os departamentos
-                    </p>
+                    <p className="text-sm text-gray-600 mt-1">Aplica-se a todos os departamentos</p>
                   </div>
                 </div>
               </button>
@@ -393,13 +405,16 @@ const FechamentoAutomaticoPage: React.FC = () => {
               {/* Opção: Departamento Específico */}
               <button
                 onClick={() => setModoConfig('departamento')}
-                className={`p-4 rounded-lg border-2 transition-all text-left ${modoConfig === 'departamento'
-                  ? 'border-[#9333EA] bg-[#9333EA]/5'
-                  : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                className={`p-4 rounded-lg border-2 transition-all text-left ${
+                  modoConfig === 'departamento'
+                    ? 'border-[#9333EA] bg-[#9333EA]/5'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
               >
                 <div className="flex items-start">
-                  <Users className={`h-6 w-6 mr-3 ${modoConfig === 'departamento' ? 'text-[#9333EA]' : 'text-gray-400'}`} />
+                  <Users
+                    className={`h-6 w-6 mr-3 ${modoConfig === 'departamento' ? 'text-[#9333EA]' : 'text-gray-400'}`}
+                  />
                   <div>
                     <h3 className="font-semibold text-[#002333]">Por Departamento</h3>
                     <p className="text-sm text-gray-600 mt-1">
@@ -468,7 +483,9 @@ const FechamentoAutomaticoPage: React.FC = () => {
                   type="number"
                   min="5"
                   value={formData.timeoutMinutos}
-                  onChange={(e) => setFormData({ ...formData, timeoutMinutos: parseInt(e.target.value) || 0 })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, timeoutMinutos: parseInt(e.target.value) || 0 })
+                  }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent"
                   placeholder="Ex: 1440 (24 horas)"
                 />
@@ -476,18 +493,45 @@ const FechamentoAutomaticoPage: React.FC = () => {
                   ⏱️ Equivale a: <strong>{formatarTempo(formData.timeoutMinutos)}</strong>
                 </p>
                 <div className="flex flex-wrap gap-2 mt-3">
-                  <button onClick={() => setFormData({ ...formData, timeoutMinutos: 30 })} className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">30 min</button>
-                  <button onClick={() => setFormData({ ...formData, timeoutMinutos: 60 })} className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">1 hora</button>
-                  <button onClick={() => setFormData({ ...formData, timeoutMinutos: 120 })} className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">2 horas</button>
-                  <button onClick={() => setFormData({ ...formData, timeoutMinutos: 1440 })} className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">24 horas</button>
-                  <button onClick={() => setFormData({ ...formData, timeoutMinutos: 2880 })} className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">48 horas</button>
+                  <button
+                    onClick={() => setFormData({ ...formData, timeoutMinutos: 30 })}
+                    className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  >
+                    30 min
+                  </button>
+                  <button
+                    onClick={() => setFormData({ ...formData, timeoutMinutos: 60 })}
+                    className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  >
+                    1 hora
+                  </button>
+                  <button
+                    onClick={() => setFormData({ ...formData, timeoutMinutos: 120 })}
+                    className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  >
+                    2 horas
+                  </button>
+                  <button
+                    onClick={() => setFormData({ ...formData, timeoutMinutos: 1440 })}
+                    className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  >
+                    24 horas
+                  </button>
+                  <button
+                    onClick={() => setFormData({ ...formData, timeoutMinutos: 2880 })}
+                    className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  >
+                    48 horas
+                  </button>
                 </div>
               </div>
 
               {/* Enviar Aviso */}
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <div>
-                  <label className="font-medium text-[#002333]">Enviar Aviso Antes do Fechamento</label>
+                  <label className="font-medium text-[#002333]">
+                    Enviar Aviso Antes do Fechamento
+                  </label>
                   <p className="text-sm text-gray-600 mt-1">
                     Notifica o cliente antes de fechar automaticamente
                   </p>
@@ -513,7 +557,9 @@ const FechamentoAutomaticoPage: React.FC = () => {
                     type="number"
                     min="1"
                     value={formData.avisoMinutosAntes}
-                    onChange={(e) => setFormData({ ...formData, avisoMinutosAntes: parseInt(e.target.value) || 0 })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, avisoMinutosAntes: parseInt(e.target.value) || 0 })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent"
                     placeholder="Ex: 60 (1 hora antes)"
                   />
@@ -562,7 +608,10 @@ const FechamentoAutomaticoPage: React.FC = () => {
                 </label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {['AGUARDANDO', 'EM_ATENDIMENTO', 'PENDENTE', 'NOVO'].map((status) => (
-                    <label key={status} className="flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+                    <label
+                      key={status}
+                      className="flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                    >
                       <input
                         type="checkbox"
                         checked={formData.statusAplicaveis.includes(status)}
@@ -575,7 +624,9 @@ const FechamentoAutomaticoPage: React.FC = () => {
                           } else {
                             setFormData({
                               ...formData,
-                              statusAplicaveis: formData.statusAplicaveis.filter((s) => s !== status),
+                              statusAplicaveis: formData.statusAplicaveis.filter(
+                                (s) => s !== status,
+                              ),
                             });
                           }
                         }}
@@ -609,7 +660,9 @@ const FechamentoAutomaticoPage: React.FC = () => {
                 onClick={handleVerificarAgora}
                 disabled={testing || !formData.ativo}
                 className="flex-1 px-4 py-3 bg-white text-[#9333EA] border border-[#9333EA] rounded-lg hover:bg-[#9333EA]/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium"
-                title={!formData.ativo ? 'Ative a configuração primeiro' : 'Executar verificação agora'}
+                title={
+                  !formData.ativo ? 'Ative a configuração primeiro' : 'Executar verificação agora'
+                }
               >
                 <Play className="h-5 w-5" />
                 {testing ? 'Verificando...' : 'Verificar Agora (Teste)'}
@@ -623,7 +676,6 @@ const FechamentoAutomaticoPage: React.FC = () => {
               </p>
             )}
           </div>
-
         </div>
       </div>
     </div>

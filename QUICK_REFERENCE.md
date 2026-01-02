@@ -11,7 +11,7 @@ Swagger:   http://56.124.63.239:3500/api-docs
 ## 🔐 Login
 
 ```
-Email: admin@conectcrm.com
+Email: admin@conectsuite.com.br
 Senha: admin123
 ```
 
@@ -59,7 +59,7 @@ ssh -i "conectcrm-key.pem" ubuntu@56.124.63.239 "df -h"
 
 ```powershell
 # Login via API
-$body = @{ email = "admin@conectcrm.com"; senha = "admin123" } | ConvertTo-Json
+$body = @{ email = "admin@conectsuite.com.br"; senha = "admin123" } | ConvertTo-Json
 Invoke-RestMethod -Uri "http://56.124.63.239:3500/auth/login" -Method Post -Body $body -ContentType "application/json"
 ```
 
@@ -73,7 +73,7 @@ ssh -i "conectcrm-key.pem" ubuntu@56.124.63.239 "cd /home/ubuntu/apps && docker-
 ### Login retorna 401
 - Verificar se senha é `admin123` (sem espaços)
 - Usar campo `senha` (não `password`)
-- Email: `admin@conectcrm.com`
+- Email: `admin@conectsuite.com.br`
 
 ### Esqueci comandos
 ```bash

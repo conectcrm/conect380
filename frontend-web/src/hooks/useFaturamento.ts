@@ -1,11 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { faturamentoAPI, FaturaRequest, FaturaResponse, PagamentoRequest } from '../services/faturamentoAPI';
+import {
+  faturamentoAPI,
+  FaturaRequest,
+  FaturaResponse,
+  PagamentoRequest,
+} from '../services/faturamentoAPI';
 import toast from 'react-hot-toast';
 
 type ListaFaturasResponse = Awaited<ReturnType<typeof faturamentoAPI.listarFaturas>>;
 type ResumoFaturamentoResponse = Awaited<ReturnType<typeof faturamentoAPI.obterResumoFaturamento>>;
-type AnalyticsFaturamentoResponse = Awaited<ReturnType<typeof faturamentoAPI.obterAnalyticsFaturamento>>;
+type AnalyticsFaturamentoResponse = Awaited<
+  ReturnType<typeof faturamentoAPI.obterAnalyticsFaturamento>
+>;
 
 // Hook para listar faturas
 export const useFaturas = (filtros?: {
@@ -169,10 +176,7 @@ export const useRegistrarPagamento = () => {
 };
 
 // Hook para resumo de faturamento
-export const useResumoFaturamento = (periodo?: {
-  dataInicio: string;
-  dataFim: string;
-}) => {
+export const useResumoFaturamento = (periodo?: { dataInicio: string; dataFim: string }) => {
   return useQuery<ResumoFaturamentoResponse>({
     queryKey: ['resumo-faturamento', periodo],
     queryFn: () => faturamentoAPI.obterResumoFaturamento(periodo),
@@ -181,10 +185,7 @@ export const useResumoFaturamento = (periodo?: {
 };
 
 // Hook para analytics de faturamento
-export const useAnalyticsFaturamento = (periodo?: {
-  dataInicio: string;
-  dataFim: string;
-}) => {
+export const useAnalyticsFaturamento = (periodo?: { dataInicio: string; dataFim: string }) => {
   return useQuery<AnalyticsFaturamentoResponse>({
     queryKey: ['analytics-faturamento', periodo],
     queryFn: () => faturamentoAPI.obterAnalyticsFaturamento(periodo),
@@ -201,14 +202,14 @@ export const useFiltrosFatura = () => {
     dataFim: '',
     searchTerm: '',
     page: 1,
-    limit: 10
+    limit: 10,
   });
 
   const updateFiltro = (key: string, value: any) => {
-    setFiltros(prev => ({
+    setFiltros((prev) => ({
       ...prev,
       [key]: value,
-      page: key !== 'page' ? 1 : value // Reset page when other filters change
+      page: key !== 'page' ? 1 : value, // Reset page when other filters change
     }));
   };
 
@@ -220,7 +221,7 @@ export const useFiltrosFatura = () => {
       dataFim: '',
       searchTerm: '',
       page: 1,
-      limit: 10
+      limit: 10,
     });
   };
 
@@ -228,7 +229,7 @@ export const useFiltrosFatura = () => {
     filtros,
     updateFiltro,
     resetFiltros,
-    setFiltros
+    setFiltros,
   };
 };
 
@@ -242,7 +243,7 @@ export const useEstatisticasFaturamento = () => {
     faturasVencidas: 0,
     faturasAberto: 0,
     valorPago: 0,
-    taxaPagamento: 0
+    taxaPagamento: 0,
   });
 
   useEffect(() => {
@@ -252,15 +253,15 @@ export const useEstatisticasFaturamento = () => {
       const stats = {
         totalFaturas: lista.length,
         valorTotal: lista.reduce((acc, f) => acc + f.valorTotal, 0),
-        faturasVencidas: lista.filter(f => f.status === 'vencida').length,
-        faturasAberto: lista.filter(f => ['pendente', 'enviada'].includes(f.status)).length,
-        valorPago: lista.filter(f => f.status === 'paga').reduce((acc, f) => acc + f.valorTotal, 0),
-        taxaPagamento: 0
+        faturasVencidas: lista.filter((f) => f.status === 'vencida').length,
+        faturasAberto: lista.filter((f) => ['pendente', 'enviada'].includes(f.status)).length,
+        valorPago: lista
+          .filter((f) => f.status === 'paga')
+          .reduce((acc, f) => acc + f.valorTotal, 0),
+        taxaPagamento: 0,
       };
 
-      stats.taxaPagamento = stats.valorTotal > 0
-        ? (stats.valorPago / stats.valorTotal) * 100
-        : 0;
+      stats.taxaPagamento = stats.valorTotal > 0 ? (stats.valorPago / stats.valorTotal) * 100 : 0;
 
       setEstatisticas(stats);
     }

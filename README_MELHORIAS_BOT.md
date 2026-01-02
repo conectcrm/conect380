@@ -95,7 +95,7 @@ npm run start:dev
 - **Sprint 2** (1 sem): Análise de Sentimento + Contexto
 - **Sprint 3** (1 sem): Dashboard Analytics + Warm Handoff
 
-**Score Projetado**: 92-95/100 (paridade com Intercom/Zendesk)
+**Score Projetado**: 92-95/100 (nível enterprise, recursos avançados)
 
 ---
 

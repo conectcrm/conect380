@@ -17,9 +17,9 @@ interface AcessoPortalProps {
 
 const AcessoPortal: React.FC<AcessoPortalProps> = ({
   propostaId,
-  titulo = "Acessar Portal",
+  titulo = 'Acessar Portal',
   clienteEmail,
-  compact = false
+  compact = false,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -36,7 +36,6 @@ const AcessoPortal: React.FC<AcessoPortalProps> = ({
 
       setUrlPortal(url);
       toast.success('Link do portal gerado!');
-
     } catch (error) {
       console.error('Erro ao gerar link:', error);
       toast.error('Erro ao gerar link do portal');
@@ -77,11 +76,10 @@ const AcessoPortal: React.FC<AcessoPortalProps> = ({
       // Simular envio (substituir por API real)
       await portalClienteService.enviarPropostaPorEmail(propostaId, {
         emailDestino: clienteEmail,
-        incluirAnexo: true
+        incluirAnexo: true,
       });
 
       toast.success('Email enviado com sucesso!');
-
     } catch (error) {
       console.error('Erro ao enviar email:', error);
       toast.error('Erro ao enviar email');
@@ -152,9 +150,7 @@ const AcessoPortal: React.FC<AcessoPortalProps> = ({
           {/* URL Gerada */}
           <div className="p-3 bg-white border rounded">
             <div className="text-xs text-gray-500 mb-1">Link do Portal:</div>
-            <div className="font-mono text-sm text-gray-700 break-all">
-              {urlPortal}
-            </div>
+            <div className="font-mono text-sm text-gray-700 break-all">{urlPortal}</div>
           </div>
 
           {/* Ações */}

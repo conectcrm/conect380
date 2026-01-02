@@ -1,4 +1,7 @@
 import api from './api';
+import { getErrorMessage } from '../utils/errorHandling';
+import type { Ticket } from './atendimentoService';
+import type { Atendente } from './atendenteService';
 
 /**
  * Enums espelhando o backend
@@ -30,7 +33,7 @@ export interface Fila {
   departamentoId?: string; // Novo campo - Consolidação Equipe → Fila (Jan 2025)
   ativo: boolean;
   ordem: number;
-  horarioAtendimento?: any;
+  horarioAtendimento?: Record<string, unknown>;
   estrategiaDistribuicao: EstrategiaDistribuicao;
   capacidadeMaxima: number;
   distribuicaoAutomatica: boolean;
@@ -96,10 +99,10 @@ export interface CreateFilaDto {
     prioridadePadrao?: PrioridadePadrao;
     notificarAposMinutos?: number;
   };
-  horarioAtendimento?: any;
+  horarioAtendimento?: Record<string, unknown>;
 }
 
-export interface UpdateFilaDto extends Partial<CreateFilaDto> { }
+export type UpdateFilaDto = Partial<CreateFilaDto>;
 
 export interface AddAtendenteFilaDto {
   atendenteId: string;
@@ -122,10 +125,8 @@ export interface MetricasFila {
   tempoMedioEspera: number;
   tempoMedioAtendimento: number;
   taxaResolucao: number;
-  atendentesDisponiveis: number;
   atendentesBloqueados: number;
 }
-
 /**
  * Serviço de Filas
  * Consome os 11 endpoints REST do FilaController
@@ -140,14 +141,7 @@ class FilaService {
       return response.data;
     } catch (err: unknown) {
       console.error('Erro ao listar filas:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      throw new Error(
-        normalizedMessage || fallbackMessage || 'Erro ao listar filas',
-      );
+      throw new Error(getErrorMessage(err, 'Erro ao listar filas'));
     }
   }
 
@@ -156,20 +150,11 @@ class FilaService {
    */
   async buscarPorId(id: string, empresaId: string): Promise<Fila> {
     try {
-      const response = await api.get(
-        `/api/filas/${id}?empresaId=${empresaId}`,
-      );
+      const response = await api.get(`/api/filas/${id}?empresaId=${empresaId}`);
       return response.data;
     } catch (err: unknown) {
       console.error('Erro ao buscar fila:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      throw new Error(
-        normalizedMessage || fallbackMessage || 'Erro ao buscar fila',
-      );
+      throw new Error(getErrorMessage(err, 'Erro ao buscar fila'));
     }
   }
 
@@ -178,48 +163,24 @@ class FilaService {
    */
   async criar(empresaId: string, dto: CreateFilaDto): Promise<Fila> {
     try {
-      const response = await api.post(
-        `/api/filas?empresaId=${empresaId}`,
-        dto,
-      );
+      const response = await api.post(`/api/filas?empresaId=${empresaId}`, dto);
       return response.data;
     } catch (err: unknown) {
       console.error('Erro ao criar fila:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      throw new Error(
-        normalizedMessage || fallbackMessage || 'Erro ao criar fila',
-      );
+      throw new Error(getErrorMessage(err, 'Erro ao criar fila'));
     }
   }
 
   /**
    * Atualiza uma fila existente
    */
-  async atualizar(
-    id: string,
-    empresaId: string,
-    dto: UpdateFilaDto,
-  ): Promise<Fila> {
+  async atualizar(id: string, empresaId: string, dto: UpdateFilaDto): Promise<Fila> {
     try {
-      const response = await api.put(
-        `/api/filas/${id}?empresaId=${empresaId}`,
-        dto,
-      );
+      const response = await api.put(`/api/filas/${id}?empresaId=${empresaId}`, dto);
       return response.data;
     } catch (err: unknown) {
       console.error('Erro ao atualizar fila:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      throw new Error(
-        normalizedMessage || fallbackMessage || 'Erro ao atualizar fila',
-      );
+      throw new Error(getErrorMessage(err, 'Erro ao atualizar fila'));
     }
   }
 
@@ -231,14 +192,7 @@ class FilaService {
       await api.delete(`/api/filas/${id}?empresaId=${empresaId}`);
     } catch (err: unknown) {
       console.error('Erro ao remover fila:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      throw new Error(
-        normalizedMessage || fallbackMessage || 'Erro ao remover fila',
-      );
+      throw new Error(getErrorMessage(err, 'Erro ao remover fila'));
     }
   }
 
@@ -258,70 +212,32 @@ class FilaService {
       return response.data;
     } catch (err: unknown) {
       console.error('Erro ao adicionar atendente à fila:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      throw new Error(
-        normalizedMessage ||
-        fallbackMessage ||
-        'Erro ao adicionar atendente à fila',
-      );
+      throw new Error(getErrorMessage(err, 'Erro ao adicionar atendente à fila'));
     }
   }
 
   /**
    * Remove um atendente de uma fila
    */
-  async removerAtendente(
-    filaId: string,
-    atendenteId: string,
-    empresaId: string,
-  ): Promise<void> {
+  async removerAtendente(filaId: string, atendenteId: string, empresaId: string): Promise<void> {
     try {
-      await api.delete(
-        `/api/filas/${filaId}/atendentes/${atendenteId}?empresaId=${empresaId}`,
-      );
+      await api.delete(`/api/filas/${filaId}/atendentes/${atendenteId}?empresaId=${empresaId}`);
     } catch (err: unknown) {
       console.error('Erro ao remover atendente da fila:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      throw new Error(
-        normalizedMessage ||
-        fallbackMessage ||
-        'Erro ao remover atendente da fila',
-      );
+      throw new Error(getErrorMessage(err, 'Erro ao remover atendente da fila'));
     }
   }
 
   /**
    * Lista atendentes de uma fila
    */
-  async listarAtendentes(
-    filaId: string,
-    empresaId: string,
-  ): Promise<FilaAtendente[]> {
+  async listarAtendentes(filaId: string, empresaId: string): Promise<FilaAtendente[]> {
     try {
-      const response = await api.get(
-        `/api/filas/${filaId}/atendentes?empresaId=${empresaId}`,
-      );
+      const response = await api.get(`/api/filas/${filaId}/atendentes?empresaId=${empresaId}`);
       return response.data;
     } catch (err: unknown) {
       console.error('Erro ao listar atendentes da fila:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      throw new Error(
-        normalizedMessage ||
-        fallbackMessage ||
-        'Erro ao listar atendentes da fila',
-      );
+      throw new Error(getErrorMessage(err, 'Erro ao listar atendentes da fila'));
     }
   }
 
@@ -331,50 +247,29 @@ class FilaService {
   async distribuirTicket(
     empresaId: string,
     dto: AtribuirTicketDto,
-  ): Promise<{ ticket: any; atendente: any }> {
+  ): Promise<{ ticket: Ticket; atendente: Atendente }> {
     try {
-      const response = await api.post(
+      const response = await api.post<{ ticket: Ticket; atendente: Atendente }>(
         `/api/filas/distribuir?empresaId=${empresaId}`,
         dto,
       );
       return response.data;
     } catch (err: unknown) {
       console.error('Erro ao distribuir ticket:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      throw new Error(
-        normalizedMessage || fallbackMessage || 'Erro ao distribuir ticket',
-      );
+      throw new Error(getErrorMessage(err, 'Erro ao distribuir ticket'));
     }
   }
 
   /**
    * Obter métricas de uma fila
    */
-  async obterMetricas(
-    filaId: string,
-    empresaId: string,
-  ): Promise<MetricasFila> {
+  async obterMetricas(filaId: string, empresaId: string): Promise<MetricasFila> {
     try {
-      const response = await api.get(
-        `/api/filas/${filaId}/metricas?empresaId=${empresaId}`,
-      );
+      const response = await api.get(`/api/filas/${filaId}/metricas?empresaId=${empresaId}`);
       return response.data;
     } catch (err: unknown) {
       console.error('Erro ao obter métricas da fila:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      throw new Error(
-        normalizedMessage ||
-        fallbackMessage ||
-        'Erro ao obter métricas da fila',
-      );
+      throw new Error(getErrorMessage(err, 'Erro ao obter métricas da fila'));
     }
   }
 
@@ -382,29 +277,16 @@ class FilaService {
    * Lista tickets de uma fila
    * TODO: Implementar quando integrado com TicketService
    */
-  async listarTickets(
-    filaId: string,
-    empresaId: string,
-    status?: string,
-  ): Promise<any[]> {
+  async listarTickets(filaId: string, empresaId: string, status?: string): Promise<Ticket[]> {
     try {
       const statusParam = status ? `&status=${status}` : '';
-      const response = await api.get(
+      const response = await api.get<Ticket[]>(
         `/api/filas/${filaId}/tickets?empresaId=${empresaId}${statusParam}`,
       );
       return response.data;
     } catch (err: unknown) {
       console.error('Erro ao listar tickets da fila:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      throw new Error(
-        normalizedMessage ||
-        fallbackMessage ||
-        'Erro ao listar tickets da fila',
-      );
+      throw new Error(getErrorMessage(err, 'Erro ao listar tickets da fila'));
     }
   }
 
@@ -416,27 +298,15 @@ class FilaService {
    * Atribui um núcleo de atendimento a uma fila
    * PATCH /api/filas/:id/nucleo
    */
-  async atribuirNucleo(
-    filaId: string,
-    empresaId: string,
-    nucleoId: string,
-  ): Promise<Fila> {
+  async atribuirNucleo(filaId: string, empresaId: string, nucleoId: string): Promise<Fila> {
     try {
-      const response = await api.patch(
-        `/api/filas/${filaId}/nucleo?empresaId=${empresaId}`,
-        { nucleoId },
-      );
+      const response = await api.patch(`/api/filas/${filaId}/nucleo?empresaId=${empresaId}`, {
+        nucleoId,
+      });
       return response.data;
     } catch (err: unknown) {
       console.error('Erro ao atribuir núcleo à fila:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      throw new Error(
-        normalizedMessage || fallbackMessage || 'Erro ao atribuir núcleo',
-      );
+      throw new Error(getErrorMessage(err, 'Erro ao atribuir núcleo'));
     }
   }
 
@@ -450,21 +320,13 @@ class FilaService {
     departamentoId: string,
   ): Promise<Fila> {
     try {
-      const response = await api.patch(
-        `/api/filas/${filaId}/departamento?empresaId=${empresaId}`,
-        { departamentoId },
-      );
+      const response = await api.patch(`/api/filas/${filaId}/departamento?empresaId=${empresaId}`, {
+        departamentoId,
+      });
       return response.data;
     } catch (err: unknown) {
       console.error('Erro ao atribuir departamento à fila:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      throw new Error(
-        normalizedMessage || fallbackMessage || 'Erro ao atribuir departamento',
-      );
+      throw new Error(getErrorMessage(err, 'Erro ao atribuir departamento'));
     }
   }
 
@@ -479,23 +341,14 @@ class FilaService {
     departamentoId?: string,
   ): Promise<Fila> {
     try {
-      const response = await api.patch(
-        `/api/filas/${filaId}/atribuir?empresaId=${empresaId}`,
-        { nucleoId, departamentoId },
-      );
+      const response = await api.patch(`/api/filas/${filaId}/atribuir?empresaId=${empresaId}`, {
+        nucleoId,
+        departamentoId,
+      });
       return response.data;
     } catch (err: unknown) {
       console.error('Erro ao atribuir núcleo/departamento à fila:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      throw new Error(
-        normalizedMessage ||
-        fallbackMessage ||
-        'Erro ao atribuir núcleo/departamento',
-      );
+      throw new Error(getErrorMessage(err, 'Erro ao atribuir núcleo/departamento'));
     }
   }
 
@@ -505,22 +358,11 @@ class FilaService {
    */
   async listarPorNucleo(nucleoId: string, empresaId: string): Promise<Fila[]> {
     try {
-      const response = await api.get(
-        `/api/filas/nucleo/${nucleoId}?empresaId=${empresaId}`,
-      );
+      const response = await api.get(`/api/filas/nucleo/${nucleoId}?empresaId=${empresaId}`);
       return response.data;
     } catch (err: unknown) {
       console.error('Erro ao listar filas por núcleo:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      throw new Error(
-        normalizedMessage ||
-        fallbackMessage ||
-        'Erro ao listar filas por núcleo',
-      );
+      throw new Error(getErrorMessage(err, 'Erro ao listar filas por núcleo'));
     }
   }
 
@@ -528,10 +370,7 @@ class FilaService {
    * Lista todas as filas de um departamento específico
    * GET /api/filas/departamento/:departamentoId
    */
-  async listarPorDepartamento(
-    departamentoId: string,
-    empresaId: string,
-  ): Promise<Fila[]> {
+  async listarPorDepartamento(departamentoId: string, empresaId: string): Promise<Fila[]> {
     try {
       const response = await api.get(
         `/api/filas/departamento/${departamentoId}?empresaId=${empresaId}`,
@@ -539,36 +378,22 @@ class FilaService {
       return response.data;
     } catch (err: unknown) {
       console.error('Erro ao listar filas por departamento:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      throw new Error(
-        normalizedMessage ||
-        fallbackMessage ||
-        'Erro ao listar filas por departamento',
-      );
+      throw new Error(getErrorMessage(err, 'Erro ao listar filas por departamento'));
     }
   }
 
   /**
    * Busca fila ideal para distribuição automática (menor carga)
    * GET /api/filas/nucleo/:nucleoId/ideal
-   * 
+   *
    * Algoritmo de Load Balancing Inteligente:
    * - Retorna fila com MENOR número de tickets ativos (aguardando + em_atendimento)
    * - Usado pelo bot de triagem para distribuição automática
    * - Retorna null se nenhuma fila ativa encontrada
    */
-  async buscarFilaIdeal(
-    nucleoId: string,
-    empresaId: string,
-  ): Promise<Fila | null> {
+  async buscarFilaIdeal(nucleoId: string, empresaId: string): Promise<Fila | null> {
     try {
-      const response = await api.get(
-        `/api/filas/nucleo/${nucleoId}/ideal?empresaId=${empresaId}`,
-      );
+      const response = await api.get(`/api/filas/nucleo/${nucleoId}/ideal?empresaId=${empresaId}`);
 
       const data = response.data;
 

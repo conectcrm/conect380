@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
+import {
+  Plus,
+  Search,
+  Filter,
   Package,
   BarChart3,
   TrendingUp,
@@ -20,33 +20,33 @@ import {
   Calendar,
   AlertTriangle,
   Check,
-  X
+  X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import { combosService, Combo, ComboEstatisticas } from '../../services/combosService';
 
 const statusConfig = {
-  ativo: { 
-    label: 'Ativo', 
+  ativo: {
+    label: 'Ativo',
     color: 'bg-green-100 text-green-800 border-green-200',
-    icon: Check
+    icon: Check,
   },
-  inativo: { 
-    label: 'Inativo', 
+  inativo: {
+    label: 'Inativo',
     color: 'bg-gray-100 text-gray-800 border-gray-200',
-    icon: Pause
+    icon: Pause,
   },
-  rascunho: { 
-    label: 'Rascunho', 
+  rascunho: {
+    label: 'Rascunho',
     color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    icon: Edit
-  }
+    icon: Edit,
+  },
 };
 
 const CombosPage: React.FC = () => {
   const navigate = useNavigate();
-  
+
   // Estados principais
   const [combos, setCombos] = useState<Combo[]>([]);
   const [estatisticas, setEstatisticas] = useState<ComboEstatisticas>({
@@ -54,7 +54,7 @@ const CombosPage: React.FC = () => {
     combosAtivos: 0,
     vendasMes: 0,
     faturamentoMes: 0,
-    combosPopulares: []
+    combosPopulares: [],
   });
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -73,7 +73,7 @@ const CombosPage: React.FC = () => {
       setIsLoading(true);
       const [combosData, estatisticasData] = await Promise.all([
         combosService.listarCombos(),
-        combosService.obterEstatisticas()
+        combosService.obterEstatisticas(),
       ]);
       setCombos(combosData);
       setEstatisticas(estatisticasData);
@@ -87,26 +87,27 @@ const CombosPage: React.FC = () => {
 
   // Filtros
   const combosFiltrados = useMemo(() => {
-    return combos.filter(combo => {
-      const matchesSearch = searchTerm === '' || 
-                           combo.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           combo.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           combo.categoria.toLowerCase().includes(searchTerm.toLowerCase());
-      
+    return combos.filter((combo) => {
+      const matchesSearch =
+        searchTerm === '' ||
+        combo.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        combo.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        combo.categoria.toLowerCase().includes(searchTerm.toLowerCase());
+
       const matchesStatus = statusFilter === 'todos' || combo.status === statusFilter;
       const matchesCategoria = categoriaFilter === 'todas' || combo.categoria === categoriaFilter;
-      
+
       return matchesSearch && matchesStatus && matchesCategoria;
     });
   }, [combos, searchTerm, statusFilter, categoriaFilter]);
 
-  const categorias = Array.from(new Set(combos.map(combo => combo.categoria)));
+  const categorias = Array.from(new Set(combos.map((combo) => combo.categoria)));
 
   // Formatação
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -118,7 +119,7 @@ const CombosPage: React.FC = () => {
   const handleDuplicarCombo = async (combo: Combo) => {
     try {
       const comboDuplicado = await combosService.duplicarCombo(combo.id);
-      setCombos(prev => [...prev, comboDuplicado]);
+      setCombos((prev) => [...prev, comboDuplicado]);
       toast.success(`Combo "${combo.nome}" duplicado com sucesso!`);
     } catch (error) {
       toast.error('Erro ao duplicar combo');
@@ -129,11 +130,9 @@ const CombosPage: React.FC = () => {
     try {
       const novoStatus = combo.status === 'ativo' ? 'inativo' : 'ativo';
       const comboAtualizado = await combosService.alterarStatusCombo(combo.id, novoStatus);
-      
-      setCombos(prev => prev.map(c => 
-        c.id === combo.id ? comboAtualizado : c
-      ));
-      
+
+      setCombos((prev) => prev.map((c) => (c.id === combo.id ? comboAtualizado : c)));
+
       toast.success(`Combo ${novoStatus === 'ativo' ? 'ativado' : 'desativado'} com sucesso!`);
     } catch (error) {
       toast.error('Erro ao alterar status do combo');
@@ -142,10 +141,10 @@ const CombosPage: React.FC = () => {
 
   const handleExcluirCombo = async () => {
     if (!selectedCombo) return;
-    
+
     try {
       await combosService.excluirCombo(selectedCombo.id);
-      setCombos(prev => prev.filter(c => c.id !== selectedCombo.id));
+      setCombos((prev) => prev.filter((c) => c.id !== selectedCombo.id));
       toast.success('Combo excluído com sucesso!');
       setShowDeleteModal(false);
       setSelectedCombo(null);
@@ -172,8 +171,8 @@ const CombosPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <BackToNucleus 
-                nucleusName="Produtos" 
+              <BackToNucleus
+                nucleusName="Produtos"
                 nucleusPath="/nuclei/produtos"
                 currentModuleName="Combos de Produtos"
               />
@@ -238,7 +237,9 @@ const CombosPage: React.FC = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Faturamento/Mês</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(estatisticas.faturamentoMes)}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {formatCurrency(estatisticas.faturamentoMes)}
+                </p>
               </div>
             </div>
           </div>
@@ -280,8 +281,10 @@ const CombosPage: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
               >
                 <option value="todas">Todas as Categorias</option>
-                {categorias.map(categoria => (
-                  <option key={categoria} value={categoria}>{categoria}</option>
+                {categorias.map((categoria) => (
+                  <option key={categoria} value={categoria}>
+                    {categoria}
+                  </option>
                 ))}
               </select>
             </div>
@@ -320,7 +323,7 @@ const CombosPage: React.FC = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {combosFiltrados.map((combo) => {
                   const StatusIcon = statusConfig[combo.status].icon;
-                  
+
                   return (
                     <tr key={combo.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -330,7 +333,10 @@ const CombosPage: React.FC = () => {
                           {combo.tags && combo.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
                               {combo.tags.slice(0, 3).map((tag, index) => (
-                                <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                                <span
+                                  key={index}
+                                  className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full"
+                                >
                                   {tag}
                                 </span>
                               ))}
@@ -350,20 +356,33 @@ const CombosPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm text-gray-500 line-through">{formatCurrency(combo.precoOriginal)}</div>
-                          <div className="text-sm font-medium text-green-600">{formatCurrency(combo.precoCombo)}</div>
-                          <div className="text-xs text-green-500">{combo.desconto.toFixed(1)}% off</div>
+                          <div className="text-sm text-gray-500 line-through">
+                            {formatCurrency(combo.precoOriginal)}
+                          </div>
+                          <div className="text-sm font-medium text-green-600">
+                            {formatCurrency(combo.precoCombo)}
+                          </div>
+                          <div className="text-xs text-green-500">
+                            {combo.desconto.toFixed(1)}% off
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{combo.produtos.length} produtos</div>
+                        <div className="text-sm text-gray-900">
+                          {combo.produtos.length} produtos
+                        </div>
                         <div className="text-xs text-gray-500">
-                          {combo.produtos.slice(0, 2).map(p => p.produto.nome).join(', ')}
+                          {combo.produtos
+                            .slice(0, 2)
+                            .map((p) => p.produto.nome)
+                            .join(', ')}
                           {combo.produtos.length > 2 && '...'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusConfig[combo.status].color}`}>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusConfig[combo.status].color}`}
+                        >
                           <StatusIcon className="w-3 h-3 mr-1" />
                           {statusConfig[combo.status].label}
                         </span>
@@ -397,13 +416,17 @@ const CombosPage: React.FC = () => {
                           <button
                             onClick={() => handleAlterarStatus(combo)}
                             className={`p-1 rounded-lg transition-colors ${
-                              combo.status === 'ativo' 
-                                ? 'text-gray-600 hover:text-gray-800 hover:bg-gray-50' 
+                              combo.status === 'ativo'
+                                ? 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
                                 : 'text-green-600 hover:text-green-800 hover:bg-green-50'
                             }`}
                             title={combo.status === 'ativo' ? 'Desativar' : 'Ativar'}
                           >
-                            {combo.status === 'ativo' ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                            {combo.status === 'ativo' ? (
+                              <Pause className="w-4 h-4" />
+                            ) : (
+                              <Play className="w-4 h-4" />
+                            )}
                           </button>
                           <button
                             onClick={() => {
@@ -446,12 +469,12 @@ const CombosPage: React.FC = () => {
               </div>
               <h3 className="text-lg font-medium text-gray-900 ml-3">Confirmar Exclusão</h3>
             </div>
-            
+
             <p className="text-gray-600 mb-6">
-              Tem certeza que deseja excluir o combo "{selectedCombo.nome}"? 
-              Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir o combo "{selectedCombo.nome}"? Esta ação não pode ser
+              desfeita.
             </p>
-            
+
             <div className="flex space-x-3">
               <button
                 onClick={() => {

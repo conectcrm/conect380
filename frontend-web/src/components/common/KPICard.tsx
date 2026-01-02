@@ -100,7 +100,9 @@ export const KPICard: React.FC<KPICardProps> = ({
   const trendId = `${cardId}-trend`;
 
   // Gera aria-label automático se não fornecido
-  const autoAriaLabel = ariaLabel || `${displayTitle}: ${typeof displayValue === 'number' ? displayValue.toLocaleString('pt-BR') : displayValue}${trend ? `, tendência ${trend.isPositive ? 'positiva' : 'negativa'} de ${trend.value}%` : ''}`;
+  const autoAriaLabel =
+    ariaLabel ||
+    `${displayTitle}: ${typeof displayValue === 'number' ? displayValue.toLocaleString('pt-BR') : displayValue}${trend ? `, tendência ${trend.isPositive ? 'positiva' : 'negativa'} de ${trend.value}%` : ''}`;
 
   if (isLoading) {
     return (
@@ -111,14 +113,23 @@ export const KPICard: React.FC<KPICardProps> = ({
         aria-live="polite"
       >
         <div className="flex items-center justify-between mb-3 sm:mb-4">
-          <div className="h-3 sm:h-4 bg-gray-200 rounded animate-pulse w-20 sm:w-24" aria-hidden="true"></div>
+          <div
+            className="h-3 sm:h-4 bg-gray-200 rounded animate-pulse w-20 sm:w-24"
+            aria-hidden="true"
+          ></div>
           <div className={`p-2 sm:p-3 rounded-xl ${colors.iconBg}`} aria-hidden="true">
             <LoaderIcon size={20} className={`sm:w-6 sm:h-6 ${colors.iconColor}`} />
           </div>
         </div>
         <div className="space-y-1 sm:space-y-2">
-          <div className="h-6 sm:h-8 bg-gray-200 rounded animate-pulse w-16 sm:w-20" aria-hidden="true"></div>
-          <div className="h-2 sm:h-3 bg-gray-200 rounded animate-pulse w-24 sm:w-32" aria-hidden="true"></div>
+          <div
+            className="h-6 sm:h-8 bg-gray-200 rounded animate-pulse w-16 sm:w-20"
+            aria-hidden="true"
+          ></div>
+          <div
+            className="h-2 sm:h-3 bg-gray-200 rounded animate-pulse w-24 sm:w-32"
+            aria-hidden="true"
+          ></div>
         </div>
         <span className="sr-only">Carregando indicador: {displayTitle}</span>
       </div>
@@ -181,10 +192,7 @@ export const KPICard: React.FC<KPICardProps> = ({
             <div
               className={`
                 flex items-center space-x-1 text-xs font-medium px-2 py-1 rounded-full self-start sm:self-auto
-                ${trend.isPositive
-                  ? 'text-green-700 bg-green-100'
-                  : 'text-red-700 bg-red-100'
-                }
+                ${trend.isPositive ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'}
               `}
               id={trendId}
               role="status"
@@ -195,8 +203,12 @@ export const KPICard: React.FC<KPICardProps> = ({
               ) : (
                 <ArrowDownIcon size={10} aria-hidden="true" />
               )}
-              <span className="whitespace-nowrap" aria-hidden="true">{Math.abs(trend.value)}%</span>
-              <span className="text-gray-500 hidden sm:inline" aria-hidden="true">{trend.label}</span>
+              <span className="whitespace-nowrap" aria-hidden="true">
+                {Math.abs(trend.value)}%
+              </span>
+              <span className="text-gray-500 hidden sm:inline" aria-hidden="true">
+                {trend.label}
+              </span>
             </div>
           )}
         </div>

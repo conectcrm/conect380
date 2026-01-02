@@ -11,17 +11,15 @@ interface QuickActionsProps {
 export const QuickActionsWidget: React.FC<QuickActionsProps> = ({
   onScheduleClick,
   onNewProposalClick,
-  onNotificationsClick
+  onNotificationsClick,
 }) => {
   return (
-    <div 
+    <div
       className="bg-white rounded-xl shadow-sm border p-6"
       role="region"
       aria-label="Ações rápidas do dashboard"
     >
-      <h3 className="text-lg font-semibold text-gray-900 mb-6">
-        Ações Rápidas
-      </h3>
+      <h3 className="text-lg font-semibold text-gray-900 mb-6">Ações Rápidas</h3>
 
       <div className="space-y-4">
         {/* Agendar Reunião */}
@@ -67,7 +65,7 @@ export const QuickActionsWidget: React.FC<QuickActionsProps> = ({
             <div className="font-medium text-gray-900">Notificações</div>
             <div className="text-sm text-gray-500">3 não lidas</div>
           </div>
-          <div 
+          <div
             className="w-2 h-2 bg-red-500 rounded-full"
             aria-label="3 notificações não lidas"
           ></div>
@@ -76,48 +74,34 @@ export const QuickActionsWidget: React.FC<QuickActionsProps> = ({
 
       {/* Resumo de Atividades */}
       <div className="mt-6 pt-6 border-t border-gray-200">
-        <h4 className="text-sm font-semibold text-gray-900 mb-4">
-          Próximas Atividades
-        </h4>
-        
+        <h4 className="text-sm font-semibold text-gray-900 mb-4">Próximas Atividades</h4>
+
         <div className="space-y-3">
           <div className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg">
             <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                Reunião com João Silva
-              </p>
-              <p className="text-xs text-gray-500">
-                Hoje, 14:30
-              </p>
+              <p className="text-sm font-medium text-gray-900 truncate">Reunião com João Silva</p>
+              <p className="text-xs text-gray-500">Hoje, 14:30</p>
             </div>
           </div>
-          
+
           <div className="flex items-start space-x-3 p-3 bg-green-50 rounded-lg">
             <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                Follow-up Proposta #1234
-              </p>
-              <p className="text-xs text-gray-500">
-                Amanhã, 09:00
-              </p>
+              <p className="text-sm font-medium text-gray-900 truncate">Follow-up Proposta #1234</p>
+              <p className="text-xs text-gray-500">Amanhã, 09:00</p>
             </div>
           </div>
-          
+
           <div className="flex items-start space-x-3 p-3 bg-orange-50 rounded-lg">
             <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                Vencimento Contrato ABC
-              </p>
-              <p className="text-xs text-gray-500">
-                Em 3 dias
-              </p>
+              <p className="text-sm font-medium text-gray-900 truncate">Vencimento Contrato ABC</p>
+              <p className="text-xs text-gray-500">Em 3 dias</p>
             </div>
           </div>
         </div>
-        
+
         <AccessibleButton
           variant="ghost"
           size="sm"

@@ -1827,7 +1827,7 @@ DELETE /api/atendimento/templates/:id              # Deletar template
 
 ```
 POST   /api/atendimento/webhooks/chatwoot          # Receber eventos do Chatwoot
-POST   /api/atendimento/webhooks/whatsapp          # Receber eventos do WhatsApp
+POST   /api/atendimento/webhooks/whatsapp/:empresaId  # Receber eventos do WhatsApp (sempre enviar X-Hub-Signature-256)
 ```
 
 ### **Relatórios**

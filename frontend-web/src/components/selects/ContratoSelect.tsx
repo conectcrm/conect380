@@ -35,7 +35,7 @@ export default function ContratoSelect({
   onCreateNew,
   required = false,
   disabled = false,
-  className = ""
+  className = '',
 }: ContratoSelectProps) {
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [loading, setLoading] = useState(false);
@@ -46,80 +46,91 @@ export default function ContratoSelect({
     carregarContratos();
   }, [clienteId]);
 
-  const carregarContratos = useCallback(async (busca?: string) => {
-    try {
-      setLoading(true);
-      const response = await contratoService.listarContratos();
+  const carregarContratos = useCallback(
+    async (busca?: string) => {
+      try {
+        setLoading(true);
+        const response = await contratoService.listarContratos();
 
-      // Filtrar por cliente se especificado
-      let contratosFormatados = response.map((contrato: ContratoService): Contrato => ({
-        id: String(contrato.id),
-        numero: contrato.numero,
-        cliente: contrato.cliente
-          ? {
-            ...contrato.cliente,
-            id: contrato.cliente.id ? String(contrato.cliente.id) : contrato.cliente.id,
-          }
-          : undefined,
-        valor: contrato.valor,
-        status: contrato.status,
-        dataEmissao: contrato.dataEmissao,
-        dataVencimento: contrato.dataVencimento,
-        descricao: contrato.descricao
-      }));
-
-      // Filtrar por busca
-      if (busca?.trim()) {
-        const query = busca.toLowerCase();
-        contratosFormatados = contratosFormatados.filter(contrato =>
-          contrato.numero.toLowerCase().includes(query) ||
-          contrato.cliente?.nome.toLowerCase().includes(query) ||
-          contrato.descricao?.toLowerCase().includes(query)
+        // Filtrar por cliente se especificado
+        let contratosFormatados = response.map(
+          (contrato: ContratoService): Contrato => ({
+            id: String(contrato.id),
+            numero: contrato.numero,
+            cliente: contrato.cliente
+              ? {
+                  ...contrato.cliente,
+                  id: contrato.cliente.id ? String(contrato.cliente.id) : contrato.cliente.id,
+                }
+              : undefined,
+            valor: contrato.valor,
+            status: contrato.status,
+            dataEmissao: contrato.dataEmissao,
+            dataVencimento: contrato.dataVencimento,
+            descricao: contrato.descricao,
+          }),
         );
-      }
 
-      // Filtrar por cliente se especificado
-      if (clienteId) {
-        contratosFormatados = contratosFormatados.filter(contrato =>
-          contrato.cliente?.id ? String(contrato.cliente.id) === clienteId : false
-        );
-      }
+        // Filtrar por busca
+        if (busca?.trim()) {
+          const query = busca.toLowerCase();
+          contratosFormatados = contratosFormatados.filter(
+            (contrato) =>
+              contrato.numero.toLowerCase().includes(query) ||
+              contrato.cliente?.nome.toLowerCase().includes(query) ||
+              contrato.descricao?.toLowerCase().includes(query),
+          );
+        }
 
-      setContratos(contratosFormatados);
-    } catch (error) {
-      console.error('Erro ao carregar contratos:', error);
-      setContratos([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [clienteId]);
+        // Filtrar por cliente se especificado
+        if (clienteId) {
+          contratosFormatados = contratosFormatados.filter((contrato) =>
+            contrato.cliente?.id ? String(contrato.cliente.id) === clienteId : false,
+          );
+        }
+
+        setContratos(contratosFormatados);
+      } catch (error) {
+        console.error('Erro ao carregar contratos:', error);
+        setContratos([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [clienteId],
+  );
 
   // Buscar contratos com debounce
-  const handleSearch = useCallback((query: string) => {
-    setSearchQuery(query);
-    carregarContratos(query);
-  }, [carregarContratos]);
+  const handleSearch = useCallback(
+    (query: string) => {
+      setSearchQuery(query);
+      carregarContratos(query);
+    },
+    [carregarContratos],
+  );
 
   // Converter contratos para opções do SearchSelect
-  const options = contratos.map(contrato => {
+  const options = contratos.map((contrato) => {
     const status = contrato.status || 'Desconhecido';
-    const valor = contrato.valor ? `R$ ${contrato.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '';
+    const valor = contrato.valor
+      ? `R$ ${contrato.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      : '';
     const cliente = contrato.cliente?.nome || 'Cliente não identificado';
 
     return {
       id: contrato.id,
       label: `#${contrato.numero}`,
       subtitle: `${cliente}${valor ? ` • ${valor}` : ''}`,
-      extra: `Status: ${status}${contrato.descricao ? ` • ${contrato.descricao.slice(0, 50)}${contrato.descricao.length > 50 ? '...' : ''}` : ''}`
+      extra: `Status: ${status}${contrato.descricao ? ` • ${contrato.descricao.slice(0, 50)}${contrato.descricao.length > 50 ? '...' : ''}` : ''}`,
     };
   });
 
   // Encontrar o valor atual nas opções
-  const selectedOption = value ? options.find(opt => opt.id === value.id) || null : null;
+  const selectedOption = value ? options.find((opt) => opt.id === value.id) || null : null;
 
   const handleChange = (option: any) => {
     if (option) {
-      const contrato = contratos.find(c => c.id === option.id);
+      const contrato = contratos.find((c) => c.id === option.id);
       onChange(contrato || null);
     } else {
       onChange(null);
@@ -161,17 +172,19 @@ export default function ContratoSelect({
             onChange={handleChange}
             onSearch={handleSearch}
             label="Contrato (opcional)"
-            placeholder={clienteId ? "Busque contratos deste cliente..." : "Busque por número ou cliente..."}
+            placeholder={
+              clienteId ? 'Busque contratos deste cliente...' : 'Busque por número ou cliente...'
+            }
             required={required}
             disabled={disabled}
             loading={loading}
             icon="file"
             emptyMessage={
               clienteId
-                ? "Nenhum contrato encontrado para este cliente"
+                ? 'Nenhum contrato encontrado para este cliente'
                 : searchQuery
-                  ? "Nenhum contrato encontrado"
-                  : "Digite para buscar contratos"
+                  ? 'Nenhum contrato encontrado'
+                  : 'Digite para buscar contratos'
             }
           />
         </div>
@@ -199,11 +212,11 @@ export default function ContratoSelect({
             <div className="flex-1 min-w-0">
               <div className="font-medium text-green-900">Contrato #{value.numero}</div>
               <div className="text-sm text-green-700 space-y-1">
-                {value.cliente && (
-                  <div>👤 {value.cliente.nome}</div>
-                )}
+                {value.cliente && <div>👤 {value.cliente.nome}</div>}
                 {value.valor && (
-                  <div>💰 R$ {value.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                  <div>
+                    💰 R$ {value.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </div>
                 )}
                 {value.status && (
                   <div className="flex items-center gap-2">

@@ -57,7 +57,7 @@ npm install axios socket.io-client
 ```powershell
 # Fazer login e obter token
 $response = Invoke-RestMethod -Uri "http://localhost:3001/api/auth/login" -Method POST -Body (@{
-    email = "admin@conectcrm.com"
+    email = "admin@conectsuite.com.br"
     password = "Admin@123"
 } | ConvertTo-Json) -ContentType "application/json"
 

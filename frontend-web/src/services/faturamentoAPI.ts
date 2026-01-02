@@ -84,7 +84,13 @@ class FaturamentoAPIService {
     sortBy?: string;
     sortOrder?: 'ASC' | 'DESC';
     q?: string;
-  }): Promise<{ faturas: FaturaResponse[]; total: number; page: number; pageSize: number; aggregates?: { valorTotal?: number; valorRecebido?: number; valorEmAberto?: number } }> {
+  }): Promise<{
+    faturas: FaturaResponse[];
+    total: number;
+    page: number;
+    pageSize: number;
+    aggregates?: { valorTotal?: number; valorRecebido?: number; valorEmAberto?: number };
+  }> {
     const params = new URLSearchParams();
 
     if (filtros?.status) params.append('status', filtros.status);
@@ -146,7 +152,7 @@ class FaturamentoAPIService {
 
   async baixarPDFFatura(faturaId: string): Promise<Blob> {
     const response = await api.get(`/faturamento/faturas/${faturaId}/pdf`, {
-      responseType: 'blob'
+      responseType: 'blob',
     });
     return response.data;
   }
@@ -166,16 +172,16 @@ class FaturamentoAPIService {
     return response.data;
   }
 
-  async atualizarPagamento(id: string, dados: Partial<PagamentoRequest>): Promise<PagamentoResponse> {
+  async atualizarPagamento(
+    id: string,
+    dados: Partial<PagamentoRequest>,
+  ): Promise<PagamentoResponse> {
     const response = await api.put(`/faturamento/pagamentos/${id}`, dados);
     return response.data;
   }
 
   // Relatórios
-  async obterResumoFaturamento(periodo?: {
-    dataInicio: string;
-    dataFim: string;
-  }): Promise<{
+  async obterResumoFaturamento(periodo?: { dataInicio: string; dataFim: string }): Promise<{
     totalFaturas: number;
     valorTotalFaturado: number;
     valorTotalPago: number;
@@ -191,10 +197,7 @@ class FaturamentoAPIService {
     return response.data;
   }
 
-  async obterAnalyticsFaturamento(periodo?: {
-    dataInicio: string;
-    dataFim: string;
-  }): Promise<{
+  async obterAnalyticsFaturamento(periodo?: { dataInicio: string; dataFim: string }): Promise<{
     faturamentoPorMes: Array<{
       mes: string;
       valor: number;

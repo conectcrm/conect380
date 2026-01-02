@@ -1,14 +1,14 @@
 /**
  * 🎯 Seletores Zustand - Atendimento Store
- * 
+ *
  * Seletores reutilizáveis para otimizar re-renders.
  * Usar com shallow comparison para evitar re-renders desnecessários.
- * 
+ *
  * Exemplo de uso:
  * ```typescript
  * import { selectTicketSelecionado } from './atendimentoSelectors';
  * import { shallow } from 'zustand/shallow';
- * 
+ *
  * const ticketSelecionado = useAtendimentoStore(selectTicketSelecionado);
  * // ou com shallow
  * const { ticket, cliente } = useAtendimentoStore(
@@ -26,20 +26,17 @@ import { AtendimentoStore } from './atendimentoStore';
  * Seleciona apenas o ticket selecionado
  * Útil para componentes que só precisam do ticket atual
  */
-export const selectTicketSelecionado = (state: AtendimentoStore) =>
-  state.ticketSelecionado;
+export const selectTicketSelecionado = (state: AtendimentoStore) => state.ticketSelecionado;
 
 /**
  * Seleciona apenas o cliente selecionado
  */
-export const selectClienteSelecionado = (state: AtendimentoStore) =>
-  state.clienteSelecionado;
+export const selectClienteSelecionado = (state: AtendimentoStore) => state.clienteSelecionado;
 
 /**
  * Seleciona lista de tickets
  */
-export const selectTickets = (state: AtendimentoStore) =>
-  state.tickets;
+export const selectTickets = (state: AtendimentoStore) => state.tickets;
 
 /**
  * Seleciona estados de loading de tickets
@@ -69,8 +66,7 @@ export const selectMensagensDoTicket = (ticketId: string) => (state: Atendimento
 /**
  * Seleciona apenas o histórico do cliente
  */
-export const selectHistoricoCliente = (state: AtendimentoStore) =>
-  state.historicoCliente;
+export const selectHistoricoCliente = (state: AtendimentoStore) => state.historicoCliente;
 
 // ===== SELETORES DE AÇÕES =====
 
@@ -122,13 +118,12 @@ export const selectResetActions = (state: AtendimentoStore) => ({
  * Seleciona tickets filtrados por status (exemplo de seletor derivado)
  */
 export const selectTicketsPorStatus = (status: string) => (state: AtendimentoStore) =>
-  state.tickets.filter(t => t.status === status);
+  state.tickets.filter((t) => t.status === status);
 
 /**
  * Conta total de tickets
  */
-export const selectTotalTickets = (state: AtendimentoStore) =>
-  state.tickets.length;
+export const selectTotalTickets = (state: AtendimentoStore) => state.tickets.length;
 
 /**
  * Verifica se há ticket selecionado
@@ -145,14 +140,12 @@ export const selectTicketSelecionadoId = (state: AtendimentoStore) =>
 /**
  * Verifica se está carregando tickets
  */
-export const selectIsLoadingTickets = (state: AtendimentoStore) =>
-  state.ticketsLoading;
+export const selectIsLoadingTickets = (state: AtendimentoStore) => state.ticketsLoading;
 
 /**
  * Verifica se há erro ao carregar tickets
  */
-export const selectHasErrorTickets = (state: AtendimentoStore) =>
-  state.ticketsError !== null;
+export const selectHasErrorTickets = (state: AtendimentoStore) => state.ticketsError !== null;
 
 // ===== SELETORES COMPOSTOS (para casos específicos) =====
 

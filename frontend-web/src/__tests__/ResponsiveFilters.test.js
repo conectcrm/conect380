@@ -1,47 +1,50 @@
-"use strict";
-var __assign = (this && this.__assign) || function () {
-  __assign = Object.assign || function (t) {
-    for (var s, i = 1, n = arguments.length; i < n; i++) {
-      s = arguments[i];
-      for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
-        t[p] = s[p];
-    }
-    return t;
+'use strict';
+var __assign =
+  (this && this.__assign) ||
+  function () {
+    __assign =
+      Object.assign ||
+      function (t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+          s = arguments[i];
+          for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p)) t[p] = s[p];
+        }
+        return t;
+      };
+    return __assign.apply(this, arguments);
   };
-  return __assign.apply(this, arguments);
-};
 exports.__esModule = true;
-var react_1 = require("@testing-library/react");
-require("@testing-library/jest-dom");
-var ResponsiveFilters_1 = require("../components/common/ResponsiveFilters");
+var react_1 = require('@testing-library/react');
+require('@testing-library/jest-dom');
+var ResponsiveFilters_1 = require('../components/common/ResponsiveFilters');
 // Mock do hook de acessibilidade
 jest.mock('../hooks/useAccessibility', function () {
-  return ({
+  return {
     useAccessibility: function () {
-      return ({
-        announceToScreenReader: jest.fn()
-      });
-    }
-  });
+      return {
+        announceToScreenReader: jest.fn(),
+      };
+    },
+  };
 });
 describe('ResponsiveFilters', function () {
   var defaultProps = {
     filtros: {
       periodo: '2025',
       vendedor: 'Todos',
-      regiao: 'Todas'
+      regiao: 'Todas',
     },
     onChange: jest.fn(),
     periodOptions: [
       { value: '2025', label: '2025' },
       { value: '2024', label: '2024' },
-      { value: '2023', label: '2023' }
+      { value: '2023', label: '2023' },
     ],
     vendedorOptions: [
       { value: 'Todos', label: 'Todos os vendedores' },
       { value: 'João Silva', label: 'João Silva' },
       { value: 'Maria Santos', label: 'Maria Santos' },
-      { value: 'Pedro Costa', label: 'Pedro Costa' }
+      { value: 'Pedro Costa', label: 'Pedro Costa' },
     ],
     regiaoOptions: [
       { value: 'Todas', label: 'Todas as regiões' },
@@ -49,8 +52,8 @@ describe('ResponsiveFilters', function () {
       { value: 'Sul', label: 'Sul' },
       { value: 'Sudeste', label: 'Sudeste' },
       { value: 'Centro-Oeste', label: 'Centro-Oeste' },
-      { value: 'Nordeste', label: 'Nordeste' }
-    ]
+      { value: 'Nordeste', label: 'Nordeste' },
+    ],
   };
   beforeEach(function () {
     jest.clearAllMocks();
@@ -93,21 +96,27 @@ describe('ResponsiveFilters', function () {
     var selects = react_1.screen.getAllByRole('combobox');
     var periodoSelect = selects[0];
     react_1.fireEvent.change(periodoSelect, { target: { value: '2024' } });
-    expect(defaultProps.onChange).toHaveBeenCalledWith(__assign(__assign({}, defaultProps.filtros), { periodo: '2024' }));
+    expect(defaultProps.onChange).toHaveBeenCalledWith(
+      __assign(__assign({}, defaultProps.filtros), { periodo: '2024' }),
+    );
   });
   it('deve chamar setFiltros quando vendedor é alterado', function () {
     (0, react_1.render)(<ResponsiveFilters_1.ResponsiveFilters {...defaultProps} />);
     var selects = react_1.screen.getAllByRole('combobox');
     var vendedorSelect = selects[1];
     react_1.fireEvent.change(vendedorSelect, { target: { value: 'João Silva' } });
-    expect(defaultProps.onChange).toHaveBeenCalledWith(__assign(__assign({}, defaultProps.filtros), { vendedor: 'João Silva' }));
+    expect(defaultProps.onChange).toHaveBeenCalledWith(
+      __assign(__assign({}, defaultProps.filtros), { vendedor: 'João Silva' }),
+    );
   });
   it('deve chamar setFiltros quando região é alterada', function () {
     (0, react_1.render)(<ResponsiveFilters_1.ResponsiveFilters {...defaultProps} />);
     var selects = react_1.screen.getAllByRole('combobox');
     var regiaoSelect = selects[2];
     react_1.fireEvent.change(regiaoSelect, { target: { value: 'Norte' } });
-    expect(defaultProps.onChange).toHaveBeenCalledWith(__assign(__assign({}, defaultProps.filtros), { regiao: 'Norte' }));
+    expect(defaultProps.onChange).toHaveBeenCalledWith(
+      __assign(__assign({}, defaultProps.filtros), { regiao: 'Norte' }),
+    );
   });
   it('deve ter opções corretas no select de período', function () {
     (0, react_1.render)(<ResponsiveFilters_1.ResponsiveFilters {...defaultProps} />);

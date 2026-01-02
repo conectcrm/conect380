@@ -4,7 +4,7 @@ export interface User {
   nome: string;
   email: string;
   telefone?: string;
-  role: 'admin' | 'manager' | 'vendedor' | 'user';
+  role: 'superadmin' | 'admin' | 'manager' | 'vendedor' | 'user';
   avatar_url?: string;
   idioma_preferido: string;
   empresa: {
@@ -42,14 +42,14 @@ export interface Cliente {
   updated_at: Date;
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   message?: string;
   errors?: string[];
 }
 
-export interface PaginatedResponse<T = any> extends ApiResponse<T[]> {
+export interface PaginatedResponse<T = unknown> extends ApiResponse<T[]> {
   pagination: {
     page: number;
     limit: number;
@@ -66,10 +66,12 @@ export interface LoginRequest {
 export interface LoginResponse {
   success: boolean;
   action?: 'TROCAR_SENHA'; // ✅ Ação de trocar senha (primeiro acesso)
-  data: {
+  data:
+  | {
     access_token: string;
     user: User;
-  } | {
+  }
+  | {
     userId: string;
     email: string;
     nome: string;

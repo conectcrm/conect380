@@ -38,7 +38,7 @@ Status: ✅ ATIVO
 - ✅ WhatsappInteractiveService - Enviando mensagens
 - ✅ TriagemBotService - Bot automatizado ativo
 - ✅ FlowEngine - Processando fluxos
-- ✅ Webhook endpoint: `/webhooks/whatsapp`
+- ✅ Webhook endpoint: `/api/atendimento/webhooks/whatsapp/:empresaId` (validação `X-Hub-Signature-256`)
 
 ### Frontend ✅
 - ✅ IntegracoesPage.tsx - Interface de configuração
@@ -109,7 +109,7 @@ Resultado Esperado:
 
 ### URL do Webhook (Produção)
 ```
-https://seu-dominio.com/webhooks/whatsapp
+https://seu-dominio.com/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
 ```
 
 ### URL do Webhook (Desenvolvimento com ngrok)
@@ -121,11 +121,11 @@ choco install ngrok
 ngrok http 3001
 
 # 3. Copiar URL gerada
-https://abc123.ngrok.io/webhooks/whatsapp
+https://abc123.ngrok.io/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
 
 # 4. Configurar na Meta Developer Console
 WhatsApp → Configuration → Webhook
-Callback URL: https://abc123.ngrok.io/webhooks/whatsapp
+Callback URL: https://abc123.ngrok.io/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
 Verify Token: conectcrm_webhook_token_123
 ```
 
@@ -146,7 +146,7 @@ Cliente (WhatsApp)
     ↓
 Meta Graph API
     ↓
-    | POST /webhooks/whatsapp
+    | POST /api/atendimento/webhooks/whatsapp/:empresaId (com X-Hub-Signature-256)
     ↓
 WhatsappWebhookService
     ↓

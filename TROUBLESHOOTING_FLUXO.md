@@ -145,14 +145,15 @@ WHERE contato_telefone = '+55SEU_NUMERO_TESTE';
 **Verificar URL do webhook no Meta:**
 
 ```
-https://6a9342270147.ngrok-free.app/api/atendimento/webhooks/whatsapp
+https://6a9342270147.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
 ```
 
 **Testar webhook manualmente:**
 ```powershell
 # Simular mensagem do WhatsApp
-curl -X POST http://localhost:3001/api/atendimento/webhooks/whatsapp `
+curl -X POST http://localhost:3001/api/atendimento/webhooks/whatsapp/<ID_EMPRESA> `
   -H "Content-Type: application/json" `
+  -H "X-Hub-Signature-256: sha256=<HMAC_GERADO_COM_APP_SECRET>" `
   -d '{
     "entry": [{
       "changes": [{

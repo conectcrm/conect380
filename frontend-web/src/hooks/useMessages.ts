@@ -20,116 +20,121 @@ export function useMessages(ticketId: string | null) {
   /**
    * Carrega mensagens de um ticket
    */
-  const carregarMensagens = useCallback(async (filtros?: Partial<BuscarMensagensFiltros>) => {
-    if (!ticketId) {
-      console.warn('⚠️ useMessages: ticketId não fornecido');
-      return;
-    }
-
-    setLoading(true);
-    setErro(null);
-
-    try {
-      const filtrosCompletos: BuscarMensagensFiltros = {
-        ticketId,
-        limit: filtros?.limit || 50,
-        offset: filtros?.offset || 0,
-        ...filtros,
-      };
-
-      console.log('🔄 Carregando mensagens do ticket:', ticketId);
-
-      const resposta = await messagesService.listar(filtrosCompletos);
-
-      if (resposta.success) {
-        setMensagens(resposta.data);
-        setTotal(resposta.total);
-        console.log(`✅ ${resposta.data.length} mensagens carregadas (total: ${resposta.total})`);
-      } else {
-        setErro('Falha ao carregar mensagens');
+  const carregarMensagens = useCallback(
+    async (filtros?: Partial<BuscarMensagensFiltros>) => {
+      if (!ticketId) {
+        console.warn('⚠️ useMessages: ticketId não fornecido');
+        return;
       }
-    } catch (error: any) {
-      console.error('❌ Erro ao carregar mensagens:', error);
-      setErro(error.response?.data?.message || error.message || 'Erro ao carregar mensagens');
-    } finally {
-      setLoading(false);
-    }
-  }, [ticketId]);
+
+      setLoading(true);
+      setErro(null);
+
+      try {
+        const filtrosCompletos: BuscarMensagensFiltros = {
+          ticketId,
+          limit: filtros?.limit || 50,
+          offset: filtros?.offset || 0,
+          ...filtros,
+        };
+
+        console.log('🔄 Carregando mensagens do ticket:', ticketId);
+
+        const resposta = await messagesService.listar(filtrosCompletos);
+
+        if (resposta.success) {
+          setMensagens(resposta.data);
+          setTotal(resposta.total);
+          console.log(`✅ ${resposta.data.length} mensagens carregadas (total: ${resposta.total})`);
+        } else {
+          setErro('Falha ao carregar mensagens');
+        }
+      } catch (error: any) {
+        console.error('❌ Erro ao carregar mensagens:', error);
+        setErro(error.response?.data?.message || error.message || 'Erro ao carregar mensagens');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [ticketId],
+  );
 
   /**
    * Envia uma nova mensagem
    */
-  const enviarMensagem = useCallback(async (
-    conteudo: string,
-    tipo?: TipoMensagem,
-    metadata?: any
-  ) => {
-    if (!ticketId) {
-      console.error('❌ Tentativa de enviar mensagem sem ticketId');
-      return;
-    }
-
-    setEnviando(true);
-    setErro(null);
-
-    try {
-      const dados: CriarMensagemDto = {
-        ticketId,
-        conteudo,
-        tipo: tipo || TipoMensagem.TEXTO,
-        metadata,
-      };
-
-      console.log('📤 Enviando mensagem:', dados);
-
-      const resposta = await messagesService.enviar(dados);
-
-      if (resposta.success) {
-        // Adicionar a nova mensagem à lista local
-        setMensagens((prev) => [...prev, resposta.data]);
-        console.log('✅ Mensagem enviada com sucesso');
-        return resposta.data;
+  const enviarMensagem = useCallback(
+    async (conteudo: string, tipo?: TipoMensagem, metadata?: any) => {
+      if (!ticketId) {
+        console.error('❌ Tentativa de enviar mensagem sem ticketId');
+        return;
       }
-    } catch (error: any) {
-      console.error('❌ Erro ao enviar mensagem:', error);
-      setErro(error.response?.data?.message || error.message || 'Erro ao enviar mensagem');
-      throw error;
-    } finally {
-      setEnviando(false);
-    }
-  }, [ticketId]);
+
+      setEnviando(true);
+      setErro(null);
+
+      try {
+        const dados: CriarMensagemDto = {
+          ticketId,
+          conteudo,
+          tipo: tipo || TipoMensagem.TEXTO,
+          metadata,
+        };
+
+        console.log('📤 Enviando mensagem:', dados);
+
+        const resposta = await messagesService.enviar(dados);
+
+        if (resposta.success) {
+          // Adicionar a nova mensagem à lista local
+          setMensagens((prev) => [...prev, resposta.data]);
+          console.log('✅ Mensagem enviada com sucesso');
+          return resposta.data;
+        }
+      } catch (error: any) {
+        console.error('❌ Erro ao enviar mensagem:', error);
+        setErro(error.response?.data?.message || error.message || 'Erro ao enviar mensagem');
+        throw error;
+      } finally {
+        setEnviando(false);
+      }
+    },
+    [ticketId],
+  );
 
   /**
    * Faz upload de um arquivo e envia como mensagem
    */
-  const enviarArquivo = useCallback(async (arquivo: File) => {
-    if (!ticketId) {
-      console.error('❌ Tentativa de enviar arquivo sem ticketId');
-      return;
-    }
-
-    setEnviando(true);
-    setErro(null);
-
-    try {
-      console.log('📤 Enviando arquivo:', arquivo.name);
-
-      const resposta = await messagesService.uploadArquivo(ticketId, arquivo);
-
-      if (resposta.success) {
-        // Adicionar a nova mensagem à lista local
-        setMensagens((prev) => [...prev, resposta.data]);
-        console.log('✅ Arquivo enviado com sucesso');
-        return resposta.data;
+  const enviarArquivo = useCallback(
+    async (arquivo: File) => {
+      if (!ticketId) {
+        console.error('❌ Tentativa de enviar arquivo sem ticketId');
+        return;
       }
-    } catch (error: any) {
-      console.error('❌ Erro ao enviar arquivo:', error);
-      setErro(error.response?.data?.message || error.message || 'Erro ao enviar arquivo');
-      throw error;
-    } finally {
-      setEnviando(false);
-    }
-  }, [ticketId]);
+
+      setEnviando(true);
+      setErro(null);
+
+      try {
+        console.log('📤 Enviando arquivo:', arquivo.name);
+
+        const resposta = await messagesService.uploadArquivo(ticketId, arquivo);
+
+        if (resposta.success) {
+          // Adicionar a nova mensagem à lista local
+          setMensagens((prev) => [...prev, resposta.data]);
+          console.log('✅ Arquivo enviado com sucesso');
+          return resposta.data;
+        }
+      } catch (error: any) {
+        console.error('❌ Erro ao enviar arquivo:', error);
+        setErro(error.response?.data?.message || error.message || 'Erro ao enviar arquivo');
+        throw error;
+      } finally {
+        setEnviando(false);
+      }
+    },
+    [ticketId],
+  );
 
   /**
    * Marca mensagens como lidas
@@ -144,8 +149,8 @@ export function useMessages(ticketId: string | null) {
         // Atualizar mensagens na lista local
         setMensagens((prev) =>
           prev.map((m) =>
-            mensagemIds.includes(m.id) ? { ...m, lida: true, lidaEm: new Date().toISOString() } : m
-          )
+            mensagemIds.includes(m.id) ? { ...m, lida: true, lidaEm: new Date().toISOString() } : m,
+          ),
         );
         console.log('✅ Mensagens marcadas como lidas');
       }
@@ -173,7 +178,7 @@ export function useMessages(ticketId: string | null) {
    */
   const atualizarMensagem = useCallback((mensagemAtualizada: Mensagem) => {
     setMensagens((prev) =>
-      prev.map((m) => (m.id === mensagemAtualizada.id ? mensagemAtualizada : m))
+      prev.map((m) => (m.id === mensagemAtualizada.id ? mensagemAtualizada : m)),
     );
   }, []);
 

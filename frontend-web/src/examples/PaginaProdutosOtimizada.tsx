@@ -31,7 +31,7 @@ export const PaginaProdutosOtimizada: React.FC = () => {
       preco: 2499.99,
       categoria: 'eletrônicos',
       status: 'ativo',
-      descricao: 'Smartphone premium com câmera de alta qualidade'
+      descricao: 'Smartphone premium com câmera de alta qualidade',
     },
     {
       id: '2',
@@ -40,7 +40,7 @@ export const PaginaProdutosOtimizada: React.FC = () => {
       preco: 3299.99,
       categoria: 'eletrônicos',
       status: 'ativo',
-      descricao: 'Notebook para uso profissional'
+      descricao: 'Notebook para uso profissional',
     },
     {
       id: '3',
@@ -49,18 +49,18 @@ export const PaginaProdutosOtimizada: React.FC = () => {
       preco: 89.99,
       categoria: 'roupas',
       status: 'inativo',
-      descricao: 'Camiseta esportiva de alta qualidade'
-    }
+      descricao: 'Camiseta esportiva de alta qualidade',
+    },
   ]);
 
   const handleSaveProduto = async (data: any) => {
     setIsLoading(true);
-    
+
     // Simular salvamento
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
     console.log('Salvando produto:', data);
-    
+
     setIsLoading(false);
   };
 
@@ -83,11 +83,13 @@ export const PaginaProdutosOtimizada: React.FC = () => {
     const statusConfig = {
       ativo: 'bg-green-100 text-green-800',
       inativo: 'bg-yellow-100 text-yellow-800',
-      descontinuado: 'bg-red-100 text-red-800'
+      descontinuado: 'bg-red-100 text-red-800',
     };
 
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusConfig[status as keyof typeof statusConfig]}`}>
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${statusConfig[status as keyof typeof statusConfig]}`}
+      >
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </span>
     );
@@ -96,28 +98,25 @@ export const PaginaProdutosOtimizada: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header Otimizado - Sem Overflow */}
-      <HeaderOtimizado 
-        userInfo={{ 
-          name: 'João Silva', 
-          role: 'Administrador' 
+      <HeaderOtimizado
+        userInfo={{
+          name: 'João Silva',
+          role: 'Administrador',
         }}
       />
 
       {/* Conteúdo Principal */}
       <main className="max-w-7xl mx-auto px-4 py-6">
-        
         {/* Cabeçalho da Página */}
         <div className="mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="heading-responsive text-gray-900">
-                Produtos
-              </h1>
+              <h1 className="heading-responsive text-gray-900">Produtos</h1>
               <p className="text-responsive text-gray-600 mt-1">
                 Gerencie o catálogo de produtos do seu CRM
               </p>
             </div>
-            
+
             <button
               onClick={handleNovoProduto}
               className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
@@ -136,9 +135,7 @@ export const PaginaProdutosOtimizada: React.FC = () => {
                 <p className="caption-responsive text-gray-500 uppercase tracking-wide">
                   Total de Produtos
                 </p>
-                <p className="metric-value text-2xl text-gray-900">
-                  {produtos.length}
-                </p>
+                <p className="metric-value text-2xl text-gray-900">{produtos.length}</p>
               </div>
               <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                 <Plus className="w-5 h-5 text-blue-600" />
@@ -153,7 +150,7 @@ export const PaginaProdutosOtimizada: React.FC = () => {
                   Produtos Ativos
                 </p>
                 <p className="metric-value text-2xl text-green-600">
-                  {produtos.filter(p => p.status === 'ativo').length}
+                  {produtos.filter((p) => p.status === 'ativo').length}
                 </p>
               </div>
               <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
@@ -169,7 +166,11 @@ export const PaginaProdutosOtimizada: React.FC = () => {
                   Valor Médio
                 </p>
                 <p className="metric-value text-2xl text-purple-600">
-                  R$ {(produtos.reduce((acc, p) => acc + p.preco, 0) / produtos.length).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R${' '}
+                  {(produtos.reduce((acc, p) => acc + p.preco, 0) / produtos.length).toLocaleString(
+                    'pt-BR',
+                    { minimumFractionDigits: 2 },
+                  )}
                 </p>
               </div>
               <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -185,7 +186,7 @@ export const PaginaProdutosOtimizada: React.FC = () => {
                   Categorias
                 </p>
                 <p className="metric-value text-2xl text-orange-600">
-                  {new Set(produtos.map(p => p.categoria)).size}
+                  {new Set(produtos.map((p) => p.categoria)).size}
                 </p>
               </div>
               <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -198,9 +199,7 @@ export const PaginaProdutosOtimizada: React.FC = () => {
         {/* Tabela Responsiva */}
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="subheading-responsive text-gray-900">
-              Lista de Produtos
-            </h2>
+            <h2 className="subheading-responsive text-gray-900">Lista de Produtos</h2>
           </div>
 
           {/* Versão Desktop */}
@@ -222,9 +221,7 @@ export const PaginaProdutosOtimizada: React.FC = () => {
                     <td className="p-4">
                       <div>
                         <p className="table-cell font-medium">{produto.nome}</p>
-                        <p className="caption-responsive text-gray-500 mt-1">
-                          {produto.descricao}
-                        </p>
+                        <p className="caption-responsive text-gray-500 mt-1">{produto.descricao}</p>
                       </div>
                     </td>
                     <td className="table-cell-numeric p-4">{produto.codigo}</td>
@@ -232,9 +229,7 @@ export const PaginaProdutosOtimizada: React.FC = () => {
                     <td className="table-cell-numeric text-right p-4">
                       R$ {produto.preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="p-4 text-center">
-                      {getStatusBadge(produto.status)}
-                    </td>
+                    <td className="p-4 text-center">{getStatusBadge(produto.status)}</td>
                     <td className="p-4">
                       <div className="flex items-center justify-center gap-2">
                         <button
@@ -269,7 +264,7 @@ export const PaginaProdutosOtimizada: React.FC = () => {
                   </div>
                   {getStatusBadge(produto.status)}
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="table-cell-numeric font-medium">
@@ -279,7 +274,7 @@ export const PaginaProdutosOtimizada: React.FC = () => {
                       {produto.categoria}
                     </p>
                   </div>
-                  
+
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleEditProduto(produto)}

@@ -254,13 +254,13 @@ try {
     Add-Content -Path $logFile -Value "[$timestamp] ✅ Backup concluído: $backupPath"
     
     # Opcional: Enviar notificação por email
-    # Send-MailMessage -To "admin@conectcrm.com" -Subject "✅ Backup OK" ...
+    # Send-MailMessage -To "admin@conectsuite.com.br" -Subject "✅ Backup OK" ...
     
 } catch {
     Add-Content -Path $logFile -Value "[$timestamp] ❌ Erro: $_"
     
     # Opcional: Alertar sobre falha
-    # Send-MailMessage -To "admin@conectcrm.com" -Subject "❌ Backup FALHOU" ...
+    # Send-MailMessage -To "admin@conectsuite.com.br" -Subject "❌ Backup FALHOU" ...
 }
 ```
 

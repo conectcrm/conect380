@@ -21,7 +21,7 @@ interface FornecedorListItemProps {
 const FornecedorListItem: React.FC<FornecedorListItemProps> = ({
   fornecedor,
   onUpdate,
-  onViewContas
+  onViewContas,
 }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -40,21 +40,16 @@ const FornecedorListItem: React.FC<FornecedorListItemProps> = ({
     }
   };
 
-  const {
-    isLoading,
-    error,
-    removeFornecedor,
-    desativarFornecedor,
-    clearError
-  } = useFornecedorRemoval(
-    onUpdate, // Callback de sucesso
-    onViewContas, // Callback para navegar para contas
-    {
-      onSuccess: (message) => showNotification(message, 'success'),
-      onError: (message) => showNotification(message, 'error'),
-      onInfo: (message) => showNotification(message, 'info')
-    }
-  );
+  const { isLoading, error, removeFornecedor, desativarFornecedor, clearError } =
+    useFornecedorRemoval(
+      onUpdate, // Callback de sucesso
+      onViewContas, // Callback para navegar para contas
+      {
+        onSuccess: (message) => showNotification(message, 'success'),
+        onError: (message) => showNotification(message, 'error'),
+        onInfo: (message) => showNotification(message, 'info'),
+      },
+    );
 
   const handleDeleteClick = () => {
     setShowDeleteConfirm(true);
@@ -87,24 +82,20 @@ const FornecedorListItem: React.FC<FornecedorListItemProps> = ({
 
   return (
     <>
-      <div className={`bg-white rounded-lg shadow-sm border p-4 ${!fornecedor.ativo ? 'opacity-60' : ''}`}>
+      <div
+        className={`bg-white rounded-lg shadow-sm border p-4 ${!fornecedor.ativo ? 'opacity-60' : ''}`}
+      >
         <div className="flex items-center justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-gray-900">{fornecedor.nome}</h3>
               {!fornecedor.ativo && (
-                <span className="px-2 py-1 text-xs bg-gray-200 text-gray-600 rounded">
-                  Inativo
-                </span>
+                <span className="px-2 py-1 text-xs bg-gray-200 text-gray-600 rounded">Inativo</span>
               )}
             </div>
             <p className="text-sm text-gray-600">{fornecedor.cnpj}</p>
-            {fornecedor.telefone && (
-              <p className="text-sm text-gray-500">{fornecedor.telefone}</p>
-            )}
-            {fornecedor.email && (
-              <p className="text-sm text-gray-500">{fornecedor.email}</p>
-            )}
+            {fornecedor.telefone && <p className="text-sm text-gray-500">{fornecedor.telefone}</p>}
+            {fornecedor.email && <p className="text-sm text-gray-500">{fornecedor.email}</p>}
           </div>
 
           <div className="flex items-center gap-2">
@@ -144,8 +135,8 @@ const FornecedorListItem: React.FC<FornecedorListItemProps> = ({
             </div>
 
             <p className="text-gray-600 mb-6">
-              Tem certeza que deseja excluir o fornecedor <strong>{fornecedor.nome}</strong>?
-              Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir o fornecedor <strong>{fornecedor.nome}</strong>? Esta
+              ação não pode ser desfeita.
             </p>
 
             <div className="flex gap-3">

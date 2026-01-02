@@ -24,7 +24,7 @@ import {
   Eye,
   Users,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
 } from 'lucide-react';
 
 export const OportunidadesPage: React.FC = () => {
@@ -46,13 +46,10 @@ export const OportunidadesPage: React.FC = () => {
     excluirOportunidade,
     moverOportunidade,
     aplicarFiltros,
-    limparFiltros
+    limparFiltros,
   } = useOportunidades();
 
-  const {
-    estatisticas,
-    loading: loadingEstatisticas
-  } = useEstatisticasOportunidades(filtros);
+  const { estatisticas, loading: loadingEstatisticas } = useEstatisticasOportunidades(filtros);
 
   // Busca em tempo real com debounce otimizado
   useEffect(() => {
@@ -78,16 +75,21 @@ export const OportunidadesPage: React.FC = () => {
 
   const getIconeVisualizacao = (tipo: VisualizacaoOportunidades) => {
     switch (tipo) {
-      case 'kanban': return Grid3X3;
-      case 'lista': return List;
-      case 'calendario': return Calendar;
-      case 'grafico': return BarChart3;
-      default: return Grid3X3;
+      case 'kanban':
+        return Grid3X3;
+      case 'lista':
+        return List;
+      case 'calendario':
+        return Calendar;
+      case 'grafico':
+        return BarChart3;
+      default:
+        return Grid3X3;
     }
   };
 
   const getCountFiltrosAtivos = () => {
-    return Object.keys(filtros).filter(key => {
+    return Object.keys(filtros).filter((key) => {
       const valor = filtros[key as keyof typeof filtros];
       return valor !== undefined && valor !== '' && valor !== null;
     }).length;
@@ -98,7 +100,9 @@ export const OportunidadesPage: React.FC = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Erro ao carregar oportunidades</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Erro ao carregar oportunidades
+          </h2>
           <p className="text-gray-600 mb-4">{error}</p>
           <button
             onClick={() => carregarOportunidades(false)}
@@ -121,14 +125,14 @@ export const OportunidadesPage: React.FC = () => {
             nucleusPath="/nuclei/crm"
             currentModuleName="Oportunidades"
           />
-          
+
           <div className="flex items-center justify-between mt-4">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <Target className="w-6 h-6 text-[#159A9C]" />
                 <h1 className="text-2xl font-bold text-gray-900">Oportunidades</h1>
               </div>
-              
+
               {estatisticas && (
                 <div className="hidden md:flex items-center space-x-4 text-sm text-gray-600">
                   <span className="flex items-center">
@@ -137,9 +141,9 @@ export const OportunidadesPage: React.FC = () => {
                   </span>
                   <span className="flex items-center">
                     <TrendingUp className="w-4 h-4 mr-1" />
-                    {new Intl.NumberFormat('pt-BR', { 
-                      style: 'currency', 
-                      currency: 'BRL' 
+                    {new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
                     }).format(estatisticas.valorTotalPipeline)}
                   </span>
                 </div>
@@ -164,9 +168,10 @@ export const OportunidadesPage: React.FC = () => {
                 onClick={() => setMostrarFiltros(!mostrarFiltros)}
                 className={`
                   px-3 py-2 rounded-lg border transition-colors flex items-center space-x-2
-                  ${mostrarFiltros 
-                    ? 'bg-[#159A9C] text-white border-[#159A9C]' 
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  ${
+                    mostrarFiltros
+                      ? 'bg-[#159A9C] text-white border-[#159A9C]'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                   }
                   ${getCountFiltrosAtivos() > 0 ? 'ring-2 ring-orange-200' : ''}
                 `}
@@ -182,25 +187,28 @@ export const OportunidadesPage: React.FC = () => {
 
               {/* Visualizações */}
               <div className="flex items-center bg-gray-100 rounded-lg p-1">
-                {(['kanban', 'lista', 'calendario', 'grafico'] as VisualizacaoOportunidades[]).map((tipo) => {
-                  const Icone = getIconeVisualizacao(tipo);
-                  return (
-                    <button
-                      key={tipo}
-                      onClick={() => setVisualizacao(tipo)}
-                      className={`
+                {(['kanban', 'lista', 'calendario', 'grafico'] as VisualizacaoOportunidades[]).map(
+                  (tipo) => {
+                    const Icone = getIconeVisualizacao(tipo);
+                    return (
+                      <button
+                        key={tipo}
+                        onClick={() => setVisualizacao(tipo)}
+                        className={`
                         p-2 rounded-md transition-colors
-                        ${visualizacao === tipo 
-                          ? 'bg-white text-[#159A9C] shadow-sm' 
-                          : 'text-gray-600 hover:text-gray-900'
+                        ${
+                          visualizacao === tipo
+                            ? 'bg-white text-[#159A9C] shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
                         }
                       `}
-                      title={tipo.charAt(0).toUpperCase() + tipo.slice(1)}
-                    >
-                      <Icone className="w-4 h-4" />
-                    </button>
-                  );
-                })}
+                        title={tipo.charAt(0).toUpperCase() + tipo.slice(1)}
+                      >
+                        <Icone className="w-4 h-4" />
+                      </button>
+                    );
+                  },
+                )}
               </div>
 
               {/* Ações */}

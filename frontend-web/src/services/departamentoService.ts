@@ -112,9 +112,7 @@ class DepartamentoService {
    */
   async adicionarAtendente(departamentoId: string, atendenteId: string): Promise<Departamento> {
     try {
-      const response = await api.post(
-        `/departamentos/${departamentoId}/atendentes/${atendenteId}`
-      );
+      const response = await api.post(`/departamentos/${departamentoId}/atendentes/${atendenteId}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao adicionar atendente:', error);
@@ -128,7 +126,7 @@ class DepartamentoService {
   async removerAtendente(departamentoId: string, atendenteId: string): Promise<Departamento> {
     try {
       const response = await api.delete(
-        `/departamentos/${departamentoId}/atendentes/${atendenteId}`
+        `/departamentos/${departamentoId}/atendentes/${atendenteId}`,
       );
       return response.data;
     } catch (error) {
@@ -140,10 +138,7 @@ class DepartamentoService {
   /**
    * Reordena os departamentos de um núcleo
    */
-  async reordenar(
-    nucleoId: string,
-    ordenacao: { id: string; ordem: number }[]
-  ): Promise<void> {
+  async reordenar(nucleoId: string, ordenacao: { id: string; ordem: number }[]): Promise<void> {
     try {
       await api.post('/departamentos/reordenar', {
         nucleoId,

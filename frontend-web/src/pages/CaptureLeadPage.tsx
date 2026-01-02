@@ -1,10 +1,18 @@
 import React, { useState } from 'react';
-import { UserPlus, Mail, Phone, Briefcase, MessageSquare, CheckCircle, AlertCircle } from 'lucide-react';
+import {
+  UserPlus,
+  Mail,
+  Phone,
+  Briefcase,
+  MessageSquare,
+  CheckCircle,
+  AlertCircle,
+} from 'lucide-react';
 import leadsService, { CaptureLeadDto } from '../services/leadsService';
 
 /**
  * CaptureLeadPage - Formulário Público de Captura de Leads
- * 
+ *
  * Landing page pública (sem autenticação) para captura de leads externos.
  * Pode ser usada em:
  * - Links de campanhas de marketing
@@ -27,7 +35,7 @@ const CaptureLeadPage: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
@@ -82,9 +90,7 @@ const CaptureLeadPage: React.FC = () => {
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="h-12 w-12 text-green-600" />
             </div>
-            <h1 className="text-3xl font-bold text-[#002333] mb-2">
-              Mensagem Enviada!
-            </h1>
+            <h1 className="text-3xl font-bold text-[#002333] mb-2">Mensagem Enviada!</h1>
             <p className="text-[#B4BEC9]">
               Obrigado pelo seu interesse. Nossa equipe entrará em contato em breve.
             </p>
@@ -111,9 +117,7 @@ const CaptureLeadPage: React.FC = () => {
               <UserPlus className="h-8 w-8 text-[#159A9C]" />
             </div>
           </div>
-          <h1 className="text-4xl font-bold text-[#002333] mb-3">
-            Entre em Contato
-          </h1>
+          <h1 className="text-4xl font-bold text-[#002333] mb-3">Entre em Contato</h1>
           <p className="text-lg text-[#B4BEC9]">
             Preencha o formulário abaixo e nossa equipe entrará em contato
           </p>
@@ -189,7 +193,10 @@ const CaptureLeadPage: React.FC = () => {
 
             {/* Empresa */}
             <div>
-              <label htmlFor="empresa_nome" className="block text-sm font-medium text-[#002333] mb-2">
+              <label
+                htmlFor="empresa_nome"
+                className="block text-sm font-medium text-[#002333] mb-2"
+              >
                 Empresa
               </label>
               <div className="relative">
@@ -258,17 +265,15 @@ const CaptureLeadPage: React.FC = () => {
 
             {/* Disclaimer */}
             <p className="text-xs text-center text-gray-500">
-              Ao enviar este formulário, você concorda com nossa política de privacidade.
-              Suas informações serão usadas apenas para entrar em contato.
+              Ao enviar este formulário, você concorda com nossa política de privacidade. Suas
+              informações serão usadas apenas para entrar em contato.
             </p>
           </form>
         </div>
 
         {/* Footer Info */}
         <div className="text-center mt-8">
-          <p className="text-sm text-gray-500">
-            Resposta em até 24 horas úteis
-          </p>
+          <p className="text-sm text-gray-500">Resposta em até 24 horas úteis</p>
         </div>
       </div>
     </div>

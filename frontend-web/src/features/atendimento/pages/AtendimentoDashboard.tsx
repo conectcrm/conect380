@@ -19,7 +19,7 @@ import {
   UserCheck,
   BarChart3,
   Calendar,
-  Target
+  Target,
 } from 'lucide-react';
 
 const AtendimentoDashboard: React.FC = () => {
@@ -33,26 +33,26 @@ const AtendimentoDashboard: React.FC = () => {
       aguardandoAtendente: 8,
       emAtendimento: 15,
       resolvidosHoje: 47,
-      satisfacao: 4.8
+      satisfacao: 4.8,
     },
     tempo: {
       tempoMedioResposta: 4, // minutos
       tempoMedioAtendimento: 18, // minutos
       tempoMedioResolucao: 2.5, // horas
-      slaAtendimento: 97.3 // %
+      slaAtendimento: 97.3, // %
     },
     canais: {
       whatsapp: { total: 28, porcentagem: 65 },
       chat: { total: 8, porcentagem: 18 },
       email: { total: 5, porcentagem: 12 },
-      telefone: { total: 2, porcentagem: 5 }
+      telefone: { total: 2, porcentagem: 5 },
     },
     atendentes: {
       online: 6,
       ocupados: 4,
       ausentes: 2,
-      total: 12
-    }
+      total: 12,
+    },
   };
 
   const atendimentosRecentes = [
@@ -63,7 +63,7 @@ const AtendimentoDashboard: React.FC = () => {
       assunto: 'Dúvida sobre cobrança',
       tempo: '5 min',
       status: 'em_atendimento',
-      atendente: 'João Santos'
+      atendente: 'João Santos',
     },
     {
       id: '2',
@@ -72,7 +72,7 @@ const AtendimentoDashboard: React.FC = () => {
       assunto: 'Suporte técnico',
       tempo: '12 min',
       status: 'aguardando',
-      atendente: null
+      atendente: null,
     },
     {
       id: '3',
@@ -81,7 +81,7 @@ const AtendimentoDashboard: React.FC = () => {
       assunto: 'Solicitação de cancelamento',
       tempo: '1h',
       status: 'resolvido',
-      atendente: 'Maria Fernanda'
+      atendente: 'Maria Fernanda',
     },
     {
       id: '4',
@@ -90,8 +90,8 @@ const AtendimentoDashboard: React.FC = () => {
       assunto: 'Informações sobre produto',
       tempo: '25 min',
       status: 'em_atendimento',
-      atendente: 'Lucas Pereira'
-    }
+      atendente: 'Lucas Pereira',
+    },
   ];
 
   const getStatusColor = (status: string) => {
@@ -152,11 +152,15 @@ const AtendimentoDashboard: React.FC = () => {
             </div>
             <div className="mt-4 sm:mt-0 flex items-center space-x-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-[#002333]">{atendimentoData.tickets.abertos}</div>
+                <div className="text-2xl font-bold text-[#002333]">
+                  {atendimentoData.tickets.abertos}
+                </div>
                 <div className="text-sm text-purple-600">Tickets Abertos</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-purple-900">{atendimentoData.atendentes.online}</div>
+                <div className="text-2xl font-bold text-purple-900">
+                  {atendimentoData.atendentes.online}
+                </div>
                 <div className="text-sm text-purple-600">Atendentes Online</div>
               </div>
             </div>
@@ -172,7 +176,7 @@ const AtendimentoDashboard: React.FC = () => {
             trend={{
               value: 5,
               isPositive: true,
-              label: "novos hoje"
+              label: 'novos hoje',
             }}
             color="blue"
           />
@@ -184,7 +188,7 @@ const AtendimentoDashboard: React.FC = () => {
             trend={{
               value: 2,
               isPositive: false,
-              label: "min vs ontem"
+              label: 'min vs ontem',
             }}
             color="green"
           />
@@ -196,7 +200,7 @@ const AtendimentoDashboard: React.FC = () => {
             trend={{
               value: 0.3,
               isPositive: true,
-              label: "vs mês anterior"
+              label: 'vs mês anterior',
             }}
             color="purple"
           />
@@ -208,7 +212,7 @@ const AtendimentoDashboard: React.FC = () => {
             trend={{
               value: 2.1,
               isPositive: true,
-              label: "% vs mês anterior"
+              label: '% vs mês anterior',
             }}
             color="orange"
           />
@@ -229,7 +233,9 @@ const AtendimentoDashboard: React.FC = () => {
                   <div className="w-3 h-3 bg-yellow-500 rounded-full mr-3"></div>
                   <span className="text-sm text-gray-600">Aguardando Atendente</span>
                 </div>
-                <span className="text-sm font-medium text-gray-900">{atendimentoData.tickets.aguardandoAtendente}</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {atendimentoData.tickets.aguardandoAtendente}
+                </span>
               </div>
 
               <div className="flex items-center justify-between">
@@ -237,7 +243,9 @@ const AtendimentoDashboard: React.FC = () => {
                   <div className="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
                   <span className="text-sm text-gray-600">Em Atendimento</span>
                 </div>
-                <span className="text-sm font-medium text-gray-900">{atendimentoData.tickets.emAtendimento}</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {atendimentoData.tickets.emAtendimento}
+                </span>
               </div>
 
               <div className="flex items-center justify-between">
@@ -245,7 +253,9 @@ const AtendimentoDashboard: React.FC = () => {
                   <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
                   <span className="text-sm text-gray-600">Resolvidos Hoje</span>
                 </div>
-                <span className="text-sm font-medium text-gray-900">{atendimentoData.tickets.resolvidosHoje}</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {atendimentoData.tickets.resolvidosHoje}
+                </span>
               </div>
             </div>
           </div>
@@ -261,9 +271,7 @@ const AtendimentoDashboard: React.FC = () => {
               {Object.entries(atendimentoData.canais).map(([canal, dados]) => (
                 <div key={canal} className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <div className="p-2 bg-gray-100 rounded-lg mr-3">
-                      {getCanalIcon(canal)}
-                    </div>
+                    <div className="p-2 bg-gray-100 rounded-lg mr-3">{getCanalIcon(canal)}</div>
                     <span className="text-sm text-gray-600 capitalize">{canal}</span>
                   </div>
                   <div className="flex items-center">
@@ -322,7 +330,9 @@ const AtendimentoDashboard: React.FC = () => {
                         <div className="p-1 bg-gray-100 rounded mr-2">
                           {getCanalIcon(atendimento.canal)}
                         </div>
-                        <span className="text-sm text-gray-600 capitalize">{atendimento.canal}</span>
+                        <span className="text-sm text-gray-600 capitalize">
+                          {atendimento.canal}
+                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -332,14 +342,14 @@ const AtendimentoDashboard: React.FC = () => {
                       <div className="text-sm text-gray-600">{atendimento.tempo}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(atendimento.status)}`}>
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(atendimento.status)}`}
+                      >
                         {getStatusText(atendimento.status)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {atendimento.atendente || '-'}
-                      </div>
+                      <div className="text-sm text-gray-900">{atendimento.atendente || '-'}</div>
                     </td>
                   </tr>
                 ))}

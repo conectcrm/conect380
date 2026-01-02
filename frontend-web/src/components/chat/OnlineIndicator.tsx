@@ -10,11 +10,11 @@ interface OnlineIndicatorProps {
 
 /**
  * Componente para mostrar indicador de status online/offline
- * 
+ *
  * @example
  * // Apenas bolinha
  * <OnlineIndicator isOnline={true} />
- * 
+ *
  * @example
  * // Com texto
  * <OnlineIndicator isOnline={true} showText lastActivity={ticket.contatoLastActivity} />
@@ -24,14 +24,13 @@ export function OnlineIndicator({
   size = 'md',
   showText = false,
   lastActivity,
-  className = ''
+  className = '',
 }: OnlineIndicatorProps) {
-
   // Tamanhos da bolinha
   const sizeClasses = {
     sm: 'w-2 h-2',
     md: 'w-3 h-3',
-    lg: 'w-4 h-4'
+    lg: 'w-4 h-4',
   };
 
   // Formatar tempo desde última atividade
@@ -61,21 +60,21 @@ export function OnlineIndicator({
     return (
       <div className={`flex items-center gap-1.5 ${className}`}>
         <div
-          className={`${sizeClasses[size]} rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'
-            } animate-pulse`}
+          className={`${sizeClasses[size]} rounded-full ${
+            isOnline ? 'bg-green-500' : 'bg-gray-400'
+          } animate-pulse`}
           title={statusText}
         />
-        <span className="text-xs text-gray-500">
-          {statusText}
-        </span>
+        <span className="text-xs text-gray-500">{statusText}</span>
       </div>
     );
   }
 
   return (
     <div
-      className={`${sizeClasses[size]} rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'
-        } ${isOnline ? 'animate-pulse' : ''} ${className}`}
+      className={`${sizeClasses[size]} rounded-full ${
+        isOnline ? 'bg-green-500' : 'bg-gray-400'
+      } ${isOnline ? 'animate-pulse' : ''} ${className}`}
       title={statusText}
     />
   );
@@ -91,25 +90,19 @@ interface AvatarWithStatusProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
-export function AvatarWithStatus({
-  nome,
-  isOnline,
-  foto,
-  size = 'md'
-}: AvatarWithStatusProps) {
-
+export function AvatarWithStatus({ nome, isOnline, foto, size = 'md' }: AvatarWithStatusProps) {
   // Tamanhos do avatar
   const avatarSizes = {
     sm: 'w-8 h-8 text-xs',
     md: 'w-10 h-10 text-sm',
-    lg: 'w-12 h-12 text-base'
+    lg: 'w-12 h-12 text-base',
   };
 
   // Tamanhos do indicador
   const indicatorSizes = {
     sm: 'w-2 h-2',
     md: 'w-3 h-3',
-    lg: 'w-3.5 h-3.5'
+    lg: 'w-3.5 h-3.5',
   };
 
   // Obter iniciais do nome
@@ -123,21 +116,20 @@ export function AvatarWithStatus({
   return (
     <div className="relative inline-block">
       {foto ? (
-        <img
-          src={foto}
-          alt={nome}
-          className={`${avatarSizes[size]} rounded-full object-cover`}
-        />
+        <img src={foto} alt={nome} className={`${avatarSizes[size]} rounded-full object-cover`} />
       ) : (
-        <div className={`${avatarSizes[size]} rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold`}>
+        <div
+          className={`${avatarSizes[size]} rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold`}
+        >
           {getIniciais(nome)}
         </div>
       )}
 
       {/* Bolinha de status */}
       <div
-        className={`absolute bottom-0 right-0 ${indicatorSizes[size]} rounded-full border-2 border-white ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
-          }`}
+        className={`absolute bottom-0 right-0 ${indicatorSizes[size]} rounded-full border-2 border-white ${
+          isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+        }`}
         title={isOnline ? 'Online' : 'Offline'}
       />
     </div>

@@ -10,40 +10,47 @@ interface Props {
   ticketAtual?: any;
 }
 
-type MotivoEncerramento = 'resolvido' | 'cancelado' | 'sem_resposta' | 'duplicado' | 'spam' | 'outro';
+type MotivoEncerramento =
+  | 'resolvido'
+  | 'cancelado'
+  | 'sem_resposta'
+  | 'duplicado'
+  | 'spam'
+  | 'outro';
 
-const MOTIVOS_ENCERRAMENTO: Array<{ value: MotivoEncerramento; label: string; descricao: string }> = [
-  {
-    value: 'resolvido',
-    label: 'Resolvido',
-    descricao: 'Problema/solicitação foi resolvido com sucesso'
-  },
-  {
-    value: 'cancelado',
-    label: 'Cancelado',
-    descricao: 'Atendimento cancelado pelo cliente ou atendente'
-  },
-  {
-    value: 'sem_resposta',
-    label: 'Sem Resposta',
-    descricao: 'Cliente não respondeu após várias tentativas'
-  },
-  {
-    value: 'duplicado',
-    label: 'Duplicado',
-    descricao: 'Ticket duplicado - já existe outro atendimento para este caso'
-  },
-  {
-    value: 'spam',
-    label: 'Spam',
-    descricao: 'Mensagem indesejada ou spam'
-  },
-  {
-    value: 'outro',
-    label: 'Outro',
-    descricao: 'Outro motivo não listado'
-  },
-];
+const MOTIVOS_ENCERRAMENTO: Array<{ value: MotivoEncerramento; label: string; descricao: string }> =
+  [
+    {
+      value: 'resolvido',
+      label: 'Resolvido',
+      descricao: 'Problema/solicitação foi resolvido com sucesso',
+    },
+    {
+      value: 'cancelado',
+      label: 'Cancelado',
+      descricao: 'Atendimento cancelado pelo cliente ou atendente',
+    },
+    {
+      value: 'sem_resposta',
+      label: 'Sem Resposta',
+      descricao: 'Cliente não respondeu após várias tentativas',
+    },
+    {
+      value: 'duplicado',
+      label: 'Duplicado',
+      descricao: 'Ticket duplicado - já existe outro atendimento para este caso',
+    },
+    {
+      value: 'spam',
+      label: 'Spam',
+      descricao: 'Mensagem indesejada ou spam',
+    },
+    {
+      value: 'outro',
+      label: 'Outro',
+      descricao: 'Outro motivo não listado',
+    },
+  ];
 
 export function EncerrarAtendimentoModal({ isOpen, onClose, onSucesso, ticketAtual }: Props) {
   const { user } = useAuth();
@@ -117,7 +124,7 @@ export function EncerrarAtendimentoModal({ isOpen, onClose, onSucesso, ticketAtu
         },
         {
           params: { empresaId },
-        }
+        },
       );
 
       // Se houver follow-up, criar em endpoint separado (se existir)
@@ -160,7 +167,8 @@ export function EncerrarAtendimentoModal({ isOpen, onClose, onSucesso, ticketAtu
 
   const mostrarToastSucesso = () => {
     const toast = document.createElement('div');
-    toast.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2';
+    toast.className =
+      'fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2';
     toast.innerHTML = `
       <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
@@ -179,7 +187,7 @@ export function EncerrarAtendimentoModal({ isOpen, onClose, onSucesso, ticketAtu
 
   if (!isOpen) return null;
 
-  const motivoSelecionado = MOTIVOS_ENCERRAMENTO.find(m => m.value === motivo);
+  const motivoSelecionado = MOTIVOS_ENCERRAMENTO.find((m) => m.value === motivo);
 
   // Data mínima para follow-up: amanhã
   const amanha = new Date();
@@ -236,17 +244,22 @@ export function EncerrarAtendimentoModal({ isOpen, onClose, onSucesso, ticketAtu
                   key={m.value}
                   onClick={() => setMotivo(m.value)}
                   disabled={loading}
-                  className={`p-4 rounded-lg border-2 text-left transition-all ${motivo === m.value
-                    ? 'border-green-600 bg-green-50'
-                    : 'border-gray-200 hover:border-gray-300 bg-white'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  className={`p-4 rounded-lg border-2 text-left transition-all ${
+                    motivo === m.value
+                      ? 'border-green-600 bg-green-50'
+                      : 'border-gray-200 hover:border-gray-300 bg-white'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
-                  <div className={`font-semibold text-sm mb-1 ${motivo === m.value ? 'text-green-900' : 'text-gray-900'
-                    }`}>
+                  <div
+                    className={`font-semibold text-sm mb-1 ${
+                      motivo === m.value ? 'text-green-900' : 'text-gray-900'
+                    }`}
+                  >
                     {m.label}
                   </div>
-                  <div className={`text-xs ${motivo === m.value ? 'text-green-700' : 'text-gray-500'
-                    }`}>
+                  <div
+                    className={`text-xs ${motivo === m.value ? 'text-green-700' : 'text-gray-500'}`}
+                  >
                     {m.descricao}
                   </div>
                 </button>
@@ -257,7 +270,8 @@ export function EncerrarAtendimentoModal({ isOpen, onClose, onSucesso, ticketAtu
             {motivoSelecionado && (
               <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                 <p className="text-sm text-gray-600">
-                  <span className="font-medium">Motivo selecionado:</span> {motivoSelecionado.descricao}
+                  <span className="font-medium">Motivo selecionado:</span>{' '}
+                  {motivoSelecionado.descricao}
                 </p>
               </div>
             )}
@@ -355,8 +369,9 @@ export function EncerrarAtendimentoModal({ isOpen, onClose, onSucesso, ticketAtu
                   Atenção: Esta ação não pode ser desfeita
                 </p>
                 <p className="text-xs text-yellow-700 mt-1">
-                  Ao encerrar o ticket, ele será marcado como concluído e removido da lista de atendimentos ativos.
-                  Você poderá consultar o histórico, mas não poderá reabrir o ticket diretamente.
+                  Ao encerrar o ticket, ele será marcado como concluído e removido da lista de
+                  atendimentos ativos. Você poderá consultar o histórico, mas não poderá reabrir o
+                  ticket diretamente.
                 </p>
               </div>
             </div>

@@ -11,7 +11,7 @@ import {
   ExternalLink,
   Download,
   Send,
-  Edit
+  Edit,
 } from 'lucide-react';
 import StatusFluxo from './StatusFluxo';
 import { calculateSafePosition } from '../../../utils/dom-helper';
@@ -35,7 +35,7 @@ export const PreviewProposta: React.FC<PreviewPropostaProps> = ({
   onEdit,
   onDownload,
   onSend,
-  position
+  position,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -49,7 +49,7 @@ export const PreviewProposta: React.FC<PreviewPropostaProps> = ({
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value || 0);
   };
 
@@ -80,10 +80,7 @@ export const PreviewProposta: React.FC<PreviewPropostaProps> = ({
   return (
     <>
       {/* Overlay transparente para fechar */}
-      <div
-        className="fixed inset-0 z-40"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 z-40" onClick={onClose} />
 
       {/* Preview Card */}
       <div
@@ -91,7 +88,7 @@ export const PreviewProposta: React.FC<PreviewPropostaProps> = ({
         style={{
           left: adjustedPosition.x,
           top: adjustedPosition.y,
-          transform: 'translate(10px, -50%)'
+          transform: 'translate(10px, -50%)',
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -118,10 +115,7 @@ export const PreviewProposta: React.FC<PreviewPropostaProps> = ({
 
         {/* Status Flow */}
         <div className="p-4 bg-gray-50 border-b border-gray-200">
-          <StatusFluxo
-            status={proposta.status}
-            compact={true}
-          />
+          <StatusFluxo status={proposta.status} compact={true} />
         </div>
 
         {/* Conteúdo Principal */}
@@ -143,9 +137,7 @@ export const PreviewProposta: React.FC<PreviewPropostaProps> = ({
                 <User className="w-4 h-4 text-gray-500" />
                 <span className="text-sm font-medium text-gray-700">Vendedor</span>
               </div>
-              <p className="text-sm text-gray-900">
-                {proposta.vendedor || 'Não atribuído'}
-              </p>
+              <p className="text-sm text-gray-900">{proposta.vendedor || 'Não atribuído'}</p>
             </div>
           </div>
 
@@ -156,9 +148,7 @@ export const PreviewProposta: React.FC<PreviewPropostaProps> = ({
                 <DollarSign className="w-4 h-4 text-gray-500" />
                 <span className="text-sm font-medium text-gray-700">Valor</span>
               </div>
-              <p className="text-lg font-bold text-green-600">
-                {formatCurrency(proposta.valor)}
-              </p>
+              <p className="text-lg font-bold text-green-600">{formatCurrency(proposta.valor)}</p>
             </div>
 
             <div>
@@ -166,21 +156,24 @@ export const PreviewProposta: React.FC<PreviewPropostaProps> = ({
                 <Calendar className="w-4 h-4 text-gray-500" />
                 <span className="text-sm font-medium text-gray-700">Vencimento</span>
               </div>
-              <p className="text-sm text-gray-900">
-                {formatDate(proposta.data_vencimento)}
-              </p>
+              <p className="text-sm text-gray-900">{formatDate(proposta.data_vencimento)}</p>
               {diasRestantes !== null && (
-                <p className={`text-xs font-medium mt-1 ${diasRestantes < 0 ? 'text-red-600' :
-                  diasRestantes <= 3 ? 'text-orange-600' :
-                    diasRestantes <= 7 ? 'text-yellow-600' :
-                      'text-green-600'
-                  }`}>
+                <p
+                  className={`text-xs font-medium mt-1 ${
+                    diasRestantes < 0
+                      ? 'text-red-600'
+                      : diasRestantes <= 3
+                        ? 'text-orange-600'
+                        : diasRestantes <= 7
+                          ? 'text-yellow-600'
+                          : 'text-green-600'
+                  }`}
+                >
                   {diasRestantes < 0
                     ? `Vencida há ${Math.abs(diasRestantes)} dias`
                     : diasRestantes === 0
                       ? 'Vence hoje'
-                      : `${diasRestantes} dias restantes`
-                  }
+                      : `${diasRestantes} dias restantes`}
                 </p>
               )}
             </div>
@@ -192,18 +185,14 @@ export const PreviewProposta: React.FC<PreviewPropostaProps> = ({
               <Clock className="w-4 h-4 text-gray-500" />
               <span className="text-sm font-medium text-gray-700">Criada em</span>
             </div>
-            <p className="text-sm text-gray-900">
-              {formatDate(proposta.data_criacao)}
-            </p>
+            <p className="text-sm text-gray-900">{formatDate(proposta.data_criacao)}</p>
           </div>
 
           {/* Descrição (se houver) */}
           {proposta.descricao && (
             <div>
               <h4 className="text-sm font-medium text-gray-700 mb-1">Descrição</h4>
-              <p className="text-sm text-gray-600 line-clamp-3">
-                {proposta.descricao}
-              </p>
+              <p className="text-sm text-gray-600 line-clamp-3">{proposta.descricao}</p>
             </div>
           )}
         </div>
@@ -247,10 +236,15 @@ export const PreviewProposta: React.FC<PreviewPropostaProps> = ({
 
         {/* Indicador de Urgência */}
         {diasRestantes !== null && diasRestantes <= 7 && (
-          <div className={`absolute top-4 right-12 w-3 h-3 rounded-full ${diasRestantes < 0 ? 'bg-red-500' :
-            diasRestantes <= 3 ? 'bg-orange-500' :
-              'bg-yellow-500'
-            } animate-pulse`} />
+          <div
+            className={`absolute top-4 right-12 w-3 h-3 rounded-full ${
+              diasRestantes < 0
+                ? 'bg-red-500'
+                : diasRestantes <= 3
+                  ? 'bg-orange-500'
+                  : 'bg-yellow-500'
+            } animate-pulse`}
+          />
         )}
       </div>
     </>

@@ -13,7 +13,7 @@ async function demonstrarEdicaoPlanos() {
       'Accept': 'application/json'
     },
     body: JSON.stringify({
-      email: 'admin@conectcrm.com',
+      email: 'admin@conectsuite.com.br',
       senha: 'password'
     })
   });

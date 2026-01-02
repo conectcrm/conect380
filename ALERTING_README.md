@@ -219,6 +219,19 @@ GRAFANA_ADMIN_USER=admin
 GRAFANA_ADMIN_PASSWORD=admin123
 ```
 
+#### Alertas internos (fila `notifications` no backend)
+
+No backend, alertas críticos são enfileirados via `notify-user` para o admin configurado:
+
+- `NOTIFICATIONS_ADMIN_USER_ID`: **obrigatório** para receber alertas internos (breaker, backlog alto e SLA em risco/violado). Sem esse valor, nenhum alerta interno é enviado.
+- `NOTIFICATIONS_BACKLOG_THRESHOLD`: opcional; se definido, alerta de backlog alto da fila de notificações (cooldown 5min).
+
+Detalhes de comportamento:
+- SLA: tickets em risco/violados geram `notify-user` deduplicado por status/ticket e não interrompem o fluxo de SLA se a fila falhar.
+- Breaker/backlog: abertura de breaker ou backlog acima do limiar envia `notify-user` para o admin quando configurado.
+- Email: handler real via SMTP (`SEND_EMAIL`) com retry/jitter; na última tentativa falha notifica admin via `notify-user` com contexto.
+- WhatsApp/SMS/Push: handlers ainda no-op; a cada job é enviada notificação ao admin informando que o canal está em modo no-op (payload inclui `context`, `jobId` e destinatário).
+
 ### 2. Configurar Slack
 
 1. Criar app em: https://api.slack.com/apps

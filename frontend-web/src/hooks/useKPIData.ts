@@ -28,29 +28,29 @@ export const useKPIData = () => {
     const fetchKPIData = async () => {
       try {
         setIsLoading(true);
-        
+
         // Simula uma chamada para API
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
+        await new Promise((resolve) => setTimeout(resolve, 800));
+
         const mockData: KPIData = {
           totalClientes: {
             value: 248,
-            trend: { value: 12, isPositive: true, label: 'este mês' }
+            trend: { value: 12, isPositive: true, label: 'este mês' },
           },
           propostasAtivas: {
             value: 32,
-            trend: { value: 5, isPositive: true, label: 'esta semana' }
+            trend: { value: 5, isPositive: true, label: 'esta semana' },
           },
           receitaMes: {
             value: 'R$ 125.000,00',
-            trend: { value: 23, isPositive: true, label: 'vs mês anterior' }
+            trend: { value: 23, isPositive: true, label: 'vs mês anterior' },
           },
           taxaConversao: {
             value: '68%',
-            trend: { value: 3, isPositive: true, label: 'vs período anterior' }
-          }
+            trend: { value: 3, isPositive: true, label: 'vs período anterior' },
+          },
         };
-        
+
         setData(mockData);
       } catch (err) {
         setError('Erro ao carregar dados dos KPIs');

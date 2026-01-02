@@ -20,22 +20,23 @@ export const contatosMock: Contato[] = [
       cidade: 'São Paulo',
       estado: 'SP',
       cep: '01234-567',
-      pais: 'Brasil'
+      pais: 'Brasil',
     },
     redes_sociais: {
       linkedin: 'https://linkedin.com/in/joaosilva',
-      twitter: 'https://twitter.com/joaosilva'
+      twitter: 'https://twitter.com/joaosilva',
     },
     tags: ['Cliente VIP', 'Tecnologia', 'Tomador de Decisão'],
     pontuacao_lead: 95,
     valor_potencial: 150000,
-    notas: 'Cliente muito engajado, interessado em expandir o negócio. Possui budget aprovado para novos projetos.',
+    notas:
+      'Cliente muito engajado, interessado em expandir o negócio. Possui budget aprovado para novos projetos.',
     anexos: [],
     atividades_recentes: 12,
     oportunidades_abertas: 2,
     vendas_realizadas: 3,
     valor_total_vendas: 450000,
-    categoria: 'Tecnologia'
+    categoria: 'Tecnologia',
   },
   {
     id: '2',
@@ -56,11 +57,11 @@ export const contatosMock: Contato[] = [
       cidade: 'São Paulo',
       estado: 'SP',
       cep: '01310-100',
-      pais: 'Brasil'
+      pais: 'Brasil',
     },
     redes_sociais: {
       linkedin: 'https://linkedin.com/in/mariaoliveira',
-      twitter: 'https://twitter.com/mariaoliveira'
+      twitter: 'https://twitter.com/mariaoliveira',
     },
     tags: ['Startup', 'Inovação', 'Hot Lead'],
     pontuacao_lead: 85,
@@ -71,7 +72,7 @@ export const contatosMock: Contato[] = [
     oportunidades_abertas: 1,
     vendas_realizadas: 0,
     valor_total_vendas: 0,
-    categoria: 'Startup'
+    categoria: 'Startup',
   },
   {
     id: '3',
@@ -91,21 +92,22 @@ export const contatosMock: Contato[] = [
       cidade: 'São Bernardo do Campo',
       estado: 'SP',
       cep: '09750-000',
-      pais: 'Brasil'
+      pais: 'Brasil',
     },
     redes_sociais: {
-      linkedin: 'https://linkedin.com/in/carlossantos'
+      linkedin: 'https://linkedin.com/in/carlossantos',
     },
     tags: ['Indústria', 'Parceiro Estratégico', 'Volume Alto'],
     pontuacao_lead: 70,
     valor_potencial: 300000,
-    notas: 'Parceiro de longa data. Sempre busca soluções inovadoras para modernizar a infraestrutura.',
+    notas:
+      'Parceiro de longa data. Sempre busca soluções inovadoras para modernizar a infraestrutura.',
     anexos: [],
     atividades_recentes: 15,
     oportunidades_abertas: 3,
     vendas_realizadas: 5,
     valor_total_vendas: 1200000,
-    categoria: 'Indústria'
+    categoria: 'Indústria',
   },
   {
     id: '4',
@@ -126,11 +128,11 @@ export const contatosMock: Contato[] = [
       cidade: 'São Paulo',
       estado: 'SP',
       cep: '01412-100',
-      pais: 'Brasil'
+      pais: 'Brasil',
     },
     redes_sociais: {
       linkedin: 'https://linkedin.com/in/anacosta',
-      instagram: 'https://instagram.com/anacostaconsultoria'
+      instagram: 'https://instagram.com/anacostaconsultoria',
     },
     tags: ['Consultoria', 'Networking', 'Influenciadora'],
     pontuacao_lead: 88,
@@ -141,7 +143,7 @@ export const contatosMock: Contato[] = [
     oportunidades_abertas: 1,
     vendas_realizadas: 4,
     valor_total_vendas: 380000,
-    categoria: 'Consultoria'
+    categoria: 'Consultoria',
   },
   {
     id: '5',
@@ -161,10 +163,10 @@ export const contatosMock: Contato[] = [
       cidade: 'Rio de Janeiro',
       estado: 'RJ',
       cep: '21040-020',
-      pais: 'Brasil'
+      pais: 'Brasil',
     },
     redes_sociais: {
-      linkedin: 'https://linkedin.com/in/robertolima'
+      linkedin: 'https://linkedin.com/in/robertolima',
     },
     tags: ['Varejo', 'Grande Empresa', 'Orçamento Aprovado'],
     pontuacao_lead: 75,
@@ -175,7 +177,7 @@ export const contatosMock: Contato[] = [
     oportunidades_abertas: 2,
     vendas_realizadas: 0,
     valor_total_vendas: 0,
-    categoria: 'Varejo'
+    categoria: 'Varejo',
   },
   {
     id: '6',
@@ -196,11 +198,11 @@ export const contatosMock: Contato[] = [
       cidade: 'Campinas',
       estado: 'SP',
       cep: '13010-111',
-      pais: 'Brasil'
+      pais: 'Brasil',
     },
     redes_sociais: {
       linkedin: 'https://linkedin.com/in/fernandapereira',
-      facebook: 'https://facebook.com/fernanda.pereira'
+      facebook: 'https://facebook.com/fernanda.pereira',
     },
     tags: ['Educação', 'Terceiro Setor', 'Inovação Educacional'],
     pontuacao_lead: 60,
@@ -211,6 +213,6 @@ export const contatosMock: Contato[] = [
     oportunidades_abertas: 1,
     vendas_realizadas: 1,
     valor_total_vendas: 65000,
-    categoria: 'Educação'
-  }
+    categoria: 'Educação',
+  },
 ];

@@ -134,11 +134,13 @@ export interface AtualizarCategoriaProdutoRequest extends Partial<CriarCategoria
   id: string;
 }
 
-export interface AtualizarSubcategoriaProdutoRequest extends Partial<CriarSubcategoriaProdutoRequest> {
+export interface AtualizarSubcategoriaProdutoRequest
+  extends Partial<CriarSubcategoriaProdutoRequest> {
   id: string;
 }
 
-export interface AtualizarConfiguracaoProdutoRequest extends Partial<CriarConfiguracaoProdutoRequest> {
+export interface AtualizarConfiguracaoProdutoRequest
+  extends Partial<CriarConfiguracaoProdutoRequest> {
   id: string;
 }
 

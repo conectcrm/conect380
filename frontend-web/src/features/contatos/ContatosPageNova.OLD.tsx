@@ -16,7 +16,7 @@ import {
   Phone,
   MessageSquare,
   Eye,
-  UserPlus
+  UserPlus,
 } from 'lucide-react';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import { ContatoMetrics } from '../../components/contatos/ContatoMetrics';
@@ -80,7 +80,7 @@ export const ContatosPage: React.FC = () => {
         oportunidades_abertas: 2,
         vendas_realizadas: 3,
         valor_total_vendas: 150000,
-        categoria: 'premium'
+        categoria: 'premium',
       },
       {
         id: '2',
@@ -104,8 +104,8 @@ export const ContatosPage: React.FC = () => {
         oportunidades_abertas: 1,
         vendas_realizadas: 0,
         valor_total_vendas: 0,
-        categoria: 'prospect'
-      }
+        categoria: 'prospect',
+      },
     ];
 
     setTimeout(() => {
@@ -115,8 +115,9 @@ export const ContatosPage: React.FC = () => {
   }, []);
 
   // Filtrar contatos
-  const contatosFiltrados = contatos.filter(contato => {
-    const matchSearch = !searchTerm ||
+  const contatosFiltrados = contatos.filter((contato) => {
+    const matchSearch =
+      !searchTerm ||
       contato.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
       contato.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       contato.empresa.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -124,7 +125,8 @@ export const ContatosPage: React.FC = () => {
 
     const matchStatus = statusFilter === 'todos' || contato.status === statusFilter;
     const matchTipo = tipoFilter === 'todos' || contato.tipo === tipoFilter;
-    const matchProprietario = proprietarioFilter === 'todos' || contato.proprietario === proprietarioFilter;
+    const matchProprietario =
+      proprietarioFilter === 'todos' || contato.proprietario === proprietarioFilter;
     const matchFonte = fonteFilter === 'todas' || contato.fonte === fonteFilter;
 
     return matchSearch && matchStatus && matchTipo && matchProprietario && matchFonte;
@@ -132,10 +134,8 @@ export const ContatosPage: React.FC = () => {
 
   // Gerenciar seleção
   const handleToggleSelect = (id: string) => {
-    setSelectedContatos(prev =>
-      prev.includes(id)
-        ? prev.filter(contactId => contactId !== id)
-        : [...prev, id]
+    setSelectedContatos((prev) =>
+      prev.includes(id) ? prev.filter((contactId) => contactId !== id) : [...prev, id],
     );
   };
 
@@ -143,15 +143,15 @@ export const ContatosPage: React.FC = () => {
     if (selectAll) {
       setSelectedContatos([]);
     } else {
-      setSelectedContatos(contatosFiltrados.map(contato => contato.id));
+      setSelectedContatos(contatosFiltrados.map((contato) => contato.id));
     }
     setSelectAll(!selectAll);
   };
 
   // Atualizar estado do "Selecionar Todos"
   useEffect(() => {
-    const allSelected = contatosFiltrados.length > 0 &&
-      selectedContatos.length === contatosFiltrados.length;
+    const allSelected =
+      contatosFiltrados.length > 0 && selectedContatos.length === contatosFiltrados.length;
     setSelectAll(allSelected);
     setShowBulkActions(selectedContatos.length > 0);
   }, [selectedContatos, contatosFiltrados]);
@@ -172,8 +172,8 @@ export const ContatosPage: React.FC = () => {
   const handleDeleteContato = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir este contato?')) {
       try {
-        setContatos(prev => prev.filter(contato => contato.id !== id));
-        setSelectedContatos(prev => prev.filter(contactId => contactId !== id));
+        setContatos((prev) => prev.filter((contato) => contato.id !== id));
+        setSelectedContatos((prev) => prev.filter((contactId) => contactId !== id));
       } catch (error) {
         console.error('Erro ao excluir contato:', error);
       }
@@ -184,9 +184,11 @@ export const ContatosPage: React.FC = () => {
     try {
       if (isEditing && contatoSelecionado) {
         const contatoAtualizado = { ...contatoSelecionado, ...dadosContato };
-        setContatos(prev => prev.map(contato =>
-          contato.id === contatoSelecionado.id ? contatoAtualizado : contato
-        ));
+        setContatos((prev) =>
+          prev.map((contato) =>
+            contato.id === contatoSelecionado.id ? contatoAtualizado : contato,
+          ),
+        );
       } else {
         const novoContato: Contato = {
           id: Date.now().toString(),
@@ -210,9 +212,9 @@ export const ContatosPage: React.FC = () => {
           oportunidades_abertas: 0,
           vendas_realizadas: 0,
           valor_total_vendas: 0,
-          categoria: dadosContato.categoria || 'geral'
+          categoria: dadosContato.categoria || 'geral',
         };
-        setContatos(prev => [novoContato, ...prev]);
+        setContatos((prev) => [novoContato, ...prev]);
       }
 
       setModalNovoContato(false);
@@ -236,7 +238,7 @@ export const ContatosPage: React.FC = () => {
   const handleBulkDelete = async () => {
     if (window.confirm(`Tem certeza que deseja excluir ${selectedContatos.length} contatos?`)) {
       try {
-        setContatos(prev => prev.filter(contato => !selectedContatos.includes(contato.id)));
+        setContatos((prev) => prev.filter((contato) => !selectedContatos.includes(contato.id)));
         setSelectedContatos([]);
       } catch (error) {
         console.error('Erro ao excluir contatos:', error);
@@ -246,30 +248,32 @@ export const ContatosPage: React.FC = () => {
 
   const handleBulkEmail = () => {
     const emails = contatos
-      .filter(contato => selectedContatos.includes(contato.id))
-      .map(contato => contato.email)
+      .filter((contato) => selectedContatos.includes(contato.id))
+      .map((contato) => contato.email)
       .join(';');
 
     window.open(`mailto:${emails}`);
   };
 
   const handleExportContatos = () => {
-    const contatosParaExportar = contatos.filter(contato =>
-      selectedContatos.length > 0 ? selectedContatos.includes(contato.id) : true
+    const contatosParaExportar = contatos.filter((contato) =>
+      selectedContatos.length > 0 ? selectedContatos.includes(contato.id) : true,
     );
 
     // Gerar CSV simples
     const headers = ['Nome', 'Email', 'Telefone', 'Empresa', 'Cargo', 'Status'];
     const csvRows = [
       headers.join(','),
-      ...contatosParaExportar.map(contato => [
-        contato.nome,
-        contato.email,
-        contato.telefone,
-        contato.empresa,
-        contato.cargo,
-        contato.status
-      ].join(','))
+      ...contatosParaExportar.map((contato) =>
+        [
+          contato.nome,
+          contato.email,
+          contato.telefone,
+          contato.empresa,
+          contato.cargo,
+          contato.status,
+        ].join(','),
+      ),
     ];
 
     const csvContent = csvRows.join('\n');
@@ -361,7 +365,7 @@ export const ContatosPage: React.FC = () => {
                 <div className="ml-4">
                   <div className="text-sm font-medium text-gray-500">Ativos</div>
                   <div className="text-2xl font-bold text-gray-900">
-                    {contatos.filter(c => c.status === 'ativo').length}
+                    {contatos.filter((c) => c.status === 'ativo').length}
                   </div>
                 </div>
               </div>
@@ -375,7 +379,7 @@ export const ContatosPage: React.FC = () => {
                 <div className="ml-4">
                   <div className="text-sm font-medium text-gray-500">Prospectos</div>
                   <div className="text-2xl font-bold text-gray-900">
-                    {contatos.filter(c => c.status === 'prospecto').length}
+                    {contatos.filter((c) => c.status === 'prospecto').length}
                   </div>
                 </div>
               </div>
@@ -389,7 +393,7 @@ export const ContatosPage: React.FC = () => {
                 <div className="ml-4">
                   <div className="text-sm font-medium text-gray-500">Leads</div>
                   <div className="text-2xl font-bold text-gray-900">
-                    {contatos.filter(c => c.tipo === 'lead').length}
+                    {contatos.filter((c) => c.tipo === 'lead').length}
                   </div>
                 </div>
               </div>
@@ -418,10 +422,11 @@ export const ContatosPage: React.FC = () => {
                   {/* Filtros */}
                   <button
                     onClick={() => setShowFilters(!showFilters)}
-                    className={`flex items-center gap-2 px-3 py-2 border rounded-lg transition-colors text-sm ${showFilters
-                      ? 'bg-[#159A9C] text-white border-[#159A9C]'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                      }`}
+                    className={`flex items-center gap-2 px-3 py-2 border rounded-lg transition-colors text-sm ${
+                      showFilters
+                        ? 'bg-[#159A9C] text-white border-[#159A9C]'
+                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
                   >
                     <Filter className="w-4 h-4" />
                     Filtros
@@ -446,19 +451,21 @@ export const ContatosPage: React.FC = () => {
                 <div className="flex border border-gray-300 rounded-lg">
                   <button
                     onClick={() => setViewMode('grid')}
-                    className={`p-2 ${viewMode === 'grid'
-                      ? 'bg-[#159A9C] text-white'
-                      : 'text-gray-700 hover:bg-gray-50'
-                      } rounded-l-lg transition-colors`}
+                    className={`p-2 ${
+                      viewMode === 'grid'
+                        ? 'bg-[#159A9C] text-white'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    } rounded-l-lg transition-colors`}
                   >
                     <Grid3X3 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setViewMode('list')}
-                    className={`p-2 ${viewMode === 'list'
-                      ? 'bg-[#159A9C] text-white'
-                      : 'text-gray-700 hover:bg-gray-50'
-                      } rounded-r-lg transition-colors border-l border-gray-300`}
+                    className={`p-2 ${
+                      viewMode === 'list'
+                        ? 'bg-[#159A9C] text-white'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    } rounded-r-lg transition-colors border-l border-gray-300`}
                   >
                     <List className="w-4 h-4" />
                   </button>
@@ -558,42 +565,52 @@ export const ContatosPage: React.FC = () => {
             {contatosFiltrados.length === 0 ? (
               <div className="text-center py-12">
                 <UserPlus className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum contato encontrado</h3>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">
+                  Nenhum contato encontrado
+                </h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  {searchTerm || statusFilter !== 'todos' || tipoFilter !== 'todos' || fonteFilter !== 'todas'
+                  {searchTerm ||
+                  statusFilter !== 'todos' ||
+                  tipoFilter !== 'todos' ||
+                  fonteFilter !== 'todas'
                     ? 'Tente ajustar os filtros ou busca.'
-                    : 'Comece criando um novo contato.'
-                  }
+                    : 'Comece criando um novo contato.'}
                 </p>
-                {(!searchTerm && statusFilter === 'todos' && tipoFilter === 'todos' && fonteFilter === 'todas') && (
-                  <div className="mt-6">
-                    <button
-                      onClick={() => {
-                        setIsEditing(false);
-                        setContatoSelecionado(null);
-                        setModalNovoContato(true);
-                      }}
-                      className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-[#159A9C] hover:bg-[#0d7a7d]"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Novo Contato
-                    </button>
-                  </div>
-                )}
+                {!searchTerm &&
+                  statusFilter === 'todos' &&
+                  tipoFilter === 'todos' &&
+                  fonteFilter === 'todas' && (
+                    <div className="mt-6">
+                      <button
+                        onClick={() => {
+                          setIsEditing(false);
+                          setContatoSelecionado(null);
+                          setModalNovoContato(true);
+                        }}
+                        className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-[#159A9C] hover:bg-[#0d7a7d]"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Novo Contato
+                      </button>
+                    </div>
+                  )}
               </div>
             ) : (
-              <div className={
-                viewMode === 'grid'
-                  ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-6'
-                  : 'divide-y divide-gray-200'
-              }>
+              <div
+                className={
+                  viewMode === 'grid'
+                    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-6'
+                    : 'divide-y divide-gray-200'
+                }
+              >
                 {contatosFiltrados.map((contato) => (
                   <div
                     key={contato.id}
-                    className={`${viewMode === 'grid'
-                      ? 'bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow'
-                      : 'p-4 hover:bg-gray-50 transition-colors'
-                      }`}
+                    className={`${
+                      viewMode === 'grid'
+                        ? 'bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow'
+                        : 'p-4 hover:bg-gray-50 transition-colors'
+                    }`}
                   >
                     {/* Checkbox de seleção */}
                     <div className="flex items-start gap-3">
@@ -618,16 +635,21 @@ export const ContatosPage: React.FC = () => {
                                 }
                               })()}
                             </h3>
-                            <p className="text-sm text-gray-500">{safeRender(contato.cargo)} - {safeRender(contato.empresa)}</p>
+                            <p className="text-sm text-gray-500">
+                              {safeRender(contato.cargo)} - {safeRender(contato.empresa)}
+                            </p>
                           </div>
 
                           <div className="flex items-center gap-1">
-                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${contato.status === 'ativo'
-                              ? 'bg-green-100 text-green-800'
-                              : contato.status === 'prospecto'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-gray-100 text-gray-800'
-                              }`}>
+                            <span
+                              className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                contato.status === 'ativo'
+                                  ? 'bg-green-100 text-green-800'
+                                  : contato.status === 'prospecto'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : 'bg-gray-100 text-gray-800'
+                              }`}
+                            >
                               {(() => {
                                 try {
                                   const safeContato = validateAndSanitizeContact(contato);
@@ -644,25 +666,29 @@ export const ContatosPage: React.FC = () => {
                         <div className="mt-3 space-y-2">
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <Mail className="w-4 h-4" />
-                            <span className="truncate">{(() => {
-                              try {
-                                const safeContato = validateAndSanitizeContact(contato);
-                                return safeRender(safeContato.email);
-                              } catch {
-                                return 'Email não disponível';
-                              }
-                            })()}</span>
+                            <span className="truncate">
+                              {(() => {
+                                try {
+                                  const safeContato = validateAndSanitizeContact(contato);
+                                  return safeRender(safeContato.email);
+                                } catch {
+                                  return 'Email não disponível';
+                                }
+                              })()}
+                            </span>
                           </div>
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <Phone className="w-4 h-4" />
-                            <span>{(() => {
-                              try {
-                                const safeContato = validateAndSanitizeContact(contato);
-                                return safeRender(safeContato.telefone);
-                              } catch {
-                                return 'Telefone não disponível';
-                              }
-                            })()}</span>
+                            <span>
+                              {(() => {
+                                try {
+                                  const safeContato = validateAndSanitizeContact(contato);
+                                  return safeRender(safeContato.telefone);
+                                } catch {
+                                  return 'Telefone não disponível';
+                                }
+                              })()}
+                            </span>
                           </div>
                         </div>
 

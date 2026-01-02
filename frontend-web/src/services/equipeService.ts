@@ -235,10 +235,7 @@ class EquipeService {
   /**
    * Busca atendentes disponíveis para um núcleo/departamento
    */
-  async buscarAtendentesDisponiveis(
-    nucleoId: string,
-    departamentoId?: string,
-  ): Promise<any[]> {
+  async buscarAtendentesDisponiveis(nucleoId: string, departamentoId?: string): Promise<any[]> {
     const params = new URLSearchParams();
     params.append('nucleoId', nucleoId);
     if (departamentoId) params.append('departamentoId', departamentoId);

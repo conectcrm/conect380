@@ -1,4 +1,11 @@
-import React, { createContext, useContext, ReactNode, useState, useEffect, useCallback } from 'react';
+import React, {
+  createContext,
+  useContext,
+  ReactNode,
+  useState,
+  useEffect,
+  useCallback,
+} from 'react';
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
@@ -17,7 +24,7 @@ i18n
       // Configuração para usar localStorage
       order: ['localStorage', 'navigator'],
       caches: ['localStorage'],
-      lookupLocalStorage: 'preferred-language'
+      lookupLocalStorage: 'preferred-language',
     },
     resources: {
       'pt-BR': {
@@ -518,7 +525,7 @@ i18n
             preferences: 'Préférences',
             systemLanguage: 'Langue du Système',
             helpSupport: 'Aide et Support',
-            helpCenter: 'Centre d\'Aide',
+            helpCenter: "Centre d'Aide",
             endSession: 'Fermer la Session',
             required: 'requis',
             optional: 'optionnel',
@@ -579,7 +586,7 @@ i18n
             newProposal: 'Nouvelle Proposition',
             schedule: 'Planifier',
             themes: 'Thèmes',
-            totalRevenue: 'Chiffre d\'Affaires Total',
+            totalRevenue: "Chiffre d'Affaires Total",
             averageTicket: 'Ticket Moyen',
             closedSales: 'Ventes Fermées',
             inNegotiation: 'En Négociation',
@@ -599,7 +606,7 @@ i18n
             approved: 'Approuvées',
             rejected: 'Rejetées',
             monthlyGoal: 'Objectif Mensuel',
-            goalAchieved: 'Objectif dépassé ! Félicitations à l\'équipe !',
+            goalAchieved: "Objectif dépassé ! Félicitations à l'équipe !",
             vsLastMonth: 'vs mois dernier',
             salesHighlight: 'Point Fort des Ventes',
             detailedPerformance: 'Performance détaillée avec contrôles avancés',
@@ -679,32 +686,32 @@ export const I18nProvider: React.FC<I18nProviderProps> = ({ children }) => {
       code: 'pt-BR',
       name: 'Português (Brasil)',
       nativeName: 'Português',
-      flag: '🇧🇷'
+      flag: '🇧🇷',
     },
     {
       code: 'en-US',
       name: 'English (United States)',
       nativeName: 'English',
-      flag: '🇺🇸'
+      flag: '🇺🇸',
     },
     {
       code: 'es-ES',
       name: 'Español (España)',
       nativeName: 'Español',
-      flag: '🇪🇸'
+      flag: '🇪🇸',
     },
     {
       code: 'fr-FR',
       name: 'Français (France)',
       nativeName: 'Français',
-      flag: '🇫🇷'
-    }
+      flag: '🇫🇷',
+    },
   ];
 
   useEffect(() => {
     const handleLanguageChange = (lng: string) => {
       setCurrentLanguage(lng);
-      setForceUpdate(prev => prev + 1); // Força re-renderização
+      setForceUpdate((prev) => prev + 1); // Força re-renderização
     };
 
     // Definir idioma inicial baseado na detecção
@@ -726,15 +733,18 @@ export const I18nProvider: React.FC<I18nProviderProps> = ({ children }) => {
 
       // Forçar atualização imediata
       setCurrentLanguage(lng);
-      setForceUpdate(prev => prev + 1);
+      setForceUpdate((prev) => prev + 1);
     } catch (error) {
       console.error('❌ Erro ao alterar idioma:', error);
     }
   };
 
-  const t = useCallback((key: string) => {
-    return i18n.t(key);
-  }, [currentLanguage, forceUpdate]); // Re-create the function when language changes
+  const t = useCallback(
+    (key: string) => {
+      return i18n.t(key);
+    },
+    [currentLanguage, forceUpdate],
+  ); // Re-create the function when language changes
 
   const value: I18nContextData = {
     language: currentLanguage,

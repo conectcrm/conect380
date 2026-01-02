@@ -28,30 +28,32 @@ export const ResponsiveFilters: React.FC<ResponsiveFiltersProps> = ({
   vendedorOptions = [],
   regiaoOptions = [],
   disabled = false,
-  loading = false
+  loading = false,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const { announceToScreenReader } = useAccessibility({ announceChanges: true });
   const filtersId = React.useId();
 
-  const effectivePeriodOptions = useMemo(() => (
-    periodOptions.length > 0 ? periodOptions : [
-      { value: 'semanal', label: 'Esta semana' },
-      { value: 'mensal', label: 'Este mês' },
-      { value: 'trimestral', label: 'Último trimestre' },
-      { value: 'semestral', label: 'Último semestre' },
-      { value: 'anual', label: 'Ano atual' }
-    ]
-  ), [periodOptions]);
+  const effectivePeriodOptions = useMemo(
+    () =>
+      periodOptions.length > 0
+        ? periodOptions
+        : [
+            { value: 'semanal', label: 'Esta semana' },
+            { value: 'mensal', label: 'Este mês' },
+            { value: 'trimestral', label: 'Último trimestre' },
+            { value: 'semestral', label: 'Último semestre' },
+            { value: 'anual', label: 'Ano atual' },
+          ],
+    [periodOptions],
+  );
 
   const effectiveVendedorOptions = useMemo(() => {
     if (vendedorOptions.length === 0) {
-      return [
-        { value: 'Todos', label: 'Todos os vendedores' }
-      ];
+      return [{ value: 'Todos', label: 'Todos os vendedores' }];
     }
 
-    const hasTodos = vendedorOptions.some(option => option.value === 'Todos');
+    const hasTodos = vendedorOptions.some((option) => option.value === 'Todos');
     return hasTodos
       ? vendedorOptions
       : [{ value: 'Todos', label: 'Todos os vendedores' }, ...vendedorOptions];
@@ -65,11 +67,11 @@ export const ResponsiveFilters: React.FC<ResponsiveFiltersProps> = ({
         { value: 'Nordeste', label: 'Nordeste' },
         { value: 'Centro-Oeste', label: 'Centro-Oeste' },
         { value: 'Sudeste', label: 'Sudeste' },
-        { value: 'Sul', label: 'Sul' }
+        { value: 'Sul', label: 'Sul' },
       ];
     }
 
-    const hasTodas = regiaoOptions.some(option => option.value === 'Todas');
+    const hasTodas = regiaoOptions.some((option) => option.value === 'Todas');
     return hasTodas
       ? regiaoOptions
       : [{ value: 'Todas', label: 'Todas as regiões' }, ...regiaoOptions];
@@ -80,29 +82,25 @@ export const ResponsiveFilters: React.FC<ResponsiveFiltersProps> = ({
   const handleToggleExpand = () => {
     const newState = !isExpanded;
     setIsExpanded(newState);
-    announceToScreenReader(
-      newState ? 'Filtros expandidos' : 'Filtros recolhidos',
-      'polite'
-    );
+    announceToScreenReader(newState ? 'Filtros expandidos' : 'Filtros recolhidos', 'polite');
   };
 
-  const handleSelectChange = (key: keyof ResponsiveFiltersProps['filtros']) => (
-    event: React.ChangeEvent<HTMLSelectElement>
-  ) => {
-    const updated = {
-      ...filtros,
-      [key]: event.target.value
+  const handleSelectChange =
+    (key: keyof ResponsiveFiltersProps['filtros']) =>
+    (event: React.ChangeEvent<HTMLSelectElement>) => {
+      const updated = {
+        ...filtros,
+        [key]: event.target.value,
+      };
+      onChange(updated);
     };
-    onChange(updated);
-  };
 
-  const renderOptions = (options: FilterOption[]) => (
-    options.map(option => (
+  const renderOptions = (options: FilterOption[]) =>
+    options.map((option) => (
       <option key={option.value} value={option.value}>
         {option.label}
       </option>
-    ))
-  );
+    ));
 
   return (
     <section
@@ -123,17 +121,16 @@ export const ResponsiveFilters: React.FC<ResponsiveFiltersProps> = ({
             <span className="text-sm font-medium text-gray-700">Filtros</span>
           </div>
           <ChevronDown
-            className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''
-              }`}
+            className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${
+              isExpanded ? 'rotate-180' : ''
+            }`}
           />
         </button>
 
         {isExpanded && (
           <div className="px-4 pb-4 space-y-3 border-t border-gray-100">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Período
-              </label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Período</label>
               <select
                 value={filtros.periodo}
                 onChange={handleSelectChange('periodo')}
@@ -145,9 +142,7 @@ export const ResponsiveFilters: React.FC<ResponsiveFiltersProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Vendedor
-              </label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Vendedor</label>
               <select
                 value={filtros.vendedor}
                 onChange={handleSelectChange('vendedor')}
@@ -159,9 +154,7 @@ export const ResponsiveFilters: React.FC<ResponsiveFiltersProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Região
-              </label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Região</label>
               <select
                 value={filtros.regiao}
                 onChange={handleSelectChange('regiao')}

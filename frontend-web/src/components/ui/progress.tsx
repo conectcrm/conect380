@@ -6,11 +6,7 @@ interface ProgressProps {
   max?: number;
 }
 
-export const Progress: React.FC<ProgressProps> = ({
-  value,
-  className = '',
-  max = 100
-}) => {
+export const Progress: React.FC<ProgressProps> = ({ value, className = '', max = 100 }) => {
   const percentage = Math.min(Math.max(value, 0), max);
 
   return (

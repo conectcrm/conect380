@@ -15,7 +15,7 @@ import {
   Eye,
   MoreVertical,
   Camera,
-  Paperclip
+  Paperclip,
 } from 'lucide-react';
 import { AvatarUpload } from '../upload/AvatarUpload';
 import { FileUpload } from '../upload/FileUpload';
@@ -37,27 +37,37 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
   onDelete,
   onView,
   onAvatarUpdate,
-  onAttachmentAdd
+  onAttachmentAdd,
 }) => {
   const [showAttachments, setShowAttachments] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'cliente': return 'bg-green-100 text-green-800';
-      case 'prospect': return 'bg-blue-100 text-blue-800';
-      case 'lead': return 'bg-yellow-100 text-yellow-800';
-      case 'inativo': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'cliente':
+        return 'bg-green-100 text-green-800';
+      case 'prospect':
+        return 'bg-blue-100 text-blue-800';
+      case 'lead':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'inativo':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'cliente': return 'Cliente';
-      case 'prospect': return 'Prospect';
-      case 'lead': return 'Lead';
-      case 'inativo': return 'Inativo';
-      default: return status;
+      case 'cliente':
+        return 'Cliente';
+      case 'prospect':
+        return 'Prospect';
+      case 'lead':
+        return 'Lead';
+      case 'inativo':
+        return 'Inativo';
+      default:
+        return status;
     }
   };
 
@@ -77,10 +87,17 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
       onClick={() => onView?.(cliente)}
     >
       {/* Status Bar */}
-      <div className={`h-1 ${cliente.status === 'cliente' ? 'bg-green-500' :
-          cliente.status === 'prospect' ? 'bg-blue-500' :
-            cliente.status === 'lead' ? 'bg-yellow-500' : 'bg-gray-400'
-        }`}></div>
+      <div
+        className={`h-1 ${
+          cliente.status === 'cliente'
+            ? 'bg-green-500'
+            : cliente.status === 'prospect'
+              ? 'bg-blue-500'
+              : cliente.status === 'lead'
+                ? 'bg-yellow-500'
+                : 'bg-gray-400'
+        }`}
+      ></div>
 
       <div className="p-4">
         {/* Header: Avatar e Nome */}
@@ -93,10 +110,17 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
               className="border-2 border-gray-100 group-hover:border-[#159A9C] transition-colors"
             />
             {/* Status Indicator */}
-            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${cliente.status === 'cliente' ? 'bg-green-500' :
-                cliente.status === 'prospect' ? 'bg-blue-500' :
-                  cliente.status === 'lead' ? 'bg-yellow-500' : 'bg-gray-400'
-              }`}></div>
+            <div
+              className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${
+                cliente.status === 'cliente'
+                  ? 'bg-green-500'
+                  : cliente.status === 'prospect'
+                    ? 'bg-blue-500'
+                    : cliente.status === 'lead'
+                      ? 'bg-yellow-500'
+                      : 'bg-gray-400'
+              }`}
+            ></div>
           </div>
 
           <div className="flex-1 min-w-0">
@@ -104,9 +128,7 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
               {cliente.nome}
             </h3>
             {cliente.empresa && (
-              <p className="text-xs text-gray-600 truncate mt-0.5">
-                {cliente.empresa}
-              </p>
+              <p className="text-xs text-gray-600 truncate mt-0.5">{cliente.empresa}</p>
             )}
           </div>
 
@@ -172,7 +194,9 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
 
         {/* Footer: Status e Data */}
         <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(cliente.status)}`}>
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(cliente.status)}`}
+          >
             {getStatusLabel(cliente.status)}
           </span>
 
@@ -192,7 +216,7 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
             <span>
               {new Date(cliente.created_at).toLocaleDateString('pt-BR', {
                 day: '2-digit',
-                month: '2-digit'
+                month: '2-digit',
               })}
             </span>
           </div>

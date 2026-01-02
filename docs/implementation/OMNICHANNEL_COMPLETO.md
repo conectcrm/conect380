@@ -5,9 +5,9 @@
 Implementação completa do núcleo de atendimento omnichannel com IA integrada para o ConectCRM.
 
 ### 🆕 **ATUALIZAÇÃO 11/10/2025:**
-✅ **Webhook WhatsApp Business API configurado e testado com sucesso!**
-- Rota corrigida: `/api/atendimento/webhooks/whatsapp`
-- Validação de token funcionando
+-✅ **Webhook WhatsApp Business API configurado e testado com sucesso!**
+- Rota corrigida: `/api/atendimento/webhooks/whatsapp/:empresaId`
+- Validação de token + `X-Hub-Signature-256` funcionando
 - Integração com Meta Developers validada
 - ngrok configurado e ativo
 

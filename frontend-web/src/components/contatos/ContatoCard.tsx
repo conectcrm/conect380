@@ -12,7 +12,7 @@ import {
   Eye,
   User,
   Tag,
-  Clock
+  Clock,
 } from 'lucide-react';
 import { Contato } from '../../features/contatos/services/contatosService';
 import { safeRender, validateAndSanitizeContact } from '../../utils/safeRender';
@@ -32,7 +32,7 @@ export const ContatoCard: React.FC<ContatoCardProps> = ({
   onEdit,
   onDelete,
   isSelected,
-  onToggleSelect
+  onToggleSelect,
 }) => {
   const [showActions, setShowActions] = React.useState(false);
 
@@ -52,7 +52,7 @@ export const ContatoCard: React.FC<ContatoCardProps> = ({
         tipo: 'lead',
         endereco: null,
         tags: [],
-        data_ultima_interacao: new Date().toISOString()
+        data_ultima_interacao: new Date().toISOString(),
       } as Contato;
     }
     return sanitized;
@@ -118,8 +118,9 @@ export const ContatoCard: React.FC<ContatoCardProps> = ({
 
   return (
     <div
-      className={`bg-white rounded-lg border-2 transition-all duration-200 hover:shadow-lg cursor-pointer ${isSelected ? 'border-[#159A9C] shadow-md' : 'border-gray-200 hover:border-gray-300'
-        }`}
+      className={`bg-white rounded-lg border-2 transition-all duration-200 hover:shadow-lg cursor-pointer ${
+        isSelected ? 'border-[#159A9C] shadow-md' : 'border-gray-200 hover:border-gray-300'
+      }`}
       onClick={() => onView(safeContato)}
     >
       {/* Header do Card */}
@@ -140,7 +141,11 @@ export const ContatoCard: React.FC<ContatoCardProps> = ({
 
             {/* Avatar */}
             <div className="w-12 h-12 bg-gradient-to-br from-[#159A9C] to-[#0d7a7d] rounded-full flex items-center justify-center text-white font-semibold text-lg">
-              {safeRender(safeContato.nome).split(' ').map(n => n[0]).join('').slice(0, 2)}
+              {safeRender(safeContato.nome)
+                .split(' ')
+                .map((n) => n[0])
+                .join('')
+                .slice(0, 2)}
             </div>
 
             {/* Informações Principais */}
@@ -164,7 +169,9 @@ export const ContatoCard: React.FC<ContatoCardProps> = ({
               )}
 
               <div className="flex items-center gap-3">
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(safeContato.status)}`}>
+                <span
+                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(safeContato.status)}`}
+                >
                   {safeRender(safeContato.status)}
                 </span>
 
@@ -317,10 +324,11 @@ export const ContatoCard: React.FC<ContatoCardProps> = ({
         {safeContato.valor_potencial && safeContato.valor_potencial > 0 && (
           <div className="mt-2 pt-2 border-t border-gray-100">
             <div className="text-sm font-medium text-[#002333]">
-              Valor Potencial: <span className="text-[#159A9C]">
+              Valor Potencial:{' '}
+              <span className="text-[#159A9C]">
                 {new Intl.NumberFormat('pt-BR', {
                   style: 'currency',
-                  currency: 'BRL'
+                  currency: 'BRL',
                 }).format(safeContato.valor_potencial)}
               </span>
             </div>

@@ -1,4 +1,5 @@
 import api from './api';
+import type { AtendenteEquipe } from './equipeService';
 
 // ========================================================================
 // TYPES & INTERFACES
@@ -22,7 +23,7 @@ export interface Atendente {
   ativo: boolean;
   createdAt: string;
   updatedAt: string;
-  equipes?: any[]; // AtendenteEquipe[]
+  equipes?: AtendenteEquipe[];
 }
 
 export interface CreateAtendenteDto {
@@ -68,7 +69,9 @@ class AtendenteService {
    * Cria um novo atendente
    * Retorna: { atendente: Atendente, senhaTemporaria?: string }
    */
-  async criar(dados: CreateAtendenteDto): Promise<{ atendente: Atendente; senhaTemporaria?: string }> {
+  async criar(
+    dados: CreateAtendenteDto,
+  ): Promise<{ atendente: Atendente; senhaTemporaria?: string }> {
     const response = await api.post('/atendimento/atendentes', dados);
     const data = response.data?.data || response.data;
 

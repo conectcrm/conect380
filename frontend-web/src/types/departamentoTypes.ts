@@ -140,16 +140,43 @@ export interface EstatisticasDepartamento {
 
 // Constantes
 export const TIPOS_DISTRIBUICAO = [
-  { value: 'round_robin', label: 'Round Robin', description: 'Distribuição circular entre atendentes' },
-  { value: 'load_balancing', label: 'Balanceamento de Carga', description: 'Prioriza atendentes com menos tickets' },
-  { value: 'skill_based', label: 'Baseado em Skills', description: 'Distribui baseado nas competências' },
+  {
+    value: 'round_robin',
+    label: 'Round Robin',
+    description: 'Distribuição circular entre atendentes',
+  },
+  {
+    value: 'load_balancing',
+    label: 'Balanceamento de Carga',
+    description: 'Prioriza atendentes com menos tickets',
+  },
+  {
+    value: 'skill_based',
+    label: 'Baseado em Skills',
+    description: 'Distribui baseado nas competências',
+  },
   { value: 'manual', label: 'Manual', description: 'Supervisor atribui manualmente' },
 ] as const;
 
 export const ICONES_DEPARTAMENTO = [
-  'briefcase', 'headset', 'phone', 'users', 'shoppingCart', 'package',
-  'creditCard', 'dollarSign', 'tool', 'settings', 'zap', 'trendingUp',
-  'target', 'award', 'shield', 'heart', 'star', 'flag'
+  'briefcase',
+  'headset',
+  'phone',
+  'users',
+  'shoppingCart',
+  'package',
+  'creditCard',
+  'dollarSign',
+  'tool',
+  'settings',
+  'zap',
+  'trendingUp',
+  'target',
+  'award',
+  'shield',
+  'heart',
+  'star',
+  'flag',
 ] as const;
 
 export const CORES_DEPARTAMENTO = [

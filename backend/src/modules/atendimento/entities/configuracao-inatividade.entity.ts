@@ -15,6 +15,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Departamento } from '../../triagem/entities/departamento.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 @Entity('atendimento_configuracao_inatividade')
 @Index(['empresaId', 'departamentoId'], { unique: true }) // Unique por empresa E departamento
@@ -24,6 +25,10 @@ export class ConfiguracaoInatividade {
 
   @Column({ type: 'uuid', name: 'empresa_id' })
   empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   /**
    * Departamento específico (opcional)

@@ -72,17 +72,16 @@ export function StandardDataTable<T>({
   onSort,
   pagination,
   loading = false,
-  emptyState
+  emptyState,
 }: StandardDataTableProps<T>) {
-
   const handleSelectAll = () => {
     if (!getItemId || !onSelectionChange) return;
 
     const safeData = data || [];
     if (safeData.length === 0) return;
 
-    const allIds = safeData.map(item => getItemId(item));
-    const allSelected = allIds.every(id => selectedItems.includes(id));
+    const allIds = safeData.map((item) => getItemId(item));
+    const allSelected = allIds.every((id) => selectedItems.includes(id));
 
     if (allSelected) {
       onSelectionChange([]);
@@ -98,7 +97,7 @@ export function StandardDataTable<T>({
     const isSelected = selectedItems.includes(itemId);
 
     if (isSelected) {
-      onSelectionChange(selectedItems.filter(id => id !== itemId));
+      onSelectionChange(selectedItems.filter((id) => id !== itemId));
     } else {
       onSelectionChange([...selectedItems, itemId]);
     }
@@ -118,9 +117,11 @@ export function StandardDataTable<T>({
       return null;
     }
 
-    return sortConfig.direction === 'asc' ?
-      <ChevronUp className="w-4 h-4 ml-1" /> :
-      <ChevronDown className="w-4 h-4 ml-1" />;
+    return sortConfig.direction === 'asc' ? (
+      <ChevronUp className="w-4 h-4 ml-1" />
+    ) : (
+      <ChevronDown className="w-4 h-4 ml-1" />
+    );
   };
 
   if (loading) {
@@ -219,8 +220,7 @@ export function StandardDataTable<T>({
               return (
                 <tr
                   key={rowIndex}
-                  className={`hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : ''
-                    }`}
+                  className={`hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : ''}`}
                 >
                   {/* Selection column */}
                   {selectable && itemId && (
@@ -238,9 +238,13 @@ export function StandardDataTable<T>({
                   {columns.map((column, colIndex) => (
                     <td
                       key={colIndex}
-                      className={`px-6 py-4 whitespace-nowrap text-sm text-gray-900 ${column.align === 'center' ? 'text-center' :
-                        column.align === 'right' ? 'text-right' : 'text-left'
-                        }`}
+                      className={`px-6 py-4 whitespace-nowrap text-sm text-gray-900 ${
+                        column.align === 'center'
+                          ? 'text-center'
+                          : column.align === 'right'
+                            ? 'text-right'
+                            : 'text-left'
+                      }`}
                     >
                       {renderCell(item, column)}
                     </td>
@@ -267,10 +271,13 @@ export function StandardDataTable<T>({
                                 <button
                                   key={actionIndex}
                                   onClick={() => action.onClick(item)}
-                                  className={`w-full px-4 py-2 text-left text-sm flex items-center space-x-2 hover:bg-gray-100 transition-colors ${action.variant === 'danger' ? 'text-red-700 hover:bg-red-50' :
-                                    action.variant === 'success' ? 'text-green-700 hover:bg-green-50' :
-                                      'text-gray-700'
-                                    }`}
+                                  className={`w-full px-4 py-2 text-left text-sm flex items-center space-x-2 hover:bg-gray-100 transition-colors ${
+                                    action.variant === 'danger'
+                                      ? 'text-red-700 hover:bg-red-50'
+                                      : action.variant === 'success'
+                                        ? 'text-green-700 hover:bg-green-50'
+                                        : 'text-gray-700'
+                                  }`}
                                 >
                                   {ActionIcon && <ActionIcon className="w-4 h-4" />}
                                   <span>{action.label}</span>
@@ -293,7 +300,7 @@ export function StandardDataTable<T>({
       {pagination && pagination.totalPages > 1 && (
         <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-t">
           <div className="text-sm text-gray-500">
-            Mostrando {((pagination.currentPage - 1) * pagination.itemsPerPage) + 1} a{' '}
+            Mostrando {(pagination.currentPage - 1) * pagination.itemsPerPage + 1} a{' '}
             {Math.min(pagination.currentPage * pagination.itemsPerPage, pagination.totalItems)} de{' '}
             {pagination.totalItems} resultados
           </div>
@@ -315,10 +322,11 @@ export function StandardDataTable<T>({
                 <button
                   key={page}
                   onClick={() => pagination.onPageChange(page)}
-                  className={`px-3 py-2 text-sm border rounded-md ${isCurrentPage
-                    ? 'bg-[#159A9C] border-[#159A9C] text-white'
-                    : 'border-gray-300 hover:bg-gray-50'
-                    }`}
+                  className={`px-3 py-2 text-sm border rounded-md ${
+                    isCurrentPage
+                      ? 'bg-[#159A9C] border-[#159A9C] text-white'
+                      : 'border-gray-300 hover:bg-gray-50'
+                  }`}
                 >
                   {page}
                 </button>

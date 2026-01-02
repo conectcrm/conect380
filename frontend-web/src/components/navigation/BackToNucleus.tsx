@@ -13,7 +13,7 @@ export const BackToNucleus: React.FC<BackToNucleusProps> = ({
   title,
   nucleusName,
   nucleusPath,
-  currentModuleName
+  currentModuleName,
 }) => {
   const displayTitle = currentModuleName || title;
 
@@ -28,9 +28,7 @@ export const BackToNucleus: React.FC<BackToNucleusProps> = ({
           <span>Voltar para {nucleusName}</span>
         </Link>
       </div>
-      {displayTitle && (
-        <h1 className="text-2xl font-bold text-[#002333]">{displayTitle}</h1>
-      )}
+      {displayTitle && <h1 className="text-2xl font-bold text-[#002333]">{displayTitle}</h1>}
     </div>
   );
 };

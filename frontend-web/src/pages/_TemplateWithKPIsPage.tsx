@@ -1,8 +1,8 @@
 /**
  * TEMPLATE DE PÁGINA - CONECT CRM
- * 
+ *
  * Este é um template base para criar novas páginas seguindo o padrão visual do sistema.
- * 
+ *
  * INSTRUÇÕES DE USO:
  * 1. Copie este arquivo para src/pages/SuaPaginaPage.tsx
  * 2. Substitua todos os comentários [PERSONALIZAR] com seus valores
@@ -10,7 +10,7 @@
  * 4. Remova os comentários de instrução
  * 5. Registre a rota em App.tsx
  * 6. Adicione no menu em menuConfig.ts
- * 
+ *
  * CORES POR MÓDULO:
  * - Comercial: #159A9C (teal)
  * - Atendimento: #9333EA (purple)
@@ -156,9 +156,10 @@ const SuaPaginaPage: React.FC = () => {
   };
 
   // Filtrar items
-  const itemsFiltrados = items.filter((item) =>
-    item.nome?.toLowerCase().includes(busca.toLowerCase()) ||
-    item.descricao?.toLowerCase().includes(busca.toLowerCase())
+  const itemsFiltrados = items.filter(
+    (item) =>
+      item.nome?.toLowerCase().includes(busca.toLowerCase()) ||
+      item.descricao?.toLowerCase().includes(busca.toLowerCase()),
   );
 
   // [PERSONALIZAR] Calcular métricas para dashboard cards
@@ -201,7 +202,9 @@ const SuaPaginaPage: React.FC = () => {
                     disabled={loading}
                     className="px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
                   >
-                    <RefreshCw className={`w-5 h-5 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
+                    <RefreshCw
+                      className={`w-5 h-5 text-gray-600 ${loading ? 'animate-spin' : ''}`}
+                    />
                   </button>
                   <button
                     onClick={() => handleOpenDialog()}
@@ -405,9 +408,7 @@ const SuaPaginaPage: React.FC = () => {
 
                   {/* Conteúdo */}
                   {item.descricao && (
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                      {item.descricao}
-                    </p>
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{item.descricao}</p>
                   )}
 
                   {/* Footer do Card */}
@@ -441,31 +442,23 @@ const SuaPaginaPage: React.FC = () => {
             <div className="space-y-4">
               {/* Campo Nome */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nome *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Nome *</label>
                 <input
                   type="text"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent transition-colors"
                   value={formData.nome}
-                  onChange={(e) =>
-                    setFormData({ ...formData, nome: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                   placeholder="Digite o nome" // [PERSONALIZAR]
                 />
               </div>
 
               {/* Campo Descrição */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Descrição
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
                 <textarea
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent transition-colors"
                   value={formData.descricao}
-                  onChange={(e) =>
-                    setFormData({ ...formData, descricao: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
                   placeholder="Descrição opcional" // [PERSONALIZAR]
                   rows={3}
                 />
@@ -473,15 +466,11 @@ const SuaPaginaPage: React.FC = () => {
 
               {/* Campo Status */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
                 <select
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent transition-colors"
                   value={formData.ativo ? 'true' : 'false'}
-                  onChange={(e) =>
-                    setFormData({ ...formData, ativo: e.target.value === 'true' })
-                  }
+                  onChange={(e) => setFormData({ ...formData, ativo: e.target.value === 'true' })}
                 >
                   <option value="true">Ativo</option>
                   <option value="false">Inativo</option>

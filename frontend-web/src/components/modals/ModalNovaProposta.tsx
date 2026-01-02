@@ -22,13 +22,17 @@ import {
   Eye,
   Save,
   MessageCircle,
-  Mail
+  Mail,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 // Hooks e Services
 import { useCalculosProposta } from '../../features/propostas/hooks/useCalculosProposta';
-import { propostasService, PropostaCompleta, Vendedor } from '../../features/propostas/services/propostasService';
+import {
+  propostasService,
+  PropostaCompleta,
+  Vendedor,
+} from '../../features/propostas/services/propostasService';
 import { clientesService, Cliente as ClienteService } from '../../services/clientesService';
 import { emailServiceReal } from '../../services/emailServiceReal';
 import { gerarTokenNumerico } from '../../utils/tokenUtils';
@@ -102,9 +106,11 @@ interface PropostaFormData {
 
 // Função auxiliar para detectar se é produto de software
 const isProdutoSoftware = (produto: Produto): boolean => {
-  return produto.tipo === 'software' ||
+  return (
+    produto.tipo === 'software' ||
     produto.categoria?.toLowerCase().includes('software') ||
-    (produto.tipoItem && ['licenca', 'modulo', 'aplicativo'].includes(produto.tipoItem));
+    (produto.tipoItem && ['licenca', 'modulo', 'aplicativo'].includes(produto.tipoItem))
+  );
 };
 
 // Schema de validação por etapa
@@ -120,14 +126,14 @@ const etapaSchemas = {
     formaPagamento: yup.string().required('Forma de pagamento é obrigatória'),
     validadeDias: yup.number().when('produtos', {
       is: (produtos: ProdutoProposta[]) =>
-        produtos && produtos.some(produto => isProdutoSoftware(produto.produto)),
+        produtos && produtos.some((produto) => isProdutoSoftware(produto.produto)),
       then: () => yup.number().optional(), // Opcional para software
-      otherwise: () => yup.number().min(1, 'Validade deve ser pelo menos 1 dia').required()
+      otherwise: () => yup.number().min(1, 'Validade deve ser pelo menos 1 dia').required(),
     }),
   }),
   resumo: yup.object().shape({
     // Validação final opcional
-  })
+  }),
 };
 
 const schema = yup.object().shape({
@@ -146,7 +152,7 @@ interface ModalNovaPropostaProps {
 export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   isOpen,
   onClose,
-  onPropostaCriada
+  onPropostaCriada,
 }) => {
   // Hook de internacionalização
   const { t } = useI18n();
@@ -186,11 +192,19 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     { id: 'cliente', titulo: 'Cliente', icone: User },
     { id: 'produtos', titulo: 'Produtos', icone: Package },
     { id: 'condicoes', titulo: 'Condições', icone: Calculator },
-    { id: 'resumo', titulo: 'Resumo', icone: FileText }
+    { id: 'resumo', titulo: 'Resumo', icone: FileText },
   ];
 
   // React Hook Form
-  const { control, handleSubmit, watch, setValue, getValues, reset, formState: { errors, isValid } } = useForm<PropostaFormData>({
+  const {
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    getValues,
+    reset,
+    formState: { errors, isValid },
+  } = useForm<PropostaFormData>({
     resolver: yupResolver(schema),
     defaultValues: {
       titulo: '', // Será preenchido automaticamente
@@ -202,15 +216,19 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       formaPagamento: 'avista',
       validadeDias: 15, // Valor padrão, será opcional para software
       observacoes: '',
-      incluirImpostosPDF: true
+      incluirImpostosPDF: true,
     },
-    mode: 'onChange'
+    mode: 'onChange',
   });
 
   // Field arrays
-  const { fields: produtos, append: adicionarProduto, remove: removerProduto } = useFieldArray({
+  const {
+    fields: produtos,
+    append: adicionarProduto,
+    remove: removerProduto,
+  } = useFieldArray({
     control,
-    name: 'produtos'
+    name: 'produtos',
   });
 
   // Watch dos campos com otimização
@@ -228,13 +246,16 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   const { totais: totaisCombinados } = useCalculosProposta(
     watchedProdutos || [],
     watchedDescontoGlobal || 0,
-    watchedImpostos || 12
+    watchedImpostos || 12,
   );
 
   // Callbacks memorizados para evitar re-renderizações
-  const handleClienteSelect = useCallback((cliente: Cliente) => {
-    setValue('cliente', cliente);
-  }, [setValue]);
+  const handleClienteSelect = useCallback(
+    (cliente: Cliente) => {
+      setValue('cliente', cliente);
+    },
+    [setValue],
+  );
 
   const handleNewCliente = useCallback(() => {
     setIsModalCadastroClienteOpen(true);
@@ -263,7 +284,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
         observacoes: cliente.observacoes || '',
         ativo: true, // Default para ativo
         createdAt: cliente.created_at || new Date().toISOString(),
-        updatedAt: cliente.updated_at || new Date().toISOString()
+        updatedAt: cliente.updated_at || new Date().toISOString(),
       }));
 
       setClientes(clientesFormatados);
@@ -276,56 +297,61 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     }
   }, []);
 
-  const handleSaveNewCliente = useCallback(async (clienteData: any) => {
-    try {
-      setIsLoading(true);
+  const handleSaveNewCliente = useCallback(
+    async (clienteData: any) => {
+      try {
+        setIsLoading(true);
 
-      // Criar o novo cliente
-      const novoCliente = await clientesService.createCliente(clienteData);
+        // Criar o novo cliente
+        const novoCliente = await clientesService.createCliente(clienteData);
 
-      // Atualizar a lista de clientes
-      await handleReloadClientes();
+        // Atualizar a lista de clientes
+        await handleReloadClientes();
 
-      // Selecionar automaticamente o cliente recém-criado
-      if (novoCliente) {
-        const clienteFormatado: Cliente = {
-          id: novoCliente.id || '',
-          nome: novoCliente.nome,
-          documento: novoCliente.documento || '',
-          email: novoCliente.email,
-          telefone: novoCliente.telefone || '',
-          endereco: novoCliente.endereco || '',
-          cidade: novoCliente.cidade || '',
-          estado: novoCliente.estado || '',
-          cep: novoCliente.cep || '',
-          tipoPessoa: novoCliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica',
-          observacoes: novoCliente.observacoes || '',
-          ativo: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
+        // Selecionar automaticamente o cliente recém-criado
+        if (novoCliente) {
+          const clienteFormatado: Cliente = {
+            id: novoCliente.id || '',
+            nome: novoCliente.nome,
+            documento: novoCliente.documento || '',
+            email: novoCliente.email,
+            telefone: novoCliente.telefone || '',
+            endereco: novoCliente.endereco || '',
+            cidade: novoCliente.cidade || '',
+            estado: novoCliente.estado || '',
+            cep: novoCliente.cep || '',
+            tipoPessoa: novoCliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica',
+            observacoes: novoCliente.observacoes || '',
+            ativo: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
 
-        setValue('cliente', clienteFormatado);
+          setValue('cliente', clienteFormatado);
 
-        toast.success('Cliente cadastrado e selecionado com sucesso!');
+          toast.success('Cliente cadastrado e selecionado com sucesso!');
+        }
+
+        // Fechar o modal
+        setIsModalCadastroClienteOpen(false);
+      } catch (error) {
+        console.error('Erro ao criar cliente:', error);
+        toast.error('Erro ao cadastrar cliente. Tente novamente.');
+      } finally {
+        setIsLoading(false);
       }
-
-      // Fechar o modal
-      setIsModalCadastroClienteOpen(false);
-
-    } catch (error) {
-      console.error('Erro ao criar cliente:', error);
-      toast.error('Erro ao cadastrar cliente. Tente novamente.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [setValue, handleReloadClientes]);
+    },
+    [setValue, handleReloadClientes],
+  );
 
   // Callback otimizado para mudança de vendedor
-  const handleVendedorChange = useCallback((vendedorId: string, onChange: (value: any) => void) => {
-    const vendedorSelecionado = vendedores.find(v => v.id === vendedorId);
-    onChange(vendedorSelecionado || null);
-  }, [vendedores]);
+  const handleVendedorChange = useCallback(
+    (vendedorId: string, onChange: (value: any) => void) => {
+      const vendedorSelecionado = vendedores.find((v) => v.id === vendedorId);
+      onChange(vendedorSelecionado || null);
+    },
+    [vendedores],
+  );
 
   // Consolidado: Reset e carregamento de dados ao abrir modal (SEM DEPENDÊNCIAS EXTRAS)
   useEffect(() => {
@@ -342,7 +368,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
         formaPagamento: 'avista',
         validadeDias: 15,
         observacoes: '',
-        incluirImpostosPDF: true
+        incluirImpostosPDF: true,
       });
 
       // 2. Reset UI states
@@ -363,7 +389,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
 
             const [vendedoresList, vendedorAtual] = await Promise.all([
               propostasService.obterVendedores(),
-              propostasService.obterVendedorAtual()
+              propostasService.obterVendedorAtual(),
             ]);
 
             setVendedores(vendedoresList);
@@ -393,7 +419,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
               cidade: cliente.cidade || '',
               estado: cliente.estado || '',
               cep: cliente.cep || '',
-              tipoPessoa: cliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica'
+              tipoPessoa: cliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica',
             }));
 
             setClientes(clientesFormatados);
@@ -442,10 +468,11 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   // Filtrar clientes
   const clientesFiltrados = useMemo(() => {
     if (!buscarCliente) return clientes;
-    return clientes.filter(cliente =>
-      cliente.nome.toLowerCase().includes(buscarCliente.toLowerCase()) ||
-      cliente.documento.includes(buscarCliente) ||
-      cliente.email.toLowerCase().includes(buscarCliente.toLowerCase())
+    return clientes.filter(
+      (cliente) =>
+        cliente.nome.toLowerCase().includes(buscarCliente.toLowerCase()) ||
+        cliente.documento.includes(buscarCliente) ||
+        cliente.email.toLowerCase().includes(buscarCliente.toLowerCase()),
     );
   }, [buscarCliente, clientes]);
 
@@ -454,18 +481,19 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     let filtered = produtosDisponiveis;
 
     if (categoriaSelecionada) {
-      filtered = filtered.filter(p => p.categoria === categoriaSelecionada);
+      filtered = filtered.filter((p) => p.categoria === categoriaSelecionada);
     }
 
     if (tipoSelecionado) {
-      filtered = filtered.filter(p => p.tipo === tipoSelecionado);
+      filtered = filtered.filter((p) => p.tipo === tipoSelecionado);
     }
 
     if (buscarProduto) {
-      filtered = filtered.filter(p =>
-        p.nome.toLowerCase().includes(buscarProduto.toLowerCase()) ||
-        p.categoria.toLowerCase().includes(buscarProduto.toLowerCase()) ||
-        p.descricao?.toLowerCase().includes(buscarProduto.toLowerCase())
+      filtered = filtered.filter(
+        (p) =>
+          p.nome.toLowerCase().includes(buscarProduto.toLowerCase()) ||
+          p.categoria.toLowerCase().includes(buscarProduto.toLowerCase()) ||
+          p.descricao?.toLowerCase().includes(buscarProduto.toLowerCase()),
       );
     }
 
@@ -474,7 +502,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
 
   // Categorias únicas
   const categorias = useMemo(() => {
-    return [...new Set(produtosDisponiveis.map(p => p.categoria))];
+    return [...new Set(produtosDisponiveis.map((p) => p.categoria))];
   }, [produtosDisponiveis]);
 
   // Funções auxiliares
@@ -489,7 +517,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       produto,
       quantidade: 1,
       desconto: 0,
-      subtotal: produto.preco
+      subtotal: produto.preco,
     };
 
     adicionarProduto(novoProduto);
@@ -512,7 +540,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       return true;
     } catch (error) {
       if (error instanceof yup.ValidationError) {
-        error.errors.forEach(err => toast.error(err));
+        error.errors.forEach((err) => toast.error(err));
       }
       return false;
     }
@@ -538,8 +566,11 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       const formData = watch();
 
       // Verificar se há produtos de software
-      const temProdutosSoftware = formData.produtos?.some(produto => isProdutoSoftware(produto.produto));
-      const validadeDias = temProdutosSoftware && !formData.validadeDias ? 30 : (formData.validadeDias || 15);
+      const temProdutosSoftware = formData.produtos?.some((produto) =>
+        isProdutoSoftware(produto.produto),
+      );
+      const validadeDias =
+        temProdutosSoftware && !formData.validadeDias ? 30 : formData.validadeDias || 15;
 
       const propostaData: PropostaCompleta = {
         ...formData,
@@ -548,7 +579,13 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
         dataValidade: new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000),
         subtotal: totaisCombinados.subtotal,
         total: totaisCombinados.total,
-        vendedor: formData.vendedor || { id: '', nome: 'Vendedor Padrão', email: '', tipo: 'vendedor' as const, ativo: true }
+        vendedor: formData.vendedor || {
+          id: '',
+          nome: 'Vendedor Padrão',
+          email: '',
+          tipo: 'vendedor' as const,
+          ativo: true,
+        },
       };
 
       const previewResult = await propostasService.previewProposta(JSON.stringify(propostaData));
@@ -572,8 +609,11 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       const formData = watch();
 
       // Verificar se há produtos de software
-      const temProdutosSoftware = formData.produtos?.some(produto => isProdutoSoftware(produto.produto));
-      const validadeDias = temProdutosSoftware && !formData.validadeDias ? 30 : (formData.validadeDias || 15);
+      const temProdutosSoftware = formData.produtos?.some((produto) =>
+        isProdutoSoftware(produto.produto),
+      );
+      const validadeDias =
+        temProdutosSoftware && !formData.validadeDias ? 30 : formData.validadeDias || 15;
 
       const propostaData: PropostaCompleta = {
         ...formData,
@@ -582,7 +622,13 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
         dataValidade: new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000),
         subtotal: totaisCombinados.subtotal,
         total: totaisCombinados.total,
-        vendedor: formData.vendedor || { id: '', nome: 'Vendedor Padrão', email: '', tipo: 'vendedor' as const, ativo: true }
+        vendedor: formData.vendedor || {
+          id: '',
+          nome: 'Vendedor Padrão',
+          email: '',
+          tipo: 'vendedor' as const,
+          ativo: true,
+        },
       };
 
       await propostasService.criarProposta(propostaData);
@@ -590,7 +636,9 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       onClose();
     } catch (error) {
       console.error('Erro ao salvar rascunho:', error);
-      toast.error('Erro ao salvar proposta como rascunho');
+      const friendlyMessage =
+        error instanceof Error ? error.message : 'Erro ao salvar proposta como rascunho';
+      toast.error(friendlyMessage);
     }
   };
 
@@ -604,8 +652,11 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       }
 
       // Verificar se há produtos de software
-      const temProdutosSoftware = formData.produtos?.some(produto => isProdutoSoftware(produto.produto));
-      const validadeDias = temProdutosSoftware && !formData.validadeDias ? 30 : (formData.validadeDias || 15);
+      const temProdutosSoftware = formData.produtos?.some((produto) =>
+        isProdutoSoftware(produto.produto),
+      );
+      const validadeDias =
+        temProdutosSoftware && !formData.validadeDias ? 30 : formData.validadeDias || 15;
 
       const propostaData: PropostaCompleta = {
         ...formData,
@@ -614,7 +665,13 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
         dataValidade: new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000),
         subtotal: totaisCombinados.subtotal,
         total: totaisCombinados.total,
-        vendedor: formData.vendedor || { id: '', nome: 'Vendedor Padrão', email: '', tipo: 'vendedor' as const, ativo: true }
+        vendedor: formData.vendedor || {
+          id: '',
+          nome: 'Vendedor Padrão',
+          email: '',
+          tipo: 'vendedor' as const,
+          ativo: true,
+        },
       };
 
       const proposta = await propostasService.criarProposta(propostaData);
@@ -624,7 +681,9 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       onClose();
     } catch (error) {
       console.error('Erro ao enviar via WhatsApp:', error);
-      toast.error('Erro ao enviar proposta via WhatsApp');
+      const friendlyMessage =
+        error instanceof Error ? error.message : 'Erro ao enviar proposta via WhatsApp';
+      toast.error(friendlyMessage);
     }
   };
 
@@ -638,8 +697,11 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       }
 
       // Verificar se há produtos de software
-      const temProdutosSoftware = formData.produtos?.some(produto => isProdutoSoftware(produto.produto));
-      const validadeDias = temProdutosSoftware && !formData.validadeDias ? 30 : (formData.validadeDias || 15);
+      const temProdutosSoftware = formData.produtos?.some((produto) =>
+        isProdutoSoftware(produto.produto),
+      );
+      const validadeDias =
+        temProdutosSoftware && !formData.validadeDias ? 30 : formData.validadeDias || 15;
 
       const propostaData: PropostaCompleta = {
         ...formData,
@@ -648,7 +710,13 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
         dataValidade: new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000),
         subtotal: totaisCombinados.subtotal,
         total: totaisCombinados.total,
-        vendedor: formData.vendedor || { id: '', nome: 'Vendedor Padrão', email: '', tipo: 'vendedor' as const, ativo: true }
+        vendedor: formData.vendedor || {
+          id: '',
+          nome: 'Vendedor Padrão',
+          email: '',
+          tipo: 'vendedor' as const,
+          ativo: true,
+        },
       };
 
       const proposta = await propostasService.criarProposta(propostaData);
@@ -658,7 +726,9 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       onClose();
     } catch (error) {
       console.error('Erro ao enviar por e-mail:', error);
-      toast.error('Erro ao enviar proposta por e-mail');
+      const friendlyMessage =
+        error instanceof Error ? error.message : 'Erro ao enviar proposta por e-mail';
+      toast.error(friendlyMessage);
     }
   };
 
@@ -668,10 +738,12 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       setIsLoading(true);
 
       // Verificar se há produtos de software
-      const temProdutosSoftware = data.produtos?.some(produto => isProdutoSoftware(produto.produto));
+      const temProdutosSoftware = data.produtos?.some((produto) =>
+        isProdutoSoftware(produto.produto),
+      );
 
       // Para produtos de software, usar validade padrão de 30 dias se não especificado
-      const validadeDias = temProdutosSoftware && !data.validadeDias ? 30 : (data.validadeDias || 15);
+      const validadeDias = temProdutosSoftware && !data.validadeDias ? 30 : data.validadeDias || 15;
 
       // Gerar token para o portal do cliente
       const tokenPortal = gerarTokenNumerico();
@@ -683,7 +755,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
         total: totaisCombinados.total,
         dataValidade: new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000),
         status: 'rascunho',
-        tokenPortal
+        tokenPortal,
       };
 
       const propostaCriada = await propostasService.criarProposta(propostaData);
@@ -699,7 +771,9 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       onClose();
     } catch (error) {
       console.error('Erro ao criar proposta:', error);
-      toast.error('Erro ao criar proposta. Tente novamente.');
+      const friendlyMessage =
+        error instanceof Error ? error.message : 'Erro ao criar proposta. Tente novamente.';
+      toast.error(friendlyMessage);
     } finally {
       setIsLoading(false);
     }
@@ -713,7 +787,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-1 sm:p-2">
       <div className="modal-content modal-nova-proposta bg-white rounded-lg sm:rounded-xl shadow-2xl w-[calc(100%-2rem)] sm:w-[700px] md:w-[900px] lg:w-[1100px] xl:w-[1200px] max-w-[1400px] h-[98vh] max-h-[98vh] overflow-hidden flex flex-col">
         {/* Header do Modal - Compacto */}
-        <div className="bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white px-3 py-2 flex-shrink-0">
+        <div className="bg-[#159A9C] text-white px-3 py-2 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
               <h2 className="text-lg font-bold truncate">Nova Proposta</h2>
@@ -743,17 +817,17 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
 
         {/* Conteúdo das Etapas - Compacto */}
         <div className="flex-1 overflow-y-auto bg-gray-50">
-          <div className="p-2 sm:p-3 md:p-4">{/* Conteúdo das etapas com espaçamento reduzido */}
+          <div className="p-2 sm:p-3 md:p-4">
+            {/* Conteúdo das etapas com espaçamento reduzido */}
             {/* Etapa 1: Informações Iniciais */}
             {etapaAtual === 0 && (
               <div className="space-y-4">
                 {/* Layout em Duas Colunas - Compacto */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
                   {/* Coluna 1: Dados da Proposta */}
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                  <div className="bg-white rounded-lg p-4 border border-[#DEEFE7]">
                     <div className="flex items-center mb-3">
-                      <FileText className="w-4 h-4 text-blue-600 mr-2" />
+                      <FileText className="w-4 h-4 text-[#159A9C] mr-2" />
                       <h4 className="text-base font-semibold text-gray-900">Dados da Proposta</h4>
                     </div>
 
@@ -787,7 +861,11 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         </label>
                         <input
                           type="date"
-                          defaultValue={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                          defaultValue={
+                            new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                              .toISOString()
+                              .split('T')[0]
+                          }
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
                         />
                       </div>
@@ -810,7 +888,9 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                               <select
                                 {...field}
                                 value={field.value?.id || ''}
-                                onChange={(e) => handleVendedorChange(e.target.value, field.onChange)}
+                                onChange={(e) =>
+                                  handleVendedorChange(e.target.value, field.onChange)
+                                }
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
                               >
                                 <option value="">Selecione um vendedor</option>
@@ -840,9 +920,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                               <p className="text-sm font-medium text-green-800">
                                 {vendedorMemoized.nome}
                               </p>
-                              <p className="text-xs text-green-600">
-                                {vendedorMemoized.email}
-                              </p>
+                              <p className="text-xs text-green-600">{vendedorMemoized.email}</p>
                             </div>
                           </div>
                         </div>
@@ -863,7 +941,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                   </div>
 
                   {/* Coluna 2: Seleção do Cliente */}
-                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+                  <div className="bg-white rounded-lg p-4 border border-[#DEEFE7]">
                     <div className="flex items-center mb-3">
                       <User className="w-4 h-4 text-green-600 mr-2" />
                       <h4 className="text-base font-semibold text-gray-900">Seleção do Cliente</h4>
@@ -874,9 +952,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         <span className="flex items-center justify-between">
                           <span>Buscar Cliente *</span>
-                          <span className="text-xs text-gray-500">
-                            💡 Use + para cadastrar
-                          </span>
+                          <span className="text-xs text-gray-500">💡 Use + para cadastrar</span>
                         </span>
                       </label>
                       <ClienteSearchOptimizedV2
@@ -897,23 +973,23 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
 
                     {/* Preview do Cliente Selecionado - Versão Compacta */}
                     {watchedCliente && (
-                      <div className="mt-3 p-3 bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-lg">
+                      <div className="mt-3 p-3 bg-[#DEEFE7] border border-[#B4BEC9] rounded-lg">
                         <div className="flex items-center">
                           <div className="flex-shrink-0">
-                            <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center">
-                              <Check className="w-4 h-4 text-teal-600" />
+                            <div className="w-8 h-8 bg-[#159A9C]/10 rounded-full flex items-center justify-center">
+                              <Check className="w-4 h-4 text-[#159A9C]" />
                             </div>
                           </div>
                           <div className="ml-3 flex-1 min-w-0">
                             <div className="flex items-center justify-between">
-                              <h5 className="text-sm font-semibold text-teal-800 truncate">
+                              <h5 className="text-sm font-semibold text-[#002333] truncate">
                                 {watchedCliente.nome}
                               </h5>
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-teal-100 text-teal-800">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-[#159A9C]/10 text-[#159A9C]">
                                 Selecionado
                               </span>
                             </div>
-                            <div className="flex items-center space-x-4 text-xs text-teal-600 mt-1">
+                            <div className="flex items-center space-x-4 text-xs text-[#159A9C] mt-1">
                               <span>{watchedCliente.documento}</span>
                               {watchedCliente.email && (
                                 <span className="truncate">{watchedCliente.email}</span>
@@ -932,7 +1008,9 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
             {etapaAtual === 1 && (
               <div className="space-y-3 md:space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <h3 className="text-base md:text-lg font-semibold text-gray-900">Produtos e Serviços</h3>
+                  <h3 className="text-base md:text-lg font-semibold text-gray-900">
+                    Produtos e Serviços
+                  </h3>
                   <button
                     onClick={() => setShowProdutoSearch(!showProdutoSearch)}
                     className="flex items-center justify-center space-x-2 text-[#159A9C] font-medium px-3 py-2 border border-[#159A9C] rounded-lg hover:bg-[#159A9C] hover:text-white transition-all text-sm"
@@ -948,9 +1026,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                       {/* Filtro por tipo */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Tipo
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
                         <select
                           value={tipoSelecionado}
                           onChange={(e) => setTipoSelecionado(e.target.value)}
@@ -973,8 +1049,10 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
                         >
                           <option value="">Todas as categorias</option>
-                          {categorias.map(categoria => (
-                            <option key={categoria} value={categoria}>{categoria}</option>
+                          {categorias.map((categoria) => (
+                            <option key={categoria} value={categoria}>
+                              {categoria}
+                            </option>
                           ))}
                         </select>
                       </div>
@@ -1005,11 +1083,11 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         </span>
                         <span>•</span>
                         <span>
-                          {produtosFiltrados.filter(p => p.tipo === 'produto').length} produtos
+                          {produtosFiltrados.filter((p) => p.tipo === 'produto').length} produtos
                         </span>
                         <span>•</span>
                         <span>
-                          {produtosFiltrados.filter(p => p.tipo === 'combo').length} combos
+                          {produtosFiltrados.filter((p) => p.tipo === 'combo').length} combos
                         </span>
                       </div>
                       {(tipoSelecionado || categoriaSelecionada || buscarProduto) && (
@@ -1037,12 +1115,12 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         <div className="col-span-2 p-8 text-center text-gray-500">
                           <Package className="h-12 w-12 text-gray-300 mx-auto mb-3" />
                           <div className="font-medium">
-                            {buscarProduto ? 'Nenhum produto encontrado' : 'Nenhum produto cadastrado'}
+                            {buscarProduto
+                              ? 'Nenhum produto encontrado'
+                              : 'Nenhum produto cadastrado'}
                           </div>
                           {buscarProduto && (
-                            <div className="text-sm mt-1">
-                              Tente ajustar os termos de busca
-                            </div>
+                            <div className="text-sm mt-1">Tente ajustar os termos de busca</div>
                           )}
                           {!buscarProduto && (
                             <div className="text-sm mt-1">
@@ -1055,18 +1133,15 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                           <div
                             key={produto.id}
                             onClick={() => handleAdicionarProduto(produto)}
-                            className={`product-card p-4 border rounded-lg hover:bg-white cursor-pointer transition-colors ${produto.tipo === 'combo'
-                              ? 'border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50'
-                              : isProdutoSoftware(produto)
-                                ? 'border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50'
-                                : 'border-gray-200'
-                              }`}
+                            className="product-card p-4 border rounded-lg hover:bg-white cursor-pointer transition-colors border-[#DEEFE7] bg-white"
                           >
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex items-center gap-2">
-                                <div className="product-name font-medium text-gray-900">{produto.nome}</div>
+                                <div className="product-name font-medium text-gray-900">
+                                  {produto.nome}
+                                </div>
                                 {produto.tipo === 'combo' && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full font-medium">
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#159A9C]/10 text-[#159A9C] text-xs rounded-full font-medium">
                                     <Package className="w-3 h-3" />
                                     COMBO
                                   </span>
@@ -1081,51 +1156,55 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                               </div>
                               <div className="text-right">
                                 <div className="text-lg font-bold text-[#159A9C]">
-                                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(produto.preco)}
+                                  {new Intl.NumberFormat('pt-BR', {
+                                    style: 'currency',
+                                    currency: 'BRL',
+                                  }).format(produto.preco)}
                                 </div>
                                 {produto.tipo === 'combo' && produto.precoOriginal && (
                                   <div className="text-sm text-gray-500 line-through">
-                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(produto.precoOriginal)}
+                                    {new Intl.NumberFormat('pt-BR', {
+                                      style: 'currency',
+                                      currency: 'BRL',
+                                    }).format(produto.precoOriginal)}
                                   </div>
                                 )}
                                 {isProdutoSoftware(produto) && produto.periodicidadeLicenca && (
-                                  <div className="text-xs text-purple-600">
+                                  <div className="text-xs text-[#159A9C]">
                                     / {produto.periodicidadeLicenca}
                                   </div>
                                 )}
                               </div>
                             </div>
 
-                            <div className="product-description text-sm text-gray-600 mb-2">{produto.descricao}</div>
+                            <div className="product-description text-sm text-gray-600 mb-2">
+                              {produto.descricao}
+                            </div>
 
                             <div className="flex items-center justify-between">
                               <div className="flex flex-wrap gap-1">
-                                <span className={`px-2 py-1 text-xs rounded ${produto.tipo === 'combo'
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : isProdutoSoftware(produto)
-                                    ? 'bg-purple-100 text-purple-800'
-                                    : 'bg-gray-100 text-gray-700'
-                                  }`}>
+                                <span className="px-2 py-1 text-xs rounded bg-[#159A9C]/10 text-[#159A9C]">
                                   {produto.categoria}
                                 </span>
                                 {produto.subcategoria && (
-                                  <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">
+                                  <span className="px-2 py-1 bg-[#159A9C]/10 text-[#159A9C] text-xs rounded">
                                     {produto.subcategoria}
                                   </span>
                                 )}
                                 {produto.tipo === 'combo' && produto.desconto && (
-                                  <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded font-medium">
+                                  <span className="px-2 py-1 bg-[#159A9C]/10 text-[#159A9C] text-xs rounded font-medium">
                                     -{produto.desconto.toFixed(1)}%
                                   </span>
                                 )}
                                 {isProdutoSoftware(produto) && produto.tipoLicenciamento && (
-                                  <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded">
+                                  <span className="px-2 py-1 bg-[#159A9C]/10 text-[#159A9C] text-xs rounded">
                                     {produto.tipoLicenciamento}
                                   </span>
                                 )}
                               </div>
                               <div className="text-xs text-gray-500">
-                                {produto.unidade || (isProdutoSoftware(produto) ? 'licenças' : 'unid')}
+                                {produto.unidade ||
+                                  (isProdutoSoftware(produto) ? 'licenças' : 'unid')}
                               </div>
                             </div>
                           </div>
@@ -1151,21 +1230,25 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                               <div className="flex items-center gap-2 mb-1">
                                 <h5 className="font-medium text-gray-900">{field.produto.nome}</h5>
                                 {field.produto.tipo === 'combo' && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full font-medium">
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#159A9C]/10 text-[#159A9C] text-xs rounded-full font-medium">
                                     <Package className="w-3 h-3" />
                                     COMBO
                                   </span>
                                 )}
                               </div>
-                              <p className="text-sm text-gray-600 mb-3">{field.produto.descricao}</p>
+                              <p className="text-sm text-gray-600 mb-3">
+                                {field.produto.descricao}
+                              </p>
 
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div>
                                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    {field.produto.tipoItem && ['licenca', 'modulo', 'aplicativo'].includes(field.produto.tipoItem)
+                                    {field.produto.tipoItem &&
+                                      ['licenca', 'modulo', 'aplicativo'].includes(
+                                        field.produto.tipoItem,
+                                      )
                                       ? 'Quantidade de Licenças'
-                                      : 'Quantidade'
-                                    }
+                                      : 'Quantidade'}
                                   </label>
                                   <Controller
                                     name={`produtos.${index}.quantidade`}
@@ -1176,9 +1259,13 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                         type="number"
                                         min="1"
                                         step="1"
-                                        placeholder={field.produto.tipoItem && ['licenca', 'modulo', 'aplicativo'].includes(field.produto.tipoItem)
-                                          ? 'Ex: 10 licenças'
-                                          : 'Ex: 1'
+                                        placeholder={
+                                          field.produto.tipoItem &&
+                                            ['licenca', 'modulo', 'aplicativo'].includes(
+                                              field.produto.tipoItem,
+                                            )
+                                            ? 'Ex: 10 licenças'
+                                            : 'Ex: 1'
                                         }
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                                         onChange={(e) => {
@@ -1189,7 +1276,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                             const subtotal = calcularSubtotalProduto(
                                               produtoAtual.produto,
                                               quantidade,
-                                              produtoAtual.desconto || 0
+                                              produtoAtual.desconto || 0,
                                             );
                                             setValue(`produtos.${index}.subtotal`, subtotal);
                                           }
@@ -1222,7 +1309,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                             const subtotal = calcularSubtotalProduto(
                                               produtoAtual.produto,
                                               produtoAtual.quantidade || 1,
-                                              desconto
+                                              desconto,
                                             );
                                             setValue(`produtos.${index}.subtotal`, subtotal);
                                           }
@@ -1237,7 +1324,10 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                     Subtotal
                                   </label>
                                   <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg font-medium text-[#159A9C]">
-                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(field.subtotal)}
+                                    {new Intl.NumberFormat('pt-BR', {
+                                      style: 'currency',
+                                      currency: 'BRL',
+                                    }).format(field.subtotal)}
                                   </div>
                                 </div>
                               </div>
@@ -1266,7 +1356,9 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
             {/* Etapa 3: Condições e Totais */}
             {etapaAtual === 2 && (
               <div className="space-y-4 md:space-y-6">
-                <h3 className="text-lg md:text-xl font-semibold text-gray-900">Condições e Totais</h3>
+                <h3 className="text-lg md:text-xl font-semibold text-gray-900">
+                  Condições e Totais
+                </h3>
 
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                   {/* Condições */}
@@ -1341,7 +1433,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     </div>
 
                     {/* Validade - Oculto para produtos Software */}
-                    {!watchedProdutos?.some(produto => isProdutoSoftware(produto.produto)) && (
+                    {!watchedProdutos?.some((produto) => isProdutoSoftware(produto.produto)) && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Validade (dias) *
@@ -1366,17 +1458,26 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     )}
 
                     {/* Mensagem informativa para produtos Software */}
-                    {watchedProdutos?.some(produto => isProdutoSoftware(produto.produto)) && (
-                      <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    {watchedProdutos?.some((produto) => isProdutoSoftware(produto.produto)) && (
+                      <div className="p-4 bg-[#DEEFE7] border border-[#B4BEC9] rounded-lg">
                         <div className="flex items-center">
                           <div className="flex-shrink-0">
-                            <svg className="h-5 w-5 text-purple-400" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                            <svg
+                              className="h-5 w-5 text-[#159A9C]"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                clipRule="evenodd"
+                              />
                             </svg>
                           </div>
                           <div className="ml-3">
-                            <p className="text-sm text-purple-700">
-                              <strong>Produtos de Software detectados:</strong> A validade e garantia são gerenciadas pela periodicidade da licença (mensal/anual).
+                            <p className="text-sm text-[#002333]">
+                              <strong>Produtos de Software detectados:</strong> A validade e
+                              garantia são gerenciadas pela periodicidade da licença (mensal/anual).
                             </p>
                           </div>
                         </div>
@@ -1411,21 +1512,31 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                       <div className="flex justify-between">
                         <span className="text-gray-600">{t('common.subtotal')}:</span>
                         <span className="font-medium">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totaisCombinados.subtotal)}
+                          {new Intl.NumberFormat('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          }).format(totaisCombinados.subtotal)}
                         </span>
                       </div>
 
                       <div className="flex justify-between">
                         <span className="text-gray-600">{t('common.discount')}:</span>
                         <span className="font-medium text-red-600">
-                          -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totaisCombinados.desconto)}
+                          -
+                          {new Intl.NumberFormat('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          }).format(totaisCombinados.desconto)}
                         </span>
                       </div>
 
                       <div className="flex justify-between">
                         <span className="text-gray-600">{t('common.taxes')}:</span>
                         <span className="font-medium">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totaisCombinados.impostos)}
+                          {new Intl.NumberFormat('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          }).format(totaisCombinados.impostos)}
                         </span>
                       </div>
 
@@ -1433,7 +1544,10 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         <div className="flex justify-between">
                           <span className="text-lg font-semibold text-gray-900">Total:</span>
                           <span className="text-lg font-bold text-[#159A9C]">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totaisCombinados.total)}
+                            {new Intl.NumberFormat('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            }).format(totaisCombinados.total)}
                           </span>
                         </div>
                       </div>
@@ -1446,7 +1560,9 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
             {/* Etapa 4: Resumo */}
             {etapaAtual === 3 && (
               <div className="space-y-4 md:space-y-6">
-                <h3 className="text-lg md:text-xl font-semibold text-gray-900">Resumo da Proposta</h3>
+                <h3 className="text-lg md:text-xl font-semibold text-gray-900">
+                  Resumo da Proposta
+                </h3>
 
                 {/* Cliente */}
                 <div className="p-4 border border-gray-200 rounded-lg">
@@ -1456,10 +1572,18 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                   </h4>
                   {watchedCliente && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                      <div><strong>Nome:</strong> {watchedCliente.nome}</div>
-                      <div><strong>Email:</strong> {watchedCliente.email}</div>
-                      <div><strong>Documento:</strong> {watchedCliente.documento}</div>
-                      <div><strong>Telefone:</strong> {watchedCliente.telefone}</div>
+                      <div>
+                        <strong>Nome:</strong> {watchedCliente.nome}
+                      </div>
+                      <div>
+                        <strong>Email:</strong> {watchedCliente.email}
+                      </div>
+                      <div>
+                        <strong>Documento:</strong> {watchedCliente.documento}
+                      </div>
+                      <div>
+                        <strong>Telefone:</strong> {watchedCliente.telefone}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1475,13 +1599,17 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                       <div key={produto.id} className="flex justify-between text-sm">
                         <span>
                           {produto.produto.nome} (x{produto.quantidade}{' '}
-                          {produto.produto.tipoItem && ['licenca', 'modulo', 'aplicativo'].includes(produto.produto.tipoItem)
+                          {produto.produto.tipoItem &&
+                            ['licenca', 'modulo', 'aplicativo'].includes(produto.produto.tipoItem)
                             ? 'licenças'
-                            : produto.produto.unidade || 'unidades'
-                          })
+                            : produto.produto.unidade || 'unidades'}
+                          )
                         </span>
                         <span className="font-medium">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(produto.subtotal)}
+                          {new Intl.NumberFormat('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          }).format(produto.subtotal)}
                         </span>
                       </div>
                     ))}
@@ -1497,19 +1625,40 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
-                      <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totaisCombinados.subtotal)}</span>
+                      <span>
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        }).format(totaisCombinados.subtotal)}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Desconto Global ({watchedDescontoGlobal}%):</span>
-                      <span className="text-red-600">-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totaisCombinados.desconto)}</span>
+                      <span className="text-red-600">
+                        -
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        }).format(totaisCombinados.desconto)}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Impostos ({watchedImpostos}%):</span>
-                      <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totaisCombinados.impostos)}</span>
+                      <span>
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        }).format(totaisCombinados.impostos)}
+                      </span>
                     </div>
                     <div className="flex justify-between font-bold text-lg pt-2 border-t">
                       <span>Total:</span>
-                      <span className="text-[#159A9C]">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totaisCombinados.total)}</span>
+                      <span className="text-[#159A9C]">
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        }).format(totaisCombinados.total)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1521,15 +1670,23 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     Condições
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                    <div><strong>Forma de Pagamento:</strong> {watch('formaPagamento')}</div>
-                    {!watchedProdutos?.some(produto => isProdutoSoftware(produto.produto)) && (
-                      <div><strong>Validade:</strong> {watch('validadeDias')} dias</div>
+                    <div>
+                      <strong>Forma de Pagamento:</strong> {watch('formaPagamento')}
+                    </div>
+                    {!watchedProdutos?.some((produto) => isProdutoSoftware(produto.produto)) && (
+                      <div>
+                        <strong>Validade:</strong> {watch('validadeDias')} dias
+                      </div>
                     )}
-                    {watchedProdutos?.some(produto => isProdutoSoftware(produto.produto)) && (
-                      <div><strong>Licenciamento:</strong> Conforme periodicidade dos produtos</div>
+                    {watchedProdutos?.some((produto) => isProdutoSoftware(produto.produto)) && (
+                      <div>
+                        <strong>Licenciamento:</strong> Conforme periodicidade dos produtos
+                      </div>
                     )}
                     {watch('observacoes') && (
-                      <div className="md:col-span-2"><strong>Observações:</strong> {watch('observacoes')}</div>
+                      <div className="md:col-span-2">
+                        <strong>Observações:</strong> {watch('observacoes')}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1573,7 +1730,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                 <button
                   onClick={handleSubmit(onSubmit)}
                   disabled={isLoading || !isValid}
-                  className="flex items-center px-3 py-1.5 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed transition-all text-sm"
+                  className="flex items-center px-3 py-1.5 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
                 >
                   {isLoading ? (
                     <>
@@ -1605,7 +1762,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                 <button
                   onClick={handleSaveAsDraft}
                   disabled={!isValid}
-                  className="flex items-center px-3 py-1.5 border border-amber-300 text-amber-700 rounded text-xs disabled:opacity-50"
+                  className="flex items-center px-3 py-1.5 border border-[#159A9C] text-[#159A9C] rounded text-xs hover:bg-[#159A9C]/10 disabled:opacity-50"
                   title="Salvar rascunho"
                 >
                   <Save className="h-3 w-3 mr-1" />
@@ -1656,7 +1813,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     <button
                       onClick={handleSaveAsDraft}
                       disabled={!isValid}
-                      className="flex items-center px-2 py-1.5 border border-amber-300 text-amber-700 rounded hover:bg-amber-50 transition-colors text-xs disabled:opacity-50"
+                      className="flex items-center px-2 py-1.5 border border-[#159A9C] text-[#159A9C] rounded hover:bg-[#159A9C]/10 transition-colors text-xs disabled:opacity-50"
                       title="Salvar como rascunho"
                     >
                       <Save className="h-3 w-3 mr-1" />
@@ -1665,7 +1822,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     <button
                       onClick={handleSendWhatsApp}
                       disabled={!isValid}
-                      className="flex items-center px-2 py-1.5 border border-green-300 text-green-700 rounded hover:bg-green-50 transition-colors text-xs disabled:opacity-50"
+                      className="flex items-center px-2 py-1.5 border border-[#159A9C] text-[#159A9C] rounded hover:bg-[#159A9C]/10 transition-colors text-xs disabled:opacity-50"
                       title="Enviar por WhatsApp"
                     >
                       <MessageCircle className="h-3 w-3 mr-1" />
@@ -1674,7 +1831,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     <button
                       onClick={handleSendEmail}
                       disabled={!isValid}
-                      className="flex items-center px-2 py-1.5 border border-blue-300 text-blue-700 rounded hover:bg-blue-50 transition-colors text-xs disabled:opacity-50"
+                      className="flex items-center px-2 py-1.5 border border-[#159A9C] text-[#159A9C] rounded hover:bg-[#159A9C]/10 transition-colors text-xs disabled:opacity-50"
                       title="Enviar por e-mail"
                     >
                       <Mail className="h-3 w-3 mr-1" />
@@ -1686,7 +1843,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                   <button
                     onClick={handleSubmit(onSubmit)}
                     disabled={isLoading || !isValid}
-                    className="flex items-center px-3 py-1.5 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed transition-all text-sm"
+                    className="flex items-center px-3 py-1.5 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
                   >
                     {isLoading ? (
                       <>

@@ -5,7 +5,6 @@ import {
   Plus,
   Edit2,
   Trash2,
-  Search,
   CheckCircle,
   AlertCircle,
   Users,
@@ -24,6 +23,7 @@ import atendenteService, {
   CreateAtendenteDto,
   StatusAtendente,
 } from '../../../services/atendenteService';
+import { getErrorMessage } from '../../../utils/errorHandling';
 
 const formatTelefone = (valor: string): string => {
   const numeros = valor.replace(/\D/g, '').slice(0, 11);
@@ -86,7 +86,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
     carregarAtendentes();
   }, []);
 
-  const carregarAtendentes = async () => {
+  const carregarAtendentes = async (): Promise<void> => {
     try {
       setLoading(true);
       setError(null);
@@ -94,19 +94,14 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
       setAtendentes(Array.isArray(dados) ? dados : []);
     } catch (err: unknown) {
       console.error('Erro ao carregar atendentes:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      setError(normalizedMessage || fallbackMessage || 'Erro ao carregar atendentes');
+      setError(getErrorMessage(err, 'Erro ao carregar atendentes'));
       setAtendentes([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOpenDialog = (atendente?: Atendente) => {
+  const handleOpenDialog = (atendente?: Atendente): void => {
     if (atendente) {
       setEditingAtendente(atendente);
       setFormData({
@@ -127,7 +122,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
     setShowDialog(true);
   };
 
-  const handleCloseDialog = () => {
+  const handleCloseDialog = (): void => {
     setShowDialog(false);
     setEditingAtendente(null);
     setValidationErrors({});
@@ -157,8 +152,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
       // Verificar se email já existe (apenas para novo cadastro)
       const emailExiste = atendentes.some(
         (a) =>
-          a.email.toLowerCase() === formData.email.toLowerCase() &&
-          a.id !== editingAtendente?.id,
+          a.email.toLowerCase() === formData.email.toLowerCase() && a.id !== editingAtendente?.id,
       );
       if (emailExiste) {
         errors.email = 'Este email já está cadastrado';
@@ -177,10 +171,9 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
 
-    // Validar formulário antes de enviar
     if (!validateForm()) {
       toast.error('Por favor, corrija os erros no formulário');
       return;
@@ -193,10 +186,8 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
         await atendenteService.atualizar(editingAtendente.id, formData);
         toast.success('Atendente atualizado com sucesso!');
       } else {
-        // ✅ NOVO: Capturar senha temporária ao criar atendente
         const response = await atendenteService.criar(formData);
 
-        // Se a API retornou senha temporária, exibir modal
         if (response.senhaTemporaria) {
           setSenhaTemporaria(response.senhaTemporaria);
           setAtendenteNome(formData.nome);
@@ -210,20 +201,15 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
       handleCloseDialog();
     } catch (err: unknown) {
       console.error('Erro ao salvar atendente:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      const errorMsg = normalizedMessage || fallbackMessage || 'Erro ao salvar atendente';
+      const errorMsg = getErrorMessage(err, 'Erro ao salvar atendente');
       setError(errorMsg);
       toast.error(errorMsg);
-      setError(normalizedMessage || fallbackMessage || 'Erro ao salvar atendente');
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja desativar este atendente?')) {
+  const handleDelete = async (id: string): Promise<void> => {
+    const confirmed = window.confirm('Deseja realmente desativar este atendente?');
+    if (!confirmed) {
       return;
     }
 
@@ -234,32 +220,9 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
       await carregarAtendentes();
     } catch (err: unknown) {
       console.error('Erro ao deletar atendente:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      const errorMsg = normalizedMessage || fallbackMessage || 'Erro ao deletar atendente';
+      const errorMsg = getErrorMessage(err, 'Erro ao deletar atendente');
       setError(errorMsg);
       toast.error(errorMsg);
-      setError(normalizedMessage || fallbackMessage || 'Erro ao deletar atendente');
-    }
-  };
-
-  const handleToggleStatus = async (atendente: Atendente) => {
-    const novoStatus =
-      atendente.status === StatusAtendente.ONLINE
-        ? StatusAtendente.OFFLINE
-        : StatusAtendente.ONLINE;
-
-    try {
-      setError(null);
-      await atendenteService.atualizarStatus(atendente.id, novoStatus);
-      toast.success(`Status alterado para ${novoStatus}!`);
-      await carregarAtendentes();
-    } catch (err: unknown) {
-      console.error('Erro ao atualizar status:', err);
-      toast.error('Erro ao atualizar status');
     }
   };
 
@@ -275,7 +238,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
   const atendentesOnline = atendentes.filter((a) => a.status === StatusAtendente.ONLINE).length;
   const atendentesOcupados = atendentes.filter((a) => a.status === StatusAtendente.OCUPADO).length;
 
-  const getStatusBadge = (status: StatusAtendente) => {
+  const getStatusBadge = (status: StatusAtendente): React.ReactNode => {
     const badges = {
       [StatusAtendente.ONLINE]: (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -317,19 +280,9 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
 
       {/* Dashboard Cards - Tema Crevasse */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <KPICard
-          titulo="Total"
-          valor={atendentes.length}
-          icone={Users}
-          color="crevasse"
-        />
+        <KPICard titulo="Total" valor={atendentes.length} icone={Users} color="crevasse" />
 
-        <KPICard
-          titulo="Online"
-          valor={atendentesOnline}
-          icone={CheckCircle}
-          color="crevasse"
-        />
+        <KPICard titulo="Online" valor={atendentesOnline} icone={CheckCircle} color="crevasse" />
 
         <KPICard
           titulo="Ocupados"
@@ -338,12 +291,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
           color="crevasse"
         />
 
-        <KPICard
-          titulo="Ativos"
-          valor={atendentesAtivos}
-          icone={UserPlus}
-          color="crevasse"
-        />
+        <KPICard titulo="Ativos" valor={atendentesAtivos} icone={UserPlus} color="crevasse" />
       </div>
 
       {/* Barra de Busca e Ações */}
@@ -355,7 +303,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
               placeholder="Buscar atendentes..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
             />
           </div>
           <div className="flex gap-2">
@@ -363,12 +311,13 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
               onClick={carregarAtendentes}
               disabled={loading}
               className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              aria-label="Atualizar atendentes"
             >
               <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
             </button>
             <button
               onClick={() => handleOpenDialog()}
-              className="inline-flex items-center px-4 py-2 bg-[#9333EA] text-white rounded-lg hover:bg-[#7E22CE] transition-colors"
+              className="inline-flex items-center px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors"
             >
               <Plus className="h-5 w-5 mr-2" />
               Novo Atendente
@@ -408,7 +357,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
           {!busca && (
             <button
               onClick={() => handleOpenDialog()}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#9333EA] text-white rounded-lg hover:bg-[#7e22ce] transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors"
             >
               <UserPlus className="h-4 w-4" />
               Cadastrar Primeiro Atendente
@@ -431,10 +380,10 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
                     </div>
                     <div
                       className={`absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-white ${atendente.status === StatusAtendente.ONLINE
-                        ? 'bg-green-500'
-                        : atendente.status === StatusAtendente.OCUPADO
-                          ? 'bg-yellow-500'
-                          : 'bg-gray-400'
+                          ? 'bg-green-500'
+                          : atendente.status === StatusAtendente.OCUPADO
+                            ? 'bg-yellow-500'
+                            : 'bg-gray-400'
                         }`}
                     />
                   </div>
@@ -529,7 +478,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
                       setValidationErrors({ ...validationErrors, nome: undefined });
                     }
                   }}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9333EA] focus:border-transparent ${validationErrors.nome ? 'border-red-500' : 'border-gray-300'
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${validationErrors.nome ? 'border-red-500' : 'border-gray-300'
                     }`}
                   placeholder="Ex: João da Silva"
                 />
@@ -539,9 +488,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                 <input
                   type="email"
                   required
@@ -552,7 +499,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
                       setValidationErrors({ ...validationErrors, email: undefined });
                     }
                   }}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9333EA] focus:border-transparent ${validationErrors.email ? 'border-red-500' : 'border-gray-300'
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${validationErrors.email ? 'border-red-500' : 'border-gray-300'
                     }`}
                   placeholder="joao@exemplo.com"
                 />
@@ -562,9 +509,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Telefone
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
                 <input
                   type="tel"
                   inputMode="tel"
@@ -577,7 +522,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
                       setValidationErrors({ ...validationErrors, telefone: undefined });
                     }
                   }}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9333EA] focus:border-transparent ${validationErrors.telefone ? 'border-red-500' : 'border-gray-300'
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${validationErrors.telefone ? 'border-red-500' : 'border-gray-300'
                     }`}
                   placeholder="(00) 00000-0000"
                 />
@@ -592,7 +537,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
                   id="ativo"
                   checked={formData.ativo}
                   onChange={(e) => setFormData({ ...formData, ativo: e.target.checked })}
-                  className="h-4 w-4 text-[#9333EA] focus:ring-[#9333EA] border-gray-300 rounded"
+                  className="h-4 w-4 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
                 />
                 <label htmlFor="ativo" className="text-sm text-gray-700">
                   Atendente ativo
@@ -610,7 +555,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-[#9333EA] text-white rounded-lg hover:bg-[#7e22ce] transition-colors"
+                  className="flex-1 px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors"
                 >
                   {editingAtendente ? 'Salvar Alterações' : 'Cadastrar'}
                 </button>
@@ -628,9 +573,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
               <div className="bg-green-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
                 <KeyRound className="h-8 w-8 text-green-600" />
               </div>
-              <h3 className="text-2xl font-bold text-[#002333] mb-2">
-                Atendente Criado!
-              </h3>
+              <h3 className="text-2xl font-bold text-[#002333] mb-2">Atendente Criado!</h3>
               <p className="text-gray-600 mb-4">
                 <strong>{atendenteNome}</strong> foi cadastrado com sucesso.
               </p>
@@ -671,9 +614,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
 
             {/* Instruções */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <h4 className="font-semibold text-blue-900 text-sm mb-2">
-                📋 Próximos passos:
-              </h4>
+              <h4 className="font-semibold text-blue-900 text-sm mb-2">📋 Próximos passos:</h4>
               <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
                 <li>Copie a senha acima</li>
                 <li>Envie para o atendente (email/WhatsApp)</li>
@@ -689,7 +630,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
                 setSenhaTemporaria(null);
                 setAtendenteNome('');
               }}
-              className="w-full bg-[#9333EA] text-white py-3 rounded-lg font-semibold hover:bg-[#7e22ce] transition-colors"
+              className="w-full bg-[#159A9C] text-white py-3 rounded-lg font-semibold hover:bg-[#0F7B7D] transition-colors"
             >
               Entendi
             </button>

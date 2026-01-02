@@ -167,7 +167,7 @@ Se a página ainda não mostrar dados, você precisará fazer login:
 # 1. Fazer login
 POST http://localhost:3001/auth/login
 Body: {
-  "email": "admin@conectcrm.com",
+  "email": "admin@conectsuite.com.br",
   "senha": "senha_aqui"
 }
 

@@ -16,7 +16,7 @@ import {
   ArrowRight,
   Loader2,
   Eye,
-  EyeOff
+  EyeOff,
 } from 'lucide-react';
 
 // Validação do formulário
@@ -24,7 +24,8 @@ const registroSchema = yup.object({
   // Dados da Empresa
   empresa: yup.object({
     nome: yup.string().required('Nome da empresa é obrigatório'),
-    cnpj: yup.string()
+    cnpj: yup
+      .string()
       .required('CNPJ é obrigatório')
       .matches(/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/, 'CNPJ deve ter formato XX.XXX.XXX/XXXX-XX'),
     email: yup.string().email('Email inválido').required('Email da empresa é obrigatório'),
@@ -32,7 +33,8 @@ const registroSchema = yup.object({
     endereco: yup.string().required('Endereço é obrigatório'),
     cidade: yup.string().required('Cidade é obrigatória'),
     estado: yup.string().required('Estado é obrigatório'),
-    cep: yup.string()
+    cep: yup
+      .string()
       .required('CEP é obrigatório')
       .matches(/^\d{5}-\d{3}$/, 'CEP deve ter formato XXXXX-XXX'),
   }),
@@ -40,10 +42,12 @@ const registroSchema = yup.object({
   usuario: yup.object({
     nome: yup.string().required('Nome do administrador é obrigatório'),
     email: yup.string().email('Email inválido').required('Email é obrigatório'),
-    senha: yup.string()
+    senha: yup
+      .string()
       .min(6, 'Senha deve ter pelo menos 6 caracteres')
       .required('Senha é obrigatória'),
-    confirmarSenha: yup.string()
+    confirmarSenha: yup
+      .string()
       .oneOf([yup.ref('senha')], 'Senhas não conferem')
       .required('Confirmação de senha é obrigatória'),
     telefone: yup.string().required('Telefone do administrador é obrigatório'),
@@ -88,9 +92,9 @@ const PLANOS = [
       'Até 1.000 clientes',
       'Módulos básicos',
       '5GB de armazenamento',
-      'Suporte por email'
+      'Suporte por email',
     ],
-    popular: false
+    popular: false,
   },
   {
     id: 'professional',
@@ -103,9 +107,9 @@ const PLANOS = [
       'Todos os módulos',
       '50GB de armazenamento',
       'White label básico',
-      'Suporte prioritário'
+      'Suporte prioritário',
     ],
-    popular: true
+    popular: true,
   },
   {
     id: 'enterprise',
@@ -118,10 +122,10 @@ const PLANOS = [
       'API completa',
       '500GB de armazenamento',
       'White label completo',
-      'Suporte dedicado'
+      'Suporte dedicado',
     ],
-    popular: false
-  }
+    popular: false,
+  },
 ];
 
 export const RegistroEmpresaPage: React.FC = () => {
@@ -137,12 +141,12 @@ export const RegistroEmpresaPage: React.FC = () => {
     watch,
     setValue,
     trigger,
-    formState: { errors }
+    formState: { errors },
   } = useForm<RegistroFormData>({
     resolver: yupResolver(registroSchema),
     defaultValues: {
-      plano: 'professional' // Plano padrão
-    }
+      plano: 'professional', // Plano padrão
+    },
   });
 
   const watchedPlano = watch('plano');
@@ -227,14 +231,12 @@ export const RegistroEmpresaPage: React.FC = () => {
         state: {
           message: 'Conta criada com sucesso! Faça login para continuar.',
           email: data.usuario.email,
-        }
+        },
       });
-
     } catch (error: unknown) {
       console.error('Erro no registro:', error);
-      const message = error instanceof Error
-        ? error.message
-        : 'Erro ao registrar empresa. Tente novamente.';
+      const message =
+        error instanceof Error ? error.message : 'Erro ao registrar empresa. Tente novamente.';
       toast.error(message);
     } finally {
       setIsSubmitting(false);
@@ -251,9 +253,7 @@ export const RegistroEmpresaPage: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Nome da Empresa *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Nome da Empresa *</label>
           <input
             {...register('empresa.nome')}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
@@ -265,9 +265,7 @@ export const RegistroEmpresaPage: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            CNPJ *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">CNPJ *</label>
           <input
             {...register('empresa.cnpj')}
             onChange={(e) => setValue('empresa.cnpj', formatarCNPJ(e.target.value))}
@@ -296,9 +294,7 @@ export const RegistroEmpresaPage: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Telefone *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Telefone *</label>
           <input
             {...register('empresa.telefone')}
             onChange={(e) => setValue('empresa.telefone', formatarTelefone(e.target.value))}
@@ -312,9 +308,7 @@ export const RegistroEmpresaPage: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            CEP *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">CEP *</label>
           <input
             {...register('empresa.cep')}
             onChange={(e) => {
@@ -334,9 +328,7 @@ export const RegistroEmpresaPage: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Endereço *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Endereço *</label>
           <input
             {...register('empresa.endereco')}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
@@ -348,9 +340,7 @@ export const RegistroEmpresaPage: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Cidade *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Cidade *</label>
           <input
             {...register('empresa.cidade')}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
@@ -362,9 +352,7 @@ export const RegistroEmpresaPage: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Estado *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Estado *</label>
           <select
             {...register('empresa.estado')}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
@@ -416,9 +404,7 @@ export const RegistroEmpresaPage: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Nome Completo *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Nome Completo *</label>
           <input
             {...register('usuario.nome')}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
@@ -430,9 +416,7 @@ export const RegistroEmpresaPage: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Email *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
           <input
             {...register('usuario.email')}
             type="email"
@@ -445,9 +429,7 @@ export const RegistroEmpresaPage: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Telefone *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Telefone *</label>
           <input
             {...register('usuario.telefone')}
             onChange={(e) => setValue('usuario.telefone', formatarTelefone(e.target.value))}
@@ -463,9 +445,7 @@ export const RegistroEmpresaPage: React.FC = () => {
         <div></div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Senha *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Senha *</label>
           <div className="relative">
             <input
               {...register('usuario.senha')}
@@ -487,9 +467,7 @@ export const RegistroEmpresaPage: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Confirmar Senha *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Confirmar Senha *</label>
           <div className="relative">
             <input
               {...register('usuario.confirmarSenha')}
@@ -525,10 +503,11 @@ export const RegistroEmpresaPage: React.FC = () => {
         {PLANOS.map((plano) => (
           <div
             key={plano.id}
-            className={`relative rounded-lg border-2 p-6 cursor-pointer transition-all ${watchedPlano === plano.id
+            className={`relative rounded-lg border-2 p-6 cursor-pointer transition-all ${
+              watchedPlano === plano.id
                 ? 'border-[#159A9C] bg-[#DEEFE7]'
                 : 'border-gray-200 hover:border-gray-300'
-              } ${plano.popular ? 'ring-2 ring-[#159A9C] ring-opacity-50' : ''}`}
+            } ${plano.popular ? 'ring-2 ring-[#159A9C] ring-opacity-50' : ''}`}
             onClick={() => setValue('plano', plano.id)}
           >
             {plano.popular && (
@@ -569,9 +548,7 @@ export const RegistroEmpresaPage: React.FC = () => {
         ))}
       </div>
 
-      {errors.plano && (
-        <p className="text-red-500 text-sm text-center">{errors.plano.message}</p>
-      )}
+      {errors.plano && <p className="text-red-500 text-sm text-center">{errors.plano.message}</p>}
 
       <div className="mt-8">
         <label className="flex items-center">
@@ -584,8 +561,8 @@ export const RegistroEmpresaPage: React.FC = () => {
             Aceito os{' '}
             <a href="/termos" className="text-[#159A9C] hover:underline" target="_blank">
               Termos de Uso
-            </a>
-            {' '}e{' '}
+            </a>{' '}
+            e{' '}
             <a href="/privacidade" className="text-[#159A9C] hover:underline" target="_blank">
               Política de Privacidade
             </a>
@@ -603,17 +580,15 @@ export const RegistroEmpresaPage: React.FC = () => {
       {[1, 2, 3].map((step) => (
         <React.Fragment key={step}>
           <div
-            className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${step <= currentStep
-                ? 'bg-[#159A9C] text-white'
-                : 'bg-gray-200 text-gray-600'
-              }`}
+            className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${
+              step <= currentStep ? 'bg-[#159A9C] text-white' : 'bg-gray-200 text-gray-600'
+            }`}
           >
             {step < currentStep ? <Check className="w-5 h-5" /> : step}
           </div>
           {step < 3 && (
             <div
-              className={`w-12 h-1 mx-2 ${step < currentStep ? 'bg-[#159A9C]' : 'bg-gray-200'
-                }`}
+              className={`w-12 h-1 mx-2 ${step < currentStep ? 'bg-[#159A9C]' : 'bg-gray-200'}`}
             />
           )}
         </React.Fragment>
@@ -626,9 +601,7 @@ export const RegistroEmpresaPage: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-[#002333] mb-4">
-            Criar Conta Empresarial
-          </h1>
+          <h1 className="text-4xl font-bold text-[#002333] mb-4">Criar Conta Empresarial</h1>
           <p className="text-xl text-gray-600">
             Junte-se a milhares de empresas que já usam o Fênix CRM
           </p>
@@ -649,8 +622,9 @@ export const RegistroEmpresaPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
-                className={`px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 ${currentStep === 1 ? 'invisible' : ''
-                  }`}
+                className={`px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 ${
+                  currentStep === 1 ? 'invisible' : ''
+                }`}
               >
                 Voltar
               </button>

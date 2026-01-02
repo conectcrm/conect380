@@ -1,26 +1,35 @@
 import { useState, useEffect, useMemo } from 'react';
-import { 
-  Package, 
-  Layers, 
-  Smartphone, 
-  Globe, 
-  Zap, 
-  Shield, 
-  Server, 
+import {
+  Package,
+  Layers,
+  Smartphone,
+  Globe,
+  Zap,
+  Shield,
+  Server,
   Monitor,
   Truck,
   Home,
   Briefcase,
   GraduationCap,
   Heart,
-  ShoppingCart
+  ShoppingCart,
 } from 'lucide-react';
 
 // Tipos para configuração de segmentos
 export interface CampoPersonalizado {
   id: string;
   nome: string;
-  tipo: 'texto' | 'numero' | 'select' | 'checkbox' | 'textarea' | 'multiselect' | 'data' | 'email' | 'url';
+  tipo:
+    | 'texto'
+    | 'numero'
+    | 'select'
+    | 'checkbox'
+    | 'textarea'
+    | 'multiselect'
+    | 'data'
+    | 'email'
+    | 'url';
   obrigatorio: boolean;
   opcoes?: string[];
   valor?: any;
@@ -100,7 +109,7 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             obrigatorio: true,
             opcoes: ['Mensal', 'Trimestral', 'Semestral', 'Anual', 'Bienal', 'Trienal'],
             placeholder: 'Selecione o período de cobrança',
-            ajuda: 'Determina a frequência de cobrança e renovação'
+            ajuda: 'Determina a frequência de cobrança e renovação',
           },
           {
             id: 'numero_usuarios',
@@ -109,7 +118,7 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             obrigatorio: true,
             placeholder: 'Ex: 5',
             ajuda: 'Número de usuários que podem acessar o sistema',
-            validacao: { min: 1, max: 1000 }
+            validacao: { min: 1, max: 1000 },
           },
           {
             id: 'numero_propriedades',
@@ -118,7 +127,7 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             obrigatorio: true,
             placeholder: 'Ex: 1',
             ajuda: 'Quantidade de propriedades rurais que podem ser gerenciadas',
-            validacao: { min: 1, max: 100 }
+            validacao: { min: 1, max: 100 },
           },
           {
             id: 'limite_animais',
@@ -127,7 +136,7 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             obrigatorio: false,
             placeholder: 'Ex: 10000',
             ajuda: 'Número máximo de animais que podem ser cadastrados',
-            validacao: { min: 0 }
+            validacao: { min: 0 },
           },
           {
             id: 'suporte_incluso',
@@ -135,8 +144,8 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             tipo: 'select',
             obrigatorio: true,
             opcoes: ['Email', 'Chat', 'Telefone', 'WhatsApp', 'Visita Técnica'],
-            ajuda: 'Canal de suporte disponível para o cliente'
-          }
+            ajuda: 'Canal de suporte disponível para o cliente',
+          },
         ],
         modulosDisponiveis: [
           'Gestão de Gado',
@@ -150,7 +159,7 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
           'Integração Balanças',
           'Rastreabilidade',
           'Meteorologia',
-          'Controle Sanitário'
+          'Controle Sanitário',
         ],
         licencasDisponiveis: [
           'MB Task (Aplicativo de Campo)',
@@ -159,8 +168,8 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
           'App Mobile Proprietário',
           'App Mobile Funcionário',
           'Dashboard Executivo',
-          'Relatórios Avançados'
-        ]
+          'Relatórios Avançados',
+        ],
       },
       {
         value: 'modulo_individual',
@@ -175,7 +184,7 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             tipo: 'multiselect',
             obrigatorio: true,
             opcoes: ['Básico', 'Profissional', 'Enterprise', 'Premium', 'Todos'],
-            ajuda: 'Quais planos podem adicionar este módulo'
+            ajuda: 'Quais planos podem adicionar este módulo',
           },
           {
             id: 'requisitos_minimos',
@@ -183,9 +192,9 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             tipo: 'textarea',
             obrigatorio: false,
             placeholder: 'Descreva os requisitos técnicos ou de plano...',
-            ajuda: 'Requisitos necessários para usar este módulo'
-          }
-        ]
+            ajuda: 'Requisitos necessários para usar este módulo',
+          },
+        ],
       },
       {
         value: 'licenca_app',
@@ -200,7 +209,7 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             tipo: 'select',
             obrigatorio: true,
             opcoes: ['Web', 'Android', 'iOS', 'Desktop Windows', 'Desktop Mac', 'Multiplataforma'],
-            ajuda: 'Plataforma onde o aplicativo será utilizado'
+            ajuda: 'Plataforma onde o aplicativo será utilizado',
           },
           {
             id: 'quantidade_minima',
@@ -209,7 +218,7 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             obrigatorio: true,
             placeholder: 'Ex: 1',
             ajuda: 'Quantidade mínima que pode ser contratada',
-            validacao: { min: 1 }
+            validacao: { min: 1 },
           },
           {
             id: 'quantidade_maxima',
@@ -218,9 +227,9 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             obrigatorio: false,
             placeholder: 'Ex: 100',
             ajuda: 'Quantidade máxima permitida (deixe vazio para ilimitado)',
-            validacao: { min: 1 }
-          }
-        ]
+            validacao: { min: 1 },
+          },
+        ],
       },
       {
         value: 'servico_consultoria',
@@ -234,8 +243,14 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             nome: 'Tipo de Serviço',
             tipo: 'select',
             obrigatorio: true,
-            opcoes: ['Implementação', 'Treinamento', 'Consultoria Técnica', 'Suporte Premium', 'Customização'],
-            ajuda: 'Categoria do serviço oferecido'
+            opcoes: [
+              'Implementação',
+              'Treinamento',
+              'Consultoria Técnica',
+              'Suporte Premium',
+              'Customização',
+            ],
+            ajuda: 'Categoria do serviço oferecido',
           },
           {
             id: 'duracao_estimada',
@@ -243,18 +258,42 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             tipo: 'numero',
             obrigatorio: false,
             placeholder: 'Ex: 40',
-            ajuda: 'Tempo estimado para conclusão do serviço'
-          }
-        ]
-      }
+            ajuda: 'Tempo estimado para conclusão do serviço',
+          },
+        ],
+      },
     ],
     categorias: [
-      { value: 'gestao_pecuaria', label: 'Gestão Pecuária', descricao: 'Sistemas para manejo de gado' },
-      { value: 'gestao_agricola', label: 'Gestão Agrícola', descricao: 'Sistemas para agricultura e plantio' },
-      { value: 'aplicativos_campo', label: 'Aplicativos de Campo', descricao: 'Apps móveis para uso no campo' },
-      { value: 'integracao_equipamentos', label: 'Integração com Equipamentos', descricao: 'Conexão com balanças, sensores, etc.' },
-      { value: 'financeiro_rural', label: 'Financeiro Rural', descricao: 'Gestão financeira específica do agro' },
-      { value: 'consultoria_tecnica', label: 'Consultoria Técnica', descricao: 'Serviços de consultoria especializada' }
+      {
+        value: 'gestao_pecuaria',
+        label: 'Gestão Pecuária',
+        descricao: 'Sistemas para manejo de gado',
+      },
+      {
+        value: 'gestao_agricola',
+        label: 'Gestão Agrícola',
+        descricao: 'Sistemas para agricultura e plantio',
+      },
+      {
+        value: 'aplicativos_campo',
+        label: 'Aplicativos de Campo',
+        descricao: 'Apps móveis para uso no campo',
+      },
+      {
+        value: 'integracao_equipamentos',
+        label: 'Integração com Equipamentos',
+        descricao: 'Conexão com balanças, sensores, etc.',
+      },
+      {
+        value: 'financeiro_rural',
+        label: 'Financeiro Rural',
+        descricao: 'Gestão financeira específica do agro',
+      },
+      {
+        value: 'consultoria_tecnica',
+        label: 'Consultoria Técnica',
+        descricao: 'Serviços de consultoria especializada',
+      },
     ],
     camposPersonalizados: [
       {
@@ -262,8 +301,15 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
         nome: 'Certificações Suportadas',
         tipo: 'multiselect',
         obrigatorio: false,
-        opcoes: ['SISBOV', 'Rainforest Alliance', 'BPA (Boas Práticas Agropecuárias)', 'Orgânico', 'UTZ', 'Fair Trade'],
-        ajuda: 'Certificações que o produto suporta ou facilita a obtenção'
+        opcoes: [
+          'SISBOV',
+          'Rainforest Alliance',
+          'BPA (Boas Práticas Agropecuárias)',
+          'Orgânico',
+          'UTZ',
+          'Fair Trade',
+        ],
+        ajuda: 'Certificações que o produto suporta ou facilita a obtenção',
       },
       {
         id: 'especies_suportadas',
@@ -271,15 +317,15 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
         tipo: 'multiselect',
         obrigatorio: false,
         opcoes: ['Bovinos', 'Suínos', 'Ovinos', 'Caprinos', 'Aves', 'Peixes', 'Equinos', 'Búfalos'],
-        ajuda: 'Tipos de animais que o sistema pode gerenciar'
-      }
+        ajuda: 'Tipos de animais que o sistema pode gerenciar',
+      },
     ],
     configuracoesPadrao: {
       moeda: 'BRL',
       timezone: 'America/Sao_Paulo',
       formato_data: 'DD/MM/YYYY',
-      idioma: 'pt-BR'
-    }
+      idioma: 'pt-BR',
+    },
   },
 
   software_saas: {
@@ -302,7 +348,7 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             obrigatorio: true,
             placeholder: 'Ex: 10',
             ajuda: 'Número máximo de usuários simultâneos',
-            validacao: { min: 1, max: 10000 }
+            validacao: { min: 1, max: 10000 },
           },
           {
             id: 'armazenamento_gb',
@@ -311,7 +357,7 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             obrigatorio: true,
             placeholder: 'Ex: 100',
             ajuda: 'Espaço de armazenamento em gigabytes',
-            validacao: { min: 1 }
+            validacao: { min: 1 },
           },
           {
             id: 'api_calls_mes',
@@ -320,16 +366,16 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             obrigatorio: false,
             placeholder: 'Ex: 10000',
             ajuda: 'Limite de chamadas de API por mês',
-            validacao: { min: 0 }
+            validacao: { min: 0 },
           },
           {
             id: 'backup_incluido',
             nome: 'Backup Automático',
             tipo: 'checkbox',
             obrigatorio: false,
-            ajuda: 'Se o plano inclui backup automático dos dados'
-          }
-        ]
+            ajuda: 'Se o plano inclui backup automático dos dados',
+          },
+        ],
       },
       {
         value: 'addon_plugin',
@@ -344,7 +390,7 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             tipo: 'texto',
             obrigatorio: true,
             placeholder: 'Ex: 2.1.0',
-            ajuda: 'Versão mínima do software principal necessária'
+            ajuda: 'Versão mínima do software principal necessária',
           },
           {
             id: 'dependencias',
@@ -352,9 +398,9 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             tipo: 'textarea',
             obrigatorio: false,
             placeholder: 'Liste outros add-ons ou requisitos...',
-            ajuda: 'Outros add-ons ou componentes necessários'
-          }
-        ]
+            ajuda: 'Outros add-ons ou componentes necessários',
+          },
+        ],
       },
       {
         value: 'licenca_enterprise',
@@ -368,7 +414,7 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             nome: 'Usuários Ilimitados',
             tipo: 'checkbox',
             obrigatorio: false,
-            ajuda: 'Se a licença permite usuários ilimitados'
+            ajuda: 'Se a licença permite usuários ilimitados',
           },
           {
             id: 'sla_garantido',
@@ -377,10 +423,10 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             obrigatorio: true,
             placeholder: 'Ex: 99.9',
             ajuda: 'Nível de serviço garantido em porcentagem',
-            validacao: { min: 90, max: 100 }
-          }
-        ]
-      }
+            validacao: { min: 90, max: 100 },
+          },
+        ],
+      },
     ],
     categorias: [
       { value: 'crm', label: 'CRM', descricao: 'Customer Relationship Management' },
@@ -388,7 +434,7 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
       { value: 'marketing', label: 'Marketing', descricao: 'Ferramentas de marketing digital' },
       { value: 'vendas', label: 'Vendas', descricao: 'Automação e gestão de vendas' },
       { value: 'financeiro', label: 'Financeiro', descricao: 'Gestão financeira e contábil' },
-      { value: 'recursos_humanos', label: 'Recursos Humanos', descricao: 'Gestão de pessoas e RH' }
+      { value: 'recursos_humanos', label: 'Recursos Humanos', descricao: 'Gestão de pessoas e RH' },
     ],
     camposPersonalizados: [
       {
@@ -396,16 +442,24 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
         nome: 'Integrações Disponíveis',
         tipo: 'multiselect',
         obrigatorio: false,
-        opcoes: ['Salesforce', 'HubSpot', 'Zapier', 'Slack', 'Microsoft Teams', 'Google Workspace', 'API REST'],
-        ajuda: 'Integrações nativas disponíveis'
-      }
+        opcoes: [
+          'Salesforce',
+          'HubSpot',
+          'Zapier',
+          'Slack',
+          'Microsoft Teams',
+          'Google Workspace',
+          'API REST',
+        ],
+        ajuda: 'Integrações nativas disponíveis',
+      },
     ],
     configuracoesPadrao: {
       moeda: 'BRL',
       timezone: 'America/Sao_Paulo',
       formato_data: 'DD/MM/YYYY',
-      idioma: 'pt-BR'
-    }
+      idioma: 'pt-BR',
+    },
   },
 
   ecommerce: {
@@ -428,7 +482,7 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             obrigatorio: true,
             placeholder: 'Ex: 0.5',
             ajuda: 'Peso do produto para cálculo de frete',
-            validacao: { min: 0.001 }
+            validacao: { min: 0.001 },
           },
           {
             id: 'dimensoes',
@@ -436,7 +490,7 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             tipo: 'texto',
             obrigatorio: true,
             placeholder: 'Ex: 20x15x10',
-            ajuda: 'Dimensões no formato LxAxP para cálculo de frete'
+            ajuda: 'Dimensões no formato LxAxP para cálculo de frete',
           },
           {
             id: 'estoque_minimo',
@@ -445,9 +499,9 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             obrigatorio: true,
             placeholder: 'Ex: 5',
             ajuda: 'Quantidade mínima em estoque',
-            validacao: { min: 0 }
-          }
-        ]
+            validacao: { min: 0 },
+          },
+        ],
       },
       {
         value: 'produto_digital',
@@ -462,7 +516,7 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             tipo: 'select',
             obrigatorio: true,
             opcoes: ['PDF', 'Vídeo MP4', 'Software', 'E-book', 'Áudio', 'Imagem', 'Curso Online'],
-            ajuda: 'Tipo do produto digital'
+            ajuda: 'Tipo do produto digital',
           },
           {
             id: 'tamanho_arquivo',
@@ -470,18 +524,22 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             tipo: 'numero',
             obrigatorio: false,
             placeholder: 'Ex: 250',
-            ajuda: 'Tamanho do arquivo em megabytes'
-          }
-        ]
-      }
+            ajuda: 'Tamanho do arquivo em megabytes',
+          },
+        ],
+      },
     ],
     categorias: [
       { value: 'eletronicos', label: 'Eletrônicos', descricao: 'Smartphones, computadores, etc.' },
       { value: 'roupas', label: 'Roupas e Acessórios', descricao: 'Vestuário e moda' },
-      { value: 'casa_jardim', label: 'Casa e Jardim', descricao: 'Decoração e utilidades domésticas' },
+      {
+        value: 'casa_jardim',
+        label: 'Casa e Jardim',
+        descricao: 'Decoração e utilidades domésticas',
+      },
       { value: 'livros', label: 'Livros', descricao: 'Livros físicos e digitais' },
       { value: 'cursos', label: 'Cursos Online', descricao: 'Educação e treinamento' },
-      { value: 'esportes', label: 'Esportes', descricao: 'Equipamentos e roupas esportivas' }
+      { value: 'esportes', label: 'Esportes', descricao: 'Equipamentos e roupas esportivas' },
     ],
     camposPersonalizados: [
       {
@@ -490,15 +548,15 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
         tipo: 'multiselect',
         obrigatorio: false,
         opcoes: ['Mercado Livre', 'Amazon', 'Magazine Luiza', 'Shopee', 'AliExpress'],
-        ajuda: 'Marketplaces onde o produto será vendido'
-      }
+        ajuda: 'Marketplaces onde o produto será vendido',
+      },
     ],
     configuracoesPadrao: {
       moeda: 'BRL',
       timezone: 'America/Sao_Paulo',
       formato_data: 'DD/MM/YYYY',
-      idioma: 'pt-BR'
-    }
+      idioma: 'pt-BR',
+    },
   },
 
   servicos_profissionais: {
@@ -519,8 +577,15 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             nome: 'Área de Especialidade',
             tipo: 'select',
             obrigatorio: true,
-            opcoes: ['Estratégia', 'Tecnologia', 'Financeiro', 'Marketing', 'Operações', 'Recursos Humanos'],
-            ajuda: 'Área principal de atuação da consultoria'
+            opcoes: [
+              'Estratégia',
+              'Tecnologia',
+              'Financeiro',
+              'Marketing',
+              'Operações',
+              'Recursos Humanos',
+            ],
+            ajuda: 'Área principal de atuação da consultoria',
           },
           {
             id: 'duracao_estimada_horas',
@@ -528,9 +593,9 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             tipo: 'numero',
             obrigatorio: false,
             placeholder: 'Ex: 40',
-            ajuda: 'Tempo estimado para conclusão do projeto'
-          }
-        ]
+            ajuda: 'Tempo estimado para conclusão do projeto',
+          },
+        ],
       },
       {
         value: 'treinamento',
@@ -545,7 +610,7 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             tipo: 'select',
             obrigatorio: true,
             opcoes: ['Presencial', 'Online', 'Híbrido'],
-            ajuda: 'Como o treinamento será ministrado'
+            ajuda: 'Como o treinamento será ministrado',
           },
           {
             id: 'numero_participantes',
@@ -554,25 +619,37 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
             obrigatorio: true,
             placeholder: 'Ex: 20',
             ajuda: 'Número máximo de participantes',
-            validacao: { min: 1, max: 1000 }
-          }
-        ]
-      }
+            validacao: { min: 1, max: 1000 },
+          },
+        ],
+      },
     ],
     categorias: [
-      { value: 'consultoria_estrategica', label: 'Consultoria Estratégica', descricao: 'Planejamento e estratégia empresarial' },
-      { value: 'consultoria_tecnologia', label: 'Consultoria em TI', descricao: 'Tecnologia da informação' },
-      { value: 'treinamento_corporativo', label: 'Treinamento Corporativo', descricao: 'Capacitação empresarial' },
-      { value: 'auditoria', label: 'Auditoria', descricao: 'Serviços de auditoria e compliance' }
+      {
+        value: 'consultoria_estrategica',
+        label: 'Consultoria Estratégica',
+        descricao: 'Planejamento e estratégia empresarial',
+      },
+      {
+        value: 'consultoria_tecnologia',
+        label: 'Consultoria em TI',
+        descricao: 'Tecnologia da informação',
+      },
+      {
+        value: 'treinamento_corporativo',
+        label: 'Treinamento Corporativo',
+        descricao: 'Capacitação empresarial',
+      },
+      { value: 'auditoria', label: 'Auditoria', descricao: 'Serviços de auditoria e compliance' },
     ],
     camposPersonalizados: [],
     configuracoesPadrao: {
       moeda: 'BRL',
       timezone: 'America/Sao_Paulo',
       formato_data: 'DD/MM/YYYY',
-      idioma: 'pt-BR'
-    }
-  }
+      idioma: 'pt-BR',
+    },
+  },
 };
 
 /**
@@ -580,7 +657,9 @@ export const SEGMENTOS_CONFIGURACAO: Record<string, SegmentoConfig> = {
  */
 export const useSegmentoConfig = (segmentoInicial?: string) => {
   const [segmentoAtivo, setSegmentoAtivo] = useState(segmentoInicial || 'agropecuario');
-  const [configuracaoPersonalizada, setConfiguracaoPersonalizada] = useState<SegmentoConfig | null>(null);
+  const [configuracaoPersonalizada, setConfiguracaoPersonalizada] = useState<SegmentoConfig | null>(
+    null,
+  );
 
   // Configuração ativa (personalizada ou padrão)
   const configuracaoAtiva = useMemo(() => {
@@ -589,17 +668,17 @@ export const useSegmentoConfig = (segmentoInicial?: string) => {
 
   // Lista de todos os segmentos disponíveis
   const segmentosDisponiveis = useMemo(() => {
-    return Object.values(SEGMENTOS_CONFIGURACAO).map(segmento => ({
+    return Object.values(SEGMENTOS_CONFIGURACAO).map((segmento) => ({
       value: segmento.id,
       label: segmento.nome,
       descricao: segmento.descricao,
-      icone: segmento.icone
+      icone: segmento.icone,
     }));
   }, []);
 
   // Obter configuração de um tipo de produto específico
   const obterConfigTipoProduto = (tipoProduto: string): TipoProdutoConfig | undefined => {
-    return configuracaoAtiva?.tiposProduto.find(tipo => tipo.value === tipoProduto);
+    return configuracaoAtiva?.tiposProduto.find((tipo) => tipo.value === tipoProduto);
   };
 
   // Adicionar campo personalizado
@@ -607,7 +686,7 @@ export const useSegmentoConfig = (segmentoInicial?: string) => {
     if (configuracaoPersonalizada) {
       setConfiguracaoPersonalizada({
         ...configuracaoPersonalizada,
-        camposPersonalizados: [...configuracaoPersonalizada.camposPersonalizados, campo]
+        camposPersonalizados: [...configuracaoPersonalizada.camposPersonalizados, campo],
       });
     }
   };
@@ -618,8 +697,8 @@ export const useSegmentoConfig = (segmentoInicial?: string) => {
       setConfiguracaoPersonalizada({
         ...configuracaoPersonalizada,
         camposPersonalizados: configuracaoPersonalizada.camposPersonalizados.filter(
-          campo => campo.id !== campoId
-        )
+          (campo) => campo.id !== campoId,
+        ),
       });
     }
   };
@@ -630,7 +709,7 @@ export const useSegmentoConfig = (segmentoInicial?: string) => {
     setConfiguracaoPersonalizada({
       ...configBase,
       ...novaConfig,
-      id: novaConfig.id || `${configBase.id}_personalizado`
+      id: novaConfig.id || `${configBase.id}_personalizado`,
     });
   };
 
@@ -655,7 +734,7 @@ export const useSegmentoConfig = (segmentoInicial?: string) => {
     configuracaoAtiva,
     configuracaoPersonalizada,
     segmentosDisponiveis,
-    
+
     // Ações
     setSegmentoAtivo,
     obterConfigTipoProduto,
@@ -664,9 +743,9 @@ export const useSegmentoConfig = (segmentoInicial?: string) => {
     criarConfiguracaoPersonalizada,
     resetarParaPadrao,
     salvarConfiguracao,
-    
+
     // Configurações padrão disponíveis
-    configuracoesPadrao: SEGMENTOS_CONFIGURACAO
+    configuracoesPadrao: SEGMENTOS_CONFIGURACAO,
   };
 };
 

@@ -11,7 +11,7 @@ import {
   Lock,
   CheckCircle,
   AlertCircle,
-  Loader2
+  Loader2,
 } from 'lucide-react';
 
 interface PaymentMethod {
@@ -41,11 +41,13 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   planoSelecionado,
   onPaymentSuccess,
   onCancel,
-  className
+  className,
 }) => {
   const [selectedMethod, setSelectedMethod] = useState<string>('card');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentStep, setPaymentStep] = useState<'method' | 'details' | 'processing' | 'success'>('method');
+  const [paymentStep, setPaymentStep] = useState<'method' | 'details' | 'processing' | 'success'>(
+    'method',
+  );
   const [formData, setFormData] = useState({
     // Dados do cartão
     cardNumber: '',
@@ -60,7 +62,7 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
     cep: '',
     address: '',
     city: '',
-    state: ''
+    state: '',
   });
 
   // Helper function para garantir que o preço seja sempre um número
@@ -83,7 +85,7 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
       type: 'card',
       fees: 'Taxa: 3,9%',
       processingTime: 'Aprovação imediata',
-      available: true
+      available: true,
     },
     {
       id: 'pix',
@@ -91,7 +93,7 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
       icon: Smartphone,
       type: 'pix',
       processingTime: 'Confirmação em até 2 minutos',
-      available: true
+      available: true,
     },
     {
       id: 'boleto',
@@ -99,18 +101,18 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
       icon: Building,
       type: 'bank',
       processingTime: 'Confirmação em 1-3 dias úteis',
-      available: true
-    }
+      available: true,
+    },
   ];
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const formatCardNumber = (value: string) => {
     const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
     const matches = v.match(/\d{4,16}/g);
-    const match = matches && matches[0] || '';
+    const match = (matches && matches[0]) || '';
     const parts = [];
     for (let i = 0, len = match.length; i < len; i += 4) {
       parts.push(match.substring(i, i + 4));
@@ -132,11 +134,13 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
 
   const validateForm = () => {
     if (selectedMethod === 'card') {
-      return formData.cardNumber.replace(/\s/g, '').length === 16 &&
+      return (
+        formData.cardNumber.replace(/\s/g, '').length === 16 &&
         formData.cardName.length > 0 &&
         formData.cardExpiry.length === 5 &&
         formData.cardCvv.length >= 3 &&
-        formData.email.length > 0;
+        formData.email.length > 0
+      );
     }
     return formData.email.length > 0;
   };
@@ -149,21 +153,20 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
 
     try {
       // Simular processamento
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise((resolve) => setTimeout(resolve, 3000));
 
       const paymentData = {
         method: selectedMethod,
         plano: planoSelecionado,
         userData: formData,
         transactionId: `tx_${Date.now()}`,
-        status: 'success'
+        status: 'success',
       };
 
       setPaymentStep('success');
       setTimeout(() => {
         onPaymentSuccess(paymentData);
       }, 2000);
-
     } catch (error) {
       console.error('Erro no pagamento:', error);
       setIsProcessing(false);
@@ -174,12 +177,8 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   const renderMethodSelection = () => (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Escolha a forma de pagamento
-        </h3>
-        <p className="text-sm text-gray-600">
-          Selecione como deseja pagar pela assinatura
-        </p>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Escolha a forma de pagamento</h3>
+        <p className="text-sm text-gray-600">Selecione como deseja pagar pela assinatura</p>
       </div>
 
       <div className="grid gap-3">
@@ -190,10 +189,11 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
               key={method.id}
               onClick={() => setSelectedMethod(method.id)}
               disabled={!method.available}
-              className={`w-full p-4 border-2 rounded-xl text-left transition-all duration-200 hover:border-blue-300 hover:bg-blue-50 ${selectedMethod === method.id
-                  ? "border-blue-500 bg-blue-50 shadow-md"
-                  : "border-gray-200 bg-white"
-                } ${!method.available && "opacity-50 cursor-not-allowed"}`}
+              className={`w-full p-4 border-2 rounded-xl text-left transition-all duration-200 hover:border-blue-300 hover:bg-blue-50 ${
+                selectedMethod === method.id
+                  ? 'border-blue-500 bg-blue-50 shadow-md'
+                  : 'border-gray-200 bg-white'
+              } ${!method.available && 'opacity-50 cursor-not-allowed'}`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -208,9 +208,7 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
                     )}
                   </div>
                 </div>
-                {selectedMethod === method.id && (
-                  <CheckCircle className="w-5 h-5 text-blue-500" />
-                )}
+                {selectedMethod === method.id && <CheckCircle className="w-5 h-5 text-blue-500" />}
               </div>
             </button>
           );
@@ -222,12 +220,8 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   const renderCardForm = () => (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Dados do cartão de crédito
-        </h3>
-        <p className="text-sm text-gray-600">
-          Seus dados estão protegidos com criptografia SSL
-        </p>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Dados do cartão de crédito</h3>
+        <p className="text-sm text-gray-600">Seus dados estão protegidos com criptografia SSL</p>
       </div>
 
       <div className="grid gap-4">
@@ -292,9 +286,7 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   const renderPixForm = () => (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Pagamento via PIX
-        </h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Pagamento via PIX</h3>
         <p className="text-sm text-gray-600">
           Após confirmar, você receberá o QR Code para pagamento
         </p>
@@ -316,21 +308,15 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   const renderProcessing = () => (
     <div className="text-center py-8">
       <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">
-        Processando pagamento...
-      </h3>
-      <p className="text-sm text-gray-600">
-        Por favor, aguarde enquanto processamos seu pagamento
-      </p>
+      <h3 className="text-lg font-semibold text-gray-900 mb-2">Processando pagamento...</h3>
+      <p className="text-sm text-gray-600">Por favor, aguarde enquanto processamos seu pagamento</p>
     </div>
   );
 
   const renderSuccess = () => (
     <div className="text-center py-8">
       <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-      <h3 className="text-xl font-bold text-gray-900 mb-2">
-        Pagamento realizado com sucesso!
-      </h3>
+      <h3 className="text-xl font-bold text-gray-900 mb-2">Pagamento realizado com sucesso!</h3>
       <p className="text-sm text-gray-600 mb-4">
         Sua assinatura foi ativada e você já pode usar todos os recursos
       </p>
@@ -343,9 +329,7 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   if (paymentStep === 'processing') {
     return (
       <Card className={className}>
-        <CardContent className="p-6">
-          {renderProcessing()}
-        </CardContent>
+        <CardContent className="p-6">{renderProcessing()}</CardContent>
       </Card>
     );
   }
@@ -353,9 +337,7 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   if (paymentStep === 'success') {
     return (
       <Card className={className}>
-        <CardContent className="p-6">
-          {renderSuccess()}
-        </CardContent>
+        <CardContent className="p-6">{renderSuccess()}</CardContent>
       </Card>
     );
   }

@@ -20,7 +20,7 @@ const breakpoints = {
   md: 768,
   lg: 1024,
   xl: 1280,
-  '2xl': 1536
+  '2xl': 1536,
 };
 
 export const useResponsive = (): ScreenSize => {
@@ -32,14 +32,14 @@ export const useResponsive = (): ScreenSize => {
     isDesktop: true,
     isLarge: false,
     orientation: 'landscape',
-    breakpoint: 'lg'
+    breakpoint: 'lg',
   });
 
   useEffect(() => {
     const updateScreenSize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
-      
+
       // Determinar breakpoint
       let breakpoint: ScreenSize['breakpoint'] = 'xs';
       if (width >= breakpoints['2xl']) breakpoint = '2xl';
@@ -65,7 +65,7 @@ export const useResponsive = (): ScreenSize => {
         isDesktop,
         isLarge,
         orientation,
-        breakpoint
+        breakpoint,
       });
     };
 
@@ -110,15 +110,15 @@ export const useModalDimensions = (maxWidth: string = '4xl') => {
 
   const getMaxWidth = () => {
     const sizes = {
-      'sm': '384px',
-      'md': '448px',
-      'lg': '512px',
-      'xl': '576px',
+      sm: '384px',
+      md: '448px',
+      lg: '512px',
+      xl: '576px',
       '2xl': '672px',
       '3xl': '768px',
       '4xl': '896px',
       '5xl': '1024px',
-      '6xl': '1152px'
+      '6xl': '1152px',
     };
 
     return sizes[maxWidth as keyof typeof sizes] || sizes['4xl'];
@@ -128,13 +128,13 @@ export const useModalDimensions = (maxWidth: string = '4xl') => {
     '--modal-max-width': getMaxWidth(),
     width: isMobile ? '95vw' : isTablet ? '90vw' : 'auto',
     maxHeight: isMobile ? '95vh' : '90vh',
-    padding: isMobile ? '0.5rem' : '1rem'
+    padding: isMobile ? '0.5rem' : '1rem',
   } as React.CSSProperties;
 
   return {
     modalStyle,
     shouldUseFullscreen: isMobile && height < 600,
-    columnsCount: isMobile ? 1 : isTablet ? 2 : 3
+    columnsCount: isMobile ? 1 : isTablet ? 2 : 3,
   };
 };
 
@@ -143,7 +143,7 @@ export const useModalDimensions = (maxWidth: string = '4xl') => {
  */
 export const useResponsiveGrid = (itemMinWidth: number = 280) => {
   const { width } = useResponsive();
-  
+
   const getColumns = () => {
     const availableWidth = width - 64; // Considerando padding
     const columns = Math.floor(availableWidth / itemMinWidth);
@@ -154,11 +154,11 @@ export const useResponsiveGrid = (itemMinWidth: number = 280) => {
     display: 'grid',
     gridTemplateColumns: `repeat(${getColumns()}, 1fr)`,
     gap: 'clamp(1rem, 3vw, 2rem)',
-    width: '100%'
+    width: '100%',
   } as React.CSSProperties;
 
   return {
     gridStyle,
-    columns: getColumns()
+    columns: getColumns(),
   };
 };

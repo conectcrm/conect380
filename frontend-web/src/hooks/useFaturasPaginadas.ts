@@ -1,5 +1,9 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { faturamentoService, FiltrosFatura, FaturasPaginadasResponse } from '../services/faturamentoService';
+import {
+  faturamentoService,
+  FiltrosFatura,
+  FaturasPaginadasResponse,
+} from '../services/faturamentoService';
 
 /**
  * Hook padronizado para listar faturas paginadas com aggregates do backend.

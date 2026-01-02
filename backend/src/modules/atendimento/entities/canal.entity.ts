@@ -43,9 +43,9 @@ export class Canal {
   })
   empresaId: string;
 
-  // @ManyToOne(() => Empresa)
-  // @JoinColumn({ name: 'empresaId' })
-  // empresa: Empresa;
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column({
     type: 'varchar',

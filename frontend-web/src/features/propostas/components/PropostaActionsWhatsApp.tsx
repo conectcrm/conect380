@@ -1,14 +1,6 @@
 import React, { useState } from 'react';
 import { toast } from 'react-hot-toast';
-import {
-  Eye,
-  Mail,
-  MessageSquare,
-  Download,
-  Share2,
-  Send,
-  Loader2
-} from 'lucide-react';
+import { Eye, Mail, MessageSquare, Download, Share2, Send, Loader2 } from 'lucide-react';
 import { emailServiceReal } from '../../../services/emailServiceReal';
 import { PropostaCompleta } from '../services/propostasService';
 import { clientesService } from '../../../services/clientesService';
@@ -44,12 +36,16 @@ interface PropostaActionsProps {
 const PropostaActions: React.FC<PropostaActionsProps> = ({
   proposta,
   onViewProposta,
-  className = "",
-  showLabels = false
+  className = '',
+  showLabels = false,
 }) => {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
-  const [clienteData, setClienteData] = useState<{ nome: string, email: string, telefone: string } | null>(null);
+  const [clienteData, setClienteData] = useState<{
+    nome: string;
+    email: string;
+    telefone: string;
+  } | null>(null);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [propostaPdfBuffer, setPropostaPdfBuffer] = useState<Uint8Array | null>(null);
 
@@ -74,14 +70,14 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         numero: proposta.numero || '',
         total: Number(proposta.total) || 0,
         dataValidade: proposta.dataValidade || new Date().toISOString(),
-        titulo: `Proposta para ${proposta.cliente?.nome || 'Cliente'}`
+        titulo: `Proposta para ${proposta.cliente?.nome || 'Cliente'}`,
       };
     } else {
       return {
         numero: proposta.numero || '',
         total: proposta.valor || 0,
         dataValidade: proposta.data_vencimento || new Date().toISOString(),
-        titulo: proposta.titulo || `Proposta ${proposta.numero}`
+        titulo: proposta.titulo || `Proposta ${proposta.numero}`,
       };
     }
   };
@@ -95,7 +91,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       const telefone = proposta.cliente?.telefone || '';
 
       // Verificar se email é fictício e buscar dados reais
-      const isEmailFicticio = email.includes('@cliente.com') ||
+      const isEmailFicticio =
+        email.includes('@cliente.com') ||
         email.includes('@cliente.temp') ||
         email.includes('@email.com');
 
@@ -103,20 +100,21 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         try {
           const response = await clientesService.getClientes({
             search: nome,
-            limit: 100
+            limit: 100,
           });
 
           if (response?.data) {
-            const clienteReal = response.data.find(c =>
-              c.nome?.toLowerCase().includes(nome.toLowerCase()) ||
-              nome.toLowerCase().includes(c.nome?.toLowerCase())
+            const clienteReal = response.data.find(
+              (c) =>
+                c.nome?.toLowerCase().includes(nome.toLowerCase()) ||
+                nome.toLowerCase().includes(c.nome?.toLowerCase()),
             );
 
             if (clienteReal && clienteReal.email && clienteReal.email !== email) {
               return {
                 nome: clienteReal.nome || nome,
                 email: clienteReal.email,
-                telefone: clienteReal.telefone || telefone
+                telefone: clienteReal.telefone || telefone,
               };
             }
           }
@@ -131,14 +129,16 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       return {
         nome: proposta.cliente || 'Cliente',
         email: proposta.cliente_contato || '',
-        telefone: proposta.cliente_telefone || ''
+        telefone: proposta.cliente_telefone || '',
       };
     }
   };
 
   // Gerar token de acesso simples
   const generateAccessToken = () => {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    return (
+      Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+    );
   };
 
   // Enviar proposta por email
@@ -160,7 +160,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         clienteNome: clienteData.nome,
         clienteEmail: clienteData.email,
         valorTotal: propostaData.total,
-        empresaNome: 'ConectCRM'
+        empresaNome: 'ConectCRM',
       };
 
       const resultado = await emailServiceReal.enviarPropostaParaCliente(emailData);
@@ -195,12 +195,12 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         cliente: {
           nome: cliente.nome,
           email: cliente.email || '',
-          telefone: cliente.telefone
+          telefone: cliente.telefone,
         },
         empresa: { nome: 'ConectCRM' },
         valorTotal: propostaData.total,
         produtos: [],
-        observacoes: propostaData.titulo
+        observacoes: propostaData.titulo,
       });
 
       // Converter Blob para Uint8Array
@@ -224,27 +224,29 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       const cliente = await getClienteData();
       const propostaData = getPropostaData();
 
-      const pdfBlob = await pdfPropostasService.gerarPdf({
-        numero: propostaData.numero,
+      const dadosPDF = {
+        numeroProposta: propostaData.numero,
+        titulo: propostaData.titulo || 'Proposta Comercial',
         cliente: {
           nome: cliente.nome,
           email: cliente.email || '',
-          telefone: cliente.telefone
+          telefone: cliente.telefone,
+          empresa: cliente.empresa,
         },
-        empresa: { nome: 'ConectCRM' },
-        valorTotal: propostaData.total,
-        produtos: [],
-        observacoes: propostaData.titulo
-      });
+        vendedor: {
+          nome: 'Admin',
+          email: 'admin@conectcrm.com',
+          telefone: '(11) 99999-9999',
+        },
+        itens: propostaData.produtos || [],
+        subtotal: propostaData.subtotal || 0,
+        valorTotal: propostaData.total || 0,
+        formaPagamento: propostaData.formaPagamento || 'À vista',
+        prazoEntrega: '30 dias',
+        validadeProposta: `${propostaData.validadeDias || 30} dias`,
+      };
 
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Proposta_${propostaData.numero}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      await pdfPropostasService.downloadPdf('comercial', dadosPDF);
 
       toast.success(`📄 PDF da proposta ${propostaData.numero} baixado`);
     } catch (error) {
@@ -267,7 +269,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         await navigator.share({
           title: `Proposta ${propostaData.numero} - ConectCRM`,
           text: `Proposta comercial para ${cliente.nome}`,
-          url: shareUrl
+          url: shareUrl,
         });
         toast.success('🔗 Proposta compartilhada');
       } catch (error) {
@@ -281,8 +283,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   };
 
   const buttonClass = showLabels
-    ? "flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-md transition-colors"
-    : "p-2 rounded-md transition-colors";
+    ? 'flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-md transition-colors'
+    : 'p-2 rounded-md transition-colors';
 
   return (
     <>
@@ -302,7 +304,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           onClick={handleSendEmail}
           disabled={sendingEmail || !clienteData?.email}
           className={`${buttonClass} text-green-600 hover:text-green-900 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed`}
-          title={clienteData?.email ? "Enviar por email" : "Cliente sem email"}
+          title={clienteData?.email ? 'Enviar por email' : 'Cliente sem email'}
         >
           {sendingEmail ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -317,7 +319,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           onClick={handleSendWhatsApp}
           disabled={!clienteData?.telefone}
           className={`${buttonClass} text-green-500 hover:text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed`}
-          title={clienteData?.telefone ? "Enviar por WhatsApp" : "Cliente sem telefone"}
+          title={clienteData?.telefone ? 'Enviar por WhatsApp' : 'Cliente sem telefone'}
         >
           <MessageSquare className="w-4 h-4" />
           {showLabels && <span>WhatsApp</span>}
@@ -360,12 +362,12 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             cliente: {
               nome: clienteData.nome,
               whatsapp: clienteData.telefone,
-              telefone: clienteData.telefone
+              telefone: clienteData.telefone,
             },
             valorTotal: getPropostaData().total,
             empresa: {
-              nome: 'ConectCRM'
-            }
+              nome: 'ConectCRM',
+            },
           }}
           pdfBuffer={propostaPdfBuffer}
           onSuccess={() => {

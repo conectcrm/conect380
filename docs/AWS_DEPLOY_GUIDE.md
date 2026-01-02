@@ -528,7 +528,7 @@ docker-compose -f docker-compose.prod.yml logs frontend
 ### WhatsApp webhook não recebe mensagens
 ```bash
 # Verificar se webhook URL está configurada no Meta:
-# https://api.conectcrm.com.br/webhooks/whatsapp
+# https://api.conectcrm.com.br/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
 # Verificar se security group permite HTTPS (443) do Facebook IPs
 ```
 

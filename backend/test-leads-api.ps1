@@ -57,7 +57,7 @@ Write-Host "📋 PASSO 1: Autenticação" -ForegroundColor Yellow
 Write-Host "Tentando login com usuário de teste..." -ForegroundColor Gray
 
 $loginBody = @{
-  email    = "admin@conectcrm.com"
+  email    = "admin@conectsuite.com.br"
   password = "Admin@123"
 }
 

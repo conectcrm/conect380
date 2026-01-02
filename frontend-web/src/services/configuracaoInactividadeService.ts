@@ -1,6 +1,6 @@
 /**
  * 🎛️ Service de Configuração de Inatividade
- * 
+ *
  * Comunicação com API de fechamento automático por inatividade
  * Suporta configurações globais (empresa) e específicas (departamento)
  */
@@ -60,11 +60,9 @@ export interface ConfiguracaoResponse {
  * @param departamentoId (Opcional) ID do departamento específico, null para global
  */
 export const buscarConfiguracao = async (
-  departamentoId?: string | null
+  departamentoId?: string | null,
 ): Promise<ConfiguracaoResponse> => {
-  const params = departamentoId !== undefined
-    ? `?departamentoId=${departamentoId || ''}`
-    : '';
+  const params = departamentoId !== undefined ? `?departamentoId=${departamentoId || ''}` : '';
 
   // 🔐 empresaId removido do path - backend pega do JWT
   const response = await api.get(`/atendimento/configuracao-inatividade${params}`);
@@ -76,7 +74,7 @@ export const buscarConfiguracao = async (
  * 🔐 empresaId extraído automaticamente do JWT no backend
  */
 export const salvarConfiguracao = async (
-  dto: ConfiguracaoInactivityDto
+  dto: ConfiguracaoInactivityDto,
 ): Promise<ConfiguracaoResponse> => {
   try {
     // 🔐 empresaId removido do path - backend pega do JWT
@@ -93,7 +91,7 @@ export const salvarConfiguracao = async (
  * 🔐 empresaId extraído automaticamente do JWT no backend
  */
 export const atualizarConfiguracao = async (
-  dto: Partial<ConfiguracaoInactivityDto>
+  dto: Partial<ConfiguracaoInactivityDto>,
 ): Promise<ConfiguracaoResponse> => {
   // 🔐 empresaId removido do path - backend pega do JWT
   const response = await api.put(`/atendimento/configuracao-inatividade`, dto);
@@ -107,29 +105,40 @@ export const atualizarConfiguracao = async (
  */
 export const verificarAgora = async (
   empresaId?: string,
-  departamentoId?: string | null
-): Promise<{ sucesso: boolean; resultado: { processados: number; fechados: number; avisados: number } }> => {
+  departamentoId?: string | null,
+): Promise<{
+  sucesso: boolean;
+  resultado: { processados: number; fechados: number; avisados: number };
+}> => {
   const params = new URLSearchParams();
   if (empresaId) params.append('empresaId', empresaId);
   if (departamentoId !== undefined) params.append('departamentoId', departamentoId || '');
 
   const queryString = params.toString() ? `?${params.toString()}` : '';
-  const response = await api.post(`/atendimento/configuracao-inatividade/verificar-agora${queryString}`);
+  const response = await api.post(
+    `/atendimento/configuracao-inatividade/verificar-agora${queryString}`,
+  );
   return response.data;
 };
 
 /**
  * Lista departamentos de uma empresa (para seleção)
  */
-export const listarDepartamentos = async (empresaId: string): Promise<{ sucesso: boolean; dados: Departamento[] }> => {
-  const response = await api.get(`/atendimento/configuracao-inatividade/departamentos/${empresaId}`);
+export const listarDepartamentos = async (
+  empresaId: string,
+): Promise<{ sucesso: boolean; dados: Departamento[] }> => {
+  const response = await api.get(
+    `/atendimento/configuracao-inatividade/departamentos/${empresaId}`,
+  );
   return response.data;
 };
 
 /**
  * Lista TODAS as configurações de uma empresa (global + departamentos)
  */
-export const listarConfiguracoes = async (empresaId: string): Promise<{ sucesso: boolean; dados: ConfiguracaoInatividade[] }> => {
+export const listarConfiguracoes = async (
+  empresaId: string,
+): Promise<{ sucesso: boolean; dados: ConfiguracaoInatividade[] }> => {
   const response = await api.get(`/atendimento/configuracao-inatividade/lista/${empresaId}`);
   return response.data;
 };
@@ -148,4 +157,3 @@ const configuracaoInactividadeService = {
 };
 
 export default configuracaoInactividadeService;
-

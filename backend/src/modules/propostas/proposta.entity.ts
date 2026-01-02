@@ -8,6 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { User } from '../users/user.entity';
+import { Empresa } from '../../empresas/entities/empresa.entity';
 
 export interface ProdutoProposta {
   id: string;
@@ -31,6 +32,13 @@ export interface ClienteProposta {
 export class Proposta {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column({ unique: true })
   numero: string;

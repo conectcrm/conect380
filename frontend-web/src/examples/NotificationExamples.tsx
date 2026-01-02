@@ -18,7 +18,7 @@ const PropostaExample = () => {
         title: 'Proposta Criada',
         message: `Proposta para ${proposta.clienteNome} foi criada com sucesso`,
         type: 'success',
-        priority: 'high'
+        priority: 'high',
       });
 
       // Criar lembrete para follow-up
@@ -29,13 +29,12 @@ const PropostaExample = () => {
         message: `Verificar andamento da proposta com ${proposta.clienteNome}`,
         scheduledFor: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 dias
       });
-
     } catch (error) {
       addNotification({
         title: 'Erro na Proposta',
         message: 'Falha ao criar proposta. Tente novamente.',
         type: 'error',
-        priority: 'high'
+        priority: 'high',
       });
     }
   };
@@ -53,7 +52,7 @@ const ClienteExample = () => {
       title: 'Interação Registrada',
       message: `Nova interação com ${clienteNome}`,
       type: 'info',
-      priority: 'medium'
+      priority: 'medium',
     });
 
     // Lembrete para próximo contato
@@ -79,7 +78,7 @@ const SystemExample = () => {
       title: 'Manutenção Programada',
       message: 'Sistema será atualizado às 23:00 hoje',
       type: 'warning',
-      priority: 'high'
+      priority: 'high',
     });
   };
 
@@ -89,7 +88,7 @@ const SystemExample = () => {
       title: 'Novo Recurso!',
       message: 'Sistema de notificações está disponível',
       type: 'success',
-      priority: 'medium'
+      priority: 'medium',
     });
   };
 
@@ -104,12 +103,12 @@ const AutomaticNotifications = () => {
   const checkExpiringPropostas = () => {
     const expiringPropostas = getExpiringPropostas(); // Função hipotética
 
-    expiringPropostas.forEach(proposta => {
+    expiringPropostas.forEach((proposta) => {
       addNotification({
         title: 'Proposta Vencendo',
         message: `Proposta ${proposta.numero} vence em 2 dias`,
         type: 'warning',
-        priority: 'high'
+        priority: 'high',
       });
     });
   };
@@ -118,12 +117,12 @@ const AutomaticNotifications = () => {
   const checkClientBirthdays = () => {
     const birthdayClients = getTodayBirthdays(); // Função hipotética
 
-    birthdayClients.forEach(client => {
+    birthdayClients.forEach((client) => {
       addNotification({
         title: 'Aniversário do Cliente',
         message: `Hoje é aniversário de ${client.nome}!`,
         type: 'info',
-        priority: 'medium'
+        priority: 'medium',
       });
     });
   };
@@ -140,7 +139,7 @@ export const useSalesNotifications = () => {
       title: 'Novo Lead',
       message: `${leadData.nome} demonstrou interesse`,
       type: 'success',
-      priority: 'high'
+      priority: 'high',
     });
 
     // Lembrete para contato inicial
@@ -158,7 +157,7 @@ export const useSalesNotifications = () => {
       title: 'Venda Fechada! 🎉',
       message: `Parabéns! Venda de R$ ${dealData.valor} foi concluída`,
       type: 'success',
-      priority: 'high'
+      priority: 'high',
     });
   };
 
@@ -167,14 +166,14 @@ export const useSalesNotifications = () => {
       title: 'Follow-up Necessário',
       message: `Cliente ${clientData.nome} precisa de acompanhamento`,
       type: 'warning',
-      priority: 'medium'
+      priority: 'medium',
     });
   };
 
   return {
     notifyNewLead,
     notifyDealClosed,
-    notifyFollowUp
+    notifyFollowUp,
   };
 };
 
@@ -187,7 +186,7 @@ export const useAgendaNotifications = () => {
       title: 'Reunião Agendada',
       message: `Reunião com ${appointment.clienteNome} agendada`,
       type: 'success',
-      priority: 'medium'
+      priority: 'medium',
     });
 
     // Lembrete 1 hora antes
@@ -206,20 +205,20 @@ export const useAgendaNotifications = () => {
       title: 'Reunião Cancelada',
       message: `Reunião com ${appointment.clienteNome} foi cancelada`,
       type: 'warning',
-      priority: 'medium'
+      priority: 'medium',
     });
   };
 
   return {
     scheduleAppointment,
-    cancelAppointment
+    cancelAppointment,
   };
 };
 
 // Funções auxiliares (simuladas)
 const createProposta = async (proposta: any) => {
   // Simular API call
-  return new Promise(resolve => setTimeout(resolve, 1000));
+  return new Promise((resolve) => setTimeout(resolve, 1000));
 };
 
 const getExpiringPropostas = () => {
@@ -232,9 +231,4 @@ const getTodayBirthdays = () => {
   return [];
 };
 
-export {
-  PropostaExample,
-  ClienteExample,
-  SystemExample,
-  AutomaticNotifications
-};
+export { PropostaExample, ClienteExample, SystemExample, AutomaticNotifications };

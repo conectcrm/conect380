@@ -45,6 +45,13 @@ export class Fatura {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa_rel: Empresa;
+
   @Column({ unique: true })
   numero: string;
 

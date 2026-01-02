@@ -18,7 +18,7 @@ import {
   Download,
   Eye,
   Star,
-  MessageSquare
+  MessageSquare,
 } from 'lucide-react';
 import { Cliente } from '../../services/clientesService';
 import { AvatarUpload } from '../upload/AvatarUpload';
@@ -42,7 +42,7 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
   onEdit,
   onDelete,
   onAvatarUpdate,
-  onAttachmentAdd
+  onAttachmentAdd,
 }) => {
   const [activeTab, setActiveTab] = useState<'info' | 'anexos' | 'historico'>('info');
 
@@ -50,21 +50,31 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'cliente': return 'bg-green-100 text-green-800 border-green-200';
-      case 'prospect': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'lead': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'inativo': return 'bg-gray-100 text-gray-800 border-gray-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'cliente':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'prospect':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'lead':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'inativo':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'cliente': return 'Cliente';
-      case 'prospect': return 'Prospect';
-      case 'lead': return 'Lead';
-      case 'inativo': return 'Inativo';
-      default: return status;
+      case 'cliente':
+        return 'Cliente';
+      case 'prospect':
+        return 'Prospect';
+      case 'lead':
+        return 'Lead';
+      case 'inativo':
+        return 'Inativo';
+      default:
+        return status;
     }
   };
 
@@ -107,14 +117,14 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
                       {cliente.empresa}
                     </p>
                   )}
-                  {cliente.cargo && (
-                    <p className="text-sm text-gray-500">{cliente.cargo}</p>
-                  )}
+                  {cliente.cargo && <p className="text-sm text-gray-500">{cliente.cargo}</p>}
                 </div>
               </div>
 
               <div className="flex items-center space-x-2">
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(cliente.status)}`}>
+                <span
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(cliente.status)}`}
+                >
                   {getStatusLabel(cliente.status)}
                 </span>
 
@@ -152,28 +162,31 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
             <div className="flex space-x-8 mt-4">
               <button
                 onClick={() => setActiveTab('info')}
-                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'info'
-                  ? 'border-[#159A9C] text-[#159A9C]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
+                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'info'
+                    ? 'border-[#159A9C] text-[#159A9C]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
               >
                 Informações
               </button>
               <button
                 onClick={() => setActiveTab('anexos')}
-                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'anexos'
-                  ? 'border-[#159A9C] text-[#159A9C]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
+                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'anexos'
+                    ? 'border-[#159A9C] text-[#159A9C]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
               >
                 Anexos
               </button>
               <button
                 onClick={() => setActiveTab('historico')}
-                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'historico'
-                  ? 'border-[#159A9C] text-[#159A9C]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
+                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'historico'
+                    ? 'border-[#159A9C] text-[#159A9C]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
               >
                 Histórico
               </button>
@@ -193,7 +206,10 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
                         <Mail className="w-5 h-5 text-gray-400" />
                         <div>
                           <p className="text-sm font-medium text-gray-900">Email</p>
-                          <a href={`mailto:${cliente.email}`} className="text-sm text-blue-600 hover:text-blue-800">
+                          <a
+                            href={`mailto:${cliente.email}`}
+                            className="text-sm text-blue-600 hover:text-blue-800"
+                          >
                             {cliente.email}
                           </a>
                         </div>
@@ -205,7 +221,10 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
                         <Phone className="w-5 h-5 text-gray-400" />
                         <div>
                           <p className="text-sm font-medium text-gray-900">Telefone</p>
-                          <a href={`tel:${cliente.telefone}`} className="text-sm text-blue-600 hover:text-blue-800">
+                          <a
+                            href={`tel:${cliente.telefone}`}
+                            className="text-sm text-blue-600 hover:text-blue-800"
+                          >
                             {cliente.telefone}
                           </a>
                         </div>
@@ -259,7 +278,7 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
                         {new Date(cliente.created_at).toLocaleDateString('pt-BR', {
                           day: '2-digit',
                           month: '2-digit',
-                          year: 'numeric'
+                          year: 'numeric',
                         })}
                       </p>
                     </div>

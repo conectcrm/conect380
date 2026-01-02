@@ -110,28 +110,28 @@ const ContratosPage: React.FC<ContratosPageProps> = ({ contratoId: propContratoI
   const formatarValor = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(valor);
   };
 
   const getStatusColor = (status: string) => {
     const statusColors: Record<string, string> = {
-      'rascunho': 'bg-gray-100 text-gray-800',
-      'aguardando_assinatura': 'bg-yellow-100 text-yellow-800',
-      'assinado': 'bg-green-100 text-green-800',
-      'cancelado': 'bg-red-100 text-red-800',
-      'vencido': 'bg-red-100 text-red-800'
+      rascunho: 'bg-gray-100 text-gray-800',
+      aguardando_assinatura: 'bg-yellow-100 text-yellow-800',
+      assinado: 'bg-green-100 text-green-800',
+      cancelado: 'bg-red-100 text-red-800',
+      vencido: 'bg-red-100 text-red-800',
     };
     return statusColors[status] || 'bg-gray-100 text-gray-800';
   };
 
   const getStatusText = (status: string) => {
     const statusTexts: Record<string, string> = {
-      'rascunho': 'Rascunho',
-      'aguardando_assinatura': 'Aguardando Assinatura',
-      'assinado': 'Assinado',
-      'cancelado': 'Cancelado',
-      'vencido': 'Vencido'
+      rascunho: 'Rascunho',
+      aguardando_assinatura: 'Aguardando Assinatura',
+      assinado: 'Assinado',
+      cancelado: 'Cancelado',
+      vencido: 'Vencido',
     };
     return statusTexts[status] || status;
   };
@@ -240,7 +240,9 @@ const ContratosPage: React.FC<ContratosPageProps> = ({ contratoId: propContratoI
                 <p className="text-blue-100 mt-1">ID: {contrato.id}</p>
               </div>
               <div className="text-right">
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(contrato.status)} border`}>
+                <span
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(contrato.status)} border`}
+                >
                   {getStatusText(contrato.status)}
                 </span>
               </div>
@@ -283,7 +285,9 @@ const ContratosPage: React.FC<ContratosPageProps> = ({ contratoId: propContratoI
                 <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                   <div>
                     <span className="text-sm font-medium text-gray-500">Valor:</span>
-                    <p className="text-xl font-bold text-green-600">{formatarValor(contrato.valor)}</p>
+                    <p className="text-xl font-bold text-green-600">
+                      {formatarValor(contrato.valor)}
+                    </p>
                   </div>
                   <div>
                     <span className="text-sm font-medium text-gray-500">Data de Vencimento:</span>
@@ -320,11 +324,17 @@ const ContratosPage: React.FC<ContratosPageProps> = ({ contratoId: propContratoI
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-sm font-medium text-gray-500">Data de Criação:</span>
-                  <p className="text-gray-900">{contrato.criadoEm ? formatarData(contrato.criadoEm) : formatarData(contrato.dataEmissao)}</p>
+                  <p className="text-gray-900">
+                    {contrato.criadoEm
+                      ? formatarData(contrato.criadoEm)
+                      : formatarData(contrato.dataEmissao)}
+                  </p>
                 </div>
                 <div>
                   <span className="font-medium text-gray-500">Última Atualização:</span>
-                  <p className="text-gray-900">{contrato.atualizadoEm ? formatarData(contrato.atualizadoEm) : 'Não informado'}</p>
+                  <p className="text-gray-900">
+                    {contrato.atualizadoEm ? formatarData(contrato.atualizadoEm) : 'Não informado'}
+                  </p>
                 </div>
                 {contrato.propostaId && (
                   <div>

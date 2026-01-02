@@ -3,10 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { 
+import {
   ArrowLeft,
-  Plus, 
-  Trash2, 
+  Plus,
+  Trash2,
   Package,
   DollarSign,
   Percent,
@@ -16,7 +16,7 @@ import {
   Loader2,
   Tag,
   Calendar,
-  FileText
+  FileText,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { combosService, ComboFormData, Combo } from '../../services/combosService';
@@ -25,21 +25,32 @@ import { useProdutosParaPropostas, ProdutoPropostaBase } from '../../shared/prod
 // Schema de validação
 const comboSchema = yup.object({
   nome: yup.string().required('Nome é obrigatório').min(3, 'Nome deve ter pelo menos 3 caracteres'),
-  descricao: yup.string().required('Descrição é obrigatória').min(10, 'Descrição deve ter pelo menos 10 caracteres'),
+  descricao: yup
+    .string()
+    .required('Descrição é obrigatória')
+    .min(10, 'Descrição deve ter pelo menos 10 caracteres'),
   categoria: yup.string().required('Categoria é obrigatória'),
   produtos: yup.array().min(2, 'Adicione pelo menos 2 produtos ao combo'),
-  tipoDesconto: yup.string().oneOf(['percentual', 'fixo']).required('Tipo de desconto é obrigatório'),
+  tipoDesconto: yup
+    .string()
+    .oneOf(['percentual', 'fixo'])
+    .required('Tipo de desconto é obrigatório'),
   descontoPercentual: yup.number().when('tipoDesconto', {
     is: 'percentual',
-    then: (schema) => schema.required('Desconto percentual é obrigatório').min(0.1, 'Desconto deve ser maior que 0').max(90, 'Desconto não pode ser maior que 90%'),
-    otherwise: (schema) => schema.optional()
+    then: (schema) =>
+      schema
+        .required('Desconto percentual é obrigatório')
+        .min(0.1, 'Desconto deve ser maior que 0')
+        .max(90, 'Desconto não pode ser maior que 90%'),
+    otherwise: (schema) => schema.optional(),
   }),
   precoFixo: yup.number().when('tipoDesconto', {
     is: 'fixo',
-    then: (schema) => schema.required('Preço fixo é obrigatório').min(0.01, 'Preço deve ser maior que 0'),
-    otherwise: (schema) => schema.optional()
+    then: (schema) =>
+      schema.required('Preço fixo é obrigatório').min(0.01, 'Preço deve ser maior que 0'),
+    otherwise: (schema) => schema.optional(),
   }),
-  status: yup.string().oneOf(['ativo', 'inativo', 'rascunho']).required('Status é obrigatório')
+  status: yup.string().oneOf(['ativo', 'inativo', 'rascunho']).required('Status é obrigatório'),
 });
 
 const NovoComboPage: React.FC = () => {
@@ -58,7 +69,14 @@ const NovoComboPage: React.FC = () => {
   const { produtos: produtosDisponiveis, buscarProdutos, categorias } = useProdutosParaPropostas();
 
   // Form
-  const { control, handleSubmit, watch, setValue, reset, formState: { errors, isValid } } = useForm<ComboFormData>({
+  const {
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    formState: { errors, isValid },
+  } = useForm<ComboFormData>({
     resolver: yupResolver(comboSchema),
     mode: 'onChange',
     defaultValues: {
@@ -71,13 +89,18 @@ const NovoComboPage: React.FC = () => {
       precoFixo: 0,
       status: 'rascunho',
       tags: [],
-      condicoes: ''
-    }
+      condicoes: '',
+    },
   });
 
-  const { fields: produtos, append: adicionarProduto, remove: removerProduto, update: atualizarProduto } = useFieldArray({
+  const {
+    fields: produtos,
+    append: adicionarProduto,
+    remove: removerProduto,
+    update: atualizarProduto,
+  } = useFieldArray({
     control,
-    name: 'produtos'
+    name: 'produtos',
   });
 
   // Watch values
@@ -111,7 +134,7 @@ const NovoComboPage: React.FC = () => {
           tags: combo.tags || [],
           validadeInicio: combo.validadeInicio,
           validadeFim: combo.validadeFim,
-          condicoes: combo.condicoes || ''
+          condicoes: combo.condicoes || '',
         });
       } else {
         toast.error('Combo não encontrado');
@@ -126,29 +149,27 @@ const NovoComboPage: React.FC = () => {
   };
 
   // Cálculos
-  const precoOriginal = watchedProdutos?.reduce((total, item) => 
-    total + (item.produto.preco * item.quantidade), 0
-  ) || 0;
+  const precoOriginal =
+    watchedProdutos?.reduce((total, item) => total + item.produto.preco * item.quantidade, 0) || 0;
 
-  const precoCombo = watchedTipoDesconto === 'percentual' 
-    ? precoOriginal * (1 - (watchedDescontoPercentual || 0) / 100)
-    : watchedPrecoFixo || 0;
+  const precoCombo =
+    watchedTipoDesconto === 'percentual'
+      ? precoOriginal * (1 - (watchedDescontoPercentual || 0) / 100)
+      : watchedPrecoFixo || 0;
 
   const economia = precoOriginal - precoCombo;
   const percentualDesconto = precoOriginal > 0 ? (economia / precoOriginal) * 100 : 0;
 
   // Filtrar produtos
   const produtosFiltrados = buscarProdutos({
-    termo: searchTerm
-  }).filter(produto => 
-    !watchedProdutos?.some(item => item.produto.id === produto.id)
-  );
+    termo: searchTerm,
+  }).filter((produto) => !watchedProdutos?.some((item) => item.produto.id === produto.id));
 
   // Handlers
   const handleAdicionarProduto = (produto: ProdutoPropostaBase) => {
     adicionarProduto({
       produto,
-      quantidade: 1
+      quantidade: 1,
     });
     setSearchTerm('');
     setShowProdutoSearch(false);
@@ -160,14 +181,14 @@ const NovoComboPage: React.FC = () => {
     const produtoAtual = watchedProdutos[index];
     atualizarProduto(index, {
       ...produtoAtual,
-      quantidade
+      quantidade,
     });
   };
 
   const onSubmit = async (data: ComboFormData) => {
     try {
       setIsSaving(true);
-      
+
       if (isEditing && id) {
         await combosService.atualizarCombo(id, data);
         toast.success('Combo atualizado com sucesso!');
@@ -175,7 +196,7 @@ const NovoComboPage: React.FC = () => {
         await combosService.criarCombo(data);
         toast.success('Combo criado com sucesso!');
       }
-      
+
       navigate('/combos');
     } catch (error) {
       toast.error('Erro ao salvar combo');
@@ -188,7 +209,7 @@ const NovoComboPage: React.FC = () => {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -222,7 +243,9 @@ const NovoComboPage: React.FC = () => {
                   {isEditing ? 'Editar Combo' : 'Novo Combo'}
                 </h1>
                 <p className="text-[#B4BEC9]">
-                  {isEditing ? 'Atualize as informações do combo' : 'Crie um novo pacote de produtos'}
+                  {isEditing
+                    ? 'Atualize as informações do combo'
+                    : 'Crie um novo pacote de produtos'}
                 </p>
               </div>
             </div>
@@ -230,9 +253,11 @@ const NovoComboPage: React.FC = () => {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
+      >
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          
           {/* Coluna 1: Informações Básicas */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
@@ -259,15 +284,11 @@ const NovoComboPage: React.FC = () => {
                     />
                   )}
                 />
-                {errors.nome && (
-                  <p className="text-red-500 text-sm mt-1">{errors.nome.message}</p>
-                )}
+                {errors.nome && <p className="text-red-500 text-sm mt-1">{errors.nome.message}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Descrição *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição *</label>
                 <Controller
                   name="descricao"
                   control={control}
@@ -288,9 +309,7 @@ const NovoComboPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Categoria *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Categoria *</label>
                 <Controller
                   name="categoria"
                   control={control}
@@ -316,9 +335,7 @@ const NovoComboPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
                 <Controller
                   name="status"
                   control={control}
@@ -336,16 +353,21 @@ const NovoComboPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tags
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tags</label>
                 <Controller
                   name="tags"
                   control={control}
                   render={({ field }) => (
                     <input
                       value={field.value?.join(', ') || ''}
-                      onChange={(e) => field.onChange(e.target.value.split(',').map(tag => tag.trim()).filter(Boolean))}
+                      onChange={(e) =>
+                        field.onChange(
+                          e.target.value
+                            .split(',')
+                            .map((tag) => tag.trim())
+                            .filter(Boolean),
+                        )
+                      }
                       type="text"
                       placeholder="startup, digital, básico"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
@@ -429,7 +451,9 @@ const NovoComboPage: React.FC = () => {
                           </div>
                         </div>
                         <div className="text-right ml-4">
-                          <div className="font-medium text-green-600">{formatCurrency(produto.preco)}</div>
+                          <div className="font-medium text-green-600">
+                            {formatCurrency(produto.preco)}
+                          </div>
                           <div className="text-xs text-gray-500">por {produto.unidade}</div>
                         </div>
                       </div>
@@ -474,7 +498,9 @@ const NovoComboPage: React.FC = () => {
                         type="number"
                         min="1"
                         value={field.quantidade}
-                        onChange={(e) => handleQuantidadeChange(index, parseInt(e.target.value) || 1)}
+                        onChange={(e) =>
+                          handleQuantidadeChange(index, parseInt(e.target.value) || 1)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                       />
                     </div>
@@ -494,7 +520,9 @@ const NovoComboPage: React.FC = () => {
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                   <Package className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                   <p className="text-gray-500">Nenhum produto adicionado</p>
-                  <p className="text-sm text-gray-400">Clique em "Adicionar Produto" para começar</p>
+                  <p className="text-sm text-gray-400">
+                    Clique em "Adicionar Produto" para começar
+                  </p>
                 </div>
               )}
             </div>
@@ -574,7 +602,9 @@ const NovoComboPage: React.FC = () => {
                       )}
                     />
                     {errors.descontoPercentual && (
-                      <p className="text-red-500 text-sm mt-1">{errors.descontoPercentual.message}</p>
+                      <p className="text-red-500 text-sm mt-1">
+                        {errors.descontoPercentual.message}
+                      </p>
                     )}
                   </div>
                 )}
@@ -610,7 +640,7 @@ const NovoComboPage: React.FC = () => {
             {/* Card de Resumo */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Resumo do Combo</h3>
-              
+
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Produtos:</span>
@@ -663,7 +693,7 @@ const NovoComboPage: React.FC = () => {
                     </>
                   )}
                 </button>
-                
+
                 <button
                   type="button"
                   onClick={() => navigate('/combos')}

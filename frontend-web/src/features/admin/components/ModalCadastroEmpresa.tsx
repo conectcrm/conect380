@@ -24,7 +24,7 @@ import {
   Camera,
   FileText,
   CreditCard,
-  Settings
+  Settings,
 } from 'lucide-react';
 import { useNotifications } from '../../../contexts/NotificationContext';
 
@@ -37,13 +37,13 @@ interface NovaEmpresaFormData {
   nomeFantasia: string;
   inscricaoEstadual: string;
   inscricaoMunicipal: string;
-  
+
   // Contato Principal
   emailPrincipal: string;
   telefonePrincipal: string;
   celularPrincipal: string;
   website: string;
-  
+
   // Endereço
   cep: string;
   endereco: string;
@@ -53,13 +53,13 @@ interface NovaEmpresaFormData {
   cidade: string;
   estado: string;
   pais: string;
-  
+
   // Responsável/Contato
   nomeResponsavel: string;
   cargoResponsavel: string;
   emailResponsavel: string;
   telefoneResponsavel: string;
-  
+
   // Configurações do Sistema
   plano: 'starter' | 'professional' | 'enterprise' | 'custom';
   status: 'ativa' | 'trial' | 'suspensa' | 'inativa';
@@ -67,18 +67,18 @@ interface NovaEmpresaFormData {
   dataFimContrato: Date;
   valorMensal: number;
   desconto: number;
-  
+
   // Configurações Avançadas
   limitUsuarios: number;
   limitClientes: number;
   limitStorage: number; // GB
   modulosAtivos: string[];
   permissoes: string[];
-  
+
   // Observações
   observacoes: string;
   tags: string[];
-  
+
   // Upload
   logo: File | null;
   contrato: File | null;
@@ -100,135 +100,188 @@ const schema = yup.object().shape({
     .required('Nome da empresa é obrigatório')
     .min(2, 'Nome deve ter pelo menos 2 caracteres')
     .max(100, 'Nome deve ter no máximo 100 caracteres'),
-  
+
   cnpj: yup
     .string()
     .required('CNPJ é obrigatório')
     .matches(/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/, 'CNPJ deve estar no formato XX.XXX.XXX/XXXX-XX'),
-  
+
   razaoSocial: yup
     .string()
     .required('Razão social é obrigatória')
     .min(2, 'Razão social deve ter pelo menos 2 caracteres'),
-  
+
   emailPrincipal: yup
     .string()
     .required('Email principal é obrigatório')
     .email('Email deve ter um formato válido'),
-  
+
   telefonePrincipal: yup
     .string()
     .required('Telefone principal é obrigatório')
     .matches(/^\(\d{2}\)\s\d{4,5}-\d{4}$/, 'Telefone deve estar no formato (XX) XXXXX-XXXX'),
-  
+
   // Endereço - Obrigatórios
   cep: yup
     .string()
     .required('CEP é obrigatório')
     .matches(/^\d{5}-\d{3}$/, 'CEP deve estar no formato XXXXX-XXX'),
-  
-  endereco: yup
-    .string()
-    .required('Endereço é obrigatório'),
-  
-  numero: yup
-    .string()
-    .required('Número é obrigatório'),
-  
-  cidade: yup
-    .string()
-    .required('Cidade é obrigatória'),
-  
-  estado: yup
-    .string()
-    .required('Estado é obrigatório')
-    .length(2, 'Estado deve ter 2 caracteres'),
-  
+
+  endereco: yup.string().required('Endereço é obrigatório'),
+
+  numero: yup.string().required('Número é obrigatório'),
+
+  cidade: yup.string().required('Cidade é obrigatória'),
+
+  estado: yup.string().required('Estado é obrigatório').length(2, 'Estado deve ter 2 caracteres'),
+
   // Responsável - Obrigatórios
-  nomeResponsavel: yup
-    .string()
-    .required('Nome do responsável é obrigatório'),
-  
-  cargoResponsavel: yup
-    .string()
-    .required('Cargo do responsável é obrigatório'),
-  
+  nomeResponsavel: yup.string().required('Nome do responsável é obrigatório'),
+
+  cargoResponsavel: yup.string().required('Cargo do responsável é obrigatório'),
+
   emailResponsavel: yup
     .string()
     .required('Email do responsável é obrigatório')
     .email('Email deve ter um formato válido'),
-  
+
   // Sistema - Obrigatórios
   plano: yup
     .string()
     .required('Plano é obrigatório')
     .oneOf(['starter', 'professional', 'enterprise', 'custom'], 'Plano inválido'),
-  
+
   status: yup
     .string()
     .required('Status é obrigatório')
     .oneOf(['ativa', 'trial', 'suspensa', 'inativa'], 'Status inválido'),
-  
+
   dataInicioContrato: yup
     .date()
     .required('Data de início do contrato é obrigatória')
     .min(new Date(), 'Data de início não pode ser no passado'),
-  
+
   dataFimContrato: yup
     .date()
     .required('Data de fim do contrato é obrigatória')
     .min(yup.ref('dataInicioContrato'), 'Data de fim deve ser posterior ao início'),
-  
+
   valorMensal: yup
     .number()
     .required('Valor mensal é obrigatório')
     .min(0, 'Valor não pode ser negativo'),
-  
+
   limitUsuarios: yup
     .number()
     .required('Limite de usuários é obrigatório')
     .min(1, 'Deve ter pelo menos 1 usuário'),
-  
+
   limitClientes: yup
     .number()
     .required('Limite de clientes é obrigatório')
     .min(1, 'Deve ter pelo menos 1 cliente'),
-  
+
   limitStorage: yup
     .number()
     .required('Limite de storage é obrigatório')
-    .min(1, 'Deve ter pelo menos 1 GB')
+    .min(1, 'Deve ter pelo menos 1 GB'),
 });
 
 // Constantes
 const PLANOS = [
-  { value: 'starter', label: 'Starter', valorBase: 99.90, limiteUsuarios: 5, limiteClientes: 100, storage: 5 },
-  { value: 'professional', label: 'Professional', valorBase: 199.90, limiteUsuarios: 15, limiteClientes: 500, storage: 20 },
-  { value: 'enterprise', label: 'Enterprise', valorBase: 399.90, limiteUsuarios: 50, limiteClientes: 2000, storage: 100 },
-  { value: 'custom', label: 'Personalizado', valorBase: 0, limiteUsuarios: 0, limiteClientes: 0, storage: 0 }
+  {
+    value: 'starter',
+    label: 'Starter',
+    valorBase: 99.9,
+    limiteUsuarios: 5,
+    limiteClientes: 100,
+    storage: 5,
+  },
+  {
+    value: 'professional',
+    label: 'Professional',
+    valorBase: 199.9,
+    limiteUsuarios: 15,
+    limiteClientes: 500,
+    storage: 20,
+  },
+  {
+    value: 'enterprise',
+    label: 'Enterprise',
+    valorBase: 399.9,
+    limiteUsuarios: 50,
+    limiteClientes: 2000,
+    storage: 100,
+  },
+  {
+    value: 'custom',
+    label: 'Personalizado',
+    valorBase: 0,
+    limiteUsuarios: 0,
+    limiteClientes: 0,
+    storage: 0,
+  },
 ];
 
 const STATUS_OPTIONS = [
   { value: 'trial', label: 'Trial (Teste)', color: 'bg-blue-100 text-blue-800' },
   { value: 'ativa', label: 'Ativa', color: 'bg-green-100 text-green-800' },
   { value: 'suspensa', label: 'Suspensa', color: 'bg-yellow-100 text-yellow-800' },
-  { value: 'inativa', label: 'Inativa', color: 'bg-red-100 text-red-800' }
+  { value: 'inativa', label: 'Inativa', color: 'bg-red-100 text-red-800' },
 ];
 
 const ESTADOS_BRASIL = [
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
-  'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
-  'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+  'AC',
+  'AL',
+  'AP',
+  'AM',
+  'BA',
+  'CE',
+  'DF',
+  'ES',
+  'GO',
+  'MA',
+  'MT',
+  'MS',
+  'MG',
+  'PA',
+  'PB',
+  'PR',
+  'PE',
+  'PI',
+  'RJ',
+  'RN',
+  'RS',
+  'RO',
+  'RR',
+  'SC',
+  'SP',
+  'SE',
+  'TO',
 ];
 
 const MODULOS_DISPONIVEIS = [
-  'CRM', 'Vendas', 'Financeiro', 'Relatórios', 'API', 'Integrações',
-  'Mobile App', 'Automação', 'Marketing', 'Suporte'
+  'CRM',
+  'Vendas',
+  'Financeiro',
+  'Relatórios',
+  'API',
+  'Integrações',
+  'Mobile App',
+  'Automação',
+  'Marketing',
+  'Suporte',
 ];
 
 const PERMISSOES_DISPONIVEIS = [
-  'admin_total', 'user_management', 'financial_access', 'reports_access',
-  'api_access', 'export_data', 'delete_records', 'bulk_operations'
+  'admin_total',
+  'user_management',
+  'financial_access',
+  'reports_access',
+  'api_access',
+  'export_data',
+  'delete_records',
+  'bulk_operations',
 ];
 
 export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
@@ -236,10 +289,12 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
   onClose,
   onSave,
   empresa,
-  isLoading = false
+  isLoading = false,
 }) => {
   const { addNotification } = useNotifications();
-  const [activeTab, setActiveTab] = useState<'basico' | 'endereco' | 'responsavel' | 'sistema' | 'configuracao'>('basico');
+  const [activeTab, setActiveTab] = useState<
+    'basico' | 'endereco' | 'responsavel' | 'sistema' | 'configuracao'
+  >('basico');
   const [showPassword, setShowPassword] = useState(false);
   const [cnpjValidado, setCnpjValidado] = useState(false);
   const [cepValidado, setCepValidado] = useState(false);
@@ -256,7 +311,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
     watch,
     reset,
     trigger,
-    getValues
+    getValues,
   } = useForm<NovaEmpresaFormData>({
     resolver: yupResolver(schema),
     mode: 'onChange',
@@ -266,7 +321,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
       limitUsuarios: 5,
       limitClientes: 100,
       limitStorage: 5,
-      valorMensal: 99.90,
+      valorMensal: 99.9,
       desconto: 0,
       modulosAtivos: ['CRM', 'Vendas'],
       permissoes: ['user_management', 'reports_access'],
@@ -274,8 +329,8 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
       pais: 'Brasil',
       dataInicioContrato: new Date(),
       dataFimContrato: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 ano
-      ...empresa
-    }
+      ...empresa,
+    },
   });
 
   const watchedPlano = watch('plano');
@@ -285,14 +340,14 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
   // Função para validar CNPJ na Receita Federal
   const validarCnpj = async (cnpj: string) => {
     if (!cnpj || cnpj.length !== 18) return;
-    
+
     setValidandoCnpj(true);
     try {
       // Simular validação (em produção, usar API da Receita Federal)
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
       const cnpjLimpo = cnpj.replace(/\D/g, '');
-      
+
       // Simulação de dados da Receita Federal
       const dadosReceita = {
         razaoSocial: 'EMPRESA EXEMPLO LTDA',
@@ -301,9 +356,9 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
         bairro: 'Centro',
         cidade: 'São Paulo',
         estado: 'SP',
-        cep: '01234-567'
+        cep: '01234-567',
       };
-      
+
       setValue('razaoSocial', dadosReceita.razaoSocial);
       setValue('nomeFantasia', dadosReceita.nomeFantasia);
       setValue('endereco', dadosReceita.endereco);
@@ -311,24 +366,23 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
       setValue('cidade', dadosReceita.cidade);
       setValue('estado', dadosReceita.estado);
       setValue('cep', dadosReceita.cep);
-      
+
       setCnpjValidado(true);
-      
+
       addNotification({
         title: '✅ CNPJ Validado',
         message: 'Dados da Receita Federal importados com sucesso!',
         type: 'success',
         priority: 'high',
-        entityType: 'tarefa'
+        entityType: 'tarefa',
       });
-      
     } catch (error) {
       addNotification({
         title: '❌ Erro na Validação',
         message: 'Não foi possível validar o CNPJ. Verifique se está correto.',
         type: 'error',
         priority: 'high',
-        entityType: 'tarefa'
+        entityType: 'tarefa',
       });
     } finally {
       setValidandoCnpj(false);
@@ -338,26 +392,26 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
   // Função para buscar endereço por CEP
   const buscarCep = async (cep: string) => {
     if (!cep || cep.length !== 9) return;
-    
+
     setValidandoCep(true);
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cep.replace('-', '')}/json/`);
       const dados = await response.json();
-      
+
       if (!dados.erro) {
         setValue('endereco', dados.logradouro);
         setValue('bairro', dados.bairro);
         setValue('cidade', dados.localidade);
         setValue('estado', dados.uf);
-        
+
         setCepValidado(true);
-        
+
         addNotification({
           title: '📍 CEP Encontrado',
           message: 'Endereço preenchido automaticamente!',
           type: 'success',
           priority: 'medium',
-          entityType: 'tarefa'
+          entityType: 'tarefa',
         });
       }
     } catch (error) {
@@ -366,7 +420,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
         message: 'Verifique se o CEP está correto.',
         type: 'error',
         priority: 'medium',
-        entityType: 'tarefa'
+        entityType: 'tarefa',
       });
     } finally {
       setValidandoCep(false);
@@ -375,7 +429,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
 
   // Aplicar limites baseados no plano
   useEffect(() => {
-    const planoSelecionado = PLANOS.find(p => p.value === watchedPlano);
+    const planoSelecionado = PLANOS.find((p) => p.value === watchedPlano);
     if (planoSelecionado && watchedPlano !== 'custom') {
       setValue('valorMensal', planoSelecionado.valorBase);
       setValue('limitUsuarios', planoSelecionado.limiteUsuarios);
@@ -431,7 +485,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
     const number = parseFloat(value.replace(/[^\d]/g, '')) / 100;
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(number);
   };
 
@@ -450,15 +504,15 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
   const onSubmit = async (data: NovaEmpresaFormData) => {
     try {
       await onSave(data);
-      
+
       addNotification({
         title: '🎉 Empresa Cadastrada',
         message: `${data.nomeEmpresa} foi cadastrada com sucesso!`,
         type: 'success',
         priority: 'high',
-        entityType: 'cliente'
+        entityType: 'cliente',
       });
-      
+
       reset();
       onClose();
     } catch (error) {
@@ -467,7 +521,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
         message: 'Não foi possível cadastrar a empresa. Tente novamente.',
         type: 'error',
         priority: 'high',
-        entityType: 'tarefa'
+        entityType: 'tarefa',
       });
     }
   };
@@ -501,9 +555,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Nome da Empresa */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Nome da Empresa *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Nome da Empresa *</label>
           <div className="relative">
             <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -522,9 +574,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
 
         {/* CNPJ */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            CNPJ *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">CNPJ *</label>
           <div className="relative">
             <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Controller
@@ -537,7 +587,11 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
                   value={formatCnpj(field.value || '')}
                   onChange={(e) => field.onChange(formatCnpj(e.target.value))}
                   className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
-                    errors.cnpj ? 'border-red-300 bg-red-50' : cnpjValidado ? 'border-green-300 bg-green-50' : 'border-gray-300'
+                    errors.cnpj
+                      ? 'border-red-300 bg-red-50'
+                      : cnpjValidado
+                        ? 'border-green-300 bg-green-50'
+                        : 'border-gray-300'
                   }`}
                   placeholder="00.000.000/0000-00"
                 />
@@ -553,9 +607,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
               )}
             </div>
           </div>
-          {errors.cnpj && (
-            <p className="mt-1 text-sm text-red-600">{errors.cnpj.message}</p>
-          )}
+          {errors.cnpj && <p className="mt-1 text-sm text-red-600">{errors.cnpj.message}</p>}
           {cnpjValidado && (
             <p className="mt-1 text-sm text-green-600">✅ CNPJ validado na Receita Federal</p>
           )}
@@ -563,9 +615,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
 
         {/* Razão Social */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Razão Social *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Razão Social *</label>
           <input
             {...register('razaoSocial')}
             type="text"
@@ -581,9 +631,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
 
         {/* Nome Fantasia */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Nome Fantasia
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Nome Fantasia</label>
           <input
             {...register('nomeFantasia')}
             type="text"
@@ -594,9 +642,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
 
         {/* Inscrição Estadual */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Inscrição Estadual
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Inscrição Estadual</label>
           <input
             {...register('inscricaoEstadual')}
             type="text"
@@ -699,9 +745,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
 
           {/* Website */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Website
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Website</label>
             <div className="relative">
               <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -722,9 +766,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* CEP */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            CEP *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">CEP *</label>
           <div className="relative">
             <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Controller
@@ -737,7 +779,11 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
                   value={formatCep(field.value || '')}
                   onChange={(e) => field.onChange(formatCep(e.target.value))}
                   className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
-                    errors.cep ? 'border-red-300 bg-red-50' : cepValidado ? 'border-green-300 bg-green-50' : 'border-gray-300'
+                    errors.cep
+                      ? 'border-red-300 bg-red-50'
+                      : cepValidado
+                        ? 'border-green-300 bg-green-50'
+                        : 'border-gray-300'
                   }`}
                   placeholder="00000-000"
                 />
@@ -753,16 +799,12 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
               )}
             </div>
           </div>
-          {errors.cep && (
-            <p className="mt-1 text-sm text-red-600">{errors.cep.message}</p>
-          )}
+          {errors.cep && <p className="mt-1 text-sm text-red-600">{errors.cep.message}</p>}
         </div>
 
         {/* Cidade */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Cidade *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Cidade *</label>
           <input
             {...register('cidade')}
             type="text"
@@ -771,16 +813,12 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
             }`}
             placeholder="Nome da cidade"
           />
-          {errors.cidade && (
-            <p className="mt-1 text-sm text-red-600">{errors.cidade.message}</p>
-          )}
+          {errors.cidade && <p className="mt-1 text-sm text-red-600">{errors.cidade.message}</p>}
         </div>
 
         {/* Estado */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Estado *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Estado *</label>
           <select
             {...register('estado')}
             className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
@@ -788,22 +826,20 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
             }`}
           >
             <option value="">Selecione...</option>
-            {ESTADOS_BRASIL.map(estado => (
-              <option key={estado} value={estado}>{estado}</option>
+            {ESTADOS_BRASIL.map((estado) => (
+              <option key={estado} value={estado}>
+                {estado}
+              </option>
             ))}
           </select>
-          {errors.estado && (
-            <p className="mt-1 text-sm text-red-600">{errors.estado.message}</p>
-          )}
+          {errors.estado && <p className="mt-1 text-sm text-red-600">{errors.estado.message}</p>}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* Endereço */}
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Endereço *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Endereço *</label>
           <input
             {...register('endereco')}
             type="text"
@@ -819,9 +855,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
 
         {/* Número */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Número *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Número *</label>
           <input
             {...register('numero')}
             type="text"
@@ -830,16 +864,12 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
             }`}
             placeholder="123"
           />
-          {errors.numero && (
-            <p className="mt-1 text-sm text-red-600">{errors.numero.message}</p>
-          )}
+          {errors.numero && <p className="mt-1 text-sm text-red-600">{errors.numero.message}</p>}
         </div>
 
         {/* Complemento */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Complemento
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Complemento</label>
           <input
             {...register('complemento')}
             type="text"
@@ -852,9 +882,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Bairro */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Bairro
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Bairro</label>
           <input
             {...register('bairro')}
             type="text"
@@ -865,9 +893,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
 
         {/* País */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            País
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">País</label>
           <input
             {...register('pais')}
             type="text"
@@ -894,9 +920,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Nome do Responsável */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Nome Completo *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Nome Completo *</label>
           <div className="relative">
             <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -915,9 +939,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
 
         {/* Cargo */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Cargo *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Cargo *</label>
           <input
             {...register('cargoResponsavel')}
             type="text"
@@ -933,9 +955,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
 
         {/* Email do Responsável */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Email *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -954,9 +974,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
 
         {/* Telefone do Responsável */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Telefone
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Telefone</label>
           <div className="relative">
             <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Controller
@@ -995,53 +1013,43 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Plano */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Plano *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Plano *</label>
           <select
             {...register('plano')}
             className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
               errors.plano ? 'border-red-300 bg-red-50' : 'border-gray-300'
             }`}
           >
-            {PLANOS.map(plano => (
+            {PLANOS.map((plano) => (
               <option key={plano.value} value={plano.value}>
                 {plano.label} - R$ {plano.valorBase.toFixed(2)}
               </option>
             ))}
           </select>
-          {errors.plano && (
-            <p className="mt-1 text-sm text-red-600">{errors.plano.message}</p>
-          )}
+          {errors.plano && <p className="mt-1 text-sm text-red-600">{errors.plano.message}</p>}
         </div>
 
         {/* Status */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Status *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Status *</label>
           <select
             {...register('status')}
             className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
               errors.status ? 'border-red-300 bg-red-50' : 'border-gray-300'
             }`}
           >
-            {STATUS_OPTIONS.map(status => (
+            {STATUS_OPTIONS.map((status) => (
               <option key={status.value} value={status.value}>
                 {status.label}
               </option>
             ))}
           </select>
-          {errors.status && (
-            <p className="mt-1 text-sm text-red-600">{errors.status.message}</p>
-          )}
+          {errors.status && <p className="mt-1 text-sm text-red-600">{errors.status.message}</p>}
         </div>
 
         {/* Data Início */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Data de Início *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Data de Início *</label>
           <div className="relative">
             <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -1059,9 +1067,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
 
         {/* Data Fim */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Data de Fim *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Data de Fim *</label>
           <div className="relative">
             <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -1079,9 +1085,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
 
         {/* Valor Mensal */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Valor Mensal *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Valor Mensal *</label>
           <div className="relative">
             <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Controller
@@ -1108,9 +1112,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
 
         {/* Desconto */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Desconto (%)
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Desconto (%)</label>
           <div className="relative">
             <input
               {...register('desconto')}
@@ -1121,7 +1123,9 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
               placeholder="0.00"
             />
-            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">%</span>
+            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+              %
+            </span>
           </div>
         </div>
       </div>
@@ -1176,9 +1180,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
 
           {/* Limite de Storage */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Storage (GB) *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Storage (GB) *</label>
             <div className="relative">
               <input
                 {...register('limitStorage')}
@@ -1189,7 +1191,9 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
                 }`}
                 placeholder="5"
               />
-              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">GB</span>
+              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                GB
+              </span>
             </div>
             {errors.limitStorage && (
               <p className="mt-1 text-sm text-red-600">{errors.limitStorage.message}</p>
@@ -1206,8 +1210,11 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
       <div>
         <h4 className="text-lg font-semibold text-gray-900 mb-4">Módulos Disponíveis</h4>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {MODULOS_DISPONIVEIS.map(modulo => (
-            <label key={modulo} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+          {MODULOS_DISPONIVEIS.map((modulo) => (
+            <label
+              key={modulo}
+              className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
+            >
               <input
                 type="checkbox"
                 value={modulo}
@@ -1227,8 +1234,11 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
           <h4 className="text-lg font-semibold text-gray-900">Permissões de Acesso</h4>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {PERMISSOES_DISPONIVEIS.map(permissao => (
-            <label key={permissao} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+          {PERMISSOES_DISPONIVEIS.map((permissao) => (
+            <label
+              key={permissao}
+              className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
+            >
               <input
                 type="checkbox"
                 value={permissao}
@@ -1248,9 +1258,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
         <div className="grid grid-cols-1 gap-6">
           {/* Observações */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Observações
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Observações</label>
             <textarea
               {...register('observacoes')}
               rows={4}
@@ -1261,9 +1269,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
 
           {/* Upload de Contrato */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Contrato (PDF)
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Contrato (PDF)</label>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-[#159A9C] transition-colors">
               <input
                 type="file"
@@ -1274,12 +1280,8 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
               />
               <label htmlFor="contrato-upload" className="cursor-pointer">
                 <FileText className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-600">
-                  Clique para fazer upload do contrato
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  PDF até 10MB
-                </p>
+                <p className="text-sm text-gray-600">Clique para fazer upload do contrato</p>
+                <p className="text-xs text-gray-400 mt-1">PDF até 10MB</p>
               </label>
             </div>
           </div>
@@ -1304,7 +1306,9 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
                 {empresa ? 'Editar Empresa' : 'Nova Empresa'}
               </h2>
               <p className="text-white text-opacity-80 text-sm">
-                {empresa ? 'Atualize as informações da empresa' : 'Cadastre uma nova empresa no sistema'}
+                {empresa
+                  ? 'Atualize as informações da empresa'
+                  : 'Cadastre uma nova empresa no sistema'}
               </p>
             </div>
           </div>
@@ -1324,7 +1328,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
               { id: 'endereco', label: 'Endereço', icon: MapPin },
               { id: 'responsavel', label: 'Responsável', icon: User },
               { id: 'sistema', label: 'Sistema', icon: Settings },
-              { id: 'configuracao', label: 'Configuração', icon: Shield }
+              { id: 'configuracao', label: 'Configuração', icon: Shield },
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -1356,7 +1360,9 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
           <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
             <div className="flex items-center space-x-4 text-sm text-gray-600">
               <div className="flex items-center space-x-1">
-                <div className={`w-2 h-2 rounded-full ${isValid ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <div
+                  className={`w-2 h-2 rounded-full ${isValid ? 'bg-green-500' : 'bg-red-500'}`}
+                ></div>
                 <span>{isValid ? 'Formulário válido' : 'Preencha os campos obrigatórios'}</span>
               </div>
               {isDirty && (
@@ -1366,7 +1372,7 @@ export const ModalCadastroEmpresa: React.FC<ModalCadastroEmpresaProps> = ({
                 </div>
               )}
             </div>
-            
+
             <div className="flex items-center space-x-3">
               <button
                 type="button"

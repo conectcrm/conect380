@@ -13,7 +13,7 @@ POST http://localhost:3001/auth/login
 Content-Type: application/json
 
 {
-  "email": "admin@conectcrm.com",
+  "email": "admin@conectsuite.com.br",
   "password": "admin123"
 }
 ```

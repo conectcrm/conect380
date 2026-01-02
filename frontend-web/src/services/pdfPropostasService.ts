@@ -65,36 +65,103 @@ class PdfPropostasService {
   private readonly baseUrl = '/propostas/pdf';
 
   async gerarPdf(tipo: string, dados: DadosProposta): Promise<Blob> {
-    const response = await api.post(`${this.baseUrl}/gerar/${tipo}`, dados, {
-      responseType: 'blob',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    return response.data;
+    try {
+      console.log('🔍 [PDF] Gerando PDF tipo:', tipo);
+      console.log('🔍 [PDF] Dados:', {
+        ...dados,
+        empresa: { ...dados.empresa, logo: dados.empresa?.logo ? '(base64)' : undefined },
+      });
+
+      const response = await api.post(`${this.baseUrl}/gerar/${tipo}`, dados, {
+        responseType: 'blob',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('✅ [PDF] Resposta recebida');
+      console.log('📊 [PDF] Headers:', response.headers);
+      console.log('📊 [PDF] Status:', response.status);
+      console.log('📊 [PDF] Tamanho:', response.data.size, 'bytes');
+      console.log('📊 [PDF] Tipo:', response.data.type);
+
+      // Ler primeiros bytes para debug
+      const reader = new FileReader();
+      const firstBytesPromise = new Promise((resolve) => {
+        reader.onload = () => {
+          const arr = new Uint8Array(reader.result as ArrayBuffer);
+          const first20 = Array.from(arr.slice(0, 20));
+          console.log('📊 [PDF] Primeiros 20 bytes:', first20.join(', '));
+          const header = String.fromCharCode(...arr.slice(0, 5));
+          console.log('📊 [PDF] Cabeçalho:', header);
+          console.log('📊 [PDF] É PDF válido:', header === '%PDF-');
+          resolve(true);
+        };
+      });
+
+      const blob = response.data.slice(0, 100);
+      reader.readAsArrayBuffer(blob);
+      await firstBytesPromise;
+
+      // Validar se o blob é realmente um PDF
+      if (
+        response.data.type &&
+        !response.data.type.includes('pdf') &&
+        !response.data.type.includes('octet-stream')
+      ) {
+        console.error('❌ [PDF] Tipo inválido:', response.data.type);
+
+        // Tentar ler como texto para ver o erro
+        const text = await response.data.text();
+        console.error('❌ [PDF] Conteúdo:', text.substring(0, 500));
+        throw new Error(`Resposta não é um PDF: ${response.data.type}`);
+      }
+
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [PDF] Erro ao gerar PDF:', error);
+
+      // Se o erro vier como blob (erro do backend), tentar ler como texto
+      if (error.response?.data instanceof Blob) {
+        const text = await error.response.data.text();
+        console.error('❌ [PDF] Erro do backend:', text);
+        throw new Error(`Erro do backend: ${text}`);
+      }
+
+      throw error;
+    }
   }
 
   async downloadPdf(tipo: string, dados: DadosProposta): Promise<void> {
     try {
+      console.log('📥 [PDF] Iniciando download...');
       const blob = await this.gerarPdf(tipo, dados);
-      
+
+      console.log('📥 [PDF] Blob recebido:', blob.size, 'bytes, tipo:', blob.type);
+
+      // Validar tamanho mínimo (PDF vazio tem ~1KB)
+      if (blob.size < 100) {
+        throw new Error('PDF gerado está vazio ou corrompido');
+      }
+
       // Criar URL temporária para download
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `proposta-${dados.numeroProposta || 'draft'}.pdf`;
-      
+
       // Adicionar ao DOM, clicar e remover
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       // Limpar URL temporária
       window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Erro ao fazer download do PDF:', error);
-      throw new Error('Não foi possível gerar o PDF da proposta');
+
+      console.log('✅ [PDF] Download concluído com sucesso');
+    } catch (error: any) {
+      console.error('❌ [PDF] Erro ao fazer download:', error);
+      throw new Error(error.message || 'Não foi possível gerar o PDF da proposta');
     }
   }
 
@@ -104,7 +171,7 @@ class PdfPropostasService {
         'Content-Type': 'application/json',
       },
     });
-    
+
     return response.data;
   }
 
@@ -118,7 +185,8 @@ class PdfPropostasService {
     return {
       numeroProposta: `${new Date().getFullYear()}${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
       titulo: 'Sistema de Gestão Empresarial',
-      descricao: 'Desenvolvimento de sistema completo de gestão empresarial com módulos integrados.',
+      descricao:
+        'Desenvolvimento de sistema completo de gestão empresarial com módulos integrados.',
       status: 'draft',
       dataEmissao: new Date().toISOString().split('T')[0],
       dataValidade: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],

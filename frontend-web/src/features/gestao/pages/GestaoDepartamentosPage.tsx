@@ -32,6 +32,7 @@ import {
   CORES_DEPARTAMENTO,
   TIPOS_DISTRIBUICAO,
 } from '../../../types/departamentoTypes';
+import { getErrorMessage } from '../../../utils/errorHandling';
 
 // ========================================================================
 // COMPONENTE PRINCIPAL
@@ -41,7 +42,9 @@ interface GestaoDepartamentosPageProps {
   hideBackButton?: boolean;
 }
 
-const GestaoDepartamentosPage: React.FC<GestaoDepartamentosPageProps> = ({ hideBackButton = false }) => {
+const GestaoDepartamentosPage: React.FC<GestaoDepartamentosPageProps> = ({
+  hideBackButton = false,
+}) => {
   // ========================================================================
   // STATES
   // ========================================================================
@@ -115,7 +118,7 @@ const GestaoDepartamentosPage: React.FC<GestaoDepartamentosPageProps> = ({ hideB
       setNucleos(nucs || []);
     } catch (err: unknown) {
       console.error('Erro ao carregar dados:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao carregar dados');
+      setError(getErrorMessage(err, 'Erro ao carregar dados'));
       setDepartamentos([]);
       setNucleos([]);
     } finally {
@@ -138,7 +141,7 @@ const GestaoDepartamentosPage: React.FC<GestaoDepartamentosPageProps> = ({ hideB
       setDepartamentos(dados || []);
     } catch (err: unknown) {
       console.error('Erro ao filtrar:', err);
-      setError('Erro ao aplicar filtros');
+      setError(getErrorMessage(err, 'Erro ao aplicar filtros'));
     } finally {
       setLoading(false);
     }
@@ -231,12 +234,7 @@ const GestaoDepartamentosPage: React.FC<GestaoDepartamentosPageProps> = ({ hideB
       }, 1500);
     } catch (err: unknown) {
       console.error('Erro ao salvar:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      setError(normalizedMessage || fallbackMessage || 'Erro ao salvar departamento');
+      setError(getErrorMessage(err, 'Erro ao salvar departamento'));
     }
   };
 
@@ -252,7 +250,7 @@ const GestaoDepartamentosPage: React.FC<GestaoDepartamentosPageProps> = ({ hideB
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: unknown) {
       console.error('Erro ao excluir:', err);
-      setError('Erro ao excluir departamento');
+      setError(getErrorMessage(err, 'Erro ao excluir departamento'));
     }
   };
 
@@ -264,7 +262,7 @@ const GestaoDepartamentosPage: React.FC<GestaoDepartamentosPageProps> = ({ hideB
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: unknown) {
       console.error('Erro ao alterar status:', err);
-      setError('Erro ao alterar status');
+      setError(getErrorMessage(err, 'Erro ao alterar status'));
     }
   };
 
@@ -331,7 +329,7 @@ const GestaoDepartamentosPage: React.FC<GestaoDepartamentosPageProps> = ({ hideB
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: unknown) {
       console.error('Erro ao reordenar:', err);
-      setError('Erro ao salvar nova ordem');
+      setError(getErrorMessage(err, 'Erro ao salvar nova ordem'));
       // Reverter mudança em caso de erro
       await carregarDados();
     }
@@ -405,10 +403,7 @@ const GestaoDepartamentosPage: React.FC<GestaoDepartamentosPageProps> = ({ hideB
       {/* Barra de Ações */}
       <div className="bg-white rounded-lg shadow-sm border border-[#DEEFE7] p-6 mb-6">
         <div className="flex justify-end">
-          <Button
-            onClick={handleNovoClick}
-            className="bg-[#9333EA] hover:bg-purple-700 text-white"
-          >
+          <Button onClick={handleNovoClick} className="bg-[#9333EA] hover:bg-purple-700 text-white">
             <Plus className="h-4 w-4 mr-2" />
             Novo Departamento
           </Button>
@@ -441,8 +436,8 @@ const GestaoDepartamentosPage: React.FC<GestaoDepartamentosPageProps> = ({ hideB
         <GripVertical className="h-5 w-5 text-purple-600 flex-shrink-0" />
         <p className="text-sm text-purple-800">
           <strong>Dica:</strong> Arraste os cards usando o ícone{' '}
-          <GripVertical className="inline h-4 w-4" /> para reordenar os departamentos.
-          A nova ordem será salva automaticamente.
+          <GripVertical className="inline h-4 w-4" /> para reordenar os departamentos. A nova ordem
+          será salva automaticamente.
         </p>
       </div>
 
@@ -511,11 +506,7 @@ const GestaoDepartamentosPage: React.FC<GestaoDepartamentosPageProps> = ({ hideB
             <X className="h-4 w-4 mr-1" />
             Limpar Filtros
           </Button>
-          <Button
-            onClick={() => carregarDados()}
-            variant="outline"
-            className="text-sm"
-          >
+          <Button onClick={() => carregarDados()} variant="outline" className="text-sm">
             <RefreshCw className="h-4 w-4 mr-1" />
             Atualizar
           </Button>
@@ -618,9 +609,13 @@ const GestaoDepartamentosPage: React.FC<GestaoDepartamentosPageProps> = ({ hideB
                               </div>
                             </div>
 
-                            <h3 className="text-lg font-semibold text-gray-900 mb-1">{dept.nome}</h3>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                              {dept.nome}
+                            </h3>
                             {dept.descricao && (
-                              <p className="text-sm text-gray-600 line-clamp-2 mb-3">{dept.descricao}</p>
+                              <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+                                {dept.descricao}
+                              </p>
                             )}
 
                             <div className="flex flex-wrap gap-2">
@@ -656,7 +651,9 @@ const GestaoDepartamentosPage: React.FC<GestaoDepartamentosPageProps> = ({ hideB
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2 text-sm text-gray-600">
                                 <Users className="h-4 w-4" />
-                                <span>{numAtendentes} atendente{numAtendentes !== 1 ? 's' : ''}</span>
+                                <span>
+                                  {numAtendentes} atendente{numAtendentes !== 1 ? 's' : ''}
+                                </span>
                               </div>
                               <button
                                 onClick={() => handleGerenciarAgentes(dept)}
@@ -670,7 +667,9 @@ const GestaoDepartamentosPage: React.FC<GestaoDepartamentosPageProps> = ({ hideB
                             {dept.slaRespostaMinutos && (
                               <div className="flex items-center gap-2 text-sm text-gray-600">
                                 <Clock className="h-4 w-4" />
-                                <span>SLA: {dept.slaRespostaMinutos}min / {dept.slaResolucaoHoras}h</span>
+                                <span>
+                                  SLA: {dept.slaRespostaMinutos}min / {dept.slaResolucaoHoras}h
+                                </span>
                               </div>
                             )}
 
@@ -741,8 +740,8 @@ const GestaoDepartamentosPage: React.FC<GestaoDepartamentosPageProps> = ({ hideB
                   value={formData.nucleoId}
                   onChange={(e) => setFormData({ ...formData, nucleoId: e.target.value })}
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${!formData.nucleoId
-                    ? 'border-red-300 focus:ring-red-500 bg-red-50'
-                    : 'border-gray-300 focus:ring-purple-500'
+                      ? 'border-red-300 focus:ring-red-500 bg-red-50'
+                      : 'border-gray-300 focus:ring-purple-500'
                     }`}
                 >
                   <option value="">⚠️ Selecione um núcleo primeiro</option>
@@ -930,9 +929,9 @@ const GestaoDepartamentosPage: React.FC<GestaoDepartamentosPageProps> = ({ hideB
                     setSuccess('✅ Atendentes atualizados!');
                     await carregarDados();
                     setTimeout(() => setSuccess(null), 3000);
-                  } catch (err) {
+                  } catch (err: unknown) {
                     console.error(err);
-                    setError('Erro ao atualizar atendentes');
+                    setError(getErrorMessage(err, 'Erro ao atualizar atendentes'));
                   }
                 }}
                 multiSelect={true}
@@ -951,5 +950,3 @@ const GestaoDepartamentosPage: React.FC<GestaoDepartamentosPageProps> = ({ hideB
 };
 
 export default GestaoDepartamentosPage;
-
-

@@ -76,7 +76,7 @@ e2e/
 ```typescript
 // Usuários de teste
 test('exemplo', async ({ adminUser, atendenteUser }) => {
-  // adminUser = { email: 'admin@conectcrm.com', senha: 'admin123' }
+  // adminUser = { email: 'admin@conectsuite.com.br', senha: 'admin123' }
   // atendenteUser = { email: 'atendente@conectcrm.com', senha: 'atend123' }
 });
 
@@ -124,7 +124,7 @@ Para documentação detalhada, consulte:
 Crie `.env.test`:
 ```env
 API_URL=http://localhost:3001
-TEST_ADMIN_EMAIL=admin@conectcrm.com
+TEST_ADMIN_EMAIL=admin@conectsuite.com.br
 TEST_ADMIN_PASSWORD=admin123
 ```
 

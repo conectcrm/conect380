@@ -11,7 +11,7 @@ import {
   Shield,
   DollarSign,
   Calendar,
-  ArrowLeft
+  ArrowLeft,
 } from 'lucide-react';
 import { PlanosAdmin } from './PlanosAdmin';
 import { ModulosAdmin } from './ModulosAdmin';
@@ -31,29 +31,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
       valor: '4',
       icone: Package,
       cor: 'text-blue-600',
-      bgCor: 'bg-blue-100'
+      bgCor: 'bg-blue-100',
     },
     {
       titulo: 'Módulos Disponíveis',
       valor: '12',
       icone: Layers,
       cor: 'text-green-600',
-      bgCor: 'bg-green-100'
+      bgCor: 'bg-green-100',
     },
     {
       titulo: 'Empresas Assinantes',
       valor: '156',
       icone: Users,
       cor: 'text-purple-600',
-      bgCor: 'bg-purple-100'
+      bgCor: 'bg-purple-100',
     },
     {
       titulo: 'Receita Mensal',
       valor: 'R$ 47.850',
       icone: DollarSign,
       cor: 'text-yellow-600',
-      bgCor: 'bg-yellow-100'
-    }
+      bgCor: 'bg-yellow-100',
+    },
   ];
 
   const atividades = [
@@ -62,29 +62,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
       descricao: 'Novo plano "Enterprise Plus" criado',
       timestamp: '2 horas atrás',
       icone: Package,
-      cor: 'text-green-600'
+      cor: 'text-green-600',
     },
     {
       tipo: 'modulo_atualizado',
       descricao: 'Módulo "Relatórios" atualizado',
       timestamp: '4 horas atrás',
       icone: Layers,
-      cor: 'text-blue-600'
+      cor: 'text-blue-600',
     },
     {
       tipo: 'empresa_subscrita',
       descricao: 'Nova empresa assinou plano Professional',
       timestamp: '6 horas atrás',
       icone: Users,
-      cor: 'text-purple-600'
+      cor: 'text-purple-600',
     },
     {
       tipo: 'pagamento_recebido',
       descricao: 'Pagamento de R$ 299,90 processado',
       timestamp: '1 dia atrás',
       icone: DollarSign,
-      cor: 'text-yellow-600'
-    }
+      cor: 'text-yellow-600',
+    },
   ];
 
   const tabs = [
@@ -92,20 +92,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
       id: 'dashboard' as TabAtiva,
       label: 'Dashboard',
       icone: BarChart3,
-      descricao: 'Visão geral do sistema'
+      descricao: 'Visão geral do sistema',
     },
     {
       id: 'planos' as TabAtiva,
       label: 'Planos',
       icone: Package,
-      descricao: 'Gerenciar planos de assinatura'
+      descricao: 'Gerenciar planos de assinatura',
     },
     {
       id: 'modulos' as TabAtiva,
       label: 'Módulos',
       icone: Layers,
-      descricao: 'Configurar módulos do sistema'
-    }
+      descricao: 'Configurar módulos do sistema',
+    },
   ];
 
   const renderDashboard = () => (
@@ -211,12 +211,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
             {onBack && (
-              <Button
-                onClick={onBack}
-                variant="outline"
-                size="sm"
-                className="mr-2"
-              >
+              <Button onClick={onBack} variant="outline" size="sm" className="mr-2">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Voltar
               </Button>
@@ -239,16 +234,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                   onClick={() => setTabAtiva(tab.id)}
                   className={`
                     group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors
-                    ${tabAtiva === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ${
+                      tabAtiva === tab.id
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }
                   `}
                 >
-                  <tab.icone className={`
+                  <tab.icone
+                    className={`
                     -ml-0.5 mr-2 h-5 w-5 transition-colors
                     ${tabAtiva === tab.id ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'}
-                  `} />
+                  `}
+                  />
                   <span>{tab.label}</span>
                   {tabAtiva === tab.id && (
                     <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800">

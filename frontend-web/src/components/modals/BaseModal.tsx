@@ -47,7 +47,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
   footer,
   className = '',
   headerClassName = '',
-  contentClassName = ''
+  contentClassName = '',
 }) => {
   if (!isOpen) {
     return null;
@@ -61,15 +61,9 @@ export const BaseModal: React.FC<BaseModalProps> = ({
           <div className={ModalStyles.header.content}>
             <div>
               <h2 className={ModalStyles.header.title}>{title}</h2>
-              {subtitle && (
-                <p className={ModalStyles.header.subtitle}>{subtitle}</p>
-              )}
+              {subtitle && <p className={ModalStyles.header.subtitle}>{subtitle}</p>}
             </div>
-            <button
-              onClick={onClose}
-              className={ModalStyles.header.closeButton}
-              type="button"
-            >
+            <button onClick={onClose} className={ModalStyles.header.closeButton} type="button">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -85,38 +79,47 @@ export const BaseModal: React.FC<BaseModalProps> = ({
 
                   return (
                     <div key={step.id} className={ModalStyles.progressBar.step.container}>
-                      <div className={`
+                      <div
+                        className={`
                         ${ModalStyles.progressBar.step.icon.base}
-                        ${isConcluida
-                          ? ModalStyles.progressBar.step.icon.completed
-                          : isAtual
-                            ? ModalStyles.progressBar.step.icon.current
-                            : ModalStyles.progressBar.step.icon.pending
+                        ${
+                          isConcluida
+                            ? ModalStyles.progressBar.step.icon.completed
+                            : isAtual
+                              ? ModalStyles.progressBar.step.icon.current
+                              : ModalStyles.progressBar.step.icon.pending
                         }
-                      `}>
+                      `}
+                      >
                         {isConcluida ? (
                           <Check className="h-3 w-3" />
                         ) : (
                           <Icone className="h-3 w-3" />
                         )}
                       </div>
-                      <span className={`
+                      <span
+                        className={`
                         ${ModalStyles.progressBar.step.label.base}
-                        ${isAtual
-                          ? ModalStyles.progressBar.step.label.current
-                          : ModalStyles.progressBar.step.label.other
+                        ${
+                          isAtual
+                            ? ModalStyles.progressBar.step.label.current
+                            : ModalStyles.progressBar.step.label.other
                         }
-                      `}>
+                      `}
+                      >
                         {step.titulo}
                       </span>
                       {index < steps.length - 1 && (
-                        <div className={`
+                        <div
+                          className={`
                           ${ModalStyles.progressBar.step.separator.base}
-                          ${isConcluida
-                            ? ModalStyles.progressBar.step.separator.completed
-                            : ModalStyles.progressBar.step.separator.pending
+                          ${
+                            isConcluida
+                              ? ModalStyles.progressBar.step.separator.completed
+                              : ModalStyles.progressBar.step.separator.pending
                           }
-                        `} />
+                        `}
+                        />
                       )}
                     </div>
                   );
@@ -128,17 +131,11 @@ export const BaseModal: React.FC<BaseModalProps> = ({
 
         {/* Conteúdo do Modal */}
         <div className={ModalStyles.content.container}>
-          <div className={`${ModalStyles.content.wrapper} ${contentClassName}`}>
-            {children}
-          </div>
+          <div className={`${ModalStyles.content.wrapper} ${contentClassName}`}>{children}</div>
         </div>
 
         {/* Footer (se fornecido) */}
-        {footer && (
-          <div className={ModalStyles.footer.container}>
-            {footer}
-          </div>
-        )}
+        {footer && <div className={ModalStyles.footer.container}>{footer}</div>}
       </div>
     </div>
   );
@@ -160,7 +157,7 @@ export const FormField: React.FC<FormFieldProps> = ({
   error,
   required = false,
   children,
-  className = ''
+  className = '',
 }) => {
   return (
     <div className={className}>
@@ -278,20 +275,19 @@ export const ModalButton: React.FC<ModalButtonProps> = ({
   className = '',
   ...props
 }) => {
-  const baseClass = size === 'small'
-    ? `${ModalStyles.button[variant]} ${ModalStyles.button.small}`
-    : ModalStyles.button[variant];
+  const baseClass =
+    size === 'small'
+      ? `${ModalStyles.button[variant]} ${ModalStyles.button.small}`
+      : ModalStyles.button[variant];
 
   return (
-    <button
-      {...props}
-      disabled={disabled || loading}
-      className={`${baseClass} ${className}`}
-    >
+    <button {...props} disabled={disabled || loading} className={`${baseClass} ${className}`}>
       {loading ? (
         <div className={`${ModalStyles.utils.loading} h-4 w-4 border-current mr-2`}></div>
       ) : Icon ? (
-        <Icon className={`${size === 'small' ? ModalStyles.button.iconSmall : ModalStyles.button.icon} mr-1`} />
+        <Icon
+          className={`${size === 'small' ? ModalStyles.button.iconSmall : ModalStyles.button.icon} mr-1`}
+        />
       ) : null}
       {children}
     </button>
@@ -310,16 +306,13 @@ export const ModalCard: React.FC<ModalCardProps> = ({
   variant = 'default',
   children,
   className = '',
-  onClick
+  onClick,
 }) => {
   const cardClass = `${ModalStyles.card.base} ${ModalStyles.card[variant]}`;
   const clickableClass = onClick ? 'cursor-pointer hover:shadow-sm transition-all' : '';
 
   return (
-    <div
-      className={`${cardClass} ${clickableClass} ${className}`}
-      onClick={onClick}
-    >
+    <div className={`${cardClass} ${clickableClass} ${className}`} onClick={onClick}>
       {children}
     </div>
   );

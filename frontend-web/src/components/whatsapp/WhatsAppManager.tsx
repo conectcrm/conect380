@@ -13,7 +13,7 @@ import {
   Smartphone,
   Users,
   RefreshCw,
-  Zap
+  Zap,
 } from 'lucide-react';
 
 interface WhatsAppStatus {
@@ -39,7 +39,7 @@ interface WhatsAppChat {
 const WhatsAppManager: React.FC = () => {
   const [status, setStatus] = useState<WhatsAppStatus>({
     isConnected: false,
-    isAuthenticated: false
+    isAuthenticated: false,
   });
   const [loading, setLoading] = useState(false);
   const [chats, setChats] = useState<WhatsAppChat[]>([]);
@@ -57,8 +57,8 @@ const WhatsAppManager: React.FC = () => {
     try {
       const response = await fetch('/api/whatsapp/status', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
       });
 
       if (response.ok) {
@@ -79,8 +79,8 @@ const WhatsAppManager: React.FC = () => {
     try {
       const response = await fetch('/api/whatsapp/chats', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
       });
 
       if (response.ok) {
@@ -101,9 +101,9 @@ const WhatsAppManager: React.FC = () => {
       const response = await fetch('/api/whatsapp/initialize', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
       });
 
       if (response.ok) {
@@ -132,14 +132,14 @@ const WhatsAppManager: React.FC = () => {
       const response = await fetch('/api/whatsapp/disconnect', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
       });
 
       if (response.ok) {
         setStatus({
           isConnected: false,
-          isAuthenticated: false
+          isAuthenticated: false,
         });
         setChats([]);
         setShowQRCode(false);
@@ -163,12 +163,12 @@ const WhatsAppManager: React.FC = () => {
       const response = await fetch('/api/whatsapp/test', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phoneNumber: testNumber
-        })
+          phoneNumber: testNumber,
+        }),
       });
 
       const result = await response.json();
@@ -290,17 +290,16 @@ const WhatsAppManager: React.FC = () => {
                 </div>
 
                 <div className="inline-block p-4 bg-white rounded-lg shadow-sm">
-                  <img
-                    src={status.qrCode}
-                    alt="QR Code WhatsApp"
-                    className="w-48 h-48 mx-auto"
-                  />
+                  <img src={status.qrCode} alt="QR Code WhatsApp" className="w-48 h-48 mx-auto" />
                 </div>
 
                 <p className="text-sm text-gray-600 mt-4">
-                  1. Abra o WhatsApp no seu celular<br />
-                  2. Toque no menu (⋮) e selecione "Dispositivos conectados"<br />
-                  3. Toque em "Conectar um dispositivo"<br />
+                  1. Abra o WhatsApp no seu celular
+                  <br />
+                  2. Toque no menu (⋮) e selecione "Dispositivos conectados"
+                  <br />
+                  3. Toque em "Conectar um dispositivo"
+                  <br />
                   4. Escaneie este código QR
                 </p>
               </div>
@@ -314,10 +313,17 @@ const WhatsAppManager: React.FC = () => {
                   <span className="font-medium text-green-700">Conectado com sucesso!</span>
                 </div>
                 <div className="text-sm text-green-600">
-                  <p><strong>Nome:</strong> {status.clientInfo.pushname}</p>
-                  <p><strong>Número:</strong> +{status.clientInfo.wid?.user}</p>
+                  <p>
+                    <strong>Nome:</strong> {status.clientInfo.pushname}
+                  </p>
+                  <p>
+                    <strong>Número:</strong> +{status.clientInfo.wid?.user}
+                  </p>
                   {status.lastConnected && (
-                    <p><strong>Última conexão:</strong> {new Date(status.lastConnected).toLocaleString('pt-BR')}</p>
+                    <p>
+                      <strong>Última conexão:</strong>{' '}
+                      {new Date(status.lastConnected).toLocaleString('pt-BR')}
+                    </p>
                   )}
                 </div>
               </div>
@@ -400,9 +406,7 @@ const WhatsAppManager: React.FC = () => {
                       )}
                     </div>
                     {chat.lastMessage && (
-                      <p className="text-sm text-gray-600 truncate mt-1">
-                        {chat.lastMessage.body}
-                      </p>
+                      <p className="text-sm text-gray-600 truncate mt-1">{chat.lastMessage.body}</p>
                     )}
                   </div>
                   {chat.lastMessage && (
@@ -438,11 +442,21 @@ const WhatsAppManager: React.FC = () => {
 
               <h4 className="font-medium text-gray-900 mb-2 mt-4">🚀 Funcionalidades:</h4>
               <ul className="list-disc list-inside space-y-1 text-gray-600">
-                <li><strong>Envio automático</strong> de propostas via WhatsApp</li>
-                <li><strong>Anexo de PDFs</strong> com as propostas</li>
-                <li><strong>Mensagens personalizadas</strong> por cliente</li>
-                <li><strong>Validação automática</strong> de números</li>
-                <li><strong>Histórico</strong> de envios e status</li>
+                <li>
+                  <strong>Envio automático</strong> de propostas via WhatsApp
+                </li>
+                <li>
+                  <strong>Anexo de PDFs</strong> com as propostas
+                </li>
+                <li>
+                  <strong>Mensagens personalizadas</strong> por cliente
+                </li>
+                <li>
+                  <strong>Validação automática</strong> de números
+                </li>
+                <li>
+                  <strong>Histórico</strong> de envios e status
+                </li>
               </ul>
 
               <h4 className="font-medium text-gray-900 mb-2 mt-4">⚠️ Importante:</h4>

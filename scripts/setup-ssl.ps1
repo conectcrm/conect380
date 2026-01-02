@@ -19,7 +19,7 @@
     Pular instalação do Certbot (assumir que já está instalado)
 
 .EXAMPLE
-    .\setup-ssl.ps1 -Domain "conectcrm.com.br" -Email "admin@conectcrm.com.br"
+    .\setup-ssl.ps1 -Domain "conectcrm.com.br" -Email "admin@conectsuite.com.br"
 
 .EXAMPLE
     .\setup-ssl.ps1 -Domain "test.conectcrm.com.br" -Email "dev@conectcrm.com.br" -Staging

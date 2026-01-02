@@ -3,11 +3,11 @@ import ChatOmnichannel from '../omnichannel/ChatOmnichannel';
 
 /**
  * Página de Atendimento Integrado
- * 
+ *
  * Esta página encapsula o sistema completo de chat omnichannel
  * com layout responsivo que se adapta a qualquer tamanho de tela
  * sem necessidade de scroll horizontal ou vertical desnecessário.
- * 
+ *
  * Funcionalidades:
  * - Layout responsivo para Desktop/Tablet/Mobile
  * - Múltiplos canais (WhatsApp, Telegram, Email, Chat, Telefone)

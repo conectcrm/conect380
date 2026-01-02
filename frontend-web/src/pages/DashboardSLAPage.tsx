@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  TrendingUp, Clock, AlertTriangle, CheckCircle,
-  XCircle, RefreshCw, Filter, BarChart3
+  TrendingUp,
+  Clock,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  Filter,
+  BarChart3,
 } from 'lucide-react';
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
 import slaService, { SlaMetricas, SlaEventLog, SlaMetricasFilterDto } from '../services/slaService';
@@ -79,7 +85,9 @@ const DashboardSLAPage: React.FC = () => {
       violado: 'Violado',
     };
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[status as keyof typeof colors]}`}>
+      <span
+        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[status as keyof typeof colors]}`}
+      >
         {labels[status as keyof typeof labels] || status}
       </span>
     );
@@ -89,10 +97,7 @@ const DashboardSLAPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header com BackToNucleus */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusName="Atendimento"
-          nucleusPath="/nuclei/atendimento"
-        />
+        <BackToNucleus nucleusName="Atendimento" nucleusPath="/nuclei/atendimento" />
       </div>
 
       <div className="p-6">
@@ -112,10 +117,11 @@ const DashboardSLAPage: React.FC = () => {
               <div className="flex gap-3">
                 <button
                   onClick={() => setAutoRefresh(!autoRefresh)}
-                  className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium ${autoRefresh
+                  className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium ${
+                    autoRefresh
                       ? 'bg-[#159A9C] text-white hover:bg-[#0F7B7D]'
                       : 'bg-white text-[#002333] border border-[#B4BEC9] hover:bg-gray-50'
-                    }`}
+                  }`}
                 >
                   <RefreshCw className={`h-4 w-4 ${autoRefresh ? 'animate-spin' : ''}`} />
                   Auto-refresh {autoRefresh ? 'ON' : 'OFF'}
@@ -139,9 +145,7 @@ const DashboardSLAPage: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-medium text-[#002333] mb-1">
-                  Data Início
-                </label>
+                <label className="block text-sm font-medium text-[#002333] mb-1">Data Início</label>
                 <input
                   type="date"
                   value={filtros.dataInicio || ''}
@@ -150,9 +154,7 @@ const DashboardSLAPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#002333] mb-1">
-                  Data Fim
-                </label>
+                <label className="block text-sm font-medium text-[#002333] mb-1">Data Fim</label>
                 <input
                   type="date"
                   value={filtros.dataFim || ''}
@@ -161,9 +163,7 @@ const DashboardSLAPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#002333] mb-1">
-                  Prioridade
-                </label>
+                <label className="block text-sm font-medium text-[#002333] mb-1">Prioridade</label>
                 <select
                   value={filtros.prioridade || ''}
                   onChange={(e) => setFiltros({ ...filtros, prioridade: e.target.value as any })}
@@ -177,9 +177,7 @@ const DashboardSLAPage: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#002333] mb-1">
-                  Canal
-                </label>
+                <label className="block text-sm font-medium text-[#002333] mb-1">Canal</label>
                 <select
                   value={filtros.canal || ''}
                   onChange={(e) => setFiltros({ ...filtros, canal: e.target.value })}
@@ -246,8 +244,12 @@ const DashboardSLAPage: React.FC = () => {
                       </p>
                       <p className="mt-3 text-sm text-[#002333]/70">
                         {(metricas?.totalTickets ?? 0) > 0
-                          ? (((metricas?.ticketsEmRisco ?? 0) / (metricas?.totalTickets ?? 1)) * 100).toFixed(1)
-                          : '0.0'}% do total
+                          ? (
+                              ((metricas?.ticketsEmRisco ?? 0) / (metricas?.totalTickets ?? 1)) *
+                              100
+                            ).toFixed(1)
+                          : '0.0'}
+                        % do total
                       </p>
                     </div>
                     <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
@@ -267,8 +269,12 @@ const DashboardSLAPage: React.FC = () => {
                       </p>
                       <p className="mt-3 text-sm text-[#002333]/70">
                         {(metricas?.totalTickets ?? 0) > 0
-                          ? (((metricas?.ticketsViolados ?? 0) / (metricas?.totalTickets ?? 1)) * 100).toFixed(1)
-                          : '0.0'}% do total
+                          ? (
+                              ((metricas?.ticketsViolados ?? 0) / (metricas?.totalTickets ?? 1)) *
+                              100
+                            ).toFixed(1)
+                          : '0.0'}
+                        % do total
                       </p>
                     </div>
                     <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center shadow-sm">
@@ -317,9 +323,7 @@ const DashboardSLAPage: React.FC = () => {
                             <span className="text-sm font-medium text-[#002333] capitalize">
                               {item.prioridade}
                             </span>
-                            <span className="text-sm text-[#002333]/70">
-                              {item.total} tickets
-                            </span>
+                            <span className="text-sm text-[#002333]/70">{item.total} tickets</span>
                           </div>
                           <div className="flex h-4 rounded-full overflow-hidden">
                             <div
@@ -376,9 +380,7 @@ const DashboardSLAPage: React.FC = () => {
                             <span className="text-sm font-medium text-[#002333] capitalize">
                               {item.canal || 'Sem canal'}
                             </span>
-                            <span className="text-sm text-[#002333]/70">
-                              {item.total} tickets
-                            </span>
+                            <span className="text-sm text-[#002333]/70">{item.total} tickets</span>
                           </div>
                           <div className="flex h-4 rounded-full overflow-hidden">
                             <div
@@ -451,14 +453,14 @@ const DashboardSLAPage: React.FC = () => {
                             <td className="px-4 py-3 text-sm text-[#002333]">
                               {alerta.ticketId.substring(0, 8)}
                             </td>
-                            <td className="px-4 py-3 text-sm">
-                              {badgeStatus(alerta.status)}
-                            </td>
+                            <td className="px-4 py-3 text-sm">{badgeStatus(alerta.status)}</td>
                             <td className="px-4 py-3 text-sm text-[#002333]">
                               {alerta.percentualUsado}%
                             </td>
                             <td className="px-4 py-3 text-sm text-[#002333]/70">
-                              {format(new Date(alerta.createdAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                              {format(new Date(alerta.createdAt), 'dd/MM/yyyy HH:mm', {
+                                locale: ptBR,
+                              })}
                             </td>
                           </tr>
                         ))}
@@ -504,9 +506,7 @@ const DashboardSLAPage: React.FC = () => {
                             <td className="px-4 py-3 text-sm text-[#002333]">
                               {violacao.ticketId.substring(0, 8)}
                             </td>
-                            <td className="px-4 py-3 text-sm">
-                              {badgeStatus(violacao.status)}
-                            </td>
+                            <td className="px-4 py-3 text-sm">{badgeStatus(violacao.status)}</td>
                             <td className="px-4 py-3 text-sm text-[#002333]">
                               {violacao.tempoResolucaoMinutos
                                 ? formatarTempo(violacao.tempoResolucaoMinutos)
@@ -518,7 +518,9 @@ const DashboardSLAPage: React.FC = () => {
                                 : '-'}
                             </td>
                             <td className="px-4 py-3 text-sm text-[#002333]/70">
-                              {format(new Date(violacao.createdAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                              {format(new Date(violacao.createdAt), 'dd/MM/yyyy HH:mm', {
+                                locale: ptBR,
+                              })}
                             </td>
                           </tr>
                         ))}

@@ -1,15 +1,15 @@
 /**
  * ⌨️ Hook para Atalhos de Teclado
- * 
+ *
  * Gerencia atalhos globais no ChatOmnichannel para agilizar atendimento.
- * 
+ *
  * Atalhos disponíveis:
  * - A: Assumir ticket (ABERTO → EM_ATENDIMENTO)
  * - G: Aguardar resposta (EM_ATENDIMENTO → AGUARDANDO)
  * - R: Resolver ticket (EM_ATENDIMENTO → RESOLVIDO)
  * - F: Fechar ticket (RESOLVIDO → FECHADO)
  * - Esc: Cancelar ação/fechar modal
- * 
+ *
  * Desabilita atalhos quando:
  * - Usuário está digitando (input/textarea focado)
  * - Modal está aberto
@@ -35,63 +35,64 @@ export const useKeyboardShortcuts = ({
   modalAberto = false,
   desabilitado = false,
 }: UseKeyboardShortcutsOptions) => {
-
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    // ❌ Não fazer nada se:
-    if (
-      desabilitado ||
-      modalAberto ||
-      !ticketSelecionado ||
-      // Usuário está digitando
-      event.target instanceof HTMLInputElement ||
-      event.target instanceof HTMLTextAreaElement ||
-      (event.target as any)?.contentEditable === 'true'
-    ) {
-      return;
-    }
-
-    const key = event.key.toLowerCase();
-    const statusAtual = ticketSelecionado.status;
-
-    // Prevenir comportamento padrão para teclas que usamos
-    const teclasMapeadas = ['a', 'g', 'r', 'f'];
-    if (teclasMapeadas.includes(key)) {
-      event.preventDefault();
-    }
-
-    // ⌨️ MAPEAMENTO DE ATALHOS
-
-    // A = Assumir (ABERTO → EM_ATENDIMENTO)
-    if (key === 'a' && statusAtual === 'aberto') {
-      console.log('🎮 Atalho [A] - Assumir ticket');
-      onMudarStatus('em_atendimento');
-      return;
-    }
-
-    // G = aGuardar resposta (EM_ATENDIMENTO → AGUARDANDO)
-    if (key === 'g' && statusAtual === 'em_atendimento') {
-      console.log('🎮 Atalho [G] - Aguardar resposta');
-      onMudarStatus('aguardando');
-      return;
-    }
-
-    // R = Resolver (EM_ATENDIMENTO/AGUARDANDO → RESOLVIDO)
-    if (key === 'r') {
-      if (statusAtual === 'em_atendimento' || statusAtual === 'aguardando') {
-        console.log('🎮 Atalho [R] - Resolver ticket');
-        onMudarStatus('resolvido');
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      // ❌ Não fazer nada se:
+      if (
+        desabilitado ||
+        modalAberto ||
+        !ticketSelecionado ||
+        // Usuário está digitando
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement ||
+        (event.target as any)?.contentEditable === 'true'
+      ) {
         return;
       }
-    }
 
-    // F = Fechar (RESOLVIDO → FECHADO)
-    if (key === 'f' && statusAtual === 'resolvido') {
-      console.log('🎮 Atalho [F] - Fechar ticket');
-      onMudarStatus('fechado');
-      return;
-    }
+      const key = event.key.toLowerCase();
+      const statusAtual = ticketSelecionado.status;
 
-  }, [ticketSelecionado, onMudarStatus, modalAberto, desabilitado]);
+      // Prevenir comportamento padrão para teclas que usamos
+      const teclasMapeadas = ['a', 'g', 'r', 'f'];
+      if (teclasMapeadas.includes(key)) {
+        event.preventDefault();
+      }
+
+      // ⌨️ MAPEAMENTO DE ATALHOS
+
+      // A = Assumir (ABERTO → EM_ATENDIMENTO)
+      if (key === 'a' && statusAtual === 'aberto') {
+        console.log('🎮 Atalho [A] - Assumir ticket');
+        onMudarStatus('em_atendimento');
+        return;
+      }
+
+      // G = aGuardar resposta (EM_ATENDIMENTO → AGUARDANDO)
+      if (key === 'g' && statusAtual === 'em_atendimento') {
+        console.log('🎮 Atalho [G] - Aguardar resposta');
+        onMudarStatus('aguardando');
+        return;
+      }
+
+      // R = Resolver (EM_ATENDIMENTO/AGUARDANDO → RESOLVIDO)
+      if (key === 'r') {
+        if (statusAtual === 'em_atendimento' || statusAtual === 'aguardando') {
+          console.log('🎮 Atalho [R] - Resolver ticket');
+          onMudarStatus('resolvido');
+          return;
+        }
+      }
+
+      // F = Fechar (RESOLVIDO → FECHADO)
+      if (key === 'f' && statusAtual === 'resolvido') {
+        console.log('🎮 Atalho [F] - Fechar ticket');
+        onMudarStatus('fechado');
+        return;
+      }
+    },
+    [ticketSelecionado, onMudarStatus, modalAberto, desabilitado],
+  );
 
   useEffect(() => {
     // Adicionar listener
@@ -134,7 +135,7 @@ export const useKeyboardShortcuts = ({
       disponivel: statusAtual === 'resolvido',
     });
 
-    return atalhos.filter(a => a.disponivel);
+    return atalhos.filter((a) => a.disponivel);
   }, [ticketSelecionado]);
 
   return {

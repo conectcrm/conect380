@@ -22,6 +22,7 @@ import { departamentoService } from '../../../services/departamentoService';
 import ModalGerenciarAgentesNucleo from '../../../components/atendimento/ModalGerenciarAgentesNucleo';
 import { ModalGerenciarDepartamentos } from '../../../components/atendimento/ModalGerenciarDepartamentos';
 import { ModalDepartamento } from '../../../components/atendimento/ModalDepartamento';
+import { getErrorMessage } from '../../../utils/errorHandling';
 
 interface NucleoExpanded extends Nucleo {
   departamentos?: any[];
@@ -102,18 +103,13 @@ const GestaoNucleosPage: React.FC = () => {
               atendentes: nucleo.atendentesIds || [],
             };
           }
-        })
+        }),
       );
 
       setNucleos(nucleosComDados);
     } catch (err: unknown) {
       console.error('Erro ao carregar núcleos:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      setError(normalizedMessage || fallbackMessage || 'Erro ao carregar núcleos');
+      setError(getErrorMessage(err, 'Erro ao carregar núcleos'));
       setNucleos([]);
     } finally {
       setLoading(false);
@@ -121,7 +117,7 @@ const GestaoNucleosPage: React.FC = () => {
   };
 
   const toggleNucleoExpansao = (nucleoId: string) => {
-    setExpandedNucleos(prev => {
+    setExpandedNucleos((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(nucleoId)) {
         newSet.delete(nucleoId);
@@ -147,8 +143,7 @@ const GestaoNucleosPage: React.FC = () => {
         tipoDistribuicao: nucleo.tipoDistribuicao ?? 'round_robin',
         slaRespostaMinutos: nucleo.slaRespostaMinutos ?? undefined,
         slaResolucaoHoras: nucleo.slaResolucaoHoras ?? undefined,
-        capacidadeMaxima:
-          nucleo.capacidadeMaxima ?? nucleo.capacidadeMaximaTickets ?? 50,
+        capacidadeMaxima: nucleo.capacidadeMaxima ?? nucleo.capacidadeMaximaTickets ?? 50,
         mensagemBoasVindas: nucleo.mensagemBoasVindas ?? '',
       });
     } else {
@@ -185,12 +180,7 @@ const GestaoNucleosPage: React.FC = () => {
       carregarNucleos();
     } catch (err: unknown) {
       console.error('Erro ao salvar núcleo:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      setError(normalizedMessage || fallbackMessage || 'Erro ao salvar núcleo');
+      setError(getErrorMessage(err, 'Erro ao salvar núcleo'));
     }
   };
 
@@ -205,12 +195,7 @@ const GestaoNucleosPage: React.FC = () => {
       carregarNucleos();
     } catch (err: unknown) {
       console.error('Erro ao deletar núcleo:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      setError(normalizedMessage || fallbackMessage || 'Erro ao deletar núcleo');
+      setError(getErrorMessage(err, 'Erro ao deletar núcleo'));
     }
   };
 
@@ -260,12 +245,7 @@ const GestaoNucleosPage: React.FC = () => {
       carregarNucleos();
     } catch (err: unknown) {
       console.error('Erro ao deletar departamento:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      setError(normalizedMessage || fallbackMessage || 'Erro ao deletar departamento');
+      setError(getErrorMessage(err, 'Erro ao deletar departamento'));
     }
   };
 
@@ -280,7 +260,7 @@ const GestaoNucleosPage: React.FC = () => {
 
     try {
       setError(null);
-      const atendentesAtualizados = (nucleo.atendentesIds || []).filter(id => id !== atendenteId);
+      const atendentesAtualizados = (nucleo.atendentesIds || []).filter((id) => id !== atendenteId);
 
       await nucleoService.atualizar(nucleo.id, {
         atendentesIds: atendentesAtualizados,
@@ -289,12 +269,7 @@ const GestaoNucleosPage: React.FC = () => {
       carregarNucleos();
     } catch (err: unknown) {
       console.error('Erro ao remover atendente:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      setError(normalizedMessage || fallbackMessage || 'Erro ao remover atendente');
+      setError(getErrorMessage(err, 'Erro ao remover atendente'));
     }
   };
 
@@ -330,8 +305,18 @@ const GestaoNucleosPage: React.FC = () => {
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
               <div className="flex-shrink-0">
-                <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg
+                  className="h-6 w-6 text-blue-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
                 </svg>
               </div>
               <div className="flex-1">
@@ -339,9 +324,10 @@ const GestaoNucleosPage: React.FC = () => {
                   📱 Como funciona o menu do WhatsApp?
                 </h3>
                 <p className="text-sm text-blue-800">
-                  Os núcleos com <strong>"Visível no Bot"</strong> ativado aparecem automaticamente como opções no menu inicial do WhatsApp.
-                  A ordem é definida pelo campo <strong>"Prioridade"</strong> (menor número = aparece primeiro).
-                  O bot adiciona automaticamente a opção "❌ Digite SAIR para cancelar".
+                  Os núcleos com <strong>"Visível no Bot"</strong> ativado aparecem automaticamente
+                  como opções no menu inicial do WhatsApp. A ordem é definida pelo campo{' '}
+                  <strong>"Prioridade"</strong> (menor número = aparece primeiro). O bot adiciona
+                  automaticamente a opção "❌ Digite SAIR para cancelar".
                 </p>
               </div>
             </div>
@@ -372,11 +358,11 @@ const GestaoNucleosPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
-                  value={filtros.ativo === undefined ? 'todos' : filtros.ativo ? 'ativo' : 'inativo'}
+                  value={
+                    filtros.ativo === undefined ? 'todos' : filtros.ativo ? 'ativo' : 'inativo'
+                  }
                   onChange={(e) => {
                     const value = e.target.value;
                     setFiltros({
@@ -479,8 +465,18 @@ const GestaoNucleosPage: React.FC = () => {
                               </h3>
                               {nucleo.visivelNoBot && (
                                 <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800 border border-green-200">
-                                  <svg className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  <svg
+                                    className="h-3 w-3 mr-1"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                    />
                                   </svg>
                                   Visível WhatsApp
                                 </span>
@@ -500,8 +496,8 @@ const GestaoNucleosPage: React.FC = () => {
                               </span>
                               <span
                                 className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${nucleo.ativo
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-gray-100 text-gray-600'
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-gray-100 text-gray-600'
                                   }`}
                               >
                                 {nucleo.ativo ? '✓ Ativo' : '✗ Inativo'}
@@ -515,7 +511,9 @@ const GestaoNucleosPage: React.FC = () => {
                             <div className="flex items-center gap-4 mt-3">
                               <div className="flex items-center gap-1.5 text-sm">
                                 <Building2 className="h-4 w-4 text-gray-400" />
-                                <span className="font-medium text-gray-700">{numDepartamentos}</span>
+                                <span className="font-medium text-gray-700">
+                                  {numDepartamentos}
+                                </span>
                                 <span className="text-gray-500">
                                   {numDepartamentos === 1 ? 'departamento' : 'departamentos'}
                                 </span>
@@ -607,17 +605,21 @@ const GestaoNucleosPage: React.FC = () => {
                                       {dept.nome?.charAt(0).toUpperCase()}
                                     </div>
                                     <div>
-                                      <p className="text-sm font-medium text-gray-900">{dept.nome}</p>
+                                      <p className="text-sm font-medium text-gray-900">
+                                        {dept.nome}
+                                      </p>
                                       {dept.descricao && (
-                                        <p className="text-xs text-gray-500 line-clamp-1">{dept.descricao}</p>
+                                        <p className="text-xs text-gray-500 line-clamp-1">
+                                          {dept.descricao}
+                                        </p>
                                       )}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <span
                                       className={`px-2 py-0.5 text-xs font-medium rounded ${dept.ativo
-                                        ? 'bg-green-100 text-green-700'
-                                        : 'bg-gray-100 text-gray-600'
+                                          ? 'bg-green-100 text-green-700'
+                                          : 'bg-gray-100 text-gray-600'
                                         }`}
                                     >
                                       {dept.ativo ? 'Ativo' : 'Inativo'}
@@ -726,8 +728,8 @@ const GestaoNucleosPage: React.FC = () => {
                             ) : (
                               <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
                                 <p className="text-xs text-yellow-800">
-                                  ⚠️ <strong>Atenção:</strong> Este núcleo não tem departamentos nem atendentes.
-                                  Tickets criados ficarão na fila manual.
+                                  ⚠️ <strong>Atenção:</strong> Este núcleo não tem departamentos nem
+                                  atendentes. Tickets criados ficarão na fila manual.
                                 </p>
                               </div>
                             )}
@@ -765,9 +767,7 @@ const GestaoNucleosPage: React.FC = () => {
               <div className="p-6 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nome *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
                     <input
                       type="text"
                       value={formData.nome}
@@ -777,9 +777,7 @@ const GestaoNucleosPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Código *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Código *</label>
                     <input
                       type="text"
                       value={formData.codigo}
@@ -793,9 +791,7 @@ const GestaoNucleosPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Descrição
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
                   <textarea
                     value={formData.descricao}
                     onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
@@ -837,8 +833,7 @@ const GestaoNucleosPage: React.FC = () => {
                       onChange={(e) =>
                         setFormData({
                           ...formData,
-                          prioridade:
-                            e.target.value === '' ? undefined : Number(e.target.value),
+                          prioridade: e.target.value === '' ? undefined : Number(e.target.value),
                         })
                       }
                       placeholder="Ex: 1 (primeiro), 2 (segundo)..."
@@ -908,9 +903,7 @@ const GestaoNucleosPage: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Cor
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cor</label>
                     <input
                       type="color"
                       value={formData.cor}
@@ -920,9 +913,7 @@ const GestaoNucleosPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Ícone
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ícone</label>
                     <input
                       type="text"
                       value={formData.icone}
@@ -957,9 +948,7 @@ const GestaoNucleosPage: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, ativo: e.target.checked })}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
-                  <label className="ml-2 block text-sm text-gray-900">
-                    Núcleo Ativo
-                  </label>
+                  <label className="ml-2 block text-sm text-gray-900">Núcleo Ativo</label>
                 </div>
 
                 <div className="flex items-start p-4 bg-green-50 border border-green-200 rounded-lg">
@@ -974,8 +963,9 @@ const GestaoNucleosPage: React.FC = () => {
                       📱 Visível no Menu do WhatsApp
                     </label>
                     <p className="text-xs text-gray-600 mt-1">
-                      Quando ativado, este núcleo aparece como opção no menu inicial que o bot envia aos clientes no WhatsApp.
-                      Use o campo "Prioridade" para definir a ordem (menor = aparece primeiro).
+                      Quando ativado, este núcleo aparece como opção no menu inicial que o bot envia
+                      aos clientes no WhatsApp. Use o campo "Prioridade" para definir a ordem (menor
+                      = aparece primeiro).
                     </p>
                   </div>
                 </div>

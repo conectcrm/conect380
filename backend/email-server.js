@@ -2,6 +2,7 @@
  * Servidor de E-mail - ConectCRM Backend
  * Processa envio de e-mails reais usando Nodemailer
  * Suporte para Gmail SMTP, SendGrid, AWS SES, e SMTP customizado
+ * LEGADO: pipeline oficial de e-mails está na fila `notifications` (send-email). Evitar uso deste servidor salvo se migrar para fila.
  */
 
 // Carregar variáveis de ambiente

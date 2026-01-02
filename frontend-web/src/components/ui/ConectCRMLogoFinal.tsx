@@ -9,7 +9,7 @@ interface ConectCRMLogoFinalProps {
 const ConectCRMLogoFinal: React.FC<ConectCRMLogoFinalProps> = ({
   size = 'md',
   variant = 'full',
-  className = ''
+  className = '',
 }) => {
   const sizes = {
     xs: 'h-6',
@@ -17,7 +17,7 @@ const ConectCRMLogoFinal: React.FC<ConectCRMLogoFinalProps> = ({
     md: 'h-10',
     lg: 'h-12',
     xl: 'h-16',
-    '2xl': 'h-20'
+    '2xl': 'h-20',
   };
 
   const iconSize = {
@@ -26,7 +26,7 @@ const ConectCRMLogoFinal: React.FC<ConectCRMLogoFinalProps> = ({
     md: 40,
     lg: 48,
     xl: 64,
-    '2xl': 80
+    '2xl': 80,
   };
 
   const textSizes = {
@@ -35,7 +35,7 @@ const ConectCRMLogoFinal: React.FC<ConectCRMLogoFinalProps> = ({
     md: 'text-xl',
     lg: 'text-2xl',
     xl: 'text-3xl',
-    '2xl': 'text-4xl'
+    '2xl': 'text-4xl',
   };
 
   if (variant === 'icon') {
@@ -119,10 +119,14 @@ const ConectCRMLogoFinal: React.FC<ConectCRMLogoFinalProps> = ({
     return (
       <div className={`inline-flex items-center ${className}`}>
         <div className="flex flex-col">
-          <span className={`font-black ${textSizes[size]} text-[#002333] leading-tight tracking-wider uppercase`}>
+          <span
+            className={`font-black ${textSizes[size]} text-[#002333] leading-tight tracking-wider uppercase`}
+          >
             CONECT
           </span>
-          <span className={`font-bold ${textSizes[size]} text-[#159A9C] leading-tight tracking-wide -mt-1`}>
+          <span
+            className={`font-bold ${textSizes[size]} text-[#159A9C] leading-tight tracking-wide -mt-1`}
+          >
             CRM
           </span>
         </div>
@@ -206,10 +210,14 @@ const ConectCRMLogoFinal: React.FC<ConectCRMLogoFinalProps> = ({
 
       {/* Texto */}
       <div className="flex flex-col">
-        <span className={`font-black ${textSizes[size]} text-[#002333] leading-tight tracking-wider uppercase`}>
+        <span
+          className={`font-black ${textSizes[size]} text-[#002333] leading-tight tracking-wider uppercase`}
+        >
           CONECT
         </span>
-        <span className={`font-bold ${textSizes[size]} text-[#159A9C] leading-tight tracking-wide -mt-1`}>
+        <span
+          className={`font-bold ${textSizes[size]} text-[#159A9C] leading-tight tracking-wide -mt-1`}
+        >
           CRM
         </span>
       </div>

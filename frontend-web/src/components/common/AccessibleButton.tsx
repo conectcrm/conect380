@@ -43,7 +43,7 @@ export const AccessibleButton = forwardRef<HTMLButtonElement, AccessibleButtonPr
       'aria-label': ariaLabel,
       ...props
     },
-    ref
+    ref,
   ) => {
     const { announceToScreenReader } = useAccessibility({ announceChanges: true });
     const buttonId = React.useId();
@@ -98,11 +98,7 @@ export const AccessibleButton = forwardRef<HTMLButtonElement, AccessibleButtonPr
         {/* Loading State */}
         {loading && (
           <>
-            <span
-              id={`${buttonId}-loading`}
-              className="sr-only"
-              aria-live="polite"
-            >
+            <span id={`${buttonId}-loading`} className="sr-only" aria-live="polite">
               {loadingText}
             </span>
             <div
@@ -149,7 +145,7 @@ export const AccessibleButton = forwardRef<HTMLButtonElement, AccessibleButtonPr
         </span>
       </button>
     );
-  }
+  },
 );
 
 AccessibleButton.displayName = 'AccessibleButton';

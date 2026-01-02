@@ -25,7 +25,7 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
   isOpen,
   onClose,
   onConfirm,
-  ticketAtual
+  ticketAtual,
 }) => {
   const { currentPalette } = useTheme();
 
@@ -41,7 +41,7 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
     { value: 'sem_resposta', label: 'Cliente Sem Resposta', icon: '⏰', cor: '#6B7280' },
     { value: 'duplicado', label: 'Atendimento Duplicado', icon: '📋', cor: '#6B7280' },
     { value: 'spam', label: 'Spam/Inválido', icon: '🗑️', cor: '#EF4444' },
-    { value: 'outro', label: 'Outro Motivo', icon: '📝', cor: '#8B5CF6' }
+    { value: 'outro', label: 'Outro Motivo', icon: '📝', cor: '#8B5CF6' },
   ];
 
   const handleConfirmar = () => {
@@ -60,7 +60,7 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
       observacoes: observacoes || undefined,
       criarFollowUp,
       dataFollowUp: criarFollowUp && dataFollowUp ? new Date(dataFollowUp) : undefined,
-      solicitarAvaliacao
+      solicitarAvaliacao,
     };
 
     onConfirm(dados);
@@ -79,7 +79,7 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
 
   if (!isOpen) return null;
 
-  const motivoSelecionado = motivosEncerramento.find(m => m.value === motivo);
+  const motivoSelecionado = motivosEncerramento.find((m) => m.value === motivo);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -97,9 +97,7 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
               <CheckCircle className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
-                Encerrar Atendimento
-              </h2>
+              <h2 className="text-xl font-semibold text-gray-900">Encerrar Atendimento</h2>
               {ticketAtual && (
                 <p className="text-sm text-gray-500">
                   {ticketAtual.contato.nome} {ticketAtual.assunto && `• ${ticketAtual.assunto}`}
@@ -128,13 +126,14 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
                   <button
                     key={m.value}
                     onClick={() => setMotivo(m.value)}
-                    className={`p-4 rounded-lg border-2 transition-all text-left ${motivo === m.value
-                      ? 'border-current shadow-md scale-105'
-                      : 'border-gray-200 hover:border-gray-300'
-                      }`}
+                    className={`p-4 rounded-lg border-2 transition-all text-left ${
+                      motivo === m.value
+                        ? 'border-current shadow-md scale-105'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
                     style={{
                       borderColor: motivo === m.value ? m.cor : undefined,
-                      backgroundColor: motivo === m.value ? `${m.cor}10` : undefined
+                      backgroundColor: motivo === m.value ? `${m.cor}10` : undefined,
                     }}
                   >
                     <div className="flex items-center gap-2 mb-1">
@@ -180,13 +179,18 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
                     checked={criarFollowUp}
                     onChange={(e) => setCriarFollowUp(e.target.checked)}
                     className="mt-1 w-4 h-4 rounded border-gray-300 focus:ring-2 focus:ring-offset-0"
-                    style={{
-                      accentColor: currentPalette.colors.primary,
-                      '--tw-ring-color': currentPalette.colors.primary
-                    } as any}
+                    style={
+                      {
+                        accentColor: currentPalette.colors.primary,
+                        '--tw-ring-color': currentPalette.colors.primary,
+                      } as any
+                    }
                   />
                   <div className="flex-1">
-                    <label htmlFor="followup" className="text-sm font-medium text-gray-700 cursor-pointer flex items-center gap-2">
+                    <label
+                      htmlFor="followup"
+                      className="text-sm font-medium text-gray-700 cursor-pointer flex items-center gap-2"
+                    >
                       <Calendar className="w-4 h-4" />
                       Criar tarefa de follow-up
                     </label>
@@ -222,13 +226,18 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
                     checked={solicitarAvaliacao}
                     onChange={(e) => setSolicitarAvaliacao(e.target.checked)}
                     className="mt-1 w-4 h-4 rounded border-gray-300 focus:ring-2 focus:ring-offset-0"
-                    style={{
-                      accentColor: currentPalette.colors.primary,
-                      '--tw-ring-color': currentPalette.colors.primary
-                    } as any}
+                    style={
+                      {
+                        accentColor: currentPalette.colors.primary,
+                        '--tw-ring-color': currentPalette.colors.primary,
+                      } as any
+                    }
                   />
                   <div className="flex-1">
-                    <label htmlFor="avaliacao" className="text-sm font-medium text-gray-700 cursor-pointer flex items-center gap-2">
+                    <label
+                      htmlFor="avaliacao"
+                      className="text-sm font-medium text-gray-700 cursor-pointer flex items-center gap-2"
+                    >
                       ⭐ Solicitar avaliação do atendimento
                     </label>
                     <p className="text-xs text-gray-500 mt-1">
@@ -246,7 +255,8 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
                 <div className="text-sm text-green-800">
                   <p className="font-medium mb-1">Atendimento Concluído!</p>
                   <p className="text-xs">
-                    O ticket será movido para "Resolvidos" e o cliente poderá reabrir caso necessário.
+                    O ticket será movido para "Resolvidos" e o cliente poderá reabrir caso
+                    necessário.
                   </p>
                 </div>
               </div>
@@ -256,8 +266,8 @@ export const EncerrarAtendimentoModal: React.FC<EncerrarAtendimentoModalProps> =
                 <div className="text-sm text-yellow-800">
                   <p className="font-medium mb-1">Atenção!</p>
                   <p className="text-xs">
-                    Ao encerrar este atendimento, ele será arquivado e não aparecerá mais na lista de ativos.
-                    Você poderá consultá-lo no histórico.
+                    Ao encerrar este atendimento, ele será arquivado e não aparecerá mais na lista
+                    de ativos. Você poderá consultá-lo no histórico.
                   </p>
                 </div>
               </div>

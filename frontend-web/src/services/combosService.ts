@@ -54,8 +54,8 @@ const combosMock: Combo[] = [
     nome: 'Pacote Startup Digital',
     descricao: 'Solução completa para startups - Software Web + Consultoria inicial',
     categoria: 'Pacote Startup',
-    precoOriginal: 899.00,
-    precoCombo: 750.00,
+    precoOriginal: 899.0,
+    precoCombo: 750.0,
     desconto: 16.6,
     status: 'ativo',
     dataCreacao: new Date('2024-01-15'),
@@ -66,37 +66,37 @@ const combosMock: Combo[] = [
         produto: {
           id: 'sw1',
           nome: 'Sistema Web Básico',
-          preco: 499.00,
+          preco: 499.0,
           categoria: 'Software',
           subcategoria: 'Sistema Web',
           tipo: 'Licença Básica',
           descricao: 'Sistema web básico com funcionalidades essenciais',
-          unidade: 'licença/mês'
+          unidade: 'licença/mês',
         },
-        quantidade: 1
+        quantidade: 1,
       },
       {
         produto: {
           id: 'cons1',
           nome: 'Consultoria Júnior - 8h',
-          preco: 400.00,
+          preco: 400.0,
           categoria: 'Consultoria',
           subcategoria: 'Gestão Empresarial',
           tipo: 'Consultor Júnior',
           descricao: 'Consultoria inicial para implementação',
-          unidade: 'hora'
+          unidade: 'hora',
         },
-        quantidade: 8
-      }
-    ]
+        quantidade: 8,
+      },
+    ],
   },
   {
     id: '2',
     nome: 'Pacote Empresarial Completo',
     descricao: 'Solução enterprise com múltiplas licenças, app mobile e treinamento',
     categoria: 'Pacote Enterprise',
-    precoOriginal: 1799.00,
-    precoCombo: 1499.00,
+    precoOriginal: 1799.0,
+    precoCombo: 1499.0,
     desconto: 16.7,
     status: 'ativo',
     dataCreacao: new Date('2024-02-01'),
@@ -107,50 +107,50 @@ const combosMock: Combo[] = [
         produto: {
           id: 'sw2',
           nome: 'Sistema Web Premium',
-          preco: 699.00,
+          preco: 699.0,
           categoria: 'Software',
           subcategoria: 'Sistema Web',
           tipo: 'Licença Premium',
           descricao: 'Sistema web premium com recursos avançados',
-          unidade: 'licença/mês'
+          unidade: 'licença/mês',
         },
-        quantidade: 2
+        quantidade: 2,
       },
       {
         produto: {
           id: 'sw3',
           nome: 'App Mobile',
-          preco: 389.00,
+          preco: 389.0,
           categoria: 'Software',
           subcategoria: 'App Mobile',
           tipo: 'Aplicativo',
           descricao: 'Aplicativo móvel nativo',
-          unidade: 'licença/mês'
+          unidade: 'licença/mês',
         },
-        quantidade: 1
+        quantidade: 1,
       },
       {
         produto: {
           id: 'trei1',
           nome: 'Treinamento Liderança',
-          preco: 1200.00,
+          preco: 1200.0,
           categoria: 'Treinamento',
           subcategoria: 'Liderança',
           tipo: 'Curso Avançado',
           descricao: 'Programa completo de liderança',
-          unidade: 'curso'
+          unidade: 'curso',
         },
-        quantidade: 1
-      }
-    ]
+        quantidade: 1,
+      },
+    ],
   },
   {
     id: '3',
     nome: 'Pacote E-commerce Plus',
     descricao: 'E-commerce completo com consultoria especializada em marketing digital',
     categoria: 'Pacote E-commerce',
-    precoOriginal: 979.00,
-    precoCombo: 850.00,
+    precoOriginal: 979.0,
+    precoCombo: 850.0,
     desconto: 13.2,
     status: 'ativo',
     dataCreacao: new Date('2024-03-01'),
@@ -161,58 +161,59 @@ const combosMock: Combo[] = [
         produto: {
           id: 'sw5',
           nome: 'E-commerce Avançado',
-          preco: 399.00,
+          preco: 399.0,
           categoria: 'Software',
           subcategoria: 'E-commerce',
           tipo: 'Loja Avançada',
           descricao: 'Plataforma e-commerce completa',
-          unidade: 'licença/mês'
+          unidade: 'licença/mês',
         },
-        quantidade: 1
+        quantidade: 1,
       },
       {
         produto: {
           id: 'cons3',
           nome: 'Consultoria Marketing Digital - 10h',
-          preco: 580.00,
+          preco: 580.0,
           categoria: 'Consultoria',
           subcategoria: 'Marketing Digital',
           tipo: 'Estratégia & Implementação',
           descricao: 'Consultoria especializada em marketing digital',
-          unidade: 'hora'
+          unidade: 'hora',
         },
-        quantidade: 10
-      }
-    ]
-  }
+        quantidade: 10,
+      },
+    ],
+  },
 ];
 
 // Simulação de API
 export const combosService = {
   // Listar todos os combos
   listarCombos: async (): Promise<Combo[]> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
     return combosMock;
   },
 
   // Buscar combo por ID
   buscarComboPorId: async (id: string): Promise<Combo | null> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return combosMock.find(combo => combo.id === id) || null;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return combosMock.find((combo) => combo.id === id) || null;
   },
 
   // Criar novo combo
   criarCombo: async (comboData: ComboFormData): Promise<Combo> => {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
     // Calcular preços
-    const precoOriginal = comboData.produtos.reduce((total, item) => 
-      total + (item.produto.preco * item.quantidade), 0
+    const precoOriginal = comboData.produtos.reduce(
+      (total, item) => total + item.produto.preco * item.quantidade,
+      0,
     );
-    
+
     let precoCombo: number;
     let desconto: number;
-    
+
     if (comboData.tipoDesconto === 'percentual' && comboData.descontoPercentual) {
       precoCombo = precoOriginal * (1 - comboData.descontoPercentual / 100);
       desconto = comboData.descontoPercentual;
@@ -239,7 +240,7 @@ export const combosService = {
       tags: comboData.tags,
       validadeInicio: comboData.validadeInicio,
       validadeFim: comboData.validadeFim,
-      condicoes: comboData.condicoes
+      condicoes: comboData.condicoes,
     };
 
     combosMock.push(novoCombo);
@@ -248,25 +249,26 @@ export const combosService = {
 
   // Atualizar combo
   atualizarCombo: async (id: string, comboData: Partial<ComboFormData>): Promise<Combo> => {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const index = combosMock.findIndex(combo => combo.id === id);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
+    const index = combosMock.findIndex((combo) => combo.id === id);
     if (index === -1) {
       throw new Error('Combo não encontrado');
     }
 
     const comboExistente = combosMock[index];
-    
+
     // Recalcular preços se produtos foram alterados
     let precoOriginal = comboExistente.precoOriginal;
     let precoCombo = comboExistente.precoCombo;
     let desconto = comboExistente.desconto;
-    
+
     if (comboData.produtos) {
-      precoOriginal = comboData.produtos.reduce((total, item) => 
-        total + (item.produto.preco * item.quantidade), 0
+      precoOriginal = comboData.produtos.reduce(
+        (total, item) => total + item.produto.preco * item.quantidade,
+        0,
       );
-      
+
       if (comboData.tipoDesconto === 'percentual' && comboData.descontoPercentual) {
         precoCombo = precoOriginal * (1 - comboData.descontoPercentual / 100);
         desconto = comboData.descontoPercentual;
@@ -282,7 +284,7 @@ export const combosService = {
       precoOriginal,
       precoCombo,
       desconto,
-      dataAtualizacao: new Date()
+      dataAtualizacao: new Date(),
     };
 
     combosMock[index] = comboAtualizado;
@@ -291,9 +293,9 @@ export const combosService = {
 
   // Excluir combo
   excluirCombo: async (id: string): Promise<boolean> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const index = combosMock.findIndex(combo => combo.id === id);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const index = combosMock.findIndex((combo) => combo.id === id);
     if (index === -1) {
       throw new Error('Combo não encontrado');
     }
@@ -310,38 +312,35 @@ export const combosService = {
     dataInicio?: Date;
     dataFim?: Date;
   }): Promise<Combo[]> => {
-    await new Promise(resolve => setTimeout(resolve, 400));
-    
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
     let resultado = [...combosMock];
 
     if (filtros.termo) {
       const termo = filtros.termo.toLowerCase();
-      resultado = resultado.filter(combo =>
-        combo.nome.toLowerCase().includes(termo) ||
-        combo.descricao.toLowerCase().includes(termo) ||
-        combo.categoria.toLowerCase().includes(termo) ||
-        combo.tags?.some(tag => tag.toLowerCase().includes(termo))
+      resultado = resultado.filter(
+        (combo) =>
+          combo.nome.toLowerCase().includes(termo) ||
+          combo.descricao.toLowerCase().includes(termo) ||
+          combo.categoria.toLowerCase().includes(termo) ||
+          combo.tags?.some((tag) => tag.toLowerCase().includes(termo)),
       );
     }
 
     if (filtros.categoria) {
-      resultado = resultado.filter(combo => combo.categoria === filtros.categoria);
+      resultado = resultado.filter((combo) => combo.categoria === filtros.categoria);
     }
 
     if (filtros.status) {
-      resultado = resultado.filter(combo => combo.status === filtros.status);
+      resultado = resultado.filter((combo) => combo.status === filtros.status);
     }
 
     if (filtros.dataInicio) {
-      resultado = resultado.filter(combo => 
-        combo.dataCreacao >= filtros.dataInicio!
-      );
+      resultado = resultado.filter((combo) => combo.dataCreacao >= filtros.dataInicio!);
     }
 
     if (filtros.dataFim) {
-      resultado = resultado.filter(combo => 
-        combo.dataCreacao <= filtros.dataFim!
-      );
+      resultado = resultado.filter((combo) => combo.dataCreacao <= filtros.dataFim!);
     }
 
     return resultado;
@@ -349,24 +348,24 @@ export const combosService = {
 
   // Obter estatísticas
   obterEstatisticas: async (): Promise<ComboEstatisticas> => {
-    await new Promise(resolve => setTimeout(resolve, 600));
-    
-    const combosAtivos = combosMock.filter(combo => combo.status === 'ativo');
-    
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    const combosAtivos = combosMock.filter((combo) => combo.status === 'ativo');
+
     return {
       totalCombos: combosMock.length,
       combosAtivos: combosAtivos.length,
       vendasMes: Math.floor(Math.random() * 50) + 10, // Simulado
       faturamentoMes: Math.floor(Math.random() * 50000) + 10000, // Simulado
-      combosPopulares: combosAtivos.slice(0, 3)
+      combosPopulares: combosAtivos.slice(0, 3),
     };
   },
 
   // Duplicar combo
   duplicarCombo: async (id: string): Promise<Combo> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const comboOriginal = combosMock.find(combo => combo.id === id);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const comboOriginal = combosMock.find((combo) => combo.id === id);
     if (!comboOriginal) {
       throw new Error('Combo não encontrado');
     }
@@ -377,7 +376,7 @@ export const combosService = {
       nome: `${comboOriginal.nome} (Cópia)`,
       status: 'rascunho',
       dataCreacao: new Date(),
-      dataAtualizacao: new Date()
+      dataAtualizacao: new Date(),
     };
 
     combosMock.push(comboDuplicado);
@@ -386,16 +385,16 @@ export const combosService = {
 
   // Ativar/Desativar combo
   alterarStatusCombo: async (id: string, novoStatus: 'ativo' | 'inativo'): Promise<Combo> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    const index = combosMock.findIndex(combo => combo.id === id);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const index = combosMock.findIndex((combo) => combo.id === id);
     if (index === -1) {
       throw new Error('Combo não encontrado');
     }
 
     combosMock[index].status = novoStatus;
     combosMock[index].dataAtualizacao = new Date();
-    
+
     return combosMock[index];
-  }
+  },
 };

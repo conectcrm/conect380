@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, CreditCard, DollarSign, Calendar, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import {
+  X,
+  Plus,
+  CreditCard,
+  DollarSign,
+  Calendar,
+  CheckCircle,
+  Clock,
+  AlertTriangle,
+} from 'lucide-react';
 import { Fatura, StatusPagamento } from '../../services/faturamentoService';
 
 interface Pagamento {
@@ -23,19 +32,20 @@ export default function ModalPagamentos({
   isOpen,
   onClose,
   fatura,
-  onRegistrarPagamento
+  onRegistrarPagamento,
 }: ModalPagamentosProps) {
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
   const [novoPagamento, setNovoPagamento] = useState({
     valor: 0,
     data: new Date().toISOString().split('T')[0],
     metodo: 'pix',
-    observacoes: ''
+    observacoes: '',
   });
   const [carregando, setCarregando] = useState(false);
 
-  const valorPago = pagamentos.reduce((total, p) =>
-    p.status === StatusPagamento.APROVADO ? total + p.valor : total, 0
+  const valorPago = pagamentos.reduce(
+    (total, p) => (p.status === StatusPagamento.APROVADO ? total + p.valor : total),
+    0,
   );
   const valorRestante = fatura.valorTotal - valorPago;
 
@@ -49,7 +59,7 @@ export default function ModalPagamentos({
     try {
       await onRegistrarPagamento({
         ...novoPagamento,
-        status: StatusPagamento.APROVADO
+        status: StatusPagamento.APROVADO,
       });
 
       // Resetar formulário
@@ -57,7 +67,7 @@ export default function ModalPagamentos({
         valor: 0,
         data: new Date().toISOString().split('T')[0],
         metodo: 'pix',
-        observacoes: ''
+        observacoes: '',
       });
     } catch (error) {
       console.error('Erro ao registrar pagamento:', error);
@@ -79,13 +89,11 @@ export default function ModalPagamentos({
               Pagamentos - Fatura #{fatura.numero}
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              Valor Total: R$ {fatura.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              Valor Total: R${' '}
+              {fatura.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
@@ -136,25 +144,39 @@ export default function ModalPagamentos({
             ) : (
               <div className="space-y-3">
                 {pagamentos.map((pagamento) => (
-                  <div key={pagamento.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div
+                    key={pagamento.id}
+                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                  >
                     <div className="flex items-center gap-4">
-                      <div className={`w-3 h-3 rounded-full ${pagamento.status === StatusPagamento.APROVADO ? 'bg-green-500' :
-                          pagamento.status === StatusPagamento.PENDENTE ? 'bg-yellow-500' :
-                            'bg-red-500'
-                        }`} />
+                      <div
+                        className={`w-3 h-3 rounded-full ${
+                          pagamento.status === StatusPagamento.APROVADO
+                            ? 'bg-green-500'
+                            : pagamento.status === StatusPagamento.PENDENTE
+                              ? 'bg-yellow-500'
+                              : 'bg-red-500'
+                        }`}
+                      />
                       <div>
                         <p className="font-medium text-gray-900">
                           R$ {pagamento.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </p>
                         <p className="text-sm text-gray-600">
-                          {new Date(pagamento.data).toLocaleDateString('pt-BR')} • {pagamento.metodo.toUpperCase()}
+                          {new Date(pagamento.data).toLocaleDateString('pt-BR')} •{' '}
+                          {pagamento.metodo.toUpperCase()}
                         </p>
                       </div>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${pagamento.status === StatusPagamento.APROVADO ? 'bg-green-100 text-green-800' :
-                        pagamento.status === StatusPagamento.PENDENTE ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                      }`}>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        pagamento.status === StatusPagamento.APROVADO
+                          ? 'bg-green-100 text-green-800'
+                          : pagamento.status === StatusPagamento.PENDENTE
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-red-100 text-red-800'
+                      }`}
+                    >
                       {pagamento.status}
                     </span>
                   </div>
@@ -178,10 +200,12 @@ export default function ModalPagamentos({
                     step="0.01"
                     max={valorRestante}
                     value={novoPagamento.valor}
-                    onChange={(e) => setNovoPagamento(prev => ({
-                      ...prev,
-                      valor: parseFloat(e.target.value) || 0
-                    }))}
+                    onChange={(e) =>
+                      setNovoPagamento((prev) => ({
+                        ...prev,
+                        valor: parseFloat(e.target.value) || 0,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     placeholder="0,00"
                   />
@@ -197,10 +221,12 @@ export default function ModalPagamentos({
                   <input
                     type="date"
                     value={novoPagamento.data}
-                    onChange={(e) => setNovoPagamento(prev => ({
-                      ...prev,
-                      data: e.target.value
-                    }))}
+                    onChange={(e) =>
+                      setNovoPagamento((prev) => ({
+                        ...prev,
+                        data: e.target.value,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
                 </div>
@@ -211,10 +237,12 @@ export default function ModalPagamentos({
                   </label>
                   <select
                     value={novoPagamento.metodo}
-                    onChange={(e) => setNovoPagamento(prev => ({
-                      ...prev,
-                      metodo: e.target.value
-                    }))}
+                    onChange={(e) =>
+                      setNovoPagamento((prev) => ({
+                        ...prev,
+                        metodo: e.target.value,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   >
                     <option value="pix">PIX</option>
@@ -233,10 +261,12 @@ export default function ModalPagamentos({
                   <input
                     type="text"
                     value={novoPagamento.observacoes}
-                    onChange={(e) => setNovoPagamento(prev => ({
-                      ...prev,
-                      observacoes: e.target.value
-                    }))}
+                    onChange={(e) =>
+                      setNovoPagamento((prev) => ({
+                        ...prev,
+                        observacoes: e.target.value,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     placeholder="Observações do pagamento"
                   />

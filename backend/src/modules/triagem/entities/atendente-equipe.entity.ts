@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { User } from '../../users/user.entity';
 import { Equipe } from './equipe.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 /**
  * Tabela de relacionamento Many-to-Many entre Atendentes e Equipes
@@ -19,6 +20,13 @@ import { Equipe } from './equipe.entity';
 export class AtendenteEquipe {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column({ type: 'uuid', name: 'atendente_id' })
   atendenteId: string;

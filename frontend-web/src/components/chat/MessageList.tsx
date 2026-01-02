@@ -57,28 +57,27 @@ export function MessageList({ mensagens, ticketId }: MessageListProps) {
   };
 
   // Agrupar mensagens por data
-  const mensagensAgrupadas = mensagens.reduce((grupos, mensagem) => {
-    const data = new Date(mensagem.criadoEm);
-    const dataStr = formatarData(data);
+  const mensagensAgrupadas = mensagens.reduce(
+    (grupos, mensagem) => {
+      const data = new Date(mensagem.criadoEm);
+      const dataStr = formatarData(data);
 
-    if (!grupos[dataStr]) {
-      grupos[dataStr] = [];
-    }
+      if (!grupos[dataStr]) {
+        grupos[dataStr] = [];
+      }
 
-    grupos[dataStr].push(mensagem);
-    return grupos;
-  }, {} as Record<string, Mensagem[]>);
+      grupos[dataStr].push(mensagem);
+      return grupos;
+    },
+    {} as Record<string, Mensagem[]>,
+  );
 
   const renderMensagemConteudo = (mensagem: Mensagem) => {
     switch (mensagem.tipo) {
       case 'IMAGEM':
         return (
           <div className="max-w-xs">
-            <img
-              src={mensagem.conteudo}
-              alt="Imagem"
-              className="rounded-lg shadow-sm"
-            />
+            <img src={mensagem.conteudo} alt="Imagem" className="rounded-lg shadow-sm" />
           </div>
         );
       case 'AUDIO':
@@ -159,18 +158,18 @@ export function MessageList({ mensagens, ticketId }: MessageListProps) {
                       className={`flex ${isRecebida ? 'justify-start' : 'justify-end'}`}
                     >
                       <div
-                        className={`max-w-md px-4 py-2 rounded-lg shadow-sm ${isRecebida
-                          ? 'bg-white text-gray-900'
-                          : 'bg-blue-600 text-white'
-                          }`}
+                        className={`max-w-md px-4 py-2 rounded-lg shadow-sm ${
+                          isRecebida ? 'bg-white text-gray-900' : 'bg-blue-600 text-white'
+                        }`}
                       >
                         {/* Conteúdo da mensagem */}
                         {renderMensagemConteudo(mensagem)}
 
                         {/* Hora */}
                         <div
-                          className={`text-xs mt-1 ${isRecebida ? 'text-gray-400' : 'text-blue-100'
-                            }`}
+                          className={`text-xs mt-1 ${
+                            isRecebida ? 'text-gray-400' : 'text-blue-100'
+                          }`}
                         >
                           {formatarHora(mensagem.criadoEm)}
                         </div>

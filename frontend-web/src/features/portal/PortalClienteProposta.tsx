@@ -17,13 +17,16 @@ import {
   DollarSign,
   Package,
   Shield,
-  Clock
+  Clock,
 } from 'lucide-react';
 import { portalClienteService } from '../../services/portalClienteService';
 import { emailService } from '../../services/emailService';
 import { pdfPropostasService } from '../../services/pdfPropostasService';
 import { formatarTokenParaExibicao, validarTokenNumerico } from '../../utils/tokenUtils';
 import { StatusSyncIndicator } from './components/StatusSyncIndicator';
+import { API_BASE_URL } from '../../services/api';
+
+const PORTAL_API_BASE = `${API_BASE_URL}/api/portal`;
 
 interface PropostaPublica {
   id: string;
@@ -85,7 +88,7 @@ const PortalClienteProposta: React.FC = () => {
   const [aceiteRealizado, setAceiteRealizado] = useState(false);
   const [showConfirmReject, setShowConfirmReject] = useState(false);
   const [tempoVisualizacao, setTempoVisualizacao] = useState<number>(0);
-  const [acoes, setAcoes] = useState<Array<{ acao: string, timestamp: string }>>([]);
+  const [acoes, setAcoes] = useState<Array<{ acao: string; timestamp: string }>>([]);
 
   useEffect(() => {
     if (identificadorProposta) {
@@ -99,7 +102,7 @@ const PortalClienteProposta: React.FC = () => {
 
     if (proposta && proposta.status !== 'aprovada' && proposta.status !== 'rejeitada') {
       interval = setInterval(() => {
-        setTempoVisualizacao(prev => prev + 1);
+        setTempoVisualizacao((prev) => prev + 1);
       }, 1000);
     }
 
@@ -120,12 +123,13 @@ const PortalClienteProposta: React.FC = () => {
     const handleBeforeUnload = () => {
       registrarAcao('saida_pagina', {
         tempoVisualizacao: tempoVisualizacao,
-        scrollPosition: window.scrollY
+        scrollPosition: window.scrollY,
       });
     };
 
     const handleScroll = () => {
-      const scrollPercent = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100;
+      const scrollPercent =
+        (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100;
       if (scrollPercent > 50) {
         registrarAcao('scroll_50_porcento', { scrollPercent });
       }
@@ -161,15 +165,15 @@ const PortalClienteProposta: React.FC = () => {
     const acao = {
       acao: tipoAcao,
       timestamp: new Date().toISOString(),
-      dados
+      dados,
     };
 
     // Adicionar à lista local
-    setAcoes(prev => [...prev, acao]);
+    setAcoes((prev) => [...prev, acao]);
 
     try {
       // ✅ Enviar para backend via portal API
-      await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/portal/proposta/${tokenParaAceite}/acao`, {
+      await fetch(`${PORTAL_API_BASE}/proposta/${tokenParaAceite}/acao`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -182,8 +186,8 @@ const PortalClienteProposta: React.FC = () => {
           dados: dados || {
             tempoVisualizacao: tempoVisualizacao,
             resolucaoTela: `${window.screen.width}x${window.screen.height}`,
-            navegador: navigator.userAgent.split(' ')[0]
-          }
+            navegador: navigator.userAgent.split(' ')[0],
+          },
         }),
       });
 
@@ -231,7 +235,7 @@ const PortalClienteProposta: React.FC = () => {
 
         try {
           // Registrar via portal API para sincronização automática
-          await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/portal/proposta/${tokenParaAceite}/view`, {
+          await fetch(`${PORTAL_API_BASE}/proposta/${tokenParaAceite}/view`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -241,21 +245,19 @@ const PortalClienteProposta: React.FC = () => {
               userAgent: navigator.userAgent,
               timestamp: new Date().toISOString(),
               resolucaoTela: `${window.screen.width}x${window.screen.height}`,
-              referrer: document.referrer
+              referrer: document.referrer,
             }),
           });
 
           // Atualizar status local para "visualizada"
-          setProposta(prev => prev ? { ...prev, status: 'visualizada' } : null);
+          setProposta((prev) => (prev ? { ...prev, status: 'visualizada' } : null));
           console.log('✅ Status atualizado para "visualizada"');
-
         } catch (error) {
           console.warn('⚠️ Erro ao registrar visualização, continuando:', error);
           // Atualizar localmente mesmo se a API falhar
-          setProposta(prev => prev ? { ...prev, status: 'visualizada' } : null);
+          setProposta((prev) => (prev ? { ...prev, status: 'visualizada' } : null));
         }
       }
-
     } catch (error) {
       console.error('Erro ao carregar proposta:', error);
       setErro('Erro ao carregar a proposta. Tente novamente.');
@@ -275,7 +277,7 @@ const PortalClienteProposta: React.FC = () => {
       // ✅ Registrar ação de aceite
       await registrarAcao('aceite_iniciado', {
         valorProposta: proposta.valorTotal,
-        tempoVisualizacao: tempoVisualizacao
+        tempoVisualizacao: tempoVisualizacao,
       });
 
       // 1. Atualizar status via portal do cliente
@@ -285,12 +287,15 @@ const PortalClienteProposta: React.FC = () => {
       // ✅ Registrar conclusão do aceite
       await registrarAcao('aceite_concluido', {
         novoStatus: 'aprovada',
-        metodoPagamento: 'pendente'
+        metodoPagamento: 'pendente',
       });
 
       // 2. Tentar sincronizar com o CRM principal
       try {
-        const syncResult = await portalClienteService.sincronizarComCRM(identificadorProposta!, 'aprovada');
+        const syncResult = await portalClienteService.sincronizarComCRM(
+          identificadorProposta!,
+          'aprovada',
+        );
 
         if (syncResult.success) {
           console.log('✅ Status sincronizado com CRM principal');
@@ -318,14 +323,14 @@ const PortalClienteProposta: React.FC = () => {
       }
 
       // 5. Atualizar estado local - SEMPRE funciona
-      setProposta(prev => prev ? { ...prev, status: 'aprovada' } : null);
+      setProposta((prev) => (prev ? { ...prev, status: 'aprovada' } : null));
       setAceiteRealizado(true);
 
       // 6. Simular atualização no "CRM" local (localStorage)
       try {
         const propostas = JSON.parse(localStorage.getItem('propostas') || '[]');
-        const index = propostas.findIndex((p: any) =>
-          p.numero === identificadorProposta || p.id === identificadorProposta
+        const index = propostas.findIndex(
+          (p: any) => p.numero === identificadorProposta || p.id === identificadorProposta,
         );
 
         if (index >= 0) {
@@ -344,7 +349,7 @@ const PortalClienteProposta: React.FC = () => {
             valor: proposta.valorTotal,
             updatedAt: new Date().toISOString(),
             approvedViaPortal: true,
-            createdAt: proposta.dataEnvio || new Date().toISOString()
+            createdAt: proposta.dataEnvio || new Date().toISOString(),
           };
           propostas.push(novaProposta);
           localStorage.setItem('propostas', JSON.stringify(propostas));
@@ -355,7 +360,6 @@ const PortalClienteProposta: React.FC = () => {
       }
 
       console.log('🎉 Proposta aprovada com sucesso! Verifique o CRM principal.');
-
     } catch (error) {
       console.error('❌ Erro ao aceitar proposta:', error);
       setErro('Erro ao aceitar a proposta. Tente novamente.');
@@ -370,7 +374,7 @@ const PortalClienteProposta: React.FC = () => {
     // ✅ Registrar ação de rejeição iniciada
     await registrarAcao('rejeicao_iniciada', {
       valorProposta: proposta.valorTotal,
-      tempoVisualizacao: tempoVisualizacao
+      tempoVisualizacao: tempoVisualizacao,
     });
 
     setShowConfirmReject(true);
@@ -388,15 +392,14 @@ const PortalClienteProposta: React.FC = () => {
       // ✅ Registrar ação de rejeição concluída
       await registrarAcao('rejeicao_concluida', {
         novoStatus: 'rejeitada',
-        motivoRejeicao: 'cliente_rejeitou'
+        motivoRejeicao: 'cliente_rejeitou',
       });
 
       // Atualizar estado local
-      setProposta(prev => prev ? { ...prev, status: 'rejeitada' } : null);
+      setProposta((prev) => (prev ? { ...prev, status: 'rejeitada' } : null));
       setShowConfirmReject(false);
 
       console.log('✅ Proposta rejeitada com sucesso');
-
     } catch (error) {
       console.error('❌ Erro ao rejeitar proposta:', error);
       setErro('Erro ao rejeitar a proposta. Tente novamente.');
@@ -424,23 +427,35 @@ const PortalClienteProposta: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'enviada': return 'bg-blue-100 text-blue-800';
-      case 'visualizada': return 'bg-yellow-100 text-yellow-800';
-      case 'aprovada': return 'bg-green-100 text-green-800';
-      case 'rejeitada': return 'bg-red-100 text-red-800';
-      case 'expirada': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'enviada':
+        return 'bg-blue-100 text-blue-800';
+      case 'visualizada':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'aprovada':
+        return 'bg-green-100 text-green-800';
+      case 'rejeitada':
+        return 'bg-red-100 text-red-800';
+      case 'expirada':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'enviada': return 'Enviada';
-      case 'visualizada': return 'Visualizada';
-      case 'aprovada': return 'Aprovada';
-      case 'rejeitada': return 'Rejeitada';
-      case 'expirada': return 'Expirada';
-      default: return 'Desconhecido';
+      case 'enviada':
+        return 'Enviada';
+      case 'visualizada':
+        return 'Visualizada';
+      case 'aprovada':
+        return 'Aprovada';
+      case 'rejeitada':
+        return 'Rejeitada';
+      case 'expirada':
+        return 'Expirada';
+      default:
+        return 'Desconhecido';
     }
   };
 
@@ -505,9 +520,7 @@ const PortalClienteProposta: React.FC = () => {
             </div>
 
             {/* Indicador de sincronização */}
-            <StatusSyncIndicator
-              propostaId={identificadorProposta || proposta?.numero || ''}
-            />
+            <StatusSyncIndicator propostaId={identificadorProposta || proposta?.numero || ''} />
 
             <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
               <strong>Próximos passos:</strong> Nossa equipe entrará em contato em até 2 horas úteis
@@ -552,15 +565,19 @@ const PortalClienteProposta: React.FC = () => {
               </div>
             </div>
             <div className="text-right">
-              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(proposta.status)}`}>
+              <span
+                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(proposta.status)}`}
+              >
                 {getStatusText(proposta.status)}
               </span>
-              {diasRestantes > 0 && proposta.status !== 'aprovada' && proposta.status !== 'rejeitada' && (
-                <p className="text-sm text-gray-500 mt-1">
-                  <Clock className="h-4 w-4 inline mr-1" />
-                  {diasRestantes} dias restantes
-                </p>
-              )}
+              {diasRestantes > 0 &&
+                proposta.status !== 'aprovada' &&
+                proposta.status !== 'rejeitada' && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    <Clock className="h-4 w-4 inline mr-1" />
+                    {diasRestantes} dias restantes
+                  </p>
+                )}
             </div>
           </div>
         </div>
@@ -581,18 +598,32 @@ const PortalClienteProposta: React.FC = () => {
                 <div>
                   <h3 className="font-medium text-gray-900 mb-2">Informações Gerais</h3>
                   <div className="space-y-2 text-sm">
-                    <div><strong>Título:</strong> {proposta.titulo}</div>
-                    <div><strong>Data de Envio:</strong> {new Date(proposta.dataEnvio).toLocaleDateString('pt-BR')}</div>
-                    <div><strong>Validade:</strong> {new Date(proposta.dataValidade).toLocaleDateString('pt-BR')}</div>
+                    <div>
+                      <strong>Título:</strong> {proposta.titulo}
+                    </div>
+                    <div>
+                      <strong>Data de Envio:</strong>{' '}
+                      {new Date(proposta.dataEnvio).toLocaleDateString('pt-BR')}
+                    </div>
+                    <div>
+                      <strong>Validade:</strong>{' '}
+                      {new Date(proposta.dataValidade).toLocaleDateString('pt-BR')}
+                    </div>
                   </div>
                 </div>
 
                 <div>
                   <h3 className="font-medium text-gray-900 mb-2">Vendedor Responsável</h3>
                   <div className="space-y-2 text-sm">
-                    <div><strong>Nome:</strong> {proposta.vendedor.nome}</div>
-                    <div><strong>Email:</strong> {proposta.vendedor.email}</div>
-                    <div><strong>Telefone:</strong> {proposta.vendedor.telefone}</div>
+                    <div>
+                      <strong>Nome:</strong> {proposta.vendedor.nome}
+                    </div>
+                    <div>
+                      <strong>Email:</strong> {proposta.vendedor.email}
+                    </div>
+                    <div>
+                      <strong>Telefone:</strong> {proposta.vendedor.telefone}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -626,19 +657,30 @@ const PortalClienteProposta: React.FC = () => {
                         </td>
                         <td className="py-4 text-center">{produto.quantidade}</td>
                         <td className="py-4 text-right">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(produto.valorUnitario)}
+                          {new Intl.NumberFormat('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          }).format(produto.valorUnitario)}
                         </td>
                         <td className="py-4 text-right font-medium">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(produto.valorTotal)}
+                          {new Intl.NumberFormat('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          }).format(produto.valorTotal)}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-gray-300">
-                      <td colSpan={3} className="py-4 text-right font-semibold text-lg">Total Geral:</td>
+                      <td colSpan={3} className="py-4 text-right font-semibold text-lg">
+                        Total Geral:
+                      </td>
                       <td className="py-4 text-right font-bold text-lg text-green-600">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(proposta.valorTotal)}
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        }).format(proposta.valorTotal)}
                       </td>
                     </tr>
                   </tfoot>
@@ -657,9 +699,15 @@ const PortalClienteProposta: React.FC = () => {
                 <div>
                   <h3 className="font-medium text-gray-900 mb-2">Pagamento e Entrega</h3>
                   <div className="space-y-2 text-sm">
-                    <div><strong>Forma de Pagamento:</strong> {proposta.condicoes.formaPagamento}</div>
-                    <div><strong>Prazo de Entrega:</strong> {proposta.condicoes.prazoEntrega}</div>
-                    <div><strong>Garantia:</strong> {proposta.condicoes.garantia}</div>
+                    <div>
+                      <strong>Forma de Pagamento:</strong> {proposta.condicoes.formaPagamento}
+                    </div>
+                    <div>
+                      <strong>Prazo de Entrega:</strong> {proposta.condicoes.prazoEntrega}
+                    </div>
+                    <div>
+                      <strong>Garantia:</strong> {proposta.condicoes.garantia}
+                    </div>
                   </div>
                 </div>
 
@@ -754,15 +802,9 @@ const PortalClienteProposta: React.FC = () => {
                 <div>
                   <strong>{proposta.empresa.nome}</strong>
                 </div>
-                <div className="text-gray-600">
-                  {proposta.empresa.endereco}
-                </div>
-                <div className="text-gray-600">
-                  {proposta.empresa.telefone}
-                </div>
-                <div className="text-gray-600">
-                  {proposta.empresa.email}
-                </div>
+                <div className="text-gray-600">{proposta.empresa.endereco}</div>
+                <div className="text-gray-600">{proposta.empresa.telefone}</div>
+                <div className="text-gray-600">{proposta.empresa.email}</div>
               </div>
             </div>
           </div>
@@ -773,9 +815,7 @@ const PortalClienteProposta: React.FC = () => {
       {showConfirmReject && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Confirmar Rejeição
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Confirmar Rejeição</h3>
             <p className="text-gray-600 mb-6">
               Tem certeza que deseja rejeitar esta proposta? Esta ação não pode ser desfeita.
             </p>

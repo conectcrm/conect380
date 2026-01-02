@@ -94,7 +94,7 @@ Fornece helpers para os testes:
 
 ```typescript
 test('deve fazer login como admin', async ({ adminUser }) => {
-  // adminUser = { email: 'admin@conectcrm.com', senha: 'admin123' }
+  // adminUser = { email: 'admin@conectsuite.com.br', senha: 'admin123' }
 });
 
 test('deve fazer login como atendente', async ({ atendenteUser }) => {
@@ -362,7 +362,7 @@ Crie `.env.test`:
 
 ```env
 API_URL=http://localhost:3001
-TEST_ADMIN_EMAIL=admin@conectcrm.com
+TEST_ADMIN_EMAIL=admin@conectsuite.com.br
 TEST_ADMIN_PASSWORD=admin123
 TEST_ATENDENTE_EMAIL=atendente@conectcrm.com
 TEST_ATENDENTE_PASSWORD=atend123

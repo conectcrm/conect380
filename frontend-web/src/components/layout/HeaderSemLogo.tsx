@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { 
-  Bell, 
-  Search, 
-  Settings, 
-  User, 
+import {
+  Bell,
+  Search,
+  Settings,
+  User,
   ChevronDown,
   LogOut,
   Moon,
   Sun,
   Globe,
-  HelpCircle
+  MessageCircle,
 } from 'lucide-react';
 
 interface HeaderSemLogoProps {
@@ -27,21 +27,21 @@ interface HeaderSemLogoProps {
 
 /**
  * Header Sem Logo - Ultra Compacto e Otimizado
- * 
+ *
  * Remove a logo para evitar aumento de altura no zoom
  * Mantém apenas o nome da empresa de forma minimalista
  * Altura fixa que não muda com zoom
  */
 export const HeaderSemLogo: React.FC<HeaderSemLogoProps> = ({
-  userInfo = { 
-    name: 'João Silva', 
+  userInfo = {
+    name: 'João Silva',
     role: 'Administrador',
-    email: 'joao.silva@empresa.com'
+    email: 'joao.silva@empresa.com',
   },
   companyName = 'Fênix CRM Demo',
   onThemeToggle,
   isDarkMode = false,
-  className = ''
+  className = '',
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -53,45 +53,43 @@ export const HeaderSemLogo: React.FC<HeaderSemLogoProps> = ({
       title: 'Novo lead: Maria Santos',
       message: 'Lead qualificado aguardando contato',
       time: 'há 5 minutos',
-      unread: true
+      unread: true,
     },
     {
       id: 2,
       title: 'Proposta aprovada',
       message: 'Cliente ABC aprovou proposta #1234',
       time: 'há 2 horas',
-      unread: true
+      unread: true,
     },
     {
       id: 3,
       title: 'Meta de vendas',
       message: 'Você atingiu 85% da meta mensal',
       time: 'há 1 dia',
-      unread: false
-    }
+      unread: false,
+    },
   ];
 
-  const unreadCount = notifications.filter(n => n.unread).length;
+  const unreadCount = notifications.filter((n) => n.unread).length;
 
   return (
     <>
       {/* Header Principal - Altura Fixa */}
-      <header className={`bg-white/95 backdrop-blur-sm border-b border-gray-200/80 sticky top-0 z-40 ${className}`}>
+      <header
+        className={`bg-white/95 backdrop-blur-sm border-b border-gray-200/80 sticky top-0 z-40 ${className}`}
+      >
         <div className="h-12 px-4 flex items-center justify-between max-w-full overflow-hidden">
-          
           {/* Seção Esquerda: Nome da Empresa + Busca */}
           <div className="flex items-center gap-4 flex-1 min-w-0">
-            
             {/* Nome da Empresa - Compacto */}
             <div className="flex-shrink-0">
-              <span className="text-sm font-semibold text-gray-900 truncate">
-                {companyName}
-              </span>
+              <span className="text-sm font-semibold text-gray-900 truncate">{companyName}</span>
             </div>
 
             {/* Separador */}
             <div className="w-px h-4 bg-gray-300 hidden sm:block"></div>
-            
+
             {/* Busca Global */}
             <div className="flex-1 max-w-md">
               <div className="relative">
@@ -107,7 +105,6 @@ export const HeaderSemLogo: React.FC<HeaderSemLogoProps> = ({
 
           {/* Seção Direita: Ações Compactas */}
           <div className="flex items-center gap-1 flex-shrink-0">
-            
             {/* Status Online */}
             <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-green-50 rounded-md">
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -160,28 +157,24 @@ export const HeaderSemLogo: React.FC<HeaderSemLogoProps> = ({
                       )}
                     </div>
                   </div>
-                  
+
                   <div className="max-h-72 overflow-y-auto">
                     {notifications.map((notification) => (
                       <div
                         key={notification.id}
-                        className={`p-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${
-                          notification.unread ? 'bg-blue-50/50' : ''
-                        }`}
+                        className={`p-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${notification.unread ? 'bg-blue-50/50' : ''
+                          }`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
-                            <p className={`text-xs font-medium ${
-                              notification.unread ? 'text-gray-900' : 'text-gray-700'
-                            }`}>
+                            <p
+                              className={`text-xs font-medium ${notification.unread ? 'text-gray-900' : 'text-gray-700'
+                                }`}
+                            >
                               {notification.title}
                             </p>
-                            <p className="text-xs text-gray-600 mt-0.5">
-                              {notification.message}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              {notification.time}
-                            </p>
+                            <p className="text-xs text-gray-600 mt-0.5">{notification.message}</p>
+                            <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
                           </div>
                           {notification.unread && (
                             <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-1 flex-shrink-0"></div>
@@ -190,7 +183,7 @@ export const HeaderSemLogo: React.FC<HeaderSemLogoProps> = ({
                       </div>
                     ))}
                   </div>
-                  
+
                   <div className="p-3 border-t border-gray-100 bg-gray-50/50">
                     <button className="w-full text-xs text-blue-600 hover:text-blue-700 font-medium">
                       Ver todas as notificações
@@ -220,17 +213,21 @@ export const HeaderSemLogo: React.FC<HeaderSemLogoProps> = ({
                 {/* Avatar Pequeno */}
                 <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
                   <span className="text-white font-medium text-xs">
-                    {userInfo.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                    {userInfo.name
+                      .split(' ')
+                      .map((n) => n[0])
+                      .join('')
+                      .toUpperCase()}
                   </span>
                 </div>
-                
+
                 {/* Info do Usuário - Oculta em mobile */}
                 <div className="text-left min-w-0 hidden md:block">
                   <p className="text-xs font-medium text-gray-900 truncate max-w-24">
                     {userInfo.name}
                   </p>
                 </div>
-                
+
                 <ChevronDown className="w-3 h-3 text-gray-400 flex-shrink-0" />
               </button>
 
@@ -242,16 +239,22 @@ export const HeaderSemLogo: React.FC<HeaderSemLogoProps> = ({
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                         <span className="text-white font-medium text-xs">
-                          {userInfo.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                          {userInfo.name
+                            .split(' ')
+                            .map((n) => n[0])
+                            .join('')
+                            .toUpperCase()}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{userInfo.name}</p>
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {userInfo.name}
+                        </p>
                         <p className="text-xs text-gray-500 truncate">{userInfo.email}</p>
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Menu de ações */}
                   <div className="py-1">
                     <button className="w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors">
@@ -263,11 +266,11 @@ export const HeaderSemLogo: React.FC<HeaderSemLogoProps> = ({
                       Configurações
                     </button>
                     <button className="w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors">
-                      <HelpCircle className="w-3.5 h-3.5 text-gray-400" />
+                      <MessageCircle className="w-3.5 h-3.5 text-gray-400" />
                       Ajuda
                     </button>
                   </div>
-                  
+
                   {/* Ações críticas */}
                   <div className="border-t border-gray-100 py-1">
                     <button className="w-full px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors">
@@ -298,7 +301,7 @@ export const HeaderSemLogo: React.FC<HeaderSemLogoProps> = ({
 
       {/* Overlay para fechar dropdowns */}
       {(showUserMenu || showNotifications) && (
-        <div 
+        <div
           className="fixed inset-0 z-30"
           onClick={() => {
             setShowUserMenu(false);

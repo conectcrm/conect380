@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Download, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Download,
   Package,
   BarChart3,
   TrendingUp,
@@ -15,7 +15,7 @@ import {
   Check,
   X,
   DollarSign,
-  ShoppingCart
+  ShoppingCart,
 } from 'lucide-react';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import { ModalCadastroProduto } from '../../components/modals/ModalCadastroProdutoLandscape';
@@ -61,21 +61,21 @@ interface ProdutoLegacy {
 }
 
 const statusConfig = {
-  ativo: { 
-    label: 'Ativo', 
+  ativo: {
+    label: 'Ativo',
     color: 'bg-green-100 text-green-800 border-green-200',
-    icon: Check
+    icon: Check,
   },
-  inativo: { 
-    label: 'Inativo', 
+  inativo: {
+    label: 'Inativo',
     color: 'bg-gray-100 text-gray-800 border-gray-200',
-    icon: X
+    icon: X,
   },
-  descontinuado: { 
-    label: 'Descontinuado', 
+  descontinuado: {
+    label: 'Descontinuado',
     color: 'bg-red-100 text-red-800 border-red-200',
-    icon: AlertTriangle
-  }
+    icon: AlertTriangle,
+  },
 };
 
 const ProdutosPage: React.FC = () => {
@@ -86,7 +86,7 @@ const ProdutosPage: React.FC = () => {
     produtosAtivos: 0,
     vendasMes: 0,
     valorTotal: 0,
-    estoquesBaixos: 0
+    estoquesBaixos: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -94,12 +94,14 @@ const ProdutosPage: React.FC = () => {
   const [categoriaFilter, setCategoriaFilter] = useState<string>('todas');
   const [selectedProduto, setSelectedProduto] = useState<ProdutoLegacy | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
+
   // Estados para o modal de cadastro
   const [showModalAvancado, setShowModalAvancado] = useState(false);
-  const [produtoParaEditar, setProdutoParaEditar] = useState<ProdutoFormData & { produtoId?: string } | null>(null);
+  const [produtoParaEditar, setProdutoParaEditar] = useState<
+    (ProdutoFormData & { produtoId?: string }) | null
+  >(null);
   const [isLoadingSave, setIsLoadingSave] = useState(false);
-  
+
   // Estados para confirmação de exclusão
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [produtoParaExcluir, setProdutoParaExcluir] = useState<ProdutoLegacy | null>(null);
@@ -111,7 +113,7 @@ const ProdutosPage: React.FC = () => {
       const produtosAPI = await produtosService.findAll();
       const produtosFormatados = produtosAPI.map(produtosService.transformApiToLegacy);
       setProdutos(produtosFormatados);
-      
+
       // Carregar estatísticas
       const estatisticasAPI = await produtosService.getEstatisticas();
       setEstatisticas(estatisticasAPI);
@@ -130,24 +132,25 @@ const ProdutosPage: React.FC = () => {
 
   // Filtrar produtos
   const produtosFiltrados = useMemo(() => {
-    return produtos.filter(produto => {
-      const matchesSearch = produto.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           produto.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           produto.fornecedor.toLowerCase().includes(searchTerm.toLowerCase());
-      
+    return produtos.filter((produto) => {
+      const matchesSearch =
+        produto.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        produto.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        produto.fornecedor.toLowerCase().includes(searchTerm.toLowerCase());
+
       const matchesStatus = statusFilter === 'todos' || produto.status === statusFilter;
       const matchesCategoria = categoriaFilter === 'todas' || produto.categoria === categoriaFilter;
-      
+
       return matchesSearch && matchesStatus && matchesCategoria;
     });
   }, [produtos, searchTerm, statusFilter, categoriaFilter]);
 
-  const categorias = Array.from(new Set(produtos.map(produto => produto.categoria)));
+  const categorias = Array.from(new Set(produtos.map((produto) => produto.categoria)));
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -157,7 +160,7 @@ const ProdutosPage: React.FC = () => {
 
   const getEstoqueStatus = (produto: ProdutoLegacy) => {
     if (produto.categoria === 'Serviços') return null;
-    
+
     if (produto.estoque.atual <= produto.estoque.minimo) {
       return { label: 'Baixo', color: 'text-red-600', icon: AlertTriangle };
     } else if (produto.estoque.atual >= produto.estoque.maximo * 0.8) {
@@ -176,13 +179,13 @@ const ProdutosPage: React.FC = () => {
     setSelectedProduto(null);
     setIsModalOpen(false);
   };
-  
+
   // Funções para o modal de cadastro
   const handleNovoProduto = () => {
     setProdutoParaEditar(null);
     setShowModalAvancado(true);
   };
-  
+
   const handleEditarProduto = (produto: ProdutoLegacy) => {
     // Converter produto existente para formato do novo modal
     setProdutoParaEditar({
@@ -196,16 +199,16 @@ const ProdutosPage: React.FC = () => {
       status: produto.status === 'ativo',
       descricao: produto.descricao,
       tags: [],
-      variacoes: []
+      variacoes: [],
     });
     setShowModalAvancado(true);
   };
-  
+
   const handleExcluirProduto = (produto: ProdutoLegacy) => {
     setProdutoParaExcluir(produto);
     setShowConfirmDelete(true);
   };
-  
+
   const confirmarExclusao = async () => {
     if (produtoParaExcluir) {
       try {
@@ -220,7 +223,7 @@ const ProdutosPage: React.FC = () => {
       }
     }
   };
-  
+
   const cancelarExclusao = () => {
     setShowConfirmDelete(false);
     setProdutoParaExcluir(null);
@@ -228,11 +231,11 @@ const ProdutosPage: React.FC = () => {
 
   const handleSaveProduto = async (data: ProdutoFormData) => {
     setIsLoadingSave(true);
-    
+
     try {
       // Converter formato do modal para API
       const produtoData = produtosService.transformFormToApi(data);
-      
+
       if (produtoParaEditar && produtoParaEditar.produtoId) {
         // Atualizar produto existente
         await produtosService.update(produtoParaEditar.produtoId, produtoData);
@@ -242,13 +245,12 @@ const ProdutosPage: React.FC = () => {
         await produtosService.create(produtoData);
         toast.success('Produto criado com sucesso!');
       }
-      
+
       // Recarregar lista
       await carregarProdutos();
-      
+
       setShowModalAvancado(false);
       setProdutoParaEditar(null);
-      
     } catch (error) {
       console.error('Erro ao salvar produto:', error);
       toast.error('Erro ao salvar produto');
@@ -276,11 +278,7 @@ const ProdutosPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-6">
             <div className="flex-1 min-w-0">
-              <BackToNucleus 
-                title="Produtos"
-                nucleusName="CRM"
-                nucleusPath="/nuclei/crm"
-              />
+              <BackToNucleus title="Produtos" nucleusName="CRM" nucleusPath="/nuclei/crm" />
               <p className="mt-1 text-sm text-gray-500">
                 Gestão completa do catálogo de produtos e serviços
               </p>
@@ -290,8 +288,8 @@ const ProdutosPage: React.FC = () => {
                 <Download className="w-4 h-4 mr-2" />
                 Exportar
               </button>
-              
-              <button 
+
+              <button
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-[#159A9C] hover:bg-[#0d7a7d] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C] transition-colors"
                 onClick={handleNovoProduto}
               >
@@ -346,7 +344,9 @@ const ProdutosPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Faturamento</p>
-                <p className="text-2xl font-bold text-[#002333]">{formatCurrency(estatisticas.valorTotal)}</p>
+                <p className="text-2xl font-bold text-[#002333]">
+                  {formatCurrency(estatisticas.valorTotal)}
+                </p>
               </div>
               <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
                 <DollarSign className="w-6 h-6 text-yellow-600" />
@@ -382,7 +382,7 @@ const ProdutosPage: React.FC = () => {
                 />
               </div>
             </div>
-            
+
             <div className="flex gap-3">
               <select
                 value={statusFilter}
@@ -394,15 +394,17 @@ const ProdutosPage: React.FC = () => {
                 <option value="inativo">Inativo</option>
                 <option value="descontinuado">Descontinuado</option>
               </select>
-              
+
               <select
                 value={categoriaFilter}
                 onChange={(e) => setCategoriaFilter(e.target.value)}
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C]"
               >
                 <option value="todas">Todas as Categorias</option>
-                {categorias.map(categoria => (
-                  <option key={categoria} value={categoria}>{categoria}</option>
+                {categorias.map((categoria) => (
+                  <option key={categoria} value={categoria}>
+                    {categoria}
+                  </option>
                 ))}
               </select>
             </div>
@@ -416,7 +418,7 @@ const ProdutosPage: React.FC = () => {
               Lista de Produtos ({produtosFiltrados.length})
             </h3>
           </div>
-          
+
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -449,26 +451,20 @@ const ProdutosPage: React.FC = () => {
                   const statusInfo = statusConfig[produto.status];
                   const estoqueStatus = getEstoqueStatus(produto);
                   const StatusIcon = statusInfo.icon;
-                  
+
                   return (
                     <tr key={produto.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {produto.nome}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            SKU: {produto.sku}
-                          </div>
+                          <div className="text-sm font-medium text-gray-900">{produto.nome}</div>
+                          <div className="text-sm text-gray-500">SKU: {produto.sku}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-900">{produto.categoria}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {formatCurrency(produto.preco)}
-                        </div>
+                        <div className="text-sm text-gray-900">{formatCurrency(produto.preco)}</div>
                         <div className="text-xs text-gray-500">
                           Custo: {formatCurrency(produto.custoUnitario)}
                         </div>
@@ -488,7 +484,9 @@ const ProdutosPage: React.FC = () => {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusInfo.color}`}>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusInfo.color}`}
+                        >
                           <StatusIcon className="w-3 h-3 mr-1" />
                           {statusInfo.label}
                         </span>
@@ -529,16 +527,17 @@ const ProdutosPage: React.FC = () => {
                 })}
               </tbody>
             </table>
-            
+
             {produtosFiltrados.length === 0 && (
               <div className="text-center py-12">
                 <Package className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum produto encontrado</h3>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">
+                  Nenhum produto encontrado
+                </h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  {produtos.length === 0 
+                  {produtos.length === 0
                     ? 'Comece criando seu primeiro produto.'
-                    : 'Tente ajustar os filtros ou termos de busca.'
-                  }
+                    : 'Tente ajustar os filtros ou termos de busca.'}
                 </p>
               </div>
             )}
@@ -552,23 +551,18 @@ const ProdutosPage: React.FC = () => {
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-96 overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Detalhes do Produto
-                </h3>
-                <button
-                  onClick={closeModal}
-                  className="text-gray-400 hover:text-gray-600"
-                >
+                <h3 className="text-lg font-medium text-gray-900">Detalhes do Produto</h3>
+                <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
                   <X className="w-6 h-6" />
                 </button>
               </div>
-              
+
               <div className="space-y-4">
                 <div>
                   <h4 className="text-sm font-medium text-gray-700">Nome</h4>
                   <p className="text-sm text-gray-900">{selectedProduto.nome}</p>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h4 className="text-sm font-medium text-gray-700">SKU</h4>
@@ -579,7 +573,7 @@ const ProdutosPage: React.FC = () => {
                     <p className="text-sm text-gray-900">{selectedProduto.categoria}</p>
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h4 className="text-sm font-medium text-gray-700">Preço</h4>
@@ -587,26 +581,29 @@ const ProdutosPage: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="text-sm font-medium text-gray-700">Custo</h4>
-                    <p className="text-sm text-gray-900">{formatCurrency(selectedProduto.custoUnitario)}</p>
+                    <p className="text-sm text-gray-900">
+                      {formatCurrency(selectedProduto.custoUnitario)}
+                    </p>
                   </div>
                 </div>
-                
+
                 {selectedProduto.categoria !== 'Serviços' && (
                   <div>
                     <h4 className="text-sm font-medium text-gray-700">Estoque</h4>
                     <p className="text-sm text-gray-900">
-                      Atual: {selectedProduto.estoque.atual} | 
-                      Mínimo: {selectedProduto.estoque.minimo} | 
-                      Máximo: {selectedProduto.estoque.maximo}
+                      Atual: {selectedProduto.estoque.atual} | Mínimo:{' '}
+                      {selectedProduto.estoque.minimo} | Máximo: {selectedProduto.estoque.maximo}
                     </p>
                   </div>
                 )}
-                
+
                 <div>
                   <h4 className="text-sm font-medium text-gray-700">Descrição</h4>
-                  <p className="text-sm text-gray-900">{selectedProduto.descricao || 'Sem descrição'}</p>
+                  <p className="text-sm text-gray-900">
+                    {selectedProduto.descricao || 'Sem descrição'}
+                  </p>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h4 className="text-sm font-medium text-gray-700">Criado em</h4>
@@ -614,7 +611,9 @@ const ProdutosPage: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="text-sm font-medium text-gray-700">Atualizado em</h4>
-                    <p className="text-sm text-gray-900">{formatDate(selectedProduto.atualizadoEm)}</p>
+                    <p className="text-sm text-gray-900">
+                      {formatDate(selectedProduto.atualizadoEm)}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -649,11 +648,12 @@ const ProdutosPage: React.FC = () => {
                   <p className="text-sm text-gray-500">Esta ação não pode ser desfeita.</p>
                 </div>
               </div>
-              
+
               <p className="text-sm text-gray-700 mb-6">
-                Tem certeza que deseja excluir o produto <strong>"{produtoParaExcluir.nome}"</strong>?
+                Tem certeza que deseja excluir o produto{' '}
+                <strong>"{produtoParaExcluir.nome}"</strong>?
               </p>
-              
+
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={cancelarExclusao}

@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Fila } from './fila.entity';
 import { User } from '../../users/user.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 /**
  * Entity que representa a relação Many-to-Many entre Fila e User (Atendente)
@@ -26,6 +27,13 @@ import { User } from '../../users/user.entity';
 export class FilaAtendente {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column({ type: 'uuid', name: 'filaId' })
   filaId: string;

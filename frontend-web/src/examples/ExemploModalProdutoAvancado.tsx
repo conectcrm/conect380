@@ -3,22 +3,22 @@ import { ModalCadastroProdutoAvancado } from '@/components/modals/ModalCadastroP
 import { useSegmentoConfig } from '@/hooks/useSegmentoConfig';
 import { BaseButton, StatusBadge } from '@/components/base';
 import { ResponsiveCard } from '@/components/layout/ResponsiveLayout';
-import { 
-  Plus, 
-  Settings, 
-  Package, 
-  Truck, 
-  Globe, 
-  ShoppingCart, 
+import {
+  Plus,
+  Settings,
+  Package,
+  Truck,
+  Globe,
+  ShoppingCart,
   Briefcase,
   Edit,
-  Trash2
+  Trash2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 /**
  * ExemploModalProdutoAvancado - Demonstração prática do modal avançado
- * 
+ *
  * Este exemplo mostra como usar o modal para diferentes segmentos:
  * - Agropecuário: Planos com módulos complexos
  * - Software/SaaS: Licenças e add-ons
@@ -29,14 +29,10 @@ export const ExemploModalProdutoAvancado: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [produtoSelecionado, setProdutoSelecionado] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Hook para gerenciar configurações de segmento
-  const {
-    segmentoAtivo,
-    configuracaoAtiva,
-    segmentosDisponiveis,
-    setSegmentoAtivo
-  } = useSegmentoConfig('agropecuario');
+  const { segmentoAtivo, configuracaoAtiva, segmentosDisponiveis, setSegmentoAtivo } =
+    useSegmentoConfig('agropecuario');
 
   // Estados para demonstrar diferentes cenários
   const [produtos, setProdutos] = useState([
@@ -53,12 +49,12 @@ export const ExemploModalProdutoAvancado: React.FC = () => {
       modulos: [
         { id: '1', nome: 'Gestão de Gado', incluido: true, quantidade: 1 },
         { id: '2', nome: 'Reprodução', incluido: true, quantidade: 1 },
-        { id: '3', nome: 'Financeiro Rural', incluido: false, quantidade: 0 }
+        { id: '3', nome: 'Financeiro Rural', incluido: false, quantidade: 0 },
       ],
       licencas: [
         { id: '1', nome: 'Portal Web Completo', tipo: 'web', quantidade: 5 },
-        { id: '2', nome: 'MB Task (Aplicativo de Campo)', tipo: 'mobile', quantidade: 2 }
-      ]
+        { id: '2', nome: 'MB Task (Aplicativo de Campo)', tipo: 'mobile', quantidade: 2 },
+      ],
     },
     {
       id: 2,
@@ -69,38 +65,37 @@ export const ExemploModalProdutoAvancado: React.FC = () => {
       status: 'ativo',
       segmento: 'software_saas',
       precoBase: 199.99,
-      tipoPreco: 'fixo'
-    }
+      tipoPreco: 'fixo',
+    },
   ]);
 
   // Função para salvar produto (simulação de API)
   const handleSaveProduto = async (data) => {
     setIsLoading(true);
-    
+
     try {
       // Simular delay de API
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
       if (produtoSelecionado) {
         // Atualizar produto existente
-        setProdutos(prev => prev.map(p => 
-          p.id === produtoSelecionado.id ? { ...data, id: p.id } : p
-        ));
+        setProdutos((prev) =>
+          prev.map((p) => (p.id === produtoSelecionado.id ? { ...data, id: p.id } : p)),
+        );
         console.log('Produto atualizado:', data);
       } else {
         // Criar novo produto
         const novoProduto = {
           ...data,
-          id: Date.now() // ID temporário
+          id: Date.now(), // ID temporário
         };
-        setProdutos(prev => [...prev, novoProduto]);
+        setProdutos((prev) => [...prev, novoProduto]);
         console.log('Novo produto criado:', novoProduto);
       }
-      
+
       // Simular sucesso
       setShowModal(false);
       setProdutoSelecionado(null);
-      
     } catch (error) {
       console.error('Erro ao salvar produto:', error);
       throw error; // Re-throw para o modal tratar
@@ -124,14 +119,14 @@ export const ExemploModalProdutoAvancado: React.FC = () => {
   // Deletar produto (simulação)
   const handleDeletarProduto = (produto) => {
     if (confirm(`Deseja realmente deletar o produto "${produto.nome}"?`)) {
-      setProdutos(prev => prev.filter(p => p.id !== produto.id));
+      setProdutos((prev) => prev.filter((p) => p.id !== produto.id));
       toast.success('Produto deletado com sucesso!');
     }
   };
 
   // Obter ícone do segmento
   const obterIconeSegmento = (segmentoId: string) => {
-    const segmento = segmentosDisponiveis.find(s => s.value === segmentoId);
+    const segmento = segmentosDisponiveis.find((s) => s.value === segmentoId);
     if (segmento?.icone) {
       const Icon = segmento.icone;
       return <Icon className="w-4 h-4" />;
@@ -144,9 +139,7 @@ export const ExemploModalProdutoAvancado: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Gestão de Produtos Avançada
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestão de Produtos Avançada</h1>
           <p className="text-gray-600">
             Exemplo de uso do modal de cadastro para diferentes segmentos de negócio
           </p>
@@ -164,9 +157,9 @@ export const ExemploModalProdutoAvancado: React.FC = () => {
               text={configuracaoAtiva?.nome || 'Segmento não selecionado'}
             />
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {segmentosDisponiveis.map(segmento => {
+            {segmentosDisponiveis.map((segmento) => {
               const Icon = segmento.icone;
               return (
                 <button
@@ -192,14 +185,10 @@ export const ExemploModalProdutoAvancado: React.FC = () => {
         {/* Ações e Filtros */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              Produtos Cadastrados
-            </h2>
-            <p className="text-gray-600 text-sm">
-              {produtos.length} produto(s) encontrado(s)
-            </p>
+            <h2 className="text-xl font-semibold text-gray-900">Produtos Cadastrados</h2>
+            <p className="text-gray-600 text-sm">{produtos.length} produto(s) encontrado(s)</p>
           </div>
-          
+
           <BaseButton
             variant="primary"
             onClick={handleNovoProduto}
@@ -211,16 +200,14 @@ export const ExemploModalProdutoAvancado: React.FC = () => {
 
         {/* Lista de Produtos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {produtos.map(produto => (
+          {produtos.map((produto) => (
             <ResponsiveCard key={produto.id} className="hover:shadow-lg transition-shadow">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-2">
                   {obterIconeSegmento(produto.segmento)}
-                  <h3 className="font-semibold text-gray-900 truncate">
-                    {produto.nome}
-                  </h3>
+                  <h3 className="font-semibold text-gray-900 truncate">{produto.nome}</h3>
                 </div>
-                
+
                 <StatusBadge
                   status={produto.status === 'ativo' ? 'success' : 'warning'}
                   text={produto.status}
@@ -232,21 +219,23 @@ export const ExemploModalProdutoAvancado: React.FC = () => {
                   <span className="text-gray-500">Código:</span>
                   <span className="font-medium">{produto.codigo}</span>
                 </div>
-                
+
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Tipo:</span>
                   <span className="font-medium">
-                    {configuracaoAtiva?.tiposProduto.find(t => t.value === produto.tipoProduto)?.label || produto.tipoProduto}
+                    {configuracaoAtiva?.tiposProduto.find((t) => t.value === produto.tipoProduto)
+                      ?.label || produto.tipoProduto}
                   </span>
                 </div>
-                
+
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Categoria:</span>
                   <span className="font-medium">
-                    {configuracaoAtiva?.categorias.find(c => c.value === produto.categoria)?.label || produto.categoria}
+                    {configuracaoAtiva?.categorias.find((c) => c.value === produto.categoria)
+                      ?.label || produto.categoria}
                   </span>
                 </div>
-                
+
                 {produto.precoBase && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">Preço:</span>
@@ -264,14 +253,16 @@ export const ExemploModalProdutoAvancado: React.FC = () => {
                     Módulos Inclusos
                   </p>
                   <div className="flex flex-wrap gap-1">
-                    {produto.modulos.filter(m => m.incluido).map(modulo => (
-                      <span
-                        key={modulo.id}
-                        className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full"
-                      >
-                        {modulo.nome}
-                      </span>
-                    ))}
+                    {produto.modulos
+                      .filter((m) => m.incluido)
+                      .map((modulo) => (
+                        <span
+                          key={modulo.id}
+                          className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full"
+                        >
+                          {modulo.nome}
+                        </span>
+                      ))}
                   </div>
                 </div>
               )}
@@ -282,7 +273,7 @@ export const ExemploModalProdutoAvancado: React.FC = () => {
                     Licenças
                   </p>
                   <div className="space-y-1">
-                    {produto.licencas.map(licenca => (
+                    {produto.licencas.map((licenca) => (
                       <div key={licenca.id} className="flex justify-between text-xs">
                         <span>{licenca.nome}</span>
                         <span className="font-medium">{licenca.quantidade}x</span>
@@ -303,7 +294,7 @@ export const ExemploModalProdutoAvancado: React.FC = () => {
                 >
                   Editar
                 </BaseButton>
-                
+
                 <BaseButton
                   variant="danger"
                   size="sm"
@@ -322,9 +313,7 @@ export const ExemploModalProdutoAvancado: React.FC = () => {
         {produtos.length === 0 && (
           <ResponsiveCard className="text-center py-12">
             <Package className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Nenhum produto cadastrado
-            </h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum produto cadastrado</h3>
             <p className="text-gray-500 mb-6">
               Clique em "Novo Produto" para começar a cadastrar seus produtos.
             </p>
@@ -368,10 +357,14 @@ export const ExemploModalProdutoAvancado: React.FC = () => {
               <div>
                 <p className="font-medium mb-2">Tipos de Produto Disponíveis:</p>
                 <code className="bg-gray-800 p-2 rounded block overflow-auto max-h-40">
-                  {JSON.stringify(configuracaoAtiva?.tiposProduto.map(t => ({ 
-                    value: t.value, 
-                    label: t.label 
-                  })), null, 2)}
+                  {JSON.stringify(
+                    configuracaoAtiva?.tiposProduto.map((t) => ({
+                      value: t.value,
+                      label: t.label,
+                    })),
+                    null,
+                    2,
+                  )}
                 </code>
               </div>
             </div>

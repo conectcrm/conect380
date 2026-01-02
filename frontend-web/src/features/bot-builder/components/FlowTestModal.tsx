@@ -1,11 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { X, RefreshCcw, AlertCircle, CheckCircle2 } from 'lucide-react';
-import {
-  EstruturaFluxo,
-  Etapa,
-  OpcaoMenu,
-  Condicao,
-} from '../types/flow-builder.types';
+import { EstruturaFluxo, Etapa, OpcaoMenu, Condicao } from '../types/flow-builder.types';
 
 interface FlowTestModalProps {
   open: boolean;
@@ -124,7 +119,10 @@ export const FlowTestModal: React.FC<FlowTestModalProps> = ({ open, estrutura, o
           return numeric;
         }
 
-        if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))) {
+        if (
+          (raw.startsWith("'") && raw.endsWith("'")) ||
+          (raw.startsWith('"') && raw.endsWith('"'))
+        ) {
           return raw.slice(1, -1);
         }
 
@@ -134,13 +132,15 @@ export const FlowTestModal: React.FC<FlowTestModalProps> = ({ open, estrutura, o
       const evaluateSimple = (fragment: string): boolean => {
         const sanitized = fragment.replace(/contexto\./g, '').trim();
         const operadores = ['===', '!==', '==', '!='] as const;
-        const operadorEncontrado = operadores.find(op => sanitized.includes(op));
+        const operadorEncontrado = operadores.find((op) => sanitized.includes(op));
 
         if (!operadorEncontrado) {
           return false;
         }
 
-        const [variavelRaw, valorRaw] = sanitized.split(operadorEncontrado).map(part => part.trim());
+        const [variavelRaw, valorRaw] = sanitized
+          .split(operadorEncontrado)
+          .map((part) => part.trim());
         if (!variavelRaw) {
           return false;
         }
@@ -165,17 +165,17 @@ export const FlowTestModal: React.FC<FlowTestModalProps> = ({ open, estrutura, o
       try {
         const gruposOu = expressao
           .split('||')
-          .map(grupo => grupo.trim())
+          .map((grupo) => grupo.trim())
           .filter(Boolean);
 
         if (gruposOu.length === 0) {
           return evaluateSimple(expressao);
         }
 
-        return gruposOu.some(grupo => {
+        return gruposOu.some((grupo) => {
           const condicoesE = grupo
             .split('&&')
-            .map(cond => cond.trim())
+            .map((cond) => cond.trim())
             .filter(Boolean);
 
           return condicoesE.every(evaluateSimple);
@@ -278,16 +278,19 @@ export const FlowTestModal: React.FC<FlowTestModalProps> = ({ open, estrutura, o
     });
   }, []);
 
-  const applyContextUpdates = useCallback((updates: Record<string, any>) => {
-    setContext(prev => {
-      const next = cloneValue(prev || {});
-      Object.entries(updates).forEach(([path, value]) => {
-        setValueAtPath(next, path, value);
+  const applyContextUpdates = useCallback(
+    (updates: Record<string, any>) => {
+      setContext((prev) => {
+        const next = cloneValue(prev || {});
+        Object.entries(updates).forEach(([path, value]) => {
+          setValueAtPath(next, path, value);
+        });
+        contextRef.current = next;
+        return next;
       });
-      contextRef.current = next;
-      return next;
-    });
-  }, [setValueAtPath]);
+    },
+    [setValueAtPath],
+  );
 
   const applyMenuContext = useCallback(
     (opcao: OpcaoMenu, resposta: string) => {
@@ -341,7 +344,7 @@ export const FlowTestModal: React.FC<FlowTestModalProps> = ({ open, estrutura, o
       const etapa = estrutura.etapas[stepId];
 
       if (!etapa) {
-        setHistory(prev => [
+        setHistory((prev) => [
           ...prev,
           createHistoryEntry('system', `⚠️ Etapa "${stepId}" não encontrada na estrutura.`),
         ]);
@@ -357,19 +360,18 @@ export const FlowTestModal: React.FC<FlowTestModalProps> = ({ open, estrutura, o
       const mensagem = etapa.mensagem || etapa.nome || `Etapa ${stepId}`;
       const mensagemFormatada = formatMessage(mensagem);
 
-      setHistory(prev => [
-        ...prev,
-        createHistoryEntry('bot', mensagemFormatada, stepId),
-      ]);
+      setHistory((prev) => [...prev, createHistoryEntry('bot', mensagemFormatada, stepId)]);
 
       const normalizedOptions = normalizeMenuOptions(etapa.opcoes);
 
       if (Array.isArray(etapa.proximaEtapaCondicional)) {
-        const condicaoAtendida = etapa.proximaEtapaCondicional.find(cond => cond?.se && evaluateConditionalExpression(cond.se));
+        const condicaoAtendida = etapa.proximaEtapaCondicional.find(
+          (cond) => cond?.se && evaluateConditionalExpression(cond.se),
+        );
 
         if (condicaoAtendida?.entao) {
           if (visited.has(condicaoAtendida.entao)) {
-            setHistory(prev => [
+            setHistory((prev) => [
               ...prev,
               createHistoryEntry('system', '⚠️ Loop detectado ao avaliar condição da etapa.'),
             ]);
@@ -393,7 +395,7 @@ export const FlowTestModal: React.FC<FlowTestModalProps> = ({ open, estrutura, o
 
       if ((etapa as any).aguardarResposta === false && etapa.proximaEtapa) {
         if (visited.has(etapa.proximaEtapa)) {
-          setHistory(prev => [
+          setHistory((prev) => [
             ...prev,
             createHistoryEntry('system', '⚠️ Loop detectado ao avançar automaticamente.'),
           ]);
@@ -419,7 +421,7 @@ export const FlowTestModal: React.FC<FlowTestModalProps> = ({ open, estrutura, o
       }
 
       if (etapa.tipo === 'condicional' && etapa.condicoes && etapa.condicoes.length > 0) {
-        const condicaoAtendida = etapa.condicoes.find(cond => evaluateCondition(cond));
+        const condicaoAtendida = etapa.condicoes.find((cond) => evaluateCondition(cond));
 
         if (condicaoAtendida?.proximaEtapa) {
           processStep(condicaoAtendida.proximaEtapa, visited);
@@ -471,7 +473,7 @@ export const FlowTestModal: React.FC<FlowTestModalProps> = ({ open, estrutura, o
     const respostaValor = opcao.texto ?? opcao.valor ?? 'Opção';
     const resposta = String(respostaValor);
 
-    setHistory(prev => [
+    setHistory((prev) => [
       ...prev,
       createHistoryEntry('user', resposta, currentStepId || undefined),
     ]);
@@ -497,10 +499,7 @@ export const FlowTestModal: React.FC<FlowTestModalProps> = ({ open, estrutura, o
     const resposta = userInput.trim();
     if (!resposta) return;
 
-    setHistory(prev => [
-      ...prev,
-      createHistoryEntry('user', resposta, currentStepId),
-    ]);
+    setHistory((prev) => [...prev, createHistoryEntry('user', resposta, currentStepId)]);
 
     setUserInput('');
 
@@ -520,7 +519,7 @@ export const FlowTestModal: React.FC<FlowTestModalProps> = ({ open, estrutura, o
 
   const handleConditionChoice = (condicao: Condicao) => {
     if (!condicao.proximaEtapa) {
-      setHistory(prev => [
+      setHistory((prev) => [
         ...prev,
         createHistoryEntry('system', 'Condição selecionada sem próxima etapa configurada.'),
       ]);
@@ -610,18 +609,19 @@ export const FlowTestModal: React.FC<FlowTestModalProps> = ({ open, estrutura, o
                 </div>
               )}
 
-              {history.map(entry => (
+              {history.map((entry) => (
                 <div
                   key={entry.id}
                   className={`flex ${entry.from === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-xl rounded-2xl px-4 py-3 text-sm shadow-sm whitespace-pre-wrap ${entry.from === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : entry.from === 'system'
-                        ? 'bg-amber-100 text-amber-900'
-                        : 'bg-white text-gray-800'
-                      }`}
+                    className={`max-w-xl rounded-2xl px-4 py-3 text-sm shadow-sm whitespace-pre-wrap ${
+                      entry.from === 'user'
+                        ? 'bg-blue-600 text-white'
+                        : entry.from === 'system'
+                          ? 'bg-amber-100 text-amber-900'
+                          : 'bg-white text-gray-800'
+                    }`}
                   >
                     {entry.stepId && entry.from !== 'user' && (
                       <p className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">
@@ -641,7 +641,7 @@ export const FlowTestModal: React.FC<FlowTestModalProps> = ({ open, estrutura, o
                 <div className="space-y-3">
                   <p className="text-xs font-semibold uppercase text-gray-500">Escolha uma opção</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {interaction.options.map(opcao => (
+                    {interaction.options.map((opcao) => (
                       <button
                         key={`${opcao.valor}-${opcao.texto}`}
                         onClick={() => handleMenuOption(opcao)}
@@ -661,8 +661,8 @@ export const FlowTestModal: React.FC<FlowTestModalProps> = ({ open, estrutura, o
                   <div className="flex gap-3">
                     <input
                       value={userInput}
-                      onChange={e => setUserInput(e.target.value)}
-                      onKeyDown={e => {
+                      onChange={(e) => setUserInput(e.target.value)}
+                      onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
                           handleSendAnswer();

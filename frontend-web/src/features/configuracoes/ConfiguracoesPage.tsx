@@ -20,7 +20,7 @@ import {
   TestTube,
   CheckCircle,
   AlertCircle,
-  Send
+  Send,
 } from 'lucide-react';
 
 const ConfiguracoesPage: React.FC = () => {
@@ -30,7 +30,7 @@ const ConfiguracoesPage: React.FC = () => {
   const [notifications, setNotifications] = useState({
     email: true,
     push: false,
-    sms: true
+    sms: true,
   });
 
   // Estados para configuração de email
@@ -38,25 +38,25 @@ const ConfiguracoesPage: React.FC = () => {
     provider: 'gmail',
     gmail: {
       user: '',
-      password: ''
+      password: '',
     },
     sendgrid: {
       apiKey: '',
-      fromEmail: ''
+      fromEmail: '',
     },
     smtp: {
       host: '',
       port: 587,
       user: '',
       password: '',
-      secure: false
+      secure: false,
     },
     empresa: {
       nome: 'ConectCRM',
       email: 'contato@conectcrm.com',
       telefone: '(11) 99999-9999',
-      endereco: 'São Paulo/SP'
-    }
+      endereco: 'São Paulo/SP',
+    },
   });
   const [testando, setTestando] = useState(false);
   const [emailTeste, setEmailTeste] = useState('');
@@ -70,19 +70,19 @@ const ConfiguracoesPage: React.FC = () => {
       setEmailConfig(JSON.parse(configSalva));
     } else {
       // Carregar das variáveis de ambiente
-      setEmailConfig(prev => ({
+      setEmailConfig((prev) => ({
         ...prev,
         provider: process.env.REACT_APP_EMAIL_PROVIDER || 'gmail',
         gmail: {
           user: process.env.REACT_APP_EMAIL_USER || '',
-          password: process.env.REACT_APP_EMAIL_PASSWORD || ''
+          password: process.env.REACT_APP_EMAIL_PASSWORD || '',
         },
         empresa: {
           nome: process.env.REACT_APP_EMPRESA_NOME || 'ConectCRM',
           email: process.env.REACT_APP_EMPRESA_EMAIL || 'contato@conectcrm.com',
           telefone: process.env.REACT_APP_EMPRESA_TELEFONE || '(11) 99999-9999',
-          endereco: process.env.REACT_APP_EMPRESA_ENDERECO || 'São Paulo/SP'
-        }
+          endereco: process.env.REACT_APP_EMPRESA_ENDERECO || 'São Paulo/SP',
+        },
       }));
     }
     setEmailTeste(localStorage.getItem('conectcrm-email-teste') || '');
@@ -126,7 +126,7 @@ const ConfiguracoesPage: React.FC = () => {
       const errorResult = {
         success: false,
         error: error instanceof Error ? error.message : 'Erro desconhecido',
-        timestamp: new Date()
+        timestamp: new Date(),
       };
       setResultadoTeste(errorResult);
       toast.error('Erro ao testar e-mail');
@@ -142,7 +142,7 @@ const ConfiguracoesPage: React.FC = () => {
     { id: 'notificacoes', label: 'Notificações', icon: Bell },
     { id: 'aparencia', label: 'Aparência', icon: Palette },
     { id: 'empresa', label: 'Empresa', icon: Building },
-    { id: 'sistema', label: 'Sistema', icon: Database }
+    { id: 'sistema', label: 'Sistema', icon: Database },
   ];
 
   const renderContent = () => {
@@ -164,9 +164,7 @@ const ConfiguracoesPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    E-mail
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">E-mail</label>
                   <input
                     type="email"
                     defaultValue="joao.silva@fenixcrm.com"
@@ -174,9 +172,7 @@ const ConfiguracoesPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Telefone
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Telefone</label>
                   <input
                     type="tel"
                     defaultValue="(11) 99999-9999"
@@ -184,9 +180,7 @@ const ConfiguracoesPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Cargo
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Cargo</label>
                   <input
                     type="text"
                     defaultValue="Administrador"
@@ -208,9 +202,7 @@ const ConfiguracoesPage: React.FC = () => {
                   <button className="bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm leading-4 font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                     Alterar foto
                   </button>
-                  <p className="text-sm text-gray-500 mt-1">
-                    JPG, GIF ou PNG. Máximo de 1MB.
-                  </p>
+                  <p className="text-sm text-gray-500 mt-1">JPG, GIF ou PNG. Máximo de 1MB.</p>
                 </div>
               </div>
             </div>
@@ -229,7 +221,7 @@ const ConfiguracoesPage: React.FC = () => {
                   </label>
                   <div className="relative">
                     <input
-                      type={showPassword ? "text" : "password"}
+                      type={showPassword ? 'text' : 'password'}
                       className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 pr-10 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     />
                     <button
@@ -246,9 +238,7 @@ const ConfiguracoesPage: React.FC = () => {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nova Senha
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Nova Senha</label>
                   <input
                     type="password"
                     className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
@@ -267,7 +257,9 @@ const ConfiguracoesPage: React.FC = () => {
             </div>
 
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Autenticação de Dois Fatores</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Autenticação de Dois Fatores
+              </h3>
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -305,17 +297,18 @@ const ConfiguracoesPage: React.FC = () => {
                 {['gmail', 'sendgrid', 'smtp'].map((provider) => (
                   <div
                     key={provider}
-                    onClick={() => setEmailConfig(prev => ({ ...prev, provider }))}
-                    className={`relative cursor-pointer rounded-lg border p-4 hover:bg-gray-50 ${emailConfig.provider === provider
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-300'
-                      }`}
+                    onClick={() => setEmailConfig((prev) => ({ ...prev, provider }))}
+                    className={`relative cursor-pointer rounded-lg border p-4 hover:bg-gray-50 ${
+                      emailConfig.provider === provider
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-300'
+                    }`}
                   >
                     <div className="flex items-center">
                       <input
                         type="radio"
                         checked={emailConfig.provider === provider}
-                        onChange={() => { }}
+                        onChange={() => {}}
                         className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                       />
                       <div className="ml-3">
@@ -345,7 +338,8 @@ const ConfiguracoesPage: React.FC = () => {
                     <div className="flex">
                       <AlertCircle className="h-5 w-5 text-yellow-400 mr-2 flex-shrink-0" />
                       <div className="text-sm text-yellow-700">
-                        <strong>Importante:</strong> Use uma "Senha de App" do Gmail, não sua senha normal.
+                        <strong>Importante:</strong> Use uma "Senha de App" do Gmail, não sua senha
+                        normal.
                         <a
                           href="https://myaccount.google.com/security"
                           target="_blank"
@@ -365,10 +359,12 @@ const ConfiguracoesPage: React.FC = () => {
                       <input
                         type="email"
                         value={emailConfig.gmail.user}
-                        onChange={(e) => setEmailConfig(prev => ({
-                          ...prev,
-                          gmail: { ...prev.gmail, user: e.target.value }
-                        }))}
+                        onChange={(e) =>
+                          setEmailConfig((prev) => ({
+                            ...prev,
+                            gmail: { ...prev.gmail, user: e.target.value },
+                          }))
+                        }
                         placeholder="seu-email@gmail.com"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
@@ -380,10 +376,12 @@ const ConfiguracoesPage: React.FC = () => {
                       <input
                         type="password"
                         value={emailConfig.gmail.password}
-                        onChange={(e) => setEmailConfig(prev => ({
-                          ...prev,
-                          gmail: { ...prev.gmail, password: e.target.value }
-                        }))}
+                        onChange={(e) =>
+                          setEmailConfig((prev) => ({
+                            ...prev,
+                            gmail: { ...prev.gmail, password: e.target.value },
+                          }))
+                        }
                         placeholder="xxxx xxxx xxxx xxxx"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
@@ -403,10 +401,12 @@ const ConfiguracoesPage: React.FC = () => {
                       <input
                         type="password"
                         value={emailConfig.sendgrid.apiKey}
-                        onChange={(e) => setEmailConfig(prev => ({
-                          ...prev,
-                          sendgrid: { ...prev.sendgrid, apiKey: e.target.value }
-                        }))}
+                        onChange={(e) =>
+                          setEmailConfig((prev) => ({
+                            ...prev,
+                            sendgrid: { ...prev.sendgrid, apiKey: e.target.value },
+                          }))
+                        }
                         placeholder="SG.xxxxxxxxxxxxxxxxxx"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
@@ -418,10 +418,12 @@ const ConfiguracoesPage: React.FC = () => {
                       <input
                         type="email"
                         value={emailConfig.sendgrid.fromEmail}
-                        onChange={(e) => setEmailConfig(prev => ({
-                          ...prev,
-                          sendgrid: { ...prev.sendgrid, fromEmail: e.target.value }
-                        }))}
+                        onChange={(e) =>
+                          setEmailConfig((prev) => ({
+                            ...prev,
+                            sendgrid: { ...prev.sendgrid, fromEmail: e.target.value },
+                          }))
+                        }
                         placeholder="contato@suaempresa.com"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
@@ -441,25 +443,27 @@ const ConfiguracoesPage: React.FC = () => {
                       <input
                         type="text"
                         value={emailConfig.smtp.host}
-                        onChange={(e) => setEmailConfig(prev => ({
-                          ...prev,
-                          smtp: { ...prev.smtp, host: e.target.value }
-                        }))}
+                        onChange={(e) =>
+                          setEmailConfig((prev) => ({
+                            ...prev,
+                            smtp: { ...prev.smtp, host: e.target.value },
+                          }))
+                        }
                         placeholder="smtp.seudominio.com"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Porta
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Porta</label>
                       <input
                         type="number"
                         value={emailConfig.smtp.port}
-                        onChange={(e) => setEmailConfig(prev => ({
-                          ...prev,
-                          smtp: { ...prev.smtp, port: parseInt(e.target.value) || 587 }
-                        }))}
+                        onChange={(e) =>
+                          setEmailConfig((prev) => ({
+                            ...prev,
+                            smtp: { ...prev.smtp, port: parseInt(e.target.value) || 587 },
+                          }))
+                        }
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
@@ -470,24 +474,26 @@ const ConfiguracoesPage: React.FC = () => {
                       <input
                         type="text"
                         value={emailConfig.smtp.user}
-                        onChange={(e) => setEmailConfig(prev => ({
-                          ...prev,
-                          smtp: { ...prev.smtp, user: e.target.value }
-                        }))}
+                        onChange={(e) =>
+                          setEmailConfig((prev) => ({
+                            ...prev,
+                            smtp: { ...prev.smtp, user: e.target.value },
+                          }))
+                        }
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Senha
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Senha</label>
                       <input
                         type="password"
                         value={emailConfig.smtp.password}
-                        onChange={(e) => setEmailConfig(prev => ({
-                          ...prev,
-                          smtp: { ...prev.smtp, password: e.target.value }
-                        }))}
+                        onChange={(e) =>
+                          setEmailConfig((prev) => ({
+                            ...prev,
+                            smtp: { ...prev.smtp, password: e.target.value },
+                          }))
+                        }
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
@@ -496,15 +502,15 @@ const ConfiguracoesPage: React.FC = () => {
                     <input
                       type="checkbox"
                       checked={emailConfig.smtp.secure}
-                      onChange={(e) => setEmailConfig(prev => ({
-                        ...prev,
-                        smtp: { ...prev.smtp, secure: e.target.checked }
-                      }))}
+                      onChange={(e) =>
+                        setEmailConfig((prev) => ({
+                          ...prev,
+                          smtp: { ...prev.smtp, secure: e.target.checked },
+                        }))
+                      }
                       className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
-                    <label className="ml-2 text-sm text-gray-700">
-                      Conexão segura (SSL/TLS)
-                    </label>
+                    <label className="ml-2 text-sm text-gray-700">Conexão segura (SSL/TLS)</label>
                   </div>
                 </div>
               )}
@@ -521,10 +527,12 @@ const ConfiguracoesPage: React.FC = () => {
                   <input
                     type="text"
                     value={emailConfig.empresa.nome}
-                    onChange={(e) => setEmailConfig(prev => ({
-                      ...prev,
-                      empresa: { ...prev.empresa, nome: e.target.value }
-                    }))}
+                    onChange={(e) =>
+                      setEmailConfig((prev) => ({
+                        ...prev,
+                        empresa: { ...prev.empresa, nome: e.target.value },
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -535,38 +543,40 @@ const ConfiguracoesPage: React.FC = () => {
                   <input
                     type="email"
                     value={emailConfig.empresa.email}
-                    onChange={(e) => setEmailConfig(prev => ({
-                      ...prev,
-                      empresa: { ...prev.empresa, email: e.target.value }
-                    }))}
+                    onChange={(e) =>
+                      setEmailConfig((prev) => ({
+                        ...prev,
+                        empresa: { ...prev.empresa, email: e.target.value },
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Telefone
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Telefone</label>
                   <input
                     type="text"
                     value={emailConfig.empresa.telefone}
-                    onChange={(e) => setEmailConfig(prev => ({
-                      ...prev,
-                      empresa: { ...prev.empresa, telefone: e.target.value }
-                    }))}
+                    onChange={(e) =>
+                      setEmailConfig((prev) => ({
+                        ...prev,
+                        empresa: { ...prev.empresa, telefone: e.target.value },
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Endereço
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Endereço</label>
                   <input
                     type="text"
                     value={emailConfig.empresa.endereco}
-                    onChange={(e) => setEmailConfig(prev => ({
-                      ...prev,
-                      empresa: { ...prev.empresa, endereco: e.target.value }
-                    }))}
+                    onChange={(e) =>
+                      setEmailConfig((prev) => ({
+                        ...prev,
+                        empresa: { ...prev.empresa, endereco: e.target.value },
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -609,8 +619,13 @@ const ConfiguracoesPage: React.FC = () => {
               </div>
 
               {resultadoTeste && (
-                <div className={`mt-4 p-4 rounded-md ${resultadoTeste.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
-                  }`}>
+                <div
+                  className={`mt-4 p-4 rounded-md ${
+                    resultadoTeste.success
+                      ? 'bg-green-50 border border-green-200'
+                      : 'bg-red-50 border border-red-200'
+                  }`}
+                >
                   <div className="flex">
                     {resultadoTeste.success ? (
                       <CheckCircle className="h-5 w-5 text-green-400 mr-2 flex-shrink-0" />
@@ -618,21 +633,24 @@ const ConfiguracoesPage: React.FC = () => {
                       <AlertCircle className="h-5 w-5 text-red-400 mr-2 flex-shrink-0" />
                     )}
                     <div>
-                      <h5 className={`font-medium ${resultadoTeste.success ? 'text-green-800' : 'text-red-800'
-                        }`}>
+                      <h5
+                        className={`font-medium ${
+                          resultadoTeste.success ? 'text-green-800' : 'text-red-800'
+                        }`}
+                      >
                         {resultadoTeste.success ? 'Teste bem-sucedido!' : 'Erro no teste'}
                       </h5>
-                      <p className={`text-sm ${resultadoTeste.success ? 'text-green-700' : 'text-red-700'
-                        }`}>
+                      <p
+                        className={`text-sm ${
+                          resultadoTeste.success ? 'text-green-700' : 'text-red-700'
+                        }`}
+                      >
                         {resultadoTeste.success
                           ? `E-mail enviado via ${resultadoTeste.provider}. Verifique sua caixa de entrada.`
-                          : resultadoTeste.error
-                        }
+                          : resultadoTeste.error}
                       </p>
                       {resultadoTeste.messageId && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          ID: {resultadoTeste.messageId}
-                        </p>
+                        <p className="text-xs text-gray-500 mt-1">ID: {resultadoTeste.messageId}</p>
                       )}
                     </div>
                   </div>
@@ -666,7 +684,9 @@ const ConfiguracoesPage: React.FC = () => {
         return (
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Preferências de Notificação</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Preferências de Notificação
+              </h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between py-3">
                   <div className="flex items-center">
@@ -682,7 +702,9 @@ const ConfiguracoesPage: React.FC = () => {
                     <input
                       type="checkbox"
                       checked={notifications.email}
-                      onChange={(e) => setNotifications({ ...notifications, email: e.target.checked })}
+                      onChange={(e) =>
+                        setNotifications({ ...notifications, email: e.target.checked })
+                      }
                       className="sr-only peer"
                     />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -694,16 +716,16 @@ const ConfiguracoesPage: React.FC = () => {
                     <Bell className="h-5 w-5 text-gray-400 mr-3" />
                     <div>
                       <p className="font-medium text-gray-900">Notificações Push</p>
-                      <p className="text-sm text-gray-600">
-                        Receber notificações no navegador
-                      </p>
+                      <p className="text-sm text-gray-600">Receber notificações no navegador</p>
                     </div>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
                       type="checkbox"
                       checked={notifications.push}
-                      onChange={(e) => setNotifications({ ...notifications, push: e.target.checked })}
+                      onChange={(e) =>
+                        setNotifications({ ...notifications, push: e.target.checked })
+                      }
                       className="sr-only peer"
                     />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -715,16 +737,16 @@ const ConfiguracoesPage: React.FC = () => {
                     <Phone className="h-5 w-5 text-gray-400 mr-3" />
                     <div>
                       <p className="font-medium text-gray-900">Notificações SMS</p>
-                      <p className="text-sm text-gray-600">
-                        Receber alertas importantes por SMS
-                      </p>
+                      <p className="text-sm text-gray-600">Receber alertas importantes por SMS</p>
                     </div>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
                       type="checkbox"
                       checked={notifications.sms}
-                      onChange={(e) => setNotifications({ ...notifications, sms: e.target.checked })}
+                      onChange={(e) =>
+                        setNotifications({ ...notifications, sms: e.target.checked })
+                      }
                       className="sr-only peer"
                     />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -784,9 +806,7 @@ const ConfiguracoesPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    CNPJ
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">CNPJ</label>
                   <input
                     type="text"
                     defaultValue="12.345.678/0001-90"
@@ -820,9 +840,7 @@ const ConfiguracoesPage: React.FC = () => {
               <h3 className="text-lg font-medium text-gray-900 mb-4">Endereço</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Logradouro
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Logradouro</label>
                   <input
                     type="text"
                     defaultValue="Av. Paulista, 1234"
@@ -830,9 +848,7 @@ const ConfiguracoesPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Cidade
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
                   <input
                     type="text"
                     defaultValue="São Paulo"
@@ -840,9 +856,7 @@ const ConfiguracoesPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    CEP
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">CEP</label>
                   <input
                     type="text"
                     defaultValue="01310-100"
@@ -936,10 +950,11 @@ const ConfiguracoesPage: React.FC = () => {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === tab.id
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                        }`}
+                      className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                        activeTab === tab.id
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      }`}
                     >
                       <Icon className="h-5 w-5 mr-3" />
                       {tab.label}

@@ -21,11 +21,12 @@ import {
   Tag,
   AlertTriangle,
 } from 'lucide-react';
+import { Oportunidade, NovaOportunidade } from '../../types/oportunidades';
 import {
-  Oportunidade,
-  NovaOportunidade,
-} from '../../types/oportunidades';
-import { EstagioOportunidade, PrioridadeOportunidade, OrigemOportunidade } from '../../types/oportunidades/enums';
+  EstagioOportunidade,
+  PrioridadeOportunidade,
+  OrigemOportunidade,
+} from '../../types/oportunidades/enums';
 import { Usuario } from '../../types/usuarios';
 import { useAuth } from '../../contexts/AuthContext';
 import InputMoeda from '../common/InputMoeda';
@@ -158,10 +159,11 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
   // Filtrar clientes conforme busca
   useEffect(() => {
     if (buscaCliente.trim()) {
-      const filtrados = clientes.filter(c =>
-        c.nome.toLowerCase().includes(buscaCliente.toLowerCase()) ||
-        c.email?.toLowerCase().includes(buscaCliente.toLowerCase()) ||
-        c.documento?.includes(buscaCliente)
+      const filtrados = clientes.filter(
+        (c) =>
+          c.nome.toLowerCase().includes(buscaCliente.toLowerCase()) ||
+          c.email?.toLowerCase().includes(buscaCliente.toLowerCase()) ||
+          c.documento?.includes(buscaCliente),
       );
       setClientesFiltrados(filtrados);
     } else {
@@ -217,6 +219,19 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
       setActiveTab('detalhes');
     }
   }, [isOpen, oportunidade, estagioInicial, user]);
+
+  useEffect(() => {
+    if (!isOpen || oportunidade) {
+      return;
+    }
+
+    if (user?.id) {
+      setFormData((prev) => ({
+        ...prev,
+        responsavel_id: prev.responsavel_id || user.id,
+      }));
+    }
+  }, [isOpen, oportunidade, user]);
 
   // ========================================
   // VALIDAÇÕES
@@ -285,7 +300,7 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
   // ========================================
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -335,7 +350,7 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
     // Se limpar, resetar cliente selecionado
     if (!valor) {
       setClienteSelecionado(null);
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         cliente_id: '',
         nomeContato: '',
@@ -352,7 +367,7 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
     setShowClienteDropdown(false);
 
     // Preencher formulário com dados do cliente
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       cliente_id: cliente.id || '',
       nomeContato: cliente.nome,
@@ -362,7 +377,7 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
     }));
 
     // Limpar erro de contato
-    setErrors(prev => prev.filter(err => err.field !== 'contato'));
+    setErrors((prev) => prev.filter((err) => err.field !== 'contato'));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -384,7 +399,21 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
       setLoading(true);
       setErrors([]);
 
-      await onSave(formData);
+      const responsavelId = formData.responsavel_id || user?.id || '';
+
+      if (!responsavelId) {
+        setErrors([{ field: 'responsavel_id', message: 'Responsável é obrigatório' }]);
+        setLoading(false);
+        return;
+      }
+
+      const payload: NovaOportunidade = {
+        ...formData,
+        responsavel_id: responsavelId,
+        cliente_id: formData.cliente_id?.trim() || '',
+      };
+
+      await onSave(payload);
 
       // Mostrar mensagem de sucesso
       setShowSuccessMessage(true);
@@ -411,13 +440,13 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
     // Verificar se há mudanças não salvas
     const hasChanges = oportunidade
       ? formData.titulo !== oportunidade.titulo ||
-      formData.descricao !== (oportunidade.descricao || '') ||
-      formData.valor !== Number(oportunidade.valor)
+        formData.descricao !== (oportunidade.descricao || '') ||
+        formData.valor !== Number(oportunidade.valor)
       : formData.titulo.trim() !== '' || formData.descricao.trim() !== '';
 
     if (hasChanges) {
       const confirmClose = window.confirm(
-        'Você tem alterações não salvas. Deseja realmente fechar?'
+        'Você tem alterações não salvas. Deseja realmente fechar?',
       );
       if (!confirmClose) return;
     }
@@ -526,10 +555,11 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                 type="button"
                 onClick={() => setActiveTab('detalhes')}
                 disabled={loading}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors disabled:opacity-50 ${activeTab === 'detalhes'
-                  ? 'border-[#159A9C] text-[#159A9C]'
-                  : 'border-transparent text-[#002333]/60 hover:text-[#002333]'
-                  }`}
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors disabled:opacity-50 ${
+                  activeTab === 'detalhes'
+                    ? 'border-[#159A9C] text-[#159A9C]'
+                    : 'border-transparent text-[#002333]/60 hover:text-[#002333]'
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />
@@ -540,10 +570,11 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                 type="button"
                 onClick={() => setActiveTab('atividades')}
                 disabled={loading}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors disabled:opacity-50 ${activeTab === 'atividades'
-                  ? 'border-[#159A9C] text-[#159A9C]'
-                  : 'border-transparent text-[#002333]/60 hover:text-[#002333]'
-                  }`}
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors disabled:opacity-50 ${
+                  activeTab === 'atividades'
+                    ? 'border-[#159A9C] text-[#159A9C]'
+                    : 'border-transparent text-[#002333]/60 hover:text-[#002333]'
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <Activity className="h-4 w-4" />
@@ -631,10 +662,11 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                         value={formData.titulo}
                         onChange={handleChange}
                         placeholder="Ex: Implantação CRM - Empresa XYZ"
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm transition-colors ${getFieldError('titulo')
-                          ? 'border-red-300 bg-red-50'
-                          : 'border-[#B4BEC9] bg-white'
-                          }`}
+                        className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm transition-colors ${
+                          getFieldError('titulo')
+                            ? 'border-red-300 bg-red-50'
+                            : 'border-[#B4BEC9] bg-white'
+                        }`}
                         required
                         disabled={loading}
                       />
@@ -705,7 +737,7 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                               rgb(251 191 36) 25%, 
                               rgb(74 222 128) 50%, 
                               rgb(34 197 94) 75%, 
-                              rgb(22 163 74) 100%) 0% / ${formData.probabilidade}% 100% no-repeat transparent`
+                              rgb(22 163 74) 100%) 0% / ${formData.probabilidade}% 100% no-repeat transparent`,
                           }}
                         />
                       </div>
@@ -713,31 +745,35 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                       {/* Indicador de valor e status */}
                       <div className="flex items-center justify-between mb-2">
                         <div
-                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${formData.probabilidade <= 20
-                            ? 'bg-red-100 text-red-700'
-                            : formData.probabilidade <= 40
-                              ? 'bg-orange-100 text-orange-700'
-                              : formData.probabilidade <= 60
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : formData.probabilidade <= 80
-                                  ? 'bg-green-100 text-green-700'
-                                  : 'bg-green-200 text-green-800'
-                            }`}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                            formData.probabilidade <= 20
+                              ? 'bg-red-100 text-red-700'
+                              : formData.probabilidade <= 40
+                                ? 'bg-orange-100 text-orange-700'
+                                : formData.probabilidade <= 60
+                                  ? 'bg-yellow-100 text-yellow-700'
+                                  : formData.probabilidade <= 80
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-green-200 text-green-800'
+                          }`}
                         >
                           <TrendingUp className="h-4 w-4" />
                           <span>{formData.probabilidade}%</span>
                         </div>
 
-                        <span className={`text-xs font-medium ${formData.probabilidade <= 20
-                          ? 'text-red-600'
-                          : formData.probabilidade <= 40
-                            ? 'text-orange-600'
-                            : formData.probabilidade <= 60
-                              ? 'text-yellow-600'
-                              : formData.probabilidade <= 80
-                                ? 'text-green-600'
-                                : 'text-green-700'
-                          }`}>
+                        <span
+                          className={`text-xs font-medium ${
+                            formData.probabilidade <= 20
+                              ? 'text-red-600'
+                              : formData.probabilidade <= 40
+                                ? 'text-orange-600'
+                                : formData.probabilidade <= 60
+                                  ? 'text-yellow-600'
+                                  : formData.probabilidade <= 80
+                                    ? 'text-green-600'
+                                    : 'text-green-700'
+                          }`}
+                        >
                           {formData.probabilidade <= 20
                             ? '❄️ Improvável'
                             : formData.probabilidade <= 40
@@ -801,7 +837,9 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                       </select>
                       {formData.prioridade && (
                         <div className="mt-2">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${PRIORIDADES_CORES[formData.prioridade]}`}>
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${PRIORIDADES_CORES[formData.prioridade]}`}
+                          >
                             {PRIORIDADES_LABELS[formData.prioridade]}
                           </span>
                         </div>
@@ -925,10 +963,11 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                             onChange={handleBuscaClienteChange}
                             onFocus={() => setShowClienteDropdown(true)}
                             placeholder="Buscar cliente por nome, e-mail ou documento..."
-                            className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm ${clienteSelecionado
-                              ? 'border-green-300 bg-green-50'
-                              : 'border-[#B4BEC9] bg-white'
-                              }`}
+                            className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm ${
+                              clienteSelecionado
+                                ? 'border-green-300 bg-green-50'
+                                : 'border-[#B4BEC9] bg-white'
+                            }`}
                             disabled={loading || loadingClientes}
                           />
                           {loadingClientes && (
@@ -979,11 +1018,14 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                         )}
 
                         {/* Estado vazio */}
-                        {showClienteDropdown && buscaCliente && clientesFiltrados.length === 0 && !loadingClientes && (
-                          <div className="absolute z-50 w-full mt-1 bg-white border border-[#B4BEC9] rounded-lg shadow-lg p-4 text-center">
-                            <p className="text-sm text-[#002333]/60">Nenhum cliente encontrado</p>
-                          </div>
-                        )}
+                        {showClienteDropdown &&
+                          buscaCliente &&
+                          clientesFiltrados.length === 0 &&
+                          !loadingClientes && (
+                            <div className="absolute z-50 w-full mt-1 bg-white border border-[#B4BEC9] rounded-lg shadow-lg p-4 text-center">
+                              <p className="text-sm text-[#002333]/60">Nenhum cliente encontrado</p>
+                            </div>
+                          )}
                       </div>
 
                       {clienteSelecionado ? (
@@ -1002,7 +1044,8 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                     {/* Nome Contato */}
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-[#002333] mb-2">
-                        Nome do Contato {!formData.cliente_id && <span className="text-red-600">*</span>}
+                        Nome do Contato{' '}
+                        {!formData.cliente_id && <span className="text-red-600">*</span>}
                       </label>
                       <input
                         type="text"
@@ -1010,10 +1053,11 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                         value={formData.nomeContato}
                         onChange={handleChange}
                         placeholder="João Silva"
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm ${getFieldError('contato')
-                          ? 'border-red-300 bg-red-50'
-                          : 'border-[#B4BEC9] bg-white'
-                          }`}
+                        className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm ${
+                          getFieldError('contato')
+                            ? 'border-red-300 bg-red-50'
+                            : 'border-[#B4BEC9] bg-white'
+                        }`}
                         disabled={loading}
                       />
                     </div>
@@ -1033,10 +1077,11 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                           value={formData.emailContato}
                           onChange={handleChange}
                           placeholder="joao@empresa.com.br"
-                          className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm ${getFieldError('emailContato')
-                            ? 'border-red-300 bg-red-50'
-                            : 'border-[#B4BEC9] bg-white'
-                            }`}
+                          className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm ${
+                            getFieldError('emailContato')
+                              ? 'border-red-300 bg-red-50'
+                              : 'border-[#B4BEC9] bg-white'
+                          }`}
                           disabled={loading}
                         />
                       </div>
@@ -1060,15 +1105,18 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                           value={formData.telefoneContato}
                           onChange={handleChange}
                           placeholder="(11) 98765-4321"
-                          className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm ${getFieldError('telefoneContato')
-                            ? 'border-red-300 bg-red-50'
-                            : 'border-[#B4BEC9] bg-white'
-                            }`}
+                          className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm ${
+                            getFieldError('telefoneContato')
+                              ? 'border-red-300 bg-red-50'
+                              : 'border-[#B4BEC9] bg-white'
+                          }`}
                           disabled={loading}
                         />
                       </div>
                       {getFieldError('telefoneContato') && (
-                        <p className="mt-1 text-xs text-red-600">{getFieldError('telefoneContato')}</p>
+                        <p className="mt-1 text-xs text-red-600">
+                          {getFieldError('telefoneContato')}
+                        </p>
                       )}
                     </div>
 
@@ -1110,10 +1158,11 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                       name="responsavel_id"
                       value={formData.responsavel_id}
                       onChange={handleChange}
-                      className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm bg-white ${getFieldError('responsavel_id')
-                        ? 'border-red-300 bg-red-50'
-                        : 'border-[#B4BEC9]'
-                        }`}
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm bg-white ${
+                        getFieldError('responsavel_id')
+                          ? 'border-red-300 bg-red-50'
+                          : 'border-[#B4BEC9]'
+                      }`}
                       required
                       disabled={loading || loadingUsuarios}
                     >

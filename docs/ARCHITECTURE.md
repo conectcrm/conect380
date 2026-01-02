@@ -678,14 +678,19 @@ export const useWebSocket = () => {
 
 ### 1. WhatsApp Business API
 
-**Webhook URL**: `https://seu-dominio.com/api/atendimento/webhooks/whatsapp`
+**Webhook URL**: `https://seu-dominio.com/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>` (sempre validar `X-Hub-Signature-256`)
 
 ```typescript
 // Receber mensagens
-@Post('webhooks/whatsapp')
-async handleWebhook(@Body() body: any) {
+@Post('webhooks/whatsapp/:empresaId')
+async handleWebhook(
+  @Param('empresaId') empresaId: string,
+  @Headers('x-hub-signature-256') signature: string,
+  @Body() body: any,
+) {
+  this.whatsappService.validarAssinatura(signature, body); // lança erro se inválido
   const mensagem = this.whatsappService.parsearMensagem(body);
-  await this.mensagemService.criar(mensagem);
+  await this.mensagemService.criar({ ...mensagem, empresaId });
   
   // Emitir via WebSocket
   this.gateway.emitirNovaMensagem(mensagem.empresaId, mensagem);

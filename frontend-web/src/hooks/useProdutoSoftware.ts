@@ -8,19 +8,19 @@ export interface CamposDinamicos {
   // Campos de estoque (ocultos para software)
   mostrarEstoque: boolean;
   mostrarQuantidade: boolean;
-  
+
   // Campos específicos de software
   mostrarLicenciamento: boolean;
   mostrarRenovacao: boolean;
-  
+
   // Labels dinâmicos
   labelQuantidade: string;
   labelUnidade: string;
-  
+
   // Validações
   quantidadeObrigatoria: boolean;
   licenciamentoObrigatorio: boolean;
-  
+
   // Mensagens e tooltips
   tooltipInfo: string;
   alertaEspecial: string;
@@ -40,49 +40,49 @@ export interface PeriodicidadeLicenca {
 
 // Constantes para licenciamento
 export const TIPOS_LICENCIAMENTO: TipoLicenciamento[] = [
-  { 
-    value: 'usuario', 
-    label: 'Usuário', 
-    descricao: 'Licença individual por usuário ativo' 
+  {
+    value: 'usuario',
+    label: 'Usuário',
+    descricao: 'Licença individual por usuário ativo',
   },
-  { 
-    value: 'dispositivo', 
-    label: 'Dispositivo', 
-    descricao: 'Licença vinculada a um dispositivo específico' 
+  {
+    value: 'dispositivo',
+    label: 'Dispositivo',
+    descricao: 'Licença vinculada a um dispositivo específico',
   },
-  { 
-    value: 'mensal', 
-    label: 'Mensal', 
-    descricao: 'Licenciamento com cobrança mensal' 
+  {
+    value: 'mensal',
+    label: 'Mensal',
+    descricao: 'Licenciamento com cobrança mensal',
   },
-  { 
-    value: 'anual', 
-    label: 'Anual', 
-    descricao: 'Licenciamento com cobrança anual' 
+  {
+    value: 'anual',
+    label: 'Anual',
+    descricao: 'Licenciamento com cobrança anual',
   },
-  { 
-    value: 'vitalicio', 
-    label: 'Vitalício', 
-    descricao: 'Licença sem vencimento' 
-  }
+  {
+    value: 'vitalicio',
+    label: 'Vitalício',
+    descricao: 'Licença sem vencimento',
+  },
 ];
 
 export const PERIODICIDADES_LICENCA: PeriodicidadeLicenca[] = [
-  { 
-    value: 'mensal', 
-    label: 'Mensal', 
-    descricao: 'Renovação todo mês' 
+  {
+    value: 'mensal',
+    label: 'Mensal',
+    descricao: 'Renovação todo mês',
   },
-  { 
-    value: 'anual', 
-    label: 'Anual', 
-    descricao: 'Renovação anual' 
+  {
+    value: 'anual',
+    label: 'Anual',
+    descricao: 'Renovação anual',
   },
-  { 
-    value: 'unica', 
-    label: 'Única', 
-    descricao: 'Licença sem renovação necessária' 
-  }
+  {
+    value: 'unica',
+    label: 'Única',
+    descricao: 'Licença sem renovação necessária',
+  },
 ];
 
 export const useProdutoSoftware = (tipoItem: string, tipo?: string) => {
@@ -96,7 +96,7 @@ export const useProdutoSoftware = (tipoItem: string, tipo?: string) => {
     quantidadeObrigatoria: true,
     licenciamentoObrigatorio: false,
     tooltipInfo: '',
-    alertaEspecial: ''
+    alertaEspecial: '',
   });
 
   // Detectar se é produto de software - usando ambas as formas para compatibilidade
@@ -109,22 +109,24 @@ export const useProdutoSoftware = (tipoItem: string, tipo?: string) => {
         // 1. Ocultar campos relacionados ao estoque físico
         mostrarEstoque: false,
         mostrarQuantidade: true, // Mantém, mas muda o label
-        
+
         // 2. Exibir campos específicos de software
         mostrarLicenciamento: true,
         mostrarRenovacao: true,
-        
+
         // 3. Labels adaptados
         labelQuantidade: 'Quantidade de Licenças',
         labelUnidade: 'Licenças',
-        
+
         // 4. Validações específicas
         quantidadeObrigatoria: true,
         licenciamentoObrigatorio: true,
-        
+
         // 5. Informações explicativas
-        tooltipInfo: 'Para produtos de software, a proposta será baseada no número de licenças e não em unidades físicas.',
-        alertaEspecial: '💡 Produto de Software: Configure o tipo de licenciamento e periodicidade para vendas mais precisas.'
+        tooltipInfo:
+          'Para produtos de software, a proposta será baseada no número de licenças e não em unidades físicas.',
+        alertaEspecial:
+          '💡 Produto de Software: Configure o tipo de licenciamento e periodicidade para vendas mais precisas.',
       });
     } else {
       // Configuração padrão para produtos físicos
@@ -138,7 +140,7 @@ export const useProdutoSoftware = (tipoItem: string, tipo?: string) => {
         quantidadeObrigatoria: true,
         licenciamentoObrigatorio: false,
         tooltipInfo: '',
-        alertaEspecial: ''
+        alertaEspecial: '',
       });
     }
   }, [tipoItem, isSoftware]);
@@ -147,7 +149,7 @@ export const useProdutoSoftware = (tipoItem: string, tipo?: string) => {
     campos,
     isSoftware,
     TIPOS_LICENCIAMENTO,
-    PERIODICIDADES_LICENCA
+    PERIODICIDADES_LICENCA,
   };
 };
 
@@ -160,15 +162,15 @@ export const validarProdutoSoftware = (dados: any, isSoftware: boolean) => {
     if (!dados.tipoLicenciamento) {
       erros.push('Tipo de licenciamento é obrigatório para produtos de software');
     }
-    
+
     if (!dados.periodicidadeLicenca) {
       erros.push('Periodicidade da licença é obrigatória para produtos de software');
     }
-    
+
     if (dados.quantidadeLicencas && dados.quantidadeLicencas <= 0) {
       erros.push('Quantidade de licenças deve ser maior que zero');
     }
-    
+
     // Validar combinações específicas
     if (dados.tipoLicenciamento === 'site' && dados.quantidadeLicencas > 1) {
       erros.push('Site License não permite múltiplas quantidades');
@@ -177,7 +179,7 @@ export const validarProdutoSoftware = (dados: any, isSoftware: boolean) => {
 
   return {
     valido: erros.length === 0,
-    erros
+    erros,
   };
 };
 
@@ -186,10 +188,10 @@ export const calcularPrecoSoftware = (
   precoBase: number,
   quantidade: number,
   tipoLicenciamento: string,
-  periodicidade: string
+  periodicidade: string,
 ) => {
   let multiplicador = 1;
-  
+
   // Ajuste por tipo de licenciamento
   switch (tipoLicenciamento) {
     case 'vitalicio':
@@ -210,22 +212,22 @@ export const calcularPrecoSoftware = (
     default:
       multiplicador = quantidade;
   }
-  
+
   // Ajuste por periodicidade
   let fatorPeriodicidade = 1;
   switch (periodicidade) {
-    case 'mensal': 
-      fatorPeriodicidade = 1; 
+    case 'mensal':
+      fatorPeriodicidade = 1;
       break;
-    case 'anual': 
+    case 'anual':
       fatorPeriodicidade = 10; // 10 meses pelo preço de 12
       break;
-    case 'unica': 
+    case 'unica':
       fatorPeriodicidade = 24; // Equivale a 2 anos
       break;
-    default: 
+    default:
       fatorPeriodicidade = 1;
   }
-  
+
   return precoBase * multiplicador * fatorPeriodicidade;
 };

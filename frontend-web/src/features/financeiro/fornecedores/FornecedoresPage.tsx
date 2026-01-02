@@ -1,15 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Edit3, Trash2, Building2, Phone, Mail, Filter, Download, MoreVertical, FileSpreadsheet, Eye, Check, X, CheckCircle, Calendar, Activity, Settings, FileText } from 'lucide-react';
+import {
+  Plus,
+  Search,
+  Edit3,
+  Trash2,
+  Building2,
+  Phone,
+  Mail,
+  Filter,
+  Download,
+  MoreVertical,
+  FileSpreadsheet,
+  Eye,
+  Check,
+  X,
+  CheckCircle,
+  Calendar,
+  Activity,
+  Settings,
+  FileText,
+} from 'lucide-react';
 import { fornecedorService, Fornecedor, NovoFornecedor } from '../../../services/fornecedorService';
 import ModalFornecedor from '../components/ModalFornecedor';
 import ModalDetalhesFornecedor from '../components/ModalDetalhesFornecedor';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
-import { exportToCSV, exportToExcel, formatDateForExport, formatStatusForExport, ExportColumn } from '../../../utils/exportUtils';
+import {
+  exportToCSV,
+  exportToExcel,
+  formatDateForExport,
+  formatStatusForExport,
+  ExportColumn,
+} from '../../../utils/exportUtils';
 import ModalConfirmacao from '../../../components/common/ModalConfirmacao';
-import { useConfirmacaoInteligente, useValidacaoFinanceira } from '../../../hooks/useConfirmacaoInteligente';
+import {
+  useConfirmacaoInteligente,
+  useValidacaoFinanceira,
+} from '../../../hooks/useConfirmacaoInteligente';
 
-export { }; // Para resolver o erro isolatedModules
+export {}; // Para resolver o erro isolatedModules
 
 interface DashboardCards {
   totalFornecedores: number;
@@ -41,7 +70,7 @@ export default function FornecedoresPage() {
     totalFornecedores: 0,
     fornecedoresAtivos: 0,
     fornecedoresInativos: 0,
-    fornecedoresCadastradosHoje: 0
+    fornecedoresCadastradosHoje: 0,
   });
 
   useEffect(() => {
@@ -53,30 +82,30 @@ export default function FornecedoresPage() {
       setCarregando(true);
       const filtros = {
         busca: busca.trim(),
-        ativo: filtroStatus === 'todos' ? undefined : filtroStatus === 'ativo'
+        ativo: filtroStatus === 'todos' ? undefined : filtroStatus === 'ativo',
       };
 
       const dados = await fornecedorService.listarFornecedores(filtros);
-      const dadosNormalizados = dados.map(fornecedor => ({
+      const dadosNormalizados = dados.map((fornecedor) => ({
         ...fornecedor,
-        cnpjCpf: fornecedor.cnpjCpf ?? fornecedor.cnpj ?? fornecedor.cpf ?? ''
+        cnpjCpf: fornecedor.cnpjCpf ?? fornecedor.cnpj ?? fornecedor.cpf ?? '',
       }));
       setFornecedores(dadosNormalizados);
 
       // Calcular estatísticas para o dashboard
       const total = dadosNormalizados.length;
-      const ativos = dadosNormalizados.filter(f => f.ativo).length;
+      const ativos = dadosNormalizados.filter((f) => f.ativo).length;
       const inativos = total - ativos;
       const hoje = new Date().toDateString();
-      const cadastradosHoje = dadosNormalizados.filter(f =>
-        new Date(f.criadoEm).toDateString() === hoje
+      const cadastradosHoje = dadosNormalizados.filter(
+        (f) => new Date(f.criadoEm).toDateString() === hoje,
       ).length;
 
       setDashboardCards({
         totalFornecedores: total,
         fornecedoresAtivos: ativos,
         fornecedoresInativos: inativos,
-        fornecedoresCadastradosHoje: cadastradosHoje
+        fornecedoresCadastradosHoje: cadastradosHoje,
       });
     } catch (error) {
       console.error('Erro ao carregar fornecedores:', error);
@@ -95,13 +124,13 @@ export default function FornecedoresPage() {
       setCarregando(true);
       const filtros = {
         busca: busca.trim(),
-        ativo: filtroStatus === 'todos' ? undefined : filtroStatus === 'ativo'
+        ativo: filtroStatus === 'todos' ? undefined : filtroStatus === 'ativo',
       };
 
       const dados = await fornecedorService.listarFornecedores(filtros);
-      const dadosNormalizados = dados.map(fornecedor => ({
+      const dadosNormalizados = dados.map((fornecedor) => ({
         ...fornecedor,
-        cnpjCpf: fornecedor.cnpjCpf ?? fornecedor.cnpj ?? fornecedor.cpf ?? ''
+        cnpjCpf: fornecedor.cnpjCpf ?? fornecedor.cnpj ?? fornecedor.cpf ?? '',
       }));
       setFornecedores(dadosNormalizados);
     } catch (error) {
@@ -142,7 +171,9 @@ export default function FornecedoresPage() {
     setFornecedorDetalhes(null);
   };
 
-  const handleSalvarFornecedor = async (dadosFornecedor: NovoFornecedor | Partial<NovoFornecedor>) => {
+  const handleSalvarFornecedor = async (
+    dadosFornecedor: NovoFornecedor | Partial<NovoFornecedor>,
+  ) => {
     try {
       if (fornecedorEdicao) {
         await fornecedorService.atualizarFornecedor(fornecedorEdicao.id, dadosFornecedor);
@@ -160,13 +191,13 @@ export default function FornecedoresPage() {
   const excluirFornecedor = async (id: number) => {
     try {
       // Buscar o fornecedor para validação
-      const fornecedor = fornecedores.find(f => f.id === id);
+      const fornecedor = fornecedores.find((f) => f.id === id);
       if (!fornecedor) return;
 
       // Usar confirmação inteligente
       const dadosContexto = {
         cliente: fornecedor.nome,
-        observacoes: fornecedor.ativo ? 'Fornecedor ativo' : 'Fornecedor inativo'
+        observacoes: fornecedor.ativo ? 'Fornecedor ativo' : 'Fornecedor inativo',
       };
 
       // Mostrar confirmação inteligente
@@ -176,7 +207,7 @@ export default function FornecedoresPage() {
           await fornecedorService.excluirFornecedor(id);
           carregarFornecedores();
         },
-        dadosContexto
+        dadosContexto,
       );
     } catch (error) {
       console.error('Erro ao excluir fornecedor:', error);
@@ -210,7 +241,7 @@ export default function FornecedoresPage() {
       { key: 'contato', label: 'Contato' },
       { key: 'cargo', label: 'Cargo' },
       { key: 'ativo', label: 'Status', format: formatStatusForExport },
-      { key: 'criadoEm', label: 'Data de Cadastro', format: formatDateForExport }
+      { key: 'criadoEm', label: 'Data de Cadastro', format: formatDateForExport },
     ];
 
     const filename = `fornecedores_${new Date().toISOString().split('T')[0]}.csv`;
@@ -230,7 +261,7 @@ export default function FornecedoresPage() {
       { key: 'contato', label: 'Contato' },
       { key: 'cargo', label: 'Cargo' },
       { key: 'ativo', label: 'Status', format: formatStatusForExport },
-      { key: 'criadoEm', label: 'Data de Cadastro', format: formatDateForExport }
+      { key: 'criadoEm', label: 'Data de Cadastro', format: formatDateForExport },
     ];
 
     const filename = `fornecedores_${new Date().toISOString().split('T')[0]}.xlsx`;
@@ -239,9 +270,9 @@ export default function FornecedoresPage() {
 
   // Funções de seleção múltipla
   const toggleSelecionarFornecedor = (fornecedorId: number) => {
-    setFornecedoresSelecionados(prev => {
+    setFornecedoresSelecionados((prev) => {
       const novaSelecao = prev.includes(fornecedorId)
-        ? prev.filter(id => id !== fornecedorId)
+        ? prev.filter((id) => id !== fornecedorId)
         : [...prev, fornecedorId];
 
       setMostrarAcoesMassa(novaSelecao.length > 0);
@@ -250,7 +281,7 @@ export default function FornecedoresPage() {
   };
 
   const selecionarTodos = () => {
-    const todosIds = fornecedores.map(f => f.id);
+    const todosIds = fornecedores.map((f) => f.id);
     setFornecedoresSelecionados(todosIds);
     setMostrarAcoesMassa(todosIds.length > 0);
   };
@@ -261,7 +292,11 @@ export default function FornecedoresPage() {
   };
 
   const ativarSelecionados = async () => {
-    if (!window.confirm(`Tem certeza que deseja ativar ${fornecedoresSelecionados.length} fornecedor(es)?`)) {
+    if (
+      !window.confirm(
+        `Tem certeza que deseja ativar ${fornecedoresSelecionados.length} fornecedor(es)?`,
+      )
+    ) {
       return;
     }
 
@@ -278,7 +313,11 @@ export default function FornecedoresPage() {
   };
 
   const desativarSelecionados = async () => {
-    if (!window.confirm(`Tem certeza que deseja desativar ${fornecedoresSelecionados.length} fornecedor(es)?`)) {
+    if (
+      !window.confirm(
+        `Tem certeza que deseja desativar ${fornecedoresSelecionados.length} fornecedor(es)?`,
+      )
+    ) {
       return;
     }
 
@@ -305,12 +344,14 @@ export default function FornecedoresPage() {
         deselecionarTodos();
         carregarFornecedores();
       },
-      { quantidadeItens: fornecedoresSelecionados.length }
+      { quantidadeItens: fornecedoresSelecionados.length },
     );
   };
 
   const exportarSelecionados = () => {
-    const fornecedoresFiltrados = fornecedores.filter(f => fornecedoresSelecionados.includes(f.id));
+    const fornecedoresFiltrados = fornecedores.filter((f) =>
+      fornecedoresSelecionados.includes(f.id),
+    );
 
     const columns: ExportColumn[] = [
       { key: 'nome', label: 'Nome' },
@@ -324,7 +365,7 @@ export default function FornecedoresPage() {
       { key: 'contato', label: 'Contato' },
       { key: 'cargo', label: 'Cargo' },
       { key: 'ativo', label: 'Status', format: formatStatusForExport },
-      { key: 'criadoEm', label: 'Data de Cadastro', format: formatDateForExport }
+      { key: 'criadoEm', label: 'Data de Cadastro', format: formatDateForExport },
     ];
 
     const filename = `fornecedores_selecionados_${new Date().toISOString().split('T')[0]}.xlsx`;
@@ -345,10 +386,7 @@ export default function FornecedoresPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusName="Financeiro"
-          nucleusPath="/nuclei/financeiro"
-        />
+        <BackToNucleus nucleusName="Financeiro" nucleusPath="/nuclei/financeiro" />
       </div>
 
       <div className="p-6">
@@ -364,7 +402,9 @@ export default function FornecedoresPage() {
                 )}
               </h1>
               <p className="mt-2 text-[#B4BEC9]">
-                {carregando ? 'Carregando fornecedores...' : `Gerencie seus ${dashboardCards.totalFornecedores} fornecedores e parceiros comerciais`}
+                {carregando
+                  ? 'Carregando fornecedores...'
+                  : `Gerencie seus ${dashboardCards.totalFornecedores} fornecedores e parceiros comerciais`}
               </p>
             </div>
 
@@ -386,8 +426,12 @@ export default function FornecedoresPage() {
           <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Total de Fornecedores</p>
-                <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.totalFornecedores}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                  Total de Fornecedores
+                </p>
+                <p className="text-3xl font-bold text-[#002333] mt-2">
+                  {dashboardCards.totalFornecedores}
+                </p>
                 <p className="text-sm text-[#002333]/70 mt-3">📊 Visão geral</p>
               </div>
               <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
@@ -399,8 +443,12 @@ export default function FornecedoresPage() {
           <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Fornecedores Ativos</p>
-                <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.fornecedoresAtivos}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                  Fornecedores Ativos
+                </p>
+                <p className="text-3xl font-bold text-[#002333] mt-2">
+                  {dashboardCards.fornecedoresAtivos}
+                </p>
                 <p className="text-sm text-[#002333]/70 mt-3">✅ Operacionais</p>
               </div>
               <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
@@ -412,8 +460,12 @@ export default function FornecedoresPage() {
           <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Fornecedores Inativos</p>
-                <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.fornecedoresInativos}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                  Fornecedores Inativos
+                </p>
+                <p className="text-3xl font-bold text-[#002333] mt-2">
+                  {dashboardCards.fornecedoresInativos}
+                </p>
                 <p className="text-sm text-[#002333]/70 mt-3">❌ Suspensos</p>
               </div>
               <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center shadow-sm">
@@ -425,8 +477,12 @@ export default function FornecedoresPage() {
           <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Cadastrados Hoje</p>
-                <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.fornecedoresCadastradosHoje}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                  Cadastrados Hoje
+                </p>
+                <p className="text-3xl font-bold text-[#002333] mt-2">
+                  {dashboardCards.fornecedoresCadastradosHoje}
+                </p>
                 <p className="text-sm text-[#002333]/70 mt-3">🆕 Novos</p>
               </div>
               <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
@@ -458,9 +514,7 @@ export default function FornecedoresPage() {
 
             <div className="flex gap-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
                 <select
                   value={filtroStatus}
                   onChange={(e) => setFiltroStatus(e.target.value as 'todos' | 'ativo' | 'inativo')}
@@ -473,9 +527,7 @@ export default function FornecedoresPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Ações
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Ações</label>
                 <div className="flex gap-2">
                   <button
                     onClick={buscarFornecedores}
@@ -582,12 +634,13 @@ export default function FornecedoresPage() {
           ) : fornecedores.length === 0 ? (
             <div className="p-8 text-center">
               <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum fornecedor encontrado</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Nenhum fornecedor encontrado
+              </h3>
               <p className="text-gray-600 mb-4">
                 {busca || filtroStatus !== 'todos'
                   ? 'Tente ajustar os filtros ou criar um novo fornecedor.'
-                  : 'Comece criando seu primeiro fornecedor.'
-                }
+                  : 'Comece criando seu primeiro fornecedor.'}
               </p>
               <button
                 onClick={abrirModalCriacao}
@@ -606,8 +659,13 @@ export default function FornecedoresPage() {
                       <div className="flex items-center">
                         <input
                           type="checkbox"
-                          checked={fornecedoresSelecionados.length === fornecedores.length && fornecedores.length > 0}
-                          onChange={(e) => e.target.checked ? selecionarTodos() : deselecionarTodos()}
+                          checked={
+                            fornecedoresSelecionados.length === fornecedores.length &&
+                            fornecedores.length > 0
+                          }
+                          onChange={(e) =>
+                            e.target.checked ? selecionarTodos() : deselecionarTodos()
+                          }
                           className="w-4 h-4 text-[#159A9C] bg-gray-100 border-gray-300 rounded focus:ring-[#159A9C] focus:ring-2"
                         />
                       </div>
@@ -663,9 +721,7 @@ export default function FornecedoresPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {fornecedor.nome}
-                          </div>
+                          <div className="text-sm font-medium text-gray-900">{fornecedor.nome}</div>
                           {fornecedor.contato && (
                             <div className="text-sm text-gray-500">
                               {fornecedor.contato} {fornecedor.cargo && `- ${fornecedor.cargo}`}
@@ -695,10 +751,13 @@ export default function FornecedoresPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${fornecedor.ativo
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                          }`}>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            fornecedor.ativo
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}
+                        >
                           {fornecedor.ativo ? 'Ativo' : 'Inativo'}
                         </span>
                       </td>

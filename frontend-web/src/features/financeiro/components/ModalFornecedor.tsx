@@ -16,7 +16,7 @@ import {
   Clock,
   Eye,
   EyeOff,
-  Loader2
+  Loader2,
 } from 'lucide-react';
 import { Fornecedor, NovoFornecedor } from '../../../services/fornecedorService';
 import { useI18n } from '../../../contexts/I18nContext';
@@ -95,9 +95,7 @@ const fornecedorSchema = yup.object({
     .min(3, 'Nome deve ter pelo menos 3 caracteres')
     .max(100, 'Nome deve ter no máximo 100 caracteres'),
 
-  razaoSocial: yup
-    .string()
-    .max(100, 'Razão Social deve ter no máximo 100 caracteres'),
+  razaoSocial: yup.string().max(100, 'Razão Social deve ter no máximo 100 caracteres'),
 
   email: yup
     .string()
@@ -113,73 +111,51 @@ const fornecedorSchema = yup.object({
     .required('Tipo é obrigatório')
     .oneOf(['pessoa_fisica', 'pessoa_juridica'], 'Tipo deve ser Pessoa Física ou Jurídica'),
 
-  cpf: yup
-    .string()
-    .when('tipo', {
-      is: 'pessoa_fisica',
-      then: (schema) => schema
+  cpf: yup.string().when('tipo', {
+    is: 'pessoa_fisica',
+    then: (schema) =>
+      schema
         .required('CPF é obrigatório para Pessoa Física')
         .test('cpf-valido', 'CPF inválido', (value) => {
           if (!value) return false;
           return validarCPF(value);
         }),
-      otherwise: (schema) => schema.notRequired()
-    }),
+    otherwise: (schema) => schema.notRequired(),
+  }),
 
-  cnpj: yup
-    .string()
-    .when('tipo', {
-      is: 'pessoa_juridica',
-      then: (schema) => schema
+  cnpj: yup.string().when('tipo', {
+    is: 'pessoa_juridica',
+    then: (schema) =>
+      schema
         .required('CNPJ é obrigatório para Pessoa Jurídica')
         .test('cnpj-valido', 'CNPJ inválido', (value) => {
           if (!value) return false;
           return validarCNPJ(value);
         }),
-      otherwise: (schema) => schema.notRequired()
-    }),
+    otherwise: (schema) => schema.notRequired(),
+  }),
 
   // Endereço - Opcionais
-  cep: yup
-    .string()
-    .matches(/^\d{5}-\d{3}$/, 'CEP deve estar no formato 12345-678'),
+  cep: yup.string().matches(/^\d{5}-\d{3}$/, 'CEP deve estar no formato 12345-678'),
 
-  endereco: yup
-    .string()
-    .max(200, 'Endereço deve ter no máximo 200 caracteres'),
+  endereco: yup.string().max(200, 'Endereço deve ter no máximo 200 caracteres'),
 
-  numero: yup
-    .string()
-    .max(10, 'Número deve ter no máximo 10 caracteres'),
+  numero: yup.string().max(10, 'Número deve ter no máximo 10 caracteres'),
 
-  bairro: yup
-    .string()
-    .max(100, 'Bairro deve ter no máximo 100 caracteres'),
+  bairro: yup.string().max(100, 'Bairro deve ter no máximo 100 caracteres'),
 
-  cidade: yup
-    .string()
-    .max(100, 'Cidade deve ter no máximo 100 caracteres'),
+  cidade: yup.string().max(100, 'Cidade deve ter no máximo 100 caracteres'),
 
-  estado: yup
-    .string()
-    .length(2, 'Estado deve ter 2 caracteres (ex: SP)'),
+  estado: yup.string().length(2, 'Estado deve ter 2 caracteres (ex: SP)'),
 
   // Outros - Opcionais
-  contato: yup
-    .string()
-    .max(100, 'Contato deve ter no máximo 100 caracteres'),
+  contato: yup.string().max(100, 'Contato deve ter no máximo 100 caracteres'),
 
-  cargo: yup
-    .string()
-    .max(100, 'Cargo deve ter no máximo 100 caracteres'),
+  cargo: yup.string().max(100, 'Cargo deve ter no máximo 100 caracteres'),
 
-  observacoes: yup
-    .string()
-    .max(1000, 'Observações deve ter no máximo 1000 caracteres'),
+  observacoes: yup.string().max(1000, 'Observações deve ter no máximo 1000 caracteres'),
 
-  ativo: yup
-    .boolean()
-    .required('Status é obrigatório')
+  ativo: yup.boolean().required('Status é obrigatório'),
 });
 
 interface ModalFornecedorProps {
@@ -195,7 +171,7 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
   onClose,
   onSave,
   fornecedor,
-  isLoading = false
+  isLoading = false,
 }) => {
   const { t } = useI18n();
 
@@ -211,7 +187,7 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
     setValue,
     watch,
     reset,
-    trigger
+    trigger,
   } = useForm<FornecedorFormData>({
     resolver: yupResolver(fornecedorSchema),
     mode: 'onChange', // Validação em tempo real
@@ -232,8 +208,8 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
       contato: '',
       cargo: '',
       observacoes: '',
-      ativo: true
-    }
+      ativo: true,
+    },
   });
 
   // Observar mudanças nos campos
@@ -245,7 +221,10 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
     if (isOpen) {
       if (fornecedor) {
         // Modo edição - mapeando do fornecedor para form
-        const tipoDetectado = fornecedor.cnpjCpf?.replace(/\D/g, '').length === 14 ? 'pessoa_juridica' : 'pessoa_fisica';
+        const tipoDetectado =
+          fornecedor.cnpjCpf?.replace(/\D/g, '').length === 14
+            ? 'pessoa_juridica'
+            : 'pessoa_fisica';
         reset({
           nome: fornecedor.nome || '',
           razaoSocial: fornecedor.razaoSocial || '',
@@ -263,7 +242,7 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
           contato: fornecedor.contato || '',
           cargo: fornecedor.cargo || '',
           observacoes: fornecedor.observacoes || '',
-          ativo: fornecedor.ativo
+          ativo: fornecedor.ativo,
         });
       } else {
         // Modo criação
@@ -284,7 +263,7 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
           contato: '',
           cargo: '',
           observacoes: '',
-          ativo: true
+          ativo: true,
         });
       }
     }
@@ -368,7 +347,7 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
     try {
       // Mostrar toast de carregamento
       const loadingToast = toast.loading(
-        fornecedor ? 'Atualizando fornecedor...' : 'Cadastrando fornecedor...'
+        fornecedor ? 'Atualizando fornecedor...' : 'Cadastrando fornecedor...',
       );
 
       // Preparar dados para envio - mapeando do form para NovoFornecedor
@@ -377,9 +356,10 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
         razaoSocial: data.razaoSocial || '',
         email: data.email || '',
         telefone: data.telefone?.replace(/\D/g, '') || '', // Remove formatação
-        cnpjCpf: data.tipo === 'pessoa_fisica'
-          ? data.cpf?.replace(/\D/g, '') || ''
-          : data.cnpj?.replace(/\D/g, '') || '',
+        cnpjCpf:
+          data.tipo === 'pessoa_fisica'
+            ? data.cpf?.replace(/\D/g, '') || ''
+            : data.cnpj?.replace(/\D/g, '') || '',
         cep: data.cep?.replace(/\D/g, '') || '', // Remove formatação
         endereco: data.endereco || '',
         numero: data.numero || '',
@@ -389,7 +369,7 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
         contato: data.contato || '',
         cargo: data.cargo || '',
         observacoes: data.observacoes || '',
-        ativo: data.ativo
+        ativo: data.ativo,
       };
 
       await onSave(fornecedorData);
@@ -397,14 +377,12 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
       // Remover toast de carregamento e mostrar sucesso
       toast.dismiss(loadingToast);
       toast.success(
-        fornecedor
-          ? 'Fornecedor atualizado com sucesso!'
-          : 'Fornecedor cadastrado com sucesso!',
+        fornecedor ? 'Fornecedor atualizado com sucesso!' : 'Fornecedor cadastrado com sucesso!',
         {
           duration: 4000,
           position: 'top-right',
           icon: '✅',
-        }
+        },
       );
 
       onClose();
@@ -420,7 +398,7 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
           duration: 5000,
           position: 'top-right',
           icon: '❌',
-        }
+        },
       );
     }
   };
@@ -437,8 +415,11 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
     }
 
     let validosCount = 0;
-    camposObrigatorios.forEach(campo => {
-      if (touchedFields[campo as keyof FornecedorFormData] && !errors[campo as keyof FornecedorFormData]) {
+    camposObrigatorios.forEach((campo) => {
+      if (
+        touchedFields[campo as keyof FornecedorFormData] &&
+        !errors[campo as keyof FornecedorFormData]
+      ) {
         validosCount++;
       }
     });
@@ -464,9 +445,7 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
                 <h2 className="text-xl font-bold text-[#002333]">
                   {fornecedor ? 'Editar Fornecedor' : 'Novo Fornecedor'}
                 </h2>
-                <p className="text-sm text-[#B4BEC9]">
-                  Preencha os dados do fornecedor abaixo
-                </p>
+                <p className="text-sm text-[#B4BEC9]">Preencha os dados do fornecedor abaixo</p>
               </div>
             </div>
 
@@ -497,7 +476,6 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                 {/* Layout em 3 colunas */}
                 <div className="grid grid-cols-3 gap-8">
-
                   {/* COLUNA 1: DADOS BÁSICOS */}
                   <div className="space-y-4">
                     <div className="border-b border-gray-200 pb-2 mb-4">
@@ -515,8 +493,9 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
                       <input
                         {...register('nome')}
                         type="text"
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.nome ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                          errors.nome ? 'border-red-300' : 'border-gray-300'
+                        }`}
                         placeholder="Digite o nome do fornecedor"
                       />
                       {errors.nome && (
@@ -547,8 +526,9 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
                       </label>
                       <select
                         {...register('tipo')}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.tipo ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                          errors.tipo ? 'border-red-300' : 'border-gray-300'
+                        }`}
                         onChange={(e) => {
                           setValue('tipo', e.target.value as 'pessoa_fisica' | 'pessoa_juridica');
                           // Limpar CPF/CNPJ ao trocar tipo
@@ -576,8 +556,9 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
                         <input
                           {...register('cpf')}
                           type="text"
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.cpf ? 'border-red-300' : 'border-gray-300'
-                            }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                            errors.cpf ? 'border-red-300' : 'border-gray-300'
+                          }`}
                           placeholder="000.000.000-00"
                           onChange={(e) => {
                             const formatted = formatarCPF(e.target.value);
@@ -599,8 +580,9 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
                         <input
                           {...register('cnpj')}
                           type="text"
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.cnpj ? 'border-red-300' : 'border-gray-300'
-                            }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                            errors.cnpj ? 'border-red-300' : 'border-gray-300'
+                          }`}
                           placeholder="00.000.000/0000-00"
                           onChange={(e) => {
                             const formatted = formatarCNPJ(e.target.value);
@@ -641,14 +623,13 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
 
                     {/* Email */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        E-mail
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
                       <input
                         {...register('email')}
                         type="email"
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.email ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                          errors.email ? 'border-red-300' : 'border-gray-300'
+                        }`}
                         placeholder="email@exemplo.com"
                       />
                       {errors.email && (
@@ -667,8 +648,9 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
                       <input
                         {...register('telefone')}
                         type="text"
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.telefone ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                          errors.telefone ? 'border-red-300' : 'border-gray-300'
+                        }`}
                         placeholder="(11) 99999-9999"
                         onChange={(e) => {
                           const formatted = formatarTelefone(e.target.value);
@@ -740,15 +722,14 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
 
                     {/* CEP */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        CEP
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
                       <div className="relative">
                         <input
                           {...register('cep')}
                           type="text"
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${errors.cep ? 'border-red-300' : 'border-gray-300'
-                            } ${isLoadingCep ? 'pr-10' : ''}`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                            errors.cep ? 'border-red-300' : 'border-gray-300'
+                          } ${isLoadingCep ? 'pr-10' : ''}`}
                           placeholder="00000-000"
                           onChange={(e) => {
                             const formatted = formatarCep(e.target.value);
@@ -784,9 +765,7 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
 
                     {/* Número */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Número
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
                       <input
                         {...register('numero')}
                         type="text"
@@ -797,9 +776,7 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
 
                     {/* Bairro */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Bairro
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Bairro</label>
                       <input
                         {...register('bairro')}
                         type="text"
@@ -810,9 +787,7 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
 
                     {/* Cidade */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Cidade
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
                       <input
                         {...register('cidade')}
                         type="text"
@@ -823,9 +798,7 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
 
                     {/* Estado */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Estado
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
                       <input
                         {...register('estado')}
                         type="text"
@@ -858,8 +831,10 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         Salvando...
                       </>
+                    ) : fornecedor ? (
+                      t('common.update')
                     ) : (
-                      fornecedor ? t('common.update') : t('common.register')
+                      t('common.register')
                     )}
                   </button>
                 </div>
@@ -872,16 +847,22 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
                 <div className="space-y-6">
                   {/* Progress */}
                   <div>
-                    <h4 className="text-sm font-medium text-gray-700 mb-3">Progresso do Cadastro</h4>
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">
+                      Progresso do Cadastro
+                    </h4>
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs text-gray-600">
                         <span>Campos obrigatórios</span>
-                        <span>{validosCount}/{totalCount}</span>
+                        <span>
+                          {validosCount}/{totalCount}
+                        </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                           className="bg-[#159A9C] h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${totalCount > 0 ? (validosCount / totalCount) * 100 : 0}%` }}
+                          style={{
+                            width: `${totalCount > 0 ? (validosCount / totalCount) * 100 : 0}%`,
+                          }}
                         />
                       </div>
                     </div>
@@ -894,8 +875,11 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
                       {[
                         { key: 'nome', label: 'Nome' },
                         { key: 'tipo', label: 'Tipo' },
-                        { key: watchedTipo === 'pessoa_fisica' ? 'cpf' : 'cnpj', label: watchedTipo === 'pessoa_fisica' ? 'CPF' : 'CNPJ' }
-                      ].map(campo => (
+                        {
+                          key: watchedTipo === 'pessoa_fisica' ? 'cpf' : 'cnpj',
+                          label: watchedTipo === 'pessoa_fisica' ? 'CPF' : 'CNPJ',
+                        },
+                      ].map((campo) => (
                         <div key={campo.key} className="flex items-center justify-between">
                           <span className="text-xs text-gray-600">{campo.label}</span>
                           {touchedFields[campo.key as keyof FornecedorFormData] ? (
@@ -933,4 +917,3 @@ const ModalFornecedor: React.FC<ModalFornecedorProps> = ({
 };
 
 export default ModalFornecedor;
-

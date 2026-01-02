@@ -5,8 +5,11 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToMany,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { Ticket } from './ticket.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 @Entity('tags')
 export class Tag {
@@ -27,6 +30,10 @@ export class Tag {
 
   @Column({ type: 'varchar', length: 36, nullable: true })
   empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresaId' })
+  empresa: Empresa;
 
   @CreateDateColumn()
   createdAt: Date;

@@ -13,7 +13,7 @@ import {
   CheckCircle,
   AlertCircle,
   BarChart3,
-  RefreshCw
+  RefreshCw,
 } from 'lucide-react';
 
 interface KpiTempoReal {
@@ -46,7 +46,7 @@ interface KpisTempoRealProps {
 
 const KpisTempoReal: React.FC<KpisTempoRealProps> = ({
   autoRefresh = true,
-  refreshInterval = 60000 // 1 minuto
+  refreshInterval = 60000, // 1 minuto
 }) => {
   const [kpis, setKpis] = useState<KpiTempoReal | null>(null);
   const [metas, setMetas] = useState<MetasProgressoData | null>(null);
@@ -71,17 +71,17 @@ const KpisTempoReal: React.FC<KpisTempoRealProps> = ({
     try {
       const [kpisResponse, metasResponse] = await Promise.all([
         fetch('/api/analytics/kpis-tempo-real', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
         }),
         fetch('/api/analytics/metas-progresso', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
-        })
+          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+        }),
       ]);
 
       if (kpisResponse.ok && metasResponse.ok) {
         const [kpisData, metasData] = await Promise.all([
           kpisResponse.json(),
-          metasResponse.json()
+          metasResponse.json(),
         ]);
 
         setKpis(kpisData);
@@ -98,7 +98,7 @@ const KpisTempoReal: React.FC<KpisTempoRealProps> = ({
   const formatarMoeda = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(valor);
   };
 
@@ -108,21 +108,31 @@ const KpisTempoReal: React.FC<KpisTempoRealProps> = ({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'superado': return 'text-green-600 bg-green-100';
-      case 'no_prazo': return 'text-blue-600 bg-blue-100';
-      case 'atencao': return 'text-yellow-600 bg-yellow-100';
-      case 'critico': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'superado':
+        return 'text-green-600 bg-green-100';
+      case 'no_prazo':
+        return 'text-blue-600 bg-blue-100';
+      case 'atencao':
+        return 'text-yellow-600 bg-yellow-100';
+      case 'critico':
+        return 'text-red-600 bg-red-100';
+      default:
+        return 'text-gray-600 bg-gray-100';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'superado': return <TrendingUp className="h-4 w-4" />;
-      case 'no_prazo': return <CheckCircle className="h-4 w-4" />;
-      case 'atencao': return <AlertCircle className="h-4 w-4" />;
-      case 'critico': return <AlertCircle className="h-4 w-4" />;
-      default: return <Target className="h-4 w-4" />;
+      case 'superado':
+        return <TrendingUp className="h-4 w-4" />;
+      case 'no_prazo':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'atencao':
+        return <AlertCircle className="h-4 w-4" />;
+      case 'critico':
+        return <AlertCircle className="h-4 w-4" />;
+      default:
+        return <Target className="h-4 w-4" />;
     }
   };
 
@@ -136,7 +146,7 @@ const KpisTempoReal: React.FC<KpisTempoRealProps> = ({
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map(i => (
+        {[1, 2, 3, 4].map((i) => (
           <Card key={i}>
             <CardContent className="p-6">
               <div className="animate-pulse">
@@ -170,12 +180,7 @@ const KpisTempoReal: React.FC<KpisTempoRealProps> = ({
         <div className="flex items-center gap-2 text-sm text-gray-600">
           <Clock className="h-4 w-4" />
           Atualizado: {ultimaAtualizacao.toLocaleTimeString('pt-BR')}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => carregarDados()}
-            className="ml-2"
-          >
+          <Button variant="outline" size="sm" onClick={() => carregarDados()} className="ml-2">
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
@@ -236,7 +241,9 @@ const KpisTempoReal: React.FC<KpisTempoRealProps> = ({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Meta Mensal</p>
-                <p className="text-2xl font-bold">{formatarPercentual(kpis.meta_mensal_progresso)}</p>
+                <p className="text-2xl font-bold">
+                  {formatarPercentual(kpis.meta_mensal_progresso)}
+                </p>
                 <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
                   <div
                     className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(kpis.meta_mensal_progresso)}`}
@@ -275,14 +282,13 @@ const KpisTempoReal: React.FC<KpisTempoRealProps> = ({
                   <div className="font-bold">
                     {meta.nome.includes('Conversão') || meta.nome.includes('Taxa')
                       ? formatarPercentual(meta.valor_atual)
-                      : formatarMoeda(meta.valor_atual)
-                    }
+                      : formatarMoeda(meta.valor_atual)}
                   </div>
                   <div className="text-sm text-gray-600">
-                    Meta: {meta.nome.includes('Conversão') || meta.nome.includes('Taxa')
+                    Meta:{' '}
+                    {meta.nome.includes('Conversão') || meta.nome.includes('Taxa')
                       ? formatarPercentual(meta.valor_meta)
-                      : formatarMoeda(meta.valor_meta)
-                    }
+                      : formatarMoeda(meta.valor_meta)}
                   </div>
                 </div>
               </div>
@@ -299,8 +305,7 @@ const KpisTempoReal: React.FC<KpisTempoRealProps> = ({
                 <span>
                   {meta.progresso >= 100
                     ? `+${formatarPercentual(meta.progresso - 100)} acima da meta`
-                    : `${formatarPercentual(100 - meta.progresso)} restante`
-                  }
+                    : `${formatarPercentual(100 - meta.progresso)} restante`}
                 </span>
               </div>
             </div>
@@ -310,11 +315,12 @@ const KpisTempoReal: React.FC<KpisTempoRealProps> = ({
             <div className="flex items-center justify-between">
               <span className="font-semibold">Previsão de Cumprimento Geral:</span>
               <Badge
-                className={metas.previsao_cumprimento >= 90
-                  ? 'bg-green-100 text-green-800'
-                  : metas.previsao_cumprimento >= 70
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : 'bg-red-100 text-red-800'
+                className={
+                  metas.previsao_cumprimento >= 90
+                    ? 'bg-green-100 text-green-800'
+                    : metas.previsao_cumprimento >= 70
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-red-100 text-red-800'
                 }
               >
                 {formatarPercentual(metas.previsao_cumprimento)}

@@ -9,12 +9,10 @@ export const ExemploTipografiaModerna: React.FC = () => {
     <div className="p-8 max-w-6xl mx-auto space-y-12">
       {/* Cabeçalho da demonstração */}
       <header className="text-center space-y-4">
-        <h1 className="text-fluid-3xl font-bold text-gray-900">
-          Sistema de Tipografia Moderno
-        </h1>
+        <h1 className="text-fluid-3xl font-bold text-gray-900">Sistema de Tipografia Moderno</h1>
         <p className="text-fluid-lg text-gray-600 max-w-3xl mx-auto">
-          Baseado nos padrões dos CRMs mais conceituados como Salesforce Lightning, 
-          HubSpot, Zoho e Pipedrive para melhor experiência do usuário.
+          Baseado nos padrões dos CRMs mais conceituados como Salesforce Lightning, HubSpot, Zoho e
+          Pipedrive para melhor experiência do usuário.
         </p>
       </header>
 
@@ -23,7 +21,7 @@ export const ExemploTipografiaModerna: React.FC = () => {
         <h2 className="text-fluid-2xl font-semibold text-gray-900 border-b pb-4">
           📊 Comparação: Antes vs Agora
         </h2>
-        
+
         <div className="grid md:grid-cols-2 gap-8">
           {/* Versão Antiga */}
           <div className="space-y-4">
@@ -66,14 +64,20 @@ export const ExemploTipografiaModerna: React.FC = () => {
         <h2 className="text-fluid-2xl font-semibold text-gray-900 border-b pb-4">
           📐 Hierarquia Tipográfica
         </h2>
-        
+
         <div className="grid gap-6">
           <div className="space-y-4">
             <h1 className="heading-responsive">H1 - Título Principal (28px → 40px)</h1>
-            <h2 className="text-fluid-2xl font-semibold text-gray-900">H2 - Seção Principal (24px → 32px)</h2>
+            <h2 className="text-fluid-2xl font-semibold text-gray-900">
+              H2 - Seção Principal (24px → 32px)
+            </h2>
             <h3 className="subheading-responsive">H3 - Subsection (20px → 24px)</h3>
-            <h4 className="text-fluid-lg font-semibold text-gray-800">H4 - Título de Card (18px → 20px)</h4>
-            <h5 className="text-fluid-base font-semibold text-gray-700">H5 - Label Destaque (16px → 18px)</h5>
+            <h4 className="text-fluid-lg font-semibold text-gray-800">
+              H4 - Título de Card (18px → 20px)
+            </h4>
+            <h5 className="text-fluid-base font-semibold text-gray-700">
+              H5 - Label Destaque (16px → 18px)
+            </h5>
             <h6 className="label-responsive uppercase">H6 - Metadata (14px → 16px)</h6>
           </div>
         </div>
@@ -81,33 +85,31 @@ export const ExemploTipografiaModerna: React.FC = () => {
 
       {/* Texto Corpo */}
       <section className="space-y-6">
-        <h2 className="text-fluid-2xl font-semibold text-gray-900 border-b pb-4">
-          📝 Texto Corpo
-        </h2>
-        
+        <h2 className="text-fluid-2xl font-semibold text-gray-900 border-b pb-4">📝 Texto Corpo</h2>
+
         <div className="space-y-6">
           <div>
             <h3 className="subheading-responsive mb-3">Texto Base (Corpo)</h3>
             <p className="text-responsive">
-              Este é o texto padrão usado em parágrafos, descrições e conteúdo geral. 
-              Agora usa 16px como base (era 14px), com line-height 1.6 para melhor 
-              legibilidade, seguindo as práticas dos CRMs líderes como Salesforce e HubSpot.
+              Este é o texto padrão usado em parágrafos, descrições e conteúdo geral. Agora usa 16px
+              como base (era 14px), com line-height 1.6 para melhor legibilidade, seguindo as
+              práticas dos CRMs líderes como Salesforce e HubSpot.
             </p>
           </div>
 
           <div>
             <h3 className="subheading-responsive mb-3">Texto Grande (Lead)</h3>
             <p className="text-fluid-lg text-gray-700">
-              Texto de destaque para introduções importantes, chamadas para ação 
-              ou informações que precisam de maior visibilidade visual.
+              Texto de destaque para introduções importantes, chamadas para ação ou informações que
+              precisam de maior visibilidade visual.
             </p>
           </div>
 
           <div>
             <h3 className="subheading-responsive mb-3">Texto Pequeno (Auxiliar)</h3>
             <p className="caption-responsive">
-              Texto auxiliar para metadados, timestamps, labels secundários e 
-              informações complementares que não precisam de destaque principal.
+              Texto auxiliar para metadados, timestamps, labels secundários e informações
+              complementares que não precisam de destaque principal.
             </p>
           </div>
         </div>
@@ -118,14 +120,12 @@ export const ExemploTipografiaModerna: React.FC = () => {
         <h2 className="text-fluid-2xl font-semibold text-gray-900 border-b pb-4">
           📋 Tipografia em Formulários
         </h2>
-        
+
         <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
           <div>
-            <label className="form-label">
-              Nome do Cliente *
-            </label>
-            <input 
-              type="text" 
+            <label className="form-label">Nome do Cliente *</label>
+            <input
+              type="text"
               className="form-input"
               placeholder="Digite o nome completo do cliente"
             />
@@ -135,26 +135,14 @@ export const ExemploTipografiaModerna: React.FC = () => {
           </div>
 
           <div>
-            <label className="form-label">
-              Email de Contato
-            </label>
-            <input 
-              type="email" 
-              className="form-input"
-              placeholder="cliente@empresa.com"
-            />
+            <label className="form-label">Email de Contato</label>
+            <input type="email" className="form-input" placeholder="cliente@empresa.com" />
           </div>
 
           <div className="space-y-2">
-            <div className="error-text">
-              ❌ Este campo é obrigatório (erro)
-            </div>
-            <div className="success-text">
-              ✅ Email validado com sucesso (sucesso)
-            </div>
-            <div className="warning-text">
-              ⚠️ Verifique o formato do email (aviso)
-            </div>
+            <div className="error-text">❌ Este campo é obrigatório (erro)</div>
+            <div className="success-text">✅ Email validado com sucesso (sucesso)</div>
+            <div className="warning-text">⚠️ Verifique o formato do email (aviso)</div>
           </div>
         </div>
       </section>
@@ -164,42 +152,24 @@ export const ExemploTipografiaModerna: React.FC = () => {
         <h2 className="text-fluid-2xl font-semibold text-gray-900 border-b pb-4">
           📊 Dashboard e Métricas
         </h2>
-        
+
         <div className="grid md:grid-cols-3 gap-6">
           <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
-            <div className="metric-value text-blue-600">
-              R$ 127.432
-            </div>
-            <div className="metric-label mt-2">
-              Vendas do Mês
-            </div>
-            <div className="metric-change positive mt-1">
-              +12,5% vs mês anterior
-            </div>
+            <div className="metric-value text-blue-600">R$ 127.432</div>
+            <div className="metric-label mt-2">Vendas do Mês</div>
+            <div className="metric-change positive mt-1">+12,5% vs mês anterior</div>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
-            <div className="metric-value text-green-600">
-              1.847
-            </div>
-            <div className="metric-label mt-2">
-              Leads Qualificados
-            </div>
-            <div className="metric-change positive mt-1">
-              +8,3% vs mês anterior
-            </div>
+            <div className="metric-value text-green-600">1.847</div>
+            <div className="metric-label mt-2">Leads Qualificados</div>
+            <div className="metric-change positive mt-1">+8,3% vs mês anterior</div>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
-            <div className="metric-value text-purple-600">
-              68%
-            </div>
-            <div className="metric-label mt-2">
-              Taxa de Conversão
-            </div>
-            <div className="metric-change negative mt-1">
-              -2,1% vs mês anterior
-            </div>
+            <div className="metric-value text-purple-600">68%</div>
+            <div className="metric-label mt-2">Taxa de Conversão</div>
+            <div className="metric-change negative mt-1">-2,1% vs mês anterior</div>
           </div>
         </div>
       </section>
@@ -209,7 +179,7 @@ export const ExemploTipografiaModerna: React.FC = () => {
         <h2 className="text-fluid-2xl font-semibold text-gray-900 border-b pb-4">
           📋 Tipografia em Tabelas
         </h2>
-        
+
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -247,7 +217,7 @@ export const ExemploTipografiaModerna: React.FC = () => {
         <h2 className="text-fluid-2xl font-semibold text-gray-900 border-b pb-4">
           🏆 Benchmark com CRMs Líderes
         </h2>
-        
+
         <div className="grid lg:grid-cols-2 gap-8">
           <div className="space-y-4">
             <h3 className="subheading-responsive">Salesforce Lightning</h3>
@@ -275,9 +245,7 @@ export const ExemploTipografiaModerna: React.FC = () => {
                 <li>• Micro-typography otimizada</li>
                 <li>• Responsividade fluida com clamp()</li>
               </ul>
-              <div className="text-xs text-orange-600 mt-3">
-                ✅ Implementado no Fênix CRM
-              </div>
+              <div className="text-xs text-orange-600 mt-3">✅ Implementado no Fênix CRM</div>
             </div>
           </div>
 
@@ -291,9 +259,7 @@ export const ExemploTipografiaModerna: React.FC = () => {
                 <li>• Hierarquia visual clara</li>
                 <li>• Font-family moderna (Inter/System)</li>
               </ul>
-              <div className="text-xs text-green-600 mt-3">
-                ✅ Padrões adotados e melhorados
-              </div>
+              <div className="text-xs text-green-600 mt-3">✅ Padrões adotados e melhorados</div>
             </div>
           </div>
 
@@ -307,9 +273,7 @@ export const ExemploTipografiaModerna: React.FC = () => {
                 <li>• Contraste adequado</li>
                 <li>• Adaptação mobile eficiente</li>
               </ul>
-              <div className="text-xs text-purple-600 mt-3">
-                ✅ Conceitos aplicados no projeto
-              </div>
+              <div className="text-xs text-purple-600 mt-3">✅ Conceitos aplicados no projeto</div>
             </div>
           </div>
         </div>
@@ -320,7 +284,7 @@ export const ExemploTipografiaModerna: React.FC = () => {
         <h2 className="text-fluid-2xl font-semibold text-gray-900 border-b pb-4">
           ♿ Acessibilidade e Inclusão
         </h2>
-        
+
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 space-y-4">
           <h3 className="subheading-responsive">Melhorias Implementadas:</h3>
           <div className="grid md:grid-cols-2 gap-6">
@@ -336,9 +300,7 @@ export const ExemploTipografiaModerna: React.FC = () => {
               </ul>
             </div>
             <div>
-              <h4 className="text-fluid-base font-semibold text-gray-800 mb-2">
-                Inclusão Visual
-              </h4>
+              <h4 className="text-fluid-base font-semibold text-gray-800 mb-2">Inclusão Visual</h4>
               <ul className="caption-responsive space-y-1">
                 <li>• Fontes otimizadas para dislexia</li>
                 <li>• Line-height aumentado</li>
@@ -352,13 +314,11 @@ export const ExemploTipografiaModerna: React.FC = () => {
 
       {/* Conclusão */}
       <section className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-8 text-center space-y-4">
-        <h2 className="text-fluid-2xl font-bold text-gray-900">
-          🎯 Resultado Final
-        </h2>
+        <h2 className="text-fluid-2xl font-bold text-gray-900">🎯 Resultado Final</h2>
         <p className="text-fluid-lg text-gray-700 max-w-3xl mx-auto">
-          O Fênix CRM agora possui um sistema de tipografia moderno, alinhado com os 
-          padrões dos CRMs mais conceituados do mercado, garantindo melhor experiência 
-          do usuário, acessibilidade e profissionalismo visual.
+          O Fênix CRM agora possui um sistema de tipografia moderno, alinhado com os padrões dos
+          CRMs mais conceituados do mercado, garantindo melhor experiência do usuário,
+          acessibilidade e profissionalismo visual.
         </p>
         <div className="grid md:grid-cols-4 gap-4 mt-6">
           <div className="bg-white rounded-lg p-4">

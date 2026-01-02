@@ -3,7 +3,9 @@ import { Search, Plus, Edit2, Trash2, X, Save, Zap, CheckCircle, AlertCircle } f
 import axios from 'axios';
 import { useAuth } from '../../hooks/useAuth';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+import { API_BASE_URL } from '../../services/api';
+
+const API_URL = API_BASE_URL;
 
 interface RespostasRapidasProps {
   onSelecionarTemplate: (conteudo: string) => void;
@@ -37,7 +39,11 @@ const CATEGORIAS = [
   { value: 'outro', label: 'Outro', icon: '📝' },
 ];
 
-export function RespostasRapidas({ onSelecionarTemplate, ticketAtual, clienteAtual }: RespostasRapidasProps) {
+export function RespostasRapidas({
+  onSelecionarTemplate,
+  ticketAtual,
+  clienteAtual,
+}: RespostasRapidasProps) {
   const { user } = useAuth();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [busca, setBusca] = useState('');
@@ -113,7 +119,7 @@ export function RespostasRapidas({ onSelecionarTemplate, ticketAtual, clienteAtu
         {
           headers: { Authorization: `Bearer ${token}` },
           params: { empresaId },
-        }
+        },
       );
 
       if (response.data.success) {
@@ -146,7 +152,7 @@ export function RespostasRapidas({ onSelecionarTemplate, ticketAtual, clienteAtu
         {
           headers: { Authorization: `Bearer ${token}` },
           params: { empresaId },
-        }
+        },
       );
 
       if (response.data.success) {
@@ -184,7 +190,7 @@ export function RespostasRapidas({ onSelecionarTemplate, ticketAtual, clienteAtu
         {
           headers: { Authorization: `Bearer ${token}` },
           params: { empresaId },
-        }
+        },
       );
 
       if (response.data.success) {
@@ -248,13 +254,18 @@ export function RespostasRapidas({ onSelecionarTemplate, ticketAtual, clienteAtu
   };
 
   const templatesFiltrados = templates.filter((t) => {
-    const matchBusca =
-      t.nome.toLowerCase().includes(busca.toLowerCase()) ||
-      t.conteudo.toLowerCase().includes(busca.toLowerCase()) ||
-      (t.atalho && t.atalho.toLowerCase().includes(busca.toLowerCase()));
+    // Evita crash quando backend não envia algum campo
+    const nome = t.nome?.toLowerCase?.() || '';
+    const conteudo = t.conteudo?.toLowerCase?.() || '';
+    const atalho = t.atalho?.toLowerCase?.() || '';
+    const buscaLower = busca.toLowerCase();
 
-    const matchCategoria =
-      categoriaFiltro === 'todas' || t.categoria === categoriaFiltro;
+    const matchBusca =
+      nome.includes(buscaLower) ||
+      conteudo.includes(buscaLower) ||
+      atalho.includes(buscaLower);
+
+    const matchCategoria = categoriaFiltro === 'todas' || t.categoria === categoriaFiltro;
 
     return matchBusca && matchCategoria;
   });
@@ -356,9 +367,7 @@ export function RespostasRapidas({ onSelecionarTemplate, ticketAtual, clienteAtu
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Categoria
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
               <select
                 value={formCategoria}
                 onChange={(e) => setFormCategoria(e.target.value)}
@@ -373,9 +382,7 @@ export function RespostasRapidas({ onSelecionarTemplate, ticketAtual, clienteAtu
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Conteúdo *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Conteúdo *</label>
               <textarea
                 value={formConteudo}
                 onChange={(e) => setFormConteudo(e.target.value)}
@@ -388,9 +395,7 @@ export function RespostasRapidas({ onSelecionarTemplate, ticketAtual, clienteAtu
             {/* Variáveis disponíveis */}
             {variaveis.length > 0 && (
               <div>
-                <p className="text-xs text-gray-600 mb-2">
-                  Clique para inserir variáveis:
-                </p>
+                <p className="text-xs text-gray-600 mb-2">Clique para inserir variáveis:</p>
                 <div className="flex flex-wrap gap-2">
                   {variaveis.map((v) => (
                     <button
@@ -450,33 +455,22 @@ export function RespostasRapidas({ onSelecionarTemplate, ticketAtual, clienteAtu
               const categoria = CATEGORIAS.find((c) => c.value === template.categoria);
 
               return (
-                <div
-                  key={template.id}
-                  className="p-4 hover:bg-gray-50 transition-colors group"
-                >
+                <div key={template.id} className="p-4 hover:bg-gray-50 transition-colors group">
                   <div className="flex items-start justify-between gap-3">
                     <button
                       onClick={() => processarTemplate(template)}
                       className="flex-1 text-left"
                     >
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold text-gray-900">
-                          {template.nome}
-                        </span>
+                        <span className="text-sm font-semibold text-gray-900">{template.nome}</span>
                         {template.atalho && (
                           <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs font-mono">
                             {template.atalho}
                           </span>
                         )}
-                        {categoria && (
-                          <span className="text-xs">
-                            {categoria.icon}
-                          </span>
-                        )}
+                        {categoria && <span className="text-xs">{categoria.icon}</span>}
                       </div>
-                      <p className="text-sm text-gray-600 line-clamp-2">
-                        {template.conteudo}
-                      </p>
+                      <p className="text-sm text-gray-600 line-clamp-2">{template.conteudo}</p>
                     </button>
 
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

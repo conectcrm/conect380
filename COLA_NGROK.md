@@ -23,10 +23,12 @@
 ## 📱 Webhooks (use a URL do ngrok)
 
 ```
-WhatsApp: /api/atendimento/webhooks/whatsapp
+WhatsApp: /api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
 Telegram: /api/atendimento/webhooks/telegram
 Twilio:   /api/atendimento/webhooks/twilio
 ```
+
+> 🔐 Lembre-se de configurar o App Secret no Meta e validar o header `X-Hub-Signature-256` em todas as requisições do WhatsApp.
 
 ---
 

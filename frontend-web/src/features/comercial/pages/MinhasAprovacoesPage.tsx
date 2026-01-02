@@ -14,7 +14,7 @@ import {
   Calendar,
   DollarSign,
   Eye,
-  RefreshCw
+  RefreshCw,
 } from 'lucide-react';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 import ModalAprovarCotacao from '../../../components/modals/ModalAprovarCotacao';
@@ -97,7 +97,7 @@ function MinhasAprovacoesPage() {
     if (cotacoesSelecionadas.size === cotacoes.length) {
       setCotacoesSelecionadas(new Set());
     } else {
-      setCotacoesSelecionadas(new Set(cotacoes.map(c => c.id)));
+      setCotacoesSelecionadas(new Set(cotacoes.map((c) => c.id)));
     }
   };
 
@@ -202,9 +202,7 @@ function MinhasAprovacoesPage() {
                   <CheckCircle className="h-6 w-6 text-[#159A9C]" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold text-[#002333]">
-                    Minhas Aprovações
-                  </h1>
+                  <h1 className="text-3xl font-bold text-[#002333]">Minhas Aprovações</h1>
                   <p className="text-[#002333]/70 mt-1">
                     {cotacoesSelecionadas.size > 0
                       ? `${cotacoesSelecionadas.size} cotação(ões) selecionada(s)`
@@ -251,9 +249,7 @@ function MinhasAprovacoesPage() {
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
                     Aprovações Pendentes
                   </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {cotacoes.length}
-                  </p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">{cotacoes.length}</p>
                   <p className="mt-3 text-sm text-[#002333]/70">
                     {cotacoes.length === 0
                       ? 'Nenhuma cotação aguardando aprovação'
@@ -324,8 +320,9 @@ function MinhasAprovacoesPage() {
                 {cotacoes.map((cotacao) => (
                   <div
                     key={cotacao.id}
-                    className={`bg-white rounded-lg shadow-sm border hover:shadow-lg transition-all ${cotacoesSelecionadas.has(cotacao.id) ? 'ring-2 ring-[#159A9C]' : ''
-                      }`}
+                    className={`bg-white rounded-lg shadow-sm border hover:shadow-lg transition-all ${
+                      cotacoesSelecionadas.has(cotacao.id) ? 'ring-2 ring-[#159A9C]' : ''
+                    }`}
                   >
                     <div className="p-6">
                       {/* Header do Card com Checkbox */}
@@ -338,20 +335,16 @@ function MinhasAprovacoesPage() {
                         />
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-bold text-[#002333]">
-                              {cotacao.titulo}
-                            </h3>
+                            <h3 className="text-lg font-bold text-[#002333]">{cotacao.titulo}</h3>
                             <span
                               className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPrioridadeColor(
-                                cotacao.prioridade
+                                cotacao.prioridade,
                               )}`}
                             >
                               {getPrioridadeLabel(cotacao.prioridade)}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-600">
-                            Cotação #{cotacao.numero}
-                          </p>
+                          <p className="text-sm text-gray-600">Cotação #{cotacao.numero}</p>
                         </div>
                         <div className="flex gap-2">
                           <button
@@ -395,7 +388,7 @@ function MinhasAprovacoesPage() {
                               R${' '}
                               {cotacao.valorTotal?.toLocaleString('pt-BR', {
                                 minimumFractionDigits: 2,
-                                maximumFractionDigits: 2
+                                maximumFractionDigits: 2,
                               }) || '0,00'}
                             </p>
                           </div>
@@ -455,7 +448,7 @@ function MinhasAprovacoesPage() {
                                     R${' '}
                                     {item.valorUnitario?.toLocaleString('pt-BR', {
                                       minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2
+                                      maximumFractionDigits: 2,
                                     })}
                                   </span>
                                 </div>

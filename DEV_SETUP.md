@@ -8,7 +8,7 @@ Este guia ajuda desenvolvedores a configurar o ambiente local para trabalhar no 
 
 ### Obrigatórios
 
-- ✅ **Node.js 20.x** ou superior
+- ✅ **Node.js 22.16.x** (npm 10+) — o frontend só inicia com `NODE_OPTIONS=--max_old_space_size=4096`, então mantenha essa versão em todo o ambiente
 - ✅ **PostgreSQL 15** ou superior
 - ✅ **Redis 7** ou superior
 - ✅ **Git**
@@ -20,6 +20,8 @@ Este guia ajuda desenvolvedores a configurar o ambiente local para trabalhar no 
 - 💡 **Docker Desktop** (para rodar PostgreSQL/Redis em containers)
 - 💡 **Postman** ou **Thunder Client** (testar APIs)
 - 💡 **Git Bash** ou **PowerShell** (Windows)
+
+> Dica: use `nvm use 22.16.0` ou `fnm use 22.16` antes de rodar `npm start`. No Windows PowerShell, defina `set NODE_OPTIONS=--max_old_space_size=4096` ao iniciar o frontend, conforme já configurado no `package.json`.
 
 ---
 
@@ -133,6 +135,8 @@ NODE_ENV=development
 PORT=3001
 ```
 
+> Consulte `docs/CREDENCIAIS_PADRAO.md` para os logins padrão usados pelos scripts (ex.: `admin@conectsuite.com.br` / `admin123`). Atualize esse documento se alterar qualquer credencial mencionada aqui.
+
 ```powershell
 # Instalar dependências
 npm install
@@ -177,6 +181,8 @@ npm install
 # Iniciar servidor React
 npm start
 ```
+
+> Se usar outro terminal, lembre-se de exportar `NODE_OPTIONS=--max_old_space_size=4096` antes do `npm start` caso o sistema não herde a configuração do script.
 
 **Frontend deve abrir em**: http://localhost:3000
 

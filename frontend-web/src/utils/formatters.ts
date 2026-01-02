@@ -1,7 +1,7 @@
 export const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
-    currency: 'BRL'
+    currency: 'BRL',
   }).format(value);
 };
 
@@ -13,7 +13,7 @@ export const formatPercent = (value: number): string => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'percent',
     minimumFractionDigits: 1,
-    maximumFractionDigits: 1
+    maximumFractionDigits: 1,
   }).format(value / 100);
 };
 

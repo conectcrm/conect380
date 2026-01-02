@@ -16,7 +16,7 @@ import {
   HelpCircle,
   Zap,
   Shield,
-  Globe
+  Globe,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { emailServiceReal } from '../../../services/emailServiceReal';
@@ -30,28 +30,28 @@ const ConfiguracaoEmailPage: React.FC = () => {
     provider: 'gmail',
     gmail: {
       user: '',
-      password: ''
+      password: '',
     },
     sendgrid: {
-      apiKey: ''
+      apiKey: '',
     },
     awsSes: {
       accessKeyId: '',
       secretAccessKey: '',
-      region: 'us-east-1'
+      region: 'us-east-1',
     },
     customSmtp: {
       host: 'smtp.gmail.com',
       port: 587,
       user: '',
-      password: ''
+      password: '',
     },
     empresa: {
       nome: '',
       email: '',
       telefone: '',
-      endereco: ''
-    }
+      endereco: '',
+    },
   });
 
   const [mostrarSenhas, setMostrarSenhas] = useState(false);
@@ -81,9 +81,17 @@ const ConfiguracaoEmailPage: React.FC = () => {
 
   const getStatusConfig = () => {
     const progresso = calcularProgresso();
-    if (progresso === 0) return { status: 'not_configured', label: 'Não configurado', color: 'gray', icon: Clock };
-    if (progresso < 50) return { status: 'partial', label: 'Configuração parcial', color: 'yellow', icon: AlertCircle };
-    if (!resultadoTeste?.success) return { status: 'configured', label: 'Configurado', color: 'blue', icon: Settings };
+    if (progresso === 0)
+      return { status: 'not_configured', label: 'Não configurado', color: 'gray', icon: Clock };
+    if (progresso < 50)
+      return {
+        status: 'partial',
+        label: 'Configuração parcial',
+        color: 'yellow',
+        icon: AlertCircle,
+      };
+    if (!resultadoTeste?.success)
+      return { status: 'configured', label: 'Configurado', color: 'blue', icon: Settings };
     return { status: 'tested', label: 'Configurado e testado', color: 'green', icon: CheckCircle };
   };
 
@@ -104,22 +112,22 @@ const ConfiguracaoEmailPage: React.FC = () => {
       setConfiguracoes(JSON.parse(configSalva));
     } else {
       // Carregar das variáveis de ambiente
-      setConfiguracoes(prev => ({
+      setConfiguracoes((prev) => ({
         ...prev,
         provider: process.env.REACT_APP_EMAIL_PROVIDER || 'gmail',
         gmail: {
           user: process.env.REACT_APP_EMAIL_USER || '',
-          password: process.env.REACT_APP_EMAIL_PASSWORD || ''
+          password: process.env.REACT_APP_EMAIL_PASSWORD || '',
         },
         sendgrid: {
-          apiKey: process.env.REACT_APP_SENDGRID_API_KEY || ''
+          apiKey: process.env.REACT_APP_SENDGRID_API_KEY || '',
         },
         empresa: {
           nome: process.env.REACT_APP_EMPRESA_NOME || 'ConectCRM',
           email: process.env.REACT_APP_EMPRESA_EMAIL || 'contato@conectcrm.com',
           telefone: process.env.REACT_APP_EMPRESA_TELEFONE || '(11) 99999-9999',
-          endereco: process.env.REACT_APP_EMPRESA_ENDERECO || 'São Paulo/SP'
-        }
+          endereco: process.env.REACT_APP_EMPRESA_ENDERECO || 'São Paulo/SP',
+        },
       }));
     }
 
@@ -151,7 +159,7 @@ const ConfiguracaoEmailPage: React.FC = () => {
         error: resultado.error || null,
         messageId: resultado.messageId || null,
         provider: EMAIL_PROVIDERS[providerAtual as keyof typeof EMAIL_PROVIDERS]?.name,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
 
       if (resultado.success) {
@@ -163,7 +171,7 @@ const ConfiguracaoEmailPage: React.FC = () => {
       setResultadoTeste({
         success: false,
         error: error.message,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       toast.error(`Erro ao testar: ${error.message}`);
     } finally {
@@ -174,14 +182,16 @@ const ConfiguracaoEmailPage: React.FC = () => {
   const getProviderInfo = () => {
     const providers: Record<string, any> = {
       gmail: {
-        setup: 'Ative a verificação em 2 etapas no Gmail e gere uma "Senha de app" nas configurações de segurança.'
+        setup:
+          'Ative a verificação em 2 etapas no Gmail e gere uma "Senha de app" nas configurações de segurança.',
       },
       sendgrid: {
-        setup: 'Crie uma conta gratuita no SendGrid e gere uma API Key com permissões de envio de e-mail.'
+        setup:
+          'Crie uma conta gratuita no SendGrid e gere uma API Key com permissões de envio de e-mail.',
       },
       awsSes: {
-        setup: 'Configure suas credenciais AWS e ative o Amazon SES na região escolhida.'
-      }
+        setup: 'Configure suas credenciais AWS e ative o Amazon SES na região escolhida.',
+      },
     };
 
     return providers[providerAtual];
@@ -209,11 +219,17 @@ const ConfiguracaoEmailPage: React.FC = () => {
                 const status = getStatusConfig();
                 const IconComponent = status.icon;
                 return (
-                  <div className={`flex items-center px-3 py-1 rounded-full text-sm font-medium ${status.color === 'green' ? 'bg-green-100 text-green-800' :
-                    status.color === 'blue' ? 'bg-blue-100 text-blue-800' :
-                      status.color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-gray-100 text-gray-800'
-                    }`}>
+                  <div
+                    className={`flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                      status.color === 'green'
+                        ? 'bg-green-100 text-green-800'
+                        : status.color === 'blue'
+                          ? 'bg-blue-100 text-blue-800'
+                          : status.color === 'yellow'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-gray-100 text-gray-800'
+                    }`}
+                  >
                     <IconComponent className="w-4 h-4 mr-2" />
                     {status.label}
                   </div>
@@ -230,10 +246,15 @@ const ConfiguracaoEmailPage: React.FC = () => {
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div
-                className={`h-2 rounded-full transition-all duration-300 ${progressoConfig === 100 ? 'bg-green-500' :
-                  progressoConfig >= 50 ? 'bg-blue-500' :
-                    progressoConfig > 0 ? 'bg-yellow-500' : 'bg-gray-400'
-                  }`}
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  progressoConfig === 100
+                    ? 'bg-green-500'
+                    : progressoConfig >= 50
+                      ? 'bg-blue-500'
+                      : progressoConfig > 0
+                        ? 'bg-yellow-500'
+                        : 'bg-gray-400'
+                }`}
                 style={{ width: `${progressoConfig}%` }}
               ></div>
             </div>
@@ -247,9 +268,15 @@ const ConfiguracaoEmailPage: React.FC = () => {
                 <div>
                   <h4 className="font-medium text-blue-900 mb-1">Próximos passos:</h4>
                   <ul className="text-sm text-blue-700 space-y-1">
-                    {progressoConfig < 50 && <li>• Complete as configurações do provedor selecionado</li>}
-                    {progressoConfig >= 50 && progressoConfig < 85 && <li>• Preencha os dados da empresa</li>}
-                    {progressoConfig >= 85 && !resultadoTeste?.success && <li>• Teste a configuração de e-mail</li>}
+                    {progressoConfig < 50 && (
+                      <li>• Complete as configurações do provedor selecionado</li>
+                    )}
+                    {progressoConfig >= 50 && progressoConfig < 85 && (
+                      <li>• Preencha os dados da empresa</li>
+                    )}
+                    {progressoConfig >= 85 && !resultadoTeste?.success && (
+                      <li>• Teste a configuração de e-mail</li>
+                    )}
                   </ul>
                 </div>
               </div>
@@ -265,23 +292,28 @@ const ConfiguracaoEmailPage: React.FC = () => {
               <div>
                 <h3 className="font-medium text-gray-900">Status da Configuração</h3>
                 <p className="text-sm text-gray-600">
-                  Provedor: <strong>{EMAIL_PROVIDERS[providerAtual as keyof typeof EMAIL_PROVIDERS]?.name}</strong>
+                  Provedor:{' '}
+                  <strong>
+                    {EMAIL_PROVIDERS[providerAtual as keyof typeof EMAIL_PROVIDERS]?.name}
+                  </strong>
                 </p>
               </div>
             </div>
             <div className="flex items-center">
-              <div className={`px-3 py-1 rounded-full text-sm font-medium ${resultadoTeste?.success
-                ? 'bg-green-100 text-green-800'
-                : resultadoTeste?.success === false
-                  ? 'bg-red-100 text-red-800'
-                  : 'bg-gray-100 text-gray-600'
-                }`}>
+              <div
+                className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  resultadoTeste?.success
+                    ? 'bg-green-100 text-green-800'
+                    : resultadoTeste?.success === false
+                      ? 'bg-red-100 text-red-800'
+                      : 'bg-gray-100 text-gray-600'
+                }`}
+              >
                 {resultadoTeste?.success
                   ? '✅ Configurado'
                   : resultadoTeste?.success === false
                     ? '❌ Com erro'
-                    : '⚙️ Não testado'
-                }
+                    : '⚙️ Não testado'}
               </div>
             </div>
           </div>
@@ -301,19 +333,22 @@ const ConfiguracaoEmailPage: React.FC = () => {
               <div className="space-y-3">
                 {Object.entries(EMAIL_PROVIDERS).map(([key, provider]) => {
                   const isSelected = providerAtual === key;
-                  const isConfigured = key === 'gmail' ?
-                    (configuracoes.gmail.user && configuracoes.gmail.password) :
-                    key === 'sendgrid' ? configuracoes.sendgrid.apiKey :
-                      false;
+                  const isConfigured =
+                    key === 'gmail'
+                      ? configuracoes.gmail.user && configuracoes.gmail.password
+                      : key === 'sendgrid'
+                        ? configuracoes.sendgrid.apiKey
+                        : false;
 
                   return (
                     <div
                       key={key}
                       onClick={() => setProviderAtual(key)}
-                      className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md ${isSelected
-                        ? 'border-blue-500 bg-blue-50 shadow-sm'
-                        : 'border-gray-200 hover:border-gray-300'
-                        }`}
+                      className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md ${
+                        isSelected
+                          ? 'border-blue-500 bg-blue-50 shadow-sm'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
                     >
                       {/* Badge de configurado */}
                       {isConfigured && (
@@ -333,12 +368,12 @@ const ConfiguracaoEmailPage: React.FC = () => {
                         {isSelected && <Check className="w-5 h-5 text-blue-600" />}
                       </div>
 
-                      <p className="text-sm text-gray-600 mb-3 leading-relaxed">{provider.description}</p>
+                      <p className="text-sm text-gray-600 mb-3 leading-relaxed">
+                        {provider.description}
+                      </p>
 
                       <div className="flex items-center justify-between text-xs">
-                        <div className="text-gray-500">
-                          📧 {provider.limits}
-                        </div>
+                        <div className="text-gray-500">📧 {provider.limits}</div>
                         {key === 'gmail' && (
                           <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
                             Grátis
@@ -378,7 +413,10 @@ const ConfiguracaoEmailPage: React.FC = () => {
           {/* Configurações */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-              <h3 className="text-lg font-semibold mb-4">Configurações do {EMAIL_PROVIDERS[providerAtual as keyof typeof EMAIL_PROVIDERS]?.name}</h3>
+              <h3 className="text-lg font-semibold mb-4">
+                Configurações do{' '}
+                {EMAIL_PROVIDERS[providerAtual as keyof typeof EMAIL_PROVIDERS]?.name}
+              </h3>
 
               {/* Gmail SMTP */}
               {providerAtual === 'gmail' && (
@@ -396,10 +434,12 @@ const ConfiguracaoEmailPage: React.FC = () => {
                       <input
                         type="email"
                         value={configuracoes.gmail.user}
-                        onChange={(e) => setConfiguracoes(prev => ({
-                          ...prev,
-                          gmail: { ...prev.gmail, user: e.target.value }
-                        }))}
+                        onChange={(e) =>
+                          setConfiguracoes((prev) => ({
+                            ...prev,
+                            gmail: { ...prev.gmail, user: e.target.value },
+                          }))
+                        }
                         placeholder="seu-email@gmail.com"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
@@ -417,10 +457,12 @@ const ConfiguracaoEmailPage: React.FC = () => {
                         <input
                           type={mostrarSenhas ? 'text' : 'password'}
                           value={configuracoes.gmail.password}
-                          onChange={(e) => setConfiguracoes(prev => ({
-                            ...prev,
-                            gmail: { ...prev.gmail, password: e.target.value }
-                          }))}
+                          onChange={(e) =>
+                            setConfiguracoes((prev) => ({
+                              ...prev,
+                              gmail: { ...prev.gmail, password: e.target.value },
+                            }))
+                          }
                           placeholder="Senha de 16 caracteres"
                           className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
@@ -429,16 +471,32 @@ const ConfiguracaoEmailPage: React.FC = () => {
                           onClick={() => setMostrarSenhas(!mostrarSenhas)}
                           className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                         >
-                          {mostrarSenhas ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          {mostrarSenhas ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
                         </button>
                       </div>
                     </div>
                   </div>
 
                   <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <h4 className="font-medium text-yellow-900 mb-2">🔐 Como gerar uma Senha de App no Gmail:</h4>
+                    <h4 className="font-medium text-yellow-900 mb-2">
+                      🔐 Como gerar uma Senha de App no Gmail:
+                    </h4>
                     <ol className="text-sm text-yellow-700 list-decimal list-inside space-y-1">
-                      <li>Acesse <a href="https://myaccount.google.com/security" target="_blank" rel="noopener noreferrer" className="text-yellow-600 hover:underline inline-flex items-center">Segurança da Conta Google <ExternalLink className="w-3 h-3 ml-1" /></a></li>
+                      <li>
+                        Acesse{' '}
+                        <a
+                          href="https://myaccount.google.com/security"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-yellow-600 hover:underline inline-flex items-center"
+                        >
+                          Segurança da Conta Google <ExternalLink className="w-3 h-3 ml-1" />
+                        </a>
+                      </li>
                       <li>Ative a "Verificação em duas etapas"</li>
                       <li>Vá em "Senhas de app" e gere uma nova senha</li>
                       <li>Escolha "Outro (nome personalizado)" e digite "ConectCRM"</li>
@@ -464,10 +522,12 @@ const ConfiguracaoEmailPage: React.FC = () => {
                       <input
                         type={mostrarSenhas ? 'text' : 'password'}
                         value={configuracoes.sendgrid.apiKey}
-                        onChange={(e) => setConfiguracoes(prev => ({
-                          ...prev,
-                          sendgrid: { ...prev.sendgrid, apiKey: e.target.value }
-                        }))}
+                        onChange={(e) =>
+                          setConfiguracoes((prev) => ({
+                            ...prev,
+                            sendgrid: { ...prev.sendgrid, apiKey: e.target.value },
+                          }))
+                        }
                         placeholder="SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                         className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
@@ -476,16 +536,32 @@ const ConfiguracaoEmailPage: React.FC = () => {
                         onClick={() => setMostrarSenhas(!mostrarSenhas)}
                         className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                       >
-                        {mostrarSenhas ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        {mostrarSenhas ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
                       </button>
                     </div>
                   </div>
 
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <h4 className="font-medium text-blue-900 mb-2">🚀 Como criar uma API Key no SendGrid:</h4>
+                    <h4 className="font-medium text-blue-900 mb-2">
+                      🚀 Como criar uma API Key no SendGrid:
+                    </h4>
                     <div className="text-sm text-blue-700">
                       <ol className="text-sm text-blue-700 list-decimal list-inside space-y-1">
-                        <li>Crie conta gratuita em <a href="https://sendgrid.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center">SendGrid.com <ExternalLink className="w-3 h-3 ml-1" /></a></li>
+                        <li>
+                          Crie conta gratuita em{' '}
+                          <a
+                            href="https://sendgrid.com"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline inline-flex items-center"
+                          >
+                            SendGrid.com <ExternalLink className="w-3 h-3 ml-1" />
+                          </a>
+                        </li>
                         <li>Vá em Settings → API Keys</li>
                         <li>Crie uma nova API Key com permissões de "Mail Send"</li>
                         <li>Copie a chave (começa com SG.)</li>
@@ -497,29 +573,39 @@ const ConfiguracaoEmailPage: React.FC = () => {
 
               {/* Dados da Empresa */}
               <div className="mt-8 pt-6 border-t border-gray-200">
-                <h4 className="font-medium text-gray-900 mb-4">Dados da Empresa (aparecem nos e-mails)</h4>
+                <h4 className="font-medium text-gray-900 mb-4">
+                  Dados da Empresa (aparecem nos e-mails)
+                </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Nome da Empresa</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Nome da Empresa
+                    </label>
                     <input
                       type="text"
                       value={configuracoes.empresa.nome}
-                      onChange={(e) => setConfiguracoes(prev => ({
-                        ...prev,
-                        empresa: { ...prev.empresa, nome: e.target.value }
-                      }))}
+                      onChange={(e) =>
+                        setConfiguracoes((prev) => ({
+                          ...prev,
+                          empresa: { ...prev.empresa, nome: e.target.value },
+                        }))
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">E-mail da Empresa</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      E-mail da Empresa
+                    </label>
                     <input
                       type="email"
                       value={configuracoes.empresa.email}
-                      onChange={(e) => setConfiguracoes(prev => ({
-                        ...prev,
-                        empresa: { ...prev.empresa, email: e.target.value }
-                      }))}
+                      onChange={(e) =>
+                        setConfiguracoes((prev) => ({
+                          ...prev,
+                          empresa: { ...prev.empresa, email: e.target.value },
+                        }))
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
@@ -528,10 +614,12 @@ const ConfiguracaoEmailPage: React.FC = () => {
                     <input
                       type="text"
                       value={configuracoes.empresa.telefone}
-                      onChange={(e) => setConfiguracoes(prev => ({
-                        ...prev,
-                        empresa: { ...prev.empresa, telefone: e.target.value }
-                      }))}
+                      onChange={(e) =>
+                        setConfiguracoes((prev) => ({
+                          ...prev,
+                          empresa: { ...prev.empresa, telefone: e.target.value },
+                        }))
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
@@ -540,10 +628,12 @@ const ConfiguracaoEmailPage: React.FC = () => {
                     <input
                       type="text"
                       value={configuracoes.empresa.endereco}
-                      onChange={(e) => setConfiguracoes(prev => ({
-                        ...prev,
-                        empresa: { ...prev.empresa, endereco: e.target.value }
-                      }))}
+                      onChange={(e) =>
+                        setConfiguracoes((prev) => ({
+                          ...prev,
+                          empresa: { ...prev.empresa, endereco: e.target.value },
+                        }))
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
@@ -597,10 +687,13 @@ const ConfiguracaoEmailPage: React.FC = () => {
 
                 {/* Resultado do Teste */}
                 {resultadoTeste && (
-                  <div className={`p-4 rounded-lg border ${resultadoTeste.success
-                    ? 'bg-green-50 border-green-200'
-                    : 'bg-red-50 border-red-200'
-                    }`}>
+                  <div
+                    className={`p-4 rounded-lg border ${
+                      resultadoTeste.success
+                        ? 'bg-green-50 border-green-200'
+                        : 'bg-red-50 border-red-200'
+                    }`}
+                  >
                     <div className="flex items-start">
                       {resultadoTeste.success ? (
                         <Check className="w-5 h-5 text-green-600 mt-0.5 mr-2 flex-shrink-0" />
@@ -608,25 +701,41 @@ const ConfiguracaoEmailPage: React.FC = () => {
                         <X className="w-5 h-5 text-red-600 mt-0.5 mr-2 flex-shrink-0" />
                       )}
                       <div>
-                        <h5 className={`font-medium mb-1 ${resultadoTeste.success ? 'text-green-900' : 'text-red-900'
-                          }`}>
+                        <h5
+                          className={`font-medium mb-1 ${
+                            resultadoTeste.success ? 'text-green-900' : 'text-red-900'
+                          }`}
+                        >
                           {resultadoTeste.success ? 'E-mail enviado com sucesso!' : 'Erro no envio'}
                         </h5>
                         {resultadoTeste.success ? (
                           <div className="text-sm text-green-700 space-y-1">
-                            <div>📧 E-mail enviado para: <strong>{emailTeste}</strong></div>
+                            <div>
+                              📧 E-mail enviado para: <strong>{emailTeste}</strong>
+                            </div>
                             {resultadoTeste.messageId && (
-                              <div>🔗 ID da mensagem: <code className="bg-green-100 px-1 rounded">{resultadoTeste.messageId}</code></div>
+                              <div>
+                                🔗 ID da mensagem:{' '}
+                                <code className="bg-green-100 px-1 rounded">
+                                  {resultadoTeste.messageId}
+                                </code>
+                              </div>
                             )}
                             {resultadoTeste.provider && (
-                              <div>⚙️ Provedor: <strong>{resultadoTeste.provider}</strong></div>
+                              <div>
+                                ⚙️ Provedor: <strong>{resultadoTeste.provider}</strong>
+                              </div>
                             )}
-                            <div>⏰ Horário: {resultadoTeste.timestamp?.toLocaleString('pt-BR')}</div>
+                            <div>
+                              ⏰ Horário: {resultadoTeste.timestamp?.toLocaleString('pt-BR')}
+                            </div>
                           </div>
                         ) : (
                           <div className="text-sm text-red-700">
                             <div>❌ Erro: {resultadoTeste.error}</div>
-                            <div>⏰ Horário: {resultadoTeste.timestamp?.toLocaleString('pt-BR')}</div>
+                            <div>
+                              ⏰ Horário: {resultadoTeste.timestamp?.toLocaleString('pt-BR')}
+                            </div>
                           </div>
                         )}
                       </div>

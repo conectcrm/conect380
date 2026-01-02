@@ -1091,14 +1091,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 </div>
                 {/* Sprint 2: Badge de tipo do ticket */}
                 {ticket.tipo && (
-                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                    ticket.tipo === 'comercial' ? 'bg-green-100 text-green-700' :
-                    ticket.tipo === 'tecnica' ? 'bg-blue-100 text-blue-700' :
-                    ticket.tipo === 'suporte' ? 'bg-purple-100 text-purple-700' :
-                    ticket.tipo === 'financeira' ? 'bg-yellow-100 text-yellow-700' :
-                    ticket.tipo === 'reclamacao' ? 'bg-red-100 text-red-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${ticket.tipo === 'comercial' ? 'bg-green-100 text-green-700' :
+                      ticket.tipo === 'tecnica' ? 'bg-blue-100 text-blue-700' :
+                        ticket.tipo === 'suporte' ? 'bg-purple-100 text-purple-700' :
+                          ticket.tipo === 'financeira' ? 'bg-yellow-100 text-yellow-700' :
+                            ticket.tipo === 'reclamacao' ? 'bg-red-100 text-red-700' :
+                              'bg-gray-100 text-gray-700'
+                    }`}>
                     {ticket.tipo.charAt(0).toUpperCase() + ticket.tipo.slice(1)}
                   </span>
                 )}

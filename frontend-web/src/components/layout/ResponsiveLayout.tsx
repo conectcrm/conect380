@@ -17,7 +17,7 @@ export const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
   className = '',
   maxWidth = '1400px',
   padding = true,
-  overflow = 'visible'
+  overflow = 'visible',
 }) => {
   const { isMobile, isTablet } = useResponsive();
 
@@ -28,15 +28,17 @@ export const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
     overflow === 'hidden' && 'overflow-hidden',
     overflow === 'auto' && 'overflow-auto',
     padding && (isMobile ? 'px-4 py-2' : isTablet ? 'px-6 py-4' : 'px-8 py-6'),
-    className
-  ].filter(Boolean).join(' ');
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <div 
+    <div
       className={layoutClasses}
-      style={{ 
+      style={{
         maxWidth,
-        overflowX: 'hidden'
+        overflowX: 'hidden',
       }}
     >
       {children}
@@ -58,10 +60,10 @@ export const AdaptiveColumns: React.FC<AdaptiveColumnsProps> = ({
   children,
   minWidth = 280,
   gap = 'clamp(1rem, 3vw, 2rem)',
-  className = ''
+  className = '',
 }) => {
   const { width } = useResponsive();
-  
+
   const getColumns = () => {
     const availableWidth = width - 64; // Margem
     const columns = Math.floor(availableWidth / minWidth);
@@ -69,14 +71,14 @@ export const AdaptiveColumns: React.FC<AdaptiveColumnsProps> = ({
   };
 
   return (
-    <div 
+    <div
       className={`adaptive-columns ${className}`}
       style={{
         display: 'grid',
         gridTemplateColumns: `repeat(${getColumns()}, 1fr)`,
         gap,
         width: '100%',
-        overflowX: 'hidden'
+        overflowX: 'hidden',
       }}
     >
       {children}
@@ -106,7 +108,7 @@ export const ResponsiveModal: React.FC<ResponsiveModalProps> = ({
   subtitle,
   maxWidth = '4xl',
   className = '',
-  preventClose = false
+  preventClose = false,
 }) => {
   const { isMobile } = useResponsive();
   const { modalStyle, shouldUseFullscreen } = useModalDimensions(maxWidth);
@@ -123,31 +125,23 @@ export const ResponsiveModal: React.FC<ResponsiveModalProps> = ({
     'modal-content',
     'custom-scroll',
     shouldUseFullscreen && 'h-full w-full rounded-none',
-    className
-  ].filter(Boolean).join(' ');
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <div 
+    <div
       className="modal-overlay bg-black bg-opacity-50 backdrop-blur-sm"
       onClick={handleBackdropClick}
     >
-      <div 
-        className={modalClasses}
-        style={modalStyle}
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className={modalClasses} style={modalStyle} onClick={(e) => e.stopPropagation()}>
         {(title || subtitle) && (
           <div className="modal-header">
             {title && (
-              <h2 className="heading-responsive font-semibold text-gray-900 mb-1">
-                {title}
-              </h2>
+              <h2 className="heading-responsive font-semibold text-gray-900 mb-1">{title}</h2>
             )}
-            {subtitle && (
-              <p className="text-responsive text-gray-600">
-                {subtitle}
-              </p>
-            )}
+            {subtitle && <p className="text-responsive text-gray-600">{subtitle}</p>}
             {!preventClose && (
               <button
                 onClick={onClose}
@@ -155,16 +149,19 @@ export const ResponsiveModal: React.FC<ResponsiveModalProps> = ({
                 aria-label="Fechar modal"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             )}
           </div>
         )}
-        
-        <div className="modal-body">
-          {children}
-        </div>
+
+        <div className="modal-body">{children}</div>
       </div>
     </div>
   );
@@ -188,7 +185,7 @@ export const ResponsiveGrid: React.FC<ResponsiveGridProps> = ({
   children,
   columns = { mobile: 1, tablet: 2, desktop: 3 },
   gap = 'clamp(1rem, 3vw, 2rem)',
-  className = ''
+  className = '',
 }) => {
   const { isMobile, isTablet, isDesktop } = useResponsive();
 
@@ -200,14 +197,14 @@ export const ResponsiveGrid: React.FC<ResponsiveGridProps> = ({
   };
 
   return (
-    <div 
+    <div
       className={`responsive-grid ${className}`}
       style={{
         display: 'grid',
         gridTemplateColumns: `repeat(${getColumns()}, 1fr)`,
         gap,
         width: '100%',
-        overflowX: 'hidden'
+        overflowX: 'hidden',
       }}
     >
       {children}
@@ -231,7 +228,7 @@ export const ResponsiveCard: React.FC<ResponsiveCardProps> = ({
   padding = true,
   shadow = true,
   border = true,
-  className = ''
+  className = '',
 }) => {
   const { isMobile } = useResponsive();
 
@@ -242,12 +239,10 @@ export const ResponsiveCard: React.FC<ResponsiveCardProps> = ({
     shadow && (isMobile ? 'shadow-sm' : 'shadow-md'),
     padding && 'padding-responsive',
     'overflow-hidden',
-    className
-  ].filter(Boolean).join(' ');
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
-  return (
-    <div className={cardClasses}>
-      {children}
-    </div>
-  );
+  return <div className={cardClasses}>{children}</div>;
 };

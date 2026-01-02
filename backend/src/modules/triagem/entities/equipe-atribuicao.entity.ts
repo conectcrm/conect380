@@ -10,6 +10,7 @@ import {
 import { Equipe } from './equipe.entity';
 import { NucleoAtendimento } from './nucleo-atendimento.entity';
 import { Departamento } from './departamento.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 /**
  * Atribuição de uma equipe a um núcleo ou departamento
@@ -19,6 +20,13 @@ import { Departamento } from './departamento.entity';
 export class EquipeAtribuicao {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column({ type: 'uuid', name: 'equipe_id' })
   equipeId: string;

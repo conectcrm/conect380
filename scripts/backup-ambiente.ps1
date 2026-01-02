@@ -174,7 +174,7 @@ Usuario DB: conectcrm
 Backend: cd backend && npm run start:dev
 Frontend: cd frontend-web && npm start
 Acesso: http://localhost:3000
-Login: admin@conectcrm.com / password
+Login: admin@conectsuite.com.br / password
 "@
 
     $envInfo | Out-File -FilePath "$backupPath\INFORMACOES_AMBIENTE.txt" -Encoding UTF8

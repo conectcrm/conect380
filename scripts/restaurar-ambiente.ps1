@@ -386,7 +386,7 @@ Write-Host "1. Abra VS Code: code C:\Projetos\conectcrm" -ForegroundColor White
 Write-Host "2. Terminal backend: cd backend && npm run start:dev" -ForegroundColor White
 Write-Host "3. Terminal frontend: cd frontend-web && npm start" -ForegroundColor White
 Write-Host "4. Acesse: http://localhost:3000" -ForegroundColor White
-Write-Host "5. Login: admin@conectcrm.com / password" -ForegroundColor White
+Write-Host "5. Login: admin@conectsuite.com.br / password" -ForegroundColor White
 
 if (-not $softwareStatus.Docker) {
     Write-Host "`n⚠️  Configure Docker manualmente:" -ForegroundColor $WarningColor

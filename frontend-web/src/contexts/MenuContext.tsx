@@ -33,9 +33,9 @@ export const MenuProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [expandedMenus]);
 
   const toggleMenu = (menuId: string) => {
-    setExpandedMenus(prev => {
+    setExpandedMenus((prev) => {
       if (prev.includes(menuId)) {
-        return prev.filter(id => id !== menuId);
+        return prev.filter((id) => id !== menuId);
       } else {
         return [...prev, menuId];
       }
@@ -47,7 +47,7 @@ export const MenuProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const expandMenu = (menuId: string) => {
-    setExpandedMenus(prev => {
+    setExpandedMenus((prev) => {
       if (!prev.includes(menuId)) {
         return [...prev, menuId];
       }
@@ -56,7 +56,7 @@ export const MenuProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const collapseMenu = (menuId: string) => {
-    setExpandedMenus(prev => prev.filter(id => id !== menuId));
+    setExpandedMenus((prev) => prev.filter((id) => id !== menuId));
   };
 
   const collapseAllMenus = () => {
@@ -71,7 +71,7 @@ export const MenuProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isMenuExpanded,
         expandMenu,
         collapseMenu,
-        collapseAllMenus
+        collapseAllMenus,
       }}
     >
       {children}

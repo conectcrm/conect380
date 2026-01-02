@@ -18,7 +18,15 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Play, AlertCircle, CheckCircle2, Smartphone, History } from 'lucide-react';
+import {
+  ArrowLeft,
+  Save,
+  Play,
+  AlertCircle,
+  CheckCircle2,
+  Smartphone,
+  History,
+} from 'lucide-react';
 
 // Components
 import { BlockLibrary } from '../../bot-builder/components/BlockLibrary';
@@ -42,12 +50,18 @@ import {
   flowToJson,
   validateFlow,
   generateNodeId,
-  calculateNewNodePosition
+  calculateNewNodePosition,
 } from '../../bot-builder/utils/flowConverter';
 import { corrigirLoopsAutomaticamente } from '../../bot-builder/utils/loop-fixer';
 
 // Types
-import { FlowNode, FlowEdge, Etapa, BlockData, EstruturaFluxo } from '../../bot-builder/types/flow-builder.types';
+import {
+  FlowNode,
+  FlowEdge,
+  Etapa,
+  BlockData,
+  EstruturaFluxo,
+} from '../../bot-builder/types/flow-builder.types';
 
 // Services
 import fluxoService from '../../../services/fluxoService';
@@ -166,56 +180,59 @@ const FluxoBuilderPage: React.FC = () => {
     }
   };
 
-  const aplicarEstruturaNoCanvas = useCallback((estrutura?: EstruturaFluxo | null) => {
-    if (!estrutura) {
-      inicializarNovoFluxo();
-      return;
-    }
-
-    const estruturaNormalizada: EstruturaFluxo = {
-      etapaInicial: estrutura.etapaInicial,
-      etapas: estrutura.etapas || {},
-      variaveis: estrutura.variaveis,
-      versao: estrutura.versao || '1.0',
-    };
-
-    try {
-      const { nodes: visualNodes, edges: visualEdges } = jsonToFlow(estruturaNormalizada);
-      setNodes(visualNodes);
-      setEdges(visualEdges);
-      setValidationErrors([]);
-      setIsDirty(false);
-      setEstruturaComLoop(null); // Limpar estrutura com loop se carregou com sucesso
-    } catch (error: any) {
-      console.error('❌ Erro ao converter JSON para visual:', error);
-
-      // Se for erro de loop infinito, salvar estrutura e oferecer correção
-      if (error.message.includes('loop') || error.message.includes('Loop')) {
-        setEstruturaComLoop(estruturaNormalizada); // Salvar para correção automática
-
-        setValidationErrors([
-          '🔴 LOOP INFINITO DETECTADO',
-          '',
-          error.message,
-          '',
-          '🤖 CORREÇÃO AUTOMÁTICA DISPONÍVEL',
-          'Clique no botão "� Corrigir Loops Automaticamente" abaixo',
-          'O sistema removerá as opções "Voltar" que causam ciclos',
-          '',
-          '📝 OU corrija manualmente:',
-          '1. Abra o editor JSON',
-          '2. Encontre as etapas que referenciam umas às outras ciclicamente',
-          '3. Remova ou redirecione uma das conexões para quebrar o ciclo',
-        ]);
-      } else {
-        setValidationErrors([`Erro ao carregar fluxo: ${error.message}`]);
+  const aplicarEstruturaNoCanvas = useCallback(
+    (estrutura?: EstruturaFluxo | null) => {
+      if (!estrutura) {
+        inicializarNovoFluxo();
+        return;
       }
 
-      // Manter visualização vazia para evitar crash
-      setNodes([]);
-      setEdges([]);
-    }
-  }, [setNodes, setEdges]);
+      const estruturaNormalizada: EstruturaFluxo = {
+        etapaInicial: estrutura.etapaInicial,
+        etapas: estrutura.etapas || {},
+        variaveis: estrutura.variaveis,
+        versao: estrutura.versao || '1.0',
+      };
+
+      try {
+        const { nodes: visualNodes, edges: visualEdges } = jsonToFlow(estruturaNormalizada);
+        setNodes(visualNodes);
+        setEdges(visualEdges);
+        setValidationErrors([]);
+        setIsDirty(false);
+        setEstruturaComLoop(null); // Limpar estrutura com loop se carregou com sucesso
+      } catch (error: any) {
+        console.error('❌ Erro ao converter JSON para visual:', error);
+
+        // Se for erro de loop infinito, salvar estrutura e oferecer correção
+        if (error.message.includes('loop') || error.message.includes('Loop')) {
+          setEstruturaComLoop(estruturaNormalizada); // Salvar para correção automática
+
+          setValidationErrors([
+            '🔴 LOOP INFINITO DETECTADO',
+            '',
+            error.message,
+            '',
+            '🤖 CORREÇÃO AUTOMÁTICA DISPONÍVEL',
+            'Clique no botão "� Corrigir Loops Automaticamente" abaixo',
+            'O sistema removerá as opções "Voltar" que causam ciclos',
+            '',
+            '📝 OU corrija manualmente:',
+            '1. Abra o editor JSON',
+            '2. Encontre as etapas que referenciam umas às outras ciclicamente',
+            '3. Remova ou redirecione uma das conexões para quebrar o ciclo',
+          ]);
+        } else {
+          setValidationErrors([`Erro ao carregar fluxo: ${error.message}`]);
+        }
+
+        // Manter visualização vazia para evitar crash
+        setNodes([]);
+        setEdges([]);
+      }
+    },
+    [setNodes, setEdges],
+  );
 
   const carregarFluxo = async (fluxoId: string) => {
     try {
@@ -258,7 +275,7 @@ const FluxoBuilderPage: React.FC = () => {
       const resumo = acoesTomadas.join('\n');
       const confirmacao = window.confirm(
         `🔧 CORREÇÃO AUTOMÁTICA\n\n${resumo}\n\n` +
-        `Deseja aplicar estas correções e salvar o fluxo?`
+        `Deseja aplicar estas correções e salvar o fluxo?`,
       );
 
       if (!confirmacao) {
@@ -283,7 +300,6 @@ const FluxoBuilderPage: React.FC = () => {
         alert('⚠️ Loops corrigidos! Não esqueça de salvar o fluxo.');
         setIsDirty(true);
       }
-
     } catch (error: any) {
       console.error('❌ Erro ao corrigir loops:', error);
       alert(`Erro ao corrigir loops: ${error.message}`);
@@ -296,8 +312,10 @@ const FluxoBuilderPage: React.FC = () => {
     try {
       setLoading(true);
       const fluxos = await fluxoService.listar({ publicado: true, canal: 'whatsapp' });
-      const fluxoPadrao = fluxos.find((item) =>
-        item.codigo === 'FLUXO_PADRAO_WHATSAPP' || item.nome?.toLowerCase() === 'fluxo padrao whatsapp'
+      const fluxoPadrao = fluxos.find(
+        (item) =>
+          item.codigo === 'FLUXO_PADRAO_WHATSAPP' ||
+          item.nome?.toLowerCase() === 'fluxo padrao whatsapp',
       );
 
       if (fluxoPadrao) {
@@ -354,24 +372,27 @@ const FluxoBuilderPage: React.FC = () => {
     }
   }, []);
 
-  const onAddBlock = useCallback((type: string) => {
-    const newPosition = calculateNewNodePosition(nodes as FlowNode[]);
-    const newId = generateNodeId(type);
-    const etapaTipo = resolveEtapaTipo(type);
+  const onAddBlock = useCallback(
+    (type: string) => {
+      const newPosition = calculateNewNodePosition(nodes as FlowNode[]);
+      const newId = generateNodeId(type);
+      const etapaTipo = resolveEtapaTipo(type);
 
-    const newNode: FlowNode = {
-      id: newId,
-      type: type as any,
-      position: newPosition,
-      data: {
-        label: `${type.charAt(0).toUpperCase() + type.slice(1)}`,
-        tipo: etapaTipo,
-      },
-    };
+      const newNode: FlowNode = {
+        id: newId,
+        type: type as any,
+        position: newPosition,
+        data: {
+          label: `${type.charAt(0).toUpperCase() + type.slice(1)}`,
+          tipo: etapaTipo,
+        },
+      };
 
-    setNodes((nds) => [...nds, newNode]);
-    setIsDirty(true);
-  }, [nodes, resolveEtapaTipo, setNodes]);
+      setNodes((nds) => [...nds, newNode]);
+      setIsDirty(true);
+    },
+    [nodes, resolveEtapaTipo, setNodes],
+  );
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
@@ -401,7 +422,7 @@ const FluxoBuilderPage: React.FC = () => {
       setNodes((nds) => [...nds, newNode]);
       setIsDirty(true);
     },
-    [resolveEtapaTipo, setNodes]
+    [resolveEtapaTipo, setNodes],
   );
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -422,7 +443,7 @@ const FluxoBuilderPage: React.FC = () => {
 
         let uniqueId = baseId;
         let suffix = 1;
-        while (eds.some(edge => edge.id === uniqueId)) {
+        while (eds.some((edge) => edge.id === uniqueId)) {
           uniqueId = `${baseId}-${suffix++}`;
         }
 
@@ -440,7 +461,7 @@ const FluxoBuilderPage: React.FC = () => {
 
       setIsDirty(true);
     },
-    [setEdges]
+    [setEdges],
   );
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
@@ -448,28 +469,34 @@ const FluxoBuilderPage: React.FC = () => {
     setSelectedNode(node as FlowNode);
   }, []);
 
-  const onUpdateNode = useCallback((nodeId: string, data: Partial<BlockData>) => {
-    console.log('🔄 Atualizando node:', {
-      nodeId,
-      novosDados: data,
-      totalOpcoes: data.etapa?.opcoes?.length || 0,
-      opcoes: data.etapa?.opcoes
-    });
+  const onUpdateNode = useCallback(
+    (nodeId: string, data: Partial<BlockData>) => {
+      console.log('🔄 Atualizando node:', {
+        nodeId,
+        novosDados: data,
+        totalOpcoes: data.etapa?.opcoes?.length || 0,
+        opcoes: data.etapa?.opcoes,
+      });
 
-    setNodes((nds) =>
-      nds.map((node) =>
-        node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node
-      )
-    );
-    setIsDirty(true);
-    setSelectedNode(null);
-  }, [setNodes]);
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node,
+        ),
+      );
+      setIsDirty(true);
+      setSelectedNode(null);
+    },
+    [setNodes],
+  );
 
-  const onDeleteNode = useCallback((nodeId: string) => {
-    setNodes((nds) => nds.filter((node) => node.id !== nodeId));
-    setSelectedNode(null);
-    setIsDirty(true);
-  }, [setNodes]);
+  const onDeleteNode = useCallback(
+    (nodeId: string) => {
+      setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+      setSelectedNode(null);
+      setIsDirty(true);
+    },
+    [setNodes],
+  );
 
   // ==================== VALIDAÇÃO E SALVAMENTO ====================
 
@@ -495,7 +522,7 @@ const FluxoBuilderPage: React.FC = () => {
       totalNodes: nodes.length,
       totalEdges: edges.length,
       validationErrors: validationErrors.length,
-      errors: validationErrors
+      errors: validationErrors,
     });
 
     // Validar primeiro
@@ -512,12 +539,12 @@ const FluxoBuilderPage: React.FC = () => {
       const estrutura = flowToJson(nodes as FlowNode[], edges as FlowEdge[]);
 
       console.log('🔄 Salvando fluxo - estrutura convertida:', {
-        etapas: Object.keys(estrutura.etapas).map(key => ({
+        etapas: Object.keys(estrutura.etapas).map((key) => ({
           id: key,
           tipo: estrutura.etapas[key].tipo,
           totalOpcoes: estrutura.etapas[key].opcoes?.length || 0,
-          opcoes: estrutura.etapas[key].opcoes
-        }))
+          opcoes: estrutura.etapas[key].opcoes,
+        })),
       });
 
       const nomeFluxo = isEditing
@@ -595,13 +622,16 @@ const FluxoBuilderPage: React.FC = () => {
       <div className="bg-white border-b px-6 py-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <BackToNucleus nucleusName="Gestão" nucleusPath="/gestao/fluxos" />
+            <BackToNucleus nucleusName="Automações" nucleusPath="/atendimento/automacoes?tab=bot" />
             <div>
-              <h1 className="text-2xl font-bold text-[#002333]">
-                🤖 Construtor de Fluxos
-              </h1>
+              <h1 className="text-2xl font-bold text-[#002333]">🤖 Construtor de Fluxos</h1>
               <p className="text-sm text-gray-500 mt-1">
-                {isEditing ? (fluxo?.nome || 'Fluxo sem nome') : (fluxo?.nome ? `${fluxo.nome} (importado)` : 'Novo Fluxo')} {isDirty && '(não salvo)'}
+                {isEditing
+                  ? fluxo?.nome || 'Fluxo sem nome'
+                  : fluxo?.nome
+                    ? `${fluxo.nome} (importado)`
+                    : 'Novo Fluxo'}{' '}
+                {isDirty && '(não salvo)'}
               </p>
             </div>
           </div>
@@ -639,9 +669,7 @@ const FluxoBuilderPage: React.FC = () => {
 
             {/* Aviso de alterações não salvas */}
             {isDirty && !autoSaving && (
-              <div className="text-sm text-orange-600 font-medium">
-                ⚠️ Alterações não salvas
-              </div>
+              <div className="text-sm text-orange-600 font-medium">⚠️ Alterações não salvas</div>
             )}
 
             {/* Botões */}
@@ -714,9 +742,7 @@ const FluxoBuilderPage: React.FC = () => {
                     Corrigindo...
                   </>
                 ) : (
-                  <>
-                    🔧 Corrigir Loops Automaticamente
-                  </>
+                  <>🔧 Corrigir Loops Automaticamente</>
                 )}
               </button>
             )}
@@ -747,14 +773,22 @@ const FluxoBuilderPage: React.FC = () => {
             <MiniMap
               nodeColor={(node) => {
                 switch (node.type) {
-                  case 'start': return '#10b981';
-                  case 'message': return '#3b82f6';
-                  case 'menu': return '#a855f7';
-                  case 'question': return '#eab308';
-                  case 'condition': return '#14b8a6';
-                  case 'action': return '#f97316';
-                  case 'end': return '#ef4444';
-                  default: return '#6b7280';
+                  case 'start':
+                    return '#10b981';
+                  case 'message':
+                    return '#3b82f6';
+                  case 'menu':
+                    return '#a855f7';
+                  case 'question':
+                    return '#eab308';
+                  case 'condition':
+                    return '#14b8a6';
+                  case 'action':
+                    return '#f97316';
+                  case 'end':
+                    return '#ef4444';
+                  default:
+                    return '#6b7280';
                 }
               }}
               maskColor="rgba(0, 0, 0, 0.1)"
@@ -770,8 +804,8 @@ const FluxoBuilderPage: React.FC = () => {
               <button
                 onClick={() => setShowPreview(false)}
                 className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${!showPreview
-                  ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:bg-gray-50'
+                    ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-600 hover:bg-gray-50'
                   }`}
               >
                 ⚙️ Configuração
@@ -779,8 +813,8 @@ const FluxoBuilderPage: React.FC = () => {
               <button
                 onClick={() => setShowPreview(true)}
                 className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${showPreview
-                  ? 'bg-teal-50 text-teal-600 border-b-2 border-teal-600'
-                  : 'text-gray-600 hover:bg-gray-50'
+                    ? 'bg-teal-50 text-teal-600 border-b-2 border-teal-600'
+                    : 'text-gray-600 hover:bg-gray-50'
                   }`}
               >
                 📱 Preview
@@ -791,11 +825,7 @@ const FluxoBuilderPage: React.FC = () => {
           {/* Conteúdo */}
           <div className="flex-1 overflow-hidden">
             {showPreview && selectedNode ? (
-              <WhatsAppPreview
-                selectedNode={selectedNode}
-                nodes={nodes}
-                edges={edges}
-              />
+              <WhatsAppPreview selectedNode={selectedNode} nodes={nodes} edges={edges} />
             ) : (
               <BlockConfig
                 node={selectedNode}

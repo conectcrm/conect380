@@ -1,9 +1,9 @@
 /**
  * Dashboard Analytics - Módulo Atendimento
- * 
+ *
  * Página de analytics com métricas agregadas, estatísticas e gráficos
  * Exibe KPIs principais, desempenho de atendentes, canais e tendências
- * 
+ *
  * Features:
  * - 6 KPI Cards principais (tickets, tempos, SLA, satisfação)
  * - Filtro de período (7d, 30d, 90d)
@@ -12,7 +12,7 @@
  * - Cards de estatísticas por canal
  * - Design Crevasse Professional (#9333EA purple)
  * - Responsivo (mobile-first)
- * 
+ *
  * @author ConectCRM
  * @date 2025-11-18
  */
@@ -37,8 +37,17 @@ import {
   DesempenhoAtendente,
   EstatisticasCanal,
 } from '../services/analyticsService';
+import SLATab from '../components/analytics/SLATab';
+import DistribuicaoTab from '../components/analytics/DistribuicaoTab';
 
 const DashboardAnalyticsPage: React.FC = () => {
+  // Estado de abas (ler do URL query param)
+  const [activeTab, setActiveTab] = useState<'geral' | 'sla' | 'distribuicao' | 'desempenho'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    return (tab === 'sla' || tab === 'distribuicao' || tab === 'desempenho') ? tab : 'geral';
+  });
+
   // Estados principais
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [atendentes, setAtendentes] = useState<DesempenhoAtendente[]>([]);
@@ -47,6 +56,14 @@ const DashboardAnalyticsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [periodo, setPeriodo] = useState<'7d' | '30d' | '90d'>('7d');
   const [refreshing, setRefreshing] = useState(false);
+
+  // Atualizar URL quando aba mudar
+  const handleTabChange = (tab: typeof activeTab) => {
+    setActiveTab(tab);
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tab);
+    window.history.pushState({}, '', url.toString());
+  };
 
   // Carregar dados ao montar e quando período mudar
   useEffect(() => {
@@ -159,11 +176,9 @@ const DashboardAnalyticsPage: React.FC = () => {
               <div>
                 <h1 className="text-3xl font-bold text-[#002333] flex items-center">
                   <BarChart3 className="h-8 w-8 mr-3 text-[#9333EA]" />
-                  Dashboard Analytics
+                  Métricas & Analytics
                 </h1>
-                <p className="text-[#002333]/60 mt-1">
-                  Métricas e estatísticas de atendimento
-                </p>
+                <p className="text-[#002333]/60 mt-1">Dashboards consolidados de atendimento</p>
               </div>
 
               {/* Controles */}
@@ -190,6 +205,48 @@ const DashboardAnalyticsPage: React.FC = () => {
                 </button>
               </div>
             </div>
+
+            {/* Navegação de Abas */}
+            <div className="mt-6 border-b border-gray-200">
+              <nav className="-mb-px flex gap-6">
+                <button
+                  onClick={() => handleTabChange('geral')}
+                  className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'geral'
+                    ? 'border-[#9333EA] text-[#9333EA]'
+                    : 'border-transparent text-[#002333]/60 hover:text-[#002333] hover:border-gray-300'
+                    }`}
+                >
+                  📊 Visão Geral
+                </button>
+                <button
+                  onClick={() => handleTabChange('sla')}
+                  className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'sla'
+                    ? 'border-[#9333EA] text-[#9333EA]'
+                    : 'border-transparent text-[#002333]/60 hover:text-[#002333] hover:border-gray-300'
+                    }`}
+                >
+                  ⏱️ SLA
+                </button>
+                <button
+                  onClick={() => handleTabChange('distribuicao')}
+                  className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'distribuicao'
+                    ? 'border-[#9333EA] text-[#9333EA]'
+                    : 'border-transparent text-[#002333]/60 hover:text-[#002333] hover:border-gray-300'
+                    }`}
+                >
+                  👥 Distribuição
+                </button>
+                <button
+                  onClick={() => handleTabChange('desempenho')}
+                  className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'desempenho'
+                    ? 'border-[#9333EA] text-[#9333EA]'
+                    : 'border-transparent text-[#002333]/60 hover:text-[#002333] hover:border-gray-300'
+                    }`}
+                >
+                  🏆 Desempenho
+                </button>
+              </nav>
+            </div>
           </div>
 
           {/* Erro feedback */}
@@ -201,18 +258,17 @@ const DashboardAnalyticsPage: React.FC = () => {
                   <p className="text-red-800 font-medium">Erro ao carregar dados</p>
                   <p className="text-red-600 text-sm mt-1">{error}</p>
                 </div>
-                <button
-                  onClick={() => setError(null)}
-                  className="text-red-600 hover:text-red-800"
-                >
+                <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800">
                   ×
                 </button>
               </div>
             </div>
           )}
 
-          {/* KPI Cards - Métricas Principais */}
-          {metrics && (
+          {/* Conteúdo por Aba */}
+
+          {/* ABA: Visão Geral */}
+          {activeTab === 'geral' && metrics && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 {/* Card: Tickets Abertos */}
@@ -267,9 +323,7 @@ const DashboardAnalyticsPage: React.FC = () => {
                       <p className="mt-2 text-3xl font-bold text-[#002333]">
                         {formatarNumero(metrics.ticketsPendentes)}
                       </p>
-                      <p className="mt-3 text-sm text-yellow-600">
-                        Aguardando ação
-                      </p>
+                      <p className="mt-3 text-sm text-yellow-600">Aguardando ação</p>
                     </div>
                     <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
                       <AlertCircle className="h-6 w-6 text-yellow-600" />
@@ -287,9 +341,7 @@ const DashboardAnalyticsPage: React.FC = () => {
                       <p className="mt-2 text-3xl font-bold text-[#002333]">
                         {formatarTempo(metrics.tempoMedioResposta)}
                       </p>
-                      <p className="mt-3 text-sm text-[#002333]/70">
-                        Primeira resposta ao cliente
-                      </p>
+                      <p className="mt-3 text-sm text-[#002333]/70">Primeira resposta ao cliente</p>
                     </div>
                     <div className="h-12 w-12 rounded-2xl bg-blue-500/10 flex items-center justify-center shadow-sm">
                       <Clock className="h-6 w-6 text-blue-600" />
@@ -307,12 +359,14 @@ const DashboardAnalyticsPage: React.FC = () => {
                       <p className="mt-2 text-3xl font-bold text-[#002333]">
                         {metrics.slaAtingido.toFixed(1)}%
                       </p>
-                      <p className="mt-3 text-sm text-[#002333]/70">
-                        Resolução dentro do prazo
-                      </p>
+                      <p className="mt-3 text-sm text-[#002333]/70">Resolução dentro do prazo</p>
                     </div>
-                    <div className={`h-12 w-12 rounded-2xl ${metrics.slaAtingido >= 90 ? 'bg-green-500/10' : 'bg-orange-500/10'} flex items-center justify-center shadow-sm`}>
-                      <Target className={`h-6 w-6 ${metrics.slaAtingido >= 90 ? 'text-green-600' : 'text-orange-600'}`} />
+                    <div
+                      className={`h-12 w-12 rounded-2xl ${metrics.slaAtingido >= 90 ? 'bg-green-500/10' : 'bg-orange-500/10'} flex items-center justify-center shadow-sm`}
+                    >
+                      <Target
+                        className={`h-6 w-6 ${metrics.slaAtingido >= 90 ? 'text-green-600' : 'text-orange-600'}`}
+                      />
                     </div>
                   </div>
                 </div>
@@ -354,9 +408,15 @@ const DashboardAnalyticsPage: React.FC = () => {
 
                       return (
                         <div key={index} className="flex-1 flex flex-col items-center">
-                          <div className="w-full bg-[#9333EA] rounded-t transition-all hover:bg-[#7928CA]" style={{ height: `${altura}%`, minHeight: '4px' }}></div>
+                          <div
+                            className="w-full bg-[#9333EA] rounded-t transition-all hover:bg-[#7928CA]"
+                            style={{ height: `${altura}%`, minHeight: '4px' }}
+                          ></div>
                           <div className="text-xs text-[#002333]/60 mt-2 text-center">
-                            {new Date(ponto.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                            {new Date(ponto.data).toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                            })}
                           </div>
                           <div className="text-xs font-semibold text-[#002333] mt-1">
                             {ponto.valor}
@@ -400,10 +460,11 @@ const DashboardAnalyticsPage: React.FC = () => {
                   </thead>
                   <tbody>
                     {atendentes.map((atendente) => (
-                      <tr key={atendente.atendenteId} className="border-b border-[#DEEFE7] hover:bg-gray-50">
-                        <td className="py-3 px-4 text-sm text-[#002333]">
-                          {atendente.nome}
-                        </td>
+                      <tr
+                        key={atendente.atendenteId}
+                        className="border-b border-[#DEEFE7] hover:bg-gray-50"
+                      >
+                        <td className="py-3 px-4 text-sm text-[#002333]">{atendente.nome}</td>
                         <td className="py-3 px-4 text-sm text-[#002333] text-right font-semibold">
                           {formatarNumero(atendente.ticketsAtendidos)}
                         </td>
@@ -478,6 +539,33 @@ const DashboardAnalyticsPage: React.FC = () => {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* ABA: SLA */}
+          {activeTab === 'sla' && <SLATab />}
+
+          {/* ABA: Distribuição */}
+          {activeTab === 'distribuicao' && <DistribuicaoTab />}
+
+          {/* ABA: Desempenho (Placeholder - futuro) */}
+          {activeTab === 'desempenho' && (
+            <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
+              <div className="max-w-md mx-auto">
+                <div className="h-16 w-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
+                  <Target className="h-8 w-8 text-green-600" />
+                </div>
+                <h3 className="text-xl font-bold text-[#002333] mb-2">Análise de Desempenho</h3>
+                <p className="text-[#002333]/60 mb-6">
+                  Rankings, comparativos e análise avançada de desempenho individual e por equipe.
+                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    🚧 <strong>Planejado</strong> - Esta aba será implementada em versões futuras com análises
+                    comparativas.
+                  </p>
+                </div>
               </div>
             </div>
           )}

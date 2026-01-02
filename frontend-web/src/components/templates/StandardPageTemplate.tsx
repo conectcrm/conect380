@@ -72,33 +72,33 @@ const colorConfigs = {
   blue: {
     text: 'text-blue-600',
     bg: 'from-blue-100 to-blue-200',
-    icon: 'text-blue-600'
+    icon: 'text-blue-600',
   },
   green: {
     text: 'text-green-600',
     bg: 'from-green-100 to-green-200',
-    icon: 'text-green-600'
+    icon: 'text-green-600',
   },
   red: {
     text: 'text-red-600',
     bg: 'from-red-100 to-red-200',
-    icon: 'text-red-600'
+    icon: 'text-red-600',
   },
   purple: {
     text: 'text-purple-600',
     bg: 'from-purple-100 to-purple-200',
-    icon: 'text-purple-600'
+    icon: 'text-purple-600',
   },
   yellow: {
     text: 'text-yellow-600',
     bg: 'from-yellow-100 to-yellow-200',
-    icon: 'text-yellow-600'
+    icon: 'text-yellow-600',
   },
   indigo: {
     text: 'text-indigo-600',
     bg: 'from-indigo-100 to-indigo-200',
-    icon: 'text-indigo-600'
-  }
+    icon: 'text-indigo-600',
+  },
 };
 
 export const StandardPageTemplate: React.FC<StandardPageTemplateProps> = ({
@@ -112,12 +112,11 @@ export const StandardPageTemplate: React.FC<StandardPageTemplateProps> = ({
   searchConfig,
   filters,
   children,
-  loading = false
+  loading = false,
 }) => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
         {/* Navigation */}
         {backTo && (
           <BackToNucleus
@@ -167,14 +166,14 @@ export const StandardPageTemplate: React.FC<StandardPageTemplateProps> = ({
                       <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">
                         {card.title}
                       </p>
-                      <p className={`text-3xl font-bold mt-2 ${config.text}`}>
-                        {card.value}
-                      </p>
+                      <p className={`text-3xl font-bold mt-2 ${config.text}`}>{card.value}</p>
                       {card.subtitle && (
                         <p className="text-xs text-gray-400 mt-1">{card.subtitle}</p>
                       )}
                     </div>
-                    <div className={`p-4 bg-gradient-to-br ${card.bgGradient || config.bg} rounded-xl`}>
+                    <div
+                      className={`p-4 bg-gradient-to-br ${card.bgGradient || config.bg} rounded-xl`}
+                    >
                       <IconComponent className={`w-8 h-8 ${config.icon}`} />
                     </div>
                   </div>
@@ -211,12 +210,13 @@ export const StandardPageTemplate: React.FC<StandardPageTemplateProps> = ({
                   <button
                     key={index}
                     onClick={action.onClick}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${action.variant === 'danger'
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      action.variant === 'danger'
                         ? 'bg-red-600 text-white hover:bg-red-700'
                         : action.variant === 'outline'
                           ? 'bg-white border border-blue-600 text-blue-600 hover:bg-blue-50'
                           : 'bg-blue-600 text-white hover:bg-blue-700'
-                      }`}
+                    }`}
                   >
                     {action.label}
                   </button>
@@ -230,13 +230,10 @@ export const StandardPageTemplate: React.FC<StandardPageTemplateProps> = ({
         {(searchConfig || (filters && filters.length > 0)) && (
           <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
             <div className="flex flex-col sm:flex-row gap-4 items-end">
-
               {/* Search */}
               {searchConfig && (
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Buscar
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Buscar</label>
                   <div className="relative">
                     <input
                       type="text"
@@ -247,8 +244,18 @@ export const StandardPageTemplate: React.FC<StandardPageTemplateProps> = ({
                       className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
                     />
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      <svg
+                        className="h-5 w-5 text-gray-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
                       </svg>
                     </div>
                   </div>
@@ -256,24 +263,25 @@ export const StandardPageTemplate: React.FC<StandardPageTemplateProps> = ({
               )}
 
               {/* Filters */}
-              {filters && filters.map((filter, index) => (
-                <div key={index} className="min-w-48">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {filter.label}
-                  </label>
-                  <select
-                    value={filter.value}
-                    onChange={(e) => filter.onChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                  >
-                    {filter.options.map((option, optionIndex) => (
-                      <option key={optionIndex} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ))}
+              {filters &&
+                filters.map((filter, index) => (
+                  <div key={index} className="min-w-48">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {filter.label}
+                    </label>
+                    <select
+                      value={filter.value}
+                      onChange={(e) => filter.onChange(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                    >
+                      {filter.options.map((option, optionIndex) => (
+                        <option key={optionIndex} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
 
               {/* Secondary Actions */}
               {secondaryActions && (
@@ -282,12 +290,13 @@ export const StandardPageTemplate: React.FC<StandardPageTemplateProps> = ({
                     <button
                       key={index}
                       onClick={action.onClick}
-                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center space-x-2 ${action.variant === 'danger'
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center space-x-2 ${
+                        action.variant === 'danger'
                           ? 'bg-red-600 text-white hover:bg-red-700'
                           : action.variant === 'outline'
                             ? 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
                             : 'bg-[#159A9C] text-white hover:bg-[#138A8C]'
-                        }`}
+                      }`}
                     >
                       {action.icon && <action.icon className="w-4 h-4" />}
                       <span>{action.label}</span>

@@ -88,10 +88,10 @@ PARAMETERS: ["default","whatsapp_business_api",true]
 **Arquivo**: `backend/src/modules/atendimento/controllers/whatsapp-webhook.controller.ts`
 
 **Alterações**:
-1. **GET /api/atendimento/webhooks/whatsapp** (linha 33)
+1. **GET /api/atendimento/webhooks/whatsapp/:empresaId** (linha 33)
    - Substituído: `'default'` → UUID ou env var
    
-2. **POST /api/atendimento/webhooks/whatsapp** (linhas 131-146)
+2. **POST /api/atendimento/webhooks/whatsapp/:empresaId** (linhas 131-146)
    - Substituído: `'default'` → UUID ou env var
    - Adicionado: Extração de `phone_number_id` do payload
    - Preparado: Lookup futuro de empresaId por phoneNumberId
@@ -131,7 +131,7 @@ node dist/src/main.js
 
 ### Teste 1: Backend Online
 ```bash
-curl http://localhost:3001/api/atendimento/webhooks/whatsapp?hub.mode=test
+curl http://localhost:3001/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>?hub.mode=test
 # Resultado: 403 Forbidden (esperado - token inválido)
 # ✅ Backend respondendo corretamente
 ```

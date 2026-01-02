@@ -19,7 +19,9 @@ interface StatCardProps {
 
 const StatCard: React.FC<StatCardProps> = ({ icon, label, value, color, bgColor }) => {
   return (
-    <div className={`${bgColor} rounded-lg p-3 flex flex-col items-center justify-center transition-all hover:shadow-md`}>
+    <div
+      className={`${bgColor} rounded-lg p-3 flex flex-col items-center justify-center transition-all hover:shadow-md`}
+    >
       <div className="text-2xl mb-1">{icon}</div>
       <div className={`text-2xl font-bold ${color} mb-1`}>{value}</div>
       <div className="text-xs text-gray-600 font-medium text-center">{label}</div>
@@ -31,9 +33,9 @@ export const TicketStats: React.FC<TicketStatsProps> = ({ tickets }) => {
   // Calcular estatísticas
   const stats = {
     total: tickets.length,
-    abertos: tickets.filter(t => t.status === 'aberto').length,
-    emAtendimento: tickets.filter(t => t.status === 'em_atendimento').length,
-    resolvidos: tickets.filter(t => t.status === 'resolvido').length,
+    abertos: tickets.filter((t) => t.status === 'aberto').length,
+    emAtendimento: tickets.filter((t) => t.status === 'em_atendimento').length,
+    resolvidos: tickets.filter((t) => t.status === 'resolvido').length,
   };
 
   return (

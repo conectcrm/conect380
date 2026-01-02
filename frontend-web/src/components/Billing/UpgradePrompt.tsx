@@ -2,16 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import {
-  Crown,
-  X,
-  Check,
-  TrendingUp,
-  Users,
-  UserCheck,
-  Database,
-  Zap
-} from 'lucide-react';
+import { Crown, X, Check, TrendingUp, Users, UserCheck, Database, Zap } from 'lucide-react';
 import { useSubscription, Plano } from '../../hooks/useSubscription';
 import { formatCurrency } from '../../utils/formatters';
 
@@ -28,7 +19,7 @@ export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
   reason = 'feature-premium',
   onUpgrade,
   onDismiss,
-  compact = false
+  compact = false,
 }) => {
   const { planos, assinatura, alterarPlano } = useSubscription();
   const [isUpgrading, setIsUpgrading] = useState(false);
@@ -38,7 +29,7 @@ export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
     if (!assinatura) return planos;
 
     // Sugerir planos superiores ao atual
-    const currentPlanIndex = planos.findIndex(p => p.id === assinatura.plano.id);
+    const currentPlanIndex = planos.findIndex((p) => p.id === assinatura.plano.id);
     return planos.slice(currentPlanIndex + 1);
   };
 
@@ -69,7 +60,7 @@ export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
           title: 'Limite Atingido',
           description: 'Você atingiu o limite do seu plano atual. Faça upgrade para continuar.',
           icon: <TrendingUp className="h-8 w-8 text-orange-500" />,
-          color: 'orange'
+          color: 'orange',
         };
 
       case 'module-not-included':
@@ -77,7 +68,7 @@ export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
           title: `Módulo ${module || 'Premium'} Não Incluído`,
           description: 'Este módulo não está disponível no seu plano atual.',
           icon: <Crown className="h-8 w-8 text-blue-500" />,
-          color: 'blue'
+          color: 'blue',
         };
 
       default:
@@ -85,7 +76,7 @@ export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
           title: 'Recurso Premium',
           description: 'Este recurso está disponível apenas nos planos superiores.',
           icon: <Crown className="h-8 w-8 text-purple-500" />,
-          color: 'purple'
+          color: 'purple',
         };
     }
   };
@@ -101,12 +92,8 @@ export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
             <div className="flex items-center gap-3">
               {content.icon}
               <div>
-                <h4 className={`font-medium text-${content.color}-800`}>
-                  {content.title}
-                </h4>
-                <p className={`text-sm text-${content.color}-700`}>
-                  {content.description}
-                </p>
+                <h4 className={`font-medium text-${content.color}-800`}>{content.title}</h4>
+                <p className={`text-sm text-${content.color}-700`}>{content.description}</p>
               </div>
             </div>
 

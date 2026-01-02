@@ -4,18 +4,18 @@ import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { toast } from 'react-hot-toast';
-import { 
-  Plus, 
-  Search, 
-  X, 
-  FileText, 
-  Calculator, 
-  User, 
-  Package, 
+import {
+  Plus,
+  Search,
+  X,
+  FileText,
+  Calculator,
+  User,
+  Package,
   Trash2,
   CreditCard,
   ArrowLeft,
-  Layers
+  Layers,
 } from 'lucide-react';
 
 // Hooks e Services
@@ -98,12 +98,12 @@ const propostaSchema = yup.object().shape({
   produtos: yup.array().when('tipoSelecao', {
     is: 'personalizado',
     then: (schema) => schema.min(1, 'Adicione pelo menos um produto'),
-    otherwise: (schema) => schema
+    otherwise: (schema) => schema,
   }),
   combos: yup.array().when('tipoSelecao', {
     is: 'combo',
     then: (schema) => schema.min(1, 'Selecione pelo menos um combo'),
-    otherwise: (schema) => schema
+    otherwise: (schema) => schema,
   }),
   descontoGlobal: yup.number().min(0).max(100),
   impostos: yup.number().min(0).max(100),
@@ -124,7 +124,7 @@ const clientesMockFallback: Cliente[] = [
     cidade: 'São Paulo',
     estado: 'SP',
     cep: '01234-567',
-    tipoPessoa: 'fisica'
+    tipoPessoa: 'fisica',
   },
   {
     id: '2',
@@ -136,7 +136,7 @@ const clientesMockFallback: Cliente[] = [
     cidade: 'São Paulo',
     estado: 'SP',
     cep: '01310-100',
-    tipoPessoa: 'fisica'
+    tipoPessoa: 'fisica',
   },
   {
     id: '3',
@@ -148,8 +148,8 @@ const clientesMockFallback: Cliente[] = [
     cidade: 'São Paulo',
     estado: 'SP',
     cep: '04567-890',
-    tipoPessoa: 'juridica'
-  }
+    tipoPessoa: 'juridica',
+  },
 ];
 
 // Produtos organizados por categoria e tipo
@@ -158,107 +158,107 @@ const produtosMock: ProdutoBase[] = [
   {
     id: 'sw1',
     nome: 'Sistema de Gestão - Licença Web Básica',
-    preco: 299.00,
+    preco: 299.0,
     categoria: 'Software',
     subcategoria: 'Sistema de Gestão',
     tipo: 'Licença Web Básica',
     descricao: 'Acesso via web, recursos básicos, até 5 usuários',
-    unidade: 'licença/mês'
+    unidade: 'licença/mês',
   },
   {
     id: 'sw2',
     nome: 'Sistema de Gestão - Licença Web Premium',
-    preco: 449.00,
+    preco: 449.0,
     categoria: 'Software',
     subcategoria: 'Sistema de Gestão',
     tipo: 'Licença Web Premium',
     descricao: 'Acesso via web, recursos avançados, usuários ilimitados',
-    unidade: 'licença/mês'
+    unidade: 'licença/mês',
   },
   // Software - App Mobile
   {
     id: 'sw3',
     nome: 'Sistema de Gestão - App Mobile',
-    preco: 389.00,
+    preco: 389.0,
     categoria: 'Software',
     subcategoria: 'Sistema de Gestão',
     tipo: 'App Mobile',
     descricao: 'Aplicativo móvel nativo iOS/Android',
-    unidade: 'licença/mês'
+    unidade: 'licença/mês',
   },
   // Software - E-commerce
   {
     id: 'sw4',
     nome: 'E-commerce - Loja Básica',
-    preco: 199.00,
+    preco: 199.0,
     categoria: 'Software',
     subcategoria: 'E-commerce',
     tipo: 'Loja Básica',
     descricao: 'Até 100 produtos, design básico',
-    unidade: 'licença/mês'
+    unidade: 'licença/mês',
   },
   {
     id: 'sw5',
     nome: 'E-commerce - Loja Avançada',
-    preco: 399.00,
+    preco: 399.0,
     categoria: 'Software',
     subcategoria: 'E-commerce',
     tipo: 'Loja Avançada',
     descricao: 'Produtos ilimitados, integrações, relatórios',
-    unidade: 'licença/mês'
+    unidade: 'licença/mês',
   },
   // Consultoria
   {
     id: 'cons1',
     nome: 'Consultoria Gestão Empresarial - Júnior',
-    preco: 150.00,
+    preco: 150.0,
     categoria: 'Consultoria',
     subcategoria: 'Gestão Empresarial',
     tipo: 'Consultor Júnior',
     descricao: 'Consultor com 1-3 anos de experiência',
-    unidade: 'hora'
+    unidade: 'hora',
   },
   {
     id: 'cons2',
     nome: 'Consultoria Gestão Empresarial - Sênior',
-    preco: 300.00,
+    preco: 300.0,
     categoria: 'Consultoria',
     subcategoria: 'Gestão Empresarial',
     tipo: 'Consultor Sênior',
     descricao: 'Consultor com 8+ anos de experiência',
-    unidade: 'hora'
+    unidade: 'hora',
   },
   {
     id: 'cons3',
     nome: 'Consultoria Marketing Digital - Estratégia',
-    preco: 180.00,
+    preco: 180.0,
     categoria: 'Consultoria',
     subcategoria: 'Marketing Digital',
     tipo: 'Estratégia & Planejamento',
     descricao: 'Desenvolvimento de estratégias de marketing',
-    unidade: 'hora'
+    unidade: 'hora',
   },
   // Treinamento
   {
     id: 'train1',
     nome: 'Treinamento Corporativo - Liderança',
-    preco: 500.00,
+    preco: 500.0,
     categoria: 'Treinamento',
     subcategoria: 'Corporativo',
     tipo: 'Liderança & Gestão',
     descricao: 'Programa de desenvolvimento de líderes',
-    unidade: 'curso'
+    unidade: 'curso',
   },
   {
     id: 'train2',
     nome: 'Treinamento Corporativo - Vendas',
-    preco: 400.00,
+    preco: 400.0,
     categoria: 'Treinamento',
     subcategoria: 'Corporativo',
     tipo: 'Técnicas de Vendas',
     descricao: 'Capacitação em técnicas de vendas',
-    unidade: 'curso'
-  }
+    unidade: 'curso',
+  },
 ];
 
 const combosMock: Combo[] = [
@@ -266,48 +266,48 @@ const combosMock: Combo[] = [
     id: 'combo1',
     nome: 'Pacote Startup Digital',
     descricao: 'Solução completa para startups - Software Web + Consultoria',
-    precoOriginal: 899.00,
-    precoCombo: 750.00,
+    precoOriginal: 899.0,
+    precoCombo: 750.0,
     desconto: 16.6,
     categoria: 'Pacote Startup',
     produtos: [
       { produto: produtosMock[0], quantidade: 1 }, // Sistema Web Básico
-      { produto: produtosMock[5], quantidade: 8 }  // 8h Consultoria Júnior
-    ]
+      { produto: produtosMock[5], quantidade: 8 }, // 8h Consultoria Júnior
+    ],
   },
   {
     id: 'combo2',
     nome: 'Pacote Empresarial Completo',
     descricao: 'Solução enterprise com múltiplas licenças e treinamento',
-    precoOriginal: 1799.00,
-    precoCombo: 1499.00,
+    precoOriginal: 1799.0,
+    precoCombo: 1499.0,
     desconto: 16.7,
     categoria: 'Pacote Enterprise',
     produtos: [
       { produto: produtosMock[1], quantidade: 2 }, // 2 Licenças Premium
       { produto: produtosMock[2], quantidade: 1 }, // 1 App Mobile
-      { produto: produtosMock[8], quantidade: 1 }  // 1 Treinamento Liderança
-    ]
+      { produto: produtosMock[8], quantidade: 1 }, // 1 Treinamento Liderança
+    ],
   },
   {
     id: 'combo3',
     nome: 'Pacote E-commerce Plus',
     descricao: 'E-commerce completo com consultoria especializada',
-    precoOriginal: 979.00,
-    precoCombo: 850.00,
+    precoOriginal: 979.0,
+    precoCombo: 850.0,
     desconto: 13.2,
     categoria: 'Pacote E-commerce',
     produtos: [
       { produto: produtosMock[4], quantidade: 1 }, // E-commerce Avançado
-      { produto: produtosMock[7], quantidade: 10 } // 10h Marketing Digital
-    ]
-  }
+      { produto: produtosMock[7], quantidade: 10 }, // 10h Marketing Digital
+    ],
+  },
 ];
 
 const NovaPropostaPage: React.FC = () => {
   // Hooks
   const navigate = useNavigate();
-  
+
   // Estados principais
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -326,7 +326,7 @@ const NovaPropostaPage: React.FC = () => {
       try {
         setIsLoadingClientes(true);
         const response = await clientesService.getClientes({ limit: 100 });
-        
+
         const clientesFormatados: Cliente[] = response.data.map((cliente: ClienteService) => ({
           id: cliente.id || '',
           nome: cliente.nome,
@@ -337,10 +337,10 @@ const NovaPropostaPage: React.FC = () => {
           cidade: cliente.cidade || '',
           estado: cliente.estado || '',
           cep: cliente.cep || '',
-          tipoPessoa: cliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica'
+          tipoPessoa: cliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica',
         }));
-        
-  setClientes(clientesFormatados);
+
+        setClientes(clientesFormatados);
       } catch (error) {
         console.error('❌ Erro ao carregar clientes:', error);
         toast.error('Erro ao carregar clientes. Usando dados de exemplo.');
@@ -352,9 +352,16 @@ const NovaPropostaPage: React.FC = () => {
 
     carregarClientes();
   }, []);
-  
+
   // React Hook Form
-  const { control, handleSubmit, watch, setValue, reset, formState: { errors, isValid } } = useForm<PropostaFormData>({
+  const {
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    formState: { errors, isValid },
+  } = useForm<PropostaFormData>({
     resolver: yupResolver(propostaSchema),
     defaultValues: {
       tipoSelecao: 'personalizado',
@@ -365,19 +372,27 @@ const NovaPropostaPage: React.FC = () => {
       formaPagamento: 'avista',
       validadeDias: 15,
       observacoes: '',
-      incluirImpostosPDF: true
-    }
+      incluirImpostosPDF: true,
+    },
   });
 
   // Field arrays
-  const { fields: produtos, append: adicionarProduto, remove: removerProduto } = useFieldArray({
+  const {
+    fields: produtos,
+    append: adicionarProduto,
+    remove: removerProduto,
+  } = useFieldArray({
     control,
-    name: 'produtos'
+    name: 'produtos',
   });
 
-  const { fields: combos, append: adicionarCombo, remove: removerCombo } = useFieldArray({
+  const {
+    fields: combos,
+    append: adicionarCombo,
+    remove: removerCombo,
+  } = useFieldArray({
     control,
-    name: 'combos'
+    name: 'combos',
   });
 
   // Watch dos campos do formulário
@@ -391,15 +406,21 @@ const NovaPropostaPage: React.FC = () => {
   const { totais, calcularSubtotalProduto } = useCalculosProposta(
     watchedProdutos || [],
     watchedDescontoGlobal || 0,
-    watchedImpostos || 0
+    watchedImpostos || 0,
   );
 
   // Calcular totais combinados (produtos + combos)
   const totaisCombinados = useMemo(() => {
-    const subtotalProdutos = (watchedProdutos || []).reduce((sum, item) => sum + (item.subtotal || 0), 0);
-    const subtotalCombos = (watchedCombos || []).reduce((sum, item) => sum + (item.subtotal || 0), 0);
+    const subtotalProdutos = (watchedProdutos || []).reduce(
+      (sum, item) => sum + (item.subtotal || 0),
+      0,
+    );
+    const subtotalCombos = (watchedCombos || []).reduce(
+      (sum, item) => sum + (item.subtotal || 0),
+      0,
+    );
     const subtotalGeral = subtotalProdutos + subtotalCombos;
-    
+
     const descontoValor = (subtotalGeral * (watchedDescontoGlobal || 0)) / 100;
     const subtotalComDesconto = subtotalGeral - descontoValor;
     const impostosValor = (subtotalComDesconto * (watchedImpostos || 0)) / 100;
@@ -409,38 +430,42 @@ const NovaPropostaPage: React.FC = () => {
       subtotal: subtotalGeral,
       desconto: descontoValor,
       impostos: impostosValor,
-      total
+      total,
     };
   }, [watchedProdutos, watchedCombos, watchedDescontoGlobal, watchedImpostos]);
 
   // Filtros de busca
   const clientesFiltrados = useMemo(() => {
     let clientesOrdenados = [...clientes].sort((a, b) => a.nome.localeCompare(b.nome));
-    
+
     if (!buscarCliente) return clientesOrdenados;
-    
-    return clientesOrdenados.filter(cliente =>
-      cliente.nome.toLowerCase().includes(buscarCliente.toLowerCase()) ||
-      cliente.documento.includes(buscarCliente) ||
-      cliente.email.toLowerCase().includes(buscarCliente.toLowerCase())
+
+    return clientesOrdenados.filter(
+      (cliente) =>
+        cliente.nome.toLowerCase().includes(buscarCliente.toLowerCase()) ||
+        cliente.documento.includes(buscarCliente) ||
+        cliente.email.toLowerCase().includes(buscarCliente.toLowerCase()),
     );
   }, [buscarCliente, clientes]);
 
   const produtosFiltrados = useMemo(() => {
     if (!buscarProduto) return produtosMock;
-    return produtosMock.filter(produto =>
-      produto.nome.toLowerCase().includes(buscarProduto.toLowerCase()) ||
-      produto.categoria.toLowerCase().includes(buscarProduto.toLowerCase()) ||
-      (produto.subcategoria && produto.subcategoria.toLowerCase().includes(buscarProduto.toLowerCase())) ||
-      (produto.tipo && produto.tipo.toLowerCase().includes(buscarProduto.toLowerCase()))
+    return produtosMock.filter(
+      (produto) =>
+        produto.nome.toLowerCase().includes(buscarProduto.toLowerCase()) ||
+        produto.categoria.toLowerCase().includes(buscarProduto.toLowerCase()) ||
+        (produto.subcategoria &&
+          produto.subcategoria.toLowerCase().includes(buscarProduto.toLowerCase())) ||
+        (produto.tipo && produto.tipo.toLowerCase().includes(buscarProduto.toLowerCase())),
     );
   }, [buscarProduto]);
 
   const combosFiltrados = useMemo(() => {
     if (!buscarCombo) return combosMock;
-    return combosMock.filter(combo =>
-      combo.nome.toLowerCase().includes(buscarCombo.toLowerCase()) ||
-      combo.categoria.toLowerCase().includes(buscarCombo.toLowerCase())
+    return combosMock.filter(
+      (combo) =>
+        combo.nome.toLowerCase().includes(buscarCombo.toLowerCase()) ||
+        combo.categoria.toLowerCase().includes(buscarCombo.toLowerCase()),
     );
   }, [buscarCombo]);
 
@@ -448,7 +473,7 @@ const NovaPropostaPage: React.FC = () => {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -465,7 +490,7 @@ const NovaPropostaPage: React.FC = () => {
       produto,
       quantidade: 1,
       desconto: 0,
-      subtotal: produto.preco
+      subtotal: produto.preco,
     };
 
     adicionarProduto(novoProduto);
@@ -478,7 +503,7 @@ const NovaPropostaPage: React.FC = () => {
     const novoCombo: ComboSelecionado = {
       combo,
       quantidade: 1,
-      subtotal: combo.precoCombo
+      subtotal: combo.precoCombo,
     };
 
     adicionarCombo(novoCombo);
@@ -490,7 +515,7 @@ const NovaPropostaPage: React.FC = () => {
   const onSubmit = async (data: PropostaFormData) => {
     try {
       setIsGeneratingPDF(true);
-      
+
       const propostaData = {
         ...data,
         cliente: clienteSelecionado,
@@ -498,24 +523,25 @@ const NovaPropostaPage: React.FC = () => {
         total: totaisCombinados.total,
         dataValidade: new Date(Date.now() + data.validadeDias * 24 * 60 * 60 * 1000),
         dataCriacao: new Date(),
-        status: 'rascunho' as const
+        status: 'rascunho' as const,
       };
 
       // Usar o serviço real de propostas
       const propostaCriada = await propostasService.criarProposta(propostaData);
       toast.success(`Proposta ${propostaCriada.numero} criada com sucesso!`);
-      
+
       // Reset do formulário
       reset();
       setClienteSelecionado(null);
       setBuscarCliente('');
-      
+
       // Navegação para lista de propostas
       navigate('/propostas');
-      
     } catch (error) {
       console.error('❌ Erro ao criar proposta:', error);
-      toast.error('Erro ao criar proposta. Tente novamente.');
+      const friendlyMessage =
+        error instanceof Error ? error.message : 'Erro ao criar proposta. Tente novamente.';
+      toast.error(friendlyMessage);
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -548,7 +574,6 @@ const NovaPropostaPage: React.FC = () => {
         <form onSubmit={handleSubmit(onSubmit)}>
           {/* Layout em 3 colunas - Paisagem/Panorâmico */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            
             {/* COLUNA 1: Seleção de Cliente */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="mb-6">
@@ -570,14 +595,12 @@ const NovaPropostaPage: React.FC = () => {
                   onBlur={() => setTimeout(() => setShowClienteDropdown(false), 200)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
-                
+
                 {/* Dropdown de clientes */}
                 {showClienteDropdown && (
                   <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                     {isLoadingClientes ? (
-                      <div className="p-4 text-center text-gray-500">
-                        Carregando clientes...
-                      </div>
+                      <div className="p-4 text-center text-gray-500">Carregando clientes...</div>
                     ) : clientesFiltrados.length === 0 ? (
                       <div className="p-4 text-center text-gray-500">
                         {buscarCliente ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
@@ -608,12 +631,22 @@ const NovaPropostaPage: React.FC = () => {
                 <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <h3 className="font-medium text-blue-900 mb-2">Cliente Selecionado</h3>
                   <div className="space-y-1 text-sm">
-                    <div><strong>Nome:</strong> {clienteSelecionado.nome}</div>
-                    <div><strong>Documento:</strong> {clienteSelecionado.documento}</div>
-                    <div><strong>Email:</strong> {clienteSelecionado.email}</div>
-                    <div><strong>Telefone:</strong> {clienteSelecionado.telefone}</div>
+                    <div>
+                      <strong>Nome:</strong> {clienteSelecionado.nome}
+                    </div>
+                    <div>
+                      <strong>Documento:</strong> {clienteSelecionado.documento}
+                    </div>
+                    <div>
+                      <strong>Email:</strong> {clienteSelecionado.email}
+                    </div>
+                    <div>
+                      <strong>Telefone:</strong> {clienteSelecionado.telefone}
+                    </div>
                     {clienteSelecionado.endereco && (
-                      <div><strong>Endereço:</strong> {clienteSelecionado.endereco}</div>
+                      <div>
+                        <strong>Endereço:</strong> {clienteSelecionado.endereco}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -703,7 +736,9 @@ const NovaPropostaPage: React.FC = () => {
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
                                 <div className="font-medium text-gray-900 mb-1">{produto.nome}</div>
-                                <div className="text-sm text-gray-600 mb-2">{produto.descricao}</div>
+                                <div className="text-sm text-gray-600 mb-2">
+                                  {produto.descricao}
+                                </div>
                                 <div className="flex flex-wrap gap-1">
                                   <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
                                     {produto.categoria}
@@ -721,7 +756,9 @@ const NovaPropostaPage: React.FC = () => {
                                 </div>
                               </div>
                               <div className="text-right ml-4">
-                                <div className="font-medium text-green-600">{formatCurrency(produto.preco)}</div>
+                                <div className="font-medium text-green-600">
+                                  {formatCurrency(produto.preco)}
+                                </div>
                                 <div className="text-xs text-gray-500">por {produto.unidade}</div>
                               </div>
                             </div>
@@ -739,7 +776,7 @@ const NovaPropostaPage: React.FC = () => {
                           <div className="flex-1">
                             <h4 className="font-medium text-gray-900">{field.produto.nome}</h4>
                             <p className="text-sm text-gray-600 mb-2">{field.produto.descricao}</p>
-                            
+
                             {/* Tags com informações do produto */}
                             <div className="flex flex-wrap gap-1">
                               <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
@@ -786,7 +823,11 @@ const NovaPropostaPage: React.FC = () => {
                                     field.onChange(quantidade);
                                     const produtoAtual = watchedProdutos?.[index];
                                     if (produtoAtual) {
-                                      const subtotal = calcularSubtotalProduto(produtoAtual.produto, quantidade, produtoAtual.desconto || 0);
+                                      const subtotal = calcularSubtotalProduto(
+                                        produtoAtual.produto,
+                                        quantidade,
+                                        produtoAtual.desconto || 0,
+                                      );
                                       setValue(`produtos.${index}.subtotal`, subtotal);
                                     }
                                   }}
@@ -815,7 +856,11 @@ const NovaPropostaPage: React.FC = () => {
                                     field.onChange(desconto);
                                     const produtoAtual = watchedProdutos?.[index];
                                     if (produtoAtual) {
-                                      const subtotal = calcularSubtotalProduto(produtoAtual.produto, produtoAtual.quantidade || 1, desconto);
+                                      const subtotal = calcularSubtotalProduto(
+                                        produtoAtual.produto,
+                                        produtoAtual.quantidade || 1,
+                                        desconto,
+                                      );
                                       setValue(`produtos.${index}.subtotal`, subtotal);
                                     }
                                   }}
@@ -903,12 +948,12 @@ const NovaPropostaPage: React.FC = () => {
                                 </div>
                               </div>
                             </div>
-                            
+
                             <div className="border-t border-gray-200 pt-2">
                               <div className="text-xs text-gray-500 mb-1">Inclui:</div>
                               <div className="flex flex-wrap gap-1">
                                 {combo.produtos.map((item, idx) => (
-                                  <span 
+                                  <span
                                     key={idx}
                                     className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800"
                                   >
@@ -931,14 +976,16 @@ const NovaPropostaPage: React.FC = () => {
                           <div className="flex-1">
                             <h4 className="font-medium text-gray-900">{field.combo.nome}</h4>
                             <p className="text-sm text-gray-600">{field.combo.categoria}</p>
-                            <div className="text-xs text-gray-500 mt-1">{field.combo.descricao}</div>
-                            
+                            <div className="text-xs text-gray-500 mt-1">
+                              {field.combo.descricao}
+                            </div>
+
                             {/* Produtos incluídos no combo */}
                             <div className="mt-2 pt-2 border-t border-gray-100">
                               <div className="text-xs text-gray-500 mb-1">Produtos incluídos:</div>
                               <div className="flex flex-wrap gap-1">
                                 {field.combo.produtos.map((item, idx) => (
-                                  <span 
+                                  <span
                                     key={idx}
                                     className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800"
                                   >
@@ -1026,7 +1073,6 @@ const NovaPropostaPage: React.FC = () => {
 
             {/* COLUNA 3: Totais e Condições */}
             <div className="space-y-6">
-              
               {/* Card de Totais */}
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center mb-6">
@@ -1081,19 +1127,27 @@ const NovaPropostaPage: React.FC = () => {
                   <div className="pt-4 border-t border-gray-200 space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Subtotal:</span>
-                      <span className="font-medium">{formatCurrency(totaisCombinados.subtotal)}</span>
+                      <span className="font-medium">
+                        {formatCurrency(totaisCombinados.subtotal)}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Desconto:</span>
-                      <span className="text-red-600">-{formatCurrency(totaisCombinados.desconto)}</span>
+                      <span className="text-red-600">
+                        -{formatCurrency(totaisCombinados.desconto)}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Impostos:</span>
-                      <span className="text-gray-600">{formatCurrency(totaisCombinados.impostos)}</span>
+                      <span className="text-gray-600">
+                        {formatCurrency(totaisCombinados.impostos)}
+                      </span>
                     </div>
                     <div className="flex justify-between text-lg font-bold border-t pt-2">
                       <span className="text-gray-900">Total:</span>
-                      <span className="text-blue-600">{formatCurrency(totaisCombinados.total)}</span>
+                      <span className="text-blue-600">
+                        {formatCurrency(totaisCombinados.total)}
+                      </span>
                     </div>
                   </div>
                 </div>

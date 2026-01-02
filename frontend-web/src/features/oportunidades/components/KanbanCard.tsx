@@ -11,7 +11,9 @@ import {
   AlertTriangle,
   TrendingUp,
   Eye,
-  Star
+  Star,
+  AlertCircle,
+  Zap,
 } from 'lucide-react';
 
 interface KanbanCardProps {
@@ -23,7 +25,7 @@ interface KanbanCardProps {
 export const KanbanCard: React.FC<KanbanCardProps> = ({
   oportunidade,
   onClick,
-  isDragging = false
+  isDragging = false,
 }) => {
   const getPrioridadeConfig = (prioridade: PrioridadeOportunidade) => {
     switch (prioridade) {
@@ -31,25 +33,25 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
         return {
           cor: 'text-red-600 bg-red-50 border-red-200',
           icone: AlertTriangle,
-          label: 'Alta'
+          label: 'Alta',
         };
       case PrioridadeOportunidade.MEDIA:
         return {
           cor: 'text-yellow-600 bg-yellow-50 border-yellow-200',
           icone: Clock,
-          label: 'Média'
+          label: 'Média',
         };
       case PrioridadeOportunidade.BAIXA:
         return {
           cor: 'text-green-600 bg-green-50 border-green-200',
           icone: TrendingUp,
-          label: 'Baixa'
+          label: 'Baixa',
         };
       default:
         return {
           cor: 'text-gray-600 bg-gray-50 border-gray-200',
           icone: Clock,
-          label: 'Média'
+          label: 'Média',
         };
     }
   };
@@ -65,7 +67,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
     const agora = new Date();
     const diff = agora.getTime() - date.getTime();
     const dias = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
+
     if (dias === 0) return 'Hoje';
     if (dias === 1) return '1 dia atrás';
     if (dias < 7) return `${dias} dias atrás`;
@@ -92,7 +94,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
           <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2 flex-1">
             {oportunidade.titulo}
           </h3>
-          
+
           {/* Indicador de Prioridade */}
           <div className={`ml-2 p-1 rounded-full border ${prioridadeConfig.cor}`}>
             <IconePrioridade className="w-3 h-3" />
@@ -103,16 +105,32 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-1">
             <DollarSign className="w-4 h-4 text-green-600" />
-            <span className="font-bold text-green-600">
-              {oportunidade.valorFormatado}
-            </span>
+            <span className="font-bold text-green-600">{oportunidade.valorFormatado}</span>
           </div>
-          
-          {/* Probabilidade */}
-          <div className={`text-xs font-medium ${getProbabilidadeColor(oportunidade.probabilidade)}`}>
-            {oportunidade.probabilidade}%
+
+          {/* Probabilidade com indicador de auto-calculado */}
+          <div className="flex items-center gap-1">
+            <div
+              className={`text-xs font-medium ${getProbabilidadeColor(oportunidade.probabilidade)}`}
+            >
+              {oportunidade.probabilidade}%
+            </div>
+            <div title="Probabilidade ajustada automaticamente baseada no estágio">
+              <Zap className="w-3 h-3 text-yellow-500" />
+            </div>
           </div>
         </div>
+
+        {/* Alerta de SLA - precisa de atenção */}
+        {oportunidade.precisaAtencao && (
+          <div className="mb-3 px-2 py-1.5 bg-red-50 border border-red-200 rounded-md flex items-center gap-2">
+            <AlertCircle className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
+            <span className="text-xs text-red-700 font-medium">
+              {oportunidade.diasNoEstagioAtual}{' '}
+              {oportunidade.diasNoEstagioAtual === 1 ? 'dia' : 'dias'} neste estágio
+            </span>
+          </div>
+        )}
 
         {/* Cliente/Contato */}
         <div className="mb-3">
@@ -121,13 +139,15 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
               <Building className="w-3 h-3" />
               <span className="truncate">{oportunidade.cliente.nome}</span>
             </div>
-          ) : oportunidade.nomeContato && (
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <User className="w-3 h-3" />
-              <span className="truncate">{oportunidade.nomeContato}</span>
-            </div>
+          ) : (
+            oportunidade.nomeContato && (
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <User className="w-3 h-3" />
+                <span className="truncate">{oportunidade.nomeContato}</span>
+              </div>
+            )
           )}
-          
+
           {oportunidade.empresaContato && !oportunidade.cliente && (
             <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1">
               <Building className="w-3 h-3" />
@@ -183,13 +203,12 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
           <div className="flex items-center space-x-1">
             <Clock className="w-3 h-3" />
             <span>
-              {oportunidade.dataFechamentoEsperado 
+              {oportunidade.dataFechamentoEsperado
                 ? new Date(oportunidade.dataFechamentoEsperado).toLocaleDateString('pt-BR', {
                     day: '2-digit',
-                    month: '2-digit'
+                    month: '2-digit',
                   })
-                : oportunidade.tempoNoEstagio
-              }
+                : oportunidade.tempoNoEstagio}
             </span>
           </div>
         </div>
@@ -199,9 +218,9 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-100">
         <div
           className={`h-full transition-all duration-300 ${
-            oportunidade.probabilidade >= 80 
-              ? 'bg-green-500' 
-              : oportunidade.probabilidade >= 60 
+            oportunidade.probabilidade >= 80
+              ? 'bg-green-500'
+              : oportunidade.probabilidade >= 60
                 ? 'bg-yellow-500'
                 : oportunidade.probabilidade >= 40
                   ? 'bg-orange-500'
@@ -213,7 +232,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
 
       {/* Overlay de Hover */}
       <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-5 transition-all duration-200 pointer-events-none" />
-      
+
       {/* Ícone de Visualizar */}
       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <div className="bg-white rounded-full p-1 shadow-md">
@@ -224,17 +243,20 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       {/* Indicador de Atividade Recente */}
       {oportunidade.ultimaAtividade && (
         <div className="absolute top-2 left-2">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Atividade recente" />
+          <div
+            className="w-2 h-2 bg-green-500 rounded-full animate-pulse"
+            title="Atividade recente"
+          />
         </div>
       )}
 
       {/* Indicador se está atrasado */}
-      {oportunidade.dataFechamentoEsperado && 
-       new Date(oportunidade.dataFechamentoEsperado) < new Date() && (
-        <div className="absolute top-2 left-2">
-          <div className="w-2 h-2 bg-red-500 rounded-full" title="Atrasado" />
-        </div>
-      )}
+      {oportunidade.dataFechamentoEsperado &&
+        new Date(oportunidade.dataFechamentoEsperado) < new Date() && (
+          <div className="absolute top-2 left-2">
+            <div className="w-2 h-2 bg-red-500 rounded-full" title="Atrasado" />
+          </div>
+        )}
     </div>
   );
 };

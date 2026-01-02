@@ -29,6 +29,10 @@ import {
   CheckCircle,
   Calendar,
   ClipboardList,
+  Ticket,
+  Layers,
+  ListChecks,
+  Tag,
 } from 'lucide-react';
 
 export interface MenuConfig {
@@ -85,11 +89,12 @@ export const menuConfig: MenuConfig[] = [
         color: 'purple',
       },
       {
-        // Sprint 2: Demandas agora usam modelo unificado Ticket (tipo='suporte')
-        id: 'atendimento-demandas',
-        title: 'Demandas',
-        icon: ClipboardList,
-        href: '/nuclei/atendimento/demandas',
+        // Sprint 2 - Fase 6: Gestão Unificada de Tickets (substitui Demandas)
+        // Tickets agora incluem demandas (tipo='suporte'), suporte técnico, comercial, etc.
+        id: 'atendimento-tickets',
+        title: 'Tickets',
+        icon: Ticket,
+        href: '/nuclei/atendimento/tickets',
         color: 'purple',
       },
       {
@@ -353,6 +358,35 @@ export const menuConfig: MenuConfig[] = [
         icon: Shield,
         href: '/configuracoes/seguranca',
         color: 'purple',
+      },
+      {
+        id: 'configuracoes-tickets',
+        title: 'Tickets',
+        icon: Settings,
+        color: 'purple',
+        children: [
+          {
+            id: 'configuracoes-tickets-niveis',
+            title: 'Níveis de Atendimento',
+            icon: Layers,
+            href: '/nuclei/configuracoes/tickets/niveis',
+            color: 'purple',
+          },
+          {
+            id: 'configuracoes-tickets-status',
+            title: 'Status Customizados',
+            icon: ListChecks,
+            href: '/nuclei/configuracoes/tickets/status',
+            color: 'purple',
+          },
+          {
+            id: 'configuracoes-tickets-tipos',
+            title: 'Tipos de Serviço',
+            icon: Tag,
+            href: '/nuclei/configuracoes/tickets/tipos',
+            color: 'purple',
+          },
+        ],
       },
     ],
   },

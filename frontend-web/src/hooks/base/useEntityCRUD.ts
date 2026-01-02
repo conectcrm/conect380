@@ -28,23 +28,23 @@ interface CRUDState<T> {
   // Dados
   items: T[];
   selectedItem: T | null;
-  
+
   // Estados de loading
   isLoading: boolean;
   isCreating: boolean;
   isUpdating: boolean;
   isDeleting: boolean;
-  
+
   // Estados de UI
   isModalOpen: boolean;
   modalMode: 'create' | 'edit' | 'view';
-  
+
   // Paginação
   currentPage: number;
   totalPages: number;
   totalItems: number;
   itemsPerPage: number;
-  
+
   // Filtros
   filters: Record<string, any>;
   searchTerm: string;
@@ -59,30 +59,30 @@ interface CRUDActions<T> {
   deletar: (id: string) => Promise<void>;
   buscarPorId: (id: string) => Promise<T | null>;
   recarregar: () => Promise<void>;
-  
+
   // Ações de UI
   abrirModal: (mode: 'create' | 'edit' | 'view', item?: T) => void;
   fecharModal: () => void;
   selecionarItem: (item: T | null) => void;
-  
+
   // Ações de filtro/busca
   setFiltros: (filtros: Record<string, any>) => void;
   setBusca: (termo: string) => void;
   setSorting: (campo: string, ordem?: 'asc' | 'desc') => void;
   irParaPagina: (pagina: number) => void;
-  
+
   // Ações em lote
   deletarSelecionados: (ids: string[]) => Promise<void>;
   exportarDados: (formato: 'csv' | 'excel' | 'pdf') => Promise<void>;
 }
 
 export function useEntityCRUD<T extends { id: string }>(
-  options: CRUDOptions<T>
+  options: CRUDOptions<T>,
 ): [CRUDState<T>, CRUDActions<T>] {
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const queryClient = useQueryClient();
-  
+
   const [state, setState] = useState<CRUDState<T>>({
     items: [],
     selectedItem: null,
@@ -99,16 +99,24 @@ export function useEntityCRUD<T extends { id: string }>(
     filters: {},
     searchTerm: '',
     sortBy: 'id',
-    sortOrder: 'desc'
+    sortOrder: 'desc',
   });
 
   // Query para listar dados
   const {
     data: items = [],
     isLoading,
-    refetch
+    refetch,
   } = useQuery({
-    queryKey: [options.entityName, 'list', state.currentPage, state.filters, state.searchTerm, state.sortBy, state.sortOrder],
+    queryKey: [
+      options.entityName,
+      'list',
+      state.currentPage,
+      state.filters,
+      state.searchTerm,
+      state.sortBy,
+      state.sortOrder,
+    ],
     queryFn: () => options.service.listar(),
     enabled: !!user, // Simplificado - sempre habilitado se usuário logado
     staleTime: 5 * 60 * 1000, // 5 minutos
@@ -120,52 +128,52 @@ export function useEntityCRUD<T extends { id: string }>(
     mutationFn: options.service.criar,
     onSuccess: async (newItem) => {
       queryClient.invalidateQueries({ queryKey: [options.entityName] });
-      
+
       // TODO: Implementar auditoria quando necessário
       console.log('CRUD: Created item', newItem);
-      
+
       showNotification({
         tipo: 'sucesso',
         titulo: 'Sucesso!',
-        mensagem: `${options.entityName} criado com sucesso.`
+        mensagem: `${options.entityName} criado com sucesso.`,
       });
-      
-      setState(prev => ({ ...prev, isModalOpen: false, selectedItem: null }));
+
+      setState((prev) => ({ ...prev, isModalOpen: false, selectedItem: null }));
     },
     onError: (error: any) => {
       showNotification({
         tipo: 'erro',
         titulo: 'Erro ao criar',
-        mensagem: error.message || `Erro ao criar ${options.entityName}.`
+        mensagem: error.message || `Erro ao criar ${options.entityName}.`,
       });
-    }
+    },
   });
 
   // Mutation para atualizar
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<T> }) => 
+    mutationFn: ({ id, data }: { id: string; data: Partial<T> }) =>
       options.service.atualizar(id, data),
     onSuccess: async (updatedItem, variables) => {
       queryClient.invalidateQueries({ queryKey: [options.entityName] });
-      
+
       // TODO: Implementar auditoria quando necessário
       console.log('CRUD: Updated item', updatedItem);
-      
+
       showNotification({
         tipo: 'sucesso',
         titulo: 'Sucesso!',
-        mensagem: `${options.entityName} atualizado com sucesso.`
+        mensagem: `${options.entityName} atualizado com sucesso.`,
       });
-      
-      setState(prev => ({ ...prev, isModalOpen: false, selectedItem: null }));
+
+      setState((prev) => ({ ...prev, isModalOpen: false, selectedItem: null }));
     },
     onError: (error: any) => {
       showNotification({
         tipo: 'erro',
         titulo: 'Erro ao atualizar',
-        mensagem: error.message || `Erro ao atualizar ${options.entityName}.`
+        mensagem: error.message || `Erro ao atualizar ${options.entityName}.`,
       });
-    }
+    },
   });
 
   // Mutation para deletar
@@ -173,73 +181,85 @@ export function useEntityCRUD<T extends { id: string }>(
     mutationFn: options.service.deletar,
     onSuccess: async (_, id) => {
       queryClient.invalidateQueries({ queryKey: [options.entityName] });
-      
+
       // TODO: Implementar auditoria quando necessário
       console.log('CRUD: Deleted item', id);
-      
+
       showNotification({
         tipo: 'sucesso',
         titulo: 'Sucesso!',
-        mensagem: `${options.entityName} deletado com sucesso.`
+        mensagem: `${options.entityName} deletado com sucesso.`,
       });
     },
     onError: (error: any) => {
       showNotification({
         tipo: 'erro',
         titulo: 'Erro ao deletar',
-        mensagem: error.message || `Erro ao deletar ${options.entityName}.`
+        mensagem: error.message || `Erro ao deletar ${options.entityName}.`,
       });
-    }
+    },
   });
 
   // Atualizar estado quando dados mudam
   useEffect(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       items,
       isLoading,
-      totalItems: items.length
+      totalItems: items.length,
     }));
   }, [items, isLoading]);
 
   // Ações
   const actions: CRUDActions<T> = {
     // Ações de dados
-    criar: useCallback(async (data: Partial<T>) => {
-      // TODO: Implementar verificação de permissão quando necessário
-      setState(prev => ({ ...prev, isCreating: true }));
-      await createMutation.mutateAsync(data);
-      setState(prev => ({ ...prev, isCreating: false }));
-    }, [createMutation]),
+    criar: useCallback(
+      async (data: Partial<T>) => {
+        // TODO: Implementar verificação de permissão quando necessário
+        setState((prev) => ({ ...prev, isCreating: true }));
+        await createMutation.mutateAsync(data);
+        setState((prev) => ({ ...prev, isCreating: false }));
+      },
+      [createMutation],
+    ),
 
-    atualizar: useCallback(async (id: string, data: Partial<T>) => {
-      // TODO: Implementar verificação de permissão quando necessário
-      setState(prev => ({ ...prev, isUpdating: true }));
-      await updateMutation.mutateAsync({ id, data });
-      setState(prev => ({ ...prev, isUpdating: false }));
-    }, [updateMutation]),
+    atualizar: useCallback(
+      async (id: string, data: Partial<T>) => {
+        // TODO: Implementar verificação de permissão quando necessário
+        setState((prev) => ({ ...prev, isUpdating: true }));
+        await updateMutation.mutateAsync({ id, data });
+        setState((prev) => ({ ...prev, isUpdating: false }));
+      },
+      [updateMutation],
+    ),
 
-    deletar: useCallback(async (id: string) => {
-      // TODO: Implementar verificação de permissão quando necessário
-      if (window.confirm(`Tem certeza que deseja deletar este ${options.entityName}?`)) {
-        setState(prev => ({ ...prev, isDeleting: true }));
-        await deleteMutation.mutateAsync(id);
-        setState(prev => ({ ...prev, isDeleting: false }));
-      }
-    }, [deleteMutation, options.entityName]),
+    deletar: useCallback(
+      async (id: string) => {
+        // TODO: Implementar verificação de permissão quando necessário
+        if (window.confirm(`Tem certeza que deseja deletar este ${options.entityName}?`)) {
+          setState((prev) => ({ ...prev, isDeleting: true }));
+          await deleteMutation.mutateAsync(id);
+          setState((prev) => ({ ...prev, isDeleting: false }));
+        }
+      },
+      [deleteMutation, options.entityName],
+    ),
 
-    buscarPorId: useCallback(async (id: string) => {
-      try {
-        return await options.service.buscarPorId(id);
-      } catch (error) {
-        showNotification({
-          tipo: 'erro',
-          titulo: 'Erro ao buscar',
-          mensagem: `Erro ao buscar ${options.entityName}.`
-        });
-        return null;
-      }
-    }, [options.service, options.entityName]),
+    buscarPorId: useCallback(
+      async (id: string) => {
+        try {
+          return await options.service.buscarPorId(id);
+        } catch (error) {
+          showNotification({
+            tipo: 'erro',
+            titulo: 'Erro ao buscar',
+            mensagem: `Erro ao buscar ${options.entityName}.`,
+          });
+          return null;
+        }
+      },
+      [options.service, options.entityName],
+    ),
 
     recarregar: useCallback(async () => {
       await refetch();
@@ -247,66 +267,69 @@ export function useEntityCRUD<T extends { id: string }>(
 
     // Ações de UI
     abrirModal: useCallback((mode: 'create' | 'edit' | 'view', item?: T) => {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         isModalOpen: true,
         modalMode: mode,
-        selectedItem: item || null
+        selectedItem: item || null,
       }));
     }, []),
 
     fecharModal: useCallback(() => {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         isModalOpen: false,
         modalMode: 'create',
-        selectedItem: null
+        selectedItem: null,
       }));
     }, []),
 
     selecionarItem: useCallback((item: T | null) => {
-      setState(prev => ({ ...prev, selectedItem: item }));
+      setState((prev) => ({ ...prev, selectedItem: item }));
     }, []),
 
     // Ações de filtro/busca
     setFiltros: useCallback((filtros: Record<string, any>) => {
-      setState(prev => ({ ...prev, filters: filtros, currentPage: 1 }));
+      setState((prev) => ({ ...prev, filters: filtros, currentPage: 1 }));
     }, []),
 
     setBusca: useCallback((termo: string) => {
-      setState(prev => ({ ...prev, searchTerm: termo, currentPage: 1 }));
+      setState((prev) => ({ ...prev, searchTerm: termo, currentPage: 1 }));
     }, []),
 
     setSorting: useCallback((campo: string, ordem?: 'asc' | 'desc') => {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         sortBy: campo,
-        sortOrder: ordem || (prev.sortBy === campo && prev.sortOrder === 'asc' ? 'desc' : 'asc')
+        sortOrder: ordem || (prev.sortBy === campo && prev.sortOrder === 'asc' ? 'desc' : 'asc'),
       }));
     }, []),
 
     irParaPagina: useCallback((pagina: number) => {
-      setState(prev => ({ ...prev, currentPage: pagina }));
+      setState((prev) => ({ ...prev, currentPage: pagina }));
     }, []),
 
     // Ações em lote
-    deletarSelecionados: useCallback(async (ids: string[]) => {
-      // TODO: Implementar verificação de permissão quando necessário
-      if (window.confirm(`Tem certeza que deseja deletar ${ids.length} itens?`)) {
-        for (const id of ids) {
-          await deleteMutation.mutateAsync(id);
+    deletarSelecionados: useCallback(
+      async (ids: string[]) => {
+        // TODO: Implementar verificação de permissão quando necessário
+        if (window.confirm(`Tem certeza que deseja deletar ${ids.length} itens?`)) {
+          for (const id of ids) {
+            await deleteMutation.mutateAsync(id);
+          }
         }
-      }
-    }, [deleteMutation]),
+      },
+      [deleteMutation],
+    ),
 
     exportarDados: useCallback(async (formato: 'csv' | 'excel' | 'pdf') => {
       // TODO: Implementar exportação
       showNotification({
         tipo: 'info',
         titulo: 'Em desenvolvimento',
-        mensagem: `Exportação em ${formato} será implementada em breve.`
+        mensagem: `Exportação em ${formato} será implementada em breve.`,
       });
-    }, [])
+    }, []),
   };
 
   return [state, actions];

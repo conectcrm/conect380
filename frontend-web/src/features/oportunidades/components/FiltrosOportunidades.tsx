@@ -1,21 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  FiltrosOportunidade, 
-  EstagioOportunidade, 
-  PrioridadeOportunidade, 
-  OrigemOportunidade 
+import {
+  FiltrosOportunidade,
+  EstagioOportunidade,
+  PrioridadeOportunidade,
+  OrigemOportunidade,
 } from '../../../types/oportunidades/index';
 import { oportunidadesService } from '../../../services/oportunidadesService';
-import {
-  X,
-  Calendar,
-  DollarSign,
-  User,
-  Tag,
-  Filter,
-  RotateCcw,
-  Search
-} from 'lucide-react';
+import { X, Calendar, DollarSign, User, Tag, Filter, RotateCcw, Search } from 'lucide-react';
 
 interface FiltrosOportunidadesProps {
   filtros: Partial<FiltrosOportunidade>;
@@ -28,10 +19,12 @@ export const FiltrosOportunidades: React.FC<FiltrosOportunidadesProps> = ({
   filtros,
   aplicarFiltros,
   limparFiltros,
-  onClose
+  onClose,
 }) => {
   const [filtrosLocais, setFiltrosLocais] = useState<Partial<FiltrosOportunidade>>(filtros);
-  const [responsaveis, setResponsaveis] = useState<Array<{ id: string; nome: string; email: string }>>([]);
+  const [responsaveis, setResponsaveis] = useState<
+    Array<{ id: string; nome: string; email: string }>
+  >([]);
   const [tagsDisponiveis, setTagsDisponiveis] = useState<string[]>([]);
   const [carregandoDados, setCarregandoDados] = useState(true);
 
@@ -44,9 +37,9 @@ export const FiltrosOportunidades: React.FC<FiltrosOportunidadesProps> = ({
       setCarregandoDados(true);
       const [responsaveisData, tagsData] = await Promise.all([
         oportunidadesService.obterResponsaveis(),
-        oportunidadesService.obterSugestoesTags()
+        oportunidadesService.obterSugestoesTags(),
       ]);
-      
+
       setResponsaveis(responsaveisData);
       setTagsDisponiveis(tagsData);
     } catch (error) {
@@ -57,9 +50,9 @@ export const FiltrosOportunidades: React.FC<FiltrosOportunidadesProps> = ({
   };
 
   const handleFiltroChange = (campo: keyof FiltrosOportunidade, valor: any) => {
-    setFiltrosLocais(prev => ({
+    setFiltrosLocais((prev) => ({
       ...prev,
-      [campo]: valor
+      [campo]: valor,
     }));
   };
 
@@ -73,10 +66,14 @@ export const FiltrosOportunidades: React.FC<FiltrosOportunidadesProps> = ({
   };
 
   const countFiltrosAtivos = () => {
-    return Object.keys(filtrosLocais).filter(key => {
+    return Object.keys(filtrosLocais).filter((key) => {
       const valor = filtrosLocais[key as keyof typeof filtrosLocais];
-      return valor !== undefined && valor !== '' && valor !== null && 
-             (Array.isArray(valor) ? valor.length > 0 : true);
+      return (
+        valor !== undefined &&
+        valor !== '' &&
+        valor !== null &&
+        (Array.isArray(valor) ? valor.length > 0 : true)
+      );
     }).length;
   };
 
@@ -87,13 +84,13 @@ export const FiltrosOportunidades: React.FC<FiltrosOportunidadesProps> = ({
     { value: EstagioOportunidade.NEGOCIACAO, label: 'Negociação' },
     { value: EstagioOportunidade.FECHAMENTO, label: 'Fechamento' },
     { value: EstagioOportunidade.GANHO, label: 'Ganho' },
-    { value: EstagioOportunidade.PERDIDO, label: 'Perdido' }
+    { value: EstagioOportunidade.PERDIDO, label: 'Perdido' },
   ];
 
   const prioridadeOptions = [
     { value: PrioridadeOportunidade.ALTA, label: 'Alta' },
     { value: PrioridadeOportunidade.MEDIA, label: 'Média' },
-    { value: PrioridadeOportunidade.BAIXA, label: 'Baixa' }
+    { value: PrioridadeOportunidade.BAIXA, label: 'Baixa' },
   ];
 
   const origemOptions = [
@@ -104,7 +101,7 @@ export const FiltrosOportunidades: React.FC<FiltrosOportunidadesProps> = ({
     { value: OrigemOportunidade.REDES_SOCIAIS, label: 'Redes Sociais' },
     { value: OrigemOportunidade.EVENTO, label: 'Evento' },
     { value: OrigemOportunidade.PARCEIRO, label: 'Parceiro' },
-    { value: OrigemOportunidade.CAMPANHA, label: 'Campanha' }
+    { value: OrigemOportunidade.CAMPANHA, label: 'Campanha' },
   ];
 
   return (
@@ -119,7 +116,7 @@ export const FiltrosOportunidades: React.FC<FiltrosOportunidadesProps> = ({
             </span>
           )}
         </div>
-        
+
         <div className="flex items-center space-x-2">
           <button
             onClick={handleLimparFiltros}
@@ -128,7 +125,7 @@ export const FiltrosOportunidades: React.FC<FiltrosOportunidadesProps> = ({
             <RotateCcw className="w-4 h-4" />
             <span>Limpar</span>
           </button>
-          
+
           <button
             onClick={onClose}
             className="text-gray-600 hover:text-gray-800 p-1 rounded-lg hover:bg-gray-100 transition-colors"
@@ -141,16 +138,16 @@ export const FiltrosOportunidades: React.FC<FiltrosOportunidadesProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Estágio */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Estágio
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Estágio</label>
           <select
             value={filtrosLocais.estagio || ''}
-            onChange={(e) => handleFiltroChange('estagio', e.target.value as EstagioOportunidade || '')}
+            onChange={(e) =>
+              handleFiltroChange('estagio', (e.target.value as EstagioOportunidade) || '')
+            }
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C] bg-white"
           >
             <option value="">Todos os estágios</option>
-            {estagiosOptions.map(option => (
+            {estagiosOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -160,16 +157,16 @@ export const FiltrosOportunidades: React.FC<FiltrosOportunidadesProps> = ({
 
         {/* Prioridade */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Prioridade
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Prioridade</label>
           <select
             value={filtrosLocais.prioridade || ''}
-            onChange={(e) => handleFiltroChange('prioridade', e.target.value as PrioridadeOportunidade || '')}
+            onChange={(e) =>
+              handleFiltroChange('prioridade', (e.target.value as PrioridadeOportunidade) || '')
+            }
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C] bg-white"
           >
             <option value="">Todas as prioridades</option>
-            {prioridadeOptions.map(option => (
+            {prioridadeOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -179,16 +176,16 @@ export const FiltrosOportunidades: React.FC<FiltrosOportunidadesProps> = ({
 
         {/* Origem */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Origem
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Origem</label>
           <select
             value={filtrosLocais.origem || ''}
-            onChange={(e) => handleFiltroChange('origem', e.target.value as OrigemOportunidade || '')}
+            onChange={(e) =>
+              handleFiltroChange('origem', (e.target.value as OrigemOportunidade) || '')
+            }
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C] bg-white"
           >
             <option value="">Todas as origens</option>
-            {origemOptions.map(option => (
+            {origemOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -209,7 +206,7 @@ export const FiltrosOportunidades: React.FC<FiltrosOportunidadesProps> = ({
             disabled={carregandoDados}
           >
             <option value="">Todos os responsáveis</option>
-            {responsaveis.map(responsavel => (
+            {responsaveis.map((responsavel) => (
               <option key={responsavel.id} value={responsavel.id}>
                 {responsavel.nome}
               </option>
@@ -255,8 +252,15 @@ export const FiltrosOportunidades: React.FC<FiltrosOportunidadesProps> = ({
           </label>
           <input
             type="date"
-            value={filtrosLocais.dataInicio ? filtrosLocais.dataInicio.toISOString().split('T')[0] : ''}
-            onChange={(e) => handleFiltroChange('dataInicio', e.target.value ? new Date(e.target.value) : undefined)}
+            value={
+              filtrosLocais.dataInicio ? filtrosLocais.dataInicio.toISOString().split('T')[0] : ''
+            }
+            onChange={(e) =>
+              handleFiltroChange(
+                'dataInicio',
+                e.target.value ? new Date(e.target.value) : undefined,
+              )
+            }
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C]"
           />
         </div>
@@ -270,7 +274,9 @@ export const FiltrosOportunidades: React.FC<FiltrosOportunidadesProps> = ({
           <input
             type="date"
             value={filtrosLocais.dataFim ? filtrosLocais.dataFim.toISOString().split('T')[0] : ''}
-            onChange={(e) => handleFiltroChange('dataFim', e.target.value ? new Date(e.target.value) : undefined)}
+            onChange={(e) =>
+              handleFiltroChange('dataFim', e.target.value ? new Date(e.target.value) : undefined)
+            }
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C]"
           />
         </div>
@@ -284,21 +290,22 @@ export const FiltrosOportunidades: React.FC<FiltrosOportunidadesProps> = ({
             Tags
           </label>
           <div className="flex flex-wrap gap-2">
-            {tagsDisponiveis.map(tag => (
+            {tagsDisponiveis.map((tag) => (
               <button
                 key={tag}
                 onClick={() => {
                   const tagsAtuais = filtrosLocais.tags || [];
                   const novasTags = tagsAtuais.includes(tag)
-                    ? tagsAtuais.filter(t => t !== tag)
+                    ? tagsAtuais.filter((t) => t !== tag)
                     : [...tagsAtuais, tag];
                   handleFiltroChange('tags', novasTags);
                 }}
                 className={`
                   px-3 py-1 rounded-full text-sm transition-colors
-                  ${(filtrosLocais.tags || []).includes(tag)
-                    ? 'bg-[#159A9C] text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ${
+                    (filtrosLocais.tags || []).includes(tag)
+                      ? 'bg-[#159A9C] text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }
                 `}
               >
@@ -313,10 +320,13 @@ export const FiltrosOportunidades: React.FC<FiltrosOportunidadesProps> = ({
       <div className="mt-6 flex items-center justify-between">
         <div className="text-sm text-gray-600">
           {countFiltrosAtivos() > 0 && (
-            <span>{countFiltrosAtivos()} filtro{countFiltrosAtivos() > 1 ? 's' : ''} ativo{countFiltrosAtivos() > 1 ? 's' : ''}</span>
+            <span>
+              {countFiltrosAtivos()} filtro{countFiltrosAtivos() > 1 ? 's' : ''} ativo
+              {countFiltrosAtivos() > 1 ? 's' : ''}
+            </span>
           )}
         </div>
-        
+
         <div className="flex items-center space-x-3">
           <button
             onClick={handleLimparFiltros}
@@ -324,7 +334,7 @@ export const FiltrosOportunidades: React.FC<FiltrosOportunidadesProps> = ({
           >
             Limpar Filtros
           </button>
-          
+
           <button
             onClick={handleAplicarFiltros}
             className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#138A8C] transition-colors"

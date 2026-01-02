@@ -1,6 +1,6 @@
 /**
  * 📊 useContextoCliente - Hook para gerenciar contexto completo do cliente
- * 
+ *
  * Funcionalidades:
  * - Carregar dados do cliente
  * - Estatísticas de atendimento
@@ -56,7 +56,7 @@ interface UseContextoClienteReturn {
 }
 
 export const useContextoCliente = (
-  options: UseContextoClienteOptions
+  options: UseContextoClienteOptions,
 ): UseContextoClienteReturn => {
   const { clienteId, telefone, autoLoad = true } = options;
 

@@ -45,7 +45,10 @@ const ResetPasswordPage: React.FC = () => {
       setFeedback(null);
       setMessage('');
 
-      const response = await authService.redefinirSenhaComToken({ token, senhaNova: novaSenha.trim() });
+      const response = await authService.redefinirSenhaComToken({
+        token,
+        senhaNova: novaSenha.trim(),
+      });
 
       setFeedback('success');
       setMessage(response.message || 'Senha alterada com sucesso! Você já pode fazer login.');
@@ -54,7 +57,9 @@ const ResetPasswordPage: React.FC = () => {
       setConfirmacaoSenha('');
     } catch (error: unknown) {
       console.error('Erro ao redefinir senha:', error);
-      const fallbackMessage = (error as any)?.response?.data?.message || 'Token inválido ou expirado. Solicite uma nova recuperação de senha.';
+      const fallbackMessage =
+        (error as any)?.response?.data?.message ||
+        'Token inválido ou expirado. Solicite uma nova recuperação de senha.';
       setFeedback('error');
       setMessage(fallbackMessage);
       toast.error(fallbackMessage);
@@ -114,10 +119,11 @@ const ResetPasswordPage: React.FC = () => {
 
           {feedback && (
             <div
-              className={`flex items-start gap-3 rounded-xl border px-4 py-3 mb-6 ${feedback === 'success'
+              className={`flex items-start gap-3 rounded-xl border px-4 py-3 mb-6 ${
+                feedback === 'success'
                   ? 'border-green-200 bg-green-50 text-green-800'
                   : 'border-red-200 bg-red-50 text-red-700'
-                }`}
+              }`}
             >
               {feedback === 'success' ? (
                 <CheckCircle2 className="h-5 w-5 mt-0.5" />
@@ -130,7 +136,10 @@ const ResetPasswordPage: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-semibold text-[#002333] mb-2" htmlFor="nova-senha">
+              <label
+                className="block text-sm font-semibold text-[#002333] mb-2"
+                htmlFor="nova-senha"
+              >
                 Nova senha
               </label>
               <div className="relative">
@@ -158,7 +167,10 @@ const ResetPasswordPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-[#002333] mb-2" htmlFor="confirmacao-senha">
+              <label
+                className="block text-sm font-semibold text-[#002333] mb-2"
+                htmlFor="confirmacao-senha"
+              >
                 Confirmar nova senha
               </label>
               <div className="relative">
@@ -177,7 +189,11 @@ const ResetPasswordPage: React.FC = () => {
                   onClick={() => setMostrarConfirmacao((prev) => !prev)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-[#B4BEC9] hover:text-[#159A9C] transition-colors"
                 >
-                  {mostrarConfirmacao ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  {mostrarConfirmacao ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
                 </button>
               </div>
               <p className={`text-xs mt-2 ${senhasConferem ? 'text-green-600' : 'text-[#6B7280]'}`}>

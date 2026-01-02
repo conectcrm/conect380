@@ -1,7 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, MessageSquare, Mail, Phone, Search, Building2, AlertCircle, Loader2 } from 'lucide-react';
+import {
+  X,
+  MessageSquare,
+  Mail,
+  Phone,
+  Search,
+  Building2,
+  AlertCircle,
+  Loader2,
+} from 'lucide-react';
 import { useTheme } from '../../../../contexts/ThemeContext';
-import { atendimentoService, CanalAtendimento, ContatoResumo } from '../services/atendimentoService';
+import {
+  atendimentoService,
+  CanalAtendimento,
+  ContatoResumo,
+} from '../services/atendimentoService';
 import { CanalTipo } from '../types';
 
 interface NovoAtendimentoModalProps {
@@ -58,12 +71,13 @@ const normalizarCorCanal = (tipo: CanalTipo, fallback: string): string => {
   }
 };
 
-const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
+const UUID_REGEX =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
 
 export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
   isOpen,
   onClose,
-  onConfirm
+  onConfirm,
 }) => {
   const { currentPalette } = useTheme();
 
@@ -83,7 +97,7 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
   const [novoContato, setNovoContato] = useState({
     nome: '',
     telefone: '',
-    email: ''
+    email: '',
   });
 
   const [clienteVinculado, setClienteVinculado] = useState('');
@@ -139,7 +153,17 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
       return;
     }
     setErroFormulario(null);
-  }, [isOpen, step, canalSelecionadoId, contatoSelecionado, novoContato.nome, novoContato.telefone, novoContato.email, assunto, descricao]);
+  }, [
+    isOpen,
+    step,
+    canalSelecionadoId,
+    contatoSelecionado,
+    novoContato.nome,
+    novoContato.telefone,
+    novoContato.email,
+    assunto,
+    descricao,
+  ]);
 
   const contatosFiltrados = useMemo(() => {
     if (!buscaContato) {
@@ -148,21 +172,23 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
 
     const termo = buscaContato.toLowerCase();
     return contatos
-      .filter((contato) =>
-        contato.nome.toLowerCase().includes(termo) ||
-        (contato.telefone && contato.telefone.includes(buscaContato)) ||
-        (contato.email && contato.email.toLowerCase().includes(termo))
+      .filter(
+        (contato) =>
+          contato.nome.toLowerCase().includes(termo) ||
+          (contato.telefone && contato.telefone.includes(buscaContato)) ||
+          (contato.email && contato.email.toLowerCase().includes(termo)),
       )
       .slice(0, 25);
   }, [buscaContato, contatos]);
 
-  const canalSelecionado = canais.find((canalAtual) => canalAtual.id === canalSelecionadoId) || null;
+  const canalSelecionado =
+    canais.find((canalAtual) => canalAtual.id === canalSelecionadoId) || null;
 
   const prioridades = [
     { value: 'baixa', label: 'Baixa', cor: '#10B981' },
     { value: 'media', label: 'Média', cor: '#F59E0B' },
     { value: 'alta', label: 'Alta', cor: '#EF4444' },
-    { value: 'urgente', label: 'Urgente', cor: '#DC2626' }
+    { value: 'urgente', label: 'Urgente', cor: '#DC2626' },
   ];
 
   const handleAdicionarTag = () => {
@@ -182,7 +208,7 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
     setNovoContato({
       nome: contato.nome,
       telefone: contato.telefone || '',
-      email: contato.email || ''
+      email: contato.email || '',
     });
     setClienteVinculado(contato.clienteNome || '');
   };
@@ -212,8 +238,15 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
       return;
     }
 
-    if (!validarTelefoneObrigatorio(canalSelecionado?.tipo, contatoSelecionado?.telefone || novoContato.telefone)) {
-      setErroFormulario('Para o canal selecionado é obrigatório informar um número de telefone válido.');
+    if (
+      !validarTelefoneObrigatorio(
+        canalSelecionado?.tipo,
+        contatoSelecionado?.telefone || novoContato.telefone,
+      )
+    ) {
+      setErroFormulario(
+        'Para o canal selecionado é obrigatório informar um número de telefone válido.',
+      );
       return;
     }
 
@@ -234,7 +267,7 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
       telefone: novoContato.telefone.trim() || undefined,
       email: novoContato.email.trim() || undefined,
       clienteId: undefined,
-      clienteNome: clienteVinculado || undefined
+      clienteNome: clienteVinculado || undefined,
     };
 
     if (!contatoBase.nome) {
@@ -243,12 +276,17 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
     }
 
     if (!validarTelefoneObrigatorio(canalSelecionado.tipo, contatoBase.telefone)) {
-      setErroFormulario('Para o canal selecionado é obrigatório informar um número de telefone válido.');
+      setErroFormulario(
+        'Para o canal selecionado é obrigatório informar um número de telefone válido.',
+      );
       return;
     }
 
-    const clienteIdNormalizado = contatoSelecionado?.clienteId ||
-      (clienteVinculado && UUID_REGEX.test(clienteVinculado.trim()) ? clienteVinculado.trim() : undefined);
+    const clienteIdNormalizado =
+      contatoSelecionado?.clienteId ||
+      (clienteVinculado && UUID_REGEX.test(clienteVinculado.trim())
+        ? clienteVinculado.trim()
+        : undefined);
 
     const dados: NovoAtendimentoData = {
       canalId: canalSelecionado.id,
@@ -263,7 +301,7 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
       assunto: assunto.trim(),
       descricao: descricao.trim(),
       prioridade,
-      tags
+      tags,
     };
 
     onConfirm(dados);
@@ -312,9 +350,7 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
               <MessageSquare className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
-                Novo Atendimento
-              </h2>
+              <h2 className="text-xl font-semibold text-gray-900">Novo Atendimento</h2>
               <p className="text-sm text-gray-500">
                 Passo {step} de 2 - {step === 1 ? 'Contato e Canal' : 'Detalhes do Atendimento'}
               </p>
@@ -349,37 +385,47 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
                     </div>
                   ) : canais.length === 0 ? (
                     <div className="text-sm text-gray-500">
-                      Nenhum canal disponível. Configure um canal em <strong>Configurações &gt; Atendimento</strong> para criar atendimentos.
+                      Nenhum canal disponível. Configure um canal em{' '}
+                      <strong>Configurações &gt; Atendimento</strong> para criar atendimentos.
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       {canais.map((canalOpcao) => {
                         const ativo = canalSelecionadoId === canalOpcao.id;
-                        const cor = normalizarCorCanal(canalOpcao.tipo, currentPalette.colors.primary);
-                        const Icone = canalOpcao.tipo === 'email'
-                          ? Mail
-                          : canalOpcao.tipo === 'telefone'
-                            ? Phone
-                            : MessageSquare;
+                        const cor = normalizarCorCanal(
+                          canalOpcao.tipo,
+                          currentPalette.colors.primary,
+                        );
+                        const Icone =
+                          canalOpcao.tipo === 'email'
+                            ? Mail
+                            : canalOpcao.tipo === 'telefone'
+                              ? Phone
+                              : MessageSquare;
 
                         return (
                           <button
                             key={canalOpcao.id}
                             type="button"
                             onClick={() => setCanalSelecionadoId(canalOpcao.id)}
-                            className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${ativo
-                              ? 'border-current shadow-md scale-105'
-                              : 'border-gray-200 hover:border-gray-300'
-                              }`}
+                            className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
+                              ativo
+                                ? 'border-current shadow-md scale-105'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
                             style={{
                               borderColor: ativo ? cor : undefined,
-                              backgroundColor: ativo ? `${cor}10` : undefined
+                              backgroundColor: ativo ? `${cor}10` : undefined,
                             }}
                           >
                             <Icone className="w-6 h-6" style={{ color: ativo ? cor : '#6B7280' }} />
                             <div className="flex flex-col items-center">
-                              <span className="text-xs font-medium text-gray-700">{canalOpcao.nome}</span>
-                              <span className="text-[11px] text-gray-500">{canalOpcao.tipo.toUpperCase()}</span>
+                              <span className="text-xs font-medium text-gray-700">
+                                {canalOpcao.nome}
+                              </span>
+                              <span className="text-[11px] text-gray-500">
+                                {canalOpcao.tipo.toUpperCase()}
+                              </span>
                             </div>
                           </button>
                         );
@@ -432,7 +478,9 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
                                 {contato.nome.charAt(0).toUpperCase()}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900 truncate">{contato.nome}</p>
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                  {contato.nome}
+                                </p>
                                 <p className="text-xs text-gray-500 truncate">
                                   {contato.telefone || 'Sem telefone cadastrado'}
                                   {contato.email ? ` • ${contato.email}` : ''}
@@ -442,14 +490,17 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
                           ))
                         ) : (
                           <div className="px-4 py-3 text-sm text-gray-500 text-center">
-                            Nenhum contato encontrado para "{buscaContato}". Utilize o formulário abaixo para cadastrar rapidamente.
+                            Nenhum contato encontrado para "{buscaContato}". Utilize o formulário
+                            abaixo para cadastrar rapidamente.
                           </div>
                         )}
                       </div>
                     )}
 
                     <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <p className="text-sm font-medium text-gray-700 mb-3">Ou cadastre um novo contato:</p>
+                      <p className="text-sm font-medium text-gray-700 mb-3">
+                        Ou cadastre um novo contato:
+                      </p>
                       <div className="space-y-3">
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -458,7 +509,9 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
                           <input
                             type="text"
                             value={novoContato.nome}
-                            onChange={(e) => setNovoContato({ ...novoContato, nome: e.target.value })}
+                            onChange={(e) =>
+                              setNovoContato({ ...novoContato, nome: e.target.value })
+                            }
                             placeholder="Ex: João Silva"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-offset-0 focus:border-transparent text-sm"
                             style={{ '--tw-ring-color': currentPalette.colors.primary } as any}
@@ -467,12 +520,18 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Telefone {canalSelecionado?.tipo && ['whatsapp', 'telefone'].includes(canalSelecionado.tipo) ? '*' : ''}
+                              Telefone{' '}
+                              {canalSelecionado?.tipo &&
+                              ['whatsapp', 'telefone'].includes(canalSelecionado.tipo)
+                                ? '*'
+                                : ''}
                             </label>
                             <input
                               type="tel"
                               value={novoContato.telefone}
-                              onChange={(e) => setNovoContato({ ...novoContato, telefone: e.target.value })}
+                              onChange={(e) =>
+                                setNovoContato({ ...novoContato, telefone: e.target.value })
+                              }
                               placeholder="(11) 99999-9999"
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-offset-0 focus:border-transparent text-sm"
                               style={{ '--tw-ring-color': currentPalette.colors.primary } as any}
@@ -485,7 +544,9 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
                             <input
                               type="email"
                               value={novoContato.email}
-                              onChange={(e) => setNovoContato({ ...novoContato, email: e.target.value })}
+                              onChange={(e) =>
+                                setNovoContato({ ...novoContato, email: e.target.value })
+                              }
                               placeholder="email@exemplo.com"
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-offset-0 focus:border-transparent text-sm"
                               style={{ '--tw-ring-color': currentPalette.colors.primary } as any}
@@ -505,12 +566,17 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
                         {contatoSelecionado.nome.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{contatoSelecionado.nome}</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {contatoSelecionado.nome}
+                        </p>
                         <p className="text-xs text-gray-500">
-                          {contatoSelecionado.telefone || 'Sem telefone'} • {contatoSelecionado.email || 'Sem email'}
+                          {contatoSelecionado.telefone || 'Sem telefone'} •{' '}
+                          {contatoSelecionado.email || 'Sem email'}
                         </p>
                         {contatoSelecionado.clienteNome && (
-                          <p className="text-xs text-gray-500">Cliente: {contatoSelecionado.clienteNome}</p>
+                          <p className="text-xs text-gray-500">
+                            Cliente: {contatoSelecionado.clienteNome}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -542,7 +608,8 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
                   style={{ '--tw-ring-color': currentPalette.colors.primary } as any}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Caso o contato já esteja vinculado a um cliente, o sistema aplicará o vínculo automaticamente.
+                  Caso o contato já esteja vinculado a um cliente, o sistema aplicará o vínculo
+                  automaticamente.
                 </p>
               </div>
             </div>
@@ -551,9 +618,7 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
             <div className="space-y-5">
               {/* Assunto */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Assunto *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Assunto *</label>
                 <input
                   type="text"
                   value={assunto}
@@ -581,20 +646,19 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
 
               {/* Prioridade */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Prioridade
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Prioridade</label>
                 <div className="grid grid-cols-4 gap-2">
                   {prioridades.map((p) => (
                     <button
                       key={p.value}
                       onClick={() => setPrioridade(p.value as any)}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${prioridade === p.value
-                        ? 'text-white shadow-md scale-105'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                        prioridade === p.value
+                          ? 'text-white shadow-md scale-105'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                       style={{
-                        backgroundColor: prioridade === p.value ? p.cor : undefined
+                        backgroundColor: prioridade === p.value ? p.cor : undefined,
                       }}
                     >
                       {p.label}
@@ -654,7 +718,8 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
                 <div className="text-sm text-blue-800">
                   <p className="font-medium mb-1">Dica:</p>
                   <p className="text-xs">
-                    Após criar o atendimento, você será redirecionado para a conversa e poderá enviar mensagens imediatamente.
+                    Após criar o atendimento, você será redirecionado para a conversa e poderá
+                    enviar mensagens imediatamente.
                   </p>
                 </div>
               </div>
@@ -664,7 +729,9 @@ export const NovoAtendimentoModal: React.FC<NovoAtendimentoModalProps> = ({
 
         <div className="px-6 py-4 border-t bg-gray-50 flex items-center justify-between">
           <div className="text-xs text-gray-500">
-            {canalSelecionado ? `Canal selecionado: ${canalSelecionado.nome}` : 'Nenhum canal selecionado'}
+            {canalSelecionado
+              ? `Canal selecionado: ${canalSelecionado.nome}`
+              : 'Nenhum canal selecionado'}
           </div>
           <div className="flex items-center gap-3">
             <button

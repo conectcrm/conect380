@@ -47,7 +47,7 @@ import {
   RefreshCw,
   Copy,
   Save,
-  Bookmark
+  Bookmark,
 } from 'lucide-react';
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
 import { oportunidadesService } from '../services/oportunidadesService';
@@ -57,13 +57,18 @@ import {
   Oportunidade,
   NovaOportunidade,
   FiltrosOportunidade,
-  EstatisticasOportunidades
+  EstatisticasOportunidades,
 } from '../types/oportunidades';
-import { EstagioOportunidade, PrioridadeOportunidade, OrigemOportunidade } from '../types/oportunidades/enums';
+import {
+  EstagioOportunidade,
+  PrioridadeOportunidade,
+  OrigemOportunidade,
+} from '../types/oportunidades/enums';
 import ModalOportunidadeRefatorado from '../components/oportunidades/ModalOportunidadeRefatorado';
 import ModalMudancaEstagio from '../components/oportunidades/ModalMudancaEstagio';
 import ModalDetalhesOportunidade from '../components/oportunidades/ModalDetalhesOportunidade';
 import ModalExport from '../components/oportunidades/ModalExport';
+import ModalMotivoPerda from '../components/oportunidades/ModalMotivoPerda';
 import { useAuth } from '../contexts/AuthContext';
 
 // Configuração do localizador do calendário (date-fns)
@@ -82,71 +87,94 @@ const localizer = dateFnsLocalizer({
 // Tipos de visualização
 type VisualizacaoPipeline = 'kanban' | 'lista' | 'calendario' | 'grafico';
 
-// Configuração dos estágios do pipeline
-// Cores progressivas que representam a jornada do lead até o fechamento
-const ESTAGIOS_CONFIG = [
+type EstagioConfig = {
+  id: EstagioOportunidade;
+  nome: string;
+  headerClass: string;
+  legendClass: string;
+  badgeTextClass: string;
+  badgeBgClass: string;
+  accentColor: string;
+};
+
+// Configuração dos estágios do pipeline alinhada ao tema Crevasse
+const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.LEADS,
     nome: 'Leads',
-    cor: 'bg-slate-500', // Cinza azulado - Leads frios, ainda não qualificados
-    corTexto: 'text-slate-700',
-    corFundo: 'bg-slate-50'
+    headerClass: 'bg-[#002333]',
+    legendClass: 'bg-[#002333]',
+    badgeTextClass: 'text-[#002333]',
+    badgeBgClass: 'bg-[#DEEFE7]',
+    accentColor: '#002333',
   },
   {
     id: EstagioOportunidade.QUALIFICACAO,
     nome: 'Qualificação',
-    cor: 'bg-blue-500', // Azul - Processo de qualificação, análise
-    corTexto: 'text-blue-700',
-    corFundo: 'bg-blue-50'
+    headerClass: 'bg-[#0F7B7D]',
+    legendClass: 'bg-[#0F7B7D]',
+    badgeTextClass: 'text-[#0F7B7D]',
+    badgeBgClass: 'bg-[#DEEFE7]',
+    accentColor: '#0F7B7D',
   },
   {
     id: EstagioOportunidade.PROPOSTA,
     nome: 'Proposta',
-    cor: 'bg-indigo-500', // Índigo - Proposta enviada, aguardando resposta
-    corTexto: 'text-indigo-700',
-    corFundo: 'bg-indigo-50'
+    headerClass: 'bg-[#159A9C]',
+    legendClass: 'bg-[#159A9C]',
+    badgeTextClass: 'text-[#0F7B7D]',
+    badgeBgClass: 'bg-[#DEEFE7]',
+    accentColor: '#159A9C',
   },
   {
     id: EstagioOportunidade.NEGOCIACAO,
     nome: 'Negociação',
-    cor: 'bg-amber-500', // Âmbar - Negociação ativa, atenção necessária
-    corTexto: 'text-amber-700',
-    corFundo: 'bg-amber-50'
+    headerClass: 'bg-[#0F7B7D]',
+    legendClass: 'bg-[#0F7B7D]',
+    badgeTextClass: 'text-[#0F7B7D]',
+    badgeBgClass: 'bg-[#DEEFE7]',
+    accentColor: '#0F7B7D',
   },
   {
     id: EstagioOportunidade.FECHAMENTO,
     nome: 'Fechamento',
-    cor: 'bg-orange-500', // Laranja - Quase fechado, última etapa
-    corTexto: 'text-orange-700',
-    corFundo: 'bg-orange-50'
+    headerClass: 'bg-[#159A9C]',
+    legendClass: 'bg-[#159A9C]',
+    badgeTextClass: 'text-[#0F7B7D]',
+    badgeBgClass: 'bg-[#DEEFE7]',
+    accentColor: '#159A9C',
   },
   {
     id: EstagioOportunidade.GANHO,
     nome: 'Ganho',
-    cor: 'bg-emerald-500', // Verde esmeralda - Sucesso, venda ganha!
-    corTexto: 'text-emerald-700',
-    corFundo: 'bg-emerald-50'
+    headerClass: 'bg-green-600',
+    legendClass: 'bg-green-600',
+    badgeTextClass: 'text-green-700',
+    badgeBgClass: 'bg-green-50',
+    accentColor: '#16A34A',
   },
   {
     id: EstagioOportunidade.PERDIDO,
     nome: 'Perdido',
-    cor: 'bg-rose-500', // Rosa/vermelho - Oportunidade perdida
-    corTexto: 'text-rose-700',
-    corFundo: 'bg-rose-50'
+    headerClass: 'bg-red-600',
+    legendClass: 'bg-red-600',
+    badgeTextClass: 'text-red-700',
+    badgeBgClass: 'bg-red-50',
+    accentColor: '#DC2626',
   },
 ];
 
-// Cores dos gráficos (valores HEX correspondentes à paleta Crevasse)
-const CORES_GRAFICOS = {
-  slate: '#64748b',
-  blue: '#3b82f6',
-  indigo: '#6366f1',
-  amber: '#f59e0b',
-  orange: '#f97316',
-  emerald: '#10b981',
-  rose: '#f43f5e',
-  teal: '#159A9C', // Cor primária do sistema
-};
+// Paleta de apoio para gráficos (seguindo tema Crevasse + cores contextuais)
+const CORES_GRAFICOS = [
+  '#002333',
+  '#0F7B7D',
+  '#159A9C',
+  '#B4BEC9',
+  '#DEEFE7',
+  '#16A34A',
+  '#FBBF24',
+  '#DC2626',
+];
 
 const PipelinePage: React.FC = () => {
   const navigate = useNavigate();
@@ -178,12 +206,18 @@ const PipelinePage: React.FC = () => {
     novoEstagio: EstagioOportunidade;
   } | null>(null);
   const [loadingMudancaEstagio, setLoadingMudancaEstagio] = useState(false);
+
+  // ✅ Estados para Modal de Motivo de Perda
+  const [showModalMotivoPerda, setShowModalMotivoPerda] = useState(false);
+  const [oportunidadeParaPerder, setOportunidadeParaPerder] = useState<Oportunidade | null>(null);
   const [showModalDeletar, setShowModalDeletar] = useState(false);
   const [oportunidadeDeletar, setOportunidadeDeletar] = useState<Oportunidade | null>(null);
   const [loadingDeletar, setLoadingDeletar] = useState(false);
   const [oportunidadeDetalhes, setOportunidadeDetalhes] = useState<Oportunidade | null>(null);
   const [oportunidadeEditando, setOportunidadeEditando] = useState<Oportunidade | null>(null);
-  const [estagioNovaOportunidade, setEstagioNovaOportunidade] = useState<EstagioOportunidade>(EstagioOportunidade.LEADS);
+  const [estagioNovaOportunidade, setEstagioNovaOportunidade] = useState<EstagioOportunidade>(
+    EstagioOportunidade.LEADS,
+  );
   const [calendarView, setCalendarView] = useState<View>('month');
   const [calendarDate, setCalendarDate] = useState(new Date());
 
@@ -196,11 +230,13 @@ const PipelinePage: React.FC = () => {
   const itensPorPagina = 10;
 
   // Estados para filtros salvos
-  const [filtrosSalvos, setFiltrosSalvos] = useState<Array<{
-    id: string;
-    nome: string;
-    filtros: typeof filtros;
-  }>>([]);
+  const [filtrosSalvos, setFiltrosSalvos] = useState<
+    Array<{
+      id: string;
+      nome: string;
+      filtros: typeof filtros;
+    }>
+  >([]);
   const [showModalSalvarFiltro, setShowModalSalvarFiltro] = useState(false);
   const [nomeFiltroSalvar, setNomeFiltroSalvar] = useState('');
   const [filtroSelecionado, setFiltroSelecionado] = useState<string | null>(null);
@@ -239,7 +275,7 @@ const PipelinePage: React.FC = () => {
       const [dados, stats, usuariosData] = await Promise.all([
         oportunidadesService.listarOportunidades(),
         oportunidadesService.obterEstatisticas(),
-        carregarUsuarios()
+        carregarUsuarios(),
       ]);
 
       setOportunidades(dados);
@@ -257,7 +293,8 @@ const PipelinePage: React.FC = () => {
           navigate('/login');
         }, 2000);
       } else {
-        const errorMessage = err?.response?.data?.message || err.message || 'Erro ao carregar oportunidades';
+        const errorMessage =
+          err?.response?.data?.message || err.message || 'Erro ao carregar oportunidades';
         setError(errorMessage);
       }
     } finally {
@@ -310,7 +347,7 @@ const PipelinePage: React.FC = () => {
     try {
       setLoadingDeletar(true);
       await oportunidadesService.excluirOportunidade(oportunidadeDeletar.id);
-      setOportunidades(prev => prev.filter(o => o.id !== oportunidadeDeletar.id));
+      setOportunidades((prev) => prev.filter((o) => o.id !== oportunidadeDeletar.id));
 
       // Recarregar estatísticas
       const stats = await oportunidadesService.obterEstatisticas();
@@ -353,6 +390,23 @@ const PipelinePage: React.FC = () => {
     toast.success('Oportunidade duplicada! Edite e salve para criar a cópia.');
   };
 
+  // Gerar proposta a partir da oportunidade
+  const handleGerarProposta = async (oportunidade: Oportunidade, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+
+    try {
+      const response = await oportunidadesService.gerarProposta(oportunidade.id);
+      toast.success('Proposta gerada com sucesso!');
+
+      // Redirecionar para a página de propostas com a proposta recém-criada
+      navigate(`/comercial/propostas?proposta=${response.proposta.id}`);
+    } catch (err: unknown) {
+      console.error('Erro ao gerar proposta:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao gerar proposta';
+      toast.error(errorMessage);
+    }
+  };
+
   // Salvar filtro atual
   const handleSalvarFiltro = () => {
     if (!nomeFiltroSalvar.trim()) {
@@ -363,7 +417,7 @@ const PipelinePage: React.FC = () => {
     const novoFiltro = {
       id: Date.now().toString(),
       nome: nomeFiltroSalvar.trim(),
-      filtros: { ...filtros }
+      filtros: { ...filtros },
     };
 
     const novosFiltros = [...filtrosSalvos, novoFiltro];
@@ -377,7 +431,7 @@ const PipelinePage: React.FC = () => {
 
   // Aplicar filtro salvo
   const handleAplicarFiltroSalvo = (filtroId: string) => {
-    const filtro = filtrosSalvos.find(f => f.id === filtroId);
+    const filtro = filtrosSalvos.find((f) => f.id === filtroId);
     if (filtro) {
       setFiltros(filtro.filtros);
       setFiltroSelecionado(filtroId);
@@ -388,7 +442,7 @@ const PipelinePage: React.FC = () => {
 
   // Deletar filtro salvo
   const handleDeletarFiltroSalvo = (filtroId: string) => {
-    const novosFiltros = filtrosSalvos.filter(f => f.id !== filtroId);
+    const novosFiltros = filtrosSalvos.filter((f) => f.id !== filtroId);
     setFiltrosSalvos(novosFiltros);
     localStorage.setItem('conectcrm-pipeline-filtros-salvos', JSON.stringify(novosFiltros));
 
@@ -416,9 +470,9 @@ const PipelinePage: React.FC = () => {
 
   // Função de ordenação
   const handleOrdenar = (campo: typeof ordenacao.campo) => {
-    setOrdenacao(prev => ({
+    setOrdenacao((prev) => ({
       campo,
-      direcao: prev.campo === campo && prev.direcao === 'asc' ? 'desc' : 'asc'
+      direcao: prev.campo === campo && prev.direcao === 'asc' ? 'desc' : 'asc',
     }));
     setPaginaAtual(1); // Reset para primeira página ao ordenar
   };
@@ -444,7 +498,11 @@ const PipelinePage: React.FC = () => {
       await carregarDados();
       setShowModal(false);
       setOportunidadeEditando(null);
-      toast.success(oportunidadeEditando ? 'Oportunidade atualizada com sucesso!' : 'Oportunidade criada com sucesso!');
+      toast.success(
+        oportunidadeEditando
+          ? 'Oportunidade atualizada com sucesso!'
+          : 'Oportunidade criada com sucesso!',
+      );
     } catch (err) {
       console.error('Erro ao salvar oportunidade:', err);
       toast.error('Erro ao salvar oportunidade');
@@ -456,7 +514,9 @@ const PipelinePage: React.FC = () => {
   // Exportar oportunidades
   const handleExport = async (formato: 'csv' | 'excel' | 'pdf') => {
     try {
-      console.log(`Exportando ${oportunidadesFiltradas.length} oportunidades no formato ${formato}`);
+      console.log(
+        `Exportando ${oportunidadesFiltradas.length} oportunidades no formato ${formato}`,
+      );
 
       const dataAtual = new Date().toISOString().split('T')[0];
 
@@ -464,9 +524,10 @@ const PipelinePage: React.FC = () => {
         // CSV Export
         const csv = [
           'Título,Estágio,Valor,Probabilidade,Prioridade,Origem,Contato,Email,Telefone,Empresa,Responsável,Data Esperada',
-          ...oportunidadesFiltradas.map(op =>
-            `"${op.titulo}","${op.estagio}","${formatarMoeda(op.valor)}","${op.probabilidade}%","${op.prioridade || ''}","${op.origem || ''}","${op.nomeContato || ''}","${op.emailContato || ''}","${op.telefoneContato || ''}","${op.empresaContato || ''}","${op.responsavel?.nome || ''}","${op.dataFechamentoEsperado || ''}"`
-          )
+          ...oportunidadesFiltradas.map(
+            (op) =>
+              `"${op.titulo}","${op.estagio}","${formatarMoeda(op.valor)}","${op.probabilidade}%","${op.prioridade || ''}","${op.origem || ''}","${op.nomeContato || ''}","${op.emailContato || ''}","${op.telefoneContato || ''}","${op.empresaContato || ''}","${op.responsavel?.nome || ''}","${op.dataFechamentoEsperado || ''}"`,
+          ),
         ].join('\n');
 
         const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }); // BOM para UTF-8
@@ -474,23 +535,22 @@ const PipelinePage: React.FC = () => {
         link.href = URL.createObjectURL(blob);
         link.download = `oportunidades_${dataAtual}.csv`;
         link.click();
-
       } else if (formato === 'excel') {
         // Excel Export usando xlsx
-        const dadosExcel = oportunidadesFiltradas.map(op => ({
-          'Título': op.titulo,
-          'Estágio': op.estagio,
-          'Valor': op.valor,
+        const dadosExcel = oportunidadesFiltradas.map((op) => ({
+          Título: op.titulo,
+          Estágio: op.estagio,
+          Valor: op.valor,
           'Probabilidade (%)': op.probabilidade,
-          'Prioridade': op.prioridade || '',
-          'Origem': op.origem || '',
-          'Contato': op.nomeContato || '',
-          'Email': op.emailContato || '',
-          'Telefone': op.telefoneContato || '',
-          'Empresa': op.empresaContato || '',
-          'Responsável': op.responsavel?.nome || '',
+          Prioridade: op.prioridade || '',
+          Origem: op.origem || '',
+          Contato: op.nomeContato || '',
+          Email: op.emailContato || '',
+          Telefone: op.telefoneContato || '',
+          Empresa: op.empresaContato || '',
+          Responsável: op.responsavel?.nome || '',
           'Data Esperada': op.dataFechamentoEsperado || '',
-          'Descrição': op.descricao || '',
+          Descrição: op.descricao || '',
         }));
 
         // Criar workbook
@@ -522,7 +582,10 @@ const PipelinePage: React.FC = () => {
         if (estatisticas) {
           const statsData = [
             { Métrica: 'Total de Oportunidades', Valor: estatisticas.totalOportunidades },
-            { Métrica: 'Valor Total do Pipeline', Valor: formatarMoeda(estatisticas.valorTotalPipeline) },
+            {
+              Métrica: 'Valor Total do Pipeline',
+              Valor: formatarMoeda(estatisticas.valorTotalPipeline),
+            },
             { Métrica: 'Ticket Médio', Valor: formatarMoeda(estatisticas.valorMedio) },
             { Métrica: 'Taxa de Conversão', Valor: `${estatisticas.taxaConversao.toFixed(1)}%` },
           ];
@@ -532,14 +595,15 @@ const PipelinePage: React.FC = () => {
         }
 
         // Adicionar aba por Estágio
-        const stagingData = ESTAGIOS_CONFIG.map(estagio => {
-          const opsEstagio = oportunidadesFiltradas.filter(op => op.estagio === estagio.id);
+        const stagingData = ESTAGIOS_CONFIG.map((estagio) => {
+          const opsEstagio = oportunidadesFiltradas.filter((op) => op.estagio === estagio.id);
           const valorTotal = opsEstagio.reduce((sum, op) => sum + op.valor, 0);
           return {
             Estágio: estagio.nome,
             Quantidade: opsEstagio.length,
             'Valor Total': formatarMoeda(valorTotal),
-            'Valor Médio': opsEstagio.length > 0 ? formatarMoeda(valorTotal / opsEstagio.length) : 'R$ 0,00',
+            'Valor Médio':
+              opsEstagio.length > 0 ? formatarMoeda(valorTotal / opsEstagio.length) : 'R$ 0,00',
           };
         });
         const wsStaging = XLSX.utils.json_to_sheet(stagingData);
@@ -548,7 +612,6 @@ const PipelinePage: React.FC = () => {
 
         // Salvar arquivo
         XLSX.writeFile(wb, `oportunidades_${dataAtual}.xlsx`);
-
       } else if (formato === 'pdf') {
         // PDF Export usando jspdf
         const doc = new jsPDF();
@@ -573,7 +636,11 @@ const PipelinePage: React.FC = () => {
           yPos += 8;
           doc.setFontSize(10);
           doc.setTextColor(64, 64, 64);
-          doc.text(`• Valor Total do Pipeline: ${formatarMoeda(estatisticas.valorTotalPipeline)}`, 14, yPos);
+          doc.text(
+            `• Valor Total do Pipeline: ${formatarMoeda(estatisticas.valorTotalPipeline)}`,
+            14,
+            yPos,
+          );
           yPos += 6;
           doc.text(`• Ticket Médio: ${formatarMoeda(estatisticas.valorMedio)}`, 14, yPos);
           yPos += 6;
@@ -582,7 +649,7 @@ const PipelinePage: React.FC = () => {
         }
 
         // Tabela de Oportunidades
-        const tableData = oportunidadesFiltradas.map(op => [
+        const tableData = oportunidadesFiltradas.map((op) => [
           op.titulo,
           op.estagio,
           formatarMoeda(op.valor),
@@ -627,7 +694,7 @@ const PipelinePage: React.FC = () => {
             `Página ${i} de ${pageCount}`,
             doc.internal.pageSize.getWidth() / 2,
             doc.internal.pageSize.getHeight() - 10,
-            { align: 'center' }
+            { align: 'center' },
           );
         }
 
@@ -658,10 +725,17 @@ const PipelinePage: React.FC = () => {
       return;
     }
 
-    // Abrir modal para registrar motivo da mudança
+    // ✅ Se for movido para PERDIDO, abrir modal de motivo de perda
+    if (novoEstagio === EstagioOportunidade.PERDIDO) {
+      setOportunidadeParaPerder(draggedItem);
+      setShowModalMotivoPerda(true);
+      return;
+    }
+
+    // Para outros estágios, abrir modal para registrar motivo da mudança
     setMudancaEstagioData({
       oportunidade: draggedItem,
-      novoEstagio: novoEstagio
+      novoEstagio: novoEstagio,
     });
     setShowModalMudancaEstagio(true);
   };
@@ -670,7 +744,7 @@ const PipelinePage: React.FC = () => {
   const handleConfirmarMudancaEstagio = async (
     motivo: string,
     comentario: string,
-    proximaAcao?: Date
+    proximaAcao?: Date,
   ) => {
     if (!mudancaEstagioData) return;
 
@@ -682,23 +756,28 @@ const PipelinePage: React.FC = () => {
       // Atualizar estágio no backend
       await oportunidadesService.atualizarOportunidade({
         id: oportunidade.id,
-        estagio: novoEstagio
+        estagio: novoEstagio,
+        responsavel_id: oportunidade.responsavel?.id || '',
       });
 
       // Criar atividade de histórico
       const descricaoAtividade = [
-        `Oportunidade movida de "${ESTAGIOS_CONFIG.find(e => e.id === oportunidade.estagio)?.nome}" para "${ESTAGIOS_CONFIG.find(e => e.id === novoEstagio)?.nome}"`,
+        `Oportunidade movida de "${ESTAGIOS_CONFIG.find((e) => e.id === oportunidade.estagio)?.nome}" para "${ESTAGIOS_CONFIG.find((e) => e.id === novoEstagio)?.nome}"`,
         `Motivo: ${motivo}`,
         comentario ? `\nDetalhes: ${comentario}` : '',
-        proximaAcao ? `\nPróxima ação agendada para: ${new Date(proximaAcao).toLocaleDateString('pt-BR')}` : ''
-      ].filter(Boolean).join('\n');
+        proximaAcao
+          ? `\nPróxima ação agendada para: ${new Date(proximaAcao).toLocaleDateString('pt-BR')}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n');
 
       try {
         await oportunidadesService.criarAtividade({
           oportunidadeId: oportunidade.id,
           tipo: 'note',
           descricao: descricaoAtividade,
-          dataAtividade: new Date()
+          dataAtividade: new Date(),
         });
       } catch (err) {
         console.warn('Erro ao criar atividade de histórico:', err);
@@ -706,10 +785,8 @@ const PipelinePage: React.FC = () => {
       }
 
       // Atualizar estado local
-      setOportunidades(prev =>
-        prev.map(op =>
-          op.id === oportunidade.id ? { ...op, estagio: novoEstagio } : op
-        )
+      setOportunidades((prev) =>
+        prev.map((op) => (op.id === oportunidade.id ? { ...op, estagio: novoEstagio } : op)),
       );
 
       // Recarregar estatísticas
@@ -732,19 +809,75 @@ const PipelinePage: React.FC = () => {
     }
   };
 
+  // ✅ Confirmar perda com motivo obrigatório
+  const handleConfirmarPerda = async (dados: {
+    motivoPerda: string;
+    motivoPerdaDetalhes?: string;
+    concorrenteNome?: string;
+    dataRevisao?: string;
+  }) => {
+    if (!oportunidadeParaPerder) return;
+
+    try {
+      setLoadingMudancaEstagio(true);
+
+      // Atualizar estágio para PERDIDO com motivo
+      await oportunidadesService.atualizarEstagio(oportunidadeParaPerder.id, {
+        estagio: EstagioOportunidade.PERDIDO,
+        motivoPerda: dados.motivoPerda,
+        motivoPerdaDetalhes: dados.motivoPerdaDetalhes,
+        concorrenteNome: dados.concorrenteNome,
+        dataRevisao: dados.dataRevisao,
+      });
+
+      // Atualizar estado local
+      setOportunidades((prev) =>
+        prev.map((op) =>
+          op.id === oportunidadeParaPerder.id
+            ? { ...op, estagio: EstagioOportunidade.PERDIDO }
+            : op,
+        ),
+      );
+
+      // Recarregar estatísticas
+      const stats = await oportunidadesService.obterEstatisticas();
+      setEstatisticas(stats);
+
+      // Fechar modal
+      setShowModalMotivoPerda(false);
+      setOportunidadeParaPerder(null);
+      setDraggedItem(null);
+
+      toast.success('Oportunidade marcada como perdida com sucesso!');
+    } catch (err: any) {
+      console.error('Erro ao marcar oportunidade como perdida:', err);
+
+      // Verificar se é erro de validação (motivo obrigatório)
+      const errorMessage = err?.response?.data?.message;
+      if (Array.isArray(errorMessage)) {
+        toast.error(errorMessage.join(', '));
+      } else {
+        toast.error(errorMessage || 'Erro ao marcar oportunidade como perdida');
+      }
+
+      setError('Erro ao marcar oportunidade como perdida');
+    } finally {
+      setLoadingMudancaEstagio(false);
+    }
+  };
+
   // Filtrar oportunidades com filtros avançados
-  const oportunidadesFiltradas = oportunidades.filter(op => {
+  const oportunidadesFiltradas = oportunidades.filter((op) => {
     // Filtro por busca (texto)
     if (filtros.busca) {
       const busca = filtros.busca.toLowerCase();
-      const matchBusca = (
+      const matchBusca =
         op.titulo.toLowerCase().includes(busca) ||
         op.descricao?.toLowerCase().includes(busca) ||
         op.nomeContato?.toLowerCase().includes(busca) ||
         op.empresaContato?.toLowerCase().includes(busca) ||
         op.emailContato?.toLowerCase().includes(busca) ||
-        op.telefoneContato?.toLowerCase().includes(busca)
-      );
+        op.telefoneContato?.toLowerCase().includes(busca);
       if (!matchBusca) return false;
     }
 
@@ -825,15 +958,15 @@ const PipelinePage: React.FC = () => {
 
   // Transformar oportunidades em eventos de calendário
   const eventosCalendario = useMemo(() => {
-    return oportunidadesFiltradas.map(op => {
+    return oportunidadesFiltradas.map((op) => {
       // Usar dataFechamentoEsperado se existir, senão usar updatedAt
       const dataEvento = op.dataFechamentoEsperado
         ? new Date(op.dataFechamentoEsperado)
         : new Date(op.updatedAt);
 
       // Encontrar cor do estágio
-      const estagioConfig = ESTAGIOS_CONFIG.find(e => e.id === op.estagio);
-      const cor = estagioConfig?.cor.replace('bg-', '') || 'slate-500';
+      const estagioConfig = ESTAGIOS_CONFIG.find((e) => e.id === op.estagio);
+      const cor = estagioConfig?.accentColor || '#159A9C';
 
       return {
         id: op.id,
@@ -849,18 +982,18 @@ const PipelinePage: React.FC = () => {
   // Dados para gráficos
   const dadosGraficos = useMemo(() => {
     // 1. Funil de conversão (Oportunidades por estágio)
-    const funil = ESTAGIOS_CONFIG.map(estagio => {
-      const oportunidadesEstagio = oportunidadesFiltradas.filter(op => op.estagio === estagio.id);
+    const funil = ESTAGIOS_CONFIG.map((estagio) => {
+      const oportunidadesEstagio = oportunidadesFiltradas.filter((op) => op.estagio === estagio.id);
       return {
         nome: estagio.nome,
         quantidade: oportunidadesEstagio.length,
         valor: oportunidadesEstagio.reduce((acc, op) => acc + Number(op.valor || 0), 0),
-        cor: estagio.cor.replace('bg-', '').replace('-500', ''),
+        cor: estagio.accentColor,
       };
     });
 
     // 2. Valor por estágio (para gráfico de barras horizontal)
-    const valorPorEstagio = funil.map(item => ({
+    const valorPorEstagio = funil.map((item) => ({
       nome: item.nome,
       valor: item.valor,
       cor: item.cor,
@@ -879,7 +1012,7 @@ const PipelinePage: React.FC = () => {
 
     // 4. Origem das oportunidades (pizza)
     const origemCount: Record<string, number> = {};
-    oportunidadesFiltradas.forEach(op => {
+    oportunidadesFiltradas.forEach((op) => {
       const origem = op.origem || 'Não informado';
       origemCount[origem] = (origemCount[origem] || 0) + 1;
     });
@@ -889,8 +1022,9 @@ const PipelinePage: React.FC = () => {
     }));
 
     // 5. Performance por responsável (top 5)
-    const responsavelStats: Record<string, { nome: string; quantidade: number; valor: number }> = {};
-    oportunidadesFiltradas.forEach(op => {
+    const responsavelStats: Record<string, { nome: string; quantidade: number; valor: number }> =
+      {};
+    oportunidadesFiltradas.forEach((op) => {
       const respId = op.responsavel?.id || 'sem-responsavel';
       const respNome = op.responsavel?.nome || 'Sem responsável';
       if (!responsavelStats[respId]) {
@@ -914,9 +1048,9 @@ const PipelinePage: React.FC = () => {
 
   // Agrupar por estágio
   const agrupadoPorEstagio = useMemo(() => {
-    return ESTAGIOS_CONFIG.map(estagio => ({
+    return ESTAGIOS_CONFIG.map((estagio) => ({
       ...estagio,
-      oportunidades: oportunidadesFiltradas.filter(op => op.estagio === estagio.id)
+      oportunidades: oportunidadesFiltradas.filter((op) => op.estagio === estagio.id),
     }));
   }, [oportunidadesFiltradas]);
 
@@ -993,8 +1127,8 @@ const PipelinePage: React.FC = () => {
                       {estatisticas.totalOportunidades}
                     </p>
                   </div>
-                  <div className="h-12 w-12 rounded-2xl bg-blue-500/10 flex items-center justify-center shadow-sm">
-                    <Target className="h-6 w-6 text-blue-600" />
+                  <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                    <Target className="h-6 w-6 text-[#159A9C]" />
                   </div>
                 </div>
               </div>
@@ -1010,8 +1144,8 @@ const PipelinePage: React.FC = () => {
                       {formatarMoeda(estatisticas.valorTotalPipeline)}
                     </p>
                   </div>
-                  <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center shadow-sm">
-                    <DollarSign className="h-6 w-6 text-emerald-600" />
+                  <div className="h-12 w-12 rounded-2xl bg-[#0F7B7D]/10 flex items-center justify-center shadow-sm">
+                    <DollarSign className="h-6 w-6 text-[#0F7B7D]" />
                   </div>
                 </div>
               </div>
@@ -1027,8 +1161,8 @@ const PipelinePage: React.FC = () => {
                       {formatarMoeda(estatisticas.valorMedio)}
                     </p>
                   </div>
-                  <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center shadow-sm">
-                    <TrendingUp className="h-6 w-6 text-indigo-600" />
+                  <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                    <TrendingUp className="h-6 w-6 text-[#159A9C]" />
                   </div>
                 </div>
               </div>
@@ -1044,8 +1178,8 @@ const PipelinePage: React.FC = () => {
                       {estatisticas.taxaConversao.toFixed(1)}%
                     </p>
                   </div>
-                  <div className="h-12 w-12 rounded-2xl bg-amber-500/10 flex items-center justify-center shadow-sm">
-                    <Target className="h-6 w-6 text-amber-600" />
+                  <div className="h-12 w-12 rounded-2xl bg-[#002333]/10 flex items-center justify-center shadow-sm">
+                    <Target className="h-6 w-6 text-[#002333]" />
                   </div>
                 </div>
               </div>
@@ -1144,33 +1278,41 @@ const PipelinePage: React.FC = () => {
                 <Filter className="h-4 w-4" />
                 Filtros
               </button>
-              {(filtros.responsavel || filtros.busca || filtros.estagio || filtros.prioridade || filtros.origem || filtros.valorMin || filtros.valorMax) && (
-                <>
-                  <button
-                    onClick={handleLimparFiltros}
-                    className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium"
-                  >
-                    <X className="h-4 w-4" />
-                    Limpar
-                  </button>
-                  <button
-                    onClick={() => setShowModalSalvarFiltro(true)}
-                    className="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium"
-                  >
-                    <Save className="h-4 w-4" />
-                    Salvar Filtro
-                  </button>
-                </>
-              )}
+              {(filtros.responsavel ||
+                filtros.busca ||
+                filtros.estagio ||
+                filtros.prioridade ||
+                filtros.origem ||
+                filtros.valorMin ||
+                filtros.valorMax) && (
+                  <>
+                    <button
+                      onClick={handleLimparFiltros}
+                      className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium"
+                    >
+                      <X className="h-4 w-4" />
+                      Limpar
+                    </button>
+                    <button
+                      onClick={() => setShowModalSalvarFiltro(true)}
+                      className="px-4 py-2 bg-[#159A9C]/10 text-[#0F7B7D] hover:bg-[#159A9C]/20 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium"
+                    >
+                      <Save className="h-4 w-4" />
+                      Salvar Filtro
+                    </button>
+                  </>
+                )}
 
               {/* Dropdown de Filtros Salvos */}
               {filtrosSalvos.length > 0 && (
                 <div className="relative">
                   <button
-                    onClick={() => document.getElementById('dropdown-filtros')?.classList.toggle('hidden')}
+                    onClick={() =>
+                      document.getElementById('dropdown-filtros')?.classList.toggle('hidden')
+                    }
                     className={`px-4 py-2 rounded-lg border transition-colors flex items-center gap-2 text-sm font-medium ${filtroSelecionado
-                        ? 'bg-blue-50 text-blue-600 border-blue-200'
-                        : 'bg-white text-[#002333] border-[#B4BEC9] hover:bg-gray-50'
+                      ? 'bg-[#159A9C]/10 text-[#0F7B7D] border-transparent'
+                      : 'bg-white text-[#002333] border-[#B4BEC9] hover:bg-gray-50'
                       }`}
                   >
                     <Bookmark className="h-4 w-4" />
@@ -1184,7 +1326,7 @@ const PipelinePage: React.FC = () => {
                       <p className="text-xs font-semibold text-[#002333]/60 uppercase tracking-wide px-3 py-2">
                         Filtros Salvos
                       </p>
-                      {filtrosSalvos.map(filtro => (
+                      {filtrosSalvos.map((filtro) => (
                         <div
                           key={filtro.id}
                           className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 rounded-lg group"
@@ -1223,17 +1365,17 @@ const PipelinePage: React.FC = () => {
               <div className="mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Estágio */}
                 <div>
-                  <label className="block text-sm font-medium text-[#002333] mb-2">
-                    Estágio
-                  </label>
+                  <label className="block text-sm font-medium text-[#002333] mb-2">Estágio</label>
                   <select
                     value={filtros.estagio}
                     onChange={(e) => setFiltros({ ...filtros, estagio: e.target.value })}
                     className="w-full px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
                   >
                     <option value="">Todos os estágios</option>
-                    {ESTAGIOS_CONFIG.map(estagio => (
-                      <option key={estagio.id} value={estagio.id}>{estagio.nome}</option>
+                    {ESTAGIOS_CONFIG.map((estagio) => (
+                      <option key={estagio.id} value={estagio.id}>
+                        {estagio.nome}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -1257,9 +1399,7 @@ const PipelinePage: React.FC = () => {
 
                 {/* Origem */}
                 <div>
-                  <label className="block text-sm font-medium text-[#002333] mb-2">
-                    Origem
-                  </label>
+                  <label className="block text-sm font-medium text-[#002333] mb-2">Origem</label>
                   <select
                     value={filtros.origem}
                     onChange={(e) => setFiltros({ ...filtros, origem: e.target.value })}
@@ -1344,7 +1484,9 @@ const PipelinePage: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-red-900 mb-1">Erro ao Carregar Dados</h3>
+                  <h3 className="text-lg font-semibold text-red-900 mb-1">
+                    Erro ao Carregar Dados
+                  </h3>
                   <p className="text-red-800 mb-4">{error}</p>
                   <div className="flex gap-3">
                     <button
@@ -1381,18 +1523,21 @@ const PipelinePage: React.FC = () => {
                   onDrop={() => handleDrop(estagio.id)}
                 >
                   {/* Header da Coluna */}
-                  <div className={`${estagio.cor} rounded-t-lg p-4`}>
+                  <div className={`${estagio.headerClass} rounded-t-lg p-4`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className="text-2xl">
-                          {estagio.id === 'leads' ? '🎯' :
-                            estagio.id === 'qualificacao' ? '✅' :
-                              estagio.id === 'proposta' ? '📄' :
-                                estagio.id === 'negociacao' ? '🤝' : '🎉'}
+                          {estagio.id === 'leads'
+                            ? '🎯'
+                            : estagio.id === 'qualificacao'
+                              ? '✅'
+                              : estagio.id === 'proposta'
+                                ? '📄'
+                                : estagio.id === 'negociacao'
+                                  ? '🤝'
+                                  : '🎉'}
                         </span>
-                        <h3 className="font-bold text-white">
-                          {estagio.nome}
-                        </h3>
+                        <h3 className="font-bold text-white">{estagio.nome}</h3>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/25 backdrop-blur-sm text-white border border-white/30">
@@ -1417,28 +1562,52 @@ const PipelinePage: React.FC = () => {
                     {estagio.oportunidades.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-16 text-center">
                         <div className="text-6xl mb-4 opacity-20">
-                          {estagio.id === 'leads' ? '🎯' :
-                            estagio.id === 'qualificacao' ? '✅' :
-                              estagio.id === 'proposta' ? '📄' :
-                                estagio.id === 'negociacao' ? '🤝' : '🎉'}
+                          {estagio.id === 'leads'
+                            ? '🎯'
+                            : estagio.id === 'qualificacao'
+                              ? '✅'
+                              : estagio.id === 'proposta'
+                                ? '📄'
+                                : estagio.id === 'negociacao'
+                                  ? '🤝'
+                                  : '🎉'}
                         </div>
-                        <p className="text-[#002333]/40 text-sm font-medium">Nenhuma oportunidade</p>
+                        <p className="text-[#002333]/40 text-sm font-medium">
+                          Nenhuma oportunidade
+                        </p>
                         <p className="text-[#002333]/30 text-xs mt-1">Arraste cards para cá</p>
                       </div>
                     ) : (
                       estagio.oportunidades.map((oportunidade) => {
                         // Determinar cor da probabilidade (heat map)
                         const prob = oportunidade.probabilidade || 0;
-                        const probColor = prob <= 20 ? 'bg-red-100 text-red-700' :
-                          prob <= 40 ? 'bg-orange-100 text-orange-700' :
-                            prob <= 60 ? 'bg-yellow-100 text-yellow-700' :
-                              prob <= 80 ? 'bg-green-100 text-green-700' :
-                                'bg-green-200 text-green-800';
-                        const probEmoji = prob <= 20 ? '❄️' : prob <= 40 ? '🌤️' : prob <= 60 ? '☀️' : prob <= 80 ? '🔥' : '🚀';
+                        const probColor =
+                          prob <= 20
+                            ? 'bg-red-100 text-red-700'
+                            : prob <= 40
+                              ? 'bg-orange-100 text-orange-700'
+                              : prob <= 60
+                                ? 'bg-yellow-100 text-yellow-700'
+                                : prob <= 80
+                                  ? 'bg-green-100 text-green-700'
+                                  : 'bg-green-200 text-green-800';
+                        const probEmoji =
+                          prob <= 20
+                            ? '❄️'
+                            : prob <= 40
+                              ? '🌤️'
+                              : prob <= 60
+                                ? '☀️'
+                                : prob <= 80
+                                  ? '🔥'
+                                  : '🚀';
 
                         // Calcular SLA
                         const diasAteVencimento = oportunidade.dataFechamentoEsperado
-                          ? differenceInDays(new Date(oportunidade.dataFechamentoEsperado), new Date())
+                          ? differenceInDays(
+                            new Date(oportunidade.dataFechamentoEsperado),
+                            new Date(),
+                          )
                           : null;
 
                         return (
@@ -1454,16 +1623,23 @@ const PipelinePage: React.FC = () => {
                               <div className="flex items-center gap-2">
                                 {/* Avatar do responsável */}
                                 {oportunidade.responsavel && (
-                                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] flex items-center justify-center text-white text-xs font-bold shadow-sm" title={oportunidade.responsavel.nome}>
+                                  <div
+                                    className="h-8 w-8 rounded-full bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] flex items-center justify-center text-white text-xs font-bold shadow-sm"
+                                    title={oportunidade.responsavel.nome}
+                                  >
                                     {oportunidade.responsavel.nome?.charAt(0).toUpperCase() || 'U'}
                                   </div>
                                 )}
                                 {/* Badge de prioridade */}
                                 {oportunidade.prioridade === 'alta' && (
-                                  <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-semibold">Alta</span>
+                                  <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
+                                    Alta
+                                  </span>
                                 )}
                                 {oportunidade.prioridade === 'urgente' && (
-                                  <span className="px-2 py-0.5 bg-red-600 text-white rounded-full text-xs font-semibold">Urgente</span>
+                                  <span className="px-2 py-0.5 bg-red-600 text-white rounded-full text-xs font-semibold">
+                                    Urgente
+                                  </span>
                                 )}
                               </div>
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1482,7 +1658,7 @@ const PipelinePage: React.FC = () => {
                                     e.stopPropagation();
                                     handleClonarOportunidade(oportunidade);
                                   }}
-                                  className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors"
+                                  className="text-[#0F7B7D] hover:bg-[#159A9C]/10 p-1.5 rounded-lg transition-colors"
                                   title="Duplicar"
                                 >
                                   <Copy className="h-4 w-4" />
@@ -1536,8 +1712,12 @@ const PipelinePage: React.FC = () => {
 
                             {/* Badge de Probabilidade com Heat Map */}
                             <div className="flex items-center justify-between mb-3">
-                              <span className="text-xs text-[#002333]/60 font-medium">Probabilidade</span>
-                              <span className={`px-3 py-1 rounded-full text-xs font-bold ${probColor} flex items-center gap-1`}>
+                              <span className="text-xs text-[#002333]/60 font-medium">
+                                Probabilidade
+                              </span>
+                              <span
+                                className={`px-3 py-1 rounded-full text-xs font-bold ${probColor} flex items-center gap-1`}
+                              >
                                 <span>{probEmoji}</span>
                                 <span>{oportunidade.probabilidade}%</span>
                               </span>
@@ -1551,16 +1731,20 @@ const PipelinePage: React.FC = () => {
                                   e.stopPropagation();
                                   navigate(`/clientes/${oportunidade.cliente.id}`);
                                 }}
-                                className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 hover:underline mb-2 transition-colors"
+                                className="flex items-center gap-2 text-sm text-[#0F7B7D] hover:text-[#159A9C] hover:underline mb-2 transition-colors"
                               >
                                 <Users className="h-4 w-4" />
-                                <span className="truncate font-medium">{oportunidade.cliente.nome}</span>
+                                <span className="truncate font-medium">
+                                  {oportunidade.cliente.nome}
+                                </span>
                               </button>
                             ) : oportunidade.nomeContato ? (
                               // Se não tem cliente, mas tem nome de contato, mostra o contato
                               <div className="flex items-center gap-2 text-sm text-[#002333]/70 mb-2">
                                 <Users className="h-4 w-4 text-[#159A9C]" />
-                                <span className="truncate font-medium">{oportunidade.nomeContato}</span>
+                                <span className="truncate font-medium">
+                                  {oportunidade.nomeContato}
+                                </span>
                               </div>
                             ) : null}
 
@@ -1569,29 +1753,45 @@ const PipelinePage: React.FC = () => {
                               <div className="flex items-center gap-2 text-sm text-[#002333]/70">
                                 <Calendar className="h-4 w-4 text-[#159A9C]" />
                                 <span className="font-medium">
-                                  {new Date(oportunidade.dataFechamentoEsperado).toLocaleDateString('pt-BR')}
+                                  {new Date(oportunidade.dataFechamentoEsperado).toLocaleDateString(
+                                    'pt-BR',
+                                  )}
                                 </span>
                               </div>
                             )}
 
-                            {/* Tags */}
-                            {oportunidade.tags && oportunidade.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-3 pt-3 border-t border-gray-100">
-                                {oportunidade.tags.slice(0, 2).map((tag, idx) => (
-                                  <span
-                                    key={idx}
-                                    className="px-2 py-1 bg-[#159A9C]/10 text-[#159A9C] rounded-md text-xs font-semibold"
-                                  >
-                                    {tag}
-                                  </span>
-                                ))}
-                                {oportunidade.tags.length > 2 && (
-                                  <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-md text-xs font-semibold">
-                                    +{oportunidade.tags.length - 2}
-                                  </span>
-                                )}
-                              </div>
-                            )}
+                            {/* Botões de ação */}
+                            <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditarOportunidade(oportunidade);
+                                }}
+                                className="flex-1 px-3 py-2 text-sm font-medium text-[#159A9C] hover:bg-[#159A9C]/10 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                title="Editar"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                                Editar
+                              </button>
+                              <button
+                                onClick={(e) => handleGerarProposta(oportunidade, e)}
+                                className="flex-1 px-3 py-2 text-sm font-medium text-white bg-[#159A9C] hover:bg-[#0F7B7D] rounded-lg transition-colors flex items-center justify-center gap-2"
+                                title="Gerar Proposta"
+                              >
+                                <FileText className="h-4 w-4" />
+                                Proposta
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletarOportunidade(oportunidade);
+                                }}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Deletar"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
                           </div>
                         );
                       })
@@ -1642,7 +1842,9 @@ const PipelinePage: React.FC = () => {
                       >
                         <div className="flex items-center gap-2">
                           Probabilidade
-                          <span className="text-[#159A9C]">{getIconeOrdenacao('probabilidade')}</span>
+                          <span className="text-[#159A9C]">
+                            {getIconeOrdenacao('probabilidade')}
+                          </span>
                         </div>
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider">
@@ -1654,7 +1856,9 @@ const PipelinePage: React.FC = () => {
                       >
                         <div className="flex items-center gap-2">
                           Data Esperada
-                          <span className="text-[#159A9C]">{getIconeOrdenacao('dataFechamentoEsperado')}</span>
+                          <span className="text-[#159A9C]">
+                            {getIconeOrdenacao('dataFechamentoEsperado')}
+                          </span>
                         </div>
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-[#002333] uppercase tracking-wider">
@@ -1671,7 +1875,9 @@ const PipelinePage: React.FC = () => {
                       </tr>
                     ) : (
                       oportunidadesPaginadas.map((oportunidade) => {
-                        const estagioInfo = ESTAGIOS_CONFIG.find(e => e.id === oportunidade.estagio);
+                        const estagioInfo = ESTAGIOS_CONFIG.find(
+                          (e) => e.id === oportunidade.estagio,
+                        );
                         return (
                           <tr
                             key={oportunidade.id}
@@ -1689,7 +1895,9 @@ const PipelinePage: React.FC = () => {
                               )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${estagioInfo?.corTexto} ${estagioInfo?.corFundo}`}>
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${estagioInfo?.badgeTextClass} ${estagioInfo?.badgeBgClass}`}
+                              >
                                 {estagioInfo?.nome}
                               </span>
                             </td>
@@ -1704,7 +1912,9 @@ const PipelinePage: React.FC = () => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-[#002333]/60">
                               {oportunidade.dataFechamentoEsperado
-                                ? new Date(oportunidade.dataFechamentoEsperado).toLocaleDateString('pt-BR')
+                                ? new Date(oportunidade.dataFechamentoEsperado).toLocaleDateString(
+                                  'pt-BR',
+                                )
                                 : '-'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -1718,6 +1928,13 @@ const PipelinePage: React.FC = () => {
                                   title="Editar"
                                 >
                                   <Edit2 className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={(e) => handleGerarProposta(oportunidade, e)}
+                                  className="text-[#159A9C] hover:text-[#0F7B7D] transition-colors p-1"
+                                  title="Gerar Proposta"
+                                >
+                                  <FileText className="h-4 w-4" />
                                 </button>
                                 <button
                                   onClick={(e) => {
@@ -1743,11 +1960,13 @@ const PipelinePage: React.FC = () => {
               {totalPaginas > 1 && (
                 <div className="border-t px-6 py-4 flex items-center justify-between bg-gray-50">
                   <div className="text-sm text-[#002333]/60">
-                    Mostrando {indexInicio + 1} a {Math.min(indexFim, oportunidadesOrdenadas.length)} de {oportunidadesOrdenadas.length} oportunidades
+                    Mostrando {indexInicio + 1} a{' '}
+                    {Math.min(indexFim, oportunidadesOrdenadas.length)} de{' '}
+                    {oportunidadesOrdenadas.length} oportunidades
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setPaginaAtual(prev => Math.max(1, prev - 1))}
+                      onClick={() => setPaginaAtual((prev) => Math.max(1, prev - 1))}
                       disabled={paginaAtual === 1}
                       className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-[#002333] hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
@@ -1756,11 +1975,11 @@ const PipelinePage: React.FC = () => {
 
                     <div className="flex items-center gap-1">
                       {Array.from({ length: totalPaginas }, (_, i) => i + 1)
-                        .filter(page => {
+                        .filter((page) => {
                           // Mostrar apenas páginas próximas à atual
-                          return page === 1 ||
-                            page === totalPaginas ||
-                            Math.abs(page - paginaAtual) <= 1;
+                          return (
+                            page === 1 || page === totalPaginas || Math.abs(page - paginaAtual) <= 1
+                          );
                         })
                         .map((page, index, array) => {
                           // Adicionar "..." entre páginas não consecutivas
@@ -1768,9 +1987,7 @@ const PipelinePage: React.FC = () => {
 
                           return (
                             <React.Fragment key={page}>
-                              {showEllipsis && (
-                                <span className="px-2 text-[#002333]/40">...</span>
-                              )}
+                              {showEllipsis && <span className="px-2 text-[#002333]/40">...</span>}
                               <button
                                 onClick={() => setPaginaAtual(page)}
                                 className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${paginaAtual === page
@@ -1786,7 +2003,7 @@ const PipelinePage: React.FC = () => {
                     </div>
 
                     <button
-                      onClick={() => setPaginaAtual(prev => Math.min(totalPaginas, prev + 1))}
+                      onClick={() => setPaginaAtual((prev) => Math.min(totalPaginas, prev + 1))}
                       disabled={paginaAtual === totalPaginas}
                       className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-[#002333] hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
@@ -1907,14 +2124,6 @@ const PipelinePage: React.FC = () => {
                 .rbc-show-more:hover {
                   text-decoration: underline;
                 }
-                /* Cores por estágio */
-                .rbc-event.event-slate-500 { background-color: #64748b !important; }
-                .rbc-event.event-blue-500 { background-color: #3b82f6 !important; }
-                .rbc-event.event-indigo-500 { background-color: #6366f1 !important; }
-                .rbc-event.event-amber-500 { background-color: #f59e0b !important; }
-                .rbc-event.event-orange-500 { background-color: #f97316 !important; }
-                .rbc-event.event-emerald-500 { background-color: #10b981 !important; }
-                .rbc-event.event-rose-500 { background-color: #f43f5e !important; }
               `}</style>
 
               <BigCalendar
@@ -1934,7 +2143,12 @@ const PipelinePage: React.FC = () => {
                   }
                 }}
                 eventPropGetter={(event: any) => ({
-                  className: `event-${event.color}`,
+                  style: {
+                    backgroundColor: event.color,
+                    borderRadius: '4px',
+                    color: '#FFFFFF',
+                    border: 'none',
+                  },
                 })}
                 messages={{
                   today: 'Hoje',
@@ -1963,7 +2177,7 @@ const PipelinePage: React.FC = () => {
                 <div className="flex flex-wrap gap-4">
                   {ESTAGIOS_CONFIG.map((estagio) => (
                     <div key={estagio.id} className="flex items-center gap-2">
-                      <div className={`w-4 h-4 rounded ${estagio.cor}`}></div>
+                      <div className={`w-4 h-4 rounded ${estagio.legendClass}`}></div>
                       <span className="text-xs text-[#002333]">{estagio.nome}</span>
                     </div>
                   ))}
@@ -1977,7 +2191,6 @@ const PipelinePage: React.FC = () => {
             <div className="space-y-6">
               {/* Grid 2x3 de gráficos */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
                 {/* 1. Funil de Conversão */}
                 <div className="bg-white rounded-lg shadow-sm border p-6">
                   <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
@@ -2000,15 +2213,11 @@ const PipelinePage: React.FC = () => {
                           backgroundColor: '#fff',
                           border: '1px solid #E5E7EB',
                           borderRadius: '8px',
-                          fontSize: '12px'
+                          fontSize: '12px',
                         }}
                         formatter={(value: any) => [value, 'Oportunidades']}
                       />
-                      <Bar
-                        dataKey="quantidade"
-                        fill="#159A9C"
-                        radius={[8, 8, 0, 0]}
-                      />
+                      <Bar dataKey="quantidade" fill="#159A9C" radius={[8, 8, 0, 0]} />
                     </RechartsBarChart>
                   </ResponsiveContainer>
                 </div>
@@ -2038,21 +2247,17 @@ const PipelinePage: React.FC = () => {
                           backgroundColor: '#fff',
                           border: '1px solid #E5E7EB',
                           borderRadius: '8px',
-                          fontSize: '12px'
+                          fontSize: '12px',
                         }}
                         formatter={(value: any) => [
                           new Intl.NumberFormat('pt-BR', {
                             style: 'currency',
-                            currency: 'BRL'
+                            currency: 'BRL',
                           }).format(value),
-                          'Valor'
+                          'Valor',
                         ]}
                       />
-                      <Bar
-                        dataKey="valor"
-                        fill="#3b82f6"
-                        radius={[0, 8, 8, 0]}
-                      />
+                      <Bar dataKey="valor" fill="#0F7B7D" radius={[0, 8, 8, 0]} />
                     </RechartsBarChart>
                   </ResponsiveContainer>
                 </div>
@@ -2082,16 +2287,16 @@ const PipelinePage: React.FC = () => {
                           backgroundColor: '#fff',
                           border: '1px solid #E5E7EB',
                           borderRadius: '8px',
-                          fontSize: '12px'
+                          fontSize: '12px',
                         }}
                         formatter={(value: any) => [`${value}%`, 'Taxa']}
                       />
                       <Line
                         type="monotone"
                         dataKey="taxa"
-                        stroke="#10b981"
+                        stroke="#159A9C"
                         strokeWidth={3}
-                        dot={{ fill: '#10b981', r: 4 }}
+                        dot={{ fill: '#159A9C', r: 4 }}
                         activeDot={{ r: 6 }}
                       />
                     </LineChart>
@@ -2111,15 +2316,17 @@ const PipelinePage: React.FC = () => {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ nome, percent }: any) => `${nome}: ${(percent * 100).toFixed(0)}%`}
+                        label={({ nome, percent }: any) =>
+                          `${nome}: ${(percent * 100).toFixed(0)}%`
+                        }
                         outerRadius={80}
-                        fill="#8884d8"
+                        fill="#159A9C"
                         dataKey="value"
                       >
                         {dadosGraficos.origens.map((entry, index) => (
                           <Cell
                             key={`cell-${index}`}
-                            fill={Object.values(CORES_GRAFICOS)[index % Object.values(CORES_GRAFICOS).length]}
+                            fill={CORES_GRAFICOS[index % CORES_GRAFICOS.length]}
                           />
                         ))}
                       </Pie>
@@ -2128,7 +2335,7 @@ const PipelinePage: React.FC = () => {
                           backgroundColor: '#fff',
                           border: '1px solid #E5E7EB',
                           borderRadius: '8px',
-                          fontSize: '12px'
+                          fontSize: '12px',
                         }}
                       />
                     </PieChart>
@@ -2144,10 +2351,7 @@ const PipelinePage: React.FC = () => {
                   <ResponsiveContainer width="100%" height={300}>
                     <RechartsBarChart data={dadosGraficos.performance}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                      <XAxis
-                        dataKey="nome"
-                        tick={{ fontSize: 12, fill: '#002333' }}
-                      />
+                      <XAxis dataKey="nome" tick={{ fontSize: 12, fill: '#002333' }} />
                       <YAxis
                         yAxisId="left"
                         orientation="left"
@@ -2164,16 +2368,16 @@ const PipelinePage: React.FC = () => {
                           backgroundColor: '#fff',
                           border: '1px solid #E5E7EB',
                           borderRadius: '8px',
-                          fontSize: '12px'
+                          fontSize: '12px',
                         }}
                         formatter={(value: any, name: string) => {
                           if (name === 'valor') {
                             return [
                               new Intl.NumberFormat('pt-BR', {
                                 style: 'currency',
-                                currency: 'BRL'
+                                currency: 'BRL',
                               }).format(value),
-                              'Valor Total'
+                              'Valor Total',
                             ];
                           }
                           return [value, 'Quantidade'];
@@ -2197,7 +2401,6 @@ const PipelinePage: React.FC = () => {
                     </RechartsBarChart>
                   </ResponsiveContainer>
                 </div>
-
               </div>
 
               {/* Resumo Estatístico */}
@@ -2219,8 +2422,9 @@ const PipelinePage: React.FC = () => {
                     <p className="text-3xl font-bold">
                       {formatarMoeda(
                         oportunidadesFiltradas.length > 0
-                          ? calcularValorTotal(oportunidadesFiltradas) / oportunidadesFiltradas.length
-                          : 0
+                          ? calcularValorTotal(oportunidadesFiltradas) /
+                          oportunidadesFiltradas.length
+                          : 0,
                       )}
                     </p>
                   </div>
@@ -2228,9 +2432,14 @@ const PipelinePage: React.FC = () => {
                     <p className="text-white/80 text-sm mb-1">Taxa Conversão</p>
                     <p className="text-3xl font-bold">
                       {dadosGraficos.funil[0]?.quantidade > 0
-                        ? ((dadosGraficos.funil.find(f => f.nome === 'Ganho')?.quantidade || 0) /
-                          dadosGraficos.funil[0].quantidade * 100).toFixed(1)
-                        : 0}%
+                        ? (
+                          ((dadosGraficos.funil.find((f) => f.nome === 'Ganho')?.quantidade ||
+                            0) /
+                            dadosGraficos.funil[0].quantidade) *
+                          100
+                        ).toFixed(1)
+                        : 0}
+                      %
                     </p>
                   </div>
                 </div>
@@ -2279,6 +2488,22 @@ const PipelinePage: React.FC = () => {
         />
       )}
 
+      {/* ✅ Modal de Motivo de Perda */}
+      {showModalMotivoPerda && oportunidadeParaPerder && (
+        <ModalMotivoPerda
+          isOpen={showModalMotivoPerda}
+          onClose={() => {
+            setShowModalMotivoPerda(false);
+            setOportunidadeParaPerder(null);
+            setDraggedItem(null);
+          }}
+          onConfirm={handleConfirmarPerda}
+          tituloOportunidade={oportunidadeParaPerder.titulo}
+          valorOportunidade={oportunidadeParaPerder.valor}
+          loading={loadingMudancaEstagio}
+        />
+      )}
+
       {/* Modal de Detalhes */}
       <ModalDetalhesOportunidade
         oportunidade={oportunidadeDetalhes}
@@ -2302,7 +2527,8 @@ const PipelinePage: React.FC = () => {
                 Confirmar Exclusão
               </h3>
               <p className="text-center text-gray-600 mb-6">
-                Tem certeza que deseja deletar a oportunidade <strong>"{oportunidadeDeletar.titulo}"</strong>?
+                Tem certeza que deseja deletar a oportunidade{' '}
+                <strong>"{oportunidadeDeletar.titulo}"</strong>?
                 <br />
                 Esta ação não pode ser desfeita.
               </p>
@@ -2345,12 +2571,10 @@ const PipelinePage: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="p-6">
-              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 mx-auto mb-4">
-                <Bookmark className="h-6 w-6 text-blue-600" />
+              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[#159A9C]/10 mx-auto mb-4">
+                <Bookmark className="h-6 w-6 text-[#0F7B7D]" />
               </div>
-              <h3 className="text-xl font-bold text-center text-[#002333] mb-2">
-                Salvar Filtro
-              </h3>
+              <h3 className="text-xl font-bold text-center text-[#002333] mb-2">Salvar Filtro</h3>
               <p className="text-center text-gray-600 mb-6">
                 Dê um nome para este filtro para reutilizá-lo depois:
               </p>

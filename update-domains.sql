@@ -15,7 +15,7 @@ WHERE cnpj = '12.345.678/0001-99' AND nome = 'Fênix Tecnologia';
 -- 2. Atualizar usuário Administrador
 UPDATE users 
 SET 
-  email = 'admin@conectcrm.com',
+  email = 'admin@conectsuite.com.br',
   updated_at = NOW()
 WHERE email = 'admin@fenixcrm.com';
 
@@ -60,7 +60,7 @@ ORDER BY tipo, nome;
 -- ==========================================
 -- CREDENCIAIS ATUALIZADAS:
 -- ==========================================
--- Email: admin@conectcrm.com     | Senha: admin123
+-- Email: admin@conectsuite.com.br     | Senha: admin123
 -- Email: maria@conectcrm.com     | Senha: manager123  
 -- Email: joao@conectcrm.com      | Senha: vendedor123
 -- ==========================================

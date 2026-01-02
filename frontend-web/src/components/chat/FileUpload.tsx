@@ -1,8 +1,19 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { X, FileText, Image as ImageIcon, File, Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import {
+  X,
+  FileText,
+  Image as ImageIcon,
+  File,
+  Upload,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+} from 'lucide-react';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+import { API_BASE_URL } from '../../services/api';
+
+const API_URL = API_BASE_URL;
 
 interface FileUploadProps {
   ticketId: string;
@@ -34,8 +45,15 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_FILES = 5;
 const ALLOWED_TYPES = {
   imagens: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'],
-  documentos: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
-  planilhas: ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+  documentos: [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ],
+  planilhas: [
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ],
   outros: ['text/plain', 'text/csv'],
 };
 
@@ -84,43 +102,46 @@ export function FileUpload({ ticketId, onUploadSuccess }: FileUploadProps) {
     });
   };
 
-  const adicionarArquivos = useCallback(async (novosArquivos: File[]) => {
-    setErro(null);
+  const adicionarArquivos = useCallback(
+    async (novosArquivos: File[]) => {
+      setErro(null);
 
-    // Validar quantidade total
-    if (arquivos.length + novosArquivos.length > MAX_FILES) {
-      setErro(`Máximo de ${MAX_FILES} arquivos permitidos`);
-      return;
-    }
-
-    const arquivosParaAdicionar: ArquivoEmUpload[] = [];
-
-    for (const arquivo of novosArquivos) {
-      const erroValidacao = validarArquivo(arquivo);
-
-      if (erroValidacao) {
-        setErro(erroValidacao);
-        continue;
+      // Validar quantidade total
+      if (arquivos.length + novosArquivos.length > MAX_FILES) {
+        setErro(`Máximo de ${MAX_FILES} arquivos permitidos`);
+        return;
       }
 
-      const preview = await gerarPreview(arquivo);
+      const arquivosParaAdicionar: ArquivoEmUpload[] = [];
 
-      arquivosParaAdicionar.push({
-        id: `${Date.now()}-${Math.random()}`,
-        arquivo,
-        nome: arquivo.name,
-        tipo: arquivo.type,
-        tamanho: arquivo.size,
-        preview,
-        progresso: 0,
-        status: 'pending',
-      });
-    }
+      for (const arquivo of novosArquivos) {
+        const erroValidacao = validarArquivo(arquivo);
 
-    if (arquivosParaAdicionar.length > 0) {
-      setArquivos((prev) => [...prev, ...arquivosParaAdicionar]);
-    }
-  }, [arquivos.length]);
+        if (erroValidacao) {
+          setErro(erroValidacao);
+          continue;
+        }
+
+        const preview = await gerarPreview(arquivo);
+
+        arquivosParaAdicionar.push({
+          id: `${Date.now()}-${Math.random()}`,
+          arquivo,
+          nome: arquivo.name,
+          tipo: arquivo.type,
+          tamanho: arquivo.size,
+          preview,
+          progresso: 0,
+          status: 'pending',
+        });
+      }
+
+      if (arquivosParaAdicionar.length > 0) {
+        setArquivos((prev) => [...prev, ...arquivosParaAdicionar]);
+      }
+    },
+    [arquivos.length],
+  );
 
   const removerArquivo = (id: string) => {
     setArquivos((prev) => prev.filter((a) => a.id !== id));
@@ -135,8 +156,8 @@ export function FileUpload({ ticketId, onUploadSuccess }: FileUploadProps) {
     try {
       setArquivos((prev) =>
         prev.map((a) =>
-          a.id === arquivoUpload.id ? { ...a, status: 'uploading', progresso: 0 } : a
-        )
+          a.id === arquivoUpload.id ? { ...a, status: 'uploading', progresso: 0 } : a,
+        ),
       );
 
       const token = localStorage.getItem('authToken');
@@ -152,32 +173,27 @@ export function FileUpload({ ticketId, onUploadSuccess }: FileUploadProps) {
             : 0;
 
           setArquivos((prev) =>
-            prev.map((a) => (a.id === arquivoUpload.id ? { ...a, progresso } : a))
+            prev.map((a) => (a.id === arquivoUpload.id ? { ...a, progresso } : a)),
           );
         },
       });
 
       setArquivos((prev) =>
         prev.map((a) =>
-          a.id === arquivoUpload.id
-            ? { ...a, status: 'success', progresso: 100 }
-            : a
-        )
+          a.id === arquivoUpload.id ? { ...a, status: 'success', progresso: 100 } : a,
+        ),
       );
 
       return response.data;
     } catch (error: any) {
       console.error('[FileUpload] Erro ao fazer upload:', error);
 
-      const mensagemErro =
-        error.response?.data?.message || 'Erro ao fazer upload do arquivo';
+      const mensagemErro = error.response?.data?.message || 'Erro ao fazer upload do arquivo';
 
       setArquivos((prev) =>
         prev.map((a) =>
-          a.id === arquivoUpload.id
-            ? { ...a, status: 'error', erro: mensagemErro }
-            : a
-        )
+          a.id === arquivoUpload.id ? { ...a, status: 'error', erro: mensagemErro } : a,
+        ),
       );
 
       throw error;
@@ -285,8 +301,7 @@ export function FileUpload({ ticketId, onUploadSuccess }: FileUploadProps) {
           }`}
       >
         <Upload
-          className={`h-12 w-12 mx-auto mb-3 ${isDragging ? 'text-[#159A9C]' : 'text-gray-400'
-            }`}
+          className={`h-12 w-12 mx-auto mb-3 ${isDragging ? 'text-[#159A9C]' : 'text-gray-400'}`}
         />
         <p className="text-sm font-medium text-gray-700 mb-1">
           {isDragging ? 'Solte os arquivos aqui' : 'Arraste arquivos ou clique para selecionar'}
@@ -294,9 +309,7 @@ export function FileUpload({ ticketId, onUploadSuccess }: FileUploadProps) {
         <p className="text-xs text-gray-500">
           Máximo {MAX_FILES} arquivos • Até {formatarTamanho(MAX_FILE_SIZE)} cada
         </p>
-        <p className="text-xs text-gray-400 mt-1">
-          Imagens, PDFs, Word, Excel
-        </p>
+        <p className="text-xs text-gray-400 mt-1">Imagens, PDFs, Word, Excel</p>
       </div>
 
       {/* Input oculto */}
@@ -343,9 +356,7 @@ export function FileUpload({ ticketId, onUploadSuccess }: FileUploadProps) {
               {/* Info do arquivo */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {arquivo.nome}
-                  </p>
+                  <p className="text-sm font-medium text-gray-900 truncate">{arquivo.nome}</p>
                   {arquivo.status === 'success' && (
                     <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
                   )}

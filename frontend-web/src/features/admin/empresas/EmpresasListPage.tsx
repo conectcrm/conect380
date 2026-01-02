@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 import { EmpresaCard } from '../components/EmpresaCard';
@@ -6,6 +6,8 @@ import { EmpresaFilters } from '../components/EmpresaFilters';
 import { EmpresaMetrics } from '../components/EmpresaMetrics';
 import { ModalCadastroEmpresa } from '../components/ModalCadastroEmpresa';
 import { useNotifications } from '../../../contexts/NotificationContext';
+import * as adminEmpresasService from '../../../services/adminEmpresasService';
+import type { EmpresaAdmin, FilterEmpresasParams } from '../../../services/adminEmpresasService';
 import {
   Building2,
   Plus,
@@ -15,7 +17,9 @@ import {
   Settings,
   Users,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  RefreshCw,
+  BarChart,
 } from 'lucide-react';
 
 interface Empresa {
@@ -35,9 +39,10 @@ interface Empresa {
 export const EmpresasListPage: React.FC = () => {
   const navigate = useNavigate();
   const { addNotification } = useNotifications();
-  
+
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showModalCadastro, setShowModalCadastro] = useState(false);
@@ -46,76 +51,98 @@ export const EmpresasListPage: React.FC = () => {
     status: '',
     plano: '',
     dataInicio: '',
-    dataFim: ''
+    dataFim: '',
+  });
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
   });
 
-  // Dados mock para demonstração
-  useEffect(() => {
-    const mockEmpresas: Empresa[] = [
-      {
-        id: '1',
-        nome: 'TechCorp Solutions',
-        cnpj: '12.345.678/0001-99',
-        email: 'contato@techcorp.com',
-        plano: 'professional',
-        status: 'ativa',
-        usuariosAtivos: 8,
-        clientesCadastrados: 1250,
-        ultimoAcesso: new Date('2025-07-23T10:30:00'),
-        dataExpiracao: new Date('2025-12-15'),
-        valorMensal: 299
-      },
-      {
-        id: '2',
-        nome: 'StartupXYZ',
-        cnpj: '98.765.432/0001-11',
-        email: 'admin@startupxyz.com',
-        plano: 'starter',
-        status: 'trial',
-        usuariosAtivos: 2,
-        clientesCadastrados: 45,
-        ultimoAcesso: new Date('2025-07-22T16:45:00'),
-        dataExpiracao: new Date('2025-08-05'),
-        valorMensal: 0
-      },
-      {
-        id: '3',
-        nome: 'Enterprise Corp',
-        cnpj: '11.222.333/0001-44',
-        email: 'sistemas@enterprise.com.br',
-        plano: 'enterprise',
-        status: 'ativa',
-        usuariosAtivos: 25,
-        clientesCadastrados: 5680,
-        ultimoAcesso: new Date('2025-07-23T08:15:00'),
-        dataExpiracao: new Date('2026-01-20'),
-        valorMensal: 899
-      }
-    ];
+  // Mapear dados da API para formato do componente
+  const mapEmpresaApiToLocal = (empresaApi: EmpresaAdmin): Empresa => {
+    return {
+      id: empresaApi.id,
+      nome: empresaApi.nome,
+      cnpj: empresaApi.cnpj,
+      email: empresaApi.email,
+      plano: empresaApi.plano.toLowerCase() as 'starter' | 'professional' | 'enterprise',
+      status: mapStatusApiToLocal(empresaApi.status),
+      usuariosAtivos: empresaApi.usuarios_ativos || 0,
+      clientesCadastrados: empresaApi.uso_mensal?.clientes || 0,
+      ultimoAcesso: empresaApi.ultimo_acesso ? new Date(empresaApi.ultimo_acesso) : new Date(),
+      dataExpiracao: empresaApi.trial_end_date ? new Date(empresaApi.trial_end_date) : new Date(),
+      valorMensal: Number(empresaApi.valor_mensal) || 0,
+    };
+  };
 
-    setTimeout(() => {
-      setEmpresas(mockEmpresas);
-      setLoading(false);
-      
+  const mapStatusApiToLocal = (status: string): 'ativa' | 'trial' | 'suspensa' | 'inativa' => {
+    const statusMap: Record<string, 'ativa' | 'trial' | 'suspensa' | 'inativa'> = {
+      active: 'ativa',
+      trial: 'trial',
+      suspended: 'suspensa',
+      cancelled: 'inativa',
+      past_due: 'inativa',
+    };
+    return statusMap[status] || 'inativa';
+  };
+
+  // Carregar empresas da API
+  const carregarEmpresas = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const params: FilterEmpresasParams = {
+        search: searchTerm || undefined,
+        status: filters.status || undefined,
+        plano: filters.plano || undefined,
+        page: pagination.page,
+        limit: pagination.limit,
+        sortBy: 'created_at',
+        sortOrder: 'DESC',
+      };
+
+      const response = await adminEmpresasService.listar(params);
+
+      const empresasMapeadas = response.data.map(mapEmpresaApiToLocal);
+      setEmpresas(empresasMapeadas);
+      setPagination({
+        ...pagination,
+        total: response.meta.total,
+        totalPages: response.meta.totalPages,
+      });
+
       addNotification({
         title: '🏢 Empresas Carregadas',
-        message: `${mockEmpresas.length} empresas encontradas`,
+        message: `${response.meta.total} empresa(s) encontrada(s)`,
         type: 'info',
-        priority: 'low'
+        priority: 'low',
       });
-    }, 1000);
-  }, [addNotification]);
+    } catch (err: unknown) {
+      console.error('Erro ao carregar empresas:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao carregar empresas';
+      setError(errorMessage);
 
-  const filteredEmpresas = empresas.filter(empresa => {
-    const matchesSearch = empresa.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         empresa.cnpj.includes(searchTerm) ||
-                         empresa.email.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = !filters.status || empresa.status === filters.status;
-    const matchesPlano = !filters.plano || empresa.plano === filters.plano;
-    
-    return matchesSearch && matchesStatus && matchesPlano;
-  });
+      addNotification({
+        title: '❌ Erro ao Carregar',
+        message: errorMessage,
+        type: 'error',
+        priority: 'high',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [searchTerm, filters, pagination.page, pagination.limit, addNotification]);
+
+  // Carregar empresas ao montar e quando filtros mudarem
+  useEffect(() => {
+    carregarEmpresas();
+  }, [carregarEmpresas]);
+
+  // Filtros já aplicados na API, mas mantemos para compatibilidade
+  const filteredEmpresas = empresas;
 
   const handleNovaEmpresa = () => {
     setEmpresaEditando(null);
@@ -131,54 +158,60 @@ export const EmpresasListPage: React.FC = () => {
     try {
       if (empresaEditando) {
         // Atualizar empresa existente
-        setEmpresas(empresas.map(emp => 
-          emp.id === empresaEditando.id 
-            ? { ...emp, ...dadosEmpresa }
-            : emp
-        ));
-        
+        await adminEmpresasService.atualizar(empresaEditando.id, {
+          nome: dadosEmpresa.nome,
+          status: dadosEmpresa.status,
+          valor_mensal: dadosEmpresa.valorMensal,
+          notas_internas: dadosEmpresa.notasInternas,
+        });
+
         addNotification({
           title: '✅ Empresa Atualizada',
           message: `${dadosEmpresa.nome} foi atualizada com sucesso`,
           type: 'success',
           priority: 'medium',
-          entityType: 'cliente'
+          entityType: 'cliente',
         });
+
+        // Recarregar lista
+        await carregarEmpresas();
       } else {
         // Criar nova empresa
-        const novaEmpresa: Empresa = {
-          id: Date.now().toString(),
+        await adminEmpresasService.criar({
           nome: dadosEmpresa.nome,
           cnpj: dadosEmpresa.cnpj,
           email: dadosEmpresa.email,
-          plano: dadosEmpresa.plano,
-          status: dadosEmpresa.status,
-          usuariosAtivos: 1,
-          clientesCadastrados: 0,
-          ultimoAcesso: new Date(),
-          dataExpiracao: new Date(dadosEmpresa.dataFimContrato),
-          valorMensal: dadosEmpresa.valorMensal
-        };
-        
-        setEmpresas([novaEmpresa, ...empresas]);
-        
+          telefone: dadosEmpresa.telefone,
+          plano: dadosEmpresa.plano.toUpperCase(),
+          trial_dias: 14,
+          admin_nome: dadosEmpresa.adminNome,
+          admin_email: dadosEmpresa.adminEmail,
+          admin_senha: dadosEmpresa.adminSenha,
+        });
+
         addNotification({
           title: '🎉 Nova Empresa Cadastrada',
           message: `${dadosEmpresa.nome} foi cadastrada com sucesso`,
           type: 'success',
           priority: 'medium',
-          entityType: 'cliente'
+          entityType: 'cliente',
         });
+
+        // Recarregar lista
+        await carregarEmpresas();
       }
-      
+
       setShowModalCadastro(false);
-    } catch (error) {
+    } catch (err: unknown) {
+      console.error('Erro ao salvar empresa:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Não foi possível salvar a empresa';
+
       addNotification({
         title: '❌ Erro ao Salvar',
-        message: 'Não foi possível salvar a empresa. Tente novamente.',
+        message: errorMessage,
         type: 'error',
         priority: 'high',
-        entityType: 'cliente'
+        entityType: 'cliente',
       });
     }
   };
@@ -188,18 +221,21 @@ export const EmpresasListPage: React.FC = () => {
       status: '',
       plano: '',
       dataInicio: '',
-      dataFim: ''
+      dataFim: '',
     });
+    setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
   const handleEmpresaClick = (empresaId: string) => {
-    const empresa = empresas.find(emp => emp.id === empresaId);
-    if (empresa) {
-      handleEditarEmpresa(empresa);
-    }
+    // Navegar para página de detalhes
+    navigate(`/admin/empresas/${empresaId}`);
   };
 
-  if (loading) {
+  const handleRefresh = () => {
+    carregarEmpresas();
+  };
+
+  if (loading && empresas.length === 0) {
     return (
       <div className="h-full flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -210,112 +246,182 @@ export const EmpresasListPage: React.FC = () => {
     );
   }
 
+  if (error && empresas.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Erro ao Carregar Empresas</h3>
+          <p className="text-gray-500 mb-6">{error}</p>
+          <button
+            onClick={handleRefresh}
+            className="bg-[#159A9C] text-white px-6 py-3 rounded-lg hover:bg-[#138A8C] transition-colors flex items-center space-x-2 mx-auto"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Tentar Novamente</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      {/* Header */}
+    <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b px-6 py-4">
         <BackToNucleus
           nucleusName="Gestão"
           nucleusPath="/nuclei/gestao"
           currentModuleName="Gestão de Empresas"
         />
-        
-        <div className="flex items-center justify-between mt-4">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Building2 className="w-6 h-6 text-[#159A9C]" />
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`
-                px-3 py-2 rounded-lg border transition-colors flex items-center space-x-2
-                ${showFilters 
-                  ? 'bg-[#159A9C] text-white border-[#159A9C]' 
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                }
-              `}
-            >
-              <Filter className="w-4 h-4" />
-              <span>Filtros</span>
-            </button>
-
-            <button
-              onClick={handleNovaEmpresa}
-              className="bg-[#159A9C] text-white px-4 py-2 rounded-lg hover:bg-[#138A8C] transition-colors flex items-center space-x-2"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Nova Empresa</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Search Bar */}
-        <div className="mt-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Buscar por nome, CNPJ ou email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-            />
-          </div>
-        </div>
-
-        {/* Filtros */}
-        {showFilters && (
-          <EmpresaFilters
-            filters={filters}
-            onFiltersChange={setFilters}
-            onReset={resetFilters}
-          />
-        )}
       </div>
 
-      {/* Métricas */}
-      <EmpresaMetrics empresas={empresas} />
+      <div className="p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-xl bg-[#159A9C]/10 flex items-center justify-center">
+                  <Building2 className="w-6 h-6 text-[#159A9C]" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-[#002333]">Gestão de Empresas</h1>
+                  <p className="text-sm text-[#B4BEC9]">Cadastre, edite e acompanhe empresas do ambiente.</p>
+                </div>
+              </div>
 
-      {/* Conteúdo Principal */}
-      <div className="flex-1 overflow-auto p-6">
-        {filteredEmpresas.length === 0 ? (
-          <div className="text-center py-12">
-            <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Nenhuma empresa encontrada
-            </h3>
-            <p className="text-gray-500 mb-6">
-              {searchTerm || Object.values(filters).some(f => f) 
-                ? 'Tente ajustar os filtros de busca' 
-                : 'Não há empresas cadastradas no sistema'
-              }
-            </p>
-            {!searchTerm && !Object.values(filters).some(f => f) && (
-              <button
-                onClick={handleNovaEmpresa}
-                className="bg-[#159A9C] text-white px-6 py-3 rounded-lg hover:bg-[#138A8C] transition-colors"
-              >
-                Cadastrar Primeira Empresa
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-end">
+                <button
+                  onClick={() => navigate('/admin/console')}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-white border-2 border-[#159A9C] text-[#159A9C] rounded-lg hover:bg-[#159A9C]/5 transition-colors text-sm font-medium"
+                  title="Ver métricas executivas e alertas do sistema"
+                >
+                  <BarChart className="h-4 w-4" />
+                  Dashboard Executivo
+                </button>
+
+                <button
+                  onClick={handleRefresh}
+                  disabled={loading}
+                  className="px-3 py-2 rounded-lg border bg-white text-gray-700 border-gray-300 hover:bg-gray-50 transition-colors flex items-center space-x-2 disabled:opacity-50"
+                  title="Atualizar lista"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  <span>Atualizar</span>
+                </button>
+
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`
+                    px-3 py-2 rounded-lg border transition-colors flex items-center space-x-2
+                    ${showFilters
+                      ? 'bg-[#159A9C] text-white border-[#159A9C]'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }
+                  `}
+                >
+                  <Filter className="w-4 h-4" />
+                  <span>Filtros</span>
+                </button>
+
+                <button
+                  onClick={handleNovaEmpresa}
+                  className="bg-[#159A9C] text-white px-4 py-2 rounded-lg hover:bg-[#138A8C] transition-colors flex items-center space-x-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Nova Empresa</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nome, CNPJ ou email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {showFilters && (
+              <div className="mt-4">
+                <EmpresaFilters filters={filters} onFiltersChange={setFilters} onReset={resetFilters} />
+              </div>
             )}
           </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {filteredEmpresas.map(empresa => (
-              <EmpresaCard
-                key={empresa.id}
-                empresa={empresa}
-                onClick={() => handleEmpresaClick(empresa.id)}
-              />
-            ))}
+
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <EmpresaMetrics empresas={empresas} />
           </div>
-        )}
+
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            {filteredEmpresas.length === 0 ? (
+              <div className="text-center py-12">
+                <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma empresa encontrada</h3>
+                <p className="text-gray-500 mb-6">
+                  {searchTerm || Object.values(filters).some((f) => f)
+                    ? 'Tente ajustar os filtros de busca'
+                    : 'Não há empresas cadastradas no sistema'}
+                </p>
+                {!searchTerm && !Object.values(filters).some((f) => f) && (
+                  <button
+                    onClick={handleNovaEmpresa}
+                    className="bg-[#159A9C] text-white px-6 py-3 rounded-lg hover:bg-[#138A8C] transition-colors"
+                  >
+                    Cadastrar Primeira Empresa
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {filteredEmpresas.map((empresa) => (
+                    <EmpresaCard
+                      key={empresa.id}
+                      empresa={empresa}
+                      onClick={() => handleEmpresaClick(empresa.id)}
+                    />
+                  ))}
+                </div>
+
+                {pagination.totalPages > 1 && (
+                  <div className="mt-6 flex items-center justify-between border-t pt-4">
+                    <div className="text-sm text-gray-600">
+                      Mostrando {(pagination.page - 1) * pagination.limit + 1} a{' '}
+                      {Math.min(pagination.page * pagination.limit, pagination.total)} de{' '}
+                      {pagination.total} empresa(s)
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setPagination((prev) => ({ ...prev, page: prev.page - 1 }))}
+                        disabled={pagination.page === 1 || loading}
+                        className="px-3 py-2 border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Anterior
+                      </button>
+                      <span className="px-4 py-2 text-sm">
+                        Página {pagination.page} de {pagination.totalPages}
+                      </span>
+                      <button
+                        onClick={() => setPagination((prev) => ({ ...prev, page: prev.page + 1 }))}
+                        disabled={pagination.page === pagination.totalPages || loading}
+                        className="px-3 py-2 border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Próxima
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Modal de Cadastro/Edição */}
       <ModalCadastroEmpresa
         isOpen={showModalCadastro}
         onClose={() => setShowModalCadastro(false)}

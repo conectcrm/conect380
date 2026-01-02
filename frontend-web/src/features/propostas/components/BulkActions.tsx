@@ -10,7 +10,7 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
-  Loader
+  Loader,
 } from 'lucide-react';
 
 interface BulkActionsProps {
@@ -22,7 +22,7 @@ interface BulkActionsProps {
 export const BulkActions: React.FC<BulkActionsProps> = ({
   selectedIds,
   onAction,
-  onClearSelection
+  onClearSelection,
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState<{
@@ -81,7 +81,7 @@ export const BulkActions: React.FC<BulkActionsProps> = ({
       action: 'delete',
       title: 'Confirmar Exclusão',
       message: `Tem certeza que deseja excluir ${selectedIds.length} proposta(s)? Esta ação não pode ser desfeita.`,
-      onConfirm: handleDelete
+      onConfirm: handleDelete,
     });
   };
 
@@ -90,7 +90,7 @@ export const BulkActions: React.FC<BulkActionsProps> = ({
       action: 'email',
       title: 'Enviar Por Email',
       message: `Deseja enviar ${selectedIds.length} proposta(s) por email para os respectivos clientes?`,
-      onConfirm: handleSendEmail
+      onConfirm: handleSendEmail,
     });
   };
 
@@ -131,11 +131,7 @@ export const BulkActions: React.FC<BulkActionsProps> = ({
               className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-400 transition-colors duration-200"
               title="Rejeitar selecionadas"
             >
-              {isLoading ? (
-                <Loader className="h-4 w-4 animate-spin" />
-              ) : (
-                <X className="h-4 w-4" />
-              )}
+              {isLoading ? <Loader className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
             </button>
 
             {/* Ação: Enviar */}
@@ -205,14 +201,10 @@ export const BulkActions: React.FC<BulkActionsProps> = ({
               ) : (
                 <Mail className="h-6 w-6 text-blue-500 mr-3" />
               )}
-              <h3 className="text-lg font-medium text-gray-900">
-                {showConfirmDialog.title}
-              </h3>
+              <h3 className="text-lg font-medium text-gray-900">{showConfirmDialog.title}</h3>
             </div>
 
-            <p className="text-gray-600 mb-6">
-              {showConfirmDialog.message}
-            </p>
+            <p className="text-gray-600 mb-6">{showConfirmDialog.message}</p>
 
             <div className="flex justify-end space-x-3">
               <button
@@ -225,10 +217,11 @@ export const BulkActions: React.FC<BulkActionsProps> = ({
               <button
                 onClick={showConfirmDialog.onConfirm}
                 disabled={isLoading}
-                className={`px-4 py-2 rounded-md text-white transition-colors duration-200 ${showConfirmDialog.action === 'delete'
+                className={`px-4 py-2 rounded-md text-white transition-colors duration-200 ${
+                  showConfirmDialog.action === 'delete'
                     ? 'bg-red-600 hover:bg-red-700 disabled:bg-red-400'
                     : 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400'
-                  }`}
+                }`}
               >
                 {isLoading ? (
                   <div className="flex items-center">

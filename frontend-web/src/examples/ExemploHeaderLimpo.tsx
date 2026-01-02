@@ -5,7 +5,7 @@ import { ModalCadastroProduto } from './ModalCadastroProduto';
 
 /**
  * Exemplo de Página com Header Limpo
- * 
+ *
  * Demonstra como o header focado em funcionalidades essenciais
  * não compete com o conteúdo da página, criando uma experiência
  * mais limpa e focada.
@@ -16,7 +16,7 @@ export const ExemploHeaderLimpo: React.FC = () => {
 
   const handleSaveProduto = async (data: any) => {
     // Simular salvamento
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise((resolve) => setTimeout(resolve, 1500));
     console.log('Produto salvo:', data);
   };
 
@@ -28,13 +28,12 @@ export const ExemploHeaderLimpo: React.FC = () => {
 
   return (
     <div className={`min-h-screen ${isDarkMode ? 'dark bg-gray-900' : 'bg-gray-50'}`}>
-      
       {/* Header Limpo - Sem Logo, Funcional */}
-      <HeaderLimpo 
+      <HeaderLimpo
         userInfo={{
           name: 'João Silva',
           role: 'Administrador',
-          email: 'joao.silva@fenixcrm.com'
+          email: 'joao.silva@fenixcrm.com',
         }}
         onThemeToggle={handleThemeToggle}
         isDarkMode={isDarkMode}
@@ -42,7 +41,6 @@ export const ExemploHeaderLimpo: React.FC = () => {
 
       {/* Layout Principal com Sidebar Simulada */}
       <div className="flex">
-        
         {/* Sidebar Simulada (onde ficaria a logo) */}
         <aside className="w-64 bg-white border-r border-gray-200 h-screen sticky top-14 hidden lg:block">
           <div className="p-6">
@@ -59,22 +57,40 @@ export const ExemploHeaderLimpo: React.FC = () => {
 
             {/* Menu de Navegação */}
             <nav className="space-y-1">
-              <a href="#" className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-900 bg-blue-50 border-r-2 border-blue-600 rounded-l">
+              <a
+                href="#"
+                className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-900 bg-blue-50 border-r-2 border-blue-600 rounded-l"
+              >
                 📊 Dashboard
               </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded">
+              <a
+                href="#"
+                className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded"
+              >
                 👥 Clientes
               </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded">
+              <a
+                href="#"
+                className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded"
+              >
                 📦 Produtos
               </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded">
+              <a
+                href="#"
+                className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded"
+              >
                 📋 Propostas
               </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded">
+              <a
+                href="#"
+                className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded"
+              >
                 💰 Financeiro
               </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded">
+              <a
+                href="#"
+                className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded"
+              >
                 📈 Relatórios
               </a>
             </nav>
@@ -84,19 +100,16 @@ export const ExemploHeaderLimpo: React.FC = () => {
         {/* Conteúdo Principal */}
         <main className="flex-1 lg:ml-0">
           <div className="max-w-7xl mx-auto px-6 py-8">
-            
             {/* Cabeçalho da Página - Aqui que fica o contexto */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">
-                    Dashboard de Vendas
-                  </h1>
+                  <h1 className="text-3xl font-bold text-gray-900">Dashboard de Vendas</h1>
                   <p className="text-gray-600 mt-2">
                     Acompanhe suas métricas e performance em tempo real
                   </p>
                 </div>
-                
+
                 <div className="flex items-center gap-3">
                   <button className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                     <Filter className="w-4 h-4" />
@@ -183,18 +196,15 @@ export const ExemploHeaderLimpo: React.FC = () => {
 
             {/* Área de Conteúdo Principal */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              
               {/* Gráfico Principal */}
               <div className="lg:col-span-2 bg-white rounded-lg border border-gray-200 p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    Vendas por Período
-                  </h2>
+                  <h2 className="text-lg font-semibold text-gray-900">Vendas por Período</h2>
                   <button className="p-2 hover:bg-gray-100 rounded-lg">
                     <MoreHorizontal className="w-4 h-4 text-gray-500" />
                   </button>
                 </div>
-                
+
                 {/* Simulação de Gráfico */}
                 <div className="h-80 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg flex items-center justify-center">
                   <div className="text-center">
@@ -206,22 +216,16 @@ export const ExemploHeaderLimpo: React.FC = () => {
 
               {/* Atividades Recentes */}
               <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-6">
-                  Atividades Recentes
-                </h2>
-                
+                <h2 className="text-lg font-semibold text-gray-900 mb-6">Atividades Recentes</h2>
+
                 <div className="space-y-4">
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                       <span className="text-sm">✓</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">
-                        Proposta aprovada
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Cliente ABC aprovou proposta #1234
-                      </p>
+                      <p className="text-sm font-medium text-gray-900">Proposta aprovada</p>
+                      <p className="text-sm text-gray-600">Cliente ABC aprovou proposta #1234</p>
                       <p className="text-xs text-gray-500 mt-1">há 2 horas</p>
                     </div>
                   </div>
@@ -231,12 +235,8 @@ export const ExemploHeaderLimpo: React.FC = () => {
                       <span className="text-sm">👤</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">
-                        Novo lead
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Maria Santos se cadastrou no site
-                      </p>
+                      <p className="text-sm font-medium text-gray-900">Novo lead</p>
+                      <p className="text-sm text-gray-600">Maria Santos se cadastrou no site</p>
                       <p className="text-xs text-gray-500 mt-1">há 5 horas</p>
                     </div>
                   </div>
@@ -246,12 +246,8 @@ export const ExemploHeaderLimpo: React.FC = () => {
                       <span className="text-sm">📝</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">
-                        Reunião agendada
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Follow-up com cliente XYZ
-                      </p>
+                      <p className="text-sm font-medium text-gray-900">Reunião agendada</p>
+                      <p className="text-sm text-gray-600">Follow-up com cliente XYZ</p>
                       <p className="text-xs text-gray-500 mt-1">amanhã às 14h</p>
                     </div>
                   </div>

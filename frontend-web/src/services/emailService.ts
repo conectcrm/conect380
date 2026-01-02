@@ -1,3 +1,5 @@
+import { API_BASE_URL } from './api';
+
 /**
  * Serviço de Envio de Emails
  * Responsável por enviar propostas, contratos e notificações
@@ -39,8 +41,7 @@ export interface EmailLog {
 }
 
 class EmailService {
-  private readonly API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-  private readonly baseUrl = `${this.API_URL}/email`;
+  private readonly baseUrl = `${API_BASE_URL}/email`;
 
   // Templates predefinidos
   private templates: EmailTemplate[] = [
@@ -68,7 +69,18 @@ class EmailService {
         {{emailVendedor}}
         {{telefoneVendedor}}
       `,
-      variaveis: ['nomeCliente', 'numeroProposta', 'nomeEmpresa', 'valorTotal', 'validadeDias', 'prazoEntrega', 'linkAceite', 'nomeVendedor', 'emailVendedor', 'telefoneVendedor']
+      variaveis: [
+        'nomeCliente',
+        'numeroProposta',
+        'nomeEmpresa',
+        'valorTotal',
+        'validadeDias',
+        'prazoEntrega',
+        'linkAceite',
+        'nomeVendedor',
+        'emailVendedor',
+        'telefoneVendedor',
+      ],
     },
     {
       id: 'proposta-aprovada',
@@ -89,7 +101,7 @@ class EmailService {
         Atenciosamente,
         {{nomeVendedor}}
       `,
-      variaveis: ['nomeCliente', 'numeroProposta', 'nomeVendedor']
+      variaveis: ['nomeCliente', 'numeroProposta', 'nomeVendedor'],
     },
     {
       id: 'contrato-envio',
@@ -110,8 +122,14 @@ class EmailService {
         Atenciosamente,
         {{nomeVendedor}}
       `,
-      variaveis: ['nomeCliente', 'numeroContrato', 'linkAssinatura', 'prazoAssinatura', 'nomeVendedor']
-    }
+      variaveis: [
+        'nomeCliente',
+        'numeroContrato',
+        'linkAssinatura',
+        'prazoAssinatura',
+        'nomeVendedor',
+      ],
+    },
   ];
 
   async enviarEmail(email: EmailEnvio): Promise<{ id: string; status: string }> {
@@ -122,7 +140,7 @@ class EmailService {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(email)
+        body: JSON.stringify(email),
       });
 
       if (!response.ok) {
@@ -139,32 +157,36 @@ class EmailService {
   }
 
   async enviarProposta(propostaId: string, dadosProposta: any, anexoPdf: string): Promise<void> {
-    const template = this.templates.find(t => t.id === 'proposta-envio')!;
+    const template = this.templates.find((t) => t.id === 'proposta-envio')!;
 
     const variaveis = {
       nomeCliente: dadosProposta.cliente.nome,
       numeroProposta: dadosProposta.numeroProposta,
       nomeEmpresa: dadosProposta.empresa.nome,
-      valorTotal: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dadosProposta.valorTotal),
+      valorTotal: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+        dadosProposta.valorTotal,
+      ),
       validadeDias: dadosProposta.validadeDias || 30,
       prazoEntrega: dadosProposta.prazoEntrega || '30 dias úteis',
       linkAceite: `${window.location.origin}/proposta/aceite/${propostaId}`,
       nomeVendedor: dadosProposta.vendedor.nome,
       emailVendedor: dadosProposta.vendedor.email,
-      telefoneVendedor: dadosProposta.vendedor.telefone || ''
+      telefoneVendedor: dadosProposta.vendedor.telefone || '',
     };
 
     const email: EmailEnvio = {
       para: [dadosProposta.cliente.email],
       assunto: this.processarTemplate(template.assunto, variaveis),
       corpo: this.processarTemplate(template.corpo, variaveis),
-      anexos: [{
-        nome: `Proposta_${dadosProposta.numeroProposta}.pdf`,
-        tipo: 'application/pdf',
-        dados: anexoPdf
-      }],
+      anexos: [
+        {
+          nome: `Proposta_${dadosProposta.numeroProposta}.pdf`,
+          tipo: 'application/pdf',
+          dados: anexoPdf,
+        },
+      ],
       templateId: template.id,
-      variaveis
+      variaveis,
     };
 
     await this.enviarEmail(email);
@@ -176,32 +198,38 @@ class EmailService {
       assunto: email.assunto,
       status: 'enviado',
       dataEnvio: new Date(),
-      propostaId
+      propostaId,
     });
   }
 
-  async enviarContratoAssinatura(contratoId: string, dadosContrato: any, anexoPdf: string): Promise<void> {
-    const template = this.templates.find(t => t.id === 'contrato-envio')!;
+  async enviarContratoAssinatura(
+    contratoId: string,
+    dadosContrato: any,
+    anexoPdf: string,
+  ): Promise<void> {
+    const template = this.templates.find((t) => t.id === 'contrato-envio')!;
 
     const variaveis = {
       nomeCliente: dadosContrato.cliente.nome,
       numeroContrato: dadosContrato.numeroContrato,
       linkAssinatura: `${window.location.origin}/contrato/assinatura/${contratoId}`,
       prazoAssinatura: 15,
-      nomeVendedor: dadosContrato.vendedor.nome
+      nomeVendedor: dadosContrato.vendedor.nome,
     };
 
     const email: EmailEnvio = {
       para: [dadosContrato.cliente.email],
       assunto: this.processarTemplate(template.assunto, variaveis),
       corpo: this.processarTemplate(template.corpo, variaveis),
-      anexos: [{
-        nome: `Contrato_${dadosContrato.numeroContrato}.pdf`,
-        tipo: 'application/pdf',
-        dados: anexoPdf
-      }],
+      anexos: [
+        {
+          nome: `Contrato_${dadosContrato.numeroContrato}.pdf`,
+          tipo: 'application/pdf',
+          dados: anexoPdf,
+        },
+      ],
       templateId: template.id,
-      variaveis
+      variaveis,
     };
 
     await this.enviarEmail(email);
@@ -212,33 +240,32 @@ class EmailService {
       assunto: email.assunto,
       status: 'enviado',
       dataEnvio: new Date(),
-      contratoId
+      contratoId,
     });
   }
 
   async notificarAprovacaoProposta(propostaId: string, dadosProposta: any): Promise<void> {
     console.log('🔍 INÍCIO: notificarAprovacaoProposta', { propostaId, dadosProposta });
-    
+
     try {
       console.log('📧 Enviando notificação de aprovação via backend integrado...');
-      
+
       // Tentar usar o backend integrado primeiro
-      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-      console.log('🌐 API_URL configurada:', API_URL);
-      
+      console.log('🌐 API_URL configurada:', API_BASE_URL);
+
       const payload = {
         numero: dadosProposta.numeroProposta || dadosProposta.numero || propostaId,
         titulo: dadosProposta.titulo || `Proposta ${propostaId}`,
         cliente: dadosProposta.cliente?.nome || dadosProposta.cliente || 'Cliente',
         valor: dadosProposta.valor || dadosProposta.valorTotal || 0,
         status: 'aprovada',
-        dataAceite: new Date().toISOString()
+        dataAceite: new Date().toISOString(),
       };
-      
+
       console.log('📦 Payload a ser enviado:', payload);
-      console.log('🎯 URL da requisição:', `${API_URL}/email/notificar-aceite`);
-      
-      const response = await fetch(`${API_URL}/email/notificar-aceite`, {
+      console.log('🎯 URL da requisição:', `${API_BASE_URL}/email/notificar-aceite`);
+
+      const response = await fetch(`${API_BASE_URL}/email/notificar-aceite`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -250,7 +277,7 @@ class EmailService {
         status: response.status,
         statusText: response.statusText,
         ok: response.ok,
-        url: response.url
+        url: response.url,
       });
 
       if (response.ok) {
@@ -262,40 +289,39 @@ class EmailService {
         console.warn('⚠️ Backend integrado falhou:', {
           status: response.status,
           statusText: response.statusText,
-          error: errorText
+          error: errorText,
         });
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
-      
     } catch (error) {
       console.error('❌ ERRO DETALHADO na notificação:', {
         name: error.name,
         message: error.message,
         stack: error.stack,
-        cause: error.cause
+        cause: error.cause,
       });
-      
+
       // Se for um erro de rede específico, logar mais detalhes
       if (error.message === 'Failed to fetch') {
         console.error('🔥 FAILED TO FETCH DETECTADO:', {
-          'API_URL': process.env.REACT_APP_API_URL || 'http://localhost:3001',
-          'Browser': navigator.userAgent,
-          'Online': navigator.onLine,
-          'Location': window.location.href,
-          'Timestamp': new Date().toISOString()
+          API_URL: API_BASE_URL,
+          Browser: navigator.userAgent,
+          Online: navigator.onLine,
+          Location: window.location.href,
+          Timestamp: new Date().toISOString(),
         });
       }
-      
+
       console.warn('⚠️ Erro no backend integrado, usando método original:', error);
     }
 
     // Fallback para método original
-    const template = this.templates.find(t => t.id === 'proposta-aprovada')!;
+    const template = this.templates.find((t) => t.id === 'proposta-aprovada')!;
 
     const variaveis = {
       nomeCliente: dadosProposta.cliente?.nome || dadosProposta.cliente || 'Cliente',
       numeroProposta: dadosProposta.numeroProposta || dadosProposta.numero || propostaId,
-      nomeVendedor: dadosProposta.vendedor?.nome || 'Equipe ConectCRM'
+      nomeVendedor: dadosProposta.vendedor?.nome || 'Equipe ConectCRM',
     };
 
     const email: EmailEnvio = {
@@ -304,13 +330,16 @@ class EmailService {
       assunto: this.processarTemplate(template.assunto, variaveis),
       corpo: this.processarTemplate(template.corpo, variaveis),
       templateId: template.id,
-      variaveis
+      variaveis,
     };
 
     await this.enviarEmail(email);
   }
 
-  async obterLogsEmail(filtros?: { propostaId?: string; contratoId?: string }): Promise<EmailLog[]> {
+  async obterLogsEmail(filtros?: {
+    propostaId?: string;
+    contratoId?: string;
+  }): Promise<EmailLog[]> {
     try {
       const params = new URLSearchParams();
       if (filtros?.propostaId) params.append('propostaId', filtros.propostaId);
@@ -327,7 +356,7 @@ class EmailService {
   async marcarComoLido(emailId: string): Promise<void> {
     try {
       await fetch(`${this.baseUrl}/logs/${emailId}/lido`, {
-        method: 'PATCH'
+        method: 'PATCH',
       });
     } catch (error) {
       console.error('Erro ao marcar email como lido:', error);
@@ -347,17 +376,17 @@ class EmailService {
 
   private async simularEnvio(email: EmailEnvio): Promise<{ id: string; status: string }> {
     // Simular delay de rede
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     console.log('📧 Email simulado enviado:', {
       para: email.para,
       assunto: email.assunto,
-      anexos: email.anexos?.length || 0
+      anexos: email.anexos?.length || 0,
     });
 
     return {
       id: `email_${Date.now()}`,
-      status: 'enviado'
+      status: 'enviado',
     };
   }
 
@@ -368,7 +397,7 @@ class EmailService {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(log)
+        body: JSON.stringify(log),
       });
     } catch (error) {
       console.error('Erro ao salvar log de email:', error);
@@ -386,7 +415,7 @@ class EmailService {
   async criarTemplate(template: Omit<EmailTemplate, 'id'>): Promise<EmailTemplate> {
     const novoTemplate: EmailTemplate = {
       ...template,
-      id: `template_${Date.now()}`
+      id: `template_${Date.now()}`,
     };
 
     this.templates.push(novoTemplate);

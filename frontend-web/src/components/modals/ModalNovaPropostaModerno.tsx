@@ -27,13 +27,17 @@ import {
   MapPin,
   UserCheck,
   Users,
-  Loader2
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 // Hooks e Services
 import { useCalculosProposta } from '../../features/propostas/hooks/useCalculosProposta';
-import { propostasService, PropostaCompleta, Vendedor } from '../../features/propostas/services/propostasService';
+import {
+  propostasService,
+  PropostaCompleta,
+  Vendedor,
+} from '../../features/propostas/services/propostasService';
 import { clientesService, Cliente as ClienteService } from '../../services/clientesService';
 import { emailServiceReal } from '../../services/emailServiceReal';
 import { gerarTokenNumerico } from '../../utils/tokenUtils';
@@ -99,7 +103,7 @@ const schema = yup.object().shape({
   cliente: yup.object().nullable().required('Cliente é obrigatório'),
   produtos: yup.array().min(1, 'Adicione pelo menos um produto à proposta'),
   formaPagamento: yup.string().required('Forma de pagamento é obrigatória'),
-  validadeDias: yup.number().min(1, 'Validade deve ser pelo menos 1 dia').required()
+  validadeDias: yup.number().min(1, 'Validade deve ser pelo menos 1 dia').required(),
 });
 
 interface ModalNovaPropostaModernoProps {
@@ -122,32 +126,32 @@ const tabs: Tab[] = [
     id: 'cliente',
     label: 'Cliente & Vendedor',
     icon: User,
-    description: 'Selecione o cliente e vendedor responsável'
+    description: 'Selecione o cliente e vendedor responsável',
   },
   {
     id: 'produtos',
     label: 'Produtos',
     icon: Package,
-    description: 'Adicione produtos e serviços à proposta'
+    description: 'Adicione produtos e serviços à proposta',
   },
   {
     id: 'condicoes',
     label: 'Condições',
     icon: Calculator,
-    description: 'Configure pagamento e condições comerciais'
+    description: 'Configure pagamento e condições comerciais',
   },
   {
     id: 'resumo',
     label: 'Resumo',
     icon: FileText,
-    description: 'Revise e finalize a proposta'
-  }
+    description: 'Revise e finalize a proposta',
+  },
 ];
 
 export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> = ({
   isOpen,
   onClose,
-  onPropostaCriada
+  onPropostaCriada,
 }) => {
   // Estados principais
   const [activeTab, setActiveTab] = useState<TabId>('cliente');
@@ -168,7 +172,7 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
     setValue,
     reset,
     trigger,
-    formState: { errors, isValid }
+    formState: { errors, isValid },
   } = useForm<FormularioProposta>({
     resolver: yupResolver(schema),
     defaultValues: {
@@ -181,14 +185,14 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
       produtos: [],
       condicoesGerais: 'Proposta válida conforme condições apresentadas.',
       formaPagamento: '',
-      validadeDias: 30
+      validadeDias: 30,
     },
-    mode: 'onChange'
+    mode: 'onChange',
   });
 
   const { fields, append, remove, update } = useFieldArray({
     control,
-    name: 'produtos'
+    name: 'produtos',
   });
 
   // Watch values com useCallback para evitar re-renders
@@ -201,7 +205,7 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
   const { totais } = useCalculosProposta(
     watchedProdutos || [],
     0, // desconto global
-    12 // impostos
+    12, // impostos
   );
 
   // Controle de execução única com useRef
@@ -239,17 +243,20 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
     try {
       console.log('Recarregando apenas clientes...');
       const response = await clientesService.getClientes({ limit: 100 });
-      const clientesData = response.data.map((cliente: ClienteService): Cliente => ({
-        id: cliente.id || '',
-        nome: cliente.nome,
-        documento: cliente.documento || '',
-        email: cliente.email,
-        telefone: cliente.telefone || '',
-        endereco: cliente.endereco || '',
-        cidade: cliente.cidade || '',
-        estado: cliente.estado || '',
-        tipoPessoa: cliente.tipo === 'pessoa_fisica' ? 'fisica' as const : 'juridica' as const
-      }));
+      const clientesData = response.data.map(
+        (cliente: ClienteService): Cliente => ({
+          id: cliente.id || '',
+          nome: cliente.nome,
+          documento: cliente.documento || '',
+          email: cliente.email,
+          telefone: cliente.telefone || '',
+          endereco: cliente.endereco || '',
+          cidade: cliente.cidade || '',
+          estado: cliente.estado || '',
+          tipoPessoa:
+            cliente.tipo === 'pessoa_fisica' ? ('fisica' as const) : ('juridica' as const),
+        }),
+      );
 
       setClientes(clientesData);
       console.log('Clientes recarregados:', clientesData.length);
@@ -283,7 +290,7 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
           }
         }, 600); // 600ms delay para vendedores
 
-        await new Promise(resolve => setTimeout(resolve, 650)); // Aguarda o timeout + margem
+        await new Promise((resolve) => setTimeout(resolve, 650)); // Aguarda o timeout + margem
         clearTimeout(vendedoresTimer);
       } catch (error) {
         console.error('Erro no timeout de vendedores:', error);
@@ -294,17 +301,20 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
       let clientesData: Cliente[] = [];
       try {
         const response = await clientesService.getClientes({ limit: 100 });
-        clientesData = response.data.map((cliente: ClienteService): Cliente => ({
-          id: cliente.id || '',
-          nome: cliente.nome,
-          documento: cliente.documento || '',
-          email: cliente.email,
-          telefone: cliente.telefone || '',
-          endereco: cliente.endereco || '',
-          cidade: cliente.cidade || '',
-          estado: cliente.estado || '',
-          tipoPessoa: cliente.tipo === 'pessoa_fisica' ? 'fisica' as const : 'juridica' as const
-        }));
+        clientesData = response.data.map(
+          (cliente: ClienteService): Cliente => ({
+            id: cliente.id || '',
+            nome: cliente.nome,
+            documento: cliente.documento || '',
+            email: cliente.email,
+            telefone: cliente.telefone || '',
+            endereco: cliente.endereco || '',
+            cidade: cliente.cidade || '',
+            estado: cliente.estado || '',
+            tipoPessoa:
+              cliente.tipo === 'pessoa_fisica' ? ('fisica' as const) : ('juridica' as const),
+          }),
+        );
         console.log('Clientes carregados:', clientesData.length);
       } catch (error) {
         console.error('Erro ao carregar clientes:', error);
@@ -316,8 +326,12 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
       setClientes(clientesData);
       setProdutos([]); // Mock temporário
 
-      console.log('Dados carregados com sucesso - Vendedores:', vendedoresData.length, 'Clientes:', clientesData.length);
-
+      console.log(
+        'Dados carregados com sucesso - Vendedores:',
+        vendedoresData.length,
+        'Clientes:',
+        clientesData.length,
+      );
     } catch (error) {
       console.error('Erro geral ao carregar dados:', error);
       toast.error('Erro ao carregar dados iniciais');
@@ -328,91 +342,106 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
   }, []); // Dependências vazias para evitar re-criação
 
   // Validação por aba
-  const validateTab = useCallback(async (tabId: TabId): Promise<boolean> => {
-    switch (tabId) {
-      case 'cliente':
-        return await trigger(['vendedor', 'cliente']);
-      case 'produtos':
-        return await trigger(['produtos']);
-      case 'condicoes':
-        return await trigger(['formaPagamento', 'validadeDias']);
-      case 'resumo':
-        return await trigger();
-      default:
-        return true;
-    }
-  }, [trigger]);
+  const validateTab = useCallback(
+    async (tabId: TabId): Promise<boolean> => {
+      switch (tabId) {
+        case 'cliente':
+          return await trigger(['vendedor', 'cliente']);
+        case 'produtos':
+          return await trigger(['produtos']);
+        case 'condicoes':
+          return await trigger(['formaPagamento', 'validadeDias']);
+        case 'resumo':
+          return await trigger();
+        default:
+          return true;
+      }
+    },
+    [trigger],
+  );
 
   // Navegação entre abas
-  const handleTabChange = useCallback(async (tabId: TabId) => {
-    const isCurrentTabValid = await validateTab(activeTab);
-    if (isCurrentTabValid || tabId === activeTab) {
-      setActiveTab(tabId);
-    } else {
-      toast.error('Complete os campos obrigatórios antes de continuar');
-    }
-  }, [activeTab, validateTab]);
+  const handleTabChange = useCallback(
+    async (tabId: TabId) => {
+      const isCurrentTabValid = await validateTab(activeTab);
+      if (isCurrentTabValid || tabId === activeTab) {
+        setActiveTab(tabId);
+      } else {
+        toast.error('Complete os campos obrigatórios antes de continuar');
+      }
+    },
+    [activeTab, validateTab],
+  );
 
   // Status da aba (completa, erro, ativa)
-  const getTabStatus = useCallback((tabId: TabId) => {
-    const hasErrors = (field: keyof FormularioProposta) => errors[field];
+  const getTabStatus = useCallback(
+    (tabId: TabId) => {
+      const hasErrors = (field: keyof FormularioProposta) => errors[field];
 
-    switch (tabId) {
-      case 'cliente':
-        if (hasErrors('vendedor') || hasErrors('cliente')) return 'error';
-        if (watchedVendedor && watchedCliente) return 'completed';
-        return activeTab === tabId ? 'active' : 'pending';
+      switch (tabId) {
+        case 'cliente':
+          if (hasErrors('vendedor') || hasErrors('cliente')) return 'error';
+          if (watchedVendedor && watchedCliente) return 'completed';
+          return activeTab === tabId ? 'active' : 'pending';
 
-      case 'produtos':
-        if (hasErrors('produtos')) return 'error';
-        if (watchedProdutos && watchedProdutos.length > 0) return 'completed';
-        return activeTab === tabId ? 'active' : 'pending';
+        case 'produtos':
+          if (hasErrors('produtos')) return 'error';
+          if (watchedProdutos && watchedProdutos.length > 0) return 'completed';
+          return activeTab === tabId ? 'active' : 'pending';
 
-      case 'condicoes':
-        if (hasErrors('formaPagamento') || hasErrors('validadeDias')) return 'error';
-        const formaPagamento = watch('formaPagamento');
-        const validadeDias = watch('validadeDias');
-        if (formaPagamento && validadeDias) return 'completed';
-        return activeTab === tabId ? 'active' : 'pending';
+        case 'condicoes':
+          if (hasErrors('formaPagamento') || hasErrors('validadeDias')) return 'error';
+          const formaPagamento = watch('formaPagamento');
+          const validadeDias = watch('validadeDias');
+          if (formaPagamento && validadeDias) return 'completed';
+          return activeTab === tabId ? 'active' : 'pending';
 
-      case 'resumo':
-        return activeTab === tabId ? 'active' : 'pending';
+        case 'resumo':
+          return activeTab === tabId ? 'active' : 'pending';
 
-      default:
-        return 'pending';
-    }
-  }, [errors, watchedVendedor, watchedCliente, watchedProdutos, activeTab, watch]);
+        default:
+          return 'pending';
+      }
+    },
+    [errors, watchedVendedor, watchedCliente, watchedProdutos, activeTab, watch],
+  );
 
   // Adicionar produto
-  const handleAddProduto = useCallback((produto: Produto) => {
-    const subtotal = produto.preco;
-    const novoProduto: ProdutoProposta = {
-      produto,
-      quantidade: 1,
-      precoUnitario: produto.preco,
-      desconto: 0,
-      valorTotal: produto.preco,
-      subtotal: subtotal,
-      observacoes: ''
-    };
-    append(novoProduto);
-  }, [append]);
+  const handleAddProduto = useCallback(
+    (produto: Produto) => {
+      const subtotal = produto.preco;
+      const novoProduto: ProdutoProposta = {
+        produto,
+        quantidade: 1,
+        precoUnitario: produto.preco,
+        desconto: 0,
+        valorTotal: produto.preco,
+        subtotal: subtotal,
+        observacoes: '',
+      };
+      append(novoProduto);
+    },
+    [append],
+  );
 
   // Atualizar produto
-  const handleUpdateProduto = useCallback((index: number, field: string, value: any) => {
-    const produto = watchedProdutos[index];
-    const updatedProduto = { ...produto, [field]: value };
+  const handleUpdateProduto = useCallback(
+    (index: number, field: string, value: any) => {
+      const produto = watchedProdutos[index];
+      const updatedProduto = { ...produto, [field]: value };
 
-    // Recalcular valor total e subtotal
-    if (field === 'quantidade' || field === 'precoUnitario' || field === 'desconto') {
-      const subtotalSemDesconto = updatedProduto.quantidade * updatedProduto.precoUnitario;
-      const desconto = (subtotalSemDesconto * updatedProduto.desconto) / 100;
-      updatedProduto.valorTotal = subtotalSemDesconto - desconto;
-      updatedProduto.subtotal = updatedProduto.valorTotal;
-    }
+      // Recalcular valor total e subtotal
+      if (field === 'quantidade' || field === 'precoUnitario' || field === 'desconto') {
+        const subtotalSemDesconto = updatedProduto.quantidade * updatedProduto.precoUnitario;
+        const desconto = (subtotalSemDesconto * updatedProduto.desconto) / 100;
+        updatedProduto.valorTotal = subtotalSemDesconto - desconto;
+        updatedProduto.subtotal = updatedProduto.valorTotal;
+      }
 
-    update(index, updatedProduto);
-  }, [watchedProdutos, update]);
+      update(index, updatedProduto);
+    },
+    [watchedProdutos, update],
+  );
 
   // Submeter proposta
   const onSubmit = async (data: FormularioProposta) => {
@@ -427,7 +456,13 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
         descontoGlobal: 0,
         impostos: 12,
         incluirImpostosPDF: true,
-        vendedor: data.vendedor || { id: '', nome: 'Vendedor Padrão', email: '', tipo: 'vendedor' as const, ativo: true }
+        vendedor: data.vendedor || {
+          id: '',
+          nome: 'Vendedor Padrão',
+          email: '',
+          tipo: 'vendedor' as const,
+          ativo: true,
+        },
       };
 
       const proposta = await propostasService.criarProposta(propostaData);
@@ -441,7 +476,8 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
       handleClose();
     } catch (error) {
       console.error('Erro ao criar proposta:', error);
-      toast.error('Erro ao criar proposta');
+      const friendlyMessage = error instanceof Error ? error.message : 'Erro ao criar proposta';
+      toast.error(friendlyMessage);
     } finally {
       setIsSaving(false);
     }
@@ -485,14 +521,15 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
                 <button
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
-                  className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all min-w-fit ${status === 'active'
-                    ? 'bg-teal-100 text-teal-800 border border-teal-300'
-                    : status === 'completed'
-                      ? 'bg-green-50 text-green-800 border border-green-300 hover:bg-green-100'
-                      : status === 'error'
-                        ? 'bg-red-50 text-red-800 border border-red-300 hover:bg-red-100'
-                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                    }`}
+                  className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all min-w-fit ${
+                    status === 'active'
+                      ? 'bg-teal-100 text-teal-800 border border-teal-300'
+                      : status === 'completed'
+                        ? 'bg-green-50 text-green-800 border border-green-300 hover:bg-green-100'
+                        : status === 'error'
+                          ? 'bg-red-50 text-red-800 border border-red-300 hover:bg-red-100'
+                          : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                  }`}
                 >
                   <div className="flex items-center space-x-2">
                     {status === 'completed' ? (
@@ -504,9 +541,7 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
                     )}
                     <div className="text-left">
                       <div className="font-medium text-sm">{tab.label}</div>
-                      <div className="text-xs opacity-75 hidden lg:block">
-                        {tab.description}
-                      </div>
+                      <div className="text-xs opacity-75 hidden lg:block">{tab.description}</div>
                     </div>
                   </div>
                 </button>
@@ -527,14 +562,11 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">
                       Informações Iniciais da Proposta
                     </h3>
-                    <p className="text-gray-600">
-                      Preencha os dados básicos e selecione o cliente
-                    </p>
+                    <p className="text-gray-600">Preencha os dados básicos e selecione o cliente</p>
                   </div>
 
                   {/* Layout em duas colunas conforme imagem */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
-
                     {/* Coluna Esquerda: Informações da Proposta */}
                     <div className="space-y-6">
                       <div>
@@ -604,7 +636,9 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
                               )}
                             />
                             {errors.dataValidade && (
-                              <p className="text-sm text-red-600 mt-1">{errors.dataValidade.message}</p>
+                              <p className="text-sm text-red-600 mt-1">
+                                {errors.dataValidade.message}
+                              </p>
                             )}
                           </div>
 
@@ -622,14 +656,24 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
                                   {...field}
                                   value={field.value?.id || ''}
                                   onChange={(e) => {
-                                    console.log('Seletor de vendedor - onChange disparado:', e.target.value);
-                                    const vendedorSelecionado = vendedores.find(v => v.id === e.target.value);
+                                    console.log(
+                                      'Seletor de vendedor - onChange disparado:',
+                                      e.target.value,
+                                    );
+                                    const vendedorSelecionado = vendedores.find(
+                                      (v) => v.id === e.target.value,
+                                    );
                                     field.onChange(vendedorSelecionado || null);
-                                    console.log('Vendedor selecionado:', vendedorSelecionado?.nome || 'Nenhum');
+                                    console.log(
+                                      'Vendedor selecionado:',
+                                      vendedorSelecionado?.nome || 'Nenhum',
+                                    );
                                   }}
                                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                                   onClick={() => {
-                                    console.log('Seletor de vendedor clicado - NÃO deve recarregar dados');
+                                    console.log(
+                                      'Seletor de vendedor clicado - NÃO deve recarregar dados',
+                                    );
                                   }}
                                 >
                                   <option value="">Selecione um vendedor</option>
@@ -671,9 +715,7 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
                     {/* Coluna Direita: Clientes */}
                     <div className="space-y-6">
                       <div>
-                        <h4 className="text-lg font-semibold text-gray-900 mb-4">
-                          Clientes
-                        </h4>
+                        <h4 className="text-lg font-semibold text-gray-900 mb-4">Clientes</h4>
 
                         {/* Busca de Clientes */}
                         <div className="mb-4">
@@ -720,10 +762,11 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
                                     onClick={() => {
                                       setValue('cliente', cliente);
                                     }}
-                                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${watchedCliente?.id === cliente.id
-                                      ? 'border-teal-500 bg-teal-50'
-                                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                      }`}
+                                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                                      watchedCliente?.id === cliente.id
+                                        ? 'border-teal-500 bg-teal-50'
+                                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                    }`}
                                   >
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center space-x-2">
@@ -733,8 +776,12 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
                                           <User className="w-4 h-4 text-gray-500" />
                                         )}
                                         <div>
-                                          <p className="font-medium text-gray-900 text-sm">{cliente.nome}</p>
-                                          <p className="text-xs text-gray-500">{cliente.documento}</p>
+                                          <p className="font-medium text-gray-900 text-sm">
+                                            {cliente.nome}
+                                          </p>
+                                          <p className="text-xs text-gray-500">
+                                            {cliente.documento}
+                                          </p>
                                         </div>
                                       </div>
                                       {watchedCliente?.id === cliente.id && (
@@ -742,7 +789,9 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
                                       )}
                                     </div>
                                     {cliente.email && (
-                                      <p className="text-xs text-gray-500 mt-1 ml-6">{cliente.email}</p>
+                                      <p className="text-xs text-gray-500 mt-1 ml-6">
+                                        {cliente.email}
+                                      </p>
                                     )}
                                   </div>
                                 ))}
@@ -765,9 +814,7 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
               {activeTab === 'produtos' && (
                 <div className="text-center py-12">
                   <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    Aba Produtos
-                  </h3>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Aba Produtos</h3>
                   <p className="text-gray-500">
                     Conteúdo da aba produtos será implementado aqui...
                   </p>
@@ -777,9 +824,7 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
               {activeTab === 'condicoes' && (
                 <div className="text-center py-12">
                   <Calculator className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    Aba Condições
-                  </h3>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Aba Condições</h3>
                   <p className="text-gray-500">
                     Conteúdo da aba condições será implementado aqui...
                   </p>
@@ -789,12 +834,8 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
               {activeTab === 'resumo' && (
                 <div className="text-center py-12">
                   <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    Aba Resumo
-                  </h3>
-                  <p className="text-gray-500">
-                    Conteúdo da aba resumo será implementado aqui...
-                  </p>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Aba Resumo</h3>
+                  <p className="text-gray-500">Conteúdo da aba resumo será implementado aqui...</p>
                 </div>
               )}
             </div>
@@ -803,7 +844,7 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
             <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-gray-500">
-                  Etapa {tabs.findIndex(t => t.id === activeTab) + 1} de {tabs.length}
+                  Etapa {tabs.findIndex((t) => t.id === activeTab) + 1} de {tabs.length}
                 </div>
 
                 <div className="flex space-x-3">
@@ -837,7 +878,7 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
                     <button
                       type="button"
                       onClick={() => {
-                        const currentIndex = tabs.findIndex(t => t.id === activeTab);
+                        const currentIndex = tabs.findIndex((t) => t.id === activeTab);
                         if (currentIndex < tabs.length - 1) {
                           handleTabChange(tabs[currentIndex + 1].id);
                         }

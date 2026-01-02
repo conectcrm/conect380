@@ -228,7 +228,7 @@ export const slaService = {
     ticketId: string,
     prioridade: string,
     canal: string,
-    criadoEm: string
+    criadoEm: string,
   ): Promise<SlaCalculoResult> {
     try {
       const response = await api.post(`/atendimento/sla/tickets/${ticketId}/calcular`, {

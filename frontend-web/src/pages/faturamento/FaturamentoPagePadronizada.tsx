@@ -12,7 +12,7 @@ import {
   Download,
   Mail,
   MoreVertical,
-  CreditCard
+  CreditCard,
 } from 'lucide-react';
 import { StandardPageTemplate, StandardDataTable } from '../../components/templates';
 import type { DashboardCard, TableColumn, TableAction } from '../../components/templates';
@@ -32,7 +32,14 @@ interface Fatura {
   tipo: 'recorrente' | 'avulsa' | 'parcela' | 'entrada';
 }
 
-type StatusFilter = 'todos' | 'rascunho' | 'enviada' | 'paga' | 'vencida' | 'cancelada' | 'pendente';
+type StatusFilter =
+  | 'todos'
+  | 'rascunho'
+  | 'enviada'
+  | 'paga'
+  | 'vencida'
+  | 'cancelada'
+  | 'pendente';
 
 // Dados mock para demonstração
 const mockFaturas: Fatura[] = [
@@ -41,63 +48,63 @@ const mockFaturas: Fatura[] = [
     numero: 'FAT-2025-001',
     clienteNome: 'Empresa ABC Ltda',
     clienteEmail: 'contato@empresaabc.com',
-    valor: 2500.00,
+    valor: 2500.0,
     status: 'paga',
     dataEmissao: new Date('2025-01-15'),
     dataVencimento: new Date('2025-02-15'),
     dataPagamento: new Date('2025-02-10'),
     descricao: 'Desenvolvimento de sistema CRM - Janeiro 2025',
-    tipo: 'recorrente'
+    tipo: 'recorrente',
   },
   {
     id: '2',
     numero: 'FAT-2025-002',
     clienteNome: 'Tech Solutions S.A.',
     clienteEmail: 'financeiro@techsolutions.com',
-    valor: 5000.00,
+    valor: 5000.0,
     status: 'pendente',
     dataEmissao: new Date('2025-02-01'),
     dataVencimento: new Date('2025-03-01'),
     descricao: 'Consultoria em automação - Fevereiro 2025',
-    tipo: 'parcela'
+    tipo: 'parcela',
   },
   {
     id: '3',
     numero: 'FAT-2025-003',
     clienteNome: 'Inovação Digital ME',
     clienteEmail: 'admin@inovacaodigital.com',
-    valor: 1200.00,
+    valor: 1200.0,
     status: 'vencida',
     dataEmissao: new Date('2025-01-10'),
     dataVencimento: new Date('2025-01-25'),
     descricao: 'Manutenção de sistema - Janeiro 2025',
-    tipo: 'avulsa'
+    tipo: 'avulsa',
   },
   {
     id: '4',
     numero: 'FAT-2025-004',
     clienteNome: 'StartupTech Inc.',
     clienteEmail: 'billing@startuptech.com',
-    valor: 3750.00,
+    valor: 3750.0,
     status: 'enviada',
     dataEmissao: new Date('2025-02-05'),
     dataVencimento: new Date('2025-03-05'),
     descricao: 'Plataforma de e-commerce - Fevereiro 2025',
-    tipo: 'parcela'
+    tipo: 'parcela',
   },
   {
     id: '5',
     numero: 'FAT-2025-005',
     clienteNome: 'ConsultoriaMax',
     clienteEmail: 'financeiro@consultoriamax.com.br',
-    valor: 8900.00,
+    valor: 8900.0,
     status: 'paga',
     dataEmissao: new Date('2025-01-20'),
     dataVencimento: new Date('2025-02-20'),
     dataPagamento: new Date('2025-02-18'),
     descricao: 'Sistema de gestão integrado - Janeiro 2025',
-    tipo: 'entrada'
-  }
+    tipo: 'entrada',
+  },
 ];
 
 export const FaturamentoPage: React.FC = () => {
@@ -111,12 +118,16 @@ export const FaturamentoPage: React.FC = () => {
 
   // Estatísticas calculadas
   const totalFaturas = faturas.length;
-  const faturasPagas = faturas.filter(f => f.status === 'paga').length;
-  const faturasVencidas = faturas.filter(f => f.status === 'vencida').length;
-  const faturasPendentes = faturas.filter(f => f.status === 'pendente').length;
+  const faturasPagas = faturas.filter((f) => f.status === 'paga').length;
+  const faturasVencidas = faturas.filter((f) => f.status === 'vencida').length;
+  const faturasPendentes = faturas.filter((f) => f.status === 'pendente').length;
   const valorTotal = faturas.reduce((total, f) => total + f.valor, 0);
-  const valorRecebido = faturas.filter(f => f.status === 'paga').reduce((total, f) => total + f.valor, 0);
-  const valorVencido = faturas.filter(f => f.status === 'vencida').reduce((total, f) => total + f.valor, 0);
+  const valorRecebido = faturas
+    .filter((f) => f.status === 'paga')
+    .reduce((total, f) => total + f.valor, 0);
+  const valorVencido = faturas
+    .filter((f) => f.status === 'vencida')
+    .reduce((total, f) => total + f.valor, 0);
 
   // Dashboard Cards
   const dashboardCards: DashboardCard[] = [
@@ -125,29 +136,29 @@ export const FaturamentoPage: React.FC = () => {
       value: totalFaturas,
       subtitle: '📊 Visão geral',
       icon: FileText,
-      color: 'blue'
+      color: 'blue',
     },
     {
       title: 'Valor Total Faturado',
       value: valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
       subtitle: '💰 Faturamento bruto',
       icon: DollarSign,
-      color: 'green'
+      color: 'green',
     },
     {
       title: 'Faturas Vencidas',
       value: faturasVencidas,
       subtitle: `${valorVencido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} em atraso`,
       icon: AlertCircle,
-      color: 'red'
+      color: 'red',
     },
     {
       title: 'Faturas Pendentes',
       value: faturasPendentes,
       subtitle: '⏳ Aguardando pagamento',
       icon: Clock,
-      color: 'yellow'
-    }
+      color: 'yellow',
+    },
   ];
 
   // Aplicar filtros
@@ -156,20 +167,21 @@ export const FaturamentoPage: React.FC = () => {
 
     // Filtro por status
     if (statusFilter !== 'todos') {
-      filtered = filtered.filter(fatura => fatura.status === statusFilter);
+      filtered = filtered.filter((fatura) => fatura.status === statusFilter);
     }
 
     // Filtro por tipo
     if (tipoFilter !== 'todos') {
-      filtered = filtered.filter(fatura => fatura.tipo === tipoFilter);
+      filtered = filtered.filter((fatura) => fatura.tipo === tipoFilter);
     }
 
     // Busca por texto
     if (searchTerm) {
-      filtered = filtered.filter(fatura =>
-        fatura.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        fatura.clienteNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        fatura.descricao.toLowerCase().includes(searchTerm.toLowerCase())
+      filtered = filtered.filter(
+        (fatura) =>
+          fatura.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          fatura.clienteNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          fatura.descricao.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
 
@@ -221,11 +233,7 @@ export const FaturamentoPage: React.FC = () => {
       key: 'numero',
       label: 'Número',
       sortable: true,
-      render: (fatura) => (
-        <div className="font-medium text-[#159A9C]">
-          {fatura.numero}
-        </div>
-      )
+      render: (fatura) => <div className="font-medium text-[#159A9C]">{fatura.numero}</div>,
     },
     {
       key: 'clienteNome',
@@ -236,7 +244,7 @@ export const FaturamentoPage: React.FC = () => {
           <div className="font-medium text-gray-900">{fatura.clienteNome}</div>
           <div className="text-sm text-gray-500">{fatura.clienteEmail}</div>
         </div>
-      )
+      ),
     },
     {
       key: 'valor',
@@ -247,12 +255,12 @@ export const FaturamentoPage: React.FC = () => {
         <span className="font-bold text-gray-900">
           {fatura.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
         </span>
-      )
+      ),
     },
     {
       key: 'status',
       label: 'Status',
-      render: (fatura) => getStatusBadge(fatura.status)
+      render: (fatura) => getStatusBadge(fatura.status),
     },
     {
       key: 'tipo',
@@ -261,18 +269,16 @@ export const FaturamentoPage: React.FC = () => {
         <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
           {fatura.tipo}
         </span>
-      )
+      ),
     },
     {
       key: 'dataVencimento',
       label: 'Vencimento',
       sortable: true,
       render: (fatura) => (
-        <div className="text-sm">
-          {fatura.dataVencimento.toLocaleDateString('pt-BR')}
-        </div>
-      )
-    }
+        <div className="text-sm">{fatura.dataVencimento.toLocaleDateString('pt-BR')}</div>
+      ),
+    },
   ];
 
   // Ações da tabela
@@ -280,38 +286,38 @@ export const FaturamentoPage: React.FC = () => {
     {
       label: 'Visualizar',
       onClick: handleViewFatura,
-      icon: Eye
+      icon: Eye,
     },
     {
       label: 'Editar',
       onClick: handleEditFatura,
       icon: Edit,
-      show: (fatura) => fatura.status !== 'paga'
+      show: (fatura) => fatura.status !== 'paga',
     },
     {
       label: 'Download PDF',
       onClick: handleDownloadPDF,
-      icon: Download
+      icon: Download,
     },
     {
       label: 'Enviar por Email',
       onClick: handleEnviarEmail,
-      icon: Mail
+      icon: Mail,
     },
     {
       label: 'Marcar como Paga',
       onClick: handleMarcarComoPaga,
       icon: CheckCircle,
       variant: 'success',
-      show: (fatura) => fatura.status !== 'paga'
+      show: (fatura) => fatura.status !== 'paga',
     },
     {
       label: 'Excluir',
       onClick: handleExcluirFatura,
       icon: X,
       variant: 'danger',
-      show: (fatura) => fatura.status === 'rascunho'
-    }
+      show: (fatura) => fatura.status === 'rascunho',
+    },
   ];
 
   // Função para obter badge do status
@@ -322,14 +328,16 @@ export const FaturamentoPage: React.FC = () => {
       paga: { bg: 'bg-green-100', text: 'text-green-800', label: 'Paga', icon: CheckCircle },
       vencida: { bg: 'bg-red-100', text: 'text-red-800', label: 'Vencida', icon: AlertCircle },
       cancelada: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Cancelada', icon: X },
-      pendente: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pendente', icon: Clock }
+      pendente: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pendente', icon: Clock },
     };
 
     const config = statusConfig[status];
     const Icon = config.icon;
 
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
+      <span
+        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}
+      >
         <Icon className="w-3 h-3 mr-1" />
         {config.label}
       </span>
@@ -341,56 +349,54 @@ export const FaturamentoPage: React.FC = () => {
       title="Faturamento"
       subtitle="Gerencie faturas, cobranças e recebimentos"
       backTo="/financeiro"
-
       dashboardCards={dashboardCards}
-
       primaryAction={{
         label: 'Nova Fatura',
         onClick: handleCriarFatura,
-        icon: Plus
+        icon: Plus,
       }}
-
       secondaryActions={[
         {
           label: 'Exportar CSV',
           onClick: handleExportarCSV,
-          variant: 'outline'
+          variant: 'outline',
         },
         {
           label: 'Exportar Excel',
           onClick: handleExportarExcel,
-          variant: 'outline'
-        }
+          variant: 'outline',
+        },
       ]}
-
-      bulkActions={selectedFaturas.length > 0 ? {
-        selectedCount: selectedFaturas.length,
-        onSelectAll: () => setSelectedFaturas(faturas.map(f => f.id)),
-        onDeselectAll: () => setSelectedFaturas([]),
-        actions: [
-          {
-            label: 'Marcar como Enviadas',
-            onClick: () => console.log('Marcar como enviadas:', selectedFaturas)
-          },
-          {
-            label: 'Exportar Selecionadas',
-            onClick: () => console.log('Exportar selecionadas:', selectedFaturas),
-            variant: 'outline'
-          },
-          {
-            label: 'Excluir Selecionadas',
-            onClick: () => console.log('Excluir selecionadas:', selectedFaturas),
-            variant: 'danger'
-          }
-        ]
-      } : undefined}
-
+      bulkActions={
+        selectedFaturas.length > 0
+          ? {
+              selectedCount: selectedFaturas.length,
+              onSelectAll: () => setSelectedFaturas(faturas.map((f) => f.id)),
+              onDeselectAll: () => setSelectedFaturas([]),
+              actions: [
+                {
+                  label: 'Marcar como Enviadas',
+                  onClick: () => console.log('Marcar como enviadas:', selectedFaturas),
+                },
+                {
+                  label: 'Exportar Selecionadas',
+                  onClick: () => console.log('Exportar selecionadas:', selectedFaturas),
+                  variant: 'outline',
+                },
+                {
+                  label: 'Excluir Selecionadas',
+                  onClick: () => console.log('Excluir selecionadas:', selectedFaturas),
+                  variant: 'danger',
+                },
+              ],
+            }
+          : undefined
+      }
       searchConfig={{
         placeholder: 'Buscar por número, cliente, descrição...',
         value: searchTerm,
-        onChange: setSearchTerm
+        onChange: setSearchTerm,
       }}
-
       filters={[
         {
           label: 'Status',
@@ -402,9 +408,9 @@ export const FaturamentoPage: React.FC = () => {
             { label: '✅ Paga', value: 'paga' },
             { label: '⏰ Pendente', value: 'pendente' },
             { label: '🚨 Vencida', value: 'vencida' },
-            { label: '❌ Cancelada', value: 'cancelada' }
+            { label: '❌ Cancelada', value: 'cancelada' },
           ],
-          onChange: (value) => setStatusFilter(value as StatusFilter)
+          onChange: (value) => setStatusFilter(value as StatusFilter),
         },
         {
           label: 'Tipo',
@@ -414,12 +420,11 @@ export const FaturamentoPage: React.FC = () => {
             { label: 'Recorrente', value: 'recorrente' },
             { label: 'Avulsa', value: 'avulsa' },
             { label: 'Parcela', value: 'parcela' },
-            { label: 'Entrada', value: 'entrada' }
+            { label: 'Entrada', value: 'entrada' },
           ],
-          onChange: setTipoFilter
-        }
+          onChange: setTipoFilter,
+        },
       ]}
-
       loading={loading}
     >
       <StandardDataTable
@@ -436,8 +441,8 @@ export const FaturamentoPage: React.FC = () => {
           icon: FileText,
           action: {
             label: 'Criar Nova Fatura',
-            onClick: handleCriarFatura
-          }
+            onClick: handleCriarFatura,
+          },
         }}
       />
     </StandardPageTemplate>

@@ -135,12 +135,12 @@ class ProdutosService {
     if (!formData.precoUnitario && !formData.preco) {
       throw new Error('Preço é obrigatório');
     }
-    
+
     const preco = formData.precoUnitario || formData.preco;
     if (isNaN(preco) || preco < 0) {
       throw new Error('Preço deve ser um número válido maior ou igual a zero');
     }
-    
+
     const transformed = {
       nome: formData.nome.trim(),
       categoria: formData.categoria.trim(),
@@ -149,17 +149,26 @@ class ProdutosService {
       tipoItem: formData.tipoItem || 'produto',
       frequencia: formData.frequencia || 'unico',
       unidadeMedida: formData.unidadeMedida || 'unidade',
-      status: formData.status === true ? 'ativo' : formData.status === false ? 'inativo' : formData.status || 'ativo',
+      status:
+        formData.status === true
+          ? 'ativo'
+          : formData.status === false
+            ? 'inativo'
+            : formData.status || 'ativo',
       descricao: formData.descricao?.trim() || undefined,
       sku: formData.sku?.trim() || undefined,
       fornecedor: formData.fornecedor?.trim() || undefined,
-      estoqueAtual: formData.estoque ? Number(formData.estoque) : formData.estoqueAtual ? Number(formData.estoqueAtual) : undefined,
+      estoqueAtual: formData.estoque
+        ? Number(formData.estoque)
+        : formData.estoqueAtual
+          ? Number(formData.estoqueAtual)
+          : undefined,
       estoqueMinimo: formData.estoqueMinimo ? Number(formData.estoqueMinimo) : undefined,
       estoqueMaximo: formData.estoqueMaximo ? Number(formData.estoqueMaximo) : undefined,
       tags: Array.isArray(formData.tags) ? formData.tags : undefined,
       variacoes: Array.isArray(formData.variacoes) ? formData.variacoes : undefined,
     };
-    
+
     return transformed;
   }
 

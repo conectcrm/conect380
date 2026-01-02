@@ -8,11 +8,19 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from '../../users/user.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 @Entity('password_reset_tokens')
 export class PasswordResetToken {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'uuid', name: 'empresa_id', nullable: true })
+  empresaId: string | null;
+
+  @ManyToOne(() => Empresa, { nullable: true })
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa | null;
 
   @Column({ name: 'user_id', type: 'uuid' })
   user_id: string;

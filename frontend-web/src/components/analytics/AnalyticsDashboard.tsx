@@ -4,12 +4,34 @@ import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
 import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, AreaChart, Area
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
 } from 'recharts';
 import {
-  TrendingUp, TrendingDown, Users, DollarSign, Clock, Target,
-  FileText, CheckCircle, AlertTriangle, Calendar, Download
+  TrendingUp,
+  TrendingDown,
+  Users,
+  DollarSign,
+  Clock,
+  Target,
+  FileText,
+  CheckCircle,
+  AlertTriangle,
+  Calendar,
+  Download,
 } from 'lucide-react';
 
 interface AnalyticsData {
@@ -78,10 +100,7 @@ interface AnalyticsDashboardProps {
 
 type PeriodoFiltro = Exclude<AnalyticsDashboardProps['periodo'], undefined>;
 
-const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
-  periodo = '30d',
-  vendedorId
-}) => {
+const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ periodo = '30d', vendedorId }) => {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPeriodo, setSelectedPeriodo] = useState(periodo);
@@ -98,11 +117,14 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   const carregarDados = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/analytics/dashboard?periodo=${selectedPeriodo}&vendedor=${selectedVendedor}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
+      const response = await fetch(
+        `/api/analytics/dashboard?periodo=${selectedPeriodo}&vendedor=${selectedVendedor}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+          },
+        },
+      );
 
       if (response.ok) {
         const analyticsData = await response.json();
@@ -118,7 +140,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   const formatarMoeda = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(valor);
   };
 
@@ -135,11 +157,14 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
   const exportarRelatorio = async () => {
     try {
-      const response = await fetch(`/api/analytics/export?periodo=${selectedPeriodo}&vendedor=${selectedVendedor}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
+      const response = await fetch(
+        `/api/analytics/export?periodo=${selectedPeriodo}&vendedor=${selectedVendedor}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+          },
+        },
+      );
 
       if (response.ok) {
         const blob = await response.blob();
@@ -206,7 +231,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os vendedores</SelectItem>
-              {data.vendedores.map(vendedor => (
+              {data.vendedores.map((vendedor) => (
                 <SelectItem key={vendedor.id} value={vendedor.id}>
                   {vendedor.nome}
                 </SelectItem>
@@ -235,7 +260,9 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                   ) : (
                     <TrendingDown className="h-4 w-4 text-red-500 mr-1" />
                   )}
-                  <span className={`text-sm ${data.vendas.crescimento_percentual >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  <span
+                    className={`text-sm ${data.vendas.crescimento_percentual >= 0 ? 'text-green-500' : 'text-red-500'}`}
+                  >
                     {formatarPercentual(Math.abs(data.vendas.crescimento_percentual))}
                   </span>
                 </div>
@@ -250,7 +277,9 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Taxa de Conversão</p>
-                <p className="text-2xl font-bold">{formatarPercentual(data.vendas.conversao_geral)}</p>
+                <p className="text-2xl font-bold">
+                  {formatarPercentual(data.vendas.conversao_geral)}
+                </p>
                 <p className="text-xs text-gray-500 mt-1">
                   Meta: {formatarPercentual(data.vendas.meta_periodo)}
                 </p>
@@ -278,7 +307,9 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Ciclo Médio</p>
-                <p className="text-2xl font-bold">{formatarTempo(data.tempo_medio.ciclo_completo)}</p>
+                <p className="text-2xl font-bold">
+                  {formatarTempo(data.tempo_medio.ciclo_completo)}
+                </p>
                 <p className="text-xs text-gray-500 mt-1">Proposta até pagamento</p>
               </div>
               <Clock className="h-8 w-8 text-orange-500" />
@@ -339,13 +370,15 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={[
-                  { etapa: 'Criadas', valor: data.funil.propostas_criadas },
-                  { etapa: 'Enviadas', valor: data.funil.propostas_enviadas },
-                  { etapa: 'Aprovadas', valor: data.funil.propostas_aprovadas },
-                  { etapa: 'Assinadas', valor: data.funil.contratos_assinados },
-                  { etapa: 'Pagas', valor: data.funil.faturas_pagas }
-                ]}>
+                <BarChart
+                  data={[
+                    { etapa: 'Criadas', valor: data.funil.propostas_criadas },
+                    { etapa: 'Enviadas', valor: data.funil.propostas_enviadas },
+                    { etapa: 'Aprovadas', valor: data.funil.propostas_aprovadas },
+                    { etapa: 'Assinadas', valor: data.funil.contratos_assinados },
+                    { etapa: 'Pagas', valor: data.funil.faturas_pagas },
+                  ]}
+                >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="etapa" />
                   <YAxis />
@@ -374,9 +407,13 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                 <Tooltip
                   formatter={(value, name) => [
                     name === 'valor' ? formatarMoeda(value as number) : value,
-                    name === 'valor' ? 'Valor Vendido' :
-                      name === 'vendas' ? 'Vendas Fechadas' :
-                        name === 'propostas' ? 'Propostas Criadas' : 'Taxa de Conversão'
+                    name === 'valor'
+                      ? 'Valor Vendido'
+                      : name === 'vendas'
+                        ? 'Vendas Fechadas'
+                        : name === 'propostas'
+                          ? 'Propostas Criadas'
+                          : 'Taxa de Conversão',
                   ]}
                 />
                 <Legend />
@@ -438,13 +475,15 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                     <td className="text-center p-2">{vendedor.propostas_criadas}</td>
                     <td className="text-center p-2">{vendedor.propostas_fechadas}</td>
                     <td className="text-center p-2">
-                      <Badge variant={vendedor.conversao >= 20 ? "default" : "secondary"}>
+                      <Badge variant={vendedor.conversao >= 20 ? 'default' : 'secondary'}>
                         {formatarPercentual(vendedor.conversao)}
                       </Badge>
                     </td>
                     <td className="text-center p-2">{formatarMoeda(vendedor.valor_vendido)}</td>
                     <td className="text-center p-2">{formatarMoeda(vendedor.ticket_medio)}</td>
-                    <td className="text-center p-2">{formatarTempo(vendedor.tempo_medio_fechamento)}</td>
+                    <td className="text-center p-2">
+                      {formatarTempo(vendedor.tempo_medio_fechamento)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -491,7 +530,10 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           <CardContent>
             <div className="space-y-3">
               {data.status_atual.map((status, index) => (
-                <div key={status.status} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div
+                  key={status.status}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                >
                   <div className="flex items-center gap-3">
                     <div
                       className="w-4 h-4 rounded-full"

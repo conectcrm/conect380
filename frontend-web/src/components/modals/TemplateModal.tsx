@@ -9,7 +9,15 @@ import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { Save, FileText, DollarSign, User, Tag } from 'lucide-react';
-import { BaseModal, FormField, FormInput, FormTextarea, FormSelect, ModalButton, ModalCard } from './BaseModal';
+import {
+  BaseModal,
+  FormField,
+  FormInput,
+  FormTextarea,
+  FormSelect,
+  ModalButton,
+  ModalCard,
+} from './BaseModal';
 
 // 1. INTERFACES E TIPOS
 interface FormData {
@@ -29,34 +37,24 @@ interface TemplateModalProps {
 
 // 2. SCHEMA DE VALIDAÇÃO
 const schema = yup.object({
-  campo1: yup
-    .string()
-    .required('Campo 1 é obrigatório')
-    .min(3, 'Mínimo 3 caracteres'),
-  campo2: yup
-    .string()
-    .required('Campo 2 é obrigatório'),
-  campo3: yup
-    .number()
-    .required('Campo 3 é obrigatório')
-    .min(0, 'Valor deve ser positivo'),
-  categoria: yup
-    .string()
-    .required('Categoria é obrigatória')
+  campo1: yup.string().required('Campo 1 é obrigatório').min(3, 'Mínimo 3 caracteres'),
+  campo2: yup.string().required('Campo 2 é obrigatório'),
+  campo3: yup.number().required('Campo 3 é obrigatório').min(0, 'Valor deve ser positivo'),
+  categoria: yup.string().required('Categoria é obrigatória'),
 });
 
 // 3. DADOS MOCK/OPÇÕES
 const categorias = [
   { value: 'categoria1', label: 'Categoria 1' },
   { value: 'categoria2', label: 'Categoria 2' },
-  { value: 'categoria3', label: 'Categoria 3' }
+  { value: 'categoria3', label: 'Categoria 3' },
 ];
 
 // 4. ETAPAS (se for um modal com wizard)
 const etapas = [
   { id: 'basicas', titulo: 'Informações Básicas', icone: FileText },
   { id: 'valores', titulo: 'Valores', icone: DollarSign },
-  { id: 'classificacao', titulo: 'Classificação', icone: Tag }
+  { id: 'classificacao', titulo: 'Classificação', icone: Tag },
 ];
 
 // 5. COMPONENTE PRINCIPAL
@@ -65,7 +63,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
   onClose,
   onSave,
   data,
-  isLoading = false
+  isLoading = false,
 }) => {
   // 6. ESTADO LOCAL (se necessário)
   const [etapaAtual, setEtapaAtual] = useState(0);
@@ -77,7 +75,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
     control,
     formState: { errors, isValid },
     reset,
-    watch
+    watch,
   } = useForm<FormData>({
     resolver: yupResolver(schema),
     mode: 'onChange',
@@ -85,8 +83,8 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
       campo1: '',
       campo2: '',
       campo3: 0,
-      categoria: ''
-    }
+      categoria: '',
+    },
   });
 
   // 8. EFFECTS
@@ -99,7 +97,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
           campo1: '',
           campo2: '',
           campo3: 0,
-          categoria: ''
+          categoria: '',
         });
       }
     }
@@ -141,31 +139,19 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
     <div className="flex items-center justify-between w-full">
       <div className="flex gap-2">
         {etapaAtual > 0 && (
-          <ModalButton
-            type="button"
-            variant="secondary"
-            onClick={handleEtapaAnterior}
-          >
+          <ModalButton type="button" variant="secondary" onClick={handleEtapaAnterior}>
             Anterior
           </ModalButton>
         )}
       </div>
 
       <div className="flex gap-2">
-        <ModalButton
-          type="button"
-          variant="secondary"
-          onClick={handleClose}
-        >
+        <ModalButton type="button" variant="secondary" onClick={handleClose}>
           Cancelar
         </ModalButton>
 
         {etapaAtual < etapas.length - 1 ? (
-          <ModalButton
-            type="button"
-            variant="primary"
-            onClick={handleProximaEtapa}
-          >
+          <ModalButton type="button" variant="primary" onClick={handleProximaEtapa}>
             Próximo
           </ModalButton>
         ) : (
@@ -202,11 +188,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
               />
             </FormField>
 
-            <FormField
-              label="Campo 2"
-              required
-              error={errors.campo2?.message}
-            >
+            <FormField label="Campo 2" required error={errors.campo2?.message}>
               <FormTextarea
                 {...register('campo2')}
                 placeholder="Digite uma descrição"
@@ -220,11 +202,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
       case 1:
         return (
           <div className="space-y-4">
-            <FormField
-              label="Campo 3 (Numérico)"
-              required
-              error={errors.campo3?.message}
-            >
+            <FormField label="Campo 3 (Numérico)" required error={errors.campo3?.message}>
               <FormInput
                 {...register('campo3', { valueAsNumber: true })}
                 type="number"
@@ -236,9 +214,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
             <ModalCard variant="info">
               <div className="flex items-center gap-2">
                 <DollarSign className="w-4 h-4 text-blue-600" />
-                <p className="text-sm text-blue-700">
-                  Informação adicional sobre valores
-                </p>
+                <p className="text-sm text-blue-700">Informação adicional sobre valores</p>
               </div>
             </ModalCard>
           </div>
@@ -247,11 +223,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
       case 2:
         return (
           <div className="space-y-4">
-            <FormField
-              label="Categoria"
-              required
-              error={errors.categoria?.message}
-            >
+            <FormField label="Categoria" required error={errors.categoria?.message}>
               <FormSelect
                 {...register('categoria')}
                 options={categorias}
@@ -263,11 +235,17 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
             <ModalCard variant="default">
               <h4 className="font-medium text-gray-900 mb-2">Resumo</h4>
               <div className="space-y-1 text-sm text-gray-600">
-                <p><strong>Campo 1:</strong> {watch('campo1') || 'Não informado'}</p>
-                <p><strong>Campo 3:</strong> {watch('campo3') || 0}</p>
-                <p><strong>Categoria:</strong> {
-                  categorias.find(c => c.value === watch('categoria'))?.label || 'Não selecionada'
-                }</p>
+                <p>
+                  <strong>Campo 1:</strong> {watch('campo1') || 'Não informado'}
+                </p>
+                <p>
+                  <strong>Campo 3:</strong> {watch('campo3') || 0}
+                </p>
+                <p>
+                  <strong>Categoria:</strong>{' '}
+                  {categorias.find((c) => c.value === watch('categoria'))?.label ||
+                    'Não selecionada'}
+                </p>
               </div>
             </ModalCard>
           </div>
@@ -290,9 +268,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
       currentStep={etapaAtual}
       footer={footerContent}
     >
-      <form onSubmit={handleSubmit(onSubmit)}>
-        {renderEtapaConteudo()}
-      </form>
+      <form onSubmit={handleSubmit(onSubmit)}>{renderEtapaConteudo()}</form>
     </BaseModal>
   );
 };

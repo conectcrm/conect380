@@ -22,7 +22,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
   onClose,
   onSave,
   cliente,
-  isLoading = false
+  isLoading = false,
 }) => {
   const { t } = useI18n();
 
@@ -33,7 +33,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
     watch,
     reset,
     setValue,
-    formState: { errors, isValid, isSubmitting }
+    formState: { errors, isValid, isSubmitting },
   } = useForm<ClienteFormData>({
     resolver: yupResolver(clienteValidationSchema),
     mode: 'onChange', // Ativando validação em tempo real conforme solicitado
@@ -57,8 +57,8 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
       },
       observacoes: '',
       status: 'lead',
-      tags: []
-    }
+      tags: [],
+    },
   });
 
   // Atualizar formulário quando cliente mudar
@@ -85,7 +85,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
           },
           observacoes: cliente.observacoes || '',
           status: cliente.status || 'lead',
-          tags: cliente.tags || []
+          tags: cliente.tags || [],
         });
       } else {
         reset({
@@ -108,7 +108,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
           },
           observacoes: '',
           status: 'lead',
-          tags: []
+          tags: [],
         });
       }
     }
@@ -155,7 +155,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
         tags: data.tags || [],
         data_nascimento: '',
         profissao: '',
-        renda: 0
+        renda: 0,
       };
 
       await onSave(clienteData);
@@ -194,14 +194,16 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
         </div>
 
         {/* Form compacto em formato paisagem */}
-        <form onSubmit={handleSubmit(onSubmit, (errors) => {
-          console.log('Erros de validação:', errors);
-          console.log('Estado do formulário - isValid:', isValid);
-          console.log('Campos com erro:', Object.keys(errors));
-        })} className="flex-1 overflow-y-auto">
+        <form
+          onSubmit={handleSubmit(onSubmit, (errors) => {
+            console.log('Erros de validação:', errors);
+            console.log('Estado do formulário - isValid:', isValid);
+            console.log('Campos com erro:', Object.keys(errors));
+          })}
+          className="flex-1 overflow-y-auto"
+        >
           <div className="p-4">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
               {/* Coluna 1: Dados Básicos */}
               <div className="space-y-3">
                 <div className="flex items-center mb-3">
@@ -246,16 +248,12 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
                   error={errors.tipo}
                   options={[
                     { value: 'pessoa_fisica', label: 'Pessoa Física' },
-                    { value: 'pessoa_juridica', label: 'Pessoa Jurídica' }
+                    { value: 'pessoa_juridica', label: 'Pessoa Jurídica' },
                   ]}
                 />
 
                 {/* Documentos compactos */}
-                <DocumentField
-                  register={register}
-                  errors={errors}
-                  watchTipo={watch('tipo')}
-                />
+                <DocumentField register={register} errors={errors} watchTipo={watch('tipo')} />
 
                 <FormField
                   name="status"
@@ -268,7 +266,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
                     { value: 'lead', label: 'Lead' },
                     { value: 'prospect', label: 'Prospect' },
                     { value: 'cliente', label: 'Cliente' },
-                    { value: 'inativo', label: 'Inativo' }
+                    { value: 'inativo', label: 'Inativo' },
                   ]}
                 />
 
@@ -307,11 +305,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
                 />
 
                 {/* Campos de endereço compactos */}
-                <AddressFields
-                  register={register}
-                  errors={errors}
-                  prefix="endereco"
-                />
+                <AddressFields register={register} errors={errors} prefix="endereco" />
               </div>
 
               {/* Coluna 3: Observações e Status */}
@@ -336,21 +330,37 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
                 <div className="bg-gray-50 p-3 rounded-lg">
                   <h4 className="text-sm font-medium text-gray-700 mb-2">Status do Formulário</h4>
                   <div className="space-y-1 text-xs">
-                    <div className={`flex items-center ${errors.nome ? 'text-red-600' : 'text-green-600'}`}>
-                      <div className={`w-2 h-2 rounded-full mr-2 ${errors.nome ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                    <div
+                      className={`flex items-center ${errors.nome ? 'text-red-600' : 'text-green-600'}`}
+                    >
+                      <div
+                        className={`w-2 h-2 rounded-full mr-2 ${errors.nome ? 'bg-red-500' : 'bg-green-500'}`}
+                      ></div>
                       Nome {errors.nome ? 'obrigatório' : 'preenchido'}
                     </div>
-                    <div className={`flex items-center ${errors.email ? 'text-red-600' : 'text-green-600'}`}>
-                      <div className={`w-2 h-2 rounded-full mr-2 ${errors.email ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                    <div
+                      className={`flex items-center ${errors.email ? 'text-red-600' : 'text-green-600'}`}
+                    >
+                      <div
+                        className={`w-2 h-2 rounded-full mr-2 ${errors.email ? 'bg-red-500' : 'bg-green-500'}`}
+                      ></div>
                       E-mail {errors.email ? 'inválido' : 'válido'}
                     </div>
-                    <div className={`flex items-center ${errors.tipo ? 'text-red-600' : 'text-green-600'}`}>
-                      <div className={`w-2 h-2 rounded-full mr-2 ${errors.tipo ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                    <div
+                      className={`flex items-center ${errors.tipo ? 'text-red-600' : 'text-green-600'}`}
+                    >
+                      <div
+                        className={`w-2 h-2 rounded-full mr-2 ${errors.tipo ? 'bg-red-500' : 'bg-green-500'}`}
+                      ></div>
                       Tipo {errors.tipo ? 'obrigatório' : 'selecionado'}
                     </div>
-                    <div className={`flex items-center ${(errors.cpf || errors.cnpj) ? 'text-red-600' : 'text-green-600'}`}>
-                      <div className={`w-2 h-2 rounded-full mr-2 ${(errors.cpf || errors.cnpj) ? 'bg-red-500' : 'bg-green-500'}`}></div>
-                      Documento {(errors.cpf || errors.cnpj) ? 'inválido' : 'válido'}
+                    <div
+                      className={`flex items-center ${errors.cpf || errors.cnpj ? 'text-red-600' : 'text-green-600'}`}
+                    >
+                      <div
+                        className={`w-2 h-2 rounded-full mr-2 ${errors.cpf || errors.cnpj ? 'bg-red-500' : 'bg-green-500'}`}
+                      ></div>
+                      Documento {errors.cpf || errors.cnpj ? 'inválido' : 'válido'}
                     </div>
                   </div>
                 </div>
@@ -364,10 +374,13 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
               {Object.keys(errors).length > 0 ? (
                 <span className="text-red-600 flex items-center">
                   <X className="w-4 h-4 mr-1" />
-                  {Object.keys(errors).length} {t('form.fieldsWithError')}: {Object.keys(errors).join(', ')}
+                  {Object.keys(errors).length} {t('form.fieldsWithError')}:{' '}
+                  {Object.keys(errors).join(', ')}
                 </span>
               ) : (
-                <span className={`flex items-center ${isValid ? 'text-green-600' : 'text-orange-600'}`}>
+                <span
+                  className={`flex items-center ${isValid ? 'text-green-600' : 'text-orange-600'}`}
+                >
                   <User className="w-4 h-4 mr-1" />
                   {isValid ? t('form.validForm') : t('form.fillAllRequiredFields')}
                 </span>
@@ -388,9 +401,7 @@ const ClienteModalCompact: React.FC<ClienteModalProps> = ({
                 disabled={!isValid || isSubmitting || isLoading}
                 className="px-6 py-2 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                {(isSubmitting || isLoading) && (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                )}
+                {(isSubmitting || isLoading) && <Loader2 className="w-4 h-4 animate-spin" />}
                 {cliente ? t('common.update') : 'Criar'} {t('common.client')}
               </button>
             </div>

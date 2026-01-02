@@ -20,14 +20,17 @@ const PortalRoutes: React.FC = () => {
       <Route path="/proposta/:propostaId" element={<PortalClienteProposta />} />
 
       {/* Rota de fallback */}
-      <Route path="*" element={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Portal do Cliente</h1>
-            <p className="text-gray-600">Link inválido ou proposta não encontrada.</p>
+      <Route
+        path="*"
+        element={
+          <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-gray-900 mb-4">Portal do Cliente</h1>
+              <p className="text-gray-600">Link inválido ou proposta não encontrada.</p>
+            </div>
           </div>
-        </div>
-      } />
+        }
+      />
     </Routes>
   );
 };

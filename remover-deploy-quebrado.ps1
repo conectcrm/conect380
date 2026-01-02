@@ -9,9 +9,9 @@
 # ============================================
 
 param(
-    [switch]$KeepImages,
-    [switch]$Force,
-    [switch]$Help
+  [switch]$KeepImages,
+  [switch]$Force,
+  [switch]$Help
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,63 +21,63 @@ $ErrorActionPreference = "Stop"
 # ═══════════════════════════════════════════════════════════════
 
 function Write-Header {
-    param([string]$Text)
-    Write-Host ""
-    Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor DarkCyan
-    Write-Host "  $Text" -ForegroundColor Yellow
-    Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor DarkCyan
-    Write-Host ""
+  param([string]$Text)
+  Write-Host ""
+  Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor DarkCyan
+  Write-Host "  $Text" -ForegroundColor Yellow
+  Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor DarkCyan
+  Write-Host ""
 }
 
 function Write-Step {
-    param([string]$Text)
-    Write-Host "📋 $Text" -ForegroundColor Cyan
+  param([string]$Text)
+  Write-Host "📋 $Text" -ForegroundColor Cyan
 }
 
 function Write-Success {
-    param([string]$Text)
-    Write-Host "✅ $Text" -ForegroundColor Green
+  param([string]$Text)
+  Write-Host "✅ $Text" -ForegroundColor Green
 }
 
 function Write-Warning {
-    param([string]$Text)
-    Write-Host "⚠️  $Text" -ForegroundColor Yellow
+  param([string]$Text)
+  Write-Host "⚠️  $Text" -ForegroundColor Yellow
 }
 
 function Write-Error-Message {
-    param([string]$Text)
-    Write-Host "❌ $Text" -ForegroundColor Red
+  param([string]$Text)
+  Write-Host "❌ $Text" -ForegroundColor Red
 }
 
 function Confirm-Action {
-    param([string]$Message)
+  param([string]$Message)
     
-    if ($Force) {
-        return $true
-    }
+  if ($Force) {
+    return $true
+  }
     
-    $response = Read-Host "$Message (s/N)"
-    return $response -eq "s" -or $response -eq "S"
+  $response = Read-Host "$Message (s/N)"
+  return $response -eq "s" -or $response -eq "S"
 }
 
 function Show-Help {
-    Write-Host ""
-    Write-Host "🔧 REMOVER DEPLOY QUEBRADO - ConectCRM" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "USO:" -ForegroundColor Cyan
-    Write-Host "  .\remover-deploy-quebrado.ps1 [opções]"
-    Write-Host ""
-    Write-Host "OPÇÕES:" -ForegroundColor Cyan
-    Write-Host "  -KeepImages    Não remove imagens Docker (mais rápido para rebuild)"
-    Write-Host "  -Force         Não pede confirmação (use com cuidado!)"
-    Write-Host "  -Help          Mostra esta ajuda"
-    Write-Host ""
-    Write-Host "EXEMPLOS:" -ForegroundColor Cyan
-    Write-Host "  .\remover-deploy-quebrado.ps1"
-    Write-Host "  .\remover-deploy-quebrado.ps1 -KeepImages"
-    Write-Host "  .\remover-deploy-quebrado.ps1 -Force"
-    Write-Host ""
-    exit 0
+  Write-Host ""
+  Write-Host "🔧 REMOVER DEPLOY QUEBRADO - ConectCRM" -ForegroundColor Yellow
+  Write-Host ""
+  Write-Host "USO:" -ForegroundColor Cyan
+  Write-Host "  .\remover-deploy-quebrado.ps1 [opções]"
+  Write-Host ""
+  Write-Host "OPÇÕES:" -ForegroundColor Cyan
+  Write-Host "  -KeepImages    Não remove imagens Docker (mais rápido para rebuild)"
+  Write-Host "  -Force         Não pede confirmação (use com cuidado!)"
+  Write-Host "  -Help          Mostra esta ajuda"
+  Write-Host ""
+  Write-Host "EXEMPLOS:" -ForegroundColor Cyan
+  Write-Host "  .\remover-deploy-quebrado.ps1"
+  Write-Host "  .\remover-deploy-quebrado.ps1 -KeepImages"
+  Write-Host "  .\remover-deploy-quebrado.ps1 -Force"
+  Write-Host ""
+  exit 0
 }
 
 # ═══════════════════════════════════════════════════════════════
@@ -85,7 +85,7 @@ function Show-Help {
 # ═══════════════════════════════════════════════════════════════
 
 if ($Help) {
-    Show-Help
+  Show-Help
 }
 
 Write-Header "🔧 REMOVER DEPLOY QUEBRADO - ConectCRM"
@@ -95,13 +95,13 @@ Write-Host "  1. Parar todos os containers do deploy atual"
 Write-Host "  2. Remover containers e networks"
 Write-Host "  3. Limpar recursos órfãos"
 if (-not $KeepImages) {
-    Write-Host "  4. Remover imagens antigas (para rebuild limpo)"
+  Write-Host "  4. Remover imagens antigas (para rebuild limpo)"
 }
 Write-Host ""
 
 if (-not (Confirm-Action "Deseja continuar?")) {
-    Write-Warning "Operação cancelada pelo usuário."
-    exit 0
+  Write-Warning "Operação cancelada pelo usuário."
+  exit 0
 }
 
 # ═══════════════════════════════════════════════════════════════
@@ -114,28 +114,29 @@ Write-Step "Verificando containers rodando..."
 $containers = docker ps --filter "name=conectcrm" --format "{{.Names}}"
 
 if ($containers) {
-    Write-Host ""
-    Write-Host "Containers encontrados:" -ForegroundColor Yellow
-    $containers | ForEach-Object { Write-Host "  - $_" -ForegroundColor White }
-    Write-Host ""
-} else {
-    Write-Warning "Nenhum container ConectCRM rodando."
+  Write-Host ""
+  Write-Host "Containers encontrados:" -ForegroundColor Yellow
+  $containers | ForEach-Object { Write-Host "  - $_" -ForegroundColor White }
+  Write-Host ""
+}
+else {
+  Write-Warning "Nenhum container ConectCRM rodando."
 }
 
 Write-Step "Verificando docker-compose files..."
 $composeFiles = @()
 if (Test-Path "docker-compose.prod.yml") {
-    $composeFiles += "docker-compose.prod.yml"
-    Write-Host "  ✓ docker-compose.prod.yml encontrado" -ForegroundColor Green
+  $composeFiles += "docker-compose.prod.yml"
+  Write-Host "  ✓ docker-compose.prod.yml encontrado" -ForegroundColor Green
 }
 if (Test-Path "docker-compose.yml") {
-    $composeFiles += "docker-compose.yml"
-    Write-Host "  ✓ docker-compose.yml encontrado" -ForegroundColor Green
+  $composeFiles += "docker-compose.yml"
+  Write-Host "  ✓ docker-compose.yml encontrado" -ForegroundColor Green
 }
 
 if ($composeFiles.Count -eq 0) {
-    Write-Error-Message "Nenhum arquivo docker-compose encontrado!"
-    exit 1
+  Write-Error-Message "Nenhum arquivo docker-compose encontrado!"
+  exit 1
 }
 
 # ═══════════════════════════════════════════════════════════════
@@ -145,13 +146,14 @@ if ($composeFiles.Count -eq 0) {
 Write-Header "PASSO 2: Parando Containers"
 
 foreach ($composeFile in $composeFiles) {
-    Write-Step "Parando containers de $composeFile..."
-    try {
-        docker-compose -f $composeFile down 2>&1 | Out-Null
-        Write-Success "Containers de $composeFile parados"
-    } catch {
-        Write-Warning "Erro ao parar $composeFile (pode já estar parado)"
-    }
+  Write-Step "Parando containers de $composeFile..."
+  try {
+    docker-compose -f $composeFile down 2>&1 | Out-Null
+    Write-Success "Containers de $composeFile parados"
+  }
+  catch {
+    Write-Warning "Erro ao parar $composeFile (pode já estar parado)"
+  }
 }
 
 # ═══════════════════════════════════════════════════════════════
@@ -174,19 +176,20 @@ Write-Step "Verificando se ainda há containers rodando..."
 $stillRunning = docker ps --filter "name=conectcrm" --format "{{.Names}}"
 
 if ($stillRunning) {
-    Write-Warning "Ainda há containers rodando:"
-    $stillRunning | ForEach-Object { 
-        Write-Host "  - $_" -ForegroundColor Red
+  Write-Warning "Ainda há containers rodando:"
+  $stillRunning | ForEach-Object { 
+    Write-Host "  - $_" -ForegroundColor Red
         
-        if (Confirm-Action "Forçar remoção de $_?") {
-            Write-Step "Forçando remoção de $_..."
-            docker stop $_ 2>&1 | Out-Null
-            docker rm -f $_ 2>&1 | Out-Null
-            Write-Success "$_ removido"
-        }
+    if (Confirm-Action "Forçar remoção de $_?") {
+      Write-Step "Forçando remoção de $_..."
+      docker stop $_ 2>&1 | Out-Null
+      docker rm -f $_ 2>&1 | Out-Null
+      Write-Success "$_ removido"
     }
-} else {
-    Write-Success "Nenhum container ConectCRM rodando!"
+  }
+}
+else {
+  Write-Success "Nenhum container ConectCRM rodando!"
 }
 
 # ═══════════════════════════════════════════════════════════════
@@ -194,42 +197,46 @@ if ($stillRunning) {
 # ═══════════════════════════════════════════════════════════════
 
 if (-not $KeepImages) {
-    Write-Header "PASSO 5: Removendo Imagens Antigas"
+  Write-Header "PASSO 5: Removendo Imagens Antigas"
     
-    Write-Step "Listando imagens ConectCRM..."
-    $images = docker images --filter "reference=*conectcrm*" --format "{{.Repository}}:{{.Tag}}"
+  Write-Step "Listando imagens ConectCRM..."
+  $images = docker images --filter "reference=*conectcrm*" --format "{{.Repository}}:{{.Tag}}"
     
-    if ($images) {
-        Write-Host ""
-        Write-Host "Imagens encontradas:" -ForegroundColor Yellow
-        $images | ForEach-Object { Write-Host "  - $_" -ForegroundColor White }
-        Write-Host ""
-        
-        if (Confirm-Action "Remover essas imagens?") {
-            Write-Step "Removendo imagens..."
-            $images | ForEach-Object {
-                try {
-                    docker rmi $_ 2>&1 | Out-Null
-                    Write-Host "  ✓ $_ removida" -ForegroundColor Green
-                } catch {
-                    Write-Warning "Não foi possível remover $_"
-                }
-            }
-            Write-Success "Imagens removidas"
-        } else {
-            Write-Warning "Remoção de imagens cancelada"
-        }
-    } else {
-        Write-Host "Nenhuma imagem ConectCRM encontrada." -ForegroundColor Gray
-    }
-    
-    # Limpar imagens órfãs
-    Write-Step "Limpando imagens órfãs..."
-    docker image prune -f 2>&1 | Out-Null
-    Write-Success "Imagens órfãs limpas"
-} else {
+  if ($images) {
     Write-Host ""
-    Write-Host "⏭️  Pulando remoção de imagens (opção -KeepImages)" -ForegroundColor Gray
+    Write-Host "Imagens encontradas:" -ForegroundColor Yellow
+    $images | ForEach-Object { Write-Host "  - $_" -ForegroundColor White }
+    Write-Host ""
+        
+    if (Confirm-Action "Remover essas imagens?") {
+      Write-Step "Removendo imagens..."
+      $images | ForEach-Object {
+        try {
+          docker rmi $_ 2>&1 | Out-Null
+          Write-Host "  ✓ $_ removida" -ForegroundColor Green
+        }
+        catch {
+          Write-Warning "Não foi possível remover $_"
+        }
+      }
+      Write-Success "Imagens removidas"
+    }
+    else {
+      Write-Warning "Remoção de imagens cancelada"
+    }
+  }
+  else {
+    Write-Host "Nenhuma imagem ConectCRM encontrada." -ForegroundColor Gray
+  }
+    
+  # Limpar imagens órfãs
+  Write-Step "Limpando imagens órfãs..."
+  docker image prune -f 2>&1 | Out-Null
+  Write-Success "Imagens órfãs limpas"
+}
+else {
+  Write-Host ""
+  Write-Host "⏭️  Pulando remoção de imagens (opção -KeepImages)" -ForegroundColor Gray
 }
 
 # ═══════════════════════════════════════════════════════════════
@@ -242,30 +249,33 @@ Write-Warning "Atenção: Remover volumes irá APAGAR DADOS do banco PostgreSQL 
 Write-Host ""
 
 if (Confirm-Action "Deseja remover volumes Docker?") {
-    Write-Step "Listando volumes..."
-    $volumes = docker volume ls --filter "name=conectcrm" --format "{{.Name}}"
+  Write-Step "Listando volumes..."
+  $volumes = docker volume ls --filter "name=conectcrm" --format "{{.Name}}"
     
-    if ($volumes) {
-        Write-Host ""
-        Write-Host "Volumes encontrados:" -ForegroundColor Yellow
-        $volumes | ForEach-Object { Write-Host "  - $_" -ForegroundColor White }
-        Write-Host ""
+  if ($volumes) {
+    Write-Host ""
+    Write-Host "Volumes encontrados:" -ForegroundColor Yellow
+    $volumes | ForEach-Object { Write-Host "  - $_" -ForegroundColor White }
+    Write-Host ""
         
-        if (Confirm-Action "⚠️  CONFIRMAR remoção de volumes (DADOS SERÃO PERDIDOS)?") {
-            Write-Step "Removendo volumes..."
-            $volumes | ForEach-Object {
-                docker volume rm $_ 2>&1 | Out-Null
-                Write-Host "  ✓ $_ removido" -ForegroundColor Green
-            }
-            Write-Success "Volumes removidos"
-        } else {
-            Write-Warning "Remoção de volumes cancelada"
-        }
-    } else {
-        Write-Host "Nenhum volume ConectCRM encontrado." -ForegroundColor Gray
+    if (Confirm-Action "⚠️  CONFIRMAR remoção de volumes (DADOS SERÃO PERDIDOS)?") {
+      Write-Step "Removendo volumes..."
+      $volumes | ForEach-Object {
+        docker volume rm $_ 2>&1 | Out-Null
+        Write-Host "  ✓ $_ removido" -ForegroundColor Green
+      }
+      Write-Success "Volumes removidos"
     }
-} else {
-    Write-Host "Volumes preservados." -ForegroundColor Gray
+    else {
+      Write-Warning "Remoção de volumes cancelada"
+    }
+  }
+  else {
+    Write-Host "Nenhum volume ConectCRM encontrado." -ForegroundColor Gray
+  }
+}
+else {
+  Write-Host "Volumes preservados." -ForegroundColor Gray
 }
 
 # ═══════════════════════════════════════════════════════════════

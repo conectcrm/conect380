@@ -12,7 +12,7 @@ const ModuleUnderConstruction: React.FC<ModuleUnderConstructionProps> = ({
   moduleName,
   description,
   estimatedCompletion,
-  features
+  features,
 }) => {
   return (
     <div className="min-h-[60vh] flex items-center justify-center p-6">
@@ -23,16 +23,10 @@ const ModuleUnderConstruction: React.FC<ModuleUnderConstructionProps> = ({
         </div>
 
         {/* Título */}
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">
-          {moduleName}
-        </h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-4">{moduleName}</h1>
 
         {/* Descrição */}
-        {description && (
-          <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-            {description}
-          </p>
-        )}
+        {description && <p className="text-xl text-gray-600 mb-8 leading-relaxed">{description}</p>}
 
         {/* Status */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-8">
@@ -67,7 +61,7 @@ const ModuleUnderConstruction: React.FC<ModuleUnderConstructionProps> = ({
         {/* Call to Action */}
         <div className="mt-8 p-4 bg-gray-50 rounded-lg">
           <p className="text-sm text-gray-600">
-            Este módulo está sendo desenvolvido seguindo as melhores práticas de UX/UI. 
+            Este módulo está sendo desenvolvido seguindo as melhores práticas de UX/UI.
             <br />
             <strong>Fique atento às próximas atualizações!</strong>
           </p>

@@ -24,7 +24,7 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
 } from 'lucide-react';
 
 interface ModalDetalhesUsuarioProps {
@@ -45,7 +45,7 @@ interface TabAtiva {
 const TABS: TabAtiva[] = [
   { id: 'detalhes', nome: 'Detalhes', icone: <User className="w-4 h-4" /> },
   { id: 'historico', nome: 'Histórico', icone: <History className="w-4 h-4" /> },
-  { id: 'configuracoes', nome: 'Configurações', icone: <Settings className="w-4 h-4" /> }
+  { id: 'configuracoes', nome: 'Configurações', icone: <Settings className="w-4 h-4" /> },
 ];
 
 export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
@@ -54,7 +54,7 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
   usuario,
   onSalvarUsuario,
   onExcluirUsuario,
-  onAlterarStatus
+  onAlterarStatus,
 }) => {
   const [tabAtiva, setTabAtiva] = useState<'detalhes' | 'historico' | 'configuracoes'>('detalhes');
   const [modoEdicao, setModoEdicao] = useState(false);
@@ -148,7 +148,7 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
         } finally {
           setIsLoading(false);
         }
-      }
+      },
     });
   };
 
@@ -175,7 +175,7 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
         } finally {
           setIsLoading(false);
         }
-      }
+      },
     });
   };
 
@@ -263,11 +263,15 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 {Object.entries(ROLE_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
                 ))}
               </select>
             ) : (
-              <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[usuario.role]}`}>
+              <div
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[usuario.role]}`}
+              >
                 {ROLE_LABELS[usuario.role]}
               </div>
             )}
@@ -324,7 +328,9 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
               Criado em
             </label>
             <div className="text-gray-900">
-              {usuario.created_at ? new Date(usuario.created_at).toLocaleDateString('pt-BR') : 'Não informado'}
+              {usuario.created_at
+                ? new Date(usuario.created_at).toLocaleDateString('pt-BR')
+                : 'Não informado'}
             </div>
           </div>
 
@@ -335,7 +341,9 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
               Último Login
             </label>
             <div className="text-gray-900">
-              {usuario.ultimo_login ? new Date(usuario.ultimo_login).toLocaleDateString('pt-BR') : 'Nunca'}
+              {usuario.ultimo_login
+                ? new Date(usuario.ultimo_login).toLocaleDateString('pt-BR')
+                : 'Nunca'}
             </div>
           </div>
         </div>
@@ -373,13 +381,18 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
           <button
             onClick={handleAlterarStatus}
             disabled={isLoading}
-            className={`flex items-center justify-center px-4 py-3 text-white rounded-lg transition-colors disabled:opacity-50 ${usuario.ativo
+            className={`flex items-center justify-center px-4 py-3 text-white rounded-lg transition-colors disabled:opacity-50 ${
+              usuario.ativo
                 ? 'bg-yellow-600 hover:bg-yellow-700'
                 : 'bg-green-600 hover:bg-green-700'
-              }`}
+            }`}
           >
-            {usuario.ativo ? <UserX className="w-4 h-4 mr-2" /> : <UserCheck className="w-4 h-4 mr-2" />}
-            {isLoading ? 'Processando...' : (usuario.ativo ? 'Inativar' : 'Ativar')}
+            {usuario.ativo ? (
+              <UserX className="w-4 h-4 mr-2" />
+            ) : (
+              <UserCheck className="w-4 h-4 mr-2" />
+            )}
+            {isLoading ? 'Processando...' : usuario.ativo ? 'Inativar' : 'Ativar'}
           </button>
         </div>
       </div>
@@ -400,7 +413,9 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
             <div className="flex-1">
               <div className="text-sm font-medium text-gray-900">Usuário criado</div>
               <div className="text-sm text-gray-500">
-                {usuario.created_at ? new Date(usuario.created_at).toLocaleString('pt-BR') : 'Data não informada'}
+                {usuario.created_at
+                  ? new Date(usuario.created_at).toLocaleString('pt-BR')
+                  : 'Data não informada'}
               </div>
             </div>
           </div>
@@ -509,10 +524,11 @@ export const ModalDetalhesUsuario: React.FC<ModalDetalhesUsuarioProps> = ({
                 <button
                   key={tab.id}
                   onClick={() => setTabAtiva(tab.id)}
-                  className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${tabAtiva === tab.id
+                  className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    tabAtiva === tab.id
                       ? 'border-[#159A9C] text-[#159A9C]'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
+                  }`}
                 >
                   {tab.icone}
                   <span className="ml-2">{tab.nome}</span>

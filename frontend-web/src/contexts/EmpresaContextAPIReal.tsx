@@ -1,8 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNotifications } from './NotificationContext';
-import { minhasEmpresasService, EmpresaCompleta, NovaEmpresaRequest } from '../services/minhasEmpresasService';
+import {
+  minhasEmpresasService,
+  EmpresaCompleta,
+  NovaEmpresaRequest,
+} from '../services/minhasEmpresasService';
 
-export interface EmpresaInfo extends Omit<EmpresaCompleta, 'dataVencimento' | 'dataCriacao' | 'ultimoAcesso'> {
+export interface EmpresaInfo
+  extends Omit<EmpresaCompleta, 'dataVencimento' | 'dataCriacao' | 'ultimoAcesso'> {
   dataVencimento: Date;
   dataCriacao: Date;
   ultimoAcesso: Date;
@@ -16,8 +21,14 @@ interface EmpresaContextType {
   refreshEmpresas: () => Promise<void>;
   addEmpresa: (empresa: NovaEmpresaRequest) => Promise<void>;
   updateEmpresa: (empresaId: string, updates: Partial<EmpresaInfo>) => Promise<void>;
-  updateConfiguracoes: (empresaId: string, configuracoes: Partial<EmpresaInfo['configuracoes']>) => Promise<void>;
-  getEstatisticas: (empresaId: string, periodo?: 'mes' | 'trimestre' | 'ano') => Promise<EmpresaInfo['estatisticas']>;
+  updateConfiguracoes: (
+    empresaId: string,
+    configuracoes: Partial<EmpresaInfo['configuracoes']>,
+  ) => Promise<void>;
+  getEstatisticas: (
+    empresaId: string,
+    periodo?: 'mes' | 'trimestre' | 'ano',
+  ) => Promise<EmpresaInfo['estatisticas']>;
   error: string | null;
 }
 
@@ -43,23 +54,26 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
       const empresasData = await minhasEmpresasService.getMinhasEmpresas();
 
       // Converter datas string para Date objects
-      const empresasComDatas = empresasData.map(empresa => ({
+      if (!Array.isArray(empresasData)) {
+        console.error('❌ empresasData não é um array:', empresasData);
+        return;
+      }
+      const empresasComDatas = empresasData.map((empresa) => ({
         ...empresa,
         dataVencimento: new Date(empresa.dataVencimento),
         dataCriacao: new Date(empresa.dataCriacao),
-        ultimoAcesso: new Date(empresa.ultimoAcesso)
+        ultimoAcesso: new Date(empresa.ultimoAcesso),
       }));
 
       setEmpresas(empresasComDatas);
 
       // Buscar empresa ativa do localStorage ou primeira empresa
       const empresaAtivaId = localStorage.getItem('empresaAtiva');
-      const ativa = empresasComDatas.find(e =>
-        empresaAtivaId ? e.id === empresaAtivaId : e.isActive
-      ) || empresasComDatas[0];
+      const ativa =
+        empresasComDatas.find((e) => (empresaAtivaId ? e.id === empresaAtivaId : e.isActive)) ||
+        empresasComDatas[0];
 
       setEmpresaAtiva(ativa);
-
     } catch (error: any) {
       console.error('Erro ao carregar empresas:', error);
       setError(error.message || 'Erro ao carregar empresas');
@@ -67,7 +81,7 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
         type: 'error',
         title: 'Erro ao carregar empresas',
         message: error.message || 'Não foi possível carregar suas empresas. Tente novamente.',
-        priority: 'high'
+        priority: 'high',
       });
     } finally {
       setLoading(false);
@@ -77,7 +91,7 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
   // Alternar empresa ativa
   const switchEmpresa = async (empresaId: string) => {
     try {
-      const empresa = empresas.find(e => e.id === empresaId);
+      const empresa = empresas.find((e) => e.id === empresaId);
       if (!empresa) {
         throw new Error('Empresa não encontrada');
       }
@@ -87,10 +101,13 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
 
       if (result.success) {
         // Atualizar estado local
-        setEmpresas(prev => prev.map(e => ({
-          ...e,
-          isActive: e.id === empresaId
-        })));
+        setEmpresas((prev) => {
+          if (!Array.isArray(prev)) return [];
+          return prev.map((e) => ({
+            ...e,
+            isActive: e.id === empresaId,
+          }));
+        });
 
         setEmpresaAtiva({ ...empresa, isActive: true });
 
@@ -98,17 +115,16 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
           type: 'success',
           title: 'Empresa alterada',
           message: `Agora você está trabalhando com ${empresa.nome}`,
-          priority: 'medium'
+          priority: 'medium',
         });
       }
-
     } catch (error: any) {
       console.error('Erro ao alterar empresa:', error);
       addNotification({
         type: 'error',
         title: 'Erro ao alterar empresa',
         message: error.message || 'Não foi possível alterar a empresa. Tente novamente.',
-        priority: 'high'
+        priority: 'high',
       });
       throw error;
     }
@@ -128,25 +144,24 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
         ...empresaCriada,
         dataVencimento: new Date(empresaCriada.dataVencimento),
         dataCriacao: new Date(empresaCriada.dataCriacao),
-        ultimoAcesso: new Date(empresaCriada.ultimoAcesso)
+        ultimoAcesso: new Date(empresaCriada.ultimoAcesso),
       };
 
-      setEmpresas(prev => [...prev, empresaComDatas]);
+      setEmpresas((prev) => [...prev, empresaComDatas]);
 
       addNotification({
         type: 'success',
         title: 'Empresa cadastrada',
         message: `A empresa ${novaEmpresa.nome} foi cadastrada com sucesso.`,
-        priority: 'medium'
+        priority: 'medium',
       });
-
     } catch (error: any) {
       console.error('Erro ao adicionar empresa:', error);
       addNotification({
         type: 'error',
         title: 'Erro ao cadastrar empresa',
         message: error.message || 'Não foi possível cadastrar a empresa. Tente novamente.',
-        priority: 'high'
+        priority: 'high',
       });
       throw error;
     }
@@ -161,12 +176,13 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
         ...empresaAtualizada,
         dataVencimento: new Date(empresaAtualizada.dataVencimento),
         dataCriacao: new Date(empresaAtualizada.dataCriacao),
-        ultimoAcesso: new Date(empresaAtualizada.ultimoAcesso)
+        ultimoAcesso: new Date(empresaAtualizada.ultimoAcesso),
       };
 
-      setEmpresas(prev => prev.map(e =>
-        e.id === empresaId ? empresaComDatas : e
-      ));
+      setEmpresas((prev) => {
+        if (!Array.isArray(prev)) return [];
+        return prev.map((e) => (e.id === empresaId ? empresaComDatas : e));
+      });
 
       if (empresaAtiva?.id === empresaId) {
         setEmpresaAtiva(empresaComDatas);
@@ -176,16 +192,15 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
         type: 'success',
         title: 'Empresa atualizada',
         message: 'As informações da empresa foram atualizadas com sucesso.',
-        priority: 'medium'
+        priority: 'medium',
       });
-
     } catch (error: any) {
       console.error('Erro ao atualizar empresa:', error);
       addNotification({
         type: 'error',
         title: 'Erro ao atualizar empresa',
         message: error.message || 'Não foi possível atualizar a empresa. Tente novamente.',
-        priority: 'high'
+        priority: 'high',
       });
       throw error;
     }
@@ -194,33 +209,36 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
   // Atualizar configurações específicas
   const updateConfiguracoes = async (
     empresaId: string,
-    configuracoes: Partial<EmpresaInfo['configuracoes']>
+    configuracoes: Partial<EmpresaInfo['configuracoes']>,
   ) => {
     try {
-      const novasConfiguracoes = await minhasEmpresasService.atualizarConfiguracoes(empresaId, configuracoes);
+      const novasConfiguracoes = await minhasEmpresasService.atualizarConfiguracoes(
+        empresaId,
+        configuracoes,
+      );
 
-      setEmpresas(prev => prev.map(e =>
-        e.id === empresaId ? { ...e, configuracoes: novasConfiguracoes } : e
-      ));
+      setEmpresas((prev) => {
+        if (!Array.isArray(prev)) return [];
+        return prev.map((e) => (e.id === empresaId ? { ...e, configuracoes: novasConfiguracoes } : e));
+      });
 
       if (empresaAtiva?.id === empresaId) {
-        setEmpresaAtiva(prev => prev ? { ...prev, configuracoes: novasConfiguracoes } : null);
+        setEmpresaAtiva((prev) => (prev ? { ...prev, configuracoes: novasConfiguracoes } : null));
       }
 
       addNotification({
         type: 'success',
         title: 'Configurações atualizadas',
         message: 'As configurações foram salvas com sucesso.',
-        priority: 'low'
+        priority: 'low',
       });
-
     } catch (error: any) {
       console.error('Erro ao atualizar configurações:', error);
       addNotification({
         type: 'error',
         title: 'Erro ao atualizar configurações',
         message: error.message || 'Não foi possível atualizar as configurações.',
-        priority: 'medium'
+        priority: 'medium',
       });
       throw error;
     }
@@ -229,29 +247,29 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
   // Buscar estatísticas detalhadas
   const getEstatisticas = async (
     empresaId: string,
-    periodo: 'mes' | 'trimestre' | 'ano' = 'mes'
+    periodo: 'mes' | 'trimestre' | 'ano' = 'mes',
   ) => {
     try {
       const estatisticas = await minhasEmpresasService.getEstatisticasEmpresa(empresaId, periodo);
 
       // Atualizar estatísticas no estado local
-      setEmpresas(prev => prev.map(e =>
-        e.id === empresaId ? { ...e, estatisticas } : e
-      ));
+      setEmpresas((prev) => {
+        if (!Array.isArray(prev)) return [];
+        return prev.map((e) => (e.id === empresaId ? { ...e, estatisticas } : e));
+      });
 
       if (empresaAtiva?.id === empresaId) {
-        setEmpresaAtiva(prev => prev ? { ...prev, estatisticas } : null);
+        setEmpresaAtiva((prev) => (prev ? { ...prev, estatisticas } : null));
       }
 
       return estatisticas;
-
     } catch (error: any) {
       console.error('Erro ao buscar estatísticas:', error);
       addNotification({
         type: 'error',
         title: 'Erro ao carregar estatísticas',
         message: error.message || 'Não foi possível carregar as estatísticas.',
-        priority: 'medium'
+        priority: 'medium',
       });
       throw error;
     }
@@ -272,14 +290,10 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
     updateEmpresa,
     updateConfiguracoes,
     getEstatisticas,
-    error
+    error,
   };
 
-  return (
-    <EmpresaContext.Provider value={value}>
-      {children}
-    </EmpresaContext.Provider>
-  );
+  return <EmpresaContext.Provider value={value}>{children}</EmpresaContext.Provider>;
 };
 
 export const useEmpresas = (): EmpresaContextType => {

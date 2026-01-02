@@ -1,6 +1,6 @@
 /**
  * 🧪 Testes para atendimentoStore (Zustand)
- * 
+ *
  * Testa:
  * - Persistência no localStorage
  * - Restauração de estado
@@ -153,7 +153,7 @@ describe('atendimentoStore', () => {
         } as Partial<Ticket>);
       });
 
-      const ticketAtualizado = result.current.tickets.find(t => t.id === 'ticket-123');
+      const ticketAtualizado = result.current.tickets.find((t) => t.id === 'ticket-123');
       expect(ticketAtualizado?.status).toBe('em_atendimento');
       expect(ticketAtualizado?.ultimaMensagem).toBe('Mensagem atualizada');
     });
@@ -376,12 +376,15 @@ describe('atendimentoStore', () => {
         result.current.setTickets([mockTicket, { ...mockTicket, id: 'ticket-999' }]);
       });
 
-      await waitFor(() => {
-        const saved = localStorage.getItem('conectcrm-atendimento-storage');
-        if (saved) {
-          expect(saved).not.toContain('tickets');
-        }
-      }, { timeout: 1000 });
+      await waitFor(
+        () => {
+          const saved = localStorage.getItem('conectcrm-atendimento-storage');
+          if (saved) {
+            expect(saved).not.toContain('tickets');
+          }
+        },
+        { timeout: 1000 },
+      );
     });
 
     it('NÃO deve persistir mensagens (muitos dados)', async () => {
@@ -398,12 +401,15 @@ describe('atendimentoStore', () => {
         result.current.adicionarMensagem('ticket-123', mockMensagem);
       });
 
-      await waitFor(() => {
-        const saved = localStorage.getItem('conectcrm-atendimento-storage');
-        if (saved) {
-          expect(saved).not.toContain('mensagens');
-        }
-      }, { timeout: 1000 });
+      await waitFor(
+        () => {
+          const saved = localStorage.getItem('conectcrm-atendimento-storage');
+          if (saved) {
+            expect(saved).not.toContain('mensagens');
+          }
+        },
+        { timeout: 1000 },
+      );
     });
 
     it('NÃO deve persistir estados de loading/error (efêmeros)', async () => {
@@ -414,13 +420,16 @@ describe('atendimentoStore', () => {
         result.current.setTicketsError('Erro de teste');
       });
 
-      await waitFor(() => {
-        const saved = localStorage.getItem('conectcrm-atendimento-storage');
-        if (saved) {
-          expect(saved).not.toContain('ticketsLoading');
-          expect(saved).not.toContain('ticketsError');
-        }
-      }, { timeout: 1000 });
+      await waitFor(
+        () => {
+          const saved = localStorage.getItem('conectcrm-atendimento-storage');
+          if (saved) {
+            expect(saved).not.toContain('ticketsLoading');
+            expect(saved).not.toContain('ticketsError');
+          }
+        },
+        { timeout: 1000 },
+      );
     });
   });
 
@@ -435,10 +444,7 @@ describe('atendimentoStore', () => {
         version: 1,
       };
 
-      localStorage.setItem(
-        'conectcrm-atendimento-storage',
-        JSON.stringify(dadosSalvos)
-      );
+      localStorage.setItem('conectcrm-atendimento-storage', JSON.stringify(dadosSalvos));
 
       await act(async () => {
         await useAtendimentoStore.persist.rehydrate();

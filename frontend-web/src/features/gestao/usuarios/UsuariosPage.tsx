@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 import { useUsuarios, useEstatisticasUsuarios } from './hooks/useUsuarios';
 import { useAtividadesUsuarios } from './hooks/useAtividadesUsuarios';
-import { Usuario, UserRole } from '../../../types/usuarios/index';
+import { Usuario } from '../../../types/usuarios/index';
 import { useConfirmation } from '../../../hooks/useConfirmation';
 import { ConfirmationModal } from '../../../components/common/ConfirmationModal';
 import {
@@ -12,7 +12,7 @@ import {
   ModalUsuarioModerno,
   ModalResetSenha,
   DashboardAtividades,
-  ModalPerfilUsuario
+  ModalPerfilUsuario,
 } from './components';
 import {
   Users,
@@ -23,18 +23,15 @@ import {
   Download,
   Settings,
   AlertCircle,
-  UserPlus
+  UserPlus,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export const UsuariosPage: React.FC = () => {
-  console.log('🔍 DEBUG: UsuariosPage iniciada');
-
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [mostrarNovoUsuario, setMostrarNovoUsuario] = useState(false);
   const [usuarioSelecionado, setUsuarioSelecionado] = useState<Usuario | null>(null);
   const [mostrarResetSenha, setMostrarResetSenha] = useState<Usuario | null>(null);
-  const [mostrarMeuPerfil, setMostrarMeuPerfil] = useState(false);
   const { confirmationState, showConfirmation } = useConfirmation();
   const [mostrarPerfilUsuario, setMostrarPerfilUsuario] = useState<Usuario | null>(null);
   const [termoBusca, setTermoBusca] = useState('');
@@ -51,19 +48,16 @@ export const UsuariosPage: React.FC = () => {
     alterarStatusUsuario,
     resetarSenha,
     aplicarFiltros,
-    limparFiltros
+    limparFiltros,
   } = useUsuarios();
 
-  const {
-    estatisticas,
-    loading: loadingEstatisticas
-  } = useEstatisticasUsuarios();
+  const { estatisticas, loading: loadingEstatisticas } = useEstatisticasUsuarios();
 
   // Hook para buscar as atividades de usuários
   const {
     atividades,
     loading: loadingAtividades,
-    error: errorAtividades
+    error: errorAtividades,
   } = useAtividadesUsuarios();
 
   // Busca em tempo real com debounce
@@ -77,30 +71,30 @@ export const UsuariosPage: React.FC = () => {
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [termoBusca]);
+  }, [aplicarFiltros, filtros.busca, termoBusca]);
 
-  const handleNovoUsuario = () => {
+  const handleNovoUsuario = (): void => {
     setMostrarNovoUsuario(true);
   };
 
-  const handleEditarUsuario = (usuario: Usuario) => {
+  const handleEditarUsuario = (usuario: Usuario): void => {
     setUsuarioSelecionado(usuario);
   };
 
-  const handleResetSenha = (usuario: Usuario) => {
+  const handleResetSenha = (usuario: Usuario): void => {
     setMostrarResetSenha(usuario);
   };
 
-  const handleVisualizarPerfil = (usuario: Usuario) => {
+  const handleVisualizarPerfil = (usuario: Usuario): void => {
     setMostrarPerfilUsuario(usuario);
   };
 
-  const handleAtualizarPerfil = async (dados: Partial<Usuario>) => {
+  const handleAtualizarPerfil = async (_dados: Partial<Usuario>): Promise<void> => {
     // Implementar lógica de atualização de perfil aqui
     toast.success('Perfil atualizado com sucesso!');
   };
 
-  const handleExcluirUsuario = async (usuario: Usuario) => {
+  const handleExcluirUsuario = async (usuario: Usuario): Promise<void> => {
     showConfirmation({
       title: 'Excluir usuário',
       message: `Tem certeza que deseja excluir o usuário "${usuario.nome}"? Esta ação não pode ser desfeita.`,
@@ -110,11 +104,11 @@ export const UsuariosPage: React.FC = () => {
       confirmButtonClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
       onConfirm: async () => {
         await excluirUsuario(usuario.id);
-      }
+      },
     });
   };
 
-  const handleAlterarStatus = async (usuario: Usuario) => {
+  const handleAlterarStatus = async (usuario: Usuario): Promise<void> => {
     const novoStatus = !usuario.ativo;
     const acao = novoStatus ? 'ativar' : 'desativar';
 
@@ -129,22 +123,31 @@ export const UsuariosPage: React.FC = () => {
         : 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
       onConfirm: async () => {
         await alterarStatusUsuario(usuario.id, novoStatus);
-      }
+      },
     });
   };
 
-  const handleAcaoMassa = async (acao: 'ativar' | 'desativar' | 'excluir', usuarios: Usuario[]) => {
-    const nomes = usuarios.length <= 3
-      ? usuarios.map(u => u.nome).join(', ')
-      : `${usuarios.slice(0, 2).map(u => u.nome).join(', ')} e mais ${usuarios.length - 2} usuários`;
+  const handleAcaoMassa = async (
+    acao: 'ativar' | 'desativar' | 'excluir',
+    usuariosSelecionadosMassa: Usuario[],
+  ): Promise<void> => {
+    const nomes =
+      usuariosSelecionadosMassa.length <= 3
+        ? usuariosSelecionadosMassa.map((u) => u.nome).join(', ')
+        : `${usuariosSelecionadosMassa
+          .slice(0, 2)
+          .map((u) => u.nome)
+          .join(', ')} e mais ${usuariosSelecionadosMassa.length - 2} usuários`;
 
-    const mensagem = acao === 'excluir'
-      ? `Tem certeza que deseja excluir os usuários: ${nomes}? Esta ação não pode ser desfeita.`
-      : `Tem certeza que deseja ${acao} os usuários: ${nomes}?`;
+    const mensagem =
+      acao === 'excluir'
+        ? `Tem certeza que deseja excluir os usuários: ${nomes}? Esta ação não pode ser desfeita.`
+        : `Tem certeza que deseja ${acao} os usuários: ${nomes}?`;
 
-    const title = acao === 'excluir'
-      ? `Excluir ${usuarios.length} usuário${usuarios.length > 1 ? 's' : ''}`
-      : `${acao.charAt(0).toUpperCase() + acao.slice(1)} ${usuarios.length} usuário${usuarios.length > 1 ? 's' : ''}`;
+    const title =
+      acao === 'excluir'
+        ? `Excluir ${usuariosSelecionadosMassa.length} usuário${usuariosSelecionadosMassa.length > 1 ? 's' : ''}`
+        : `${acao.charAt(0).toUpperCase() + acao.slice(1)} ${usuariosSelecionadosMassa.length} usuário${usuariosSelecionadosMassa.length > 1 ? 's' : ''}`;
 
     showConfirmation({
       title,
@@ -152,41 +155,47 @@ export const UsuariosPage: React.FC = () => {
       confirmText: acao === 'excluir' ? 'Excluir' : acao.charAt(0).toUpperCase() + acao.slice(1),
       cancelText: 'Cancelar',
       icon: acao === 'excluir' ? 'danger' : acao === 'ativar' ? 'success' : 'warning',
-      confirmButtonClass: acao === 'excluir' || acao === 'desativar'
-        ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
-        : 'bg-green-600 hover:bg-green-700 focus:ring-green-500',
+      confirmButtonClass:
+        acao === 'excluir' || acao === 'desativar'
+          ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
+          : 'bg-green-600 hover:bg-green-700 focus:ring-green-500',
       onConfirm: async () => {
         try {
           if (acao === 'excluir') {
-            for (const usuario of usuarios) {
+            for (const usuario of usuariosSelecionadosMassa) {
               await excluirUsuario(usuario.id);
             }
-            toast.success(`${usuarios.length} usuário(s) excluído(s) com sucesso!`);
+            toast.success(
+              `${usuariosSelecionadosMassa.length} usuário(s) excluído(s) com sucesso!`,
+            );
           } else {
             const novoStatus = acao === 'ativar';
-            for (const usuario of usuarios) {
+            for (const usuario of usuariosSelecionadosMassa) {
               await alterarStatusUsuario(usuario.id, novoStatus);
             }
-            toast.success(`${usuarios.length} usuário(s) ${acao === 'ativar' ? 'ativado(s)' : 'desativado(s)'} com sucesso!`);
+            toast.success(
+              `${usuariosSelecionadosMassa.length} usuário(s) ${acao === 'ativar' ? 'ativado(s)' : 'desativado(s)'} com sucesso!`,
+            );
           }
         } catch (error) {
+          console.error(`Erro ao ${acao} usuários em massa:`, error);
           toast.error(`Erro ao ${acao} usuários em massa`);
         }
-      }
+      },
     });
   };
 
-  const getCountFiltrosAtivos = () => {
-    return Object.keys(filtros).filter(key => {
+  const getCountFiltrosAtivos = (): number => {
+    return Object.keys(filtros).filter((key) => {
       const valor = filtros[key as keyof typeof filtros];
       return valor !== undefined && valor !== '' && valor !== null;
     }).length;
   };
 
-  const handleExportarUsuarios = () => {
+  const handleExportarUsuarios = (): void => {
     toast('Funcionalidade de exportação em desenvolvimento', {
       icon: 'ℹ️',
-      duration: 3000
+      duration: 3000,
     });
   };
 

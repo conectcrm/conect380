@@ -7,9 +7,9 @@ interface ColorPaletteSelectorProps {
   showAsModal?: boolean;
 }
 
-const ColorPaletteSelector: React.FC<ColorPaletteSelectorProps> = ({ 
-  onClose, 
-  showAsModal = false 
+const ColorPaletteSelector: React.FC<ColorPaletteSelectorProps> = ({
+  onClose,
+  showAsModal = false,
 }) => {
   const { currentPalette, setPalette, availablePalettes } = useTheme();
   const [selectedPalette, setSelectedPalette] = useState(currentPalette.id);
@@ -21,19 +21,19 @@ const ColorPaletteSelector: React.FC<ColorPaletteSelectorProps> = ({
 
   const PalettePreview = ({ palette }: { palette: any }) => (
     <div className="flex space-x-1">
-      <div 
+      <div
         className="w-4 h-4 rounded-full border border-gray-300"
         style={{ backgroundColor: palette.colors.primary }}
       />
-      <div 
+      <div
         className="w-4 h-4 rounded-full border border-gray-300"
         style={{ backgroundColor: palette.colors.secondary }}
       />
-      <div 
+      <div
         className="w-4 h-4 rounded-full border border-gray-300"
         style={{ backgroundColor: palette.colors.accent }}
       />
-      <div 
+      <div
         className="w-4 h-4 rounded-full border border-gray-300"
         style={{ backgroundColor: palette.colors.success }}
       />
@@ -93,28 +93,28 @@ const ColorPaletteSelector: React.FC<ColorPaletteSelectorProps> = ({
             {/* Preview das cores principais */}
             <div className="mt-4 grid grid-cols-4 gap-2">
               <div className="text-center">
-                <div 
+                <div
                   className="w-full h-8 rounded border border-gray-300 mb-1"
                   style={{ backgroundColor: palette.colors.primary }}
                 />
                 <span className="text-xs text-gray-500">Primária</span>
               </div>
               <div className="text-center">
-                <div 
+                <div
                   className="w-full h-8 rounded border border-gray-300 mb-1"
                   style={{ backgroundColor: palette.colors.secondary }}
                 />
                 <span className="text-xs text-gray-500">Secundária</span>
               </div>
               <div className="text-center">
-                <div 
+                <div
                   className="w-full h-8 rounded border border-gray-300 mb-1"
                   style={{ backgroundColor: palette.colors.accent }}
                 />
                 <span className="text-xs text-gray-500">Destaque</span>
               </div>
               <div className="text-center">
-                <div 
+                <div
                   className="w-full h-8 rounded border border-gray-300 mb-1"
                   style={{ backgroundColor: palette.colors.success }}
                 />
@@ -141,9 +141,7 @@ const ColorPaletteSelector: React.FC<ColorPaletteSelectorProps> = ({
   if (showAsModal) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-          {content}
-        </div>
+        <div className="max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">{content}</div>
       </div>
     );
   }

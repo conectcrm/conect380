@@ -9,6 +9,7 @@ import {
   Index,
 } from 'typeorm';
 import { FluxoAutomatizado } from './fluxo-automatizado.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 export enum TipoEvento {
   PROPOSTA_ACEITA = 'proposta_aceita',
@@ -37,6 +38,13 @@ export enum StatusEvento {
 export class EventoFluxo {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column({ type: 'uuid' })
   tenantId: string;

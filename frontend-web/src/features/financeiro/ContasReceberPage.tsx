@@ -18,7 +18,7 @@ import {
   AlertTriangle,
   CreditCard,
   FileText,
-  Mail
+  Mail,
 } from 'lucide-react';
 
 interface ContaReceber {
@@ -61,7 +61,7 @@ const ContasReceberPage: React.FC = () => {
       diasAtraso: 0,
       formaPagamento: 'Boleto Bancário',
       responsavel: 'Maria Santos',
-      categoria: 'Licença de Software'
+      categoria: 'Licença de Software',
     },
     {
       id: '2',
@@ -78,7 +78,7 @@ const ContasReceberPage: React.FC = () => {
       formaPagamento: 'Transferência Bancária',
       responsavel: 'Carlos Lima',
       categoria: 'Consultoria',
-      observacoes: 'Pagamento realizado antes do vencimento'
+      observacoes: 'Pagamento realizado antes do vencimento',
     },
     {
       id: '3',
@@ -94,7 +94,7 @@ const ContasReceberPage: React.FC = () => {
       formaPagamento: 'PIX',
       responsavel: 'Ana Silva',
       categoria: 'Desenvolvimento',
-      observacoes: 'Cliente solicitou prorrogação por dificuldades financeiras'
+      observacoes: 'Cliente solicitou prorrogação por dificuldades financeiras',
     },
     {
       id: '4',
@@ -110,7 +110,7 @@ const ContasReceberPage: React.FC = () => {
       formaPagamento: 'Boleto Bancário',
       responsavel: 'Lucas Pereira',
       categoria: 'Manutenção',
-      observacoes: 'Pagamento parcial realizado, aguardando restante'
+      observacoes: 'Pagamento parcial realizado, aguardando restante',
     },
     {
       id: '5',
@@ -125,12 +125,13 @@ const ContasReceberPage: React.FC = () => {
       diasAtraso: 0,
       formaPagamento: 'Cartão de Crédito',
       responsavel: 'Maria Santos',
-      categoria: 'Hospedagem'
-    }
+      categoria: 'Hospedagem',
+    },
   ];
 
-  const filteredContas = contas.filter(conta => {
-    const matchesSearch = conta.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredContas = contas.filter((conta) => {
+    const matchesSearch =
+      conta.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
       conta.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
       conta.empresa.toLowerCase().includes(searchTerm.toLowerCase()) ||
       conta.descricao.toLowerCase().includes(searchTerm.toLowerCase());
@@ -152,38 +153,53 @@ const ContasReceberPage: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pendente': return 'bg-yellow-100 text-yellow-800';
-      case 'vencida': return 'bg-red-100 text-red-800';
-      case 'paga': return 'bg-green-100 text-green-800';
-      case 'cancelada': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'pendente':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'vencida':
+        return 'bg-red-100 text-red-800';
+      case 'paga':
+        return 'bg-green-100 text-green-800';
+      case 'cancelada':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'pendente': return 'Pendente';
-      case 'vencida': return 'Vencida';
-      case 'paga': return 'Paga';
-      case 'cancelada': return 'Cancelada';
-      default: return status;
+      case 'pendente':
+        return 'Pendente';
+      case 'vencida':
+        return 'Vencida';
+      case 'paga':
+        return 'Paga';
+      case 'cancelada':
+        return 'Cancelada';
+      default:
+        return status;
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pendente': return <Clock className="w-4 h-4" />;
-      case 'vencida': return <AlertTriangle className="w-4 h-4" />;
-      case 'paga': return <CheckCircle className="w-4 h-4" />;
-      case 'cancelada': return <XCircle className="w-4 h-4" />;
-      default: return <FileText className="w-4 h-4" />;
+      case 'pendente':
+        return <Clock className="w-4 h-4" />;
+      case 'vencida':
+        return <AlertTriangle className="w-4 h-4" />;
+      case 'paga':
+        return <CheckCircle className="w-4 h-4" />;
+      case 'cancelada':
+        return <XCircle className="w-4 h-4" />;
+      default:
+        return <FileText className="w-4 h-4" />;
     }
   };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -202,10 +218,14 @@ const ContasReceberPage: React.FC = () => {
   const getVencimentoColor = (dataVencimento: string, status: string) => {
     const vencimentoStatus = getVencimentoStatus(dataVencimento, status);
     switch (vencimentoStatus) {
-      case 'vencida': return 'text-red-600';
-      case 'vencendo': return 'text-yellow-600';
-      case 'paga': return 'text-green-600';
-      default: return 'text-[#002333]';
+      case 'vencida':
+        return 'text-red-600';
+      case 'vencendo':
+        return 'text-yellow-600';
+      case 'paga':
+        return 'text-green-600';
+      default:
+        return 'text-[#002333]';
     }
   };
 
@@ -216,15 +236,15 @@ const ContasReceberPage: React.FC = () => {
 
   const getResumoFinanceiro = () => {
     const totalPendente = contas
-      .filter(c => c.status === 'pendente')
+      .filter((c) => c.status === 'pendente')
       .reduce((total, c) => total + c.valor, 0);
 
     const totalVencidas = contas
-      .filter(c => c.status === 'vencida')
+      .filter((c) => c.status === 'vencida')
       .reduce((total, c) => total + c.valor, 0);
 
     const totalRecebido = contas
-      .filter(c => c.status === 'paga')
+      .filter((c) => c.status === 'paga')
       .reduce((total, c) => total + c.valorPago, 0);
 
     const totalGeral = contas.reduce((total, c) => total + c.valor, 0);
@@ -234,8 +254,8 @@ const ContasReceberPage: React.FC = () => {
       totalVencidas,
       totalRecebido,
       totalGeral,
-      contasPendentes: contas.filter(c => c.status === 'pendente').length,
-      contasVencidas: contas.filter(c => c.status === 'vencida').length
+      contasPendentes: contas.filter((c) => c.status === 'pendente').length,
+      contasVencidas: contas.filter((c) => c.status === 'vencida').length,
     };
   };
 
@@ -245,10 +265,7 @@ const ContasReceberPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusName="Financeiro"
-          nucleusPath="/nuclei/financeiro"
-        />
+        <BackToNucleus nucleusName="Financeiro" nucleusPath="/nuclei/financeiro" />
       </div>
 
       <div className="p-6">
@@ -284,8 +301,12 @@ const ContasReceberPage: React.FC = () => {
           <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Total a Receber</p>
-                <p className="text-3xl font-bold text-[#002333] mt-2">{formatCurrency(resumo.totalGeral)}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                  Total a Receber
+                </p>
+                <p className="text-3xl font-bold text-[#002333] mt-2">
+                  {formatCurrency(resumo.totalGeral)}
+                </p>
                 <p className="text-sm text-[#002333]/70 mt-1">Valor total</p>
               </div>
               <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
@@ -297,8 +318,12 @@ const ContasReceberPage: React.FC = () => {
           <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Pendentes</p>
-                <p className="text-3xl font-bold text-[#002333] mt-2">{formatCurrency(resumo.totalPendente)}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                  Pendentes
+                </p>
+                <p className="text-3xl font-bold text-[#002333] mt-2">
+                  {formatCurrency(resumo.totalPendente)}
+                </p>
                 <p className="text-sm text-[#002333]/70 mt-1">{resumo.contasPendentes} contas</p>
               </div>
               <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
@@ -310,8 +335,12 @@ const ContasReceberPage: React.FC = () => {
           <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Vencidas</p>
-                <p className="text-3xl font-bold text-[#002333] mt-2">{formatCurrency(resumo.totalVencidas)}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                  Vencidas
+                </p>
+                <p className="text-3xl font-bold text-[#002333] mt-2">
+                  {formatCurrency(resumo.totalVencidas)}
+                </p>
                 <p className="text-sm text-[#002333]/70 mt-1">{resumo.contasVencidas} contas</p>
               </div>
               <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center shadow-sm">
@@ -323,8 +352,12 @@ const ContasReceberPage: React.FC = () => {
           <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Recebido</p>
-                <p className="text-3xl font-bold text-[#002333] mt-2">{formatCurrency(resumo.totalRecebido)}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                  Recebido
+                </p>
+                <p className="text-3xl font-bold text-[#002333] mt-2">
+                  {formatCurrency(resumo.totalRecebido)}
+                </p>
                 <p className="text-sm text-[#002333]/70 mt-1">Este mês</p>
               </div>
               <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
@@ -338,9 +371,7 @@ const ContasReceberPage: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
           <div className="flex flex-col sm:flex-row gap-4 items-end">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Buscar Contas
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Buscar Contas</label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
@@ -355,9 +386,7 @@ const ContasReceberPage: React.FC = () => {
 
             <div className="flex gap-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
@@ -372,9 +401,7 @@ const ContasReceberPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Vencimento
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Vencimento</label>
                 <select
                   value={filterVencimento}
                   onChange={(e) => setFilterVencimento(e.target.value)}
@@ -442,7 +469,9 @@ const ContasReceberPage: React.FC = () => {
                       Responsável
                     </div>
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Ações</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Ações
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -468,7 +497,9 @@ const ContasReceberPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm font-bold text-[#159A9C]">{formatCurrency(conta.valor)}</div>
+                        <div className="text-sm font-bold text-[#159A9C]">
+                          {formatCurrency(conta.valor)}
+                        </div>
                         {conta.valorPago > 0 && (
                           <div className="text-xs text-green-600">
                             Pago: {formatCurrency(conta.valorPago)}
@@ -477,7 +508,9 @@ const ContasReceberPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className={`text-sm ${getVencimentoColor(conta.dataVencimento, conta.status)}`}>
+                      <div
+                        className={`text-sm ${getVencimentoColor(conta.dataVencimento, conta.status)}`}
+                      >
                         <div className="flex items-center">
                           <Calendar className="w-4 h-4 mr-1" />
                           {new Date(conta.dataVencimento).toLocaleDateString('pt-BR')}
@@ -490,7 +523,9 @@ const ContasReceberPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(conta.status)}`}>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(conta.status)}`}
+                      >
                         {getStatusIcon(conta.status)}
                         {getStatusLabel(conta.status)}
                       </span>
@@ -516,13 +551,22 @@ const ContasReceberPage: React.FC = () => {
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button className="text-[#159A9C] hover:text-[#0F7B7D] p-1 rounded hover:bg-[#159A9C]/10 transition-colors" title="Editar">
+                        <button
+                          className="text-[#159A9C] hover:text-[#0F7B7D] p-1 rounded hover:bg-[#159A9C]/10 transition-colors"
+                          title="Editar"
+                        >
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button className="text-[#159A9C] hover:text-[#0F7B7D] p-1 rounded hover:bg-[#159A9C]/10 transition-colors" title="Enviar Cobrança">
+                        <button
+                          className="text-[#159A9C] hover:text-[#0F7B7D] p-1 rounded hover:bg-[#159A9C]/10 transition-colors"
+                          title="Enviar Cobrança"
+                        >
                           <Mail className="w-4 h-4" />
                         </button>
-                        <button className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors" title="Excluir">
+                        <button
+                          className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+                          title="Excluir"
+                        >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -584,12 +628,16 @@ const ContasReceberPage: React.FC = () => {
                     </div>
                     <div>
                       <label className="text-sm text-[#B4BEC9]">Valor Total</label>
-                      <p className="text-[#159A9C] font-bold text-xl">{formatCurrency(selectedConta.valor)}</p>
+                      <p className="text-[#159A9C] font-bold text-xl">
+                        {formatCurrency(selectedConta.valor)}
+                      </p>
                     </div>
                     {selectedConta.valorPago > 0 && (
                       <div>
                         <label className="text-sm text-[#B4BEC9]">Valor Pago</label>
-                        <p className="text-green-600 font-bold text-lg">{formatCurrency(selectedConta.valorPago)}</p>
+                        <p className="text-green-600 font-bold text-lg">
+                          {formatCurrency(selectedConta.valorPago)}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -618,14 +666,18 @@ const ContasReceberPage: React.FC = () => {
                   <div className="space-y-3">
                     <div>
                       <label className="text-sm text-[#B4BEC9]">Data de Vencimento</label>
-                      <p className={`font-medium ${getVencimentoColor(selectedConta.dataVencimento, selectedConta.status)}`}>
+                      <p
+                        className={`font-medium ${getVencimentoColor(selectedConta.dataVencimento, selectedConta.status)}`}
+                      >
                         {new Date(selectedConta.dataVencimento).toLocaleDateString('pt-BR')}
                       </p>
                     </div>
                     {selectedConta.dataPagamento && (
                       <div>
                         <label className="text-sm text-[#B4BEC9]">Data de Pagamento</label>
-                        <p className="text-green-600">{new Date(selectedConta.dataPagamento).toLocaleDateString('pt-BR')}</p>
+                        <p className="text-green-600">
+                          {new Date(selectedConta.dataPagamento).toLocaleDateString('pt-BR')}
+                        </p>
                       </div>
                     )}
                     <div>
@@ -647,7 +699,9 @@ const ContasReceberPage: React.FC = () => {
                     <div>
                       <label className="text-sm text-[#B4BEC9]">Status Atual</label>
                       <div>
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedConta.status)}`}>
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedConta.status)}`}
+                        >
                           {getStatusIcon(selectedConta.status)}
                           {getStatusLabel(selectedConta.status)}
                         </span>

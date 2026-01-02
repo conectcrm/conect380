@@ -7,7 +7,7 @@ import {
   Eye,
   Copy,
   Calendar,
-  FileText
+  FileText,
 } from 'lucide-react';
 
 interface ContaPagar {
@@ -39,7 +39,7 @@ export const AcoesConta: React.FC<AcoesContaProps> = ({
   onPagar,
   onExcluir,
   onVisualizar,
-  onDuplicar
+  onDuplicar,
 }) => {
   const [menuAberto, setMenuAberto] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);

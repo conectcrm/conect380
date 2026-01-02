@@ -1,6 +1,6 @@
 /**
  * 🔌 useWebSocket - Hook para conexão WebSocket em tempo real
- * 
+ *
  * Funcionalidades:
  * - Conectar ao gateway do backend
  * - Autenticação automática com JWT
@@ -19,13 +19,19 @@ import { io, Socket } from 'socket.io-client';
 import { Ticket, Mensagem } from '../types';
 import { normalizarMensagemPayload } from '../services/atendimentoService';
 import { useAtendimentoStore } from '../../../../stores/atendimentoStore';
+import { resolveSocketBaseUrl } from '../../../../utils/network';
 
 interface WebSocketEvents {
   onNovoTicket?: (ticket: Ticket) => void;
   onNovaMensagem?: (mensagem: Mensagem) => void;
   onTicketAtualizado?: (ticket: Ticket) => void;
-  onTicketTransferido?: (data: { ticket: Ticket; antigoAtendente?: string; novoAtendente?: string }) => void;
+  onTicketTransferido?: (data: {
+    ticket: Ticket;
+    antigoAtendente?: string;
+    novoAtendente?: string;
+  }) => void;
   onTicketEncerrado?: (ticket: Ticket) => void;
+  onUsuarioDigitando?: (data: { ticketId: string; usuarioId: string; usuarioNome: string }) => void; // 🆕 NOVO
 }
 
 interface UseWebSocketOptions {
@@ -41,26 +47,35 @@ interface UseWebSocketReturn {
   connect: () => void;
   disconnect: () => void;
   emit: (event: string, data: any) => void;
-  entrarNoTicket: (ticketId: string) => void; // 🔥 NOVA
-  sairDoTicket: (ticketId: string) => void; // 🔥 NOVA
+  entrarNoTicket: (ticketId: string) => void;
+  sairDoTicket: (ticketId: string) => void;
+  emitirDigitando: (ticketId: string) => void; // 🆕 NOVO
 }
 
-const WEBSOCKET_URL = process.env.REACT_APP_WEBSOCKET_URL || 'http://localhost:3001/atendimento';
-const DEBUG = false; // ✅ Desabilitado após resolução do problema de tempo real
+const SOCKET_BASE_URL = resolveSocketBaseUrl({
+  envUrl: process.env.REACT_APP_WEBSOCKET_URL || process.env.REACT_APP_WS_URL,
+  onEnvIgnored: ({ envUrl, currentHost }) => {
+    console.warn(
+      '⚠️ [Omnichannel] Ignorando URL de WebSocket local em acesso via rede:',
+      envUrl,
+      '→ host atual',
+      currentHost,
+    );
+  },
+});
+
+const WEBSOCKET_URL = SOCKET_BASE_URL.endsWith('/')
+  ? `${SOCKET_BASE_URL}atendimento`
+  : `${SOCKET_BASE_URL}/atendimento`;
+const DEBUG = false; // 🔍 DEBUG ATIVADO para diagnosticar indicador de digitação
 
 // 🔒 SINGLETON: Garantir apenas 1 instância WebSocket em toda aplicação
 let globalSocket: Socket | null = null;
 let connectionCount = 0;
 let isConnecting = false; // 🚦 Flag para prevenir múltiplas conexões simultâneas
 
-export const useWebSocket = (
-  options: UseWebSocketOptions = {}
-): UseWebSocketReturn => {
-  const {
-    enabled = true,
-    autoConnect = true,
-    events = {}
-  } = options;
+export const useWebSocket = (options: UseWebSocketOptions = {}): UseWebSocketReturn => {
+  const { enabled = true, autoConnect = true, events = {} } = options;
 
   const socketRef = useRef<Socket | null>(null);
   const [connected, setConnected] = useState(false);
@@ -117,7 +132,7 @@ export const useWebSocket = (
       setConnecting(true);
       setError(null);
 
-      // Obter token de autenticação
+      // ✅ Obter token ATUALIZADO do localStorage (pode ter sido renovado pelo interceptor)
       const token = localStorage.getItem('authToken');
       if (!token) {
         isConnecting = false;
@@ -125,11 +140,12 @@ export const useWebSocket = (
       }
 
       if (DEBUG) console.log('🔌 Conectando ao WebSocket:', WEBSOCKET_URL);
+      if (DEBUG) console.log('🔑 Token (primeiros 20 chars):', token.substring(0, 20) + '...');
 
       // Criar conexão (apenas se não existir)
       const socket = io(WEBSOCKET_URL, {
         auth: {
-          token
+          token,
         },
         transports: ['websocket', 'polling'],
         reconnection: true,
@@ -176,9 +192,43 @@ export const useWebSocket = (
       socket.on('connect_error', (err) => {
         isConnecting = false; // 🚦 Liberar em caso de erro
         console.error('❌ Erro de conexão WebSocket:', err.message);
-        setError(err.message);
+
+        // 🔄 Se erro for de autenticação (token expirado), tentar obter novo token e reconectar
+        if (err.message.includes('jwt expired') || err.message.includes('TokenExpiredError')) {
+          console.warn('⚠️ Token JWT expirado no WebSocket. Aguardando renovação...');
+
+          // Aguardar 2 segundos e tentar novamente (dar tempo para interceptor renovar)
+          setTimeout(() => {
+            const newToken = localStorage.getItem('authToken');
+            if (newToken && newToken !== token) {
+              console.log('🔄 Novo token detectado! Reconectando WebSocket...');
+              // Desconectar socket antigo
+              if (socketRef.current) {
+                socketRef.current.disconnect();
+                socketRef.current = null;
+                globalSocket = null;
+              }
+              // Reconectar com novo token
+              connect();
+            } else {
+              console.warn('⚠️ Token não foi renovado. WebSocket permanecerá desconectado.');
+              setError('Token expirado. Faça login novamente.');
+            }
+          }, 2000);
+        } else {
+          setError(err.message);
+        }
+
         setConnecting(false);
       });
+
+      // 🧹 REMOVER listeners antigos antes de adicionar novos (evitar duplicação)
+      socket.off('novo_ticket');
+      socket.off('nova_mensagem');
+      socket.off('ticket_atualizado');
+      socket.off('ticket_transferido');
+      socket.off('ticket_encerrado');
+      socket.off('mensagem:digitando');
 
       // Eventos de negócio
       socket.on('novo_ticket', (ticket: Ticket) => {
@@ -195,12 +245,8 @@ export const useWebSocket = (
         if (DEBUG) console.log('💬 Nova mensagem recebida:', mensagem);
         const mensagemNormalizada = normalizarMensagemPayload(mensagem);
 
-        // 🏪 Atualizar store diretamente
-        if (mensagemNormalizada.ticketId) {
-          adicionarMensagemStore(mensagemNormalizada.ticketId, mensagemNormalizada);
-        }
-
-        // 🔔 Callback opcional para notificações/UI
+        // 🔔 Callback para componente processar (evitar duplicação no store)
+        // O callback (ChatOmnichannel) chamará adicionarMensagemRecebida que já adiciona ao store
         events.onNovaMensagem?.(mensagemNormalizada);
       });
 
@@ -240,6 +286,13 @@ export const useWebSocket = (
         events.onTicketEncerrado?.(ticket);
       });
 
+      // 🆕 NOVO: Evento de usuário digitando
+      socket.on('mensagem:digitando', (data: any) => {
+        if (events.onUsuarioDigitando) {
+          events.onUsuarioDigitando(data);
+        }
+      });
+
       // Eventos de erro
       socket.on('error', (error: any) => {
         console.error('❌ Erro do WebSocket:', error);
@@ -247,7 +300,6 @@ export const useWebSocket = (
       });
 
       socketRef.current = socket;
-
     } catch (err: any) {
       isConnecting = false; // 🚦 Liberar em caso de erro
       console.error('❌ Erro ao conectar WebSocket:', err);
@@ -263,13 +315,24 @@ export const useWebSocket = (
 
     // 🔒 Só desconectar se nenhum componente estiver usando
     if (connectionCount === 0 && socketRef.current) {
-      if (DEBUG) console.log('🔌 Desconectando WebSocket...');
-      socketRef.current.disconnect();
-      socketRef.current = null;
-      globalSocket = null;
-      isConnecting = false; // 🚦 Reset flag
-      setConnected(false);
-      setConnecting(false);
+      try {
+        // ✅ Verificar se socket está realmente conectado antes de desconectar
+        if (socketRef.current.connected || socketRef.current.active) {
+          if (DEBUG) console.log('🔌 Desconectando WebSocket...');
+          socketRef.current.disconnect();
+        } else {
+          if (DEBUG) console.log('🔌 WebSocket já estava desconectado');
+        }
+      } catch (err) {
+        // ✅ Ignorar erros de desconexão (socket já pode estar fechado)
+        if (DEBUG) console.log('⚠️ Erro ao desconectar (esperado em desenvolvimento):', err);
+      } finally {
+        socketRef.current = null;
+        globalSocket = null;
+        isConnecting = false; // 🚦 Reset flag
+        setConnected(false);
+        setConnecting(false);
+      }
     } else {
       if (DEBUG) console.log('♻️ WebSocket mantido (ainda em uso por outros componentes)');
     }
@@ -288,10 +351,9 @@ export const useWebSocket = (
   // 🔥 NOVO: Entrar na sala de um ticket
   const entrarNoTicket = useCallback((ticketId: string) => {
     if (socketRef.current?.connected) {
-      if (DEBUG) console.log('🚪 Entrando na sala do ticket:', ticketId);
       socketRef.current.emit('ticket:entrar', { ticketId });
     } else {
-      console.warn('⚠️ WebSocket não conectado, não é possível entrar no ticket:', ticketId);
+      console.warn('⚠️ [HOOK] WebSocket não conectado, não é possível entrar no ticket:', ticketId);
     }
   }, []);
 
@@ -302,6 +364,13 @@ export const useWebSocket = (
       socketRef.current.emit('ticket:sair', { ticketId });
     } else {
       console.warn('⚠️ WebSocket não conectado, não é possível sair do ticket:', ticketId);
+    }
+  }, []);
+
+  // 🆕 NOVO: Emitir evento de digitação
+  const emitirDigitando = useCallback((ticketId: string) => {
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('mensagem:digitando', { ticketId });
     }
   }, []);
 
@@ -334,7 +403,8 @@ export const useWebSocket = (
     connect,
     disconnect,
     emit,
-    entrarNoTicket, // 🔥 NOVA
-    sairDoTicket, // 🔥 NOVA
+    entrarNoTicket,
+    sairDoTicket,
+    emitirDigitando, // 🆕 NOVO
   };
 };

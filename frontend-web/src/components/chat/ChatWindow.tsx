@@ -72,20 +72,26 @@ export function ChatWindow({ token }: ChatWindowProps) {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-800">
-                    Ticket #{chat.tickets.find(t => t.id === activeTicketId)?.numero || activeTicketId.slice(0, 8)}
+                    Ticket #
+                    {chat.tickets.find((t) => t.id === activeTicketId)?.numero ||
+                      activeTicketId.slice(0, 8)}
                   </h2>
                   <p className="text-sm text-gray-500">
-                    {chat.tickets.find(t => t.id === activeTicketId)?.assunto || 'Sem assunto'}
+                    {chat.tickets.find((t) => t.id === activeTicketId)?.assunto || 'Sem assunto'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${chat.tickets.find(t => t.id === activeTicketId)?.status === 'aberto'
-                      ? 'bg-blue-100 text-blue-800'
-                      : chat.tickets.find(t => t.id === activeTicketId)?.status === 'em_atendimento'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-green-100 text-green-800'
-                    }`}>
-                    {chat.tickets.find(t => t.id === activeTicketId)?.status}
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      chat.tickets.find((t) => t.id === activeTicketId)?.status === 'aberto'
+                        ? 'bg-blue-100 text-blue-800'
+                        : chat.tickets.find((t) => t.id === activeTicketId)?.status ===
+                            'em_atendimento'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-green-100 text-green-800'
+                    }`}
+                  >
+                    {chat.tickets.find((t) => t.id === activeTicketId)?.status}
                   </span>
                 </div>
               </div>
@@ -93,7 +99,7 @@ export function ChatWindow({ token }: ChatWindowProps) {
 
             {/* Lista de mensagens */}
             <MessageList
-              mensagens={chat.mensagens.filter(m => m.ticketId === activeTicketId)}
+              mensagens={chat.mensagens.filter((m) => m.ticketId === activeTicketId)}
               ticketId={activeTicketId}
             />
 

@@ -13,7 +13,7 @@ interface ConfigEmailForm {
 
 /**
  * 📧 Configuração de Canal E-mail
- * 
+ *
  * Permite configurar:
  * - SendGrid (API Key)
  * - AWS SES (em breve)
@@ -113,7 +113,9 @@ export const ConfigurarCanalEmail: React.FC = () => {
       });
 
       if (response.data?.success) {
-        alert(`✅ E-mail de teste enviado para ${form.test_email}!\n\nVerifique sua caixa de entrada.`);
+        alert(
+          `✅ E-mail de teste enviado para ${form.test_email}!\n\nVerifique sua caixa de entrada.`,
+        );
       } else {
         throw new Error(response.data?.message || 'Erro ao enviar e-mail de teste');
       }
@@ -159,10 +161,11 @@ export const ConfigurarCanalEmail: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setForm({ ...form, provedor: 'sendgrid' })}
-                className={`p-4 rounded-lg border-2 transition-all ${form.provedor === 'sendgrid'
-                  ? 'border-[#159A9C] bg-[#159A9C]/10'
-                  : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  form.provedor === 'sendgrid'
+                    ? 'border-[#159A9C] bg-[#159A9C]/10'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
               >
                 <div className="font-medium text-sm">SendGrid</div>
                 <div className="text-xs text-gray-500 mt-1">Recomendado</div>

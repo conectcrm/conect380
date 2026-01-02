@@ -20,13 +20,13 @@ export const useSimpleCurrency = (initialValue = 0) => {
 
   const handleChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const input = event.target.value;
-    
+
     // Extrai apenas dígitos
     const digitsOnly = input.replace(/\D/g, '');
-    
+
     // Atualiza o raw input
     setRawInput(digitsOnly);
-    
+
     let newValue: number;
     if (digitsOnly === '') {
       newValue = 0;
@@ -36,7 +36,7 @@ export const useSimpleCurrency = (initialValue = 0) => {
       newValue = parseInt(digitsOnly, 10) / 100;
       setValue(newValue);
     }
-    
+
     // Retorna o valor calculado para uso imediato
     return newValue;
   }, []);
@@ -51,6 +51,6 @@ export const useSimpleCurrency = (initialValue = 0) => {
     setValue: useCallback((newValue: number) => {
       setValue(newValue);
       setRawInput(newValue === 0 ? '' : (newValue * 100).toString());
-    }, [])
+    }, []),
   };
 };

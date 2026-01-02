@@ -15,7 +15,7 @@ import {
   Trash2,
   CreditCard,
   ArrowLeft,
-  Layers
+  Layers,
 } from 'lucide-react';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 
@@ -29,7 +29,7 @@ import usuariosService from '../../services/usuariosService';
 import {
   ProdutoPropostaBase,
   useProdutosParaPropostas,
-  sincronizarProdutos
+  sincronizarProdutos,
 } from '../../shared/produtosAdapter';
 
 // Redefinir tipos específicos para propostas
@@ -112,28 +112,47 @@ interface PropostaFormData {
 const propostaSchema = yup.object().shape({
   vendedor: yup.object().nullable().required('Vendedor responsável é obrigatório'),
   cliente: yup.object().nullable().required('Cliente é obrigatório'),
-  tipoSelecao: yup.string().oneOf(['personalizado', 'combo']).required('Tipo de seleção é obrigatório'),
+  tipoSelecao: yup
+    .string()
+    .oneOf(['personalizado', 'combo'])
+    .required('Tipo de seleção é obrigatório'),
   produtos: yup.array().when('tipoSelecao', {
     is: 'personalizado',
     then: (schema) => schema.min(1, 'Adicione pelo menos um produto'),
-    otherwise: (schema) => schema.optional()
+    otherwise: (schema) => schema.optional(),
   }),
   combos: yup.array().when('tipoSelecao', {
     is: 'combo',
     then: (schema) => schema.min(1, 'Selecione pelo menos um combo'),
-    otherwise: (schema) => schema.optional()
+    otherwise: (schema) => schema.optional(),
   }),
-  descontoGlobal: yup.number().min(0, 'Desconto não pode ser negativo').max(100, 'Desconto não pode ser superior a 100%').default(0),
-  impostos: yup.number().min(0, 'Impostos não podem ser negativos').max(100, 'Impostos não podem ser superiores a 100%').default(12),
+  descontoGlobal: yup
+    .number()
+    .min(0, 'Desconto não pode ser negativo')
+    .max(100, 'Desconto não pode ser superior a 100%')
+    .default(0),
+  impostos: yup
+    .number()
+    .min(0, 'Impostos não podem ser negativos')
+    .max(100, 'Impostos não podem ser superiores a 100%')
+    .default(12),
   formaPagamento: yup.string().required('Forma de pagamento é obrigatória'),
-  validadeDias: yup.number().min(1, 'Validade deve ser de pelo menos 1 dia').max(365, 'Validade não pode ser superior a 365 dias').default(15),
+  validadeDias: yup
+    .number()
+    .min(1, 'Validade deve ser de pelo menos 1 dia')
+    .max(365, 'Validade não pode ser superior a 365 dias')
+    .default(15),
   observacoes: yup.string().max(500, 'Observações devem ter no máximo 500 caracteres').optional(),
   incluirImpostosPDF: yup.boolean().default(true),
   parcelas: yup.number().when('formaPagamento', {
     is: 'parcelado',
-    then: (schema) => schema.min(2, 'Mínimo de 2 parcelas').max(12, 'Máximo de 12 parcelas').required('Número de parcelas é obrigatório'),
-    otherwise: (schema) => schema.optional()
-  })
+    then: (schema) =>
+      schema
+        .min(2, 'Mínimo de 2 parcelas')
+        .max(12, 'Máximo de 12 parcelas')
+        .required('Número de parcelas é obrigatório'),
+    otherwise: (schema) => schema.optional(),
+  }),
 });
 
 // Dados mock dos combos (temporário - será integrado ao adapter em futuras versões)
@@ -142,22 +161,22 @@ const combosMock: Combo[] = [
     id: 'combo1',
     nome: 'Pacote Startup',
     descricao: 'Sistema básico + consultoria inicial',
-    precoOriginal: 899.00,
-    precoCombo: 750.00,
+    precoOriginal: 899.0,
+    precoCombo: 750.0,
     desconto: 16.6,
     categoria: 'Pacote Startup',
-    produtos: []  // Será populado dinamicamente
+    produtos: [], // Será populado dinamicamente
   },
   {
     id: 'combo2',
     nome: 'Pacote E-commerce',
     descricao: 'Loja online completa + marketing',
-    precoOriginal: 1199.00,
-    precoCombo: 999.00,
+    precoOriginal: 1199.0,
+    precoCombo: 999.0,
     desconto: 16.7,
     categoria: 'Pacote E-commerce',
-    produtos: []  // Será populado dinamicamente
-  }
+    produtos: [], // Será populado dinamicamente
+  },
 ];
 
 const NovaPropostaPage: React.FC = () => {
@@ -165,7 +184,12 @@ const NovaPropostaPage: React.FC = () => {
   const navigate = useNavigate();
 
   // Integração com adapter de produtos
-  const { produtos: produtosDisponiveis, buscarProdutos, categorias, subcategoriasPorCategoria } = useProdutosParaPropostas();
+  const {
+    produtos: produtosDisponiveis,
+    buscarProdutos,
+    categorias,
+    subcategoriasPorCategoria,
+  } = useProdutosParaPropostas();
 
   // Estados principais
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
@@ -188,10 +212,10 @@ const NovaPropostaPage: React.FC = () => {
           nome: vendedor.nome,
           email: vendedor.email,
           role: 'vendedor', // Manter compatibilidade com interface
-          ativo: vendedor.ativo
+          ativo: vendedor.ativo,
         }));
 
-  setVendedores(vendedoresFormatados);
+        setVendedores(vendedoresFormatados);
       } catch (error) {
         console.error('❌ Erro ao carregar vendedores:', error);
         setVendedores([]);
@@ -229,10 +253,10 @@ const NovaPropostaPage: React.FC = () => {
           cidade: cliente.cidade || '',
           estado: cliente.estado || '',
           cep: cliente.cep || '',
-          tipoPessoa: cliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica'
+          tipoPessoa: cliente.tipo === 'pessoa_fisica' ? 'fisica' : 'juridica',
         }));
 
-  setClientes(clientesFormatados);
+        setClientes(clientesFormatados);
       } catch (error) {
         console.error('❌ Erro ao carregar clientes:', error);
         toastNotify.error('Erro ao carregar clientes. Usando dados de exemplo.');
@@ -251,7 +275,14 @@ const NovaPropostaPage: React.FC = () => {
   const [subcategoriaSelecionada, setSubcategoriaSelecionada] = useState('');
 
   // React Hook Form
-  const { control, handleSubmit, watch, setValue, reset, formState: { errors, isValid } } = useForm<PropostaFormData>({
+  const {
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    formState: { errors, isValid },
+  } = useForm<PropostaFormData>({
     resolver: yupResolver(propostaSchema),
     defaultValues: {
       vendedor: null,
@@ -263,19 +294,27 @@ const NovaPropostaPage: React.FC = () => {
       formaPagamento: 'avista',
       validadeDias: 15,
       observacoes: '',
-      incluirImpostosPDF: true
-    }
+      incluirImpostosPDF: true,
+    },
   });
 
   // Field arrays
-  const { fields: produtos, append: adicionarProduto, remove: removerProduto } = useFieldArray({
+  const {
+    fields: produtos,
+    append: adicionarProduto,
+    remove: removerProduto,
+  } = useFieldArray({
     control,
-    name: 'produtos'
+    name: 'produtos',
   });
 
-  const { fields: combos, append: adicionarCombo, remove: removerCombo } = useFieldArray({
+  const {
+    fields: combos,
+    append: adicionarCombo,
+    remove: removerCombo,
+  } = useFieldArray({
     control,
-    name: 'combos'
+    name: 'combos',
   });
 
   // Watch dos campos do formulário
@@ -290,13 +329,19 @@ const NovaPropostaPage: React.FC = () => {
   const { totais, calcularSubtotalProduto } = useCalculosProposta(
     watchedProdutos || [],
     watchedDescontoGlobal || 0,
-    watchedImpostos || 0
+    watchedImpostos || 0,
   );
 
   // Calcular totais combinados (produtos + combos)
   const totaisCombinados = useMemo(() => {
-    const subtotalProdutos = (watchedProdutos || []).reduce((sum, item) => sum + (item.subtotal || 0), 0);
-    const subtotalCombos = (watchedCombos || []).reduce((sum, item) => sum + (item.subtotal || 0), 0);
+    const subtotalProdutos = (watchedProdutos || []).reduce(
+      (sum, item) => sum + (item.subtotal || 0),
+      0,
+    );
+    const subtotalCombos = (watchedCombos || []).reduce(
+      (sum, item) => sum + (item.subtotal || 0),
+      0,
+    );
     const subtotalGeral = subtotalProdutos + subtotalCombos;
 
     const descontoValor = (subtotalGeral * (watchedDescontoGlobal || 0)) / 100;
@@ -308,7 +353,7 @@ const NovaPropostaPage: React.FC = () => {
       subtotal: subtotalGeral,
       desconto: descontoValor,
       impostos: impostosValor,
-      total
+      total,
     };
   }, [watchedProdutos, watchedCombos, watchedDescontoGlobal, watchedImpostos]);
 
@@ -318,10 +363,11 @@ const NovaPropostaPage: React.FC = () => {
 
     if (!buscarCliente) return clientesOrdenados;
 
-    return clientesOrdenados.filter(cliente =>
-      cliente.nome.toLowerCase().includes(buscarCliente.toLowerCase()) ||
-      cliente.documento.includes(buscarCliente) ||
-      cliente.email.toLowerCase().includes(buscarCliente.toLowerCase())
+    return clientesOrdenados.filter(
+      (cliente) =>
+        cliente.nome.toLowerCase().includes(buscarCliente.toLowerCase()) ||
+        cliente.documento.includes(buscarCliente) ||
+        cliente.email.toLowerCase().includes(buscarCliente.toLowerCase()),
     );
   }, [buscarCliente, clientes]);
 
@@ -329,7 +375,7 @@ const NovaPropostaPage: React.FC = () => {
     return buscarProdutos({
       categoria: categoriaSelecionada || undefined,
       subcategoria: subcategoriaSelecionada || undefined,
-      termo: buscarProduto || undefined
+      termo: buscarProduto || undefined,
     });
   }, [buscarProduto, categoriaSelecionada, subcategoriaSelecionada, buscarProdutos]);
 
@@ -351,9 +397,10 @@ const NovaPropostaPage: React.FC = () => {
 
   const combosFiltrados = useMemo(() => {
     if (!buscarCombo) return combosMock;
-    return combosMock.filter(combo =>
-      combo.nome.toLowerCase().includes(buscarCombo.toLowerCase()) ||
-      combo.categoria.toLowerCase().includes(buscarCombo.toLowerCase())
+    return combosMock.filter(
+      (combo) =>
+        combo.nome.toLowerCase().includes(buscarCombo.toLowerCase()) ||
+        combo.categoria.toLowerCase().includes(buscarCombo.toLowerCase()),
     );
   }, [buscarCombo]);
 
@@ -361,7 +408,7 @@ const NovaPropostaPage: React.FC = () => {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -378,7 +425,7 @@ const NovaPropostaPage: React.FC = () => {
       produto,
       quantidade: 1,
       desconto: 0,
-      subtotal: produto.preco
+      subtotal: produto.preco,
     };
 
     adicionarProduto(novoProduto);
@@ -397,7 +444,7 @@ const NovaPropostaPage: React.FC = () => {
     const novoCombo: ComboSelecionado = {
       combo,
       quantidade: 1,
-      subtotal: combo.precoCombo
+      subtotal: combo.precoCombo,
     };
 
     adicionarCombo(novoCombo);
@@ -433,7 +480,7 @@ const NovaPropostaPage: React.FC = () => {
         dataValidade: new Date(Date.now() + data.validadeDias * 24 * 60 * 60 * 1000),
         dataCriacao: new Date(),
         status: 'rascunho' as const,
-        numero: `PROP-${Date.now().toString().slice(-6)}`
+        numero: `PROP-${Date.now().toString().slice(-6)}`,
       };
       const propostaCriada = await propostasService.criarProposta(propostaData);
       toastNotify.dismiss(loadingToastId);
@@ -451,7 +498,9 @@ const NovaPropostaPage: React.FC = () => {
         navigate('/propostas');
       }, 1500);
     } catch (error) {
-      toastNotify.error('Erro ao criar proposta. Tente novamente.');
+      const friendlyMessage =
+        error instanceof Error ? error.message : 'Erro ao criar proposta. Tente novamente.';
+      toastNotify.error(friendlyMessage);
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -481,7 +530,6 @@ const NovaPropostaPage: React.FC = () => {
         <form onSubmit={handleSubmit(onSubmit)}>
           {/* Layout em 3 colunas - Paisagem/Panorâmico */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-
             {/* COLUNA 1: Seleção de Vendedor e Cliente */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               {/* Seleção de Vendedor */}
@@ -507,10 +555,16 @@ const NovaPropostaPage: React.FC = () => {
                     {isLoadingVendedores ? (
                       <div className="p-4 text-center text-gray-500">Carregando vendedores...</div>
                     ) : vendedores.length === 0 ? (
-                      <div className="p-4 text-center text-gray-500">Nenhum vendedor cadastrado</div>
+                      <div className="p-4 text-center text-gray-500">
+                        Nenhum vendedor cadastrado
+                      </div>
                     ) : (
                       vendedores
-                        .filter(v => v.nome.toLowerCase().includes(buscarVendedor.toLowerCase()) || v.email.toLowerCase().includes(buscarVendedor.toLowerCase()))
+                        .filter(
+                          (v) =>
+                            v.nome.toLowerCase().includes(buscarVendedor.toLowerCase()) ||
+                            v.email.toLowerCase().includes(buscarVendedor.toLowerCase()),
+                        )
                         .map((vendedor) => (
                           <div
                             key={vendedor.id}
@@ -522,8 +576,12 @@ const NovaPropostaPage: React.FC = () => {
                             }}
                             className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
                           >
-                            <div className="font-medium text-gray-900">{safeRender(vendedor.nome)}</div>
-                            <div className="text-sm text-gray-500">{safeRender(vendedor.email)}</div>
+                            <div className="font-medium text-gray-900">
+                              {safeRender(vendedor.nome)}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {safeRender(vendedor.email)}
+                            </div>
                           </div>
                         ))
                     )}
@@ -538,8 +596,12 @@ const NovaPropostaPage: React.FC = () => {
                 <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
                   <h3 className="font-medium text-green-900 mb-2">Vendedor Selecionado</h3>
                   <div className="space-y-1 text-sm">
-                    <div><strong>Nome:</strong> {safeRender(vendedorSelecionado.nome)}</div>
-                    <div><strong>Email:</strong> {safeRender(vendedorSelecionado.email)}</div>
+                    <div>
+                      <strong>Nome:</strong> {safeRender(vendedorSelecionado.nome)}
+                    </div>
+                    <div>
+                      <strong>Email:</strong> {safeRender(vendedorSelecionado.email)}
+                    </div>
                   </div>
                 </div>
               )}
@@ -566,7 +628,9 @@ const NovaPropostaPage: React.FC = () => {
                     {isLoadingClientes ? (
                       <div className="p-4 text-center text-gray-500">Carregando clientes...</div>
                     ) : clientesFiltrados.length === 0 ? (
-                      <div className="p-4 text-center text-gray-500">{buscarCliente ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}</div>
+                      <div className="p-4 text-center text-gray-500">
+                        {buscarCliente ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
+                      </div>
                     ) : (
                       clientesFiltrados.map((cliente) => (
                         <div
@@ -574,8 +638,12 @@ const NovaPropostaPage: React.FC = () => {
                           onClick={() => handleSelecionarCliente(cliente)}
                           className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
                         >
-                          <div className="font-medium text-gray-900">{safeRender(cliente.nome)}</div>
-                          <div className="text-sm text-gray-600">{safeRender(cliente.documento)}</div>
+                          <div className="font-medium text-gray-900">
+                            {safeRender(cliente.nome)}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {safeRender(cliente.documento)}
+                          </div>
                           <div className="text-sm text-gray-500">{safeRender(cliente.email)}</div>
                         </div>
                       ))
@@ -590,12 +658,22 @@ const NovaPropostaPage: React.FC = () => {
                 <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <h3 className="font-medium text-blue-900 mb-2">Cliente Selecionado</h3>
                   <div className="space-y-1 text-sm">
-                    <div><strong>Nome:</strong> {safeRender(clienteSelecionado.nome)}</div>
-                    <div><strong>Documento:</strong> {safeRender(clienteSelecionado.documento)}</div>
-                    <div><strong>Email:</strong> {safeRender(clienteSelecionado.email)}</div>
-                    <div><strong>Telefone:</strong> {safeRender(clienteSelecionado.telefone)}</div>
+                    <div>
+                      <strong>Nome:</strong> {safeRender(clienteSelecionado.nome)}
+                    </div>
+                    <div>
+                      <strong>Documento:</strong> {safeRender(clienteSelecionado.documento)}
+                    </div>
+                    <div>
+                      <strong>Email:</strong> {safeRender(clienteSelecionado.email)}
+                    </div>
+                    <div>
+                      <strong>Telefone:</strong> {safeRender(clienteSelecionado.telefone)}
+                    </div>
                     {clienteSelecionado.endereco && (
-                      <div><strong>Endereço:</strong> {safeRender(clienteSelecionado.endereco)}</div>
+                      <div>
+                        <strong>Endereço:</strong> {safeRender(clienteSelecionado.endereco)}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -621,10 +699,11 @@ const NovaPropostaPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => field.onChange('personalizado')}
-                        className={`flex-1 flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${field.value === 'personalizado'
-                          ? 'bg-white text-green-600 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-800'
-                          }`}
+                        className={`flex-1 flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                          field.value === 'personalizado'
+                            ? 'bg-white text-green-600 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-800'
+                        }`}
                       >
                         <Package className="h-4 w-4 mr-2" />
                         Personalizado
@@ -632,10 +711,11 @@ const NovaPropostaPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => field.onChange('combo')}
-                        className={`flex-1 flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${field.value === 'combo'
-                          ? 'bg-white text-green-600 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-800'
-                          }`}
+                        className={`flex-1 flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                          field.value === 'combo'
+                            ? 'bg-white text-green-600 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-800'
+                        }`}
                       >
                         <Layers className="h-4 w-4 mr-2" />
                         Combos
@@ -738,7 +818,9 @@ const NovaPropostaPage: React.FC = () => {
                           <span className="text-orange-600">Nenhum produto encontrado</span>
                         ) : (
                           <span>
-                            {produtosFiltrados.length} produto{produtosFiltrados.length !== 1 ? 's' : ''} encontrado{produtosFiltrados.length !== 1 ? 's' : ''}
+                            {produtosFiltrados.length} produto
+                            {produtosFiltrados.length !== 1 ? 's' : ''} encontrado
+                            {produtosFiltrados.length !== 1 ? 's' : ''}
                             {(categoriaSelecionada || subcategoriaSelecionada) && (
                               <span className="ml-2 font-medium">
                                 {categoriaSelecionada && `em ${categoriaSelecionada}`}
@@ -758,8 +840,12 @@ const NovaPropostaPage: React.FC = () => {
                           >
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
-                                <div className="font-medium text-gray-900 mb-1">{safeRender(produto.nome)}</div>
-                                <div className="text-sm text-gray-600 mb-2">{safeRender(produto.descricao)}</div>
+                                <div className="font-medium text-gray-900 mb-1">
+                                  {safeRender(produto.nome)}
+                                </div>
+                                <div className="text-sm text-gray-600 mb-2">
+                                  {safeRender(produto.descricao)}
+                                </div>
                                 <div className="flex flex-wrap gap-1">
                                   <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
                                     {safeRender(produto.categoria)}
@@ -777,7 +863,9 @@ const NovaPropostaPage: React.FC = () => {
                                 </div>
                               </div>
                               <div className="text-right ml-4">
-                                <div className="font-medium text-green-600">{formatCurrency(produto.preco)}</div>
+                                <div className="font-medium text-green-600">
+                                  {formatCurrency(produto.preco)}
+                                </div>
                                 <div className="text-xs text-gray-500">por {produto.unidade}</div>
                               </div>
                             </div>
@@ -793,8 +881,12 @@ const NovaPropostaPage: React.FC = () => {
                       <div key={field.id} className="border border-gray-200 rounded-lg p-4">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1">
-                            <h4 className="font-medium text-gray-900">{safeRender(field.produto.nome)}</h4>
-                            <p className="text-sm text-gray-600 mb-2">{safeRender(field.produto.descricao)}</p>
+                            <h4 className="font-medium text-gray-900">
+                              {safeRender(field.produto.nome)}
+                            </h4>
+                            <p className="text-sm text-gray-600 mb-2">
+                              {safeRender(field.produto.descricao)}
+                            </p>
 
                             {/* Tags com informações do produto */}
                             <div className="flex flex-wrap gap-1">
@@ -842,7 +934,11 @@ const NovaPropostaPage: React.FC = () => {
                                     field.onChange(quantidade);
                                     const produtoAtual = watchedProdutos?.[index];
                                     if (produtoAtual) {
-                                      const subtotal = calcularSubtotalProduto(produtoAtual.produto, quantidade, produtoAtual.desconto || 0);
+                                      const subtotal = calcularSubtotalProduto(
+                                        produtoAtual.produto,
+                                        quantidade,
+                                        produtoAtual.desconto || 0,
+                                      );
                                       setValue(`produtos.${index}.subtotal`, subtotal);
                                     }
                                   }}
@@ -871,7 +967,11 @@ const NovaPropostaPage: React.FC = () => {
                                     field.onChange(desconto);
                                     const produtoAtual = watchedProdutos?.[index];
                                     if (produtoAtual) {
-                                      const subtotal = calcularSubtotalProduto(produtoAtual.produto, produtoAtual.quantidade || 1, desconto);
+                                      const subtotal = calcularSubtotalProduto(
+                                        produtoAtual.produto,
+                                        produtoAtual.quantidade || 1,
+                                        desconto,
+                                      );
                                       setValue(`produtos.${index}.subtotal`, subtotal);
                                     }
                                   }}
@@ -943,9 +1043,15 @@ const NovaPropostaPage: React.FC = () => {
                           >
                             <div className="flex justify-between items-start mb-3">
                               <div className="flex-1">
-                                <div className="font-medium text-gray-900">{safeRender(combo.nome)}</div>
-                                <div className="text-sm text-gray-600 mb-2">{safeRender(combo.categoria)}</div>
-                                <div className="text-xs text-gray-500">{safeRender(combo.descricao)}</div>
+                                <div className="font-medium text-gray-900">
+                                  {safeRender(combo.nome)}
+                                </div>
+                                <div className="text-sm text-gray-600 mb-2">
+                                  {safeRender(combo.categoria)}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {safeRender(combo.descricao)}
+                                </div>
                               </div>
                               <div className="text-right">
                                 <div className="text-xs text-gray-400 line-through">
@@ -985,9 +1091,15 @@ const NovaPropostaPage: React.FC = () => {
                       <div key={field.id} className="border border-gray-200 rounded-lg p-4">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1">
-                            <h4 className="font-medium text-gray-900">{safeRender(field.combo.nome)}</h4>
-                            <p className="text-sm text-gray-600">{safeRender(field.combo.categoria)}</p>
-                            <div className="text-xs text-gray-500 mt-1">{safeRender(field.combo.descricao)}</div>
+                            <h4 className="font-medium text-gray-900">
+                              {safeRender(field.combo.nome)}
+                            </h4>
+                            <p className="text-sm text-gray-600">
+                              {safeRender(field.combo.categoria)}
+                            </p>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {safeRender(field.combo.descricao)}
+                            </div>
 
                             {/* Produtos incluídos no combo */}
                             <div className="mt-2 pt-2 border-t border-gray-100">
@@ -1082,7 +1194,6 @@ const NovaPropostaPage: React.FC = () => {
 
             {/* COLUNA 3: Totais e Condições */}
             <div className="space-y-6">
-
               {/* Card de Totais */}
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center mb-6">
@@ -1137,19 +1248,27 @@ const NovaPropostaPage: React.FC = () => {
                   <div className="pt-4 border-t border-gray-200 space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Subtotal:</span>
-                      <span className="font-medium">{formatCurrency(totaisCombinados.subtotal)}</span>
+                      <span className="font-medium">
+                        {formatCurrency(totaisCombinados.subtotal)}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Desconto:</span>
-                      <span className="text-red-600">-{formatCurrency(totaisCombinados.desconto)}</span>
+                      <span className="text-red-600">
+                        -{formatCurrency(totaisCombinados.desconto)}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Impostos:</span>
-                      <span className="text-gray-600">{formatCurrency(totaisCombinados.impostos)}</span>
+                      <span className="text-gray-600">
+                        {formatCurrency(totaisCombinados.impostos)}
+                      </span>
                     </div>
                     <div className="flex justify-between text-lg font-bold border-t pt-2">
                       <span className="text-gray-900">Total:</span>
-                      <span className="text-blue-600">{formatCurrency(totaisCombinados.total)}</span>
+                      <span className="text-blue-600">
+                        {formatCurrency(totaisCombinados.total)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1271,7 +1390,10 @@ const NovaPropostaPage: React.FC = () => {
               <div className="bg-white rounded-lg shadow-sm p-6">
                 {/* Debug Info (apenas para desenvolvimento) */}
                 <div className="mb-4 text-xs text-gray-500 space-y-1">
-                  <div>Cliente: {clienteSelecionado ? '✅' : '❌'} {clienteSelecionado?.nome || 'Nenhum'}</div>
+                  <div>
+                    Cliente: {clienteSelecionado ? '✅' : '❌'}{' '}
+                    {clienteSelecionado?.nome || 'Nenhum'}
+                  </div>
                   <div>Produtos: {watchedProdutos?.length || 0} item(s)</div>
                   <div>Combos: {watchedCombos?.length || 0} item(s)</div>
                   <div>Formulário válido: {isValid ? '✅' : '❌'}</div>
@@ -1321,10 +1443,15 @@ const NovaPropostaPage: React.FC = () => {
                       // Exibir erros específicos
                       if (Object.keys(errors).length > 0) {
                         const fieldMessages = Object.entries(errors)
-                          .map(([field, error]) => `${field}: ${error?.message || 'Erro não identificado'}`)
+                          .map(
+                            ([field, error]) =>
+                              `${field}: ${error?.message || 'Erro não identificado'}`,
+                          )
                           .join('\n');
 
-                        toastNotify.error(`Encontrados ${Object.keys(errors).length} erro(s):\n${fieldMessages}`);
+                        toastNotify.error(
+                          `Encontrados ${Object.keys(errors).length} erro(s):\n${fieldMessages}`,
+                        );
                       } else {
                         toastNotify.success('Nenhum erro encontrado no formulário!');
                       }

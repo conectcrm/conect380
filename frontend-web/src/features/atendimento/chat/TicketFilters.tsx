@@ -17,7 +17,7 @@ interface TicketFiltersProps {
 export const TicketFilters: React.FC<TicketFiltersProps> = ({
   filters,
   onChange,
-  onClearFilters
+  onClearFilters,
 }) => {
   const [searchDebounced, setSearchDebounced] = useState(filters.search);
 
@@ -37,7 +37,8 @@ export const TicketFilters: React.FC<TicketFiltersProps> = ({
     setSearchDebounced(filters.search);
   }, [filters.search]);
 
-  const hasActiveFilters = filters.status !== '' || filters.prioridade !== '' || filters.search !== '';
+  const hasActiveFilters =
+    filters.status !== '' || filters.prioridade !== '' || filters.search !== '';
 
   const handleClearFilters = () => {
     setSearchDebounced('');
@@ -48,7 +49,7 @@ export const TicketFilters: React.FC<TicketFiltersProps> = ({
         search: '',
         status: '',
         prioridade: '',
-        ordenacao: 'recente'
+        ordenacao: 'recente',
       });
     }
   };
@@ -144,7 +145,7 @@ export const useTicketFilters = (initialFilters?: Partial<TicketFiltersState>) =
     status: '',
     prioridade: '',
     ordenacao: 'recente',
-    ...initialFilters
+    ...initialFilters,
   });
 
   const clearFilters = () => {
@@ -152,13 +153,13 @@ export const useTicketFilters = (initialFilters?: Partial<TicketFiltersState>) =
       search: '',
       status: '',
       prioridade: '',
-      ordenacao: 'recente'
+      ordenacao: 'recente',
     });
   };
 
   return {
     filters,
     setFilters,
-    clearFilters
+    clearFilters,
   };
 };

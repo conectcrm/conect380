@@ -1,0 +1,19 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^mailto:"
+    },
+    {
+      "pattern": "https://github.com/Dhonleno/conectsuite/issues"
+    },
+    {
+      "pattern": "^#"
+    },
+    {
+      "pattern": "^https?://localhost(:[0-9]+)?"
+    },
+    {
+      "pattern": "^https://www\\.gartner\\.com/"
+    }
+  ]
+}

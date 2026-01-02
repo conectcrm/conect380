@@ -10,9 +10,11 @@ export const MessageBlock: React.FC<NodeProps<BlockData>> = ({ data, selected })
   const preview = mensagem.length > 50 ? mensagem.substring(0, 50) + '...' : mensagem;
 
   return (
-    <div className={`relative bg-white rounded-lg shadow-md border-2 ${selected ? 'border-blue-500' : 'border-gray-300'
-      } transition-all hover:shadow-lg min-w-[200px] max-w-[300px]`}>
-
+    <div
+      className={`relative bg-white rounded-lg shadow-md border-2 ${
+        selected ? 'border-blue-500' : 'border-gray-300'
+      } transition-all hover:shadow-lg min-w-[200px] max-w-[300px]`}
+    >
       {/* Handle de entrada (top) */}
       <Handle
         type="target"
@@ -28,9 +30,7 @@ export const MessageBlock: React.FC<NodeProps<BlockData>> = ({ data, selected })
 
       {/* Body */}
       <div className="p-3">
-        <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
-          {preview}
-        </p>
+        <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{preview}</p>
       </div>
 
       {/* Handle de saída (bottom) */}

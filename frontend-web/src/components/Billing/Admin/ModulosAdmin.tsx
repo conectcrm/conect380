@@ -17,7 +17,7 @@ import {
   Palette,
   Star,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import { ModuloSistema } from '../../../hooks/useSubscription';
@@ -41,7 +41,7 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
     cor: '#3B82F6',
     ativo: true,
     essencial: false,
-    ordem: 0
+    ordem: 0,
   });
 
   useEffect(() => {
@@ -53,7 +53,9 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
       setLoading(true);
       const response = await api.get('/planos/modulos');
       // Ordenar por ordem
-      const modulosOrdenados = response.data.sort((a: ModuloSistema, b: ModuloSistema) => a.ordem - b.ordem);
+      const modulosOrdenados = response.data.sort(
+        (a: ModuloSistema, b: ModuloSistema) => a.ordem - b.ordem,
+      );
       setModulos(modulosOrdenados);
       setError(null);
     } catch (err: any) {
@@ -74,7 +76,7 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
       cor: '#3B82F6',
       ativo: true,
       essencial: false,
-      ordem: modulos.length
+      ordem: modulos.length,
     });
     setShowForm(true);
   };
@@ -89,7 +91,7 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
       cor: modulo.cor || '#3B82F6',
       ativo: modulo.ativo !== false,
       essencial: modulo.essencial || false,
-      ordem: modulo.ordem || 0
+      ordem: modulo.ordem || 0,
     });
     setShowForm(true);
     onEdit?.(modulo);
@@ -120,7 +122,7 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
     try {
       await api.put(`/planos/modulos/${modulo.id}`, {
         ...modulo,
-        ativo: !modulo.ativo
+        ativo: !modulo.ativo,
       });
       await carregarModulos();
     } catch (err: any) {
@@ -149,7 +151,7 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
   };
 
   const handleMoverModulo = async (modulo: ModuloSistema, direcao: 'up' | 'down') => {
-    const indiceAtual = modulos.findIndex(m => m.id === modulo.id);
+    const indiceAtual = modulos.findIndex((m) => m.id === modulo.id);
 
     if (
       (direcao === 'up' && indiceAtual === 0) ||
@@ -165,12 +167,12 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
       // Atualizar as ordens
       await api.put(`/planos/modulos/${modulo.id}`, {
         ...modulo,
-        ordem: moduloTroca.ordem
+        ordem: moduloTroca.ordem,
       });
 
       await api.put(`/planos/modulos/${moduloTroca.id}`, {
         ...moduloTroca,
-        ordem: modulo.ordem
+        ordem: modulo.ordem,
       });
 
       await carregarModulos();
@@ -181,9 +183,24 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
   };
 
   const icones = [
-    'BarChart3', 'Users', 'FileText', 'Target', 'Package', 'BarChart',
-    'Zap', 'Code', 'Settings', 'CreditCard', 'Calendar', 'Mail',
-    'Phone', 'Globe', 'Shield', 'Lock', 'Key', 'Database'
+    'BarChart3',
+    'Users',
+    'FileText',
+    'Target',
+    'Package',
+    'BarChart',
+    'Zap',
+    'Code',
+    'Settings',
+    'CreditCard',
+    'Calendar',
+    'Mail',
+    'Phone',
+    'Globe',
+    'Shield',
+    'Lock',
+    'Key',
+    'Database',
   ];
 
   if (loading) {
@@ -283,11 +300,7 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
                   </Button>
 
                   {/* Editar */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleEditarModulo(modulo)}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => handleEditarModulo(modulo)}>
                     <Edit className="h-4 w-4" />
                   </Button>
 
@@ -325,9 +338,7 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
           <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
             <Card className="border-0 shadow-lg">
               <CardHeader>
-                <CardTitle>
-                  {editingModulo ? 'Editar Módulo' : 'Novo Módulo'}
-                </CardTitle>
+                <CardTitle>{editingModulo ? 'Editar Módulo' : 'Novo Módulo'}</CardTitle>
               </CardHeader>
 
               <CardContent>
@@ -337,7 +348,7 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
                     <Input
                       id="nome"
                       value={formData.nome}
-                      onChange={(e) => setFormData(prev => ({ ...prev, nome: e.target.value }))}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, nome: e.target.value }))}
                       required
                     />
                   </div>
@@ -347,7 +358,9 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
                     <Input
                       id="codigo"
                       value={formData.codigo}
-                      onChange={(e) => setFormData(prev => ({ ...prev, codigo: e.target.value.toLowerCase() }))}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, codigo: e.target.value.toLowerCase() }))
+                      }
                       required
                     />
                   </div>
@@ -357,7 +370,9 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
                     <Textarea
                       id="descricao"
                       value={formData.descricao}
-                      onChange={(e) => setFormData(prev => ({ ...prev, descricao: e.target.value }))}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, descricao: e.target.value }))
+                      }
                       rows={3}
                     />
                   </div>
@@ -367,12 +382,14 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
                     <select
                       id="icone"
                       value={formData.icone}
-                      onChange={(e) => setFormData(prev => ({ ...prev, icone: e.target.value }))}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, icone: e.target.value }))}
                       className="w-full h-10 rounded-md border border-gray-300 px-3 text-sm"
                     >
                       <option value="">Selecione um ícone</option>
-                      {icones.map(icone => (
-                        <option key={icone} value={icone}>{icone}</option>
+                      {icones.map((icone) => (
+                        <option key={icone} value={icone}>
+                          {icone}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -384,12 +401,12 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
                         id="cor"
                         type="color"
                         value={formData.cor}
-                        onChange={(e) => setFormData(prev => ({ ...prev, cor: e.target.value }))}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, cor: e.target.value }))}
                         className="w-16 h-10"
                       />
                       <Input
                         value={formData.cor}
-                        onChange={(e) => setFormData(prev => ({ ...prev, cor: e.target.value }))}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, cor: e.target.value }))}
                         placeholder="#3B82F6"
                         className="flex-1"
                       />
@@ -400,7 +417,9 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
                     <Label>Módulo Ativo</Label>
                     <Switch
                       checked={formData.ativo}
-                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, ativo: checked }))}
+                      onCheckedChange={(checked) =>
+                        setFormData((prev) => ({ ...prev, ativo: checked }))
+                      }
                     />
                   </div>
 
@@ -411,7 +430,9 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
                     </div>
                     <Switch
                       checked={formData.essencial}
-                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, essencial: checked }))}
+                      onCheckedChange={(checked) =>
+                        setFormData((prev) => ({ ...prev, essencial: checked }))
+                      }
                     />
                   </div>
 
@@ -421,7 +442,9 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
                       id="ordem"
                       type="number"
                       value={formData.ordem}
-                      onChange={(e) => setFormData(prev => ({ ...prev, ordem: parseInt(e.target.value) || 0 }))}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, ordem: parseInt(e.target.value) || 0 }))
+                      }
                     />
                   </div>
 

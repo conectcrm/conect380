@@ -10,7 +10,7 @@ interface ModalNovaPropostaSimpleProps {
 export const ModalNovaPropostaSimple: React.FC<ModalNovaPropostaSimpleProps> = ({
   isOpen,
   onClose,
-  onPropostaCriada
+  onPropostaCriada,
 }) => {
   console.log('🔍 ModalNovaPropostaSimple renderizando, isOpen:', isOpen);
 
@@ -45,9 +45,12 @@ export const ModalNovaPropostaSimple: React.FC<ModalNovaPropostaSimpleProps> = (
         {/* Conteúdo */}
         <div className="p-6">
           <h3 className="text-lg font-semibold mb-4">🎉 Modal funcionando!</h3>
-          <p className="mb-4">Se você está vendo este texto, o modal está sendo renderizado corretamente.</p>
+          <p className="mb-4">
+            Se você está vendo este texto, o modal está sendo renderizado corretamente.
+          </p>
           <p className="mb-4 text-sm text-gray-600">
-            Este é um modal simplificado para testar se o problema é na estrutura básica ou na lógica complexa do modal original.
+            Este é um modal simplificado para testar se o problema é na estrutura básica ou na
+            lógica complexa do modal original.
           </p>
           <button
             onClick={() => {

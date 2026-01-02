@@ -117,7 +117,7 @@ INSERT INTO oportunidades (
     'telefone',
     ARRAY['Healthcare', 'Gestão'],
     '2025-09-15',
-    (SELECT id FROM users WHERE email = 'admin@conectcrm.com' LIMIT 1),
+    (SELECT id FROM users WHERE email = 'admin@conectsuite.com.br' LIMIT 1),
     'Dr. Roberto Silva',
     'roberto@medcenter.com.br',
     '(11) 97654-3210',
@@ -165,7 +165,7 @@ INSERT INTO oportunidades (
     'indicacao',
     ARRAY['Educação', 'Sistema'],
     '2025-07-25',
-    (SELECT id FROM users WHERE email = 'admin@conectcrm.com' LIMIT 1),
+    (SELECT id FROM users WHERE email = 'admin@conectsuite.com.br' LIMIT 1),
     'Prof. Maria Helena',
     'maria@escolafuturo.edu.br',
     '(11) 94321-0987',
@@ -229,7 +229,7 @@ INSERT INTO atividades (tipo, descricao, oportunidade_id, criado_por_id, data_at
     'note',
     'Contrato assinado! Iniciar processo de implementação na próxima semana',
     6,
-    (SELECT id FROM users WHERE email = 'admin@conectcrm.com' LIMIT 1),
+    (SELECT id FROM users WHERE email = 'admin@conectsuite.com.br' LIMIT 1),
     '2025-07-22 10:00:00'
 ),
 (

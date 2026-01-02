@@ -20,7 +20,7 @@ const ResponsiveStepIndicator: React.FC<ResponsiveStepIndicatorProps> = ({
   currentStep,
   completedSteps,
   onStepClick,
-  className = ''
+  className = '',
 }) => {
   const canNavigateToStep = (stepIndex: number) => {
     return stepIndex <= currentStep || completedSteps.includes(stepIndex);
@@ -35,7 +35,8 @@ const ResponsiveStepIndicator: React.FC<ResponsiveStepIndicatorProps> = ({
 
   const getStepClasses = (stepIndex: number) => {
     const status = getStepStatus(stepIndex);
-    const baseClasses = 'flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full text-xs font-medium transition-all duration-200';
+    const baseClasses =
+      'flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full text-xs font-medium transition-all duration-200';
 
     switch (status) {
       case 'completed':
@@ -53,8 +54,9 @@ const ResponsiveStepIndicator: React.FC<ResponsiveStepIndicatorProps> = ({
     if (stepIndex >= steps.length - 1) return 'hidden';
 
     const isCompleted = completedSteps.includes(stepIndex) || stepIndex < currentStep;
-    return `hidden sm:block flex-1 h-0.5 mx-2 transition-colors duration-300 ${isCompleted ? 'bg-[#159A9C]' : 'bg-gray-200'
-      }`;
+    return `hidden sm:block flex-1 h-0.5 mx-2 transition-colors duration-300 ${
+      isCompleted ? 'bg-[#159A9C]' : 'bg-gray-200'
+    }`;
   };
 
   return (
@@ -75,8 +77,11 @@ const ResponsiveStepIndicator: React.FC<ResponsiveStepIndicatorProps> = ({
                   <step.icone className="w-4 h-4" />
                 )}
               </button>
-              <span className={`mt-1 text-xs text-center ${index === currentStep ? 'text-[#159A9C] font-medium' : 'text-gray-500'
-                }`}>
+              <span
+                className={`mt-1 text-xs text-center ${
+                  index === currentStep ? 'text-[#159A9C] font-medium' : 'text-gray-500'
+                }`}
+              >
                 {step.titulo}
               </span>
             </div>
@@ -87,15 +92,13 @@ const ResponsiveStepIndicator: React.FC<ResponsiveStepIndicatorProps> = ({
         <div className="w-full bg-gray-200 rounded-full h-1.5 mb-4">
           <div
             className="bg-[#159A9C] h-1.5 rounded-full transition-all duration-500 ease-out"
-            style={{ width: `${((currentStep) / (steps.length - 1)) * 100}%` }}
+            style={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
           />
         </div>
 
         {/* Current step info */}
         <div className="text-center">
-          <p className="text-sm font-medium text-gray-900">
-            {steps[currentStep]?.titulo}
-          </p>
+          <p className="text-sm font-medium text-gray-900">{steps[currentStep]?.titulo}</p>
         </div>
       </div>
 
@@ -118,8 +121,11 @@ const ResponsiveStepIndicator: React.FC<ResponsiveStepIndicatorProps> = ({
                 </button>
 
                 <div className="text-center max-w-20">
-                  <p className={`text-xs font-medium ${index === currentStep ? 'text-[#159A9C]' : 'text-gray-700'
-                    }`}>
+                  <p
+                    className={`text-xs font-medium ${
+                      index === currentStep ? 'text-[#159A9C]' : 'text-gray-700'
+                    }`}
+                  >
                     {step.titulo}
                   </p>
                 </div>

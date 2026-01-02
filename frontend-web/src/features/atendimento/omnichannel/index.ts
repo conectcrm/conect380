@@ -18,7 +18,7 @@ export type {
   EncerrarTicketResponse,
   BuscarContatosParams,
   BuscarClientesParams,
-  Cliente
+  Cliente,
 } from './services/atendimentoService';
 
 // Hooks

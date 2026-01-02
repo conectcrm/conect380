@@ -12,16 +12,28 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { atendimentoService } from '../services/atendimentoService';
+import { atendimentoService, normalizarMensagemPayload } from '../services/atendimentoService';
 import { Mensagem, StatusMensagem } from '../types';
 import {
   useAtendimentoStore,
-  getMensagensDoTicket,
-  isTicketLoadingMensagens,
-  getMensagensError,
 } from '../../../../stores/atendimentoStore';
 
-const DEBUG = false; // ✅ Desabilitado após resolução do problema de tempo real
+const DEBUG = false; // 🧪 Habilitado para testar mensagens em tempo real
+
+const chaveMensagem = (m: Mensagem) => m.id || m.idExterno || `${m.ticketId}-${m.timestamp}`;
+
+const deduplicarMensagens = (lista: Mensagem[]): Mensagem[] => {
+  const mapa = new Map<string, Mensagem>();
+
+  lista.forEach((msg) => {
+    const key = chaveMensagem(msg);
+    if (!mapa.has(key)) {
+      mapa.set(key, msg);
+    }
+  });
+
+  return Array.from(mapa.values());
+};
 
 interface UseMensagensOptions {
   ticketId: string | null;
@@ -55,21 +67,11 @@ interface UseMensagensReturn {
 export const useMensagens = (options: UseMensagensOptions): UseMensagensReturn => {
   const { ticketId, autoScroll = true, pageSize = 50 } = options;
 
-  // ===== ESTADO (usando Zustand Store para mensagens) =====
-  const {
-    setMensagens: setMensagensStore,
-    setMensagensLoading,
-    setMensagensError,
-    adicionarMensagem: adicionarMensagemStore,
-    atualizarMensagem,
-  } = useAtendimentoStore();
-
-  // Buscar mensagens do ticket atual usando helpers
-  const mensagens = ticketId ? getMensagensDoTicket(ticketId) : [];
-  const loading = ticketId ? isTicketLoadingMensagens(ticketId) : false;
-  const error = ticketId ? getMensagensError(ticketId) : null;
-
-  // Estados locais (não precisam estar na store global)
+  // ===== ESTADO LOCAL REATIVO (como Slack, WhatsApp, Discord) =====
+  // 🔥 Mensagens são gerenciadas localmente para garantir reatividade imediata
+  const [mensagens, setMensagens] = useState<Mensagem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [temMais, setTemMais] = useState(false);
   const [paginaAtual, setPaginaAtual] = useState(1);
@@ -77,16 +79,23 @@ export const useMensagens = (options: UseMensagensOptions): UseMensagensReturn =
   const mensagensRef = useRef<HTMLDivElement>(null);
   const ultimaMensagemRef = useRef<string | null>(null);
 
+  // 🔥 Manter sincronização com store Zustand (para outros componentes)
+  const {
+    setMensagens: setMensagensStore,
+    adicionarMensagem: adicionarMensagemStore,
+    atualizarMensagem: atualizarMensagemStore,
+  } = useAtendimentoStore();
+
   // ===== CARREGAR MENSAGENS =====
   const carregarMensagens = useCallback(
     async (pagina: number = 1, append: boolean = false) => {
       if (!ticketId) {
-        setMensagensStore(ticketId || 'empty', []);
+        setMensagens([]);
         return;
       }
 
-      setMensagensLoading(ticketId, true);
-      setMensagensError(ticketId, null);
+      setLoading(true);
+      setError(null);
 
       try {
         const response = await atendimentoService.listarMensagens({
@@ -96,12 +105,15 @@ export const useMensagens = (options: UseMensagensOptions): UseMensagensReturn =
         });
 
         if (append) {
-          // Adicionar mensagens antigas (paginação)
-          const mensagensAtuais = getMensagensDoTicket(ticketId);
-          setMensagensStore(ticketId, [...response.data, ...mensagensAtuais]);
+          // Adicionar mensagens antigas (paginação) com deduplicação
+          setMensagens((prev) => deduplicarMensagens([...response.data, ...prev]));
         } else {
           // Substituir mensagens (refresh)
-          setMensagensStore(ticketId, response.data);
+          const dedup = deduplicarMensagens(response.data);
+          setMensagens(dedup);
+
+          // 🔥 Sincronizar com store Zustand (para outros componentes)
+          setMensagensStore(ticketId, dedup);
         }
 
         setTemMais(response.data.length === pageSize);
@@ -111,13 +123,13 @@ export const useMensagens = (options: UseMensagensOptions): UseMensagensReturn =
           console.log(`✅ ${response.data.length} mensagens carregadas (página ${pagina})`);
       } catch (err: any) {
         const mensagemErro = err.response?.data?.message || 'Erro ao carregar mensagens';
-        setMensagensError(ticketId, mensagemErro);
+        setError(mensagemErro);
         console.error('❌ Erro ao carregar mensagens:', err);
       } finally {
-        setMensagensLoading(ticketId, false);
+        setLoading(false);
       }
     },
-    [ticketId, pageSize, setMensagensStore, setMensagensLoading, setMensagensError],
+    [ticketId, pageSize, setMensagensStore],
   );
 
   // ===== CARREGAR MAIS (SCROLL INFINITO) =====
@@ -140,19 +152,18 @@ export const useMensagens = (options: UseMensagensOptions): UseMensagensReturn =
           conteudo: conteudo.trim(),
         });
 
-        // 🔥 NÃO adicionar otimisticamente - WebSocket cuidará disso
-        // Evita duplicatas (mensagem aparecerá via WebSocket)
+        // 🔥 Não adicionar manualmente; dedupe usa id/idExterno e WS já entrega
         if (DEBUG) console.log('✅ Mensagem enviada, aguardando WebSocket...');
-      } catch (err: any) {
-        const mensagemErro = err.response?.data?.message || 'Erro ao enviar mensagem';
-        if (ticketId) setMensagensError(ticketId, mensagemErro);
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Erro ao enviar mensagem';
+        setError(errorMessage);
         console.error('❌ Erro ao enviar mensagem:', err);
         throw err;
       } finally {
         setEnviando(false);
       }
     },
-    [ticketId, setMensagensError],
+    [ticketId],
   );
 
   // ===== ENVIAR MENSAGEM COM ANEXOS =====
@@ -170,18 +181,18 @@ export const useMensagens = (options: UseMensagensOptions): UseMensagensReturn =
           onUploadProgress: options?.onUploadProgress, // 🔄 NOVO: Passar callback de progresso
         });
 
-        // 🔥 NÃO adicionar otimisticamente - WebSocket cuidará disso
+        // 🔥 Não adicionar manualmente; WebSocket entrega e dedupe evita duplicata
         if (DEBUG) console.log('✅ Mensagem com anexos enviada, aguardando WebSocket...');
-      } catch (err: any) {
-        const mensagemErro = err.response?.data?.message || 'Erro ao enviar mensagem';
-        if (ticketId) setMensagensError(ticketId, mensagemErro);
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Erro ao enviar mensagem';
+        setError(errorMessage);
         console.error('❌ Erro ao enviar mensagem com anexos:', err);
         throw err;
       } finally {
         setEnviando(false);
       }
     },
-    [ticketId, setMensagensError, options?.onUploadProgress],
+    [ticketId, options?.onUploadProgress],
   );
 
   // ===== ENVIAR ÁUDIO =====
@@ -198,18 +209,18 @@ export const useMensagens = (options: UseMensagensOptions): UseMensagensReturn =
           audio: { blob: audioBlob, duracao },
         });
 
-        // 🔥 NÃO adicionar otimisticamente - WebSocket cuidará disso
+        // 🔥 Não adicionar manualmente; WS entrega
         if (DEBUG) console.log('✅ Áudio enviado, aguardando WebSocket...');
-      } catch (err: any) {
-        const mensagemErro = err.response?.data?.message || 'Erro ao enviar áudio';
-        if (ticketId) setMensagensError(ticketId, mensagemErro);
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Erro ao enviar áudio';
+        setError(errorMessage);
         console.error('❌ Erro ao enviar áudio:', err);
         throw err;
       } finally {
         setEnviando(false);
       }
     },
-    [ticketId, setMensagensError],
+    [ticketId],
   );
 
   // ===== MARCAR COMO LIDAS =====
@@ -222,7 +233,7 @@ export const useMensagens = (options: UseMensagensOptions): UseMensagensReturn =
 
         // Atualizar mensagens na store
         mensagemIds.forEach((mensagemId) => {
-          atualizarMensagem(ticketId, mensagemId, { status: 'lido' as StatusMensagem });
+          atualizarMensagemStore(ticketId, mensagemId, { status: 'lido' as StatusMensagem });
         });
 
         if (DEBUG) console.log(`✅ ${mensagemIds.length} mensagens marcadas como lidas`);
@@ -230,7 +241,7 @@ export const useMensagens = (options: UseMensagensOptions): UseMensagensReturn =
         console.error('❌ Erro ao marcar mensagens como lidas:', err);
       }
     },
-    [ticketId, atualizarMensagem],
+    [ticketId, atualizarMensagemStore],
   );
 
   // ===== RECARREGAR =====
@@ -241,12 +252,31 @@ export const useMensagens = (options: UseMensagensOptions): UseMensagensReturn =
   // ===== ADICIONAR MENSAGEM RECEBIDA (WEBSOCKET) =====
   const adicionarMensagemRecebida = useCallback(
     (mensagem: Mensagem) => {
-      if (!ticketId) return;
+      if (!ticketId || !mensagem || mensagem.ticketId !== ticketId) return;
+
+      const mensagemNormalizada = normalizarMensagemPayload(mensagem);
 
       if (DEBUG) console.log('📩 Adicionando mensagem recebida via WebSocket:', mensagem);
 
-      // Usar a função da store que já tem deduplicação embutida
-      adicionarMensagemStore(ticketId, mensagem);
+      // 🔥 ATUALIZAR ESTADO LOCAL (para reatividade imediata)
+      setMensagens((prev) => {
+        // 🛡️ Garantir que prev seja sempre um array
+        const prevArray = Array.isArray(prev) ? prev : [];
+
+        // Evitar duplicatas
+        const novaChave = chaveMensagem(mensagemNormalizada);
+        const jaExiste = prevArray.some((m) => chaveMensagem(m) === novaChave);
+        if (jaExiste) {
+          if (DEBUG) console.warn(`⚠️ Mensagem ${mensagemNormalizada.id} já existe`);
+          return prevArray;
+        }
+
+        if (DEBUG) console.log('🔥 Mensagem adicionada em tempo real:', mensagemNormalizada.id);
+        return [...prevArray, mensagemNormalizada]; // Adiciona no final
+      });
+
+      // 🔄 Sincronizar com store (para outros componentes)
+      adicionarMensagemStore(ticketId, mensagemNormalizada);
     },
     [ticketId, adicionarMensagemStore],
   );

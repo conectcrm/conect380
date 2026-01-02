@@ -1,4 +1,5 @@
 import { api } from './api';
+import { getErrorMessage } from '../utils/errorHandling';
 
 /**
  * Interface Contato - Alinhada com backend
@@ -57,19 +58,36 @@ export interface UpdateContatoDto {
  */
 class ContatosService {
   private readonly baseUrl = '/api/crm';
+  private readonly errorPrefix = '[ContatosService]';
+
+  private async handleRequest<T>(request: () => Promise<{ data: T }>, context: string): Promise<T> {
+    try {
+      const response = await request();
+      return response.data;
+    } catch (err: unknown) {
+      console.error(`${this.errorPrefix} ${context}:`, err);
+      throw new Error(getErrorMessage(err, context));
+    }
+  }
+
+  private async handleVoidRequest(request: () => Promise<unknown>, context: string): Promise<void> {
+    try {
+      await request();
+    } catch (err: unknown) {
+      console.error(`${this.errorPrefix} ${context}:`, err);
+      throw new Error(getErrorMessage(err, context));
+    }
+  }
 
   /**
    * Lista TODOS os contatos da empresa (de todos os clientes)
    * GET /api/crm/contatos
    */
   async listarTodos(): Promise<Contato[]> {
-    try {
-      const response = await api.get(`${this.baseUrl}/contatos`);
-      return response.data;
-    } catch (error) {
-      console.error('❌ Erro ao listar todos os contatos:', error);
-      throw error;
-    }
+    return this.handleRequest(
+      () => api.get<Contato[]>(`${this.baseUrl}/contatos`),
+      'Erro ao listar todos os contatos',
+    );
   }
 
   /**
@@ -77,13 +95,10 @@ class ContatosService {
    * GET /api/crm/clientes/:clienteId/contatos
    */
   async listarPorCliente(clienteId: string): Promise<Contato[]> {
-    try {
-      const response = await api.get(`${this.baseUrl}/clientes/${clienteId}/contatos`);
-      return response.data;
-    } catch (error) {
-      console.error('❌ Erro ao listar contatos do cliente:', error);
-      throw error;
-    }
+    return this.handleRequest(
+      () => api.get<Contato[]>(`${this.baseUrl}/clientes/${clienteId}/contatos`),
+      'Erro ao listar contatos do cliente',
+    );
   }
 
   /**
@@ -91,13 +106,10 @@ class ContatosService {
    * GET /api/crm/contatos/:id
    */
   async buscarPorId(contatoId: string): Promise<Contato> {
-    try {
-      const response = await api.get(`${this.baseUrl}/contatos/${contatoId}`);
-      return response.data;
-    } catch (error) {
-      console.error('❌ Erro ao buscar contato:', error);
-      throw error;
-    }
+    return this.handleRequest(
+      () => api.get<Contato>(`${this.baseUrl}/contatos/${contatoId}`),
+      'Erro ao buscar contato',
+    );
   }
 
   /**
@@ -105,16 +117,10 @@ class ContatosService {
    * POST /api/crm/clientes/:clienteId/contatos
    */
   async criar(clienteId: string, data: CreateContatoDto): Promise<Contato> {
-    try {
-      const response = await api.post(
-        `${this.baseUrl}/clientes/${clienteId}/contatos`,
-        data
-      );
-      return response.data;
-    } catch (error) {
-      console.error('❌ Erro ao criar contato:', error);
-      throw error;
-    }
+    return this.handleRequest(
+      () => api.post<Contato>(`${this.baseUrl}/clientes/${clienteId}/contatos`, data),
+      'Erro ao criar contato',
+    );
   }
 
   /**
@@ -122,16 +128,10 @@ class ContatosService {
    * PATCH /api/crm/contatos/:id
    */
   async atualizar(contatoId: string, data: UpdateContatoDto): Promise<Contato> {
-    try {
-      const response = await api.patch(
-        `${this.baseUrl}/contatos/${contatoId}`,
-        data
-      );
-      return response.data;
-    } catch (error) {
-      console.error('❌ Erro ao atualizar contato:', error);
-      throw error;
-    }
+    return this.handleRequest(
+      () => api.patch<Contato>(`${this.baseUrl}/contatos/${contatoId}`, data),
+      'Erro ao atualizar contato',
+    );
   }
 
   /**
@@ -139,12 +139,10 @@ class ContatosService {
    * DELETE /api/crm/contatos/:id
    */
   async remover(contatoId: string): Promise<void> {
-    try {
-      await api.delete(`${this.baseUrl}/contatos/${contatoId}`);
-    } catch (error) {
-      console.error('❌ Erro ao remover contato:', error);
-      throw error;
-    }
+    await this.handleVoidRequest(
+      () => api.delete(`${this.baseUrl}/contatos/${contatoId}`),
+      'Erro ao remover contato',
+    );
   }
 
   /**
@@ -152,15 +150,10 @@ class ContatosService {
    * PATCH /api/crm/contatos/:id/principal
    */
   async definirPrincipal(contatoId: string): Promise<Contato> {
-    try {
-      const response = await api.patch(
-        `${this.baseUrl}/contatos/${contatoId}/principal`
-      );
-      return response.data;
-    } catch (error) {
-      console.error('❌ Erro ao definir contato principal:', error);
-      throw error;
-    }
+    return this.handleRequest(
+      () => api.patch<Contato>(`${this.baseUrl}/contatos/${contatoId}/principal`),
+      'Erro ao definir contato principal',
+    );
   }
 
   /**

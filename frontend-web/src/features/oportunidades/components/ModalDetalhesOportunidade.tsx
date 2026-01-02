@@ -4,7 +4,7 @@ import {
   AtualizarOportunidade,
   EstagioOportunidade,
   PrioridadeOportunidade,
-  OrigemOportunidade
+  OrigemOportunidade,
 } from '../../../types/oportunidades/index';
 import {
   type LucideIcon,
@@ -15,10 +15,11 @@ import {
   X,
   Edit2,
   Save,
-  AlertCircle
+  AlertCircle,
 } from 'lucide-react';
 
-const asIcon = (IconComponent: LucideIcon) => IconComponent as React.FC<React.SVGProps<SVGSVGElement>>;
+const asIcon = (IconComponent: LucideIcon) =>
+  IconComponent as React.FC<React.SVGProps<SVGSVGElement>>;
 
 const UserIcon = asIcon(User);
 const DollarSignIcon = asIcon(DollarSign);
@@ -44,13 +45,13 @@ const estagiosOptions: Array<{ value: EstagioOportunidade; label: string }> = [
   { value: EstagioOportunidade.NEGOCIACAO, label: 'Negociação' },
   { value: EstagioOportunidade.FECHAMENTO, label: 'Fechamento' },
   { value: EstagioOportunidade.GANHO, label: 'Ganhou' },
-  { value: EstagioOportunidade.PERDIDO, label: 'Perdeu' }
+  { value: EstagioOportunidade.PERDIDO, label: 'Perdeu' },
 ];
 
 const prioridadeOptions: Array<{ value: PrioridadeOportunidade; label: string }> = [
   { value: PrioridadeOportunidade.BAIXA, label: 'Baixa' },
   { value: PrioridadeOportunidade.MEDIA, label: 'Média' },
-  { value: PrioridadeOportunidade.ALTA, label: 'Alta' }
+  { value: PrioridadeOportunidade.ALTA, label: 'Alta' },
 ];
 
 const origemOptions: Array<{ value: OrigemOportunidade; label: string }> = [
@@ -61,14 +62,14 @@ const origemOptions: Array<{ value: OrigemOportunidade; label: string }> = [
   { value: OrigemOportunidade.REDES_SOCIAIS, label: 'Redes Sociais' },
   { value: OrigemOportunidade.EVENTO, label: 'Evento' },
   { value: OrigemOportunidade.PARCEIRO, label: 'Parceiro' },
-  { value: OrigemOportunidade.CAMPANHA, label: 'Campanha' }
+  { value: OrigemOportunidade.CAMPANHA, label: 'Campanha' },
 ];
 
 export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   isOpen,
   oportunidade,
   onClose,
-  onUpdateSuccess
+  onUpdateSuccess,
 }) => {
   const { atualizarOportunidade, loading } = useOportunidades();
   const [isEditing, setIsEditing] = useState(false);
@@ -86,7 +87,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
     empresaContato: '',
     dataFechamentoEsperado: '',
     origem: OrigemOportunidade.WEBSITE,
-    observacoes: ''
+    observacoes: '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -109,7 +110,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
           ? new Date(oportunidade.dataFechamentoEsperado).toISOString().split('T')[0]
           : '',
         origem: oportunidade.origem || OrigemOportunidade.WEBSITE,
-        observacoes: oportunidade.observacoes || ''
+        observacoes: oportunidade.observacoes || '',
       });
     }
   }, [oportunidade]);
@@ -155,7 +156,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
           ? typeof formData.dataFechamentoEsperado === 'string'
             ? formData.dataFechamentoEsperado
             : formData.dataFechamentoEsperado.toISOString()
-          : null
+          : null,
       };
 
       await atualizarOportunidade(payload);
@@ -184,7 +185,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
           ? new Date(oportunidade.dataFechamentoEsperado).toISOString().split('T')[0]
           : '',
         origem: oportunidade.origem || OrigemOportunidade.WEBSITE,
-        observacoes: oportunidade.observacoes || ''
+        observacoes: oportunidade.observacoes || '',
       });
     }
     setIsEditing(false);
@@ -199,13 +200,13 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
   const handleInputChange = (field: keyof AtualizarOportunidade, value: any) => {
     if (field === 'dataFechamentoEsperado') {
       const coercedValue = value ? String(value) : '';
-      setFormData(prev => ({ ...prev, [field]: coercedValue }));
+      setFormData((prev) => ({ ...prev, [field]: coercedValue }));
     } else {
-      setFormData(prev => ({ ...prev, [field]: value }));
+      setFormData((prev) => ({ ...prev, [field]: value }));
     }
 
     if (errors[field as string]) {
-      setErrors(prev => ({ ...prev, [field as string]: '' }));
+      setErrors((prev) => ({ ...prev, [field as string]: '' }));
     }
   };
 
@@ -248,14 +249,15 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={handleClose} />
+        <div
+          className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
+          onClick={handleClose}
+        />
 
         <div className="inline-block w-[calc(100%-2rem)] sm:w-[700px] md:w-[800px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] px-6 py-4 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-3">
-              <h3 className="text-lg font-medium text-gray-900">
-                Detalhes da Oportunidade
-              </h3>
+              <h3 className="text-lg font-medium text-gray-900">Detalhes da Oportunidade</h3>
               {!isEditing && (
                 <button
                   onClick={() => setIsEditing(true)}
@@ -266,10 +268,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                 </button>
               )}
             </div>
-            <button
-              onClick={handleClose}
-              className="text-gray-400 hover:text-gray-600"
-            >
+            <button onClick={handleClose} className="text-gray-400 hover:text-gray-600">
               <CloseIcon className="w-6 h-6" />
             </button>
           </div>
@@ -295,7 +294,9 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                         onChange={(e) => handleInputChange('titulo', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
-                      {errors.titulo && <p className="text-sm text-red-600 mt-1">{errors.titulo}</p>}
+                      {errors.titulo && (
+                        <p className="text-sm text-red-600 mt-1">{errors.titulo}</p>
+                      )}
                     </div>
                   ) : (
                     <p className="text-gray-900">{oportunidade.titulo}</p>
@@ -303,9 +304,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Descrição
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
                   {isEditing ? (
                     <textarea
                       value={formData.descricao}
@@ -345,29 +344,32 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                       {errors.valor && <p className="text-sm text-red-600 mt-1">{errors.valor}</p>}
                     </div>
                   ) : (
-                    <p className="text-lg font-semibold text-green-600">{oportunidade.valorFormatado}</p>
+                    <p className="text-lg font-semibold text-green-600">
+                      {oportunidade.valorFormatado}
+                    </p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Estágio
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Estágio</label>
                   {isEditing ? (
                     <select
                       value={formData.estagio}
                       onChange={(e) => handleInputChange('estagio', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      {estagiosOptions.map(option => (
+                      {estagiosOptions.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
                         </option>
                       ))}
                     </select>
                   ) : (
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getEstagioColor(oportunidade.estagio)}`}>
-                      {estagiosOptions.find(e => e.value === oportunidade.estagio)?.label || oportunidade.estagio}
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getEstagioColor(oportunidade.estagio)}`}
+                    >
+                      {estagiosOptions.find((e) => e.value === oportunidade.estagio)?.label ||
+                        oportunidade.estagio}
                     </span>
                   )}
                 </div>
@@ -386,7 +388,9 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                         max="100"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
-                      {errors.probabilidade && <p className="text-sm text-red-600 mt-1">{errors.probabilidade}</p>}
+                      {errors.probabilidade && (
+                        <p className="text-sm text-red-600 mt-1">{errors.probabilidade}</p>
+                      )}
                     </div>
                   ) : (
                     <div className="flex items-center">
@@ -404,24 +408,25 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Prioridade
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Prioridade</label>
                   {isEditing ? (
                     <select
                       value={formData.prioridade}
                       onChange={(e) => handleInputChange('prioridade', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      {prioridadeOptions.map(option => (
+                      {prioridadeOptions.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
                         </option>
                       ))}
                     </select>
                   ) : (
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPrioridadeColor(oportunidade.prioridade)}`}>
-                      {prioridadeOptions.find(p => p.value === oportunidade.prioridade)?.label || oportunidade.prioridade}
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPrioridadeColor(oportunidade.prioridade)}`}
+                    >
+                      {prioridadeOptions.find((p) => p.value === oportunidade.prioridade)?.label ||
+                        oportunidade.prioridade}
                     </span>
                   )}
                 </div>
@@ -433,11 +438,13 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                   {isEditing ? (
                     <input
                       type="date"
-                      value={formData.dataFechamentoEsperado
-                        ? typeof formData.dataFechamentoEsperado === 'string'
-                          ? formData.dataFechamentoEsperado
-                          : new Date(formData.dataFechamentoEsperado).toISOString().split('T')[0]
-                        : ''}
+                      value={
+                        formData.dataFechamentoEsperado
+                          ? typeof formData.dataFechamentoEsperado === 'string'
+                            ? formData.dataFechamentoEsperado
+                            : new Date(formData.dataFechamentoEsperado).toISOString().split('T')[0]
+                          : ''
+                      }
                       onChange={(e) => handleInputChange('dataFechamentoEsperado', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -445,8 +452,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                     <p className="text-gray-900">
                       {oportunidade.dataFechamentoEsperado
                         ? new Date(oportunidade.dataFechamentoEsperado).toLocaleDateString('pt-BR')
-                        : 'Não informado'
-                      }
+                        : 'Não informado'}
                     </p>
                   )}
                 </div>
@@ -473,7 +479,9 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                         onChange={(e) => handleInputChange('nomeContato', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
-                      {errors.nomeContato && <p className="text-sm text-red-600 mt-1">{errors.nomeContato}</p>}
+                      {errors.nomeContato && (
+                        <p className="text-sm text-red-600 mt-1">{errors.nomeContato}</p>
+                      )}
                     </div>
                   ) : (
                     <p className="text-gray-900">{oportunidade.nomeContato || 'Não informado'}</p>
@@ -492,7 +500,9 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                         onChange={(e) => handleInputChange('emailContato', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
-                      {errors.emailContato && <p className="text-sm text-red-600 mt-1">{errors.emailContato}</p>}
+                      {errors.emailContato && (
+                        <p className="text-sm text-red-600 mt-1">{errors.emailContato}</p>
+                      )}
                     </div>
                   ) : (
                     <p className="text-gray-900">{oportunidade.emailContato || 'Não informado'}</p>
@@ -500,9 +510,7 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Telefone
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
                   {isEditing ? (
                     <input
                       type="text"
@@ -511,14 +519,14 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   ) : (
-                    <p className="text-gray-900">{oportunidade.telefoneContato || 'Não informado'}</p>
+                    <p className="text-gray-900">
+                      {oportunidade.telefoneContato || 'Não informado'}
+                    </p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Empresa
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
                   {isEditing ? (
                     <input
                       type="text"
@@ -527,7 +535,9 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   ) : (
-                    <p className="text-gray-900">{oportunidade.empresaContato || 'Não informado'}</p>
+                    <p className="text-gray-900">
+                      {oportunidade.empresaContato || 'Não informado'}
+                    </p>
                   )}
                 </div>
               </div>
@@ -542,16 +552,16 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Origem
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Origem</label>
                   {isEditing ? (
                     <select
                       value={formData.origem}
-                      onChange={(e) => handleInputChange('origem', e.target.value as OrigemOportunidade)}
+                      onChange={(e) =>
+                        handleInputChange('origem', e.target.value as OrigemOportunidade)
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      {origemOptions.map(option => (
+                      {origemOptions.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
                         </option>
@@ -560,7 +570,8 @@ export const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps>
                   ) : (
                     <p className="text-gray-900">
                       {oportunidade.origem
-                        ? origemOptions.find(option => option.value === oportunidade.origem)?.label || oportunidade.origem
+                        ? origemOptions.find((option) => option.value === oportunidade.origem)
+                            ?.label || oportunidade.origem
                         : 'Não informado'}
                     </p>
                   )}

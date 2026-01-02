@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-export type PerfilUsuario = 'gerente' | 'vendedor' | 'operacional' | 'financeiro' | 'suporte' | 'administrador';
+export type PerfilUsuario =
+  | 'gerente'
+  | 'vendedor'
+  | 'operacional'
+  | 'financeiro'
+  | 'suporte'
+  | 'administrador';
 
 interface ProfileContextData {
   perfilSelecionado: PerfilUsuario;
@@ -18,14 +24,10 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
 
   const value = {
     perfilSelecionado,
-    setPerfilSelecionado
+    setPerfilSelecionado,
   };
 
-  return (
-    <ProfileContext.Provider value={value}>
-      {children}
-    </ProfileContext.Provider>
-  );
+  return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
 };
 
 export const useProfile = (): ProfileContextData => {

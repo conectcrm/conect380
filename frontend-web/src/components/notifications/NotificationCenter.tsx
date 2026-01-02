@@ -15,7 +15,7 @@ import {
   CheckCircle,
   XCircle,
   Filter,
-  MoreVertical
+  MoreVertical,
 } from 'lucide-react';
 
 interface NotificationCenterProps {
@@ -36,7 +36,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
   } = useNotifications();
 
   const [isOpen, setIsOpen] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'unread' | 'success' | 'error' | 'warning' | 'info' | 'reminder'>('all');
+  const [filter, setFilter] = useState<
+    'all' | 'unread' | 'success' | 'error' | 'warning' | 'info' | 'reminder'
+  >('all');
   const [realUnreadCount, setRealUnreadCount] = useState(0);
 
   // ✅ Usar useRef para persistir o Set entre re-renders (evita duplicadas)
@@ -103,7 +105,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
     return () => clearInterval(interval);
   }, [notifications, addNotification]);
 
-  const filteredNotifications = notifications.filter(notification => {
+  const filteredNotifications = notifications.filter((notification) => {
     switch (filter) {
       case 'unread':
         return !notification.read;
@@ -171,11 +173,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
         className="relative p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
         title="Notificações"
       >
-        {settings.soundEnabled ? (
-          <Bell className="w-6 h-6" />
-        ) : (
-          <BellOff className="w-6 h-6" />
-        )}
+        {settings.soundEnabled ? <Bell className="w-6 h-6" /> : <BellOff className="w-6 h-6" />}
 
         {/* Badge de notificações não lidas */}
         {realUnreadCount > 0 && (
@@ -218,16 +216,25 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
               {[
                 { key: 'all', label: 'Todas', count: notifications.length },
                 { key: 'unread', label: 'Não Lidas', count: realUnreadCount },
-                { key: 'reminder', label: 'Lembretes', count: notifications.filter(n => n.type === 'reminder').length },
-                { key: 'error', label: 'Erros', count: notifications.filter(n => n.type === 'error').length },
+                {
+                  key: 'reminder',
+                  label: 'Lembretes',
+                  count: notifications.filter((n) => n.type === 'reminder').length,
+                },
+                {
+                  key: 'error',
+                  label: 'Erros',
+                  count: notifications.filter((n) => n.type === 'error').length,
+                },
               ].map(({ key, label, count }) => (
                 <button
                   key={key}
                   onClick={() => setFilter(key as any)}
-                  className={`px-3 py-1 text-xs rounded-full transition-colors ${filter === key
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
+                  className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                    filter === key
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
                 >
                   {label} {count > 0 && `(${count})`}
                 </button>
@@ -241,7 +248,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
               <div className="p-8 text-center">
                 <Bell className="w-12 h-12 mx-auto text-gray-300 mb-4" />
                 <p className="text-gray-500 mb-4">
-                  {filter === 'all' ? 'Nenhuma notificação' : `Nenhuma notificação ${filter === 'unread' ? 'não lida' : `do tipo ${filter}`}`}
+                  {filter === 'all'
+                    ? 'Nenhuma notificação'
+                    : `Nenhuma notificação ${filter === 'unread' ? 'não lida' : `do tipo ${filter}`}`}
                 </p>
                 <button
                   onClick={() => {
@@ -258,8 +267,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                 {filteredNotifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-4 hover:bg-gray-50 transition-colors border-l-4 ${!notification.read ? 'bg-blue-50' : 'bg-white'
-                      } ${getPriorityColor(notification.priority)}`}
+                    className={`p-4 hover:bg-gray-50 transition-colors border-l-4 ${
+                      !notification.read ? 'bg-blue-50' : 'bg-white'
+                    } ${getPriorityColor(notification.priority)}`}
                   >
                     <div className="flex items-start space-x-3">
                       {/* Ícone */}
@@ -271,13 +281,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <p className={`text-sm font-medium ${!notification.read ? 'text-gray-900' : 'text-gray-700'
-                              }`}>
+                            <p
+                              className={`text-sm font-medium ${
+                                !notification.read ? 'text-gray-900' : 'text-gray-700'
+                              }`}
+                            >
                               {notification.title}
                             </p>
-                            <p className="text-sm text-gray-600 mt-1">
-                              {notification.message}
-                            </p>
+                            <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
                             <p className="text-xs text-gray-500 mt-2">
                               {formatTime(notification.timestamp)}
                             </p>

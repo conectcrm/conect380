@@ -127,7 +127,7 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
     propostas: [],
     agenda: [],
     leads: [],
-    alertas: []
+    alertas: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -148,17 +148,17 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
             percentual: 75,
             diasRestantes: 8,
             mediaVendasDiarias: 1875,
-            metaDiaria: 1667
+            metaDiaria: 1667,
           },
           ranking: {
             posicao: 2,
             total: 8,
             pontos: 1250,
-            nivel: "Vendedor Gold",
+            nivel: 'Vendedor Gold',
             proximoNivel: {
-              nome: "Vendedor Platinum",
-              pontosNecessarios: 250
-            }
+              nome: 'Vendedor Platinum',
+              pontosNecessarios: 250,
+            },
           },
           pipeline: {
             valor: 125000,
@@ -167,8 +167,8 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
             distribuicao: {
               quente: { valor: 45000, quantidade: 4 },
               morno: { valor: 52000, quantidade: 5 },
-              frio: { valor: 28000, quantidade: 3 }
-            }
+              frio: { valor: 28000, quantidade: 3 },
+            },
           },
           atividades: {
             hoje: {
@@ -176,20 +176,20 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
               reunioes: 3,
               followups: 5,
               emails: 12,
-              propostas: 2
+              propostas: 2,
             },
             semana: {
               calls: 42,
               reunioes: 12,
               followups: 28,
               emails: 65,
-              propostas: 8
+              propostas: 8,
             },
             metas: {
               callsDiarias: 10,
               reunioesSemana: 15,
-              followupsDiarios: 8
-            }
+              followupsDiarios: 8,
+            },
           },
           performance: {
             taxaConversao: 18.5,
@@ -197,8 +197,8 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
             tempoMedioCiclo: 28,
             satisfacaoCliente: 4.7,
             nota: 8.5,
-            estrelas: 4
-          }
+            estrelas: 4,
+          },
         },
         propostas: [
           {
@@ -210,7 +210,7 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
             prazo: '2025-08-10',
             diasAteVencimento: 6,
             proximaAcao: 'Apresentação final',
-            status: 'Negociação'
+            status: 'Negociação',
           },
           {
             id: '2',
@@ -221,7 +221,7 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
             prazo: '2025-08-15',
             diasAteVencimento: 11,
             proximaAcao: 'Ajustar proposta',
-            status: 'Análise'
+            status: 'Análise',
           },
           {
             id: '3',
@@ -232,8 +232,8 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
             prazo: '2025-08-20',
             diasAteVencimento: 16,
             proximaAcao: 'Follow-up',
-            status: 'Enviada'
-          }
+            status: 'Enviada',
+          },
         ],
         agenda: [
           {
@@ -244,7 +244,7 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
             horario: '14:30',
             duracao: 60,
             status: 'agendado',
-            prioridade: 'alta'
+            prioridade: 'alta',
           },
           {
             id: '2',
@@ -254,7 +254,7 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
             horario: '16:00',
             duracao: 30,
             status: 'agendado',
-            prioridade: 'media'
+            prioridade: 'media',
           },
           {
             id: '3',
@@ -264,8 +264,8 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
             horario: '17:30',
             duracao: 45,
             status: 'agendado',
-            prioridade: 'alta'
-          }
+            prioridade: 'alta',
+          },
         ],
         leads: [
           {
@@ -278,7 +278,7 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
             ultimoContato: '2025-08-03',
             proximaAcao: 'Qualificação inicial',
             telefone: '(11) 9999-8888',
-            email: 'maria@inovacao.com'
+            email: 'maria@inovacao.com',
           },
           {
             id: '2',
@@ -290,8 +290,8 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
             ultimoContato: '2025-08-02',
             proximaAcao: 'Demo agendada',
             telefone: '(11) 8888-7777',
-            email: 'carlos@techstartup.com'
-          }
+            email: 'carlos@techstartup.com',
+          },
         ],
         alertas: [
           {
@@ -302,8 +302,8 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
             descricao: 'Você está no caminho certo! Restam 8 dias para fechar o mês.',
             acao: {
               texto: 'Ver pipeline',
-              url: '/propostas'
-            }
+              url: '/propostas',
+            },
           },
           {
             id: '2',
@@ -313,14 +313,14 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
             descricao: 'Proposta de R$ 15.000 com 85% de probabilidade precisa de atenção.',
             acao: {
               texto: 'Ver proposta',
-              url: '/propostas/1'
-            }
-          }
-        ]
+              url: '/propostas/1',
+            },
+          },
+        ],
       };
 
       // Simular delay de API
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       setData(mockData);
     } catch (err) {
@@ -355,11 +355,22 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
     const { meta, atividades, performance, pipeline } = data.kpis;
 
     return {
-      statusMeta: meta.percentual >= 100 ? 'superada' : meta.percentual >= 90 ? 'quase_la' : meta.percentual >= 70 ? 'caminho_certo' : 'atencao',
-      produtividadeDiaria: atividades.hoje.calls + atividades.hoje.reunioes + atividades.hoje.followups,
-      efetividadePipeline: (pipeline.valor * pipeline.probabilidade / 100),
-      projecaoMensal: meta.atual + (meta.mediaVendasDiarias * meta.diasRestantes),
-      performanceGeral: Math.round((performance.nota * 10 + performance.taxaConversao + (performance.satisfacaoCliente * 20)) / 3)
+      statusMeta:
+        meta.percentual >= 100
+          ? 'superada'
+          : meta.percentual >= 90
+            ? 'quase_la'
+            : meta.percentual >= 70
+              ? 'caminho_certo'
+              : 'atencao',
+      produtividadeDiaria:
+        atividades.hoje.calls + atividades.hoje.reunioes + atividades.hoje.followups,
+      efetividadePipeline: (pipeline.valor * pipeline.probabilidade) / 100,
+      projecaoMensal: meta.atual + meta.mediaVendasDiarias * meta.diasRestantes,
+      performanceGeral: Math.round(
+        (performance.nota * 10 + performance.taxaConversao + performance.satisfacaoCliente * 20) /
+          3,
+      ),
     };
   }, [data.kpis]);
 
@@ -368,6 +379,6 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
     loading,
     error,
     refresh,
-    insights
+    insights,
   };
 };

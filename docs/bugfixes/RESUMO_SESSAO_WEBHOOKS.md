@@ -53,7 +53,7 @@ scripts/
 ```typescript
 // ❌ ANTES
 @Controller('webhooks/whatsapp')
-// Meta chamando: /api/atendimento/webhooks/whatsapp
+// Meta chamando: /api/atendimento/webhooks/whatsapp/:empresaId
 // Resultado: 404 Not Found
 ```
 
@@ -62,15 +62,16 @@ scripts/
 // ✅ DEPOIS
 @Controller('api/atendimento/webhooks/whatsapp')
 export class WhatsAppWebhookController {
-  @Get()  // Sem empresaId para verificação da Meta
+  @Get(':empresaId')
   async verificarWebhook(
+    @Param('empresaId') empresaId: string,
     @Query('hub.mode') mode: string,
     @Query('hub.verify_token') verifyToken: string,
     @Query('hub.challenge') challenge: string,
     @Res() res: Response,
   ) {
     if (mode !== 'subscribe') return res.status(403).send('Modo inválido');
-    const valido = await this.service.validarTokenVerificacao('default', verifyToken);
+    const valido = await this.service.validarTokenVerificacao(empresaId, verifyToken);
     if (!valido) return res.status(403).send('Token inválido');
     return res.status(200).send(challenge);
   }
@@ -109,7 +110,7 @@ async validarTokenVerificacao(empresaId: string, verifyToken: string): Promise<b
 #### **Resultado:**
 ```bash
 # Teste local bem-sucedido:
-curl "http://localhost:3001/api/atendimento/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=conectcrm_webhook_token_123&hub.challenge=TEST123"
+curl "http://localhost:3001/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>?hub.mode=subscribe&hub.verify_token=conectcrm_webhook_token_123&hub.challenge=TEST123"
 
 # ✅ Resposta: TEST123 (Status 200 OK)
 ```
@@ -231,14 +232,14 @@ scripts/                   (3 arquivos, 560+ linhas)
 
 ### **Teste 1: Webhook Local**
 ```bash
-curl "http://localhost:3001/api/atendimento/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=conectcrm_webhook_token_123&hub.challenge=TEST123"
+curl "http://localhost:3001/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>?hub.mode=subscribe&hub.verify_token=conectcrm_webhook_token_123&hub.challenge=TEST123"
 
 ✅ Resultado: TEST123 (Status 200 OK)
 ```
 
 ### **Teste 2: Webhook via ngrok**
 ```
-URL Pública: https://4f1d295b3b6e.ngrok-free.app/api/atendimento/webhooks/whatsapp
+URL Pública: https://4f1d295b3b6e.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
 Token: conectcrm_webhook_token_123
 Meta Webhook Fields: messages, message_status
 
@@ -308,7 +309,7 @@ WebSocket: ws://localhost:3001/ws
 2. **Configurar WhatsApp Business no Meta Developers**
    ```
    # Já configurado:
-   ✅ Webhook URL: https://4f1d295b3b6e.ngrok-free.app/api/atendimento/webhooks/whatsapp
+  ✅ Webhook URL: https://4f1d295b3b6e.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
    ✅ Verify Token: conectcrm_webhook_token_123
    ✅ Webhook Fields: messages, message_status
    ✅ Status: Verificado pela Meta
@@ -423,7 +424,7 @@ https://4f1d295b3b6e.ngrok-free.app → http://localhost:3001
 
 ### **Meta Webhook Configuration**
 ```
-Callback URL: https://4f1d295b3b6e.ngrok-free.app/api/atendimento/webhooks/whatsapp
+Callback URL: https://4f1d295b3b6e.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
 Verify Token: conectcrm_webhook_token_123
 Subscribe to: messages, message_status
 Status: ✅ Verificado

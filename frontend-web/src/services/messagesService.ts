@@ -1,6 +1,7 @@
 import axios from 'axios';
+import { API_BASE_URL } from './api';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_URL = API_BASE_URL;
 
 /**
  * Tipos de mensagem
@@ -141,7 +142,7 @@ class MessagesService {
 
       const response = await axios.get<ListarMensagensResposta>(
         `${API_URL}/atendimento/mensagens?${params.toString()}`,
-        this.getAuthHeaders()
+        this.getAuthHeaders(),
       );
 
       console.log('✅ Mensagens listadas:', response.data);
@@ -165,7 +166,7 @@ class MessagesService {
       const response = await axios.post<CriarMensagemResposta>(
         `${API_URL}/atendimento/mensagens`,
         payload,
-        this.getAuthHeaders()
+        this.getAuthHeaders(),
       );
 
       console.log('✅ Mensagem enviada:', response.data);
@@ -184,7 +185,7 @@ class MessagesService {
       const response = await axios.patch<{ success: boolean; message: string }>(
         `${API_URL}/atendimento/mensagens/marcar-lida`,
         dados,
-        this.getAuthHeaders()
+        this.getAuthHeaders(),
       );
 
       console.log('✅ Mensagens marcadas como lidas:', response.data);
@@ -224,7 +225,7 @@ class MessagesService {
             Authorization: token ? `Bearer ${token}` : '',
             'Content-Type': 'multipart/form-data',
           },
-        }
+        },
       );
 
       console.log('✅ Arquivo enviado:', response.data);
@@ -242,7 +243,7 @@ class MessagesService {
     try {
       const response = await axios.get<{ success: boolean; data: Mensagem }>(
         `${API_URL}/atendimento/mensagens/${mensagemId}`,
-        this.getAuthHeaders()
+        this.getAuthHeaders(),
       );
 
       console.log('✅ Mensagem encontrada:', response.data);

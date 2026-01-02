@@ -187,15 +187,15 @@ function detectLoops(estrutura: EstruturaFluxo): string[][] {
 /**
  * Converte estrutura JSON do backend para nodes/edges do React Flow
  */
-export function jsonToFlow(estrutura: EstruturaFluxo): { nodes: FlowNode[], edges: FlowEdge[] } {
+export function jsonToFlow(estrutura: EstruturaFluxo): { nodes: FlowNode[]; edges: FlowEdge[] } {
   // 🔍 DETECTAR LOOPS ANTES DE PROCESSAR
   const loops = detectLoops(estrutura);
   if (loops.length > 0) {
-    const loopDescriptions = loops.map(loop => loop.join(' → ')).join('\n');
+    const loopDescriptions = loops.map((loop) => loop.join(' → ')).join('\n');
     console.error('🔴 LOOPS INFINITOS DETECTADOS:', loops);
     throw new Error(
       `❌ Fluxo contém ${loops.length} loop(s) infinito(s):\n\n${loopDescriptions}\n\n` +
-      `Por favor, corrija o fluxo removendo as referências circulares.`
+        `Por favor, corrija o fluxo removendo as referências circulares.`,
     );
   }
 
@@ -203,7 +203,7 @@ export function jsonToFlow(estrutura: EstruturaFluxo): { nodes: FlowNode[], edge
   const edges: FlowEdge[] = [];
 
   // Cache para posicionamento
-  const positionedNodes = new Map<string, { x: number, y: number }>();
+  const positionedNodes = new Map<string, { x: number; y: number }>();
   let currentY = 100;
   let currentLevel = 0;
 
@@ -232,7 +232,7 @@ export function jsonToFlow(estrutura: EstruturaFluxo): { nodes: FlowNode[], edge
 
   // 3. Processar todas as etapas
   const processedNodes = new Set<string>();
-  const queue: Array<{ etapaId: string, level: number, parentX: number }> = [];
+  const queue: Array<{ etapaId: string; level: number; parentX: number }> = [];
 
   if (estrutura.etapaInicial) {
     queue.push({ etapaId: estrutura.etapaInicial, level: 1, parentX: 400 });
@@ -275,7 +275,7 @@ export function jsonToFlow(estrutura: EstruturaFluxo): { nodes: FlowNode[], edge
         queue.push({
           etapaId: next.targetId,
           level: level + 1,
-          parentX: x + offsetX
+          parentX: x + offsetX,
         });
       }
     });
@@ -287,7 +287,7 @@ export function jsonToFlow(estrutura: EstruturaFluxo): { nodes: FlowNode[], edge
 /**
  * Converte uma Etapa em Node do React Flow
  */
-function etapaToNode(id: string, etapa: Etapa, position: { x: number, y: number }): FlowNode {
+function etapaToNode(id: string, etapa: Etapa, position: { x: number; y: number }): FlowNode {
   const blockType = getBlockType(etapa.tipo);
   const label = getEtapaLabel(etapa, id);
 
@@ -339,14 +339,26 @@ function getBlockType(tipo: string): BlockType {
  * Extrai próximas etapas de uma etapa
  * Suporta tanto formato novo (proximaEtapa) quanto legado (proxima_etapa)
  */
-function getNextSteps(etapa: Etapa): Array<{ targetId: string; label?: string; animated?: boolean; type?: string }> {
-  const nextSteps: Array<{ targetId: string; label?: string; animated?: boolean; type?: string }> = [];
-  const pushStep = (step: { targetId?: string; label?: string; animated?: boolean; type?: string }) => {
+function getNextSteps(
+  etapa: Etapa,
+): Array<{ targetId: string; label?: string; animated?: boolean; type?: string }> {
+  const nextSteps: Array<{ targetId: string; label?: string; animated?: boolean; type?: string }> =
+    [];
+  const pushStep = (step: {
+    targetId?: string;
+    label?: string;
+    animated?: boolean;
+    type?: string;
+  }) => {
     if (!step.targetId) {
       return;
     }
 
-    if (nextSteps.find(existing => existing.targetId === step.targetId && existing.label === step.label)) {
+    if (
+      nextSteps.find(
+        (existing) => existing.targetId === step.targetId && existing.label === step.label,
+      )
+    ) {
       return;
     }
 
@@ -383,7 +395,11 @@ function getNextSteps(etapa: Etapa): Array<{ targetId: string; label?: string; a
     etapa.condicoes.forEach((condicao, index) => {
       pushStep({
         targetId: condicao.proximaEtapa,
-        label: condicao.campo ? `${condicao.campo} ${condicao.operador || '->'}` : index === 0 ? 'Sim' : 'Não',
+        label: condicao.campo
+          ? `${condicao.campo} ${condicao.operador || '->'}`
+          : index === 0
+            ? 'Sim'
+            : 'Não',
         animated: false,
         type: 'smoothstep',
       });
@@ -423,13 +439,13 @@ export function flowToJson(nodes: FlowNode[], edges: FlowEdge[]): EstruturaFluxo
   let etapaInicial = '';
 
   // 1. Identificar etapa inicial (conectada ao START)
-  const startEdge = edges.find(e => e.source === 'start');
+  const startEdge = edges.find((e) => e.source === 'start');
   if (startEdge) {
     etapaInicial = startEdge.target;
   }
 
   // 2. Converter cada node (exceto START) em Etapa
-  nodes.forEach(node => {
+  nodes.forEach((node) => {
     if (node.id === 'start') return;
 
     const etapa = nodeToEtapa(node, edges);
@@ -459,14 +475,14 @@ function nodeToEtapa(node: FlowNode, edges: FlowEdge[]): Etapa | null {
   };
 
   // Atualizar conexões baseado nos edges
-  const outgoingEdges = edges.filter(e => e.source === node.id);
+  const outgoingEdges = edges.filter((e) => e.source === node.id);
 
   // Se tem opções de menu, atualizar proximaEtapa de cada opção
   if (etapa.opcoes && etapa.opcoes.length > 0) {
     etapa.opcoes = etapa.opcoes.map((opcao, index) => {
       const handleId = `source-${index}`;
-      const edgeByHandle = outgoingEdges.find(e => e.sourceHandle === handleId);
-      const edgeByLabel = outgoingEdges.find(e => e.label === opcao.texto);
+      const edgeByHandle = outgoingEdges.find((e) => e.sourceHandle === handleId);
+      const edgeByLabel = outgoingEdges.find((e) => e.label === opcao.texto);
 
       const edge = edgeByHandle || edgeByLabel;
 
@@ -480,7 +496,7 @@ function nodeToEtapa(node: FlowNode, edges: FlowEdge[]): Etapa | null {
   // Se tem condições, atualizar proximaEtapa de cada condição
   if (etapa.condicoes && etapa.condicoes.length > 0) {
     etapa.condicoes = etapa.condicoes.map((condicao, index) => {
-      const edge = outgoingEdges.find(e => e.label === (index === 0 ? 'Sim' : 'Não'));
+      const edge = outgoingEdges.find((e) => e.label === (index === 0 ? 'Sim' : 'Não'));
       return {
         ...condicao,
         proximaEtapa: edge?.target || condicao.proximaEtapa,
@@ -501,41 +517,44 @@ function nodeToEtapa(node: FlowNode, edges: FlowEdge[]): Etapa | null {
 /**
  * Valida se o fluxo está completo e sem erros
  */
-export function validateFlow(nodes: FlowNode[], edges: FlowEdge[]): { isValid: boolean, errors: string[] } {
+export function validateFlow(
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
 
   const nodeMap = new Map<string, FlowNode>();
-  nodes.forEach(node => {
+  nodes.forEach((node) => {
     nodeMap.set(node.id, node);
   });
 
   // 1. Verificar se tem nó START
-  const hasStart = nodes.some(n => n.id === 'start');
+  const hasStart = nodes.some((n) => n.id === 'start');
   if (!hasStart) {
     errors.push('Fluxo deve ter um bloco de Início');
   }
 
   // 2. Verificar se START está conectado
-  const startConnected = edges.some(e => e.source === 'start');
+  const startConnected = edges.some((e) => e.source === 'start');
   if (!startConnected) {
     errors.push('Bloco de Início deve estar conectado a uma etapa');
   }
 
   // 3. Verificar nodes órfãos (exceto START)
   const connectedNodes = new Set<string>();
-  edges.forEach(e => {
+  edges.forEach((e) => {
     connectedNodes.add(e.source);
     connectedNodes.add(e.target);
   });
 
-  nodes.forEach(node => {
+  nodes.forEach((node) => {
     if (node.id !== 'start' && !connectedNodes.has(node.id)) {
       errors.push(`Bloco "${node.data.label}" está desconectado`);
     }
   });
 
   // 4. Verificar se nodes têm configuração válida
-  nodes.forEach(node => {
+  nodes.forEach((node) => {
     if (node.id === 'start') return;
 
     if (!node.data.etapa) {
@@ -545,7 +564,8 @@ export function validateFlow(nodes: FlowNode[], edges: FlowEdge[]): { isValid: b
 
     const etapa = node.data.etapa;
 
-    const requiresMensagem = MENU_TYPES.has(etapa.tipo) || QUESTION_TYPES.has(etapa.tipo) || etapa.tipo === 'mensagem';
+    const requiresMensagem =
+      MENU_TYPES.has(etapa.tipo) || QUESTION_TYPES.has(etapa.tipo) || etapa.tipo === 'mensagem';
     if (requiresMensagem && (!etapa.mensagem || etapa.mensagem.trim() === '')) {
       errors.push(`Bloco "${node.data.label}" precisa de uma mensagem`);
     }
@@ -584,13 +604,13 @@ export function validateFlow(nodes: FlowNode[], edges: FlowEdge[]): { isValid: b
     stack.push(nodeId);
     visited.add(nodeId);
 
-    const outgoing = edges.filter(e => e.source === nodeId);
+    const outgoing = edges.filter((e) => e.source === nodeId);
 
     for (const edge of outgoing) {
       const existingIndex = stack.indexOf(edge.target);
       if (existingIndex !== -1) {
         const cycleNodes = stack.slice(existingIndex);
-        const hasInteractiveInCycle = cycleNodes.some(id => isInteractiveNode(id));
+        const hasInteractiveInCycle = cycleNodes.some((id) => isInteractiveNode(id));
 
         if (!hasInteractiveInCycle) {
           hasBlockingCycle = true;
@@ -635,13 +655,13 @@ export function generateNodeId(prefix: string = 'etapa'): string {
 /**
  * Calcula posição para novo node
  */
-export function calculateNewNodePosition(nodes: FlowNode[]): { x: number, y: number } {
+export function calculateNewNodePosition(nodes: FlowNode[]): { x: number; y: number } {
   if (nodes.length === 0) {
     return { x: 400, y: 100 };
   }
 
   // Encontrar posição mais baixa
-  const maxY = Math.max(...nodes.map(n => n.position.y));
+  const maxY = Math.max(...nodes.map((n) => n.position.y));
 
   return {
     x: 400,

@@ -8,15 +8,19 @@ import {
   Send,
   CheckCircle2,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
 } from 'lucide-react';
-import { pdfPropostasService, DadosProposta, TemplateInfo } from '../../services/pdfPropostasService';
+import {
+  pdfPropostasService,
+  DadosProposta,
+  TemplateInfo,
+} from '../../services/pdfPropostasService';
 
 const TemplatesPropostasPage: React.FC = () => {
   const [templates, setTemplates] = useState<TemplateInfo[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('comercial');
   const [dadosProposta, setDadosProposta] = useState<DadosProposta>(
-    pdfPropostasService.criarDadosExemplo()
+    pdfPropostasService.criarDadosExemplo(),
   );
   const [loading, setLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>('');
@@ -66,13 +70,13 @@ const TemplatesPropostasPage: React.FC = () => {
   const handleInputChange = (field: string, value: unknown) => {
     const keys = field.split('.');
     if (keys.length === 1) {
-      setDadosProposta(prev => ({ ...prev, [field]: value }));
+      setDadosProposta((prev) => ({ ...prev, [field]: value }));
       return;
     }
 
     const [parentKey, childKey] = keys as [keyof DadosProposta, string];
 
-    setDadosProposta(prev => {
+    setDadosProposta((prev) => {
       const parentValue = prev[parentKey];
       const parentObject =
         parentValue && typeof parentValue === 'object' && !Array.isArray(parentValue)
@@ -83,8 +87,8 @@ const TemplatesPropostasPage: React.FC = () => {
         ...prev,
         [parentKey]: {
           ...parentObject,
-          [childKey]: value
-        }
+          [childKey]: value,
+        },
       };
     });
   };
@@ -96,27 +100,27 @@ const TemplatesPropostasPage: React.FC = () => {
       quantidade: 1,
       valorUnitario: 0,
       desconto: 0,
-      valorTotal: 0
+      valorTotal: 0,
     };
-    setDadosProposta(prev => ({
+    setDadosProposta((prev) => ({
       ...prev,
-      itens: [...prev.itens, novoItem]
+      itens: [...prev.itens, novoItem],
     }));
   };
 
   const removerItem = (index: number) => {
-    setDadosProposta(prev => ({
+    setDadosProposta((prev) => ({
       ...prev,
-      itens: prev.itens.filter((_, i) => i !== index)
+      itens: prev.itens.filter((_, i) => i !== index),
     }));
   };
 
   const calcularTotais = () => {
     const subtotal = dadosProposta.itens.reduce((sum, item) => sum + item.valorTotal, 0);
-    setDadosProposta(prev => ({
+    setDadosProposta((prev) => ({
       ...prev,
       subtotal,
-      valorTotal: subtotal - (prev.descontoGeral || 0) + (prev.impostos || 0)
+      valorTotal: subtotal - (prev.descontoGeral || 0) + (prev.impostos || 0),
     }));
   };
 
@@ -131,12 +135,8 @@ const TemplatesPropostasPage: React.FC = () => {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Templates de Propostas
-        </h1>
-        <p className="text-gray-600">
-          Gerencie e teste templates de propostas comerciais
-        </p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Templates de Propostas</h1>
+        <p className="text-gray-600">Gerencie e teste templates de propostas comerciais</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -158,15 +158,15 @@ const TemplatesPropostasPage: React.FC = () => {
                 onChange={(e) => setSelectedTemplate(e.target.value)}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
               >
-                {templates.map(template => (
+                {templates.map((template) => (
                   <option key={template.id} value={template.id}>
                     {template.nome}
                   </option>
                 ))}
               </select>
-              {templates.find(t => t.id === selectedTemplate) && (
+              {templates.find((t) => t.id === selectedTemplate) && (
                 <p className="mt-1 text-sm text-gray-500">
-                  {templates.find(t => t.id === selectedTemplate)?.descricao}
+                  {templates.find((t) => t.id === selectedTemplate)?.descricao}
                 </p>
               )}
             </div>
@@ -249,9 +249,7 @@ const TemplatesPropostasPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Título
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>
                   <input
                     type="text"
                     value={dadosProposta.titulo}
@@ -351,7 +349,7 @@ const TemplatesPropostasPage: React.FC = () => {
                   <div className="text-3xl font-bold text-[#159A9C]">
                     {new Intl.NumberFormat('pt-BR', {
                       style: 'currency',
-                      currency: 'BRL'
+                      currency: 'BRL',
                     }).format(dadosProposta.valorTotal)}
                   </div>
                 </div>

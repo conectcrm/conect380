@@ -13,6 +13,7 @@ import {
 import { FilaAtendente } from './fila-atendente.entity';
 import { NucleoAtendimento } from '../../triagem/entities/nucleo-atendimento.entity';
 import { Departamento } from '../../triagem/entities/departamento.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 export enum EstrategiaDistribuicao {
   ROUND_ROBIN = 'ROUND_ROBIN',
@@ -28,6 +29,10 @@ export class Fila {
 
   @Column({ type: 'uuid', name: 'empresaId' })
   empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresaId' })
+  empresa: Empresa;
 
   @Column({ type: 'varchar', length: 100 })
   nome: string;

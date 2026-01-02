@@ -7,24 +7,24 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Build args para variáveis de ambiente do React (ANTES de copiar código)
+ARG REACT_APP_API_URL=http://localhost:3001
+ARG REACT_APP_WS_URL=ws://localhost:3001
+
+# Expor variáveis como ambiente em tempo de build
+ENV REACT_APP_API_URL=${REACT_APP_API_URL}
+ENV REACT_APP_WS_URL=${REACT_APP_WS_URL}
+
 # Copiar arquivos de dependências
 COPY package*.json ./
 
 # Instalar dependências
 RUN npm ci --legacy-peer-deps
 
-# Copiar código fonte
+# Copiar código fonte (exceto .env.production via .dockerignore)
 COPY . .
 
-# Build args para variáveis de ambiente do React
-ARG REACT_APP_API_URL
-ARG REACT_APP_WS_URL
-
-# Expor variáveis como ambiente em tempo de build
-ENV REACT_APP_API_URL=${REACT_APP_API_URL}
-ENV REACT_APP_WS_URL=${REACT_APP_WS_URL}
-
-# Build para produção
+# Build para produção (com variáveis ENV já definidas)
 RUN npm run build
 
 # ============================================

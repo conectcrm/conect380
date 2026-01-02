@@ -63,7 +63,7 @@ const EquipePage: React.FC = () => {
       {/* Header */}
       <div className="bg-white border-b px-6 py-4">
         <BackToNucleus nucleusName="Atendimento" nucleusPath="/nuclei/atendimento" />
-        
+
         <div className="mt-4">
           <h1 className="text-3xl font-bold text-[#002333] flex items-center gap-3">
             <Users className="h-8 w-8 text-[#159A9C]" />
@@ -82,17 +82,16 @@ const EquipePage: React.FC = () => {
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
-              
+
               return (
                 <button
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
                   className={`
                     flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-colors
-                    ${
-                      isActive
-                        ? 'border-[#159A9C] text-[#159A9C]'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ${isActive
+                      ? 'border-[#159A9C] text-[#159A9C]'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }
                   `}
                 >

@@ -31,6 +31,13 @@ export class Pagamento {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
+
   @Column()
   faturaId: number;
 

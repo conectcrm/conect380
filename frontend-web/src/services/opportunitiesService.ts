@@ -9,7 +9,15 @@ export interface Opportunity {
   probabilidade: number;
   estagio: 'leads' | 'qualification' | 'proposal' | 'negotiation' | 'closing' | 'won' | 'lost';
   prioridade: 'low' | 'medium' | 'high';
-  origem: 'website' | 'indicacao' | 'telefone' | 'email' | 'redes_sociais' | 'evento' | 'parceiro' | 'campanha';
+  origem:
+    | 'website'
+    | 'indicacao'
+    | 'telefone'
+    | 'email'
+    | 'redes_sociais'
+    | 'evento'
+    | 'parceiro'
+    | 'campanha';
   tags?: string[];
   dataFechamentoEsperado?: string;
   dataFechamentoReal?: string;
@@ -131,10 +139,14 @@ export const opportunitiesService = {
     return response.data;
   },
 
-  async updateStage(id: number, estagio: string, dataFechamentoReal?: string): Promise<Opportunity> {
+  async updateStage(
+    id: number,
+    estagio: string,
+    dataFechamentoReal?: string,
+  ): Promise<Opportunity> {
     const response = await api.patch(`/oportunidades/${id}/estagio`, {
       estagio,
-      dataFechamentoReal
+      dataFechamentoReal,
     });
     return response.data;
   },
@@ -186,7 +198,7 @@ export const opportunitiesService = {
   async createActivity(opportunityId: number, data: CreateActivityDto): Promise<Activity> {
     const response = await api.post(`/oportunidades/${opportunityId}/atividades`, data);
     return response.data;
-  }
+  },
 };
 
 // Hook para usar com React Query
@@ -224,10 +236,14 @@ export const useOpportunities = () => {
     },
 
     updateStage: {
-      mutationFn: ({ id, estagio, dataFechamentoReal }: {
+      mutationFn: ({
+        id,
+        estagio,
+        dataFechamentoReal,
+      }: {
         id: number;
         estagio: string;
-        dataFechamentoReal?: string
+        dataFechamentoReal?: string;
       }) => opportunitiesService.updateStage(id, estagio, dataFechamentoReal),
     },
 
@@ -236,10 +252,8 @@ export const useOpportunities = () => {
     },
 
     createActivity: {
-      mutationFn: ({ opportunityId, data }: {
-        opportunityId: number;
-        data: CreateActivityDto
-      }) => opportunitiesService.createActivity(opportunityId, data),
+      mutationFn: ({ opportunityId, data }: { opportunityId: number; data: CreateActivityDto }) =>
+        opportunitiesService.createActivity(opportunityId, data),
     },
   };
 };

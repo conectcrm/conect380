@@ -1,5 +1,5 @@
 # Teste Rápido de Endpoints - Gestão de Filas
-# Email: admin@conectcrm.com | Senha: admin123
+# Email: admin@conectsuite.com.br | Senha: admin123
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host " TESTE RAPIDO - ENDPOINTS DE FILAS" -ForegroundColor Cyan
@@ -9,7 +9,7 @@ Write-Host ""
 # Login
 Write-Host "[1/5] Fazendo login..." -ForegroundColor Yellow
 $loginBody = @{
-  email = "admin@conectcrm.com"
+  email = "admin@conectsuite.com.br"
   senha = "admin123"
 } | ConvertTo-Json
 

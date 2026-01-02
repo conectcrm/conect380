@@ -19,7 +19,7 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
   onUpdate,
   onClose,
   onDelete,
-  nucleos = []
+  nucleos = [],
 }) => {
   const [etapa, setEtapa] = useState<Etapa | null>(null);
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
@@ -30,7 +30,8 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
       return value;
     }
 
-    const globalClone = (globalThis as unknown as { structuredClone?: <K>(input: K) => K }).structuredClone;
+    const globalClone = (globalThis as unknown as { structuredClone?: <K>(input: K) => K })
+      .structuredClone;
 
     if (typeof globalClone === 'function') {
       try {
@@ -58,7 +59,7 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
     try {
       setLoadingDepartamentos(true);
       const deps = await departamentoService.listarPorNucleo(nucleoId);
-      setDepartamentos(deps.filter(d => d.ativo));
+      setDepartamentos(deps.filter((d) => d.ativo));
     } catch (error) {
       console.error('Erro ao carregar departamentos:', error);
       setDepartamentos([]);
@@ -103,7 +104,7 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
       console.log('💾 Salvando configuração do bloco:', {
         nodeId: node.id,
         opcoes: etapaClonada.opcoes,
-        totalOpcoes: etapaClonada.opcoes?.length || 0
+        totalOpcoes: etapaClonada.opcoes?.length || 0,
       });
       onUpdate(node.id, {
         etapa: etapaClonada,
@@ -130,7 +131,7 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
 
       console.log('➕ Nova opção adicionada:', {
         totalOpcoes: opcoesAtuais.length,
-        novaOpcao
+        novaOpcao,
       });
 
       return {
@@ -182,25 +183,17 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
     <div className="w-96 bg-white border-l border-gray-200 flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <h3 className="text-sm font-bold text-[#002333]">
-          ⚙️ Configurar Bloco
-        </h3>
-        <button
-          onClick={onClose}
-          className="text-gray-400 hover:text-gray-600 transition-colors"
-        >
+        <h3 className="text-sm font-bold text-[#002333]">⚙️ Configurar Bloco</h3>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
           <X className="w-5 h-5" />
         </button>
       </div>
 
       {/* Body - Scrollable */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-
         {/* Nome do Bloco */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Nome do Bloco
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Bloco</label>
           <input
             type="text"
             value={etapa.nome}
@@ -222,9 +215,7 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
             rows={4}
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
           />
-          <p className="text-xs text-gray-500 mt-1">
-            {etapa.mensagem.length} caracteres
-          </p>
+          <p className="text-xs text-gray-500 mt-1">{etapa.mensagem.length} caracteres</p>
         </div>
 
         {/* Seleção de Núcleos (Menu Dinâmico) */}
@@ -236,7 +227,8 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
                   🎯 Menu Dinâmico de Núcleos
                 </label>
                 <p className="text-xs text-blue-700">
-                  Marque os núcleos que devem aparecer no menu. O bot irá listar automaticamente os departamentos de cada núcleo.
+                  Marque os núcleos que devem aparecer no menu. O bot irá listar automaticamente os
+                  departamentos de cada núcleo.
                 </p>
               </div>
             </div>
@@ -259,16 +251,14 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
                           const nucleosAtuais = etapa.nucleosMenu || [];
                           const novosNucleos = e.target.checked
                             ? [...nucleosAtuais, nucleo.id]
-                            : nucleosAtuais.filter(id => id !== nucleo.id);
+                            : nucleosAtuais.filter((id) => id !== nucleo.id);
 
                           setEtapa({ ...etapa, nucleosMenu: novosNucleos });
                         }}
                         className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                       />
                       <div className="flex-1">
-                        <span className="text-sm font-medium text-gray-900">
-                          {nucleo.nome}
-                        </span>
+                        <span className="text-sm font-medium text-gray-900">{nucleo.nome}</span>
                         {isSelected && (
                           <span className="ml-2 text-xs text-green-600 font-medium">
                             ✓ Incluído no menu
@@ -288,8 +278,8 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
             {etapa.nucleosMenu && etapa.nucleosMenu.length > 0 && (
               <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded">
                 <p className="text-xs text-green-800">
-                  ✓ <strong>{etapa.nucleosMenu.length}</strong> núcleo(s) selecionado(s).
-                  O bot irá gerar automaticamente as opções do menu.
+                  ✓ <strong>{etapa.nucleosMenu.length}</strong> núcleo(s) selecionado(s). O bot irá
+                  gerar automaticamente as opções do menu.
                 </p>
               </div>
             )}
@@ -311,7 +301,8 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
               </button>
             </div>
             <p className="text-xs text-gray-600 mb-3">
-              Use opções manuais apenas se precisar de ações customizadas além dos núcleos dinâmicos.
+              Use opções manuais apenas se precisar de ações customizadas além dos núcleos
+              dinâmicos.
             </p>
 
             <div className="space-y-3">
@@ -319,9 +310,7 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
                 etapa.opcoes.map((opcao, index) => (
                   <div key={index} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                     <div className="flex items-start justify-between mb-2">
-                      <span className="text-xs font-semibold text-gray-600">
-                        Opção {index + 1}
-                      </span>
+                      <span className="text-xs font-semibold text-gray-600">Opção {index + 1}</span>
                       <button
                         onClick={() => handleRemoveOption(index)}
                         className="text-red-500 hover:text-red-700"
@@ -377,8 +366,10 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
                               className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                             >
                               <option value="">Selecione...</option>
-                              {nucleos.map(n => (
-                                <option key={n.id} value={n.id}>{n.nome}</option>
+                              {nucleos.map((n) => (
+                                <option key={n.id} value={n.id}>
+                                  {n.nome}
+                                </option>
                               ))}
                             </select>
                           </div>
@@ -393,11 +384,13 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
                               ) : departamentos.length > 0 ? (
                                 <select
                                   value={opcao.departamentoId || ''}
-                                  onChange={(e) => handleUpdateOption(index, 'departamentoId', e.target.value)}
+                                  onChange={(e) =>
+                                    handleUpdateOption(index, 'departamentoId', e.target.value)
+                                  }
                                   className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                                 >
                                   <option value="">Nenhum (transferir para núcleo)</option>
-                                  {departamentos.map(d => (
+                                  {departamentos.map((d) => (
                                     <option key={d.id} value={d.id}>
                                       {d.codigo} - {d.nome}
                                     </option>
@@ -427,9 +420,7 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
         {/* Ação (Action Block) */}
         {node.type === 'action' && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Tipo de Ação
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Ação</label>
             <select
               value={etapa.opcoes?.[0]?.acao || 'proximo_passo'}
               onChange={(e) => {
@@ -451,9 +442,7 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
             {etapa.opcoes?.[0]?.acao === 'transferir_nucleo' && (
               <>
                 <div className="mt-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Núcleo
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Núcleo</label>
                   <select
                     value={etapa.opcoes[0].nucleoId || ''}
                     onChange={(e) => {
@@ -465,8 +454,10 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                   >
                     <option value="">Selecione um núcleo...</option>
-                    {nucleos.map(n => (
-                      <option key={n.id} value={n.id}>{n.nome}</option>
+                    {nucleos.map((n) => (
+                      <option key={n.id} value={n.id}>
+                        {n.nome}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -489,7 +480,7 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                       >
                         <option value="">Nenhum (transferir apenas para núcleo)</option>
-                        {departamentos.map(d => (
+                        {departamentos.map((d) => (
                           <option key={d.id} value={d.id}>
                             {d.codigo} - {d.nome}
                           </option>
@@ -506,7 +497,6 @@ export const BlockConfig: React.FC<BlockConfigProps> = ({
             )}
           </div>
         )}
-
       </div>
 
       {/* Footer - Actions */}

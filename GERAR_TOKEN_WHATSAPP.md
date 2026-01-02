@@ -9,7 +9,7 @@
 ## 🐛 **ERRO ATUAL**
 
 ```
-❌ POST /api/atendimento/webhooks/whatsapp/.../enviar → 500
+❌ POST /api/atendimento/webhooks/whatsapp/:empresaId/enviar → 500
 ❌ Causa: Request failed with status code 401
 ❌ Motivo: Token WhatsApp expirado ou inválido
 ```

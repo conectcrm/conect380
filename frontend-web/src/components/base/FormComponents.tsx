@@ -13,14 +13,14 @@ interface FormFieldProps {
 
 /**
  * FormField - Componente base para campos de formulário
- * 
+ *
  * Componente padronizado para todos os campos de formulário nos modais,
  * garantindo consistência visual e de experiência do usuário.
- * 
+ *
  * @example
  * ```tsx
- * <FormField 
- *   label="Nome completo" 
+ * <FormField
+ *   label="Nome completo"
  *   error={errors.nome?.message}
  *   required
  *   hint="Digite o nome completo do cliente"
@@ -37,7 +37,7 @@ export const FormField: React.FC<FormFieldProps> = ({
   className = '',
   labelClassName = '',
   errorClassName = '',
-  hint
+  hint,
 }) => {
   return (
     <div className={`space-y-1 ${className}`}>
@@ -45,13 +45,11 @@ export const FormField: React.FC<FormFieldProps> = ({
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
-      
-      {hint && (
-        <p className="text-xs text-gray-500 -mt-1 mb-2">{hint}</p>
-      )}
-      
+
+      {hint && <p className="text-xs text-gray-500 -mt-1 mb-2">{hint}</p>}
+
       {children}
-      
+
       {error && (
         <p className={`text-sm text-red-600 flex items-center ${errorClassName}`}>
           <span className="w-1 h-1 bg-red-600 rounded-full mr-2"></span>
@@ -70,7 +68,7 @@ interface BaseInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 
 /**
  * BaseInput - Componente base para inputs
- * 
+ *
  * Input padronizado com estilos do Fênix CRM
  */
 export const BaseInput: React.FC<BaseInputProps> = ({

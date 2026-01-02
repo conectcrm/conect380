@@ -11,7 +11,7 @@
 CREATE TABLE atendimento_integracoes_config (
     id UUID PRIMARY KEY,
     empresa_id UUID NOT NULL,
-    tipo VARCHAR(50) NOT NULL, -- 'whatsapp', 'telegram', 'email', 'openai', 'anthropic'
+    tipo VARCHAR(50) NOT NULL, -- 'whatsapp', 'telegram', 'email', 'openai', 'anthropic', 'twilio', 'push_fcm'
     ativo BOOLEAN DEFAULT FALSE,
     credenciais JSONB, -- Chaves de API, tokens, etc
     webhook_secret VARCHAR(255),
@@ -194,7 +194,7 @@ ANTHROPIC_MAX_TOKENS=2000
   "credenciais": {
     "twilio_account_sid": "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
     "twilio_auth_token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    "twilio_phone_number": "+5511999999999",
+    "twilio_from": "+5511999999999",
     "twilio_whatsapp_number": "whatsapp:+14155238886"
   }
 }
@@ -202,6 +202,33 @@ ANTHROPIC_MAX_TOKENS=2000
 
 **Onde obter:**
 - **Twilio Console**: https://www.twilio.com/console
+
+---
+
+### **F) Push (Firebase Cloud Messaging)**
+
+**Credenciais necessárias:**
+```json
+{
+  "tipo": "push_fcm",
+  "ativo": true,
+  "credenciais": {
+    "fcm_project_id": "seu-projeto-firebase",
+    "fcm_service_account_json": "{\\"type\\":\\"service_account\\",...}"
+  }
+}
+```
+
+**Onde obter:**
+- **Firebase Console**: https://console.firebase.google.com/ (Configurações do projeto → Contas de serviço → chave JSON)
+
+**Variáveis de ambiente (fallback):**
+```bash
+# backend/.env
+FCM_PROJECT_ID=seu-projeto-firebase
+# Opcional: service account JSON inline (sem quebras de linha)
+FCM_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"seu-projeto-firebase",...}
+```
 
 ---
 
@@ -450,10 +477,10 @@ INSERT INTO atendimento_integracoes_config (
 
 ### **Passo 3: Configurar Webhook no Facebook**
 1. Vá em WhatsApp → Configuration → Webhook
-2. **Callback URL**: `https://seu-dominio.com/api/webhooks/whatsapp/sua-empresa-uuid`
+2. **Callback URL**: `https://seu-dominio.com/api/atendimento/webhooks/whatsapp/sua-empresa-uuid`
 3. **Verify Token**: `meu-token-secreto-123` (mesmo do banco)
 4. **Webhook Fields**: `messages`, `message_status`
-5. Clique em "Verify and Save"
+5. Clique em "Verify and Save" e confirme que o Meta envia o header `X-Hub-Signature-256` (App Secret configurado)
 
 ### **Passo 4: Testar**
 ```bash

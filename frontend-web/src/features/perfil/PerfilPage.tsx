@@ -11,7 +11,9 @@ const PerfilPage: React.FC = () => {
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Meu Perfil</h1>
-          <p className="text-gray-600">Gerencie suas informações pessoais e configurações de conta</p>
+          <p className="text-gray-600">
+            Gerencie suas informações pessoais e configurações de conta
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -47,7 +49,9 @@ const PerfilPage: React.FC = () => {
                 <div className="space-y-3">
                   <div className="flex items-center text-sm">
                     <Mail className="w-4 h-4 text-gray-400 mr-3" />
-                    <span className="text-gray-600">{user?.email || 'admin@conectcrm.com'}</span>
+                    <span className="text-gray-600">
+                      {user?.email || 'admin@conectsuite.com.br'}
+                    </span>
                   </div>
                   <div className="flex items-center text-sm">
                     <Building className="w-4 h-4 text-gray-400 mr-3" />
@@ -92,21 +96,17 @@ const PerfilPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                   <input
                     type="email"
-                    value={user?.email || 'admin@conectcrm.com'}
+                    value={user?.email || 'admin@conectsuite.com.br'}
                     readOnly
                     className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Telefone
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Telefone</label>
                   <input
                     type="tel"
                     value="(11) 99999-9999"
@@ -137,7 +137,9 @@ const PerfilPage: React.FC = () => {
                 <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                   <div>
                     <h4 className="font-medium text-gray-900">Alterar Senha</h4>
-                    <p className="text-sm text-gray-600">Atualize sua senha regularmente para manter sua conta segura</p>
+                    <p className="text-sm text-gray-600">
+                      Atualize sua senha regularmente para manter sua conta segura
+                    </p>
                   </div>
                   <button className="px-4 py-2 text-blue-600 hover:text-blue-700 font-medium">
                     Alterar
@@ -147,7 +149,9 @@ const PerfilPage: React.FC = () => {
                 <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                   <div>
                     <h4 className="font-medium text-gray-900">Autenticação em Duas Etapas</h4>
-                    <p className="text-sm text-gray-600">Adicione uma camada extra de segurança à sua conta</p>
+                    <p className="text-sm text-gray-600">
+                      Adicione uma camada extra de segurança à sua conta
+                    </p>
                   </div>
                   <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium">
                     Ativar
@@ -157,7 +161,9 @@ const PerfilPage: React.FC = () => {
                 <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                   <div>
                     <h4 className="font-medium text-gray-900">Notificações por Email</h4>
-                    <p className="text-sm text-gray-600">Receba atualizações importantes por email</p>
+                    <p className="text-sm text-gray-600">
+                      Receba atualizações importantes por email
+                    </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" className="sr-only peer" defaultChecked />

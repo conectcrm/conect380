@@ -57,8 +57,9 @@ Depois de iniciar, copie a URL do ngrok e configure:
 ### WhatsApp
 https://developers.facebook.com/apps
 ```
-Webhook: https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp
+Webhook: https://SEU_DOMINIO.ngrok-free.app/api/atendimento/webhooks/whatsapp/<ID_EMPRESA>
 Token: conectcrm_webhook_token_123
+Header: X-Hub-Signature-256 (HMAC-SHA256 gerado com o App Secret)
 ```
 
 ### Telegram

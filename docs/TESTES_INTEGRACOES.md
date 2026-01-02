@@ -257,7 +257,7 @@ npx playwright show-report
 # Login
 curl -X POST http://localhost:3001/auth/login ^
   -H "Content-Type: application/json" ^
-  -d "{\"email\":\"admin@conectcrm.com\",\"password\":\"sua_senha\"}"
+  -d "{\"email\":\"admin@conectsuite.com.br\",\"senha\":\"admin123\"}"
 
 # Copiar o token da resposta
 ```

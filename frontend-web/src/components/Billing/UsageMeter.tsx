@@ -11,7 +11,7 @@ import {
   TrendingUp,
   AlertTriangle,
   CheckCircle,
-  Info
+  Info,
 } from 'lucide-react';
 import { useSubscription } from '../../hooks/useSubscription';
 
@@ -20,16 +20,8 @@ interface UsageMeterProps {
   showDetails?: boolean;
 }
 
-export const UsageMeter: React.FC<UsageMeterProps> = ({
-  onUpgrade,
-  showDetails = false
-}) => {
-  const {
-    assinatura,
-    limites,
-    calcularProgresso,
-    loading
-  } = useSubscription();
+export const UsageMeter: React.FC<UsageMeterProps> = ({ onUpgrade, showDetails = false }) => {
+  const { assinatura, limites, calcularProgresso, loading } = useSubscription();
 
   if (loading || !assinatura || !limites) {
     return (
@@ -75,7 +67,7 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({
       current: progresso.usuarios.usado,
       limit: progresso.usuarios.total,
       percentage: progresso.usuarios.percentual,
-      unit: 'usuários'
+      unit: 'usuários',
     },
     {
       id: 'clientes',
@@ -84,7 +76,7 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({
       current: progresso.clientes.usado,
       limit: progresso.clientes.total,
       percentage: progresso.clientes.percentual,
-      unit: 'clientes'
+      unit: 'clientes',
     },
     {
       id: 'storage',
@@ -93,7 +85,7 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({
       current: progresso.storage.usado,
       limit: progresso.storage.total,
       percentage: progresso.storage.percentual,
-      unit: 'MB'
+      unit: 'MB',
     },
     {
       id: 'api',
@@ -102,17 +94,19 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({
       current: assinatura.apiCallsHoje,
       limit: assinatura.plano.limiteApiCalls,
       percentage: (assinatura.apiCallsHoje / assinatura.plano.limiteApiCalls) * 100,
-      unit: 'calls'
-    }
+      unit: 'calls',
+    },
   ];
 
-  const hasWarnings = metrics.some(metric => metric.percentage >= 80);
-  const hasCritical = metrics.some(metric => metric.percentage >= 95);
+  const hasWarnings = metrics.some((metric) => metric.percentage >= 80);
+  const hasCritical = metrics.some((metric) => metric.percentage >= 95);
 
   if (!showDetails) {
     // Versão compacta
     return (
-      <Card className={`${hasCritical ? 'border-red-200' : hasWarnings ? 'border-yellow-200' : 'border-green-200'}`}>
+      <Card
+        className={`${hasCritical ? 'border-red-200' : hasWarnings ? 'border-yellow-200' : 'border-green-200'}`}
+      >
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-medium">Uso dos Recursos</h4>
@@ -191,8 +185,12 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({
 
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span>{metric.current} {metric.unit}</span>
-                    <span className="text-gray-500">de {metric.limit} {metric.unit}</span>
+                    <span>
+                      {metric.current} {metric.unit}
+                    </span>
+                    <span className="text-gray-500">
+                      de {metric.limit} {metric.unit}
+                    </span>
                   </div>
 
                   <div className="relative">
@@ -214,7 +212,10 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({
                       </Badge>
                     )}
                     {metric.percentage >= 80 && metric.percentage < 95 && (
-                      <Badge variant="outline" className="text-xs border-yellow-300 text-yellow-700">
+                      <Badge
+                        variant="outline"
+                        className="text-xs border-yellow-300 text-yellow-700"
+                      >
                         Próximo do Limite
                       </Badge>
                     )}
@@ -223,9 +224,7 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({
 
                 {/* Estimativa baseada no uso */}
                 {metric.id === 'api' && (
-                  <div className="text-xs text-gray-500 border-t pt-2">
-                    Reset diário às 00:00
-                  </div>
+                  <div className="text-xs text-gray-500 border-t pt-2">Reset diário às 00:00</div>
                 )}
               </div>
             ))}
@@ -235,7 +234,9 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({
 
       {/* Recomendações */}
       {(hasCritical || hasWarnings) && (
-        <Card className={hasCritical ? 'border-red-200 bg-red-50' : 'border-yellow-200 bg-yellow-50'}>
+        <Card
+          className={hasCritical ? 'border-red-200 bg-red-50' : 'border-yellow-200 bg-yellow-50'}
+        >
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
               {hasCritical ? (
@@ -250,10 +251,9 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({
                 </h4>
 
                 <p className={`text-sm mt-1 ${hasCritical ? 'text-red-700' : 'text-yellow-700'}`}>
-                  {hasCritical ?
-                    'Você atingiu o limite de alguns recursos. Faça upgrade para continuar usando todas as funcionalidades.' :
-                    'Você está próximo do limite de alguns recursos. Considere fazer upgrade para evitar interrupções.'
-                  }
+                  {hasCritical
+                    ? 'Você atingiu o limite de alguns recursos. Faça upgrade para continuar usando todas as funcionalidades.'
+                    : 'Você está próximo do limite de alguns recursos. Considere fazer upgrade para evitar interrupções.'}
                 </p>
 
                 {onUpgrade && (

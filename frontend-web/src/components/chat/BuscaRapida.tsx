@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../hooks/useAuth';
+import { API_BASE_URL } from '../../services/api';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_URL = API_BASE_URL;
 
 // ============================
 // INTERFACES TYPESCRIPT
@@ -41,6 +42,7 @@ interface RespostaBuscaGlobal {
   };
 }
 
+const API_URL = API_BASE_URL;
 interface BuscaRapidaProps {
   isOpen: boolean;
   onClose: () => void;
@@ -52,7 +54,12 @@ interface BuscaRapidaProps {
 // COMPONENTE PRINCIPAL
 // ============================
 
-export function BuscaRapida({ isOpen, onClose, onSelecionarResultado, onEnviarNoChat }: BuscaRapidaProps) {
+export function BuscaRapida({
+  isOpen,
+  onClose,
+  onSelecionarResultado,
+  onEnviarNoChat,
+}: BuscaRapidaProps) {
   const { user } = useAuth();
   const [query, setQuery] = useState('');
   const [resultados, setResultados] = useState<ResultadoBusca[]>([]);
@@ -131,7 +138,7 @@ export function BuscaRapida({ isOpen, onClose, onSelecionarResultado, onEnviarNo
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       setResultados(response.data.resultados);
@@ -176,7 +183,7 @@ export function BuscaRapida({ isOpen, onClose, onSelecionarResultado, onEnviarNo
           break;
       }
     },
-    [isOpen, resultados, selectedIndex, onClose]
+    [isOpen, resultados, selectedIndex, onClose],
   );
 
   useEffect(() => {
@@ -211,13 +218,16 @@ export function BuscaRapida({ isOpen, onClose, onSelecionarResultado, onEnviarNo
   };
 
   // Agrupar resultados por tipo
-  const resultadosAgrupados = resultados.reduce((acc, resultado) => {
-    if (!acc[resultado.tipo]) {
-      acc[resultado.tipo] = [];
-    }
-    acc[resultado.tipo].push(resultado);
-    return acc;
-  }, {} as Record<TipoRecursoBusca, ResultadoBusca[]>);
+  const resultadosAgrupados = resultados.reduce(
+    (acc, resultado) => {
+      if (!acc[resultado.tipo]) {
+        acc[resultado.tipo] = [];
+      }
+      acc[resultado.tipo].push(resultado);
+      return acc;
+    },
+    {} as Record<TipoRecursoBusca, ResultadoBusca[]>,
+  );
 
   if (!isOpen) return null;
 
@@ -235,9 +245,7 @@ export function BuscaRapida({ isOpen, onClose, onSelecionarResultado, onEnviarNo
           {/* Header com Input */}
           <div className="p-4 border-b">
             <div className="relative">
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-xl">
-                🔍
-              </span>
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-xl">🔍</span>
               <input
                 ref={inputRef}
                 type="text"
@@ -290,7 +298,8 @@ export function BuscaRapida({ isOpen, onClose, onSelecionarResultado, onEnviarNo
                 {Object.entries(resultadosAgrupados).map(([tipo, items]) => (
                   <div key={tipo} className="border-b last:border-b-0">
                     <div className="px-4 py-2 bg-gray-50 text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                      {getTipoIcon(tipo as TipoRecursoBusca)} {getTipoLabel(tipo as TipoRecursoBusca)} ({items.length})
+                      {getTipoIcon(tipo as TipoRecursoBusca)}{' '}
+                      {getTipoLabel(tipo as TipoRecursoBusca)} ({items.length})
                     </div>
                     {items.map((resultado, index) => {
                       const globalIndex = resultados.indexOf(resultado);
@@ -300,8 +309,8 @@ export function BuscaRapida({ isOpen, onClose, onSelecionarResultado, onEnviarNo
                         <div
                           key={resultado.id}
                           className={`px-4 py-3 cursor-pointer transition-colors ${isSelected
-                            ? 'bg-blue-50 border-l-4 border-blue-600'
-                            : 'hover:bg-gray-50 border-l-4 border-transparent'
+                              ? 'bg-blue-50 border-l-4 border-blue-600'
+                              : 'hover:bg-gray-50 border-l-4 border-transparent'
                             }`}
                           onClick={() => handleSelecionarResultado(resultado)}
                         >
@@ -311,9 +320,7 @@ export function BuscaRapida({ isOpen, onClose, onSelecionarResultado, onEnviarNo
                                 <h4 className="font-medium text-gray-900 truncate">
                                   {resultado.titulo}
                                 </h4>
-                                {resultado.status && (
-                                  <StatusBadge status={resultado.status} />
-                                )}
+                                {resultado.status && <StatusBadge status={resultado.status} />}
                               </div>
                               {resultado.subtitulo && (
                                 <p className="text-sm text-gray-600 truncate">
@@ -324,9 +331,7 @@ export function BuscaRapida({ isOpen, onClose, onSelecionarResultado, onEnviarNo
                                 {resultado.valor && (
                                   <span>💰 {formatarValor(resultado.valor)}</span>
                                 )}
-                                {resultado.data && (
-                                  <span>📅 {formatarData(resultado.data)}</span>
-                                )}
+                                {resultado.data && <span>📅 {formatarData(resultado.data)}</span>}
                                 <span className="text-blue-600">
                                   ⚡ {Math.round(resultado.relevancia * 100)}% relevante
                                 </span>
@@ -356,9 +361,15 @@ export function BuscaRapida({ isOpen, onClose, onSelecionarResultado, onEnviarNo
           {/* Footer */}
           <div className="px-4 py-3 bg-gray-50 border-t flex items-center justify-between text-xs text-gray-600">
             <div className="flex items-center gap-4">
-              <span>⌨️ <kbd className="px-1.5 py-0.5 bg-white border rounded">↑↓</kbd> navegar</span>
-              <span><kbd className="px-1.5 py-0.5 bg-white border rounded">Enter</kbd> selecionar</span>
-              <span><kbd className="px-1.5 py-0.5 bg-white border rounded">Esc</kbd> fechar</span>
+              <span>
+                ⌨️ <kbd className="px-1.5 py-0.5 bg-white border rounded">↑↓</kbd> navegar
+              </span>
+              <span>
+                <kbd className="px-1.5 py-0.5 bg-white border rounded">Enter</kbd> selecionar
+              </span>
+              <span>
+                <kbd className="px-1.5 py-0.5 bg-white border rounded">Esc</kbd> fechar
+              </span>
             </div>
             {tempoMs !== null && (
               <span className="text-gray-500">

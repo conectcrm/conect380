@@ -28,7 +28,7 @@ O usuário reportou que as configurações de **WhatsApp** e **OpenAI (GPT-4o, G
 **Resultado**: Token JWT **CONTINHA** `empresa_id` corretamente:
 ```json
 {
-  "email": "admin@conectcrm.com",
+  "email": "admin@conectsuite.com.br",
   "sub": "a47ac10b-58cc-4372-a567-0e02b2c3d480",
   "empresa_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479", // ✅ PRESENTE
   "role": "admin"

@@ -3,9 +3,24 @@ import { useI18n } from '../../contexts/I18nContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { KPICard } from '../../components/common/KPICard';
 import {
-  Settings, CheckSquare, Clock, AlertTriangle, Users, FileText,
-  TrendingUp, Activity, Target, Calendar, Bell, RefreshCw,
-  ArrowUp, ArrowDown, Zap, Timer, UserCheck, ClipboardList
+  Settings,
+  CheckSquare,
+  Clock,
+  AlertTriangle,
+  Users,
+  FileText,
+  TrendingUp,
+  Activity,
+  Target,
+  Calendar,
+  Bell,
+  RefreshCw,
+  ArrowUp,
+  ArrowDown,
+  Zap,
+  Timer,
+  UserCheck,
+  ClipboardList,
 } from 'lucide-react';
 
 const OperacionalDashboard: React.FC = () => {
@@ -18,25 +33,25 @@ const OperacionalDashboard: React.FC = () => {
       abertos: 42,
       emAndamento: 18,
       resolvidos: 156,
-      vencidos: 3
+      vencidos: 3,
     },
     sla: {
       cumprimento: 92.5,
       tempoMedioResposta: 2.3, // horas
       tempoMedioResolucao: 8.7, // horas
-      meta: 95
+      meta: 95,
     },
     processos: {
       automatizados: 78,
       manuais: 22,
-      eficiencia: 87.3
+      eficiencia: 87.3,
     },
     equipe: {
       online: 12,
       ocupados: 8,
       disponiveis: 4,
-      ausentes: 2
-    }
+      ausentes: 2,
+    },
   };
 
   const ticketsUrgentes = [
@@ -46,7 +61,7 @@ const OperacionalDashboard: React.FC = () => {
       cliente: 'Tech Solutions',
       prioridade: 'critica',
       tempo: '2h atrasado',
-      responsavel: 'Carlos Santos'
+      responsavel: 'Carlos Santos',
     },
     {
       id: 'T002',
@@ -54,7 +69,7 @@ const OperacionalDashboard: React.FC = () => {
       cliente: 'StartUp Growth',
       prioridade: 'alta',
       tempo: '1h restante',
-      responsavel: 'Ana Silva'
+      responsavel: 'Ana Silva',
     },
     {
       id: 'T003',
@@ -62,8 +77,8 @@ const OperacionalDashboard: React.FC = () => {
       cliente: 'Digital Pro',
       prioridade: 'media',
       tempo: '4h restantes',
-      responsavel: 'João Oliveira'
-    }
+      responsavel: 'João Oliveira',
+    },
   ];
 
   const processosAtivos = [
@@ -73,7 +88,7 @@ const OperacionalDashboard: React.FC = () => {
       progresso: 75,
       etapa: '3 de 4',
       responsavel: 'Maria Costa',
-      prazo: '2 dias'
+      prazo: '2 dias',
     },
     {
       id: 'P002',
@@ -81,7 +96,7 @@ const OperacionalDashboard: React.FC = () => {
       progresso: 45,
       etapa: '2 de 5',
       responsavel: 'Pedro Alves',
-      prazo: '5 dias'
+      prazo: '5 dias',
     },
     {
       id: 'P003',
@@ -89,17 +104,22 @@ const OperacionalDashboard: React.FC = () => {
       progresso: 90,
       etapa: '4 de 4',
       responsavel: 'Laura Santos',
-      prazo: '1 dia'
-    }
+      prazo: '1 dia',
+    },
   ];
 
   const getPriorityColor = (prioridade: string) => {
     switch (prioridade) {
-      case 'critica': return 'bg-red-100 text-red-800 border-red-200';
-      case 'alta': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'media': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'baixa': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'critica':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'alta':
+        return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'media':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'baixa':
+        return 'bg-green-100 text-green-800 border-green-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -114,17 +134,19 @@ const OperacionalDashboard: React.FC = () => {
                 <Settings className="h-8 w-8 mr-3 text-orange-600" />
                 Dashboard Operacional
               </h1>
-              <p className="mt-2 text-orange-700">
-                Gestão de processos, tickets e SLA
-              </p>
+              <p className="mt-2 text-orange-700">Gestão de processos, tickets e SLA</p>
             </div>
             <div className="mt-4 sm:mt-0 flex items-center space-x-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-orange-900">{operacionalData.sla.cumprimento}%</div>
+                <div className="text-2xl font-bold text-orange-900">
+                  {operacionalData.sla.cumprimento}%
+                </div>
                 <div className="text-sm text-orange-600">SLA</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-orange-900">{operacionalData.tickets.abertos}</div>
+                <div className="text-2xl font-bold text-orange-900">
+                  {operacionalData.tickets.abertos}
+                </div>
                 <div className="text-sm text-orange-600">Tickets Abertos</div>
               </div>
               <button className="px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded-lg transition-colors flex items-center space-x-2">
@@ -171,9 +193,7 @@ const OperacionalDashboard: React.FC = () => {
                 <div className="text-2xl font-bold text-gray-900 mt-1">
                   {operacionalData.sla.cumprimento}%
                 </div>
-                <div className="text-sm text-gray-500">
-                  Meta: {operacionalData.sla.meta}%
-                </div>
+                <div className="text-sm text-gray-500">Meta: {operacionalData.sla.meta}%</div>
               </div>
               <div className="p-3 bg-blue-100 rounded-lg">
                 <Timer className="h-8 w-8 text-blue-600" />
@@ -251,16 +271,14 @@ const OperacionalDashboard: React.FC = () => {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium text-gray-900">{ticket.titulo}</span>
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getPriorityColor(ticket.prioridade)}`}>
+                        <span
+                          className={`px-2 py-1 text-xs font-medium rounded-full border ${getPriorityColor(ticket.prioridade)}`}
+                        >
                           {ticket.prioridade.toUpperCase()}
                         </span>
                       </div>
-                      <div className="text-sm text-gray-600">
-                        Cliente: {ticket.cliente}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Responsável: {ticket.responsavel}
-                      </div>
+                      <div className="text-sm text-gray-600">Cliente: {ticket.cliente}</div>
+                      <div className="text-sm text-gray-600">Responsável: {ticket.responsavel}</div>
                     </div>
                     <div className="text-right">
                       <div className="text-sm font-medium text-gray-900">#{ticket.id}</div>
@@ -289,17 +307,11 @@ const OperacionalDashboard: React.FC = () => {
                       <div className="text-sm text-gray-600">
                         Responsável: {processo.responsavel}
                       </div>
-                      <div className="text-sm text-gray-600">
-                        Prazo: {processo.prazo}
-                      </div>
+                      <div className="text-sm text-gray-600">Prazo: {processo.prazo}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm font-medium text-gray-900">
-                        {processo.progresso}%
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        Etapa {processo.etapa}
-                      </div>
+                      <div className="text-sm font-medium text-gray-900">{processo.progresso}%</div>
+                      <div className="text-xs text-gray-500">Etapa {processo.etapa}</div>
                     </div>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
@@ -323,7 +335,7 @@ const OperacionalDashboard: React.FC = () => {
             trend={{
               value: 12,
               isPositive: true,
-              label: "vs semana anterior"
+              label: 'vs semana anterior',
             }}
           />
 
@@ -334,7 +346,7 @@ const OperacionalDashboard: React.FC = () => {
             trend={{
               value: 5,
               isPositive: false,
-              label: "vs semana anterior"
+              label: 'vs semana anterior',
             }}
           />
 
@@ -345,7 +357,7 @@ const OperacionalDashboard: React.FC = () => {
             trend={{
               value: 3,
               isPositive: true,
-              label: "vs mês anterior"
+              label: 'vs mês anterior',
             }}
           />
 
@@ -356,7 +368,7 @@ const OperacionalDashboard: React.FC = () => {
             trend={{
               value: 0.3,
               isPositive: true,
-              label: "vs mês anterior"
+              label: 'vs mês anterior',
             }}
           />
         </div>
@@ -366,19 +378,27 @@ const OperacionalDashboard: React.FC = () => {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Status da Equipe Operacional</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">{operacionalData.equipe.disponiveis}</div>
+              <div className="text-2xl font-bold text-green-600">
+                {operacionalData.equipe.disponiveis}
+              </div>
               <div className="text-sm text-gray-600">Disponíveis</div>
             </div>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">{operacionalData.equipe.ocupados}</div>
+              <div className="text-2xl font-bold text-blue-600">
+                {operacionalData.equipe.ocupados}
+              </div>
               <div className="text-sm text-gray-600">Ocupados</div>
             </div>
             <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-2xl font-bold text-gray-600">{operacionalData.equipe.ausentes}</div>
+              <div className="text-2xl font-bold text-gray-600">
+                {operacionalData.equipe.ausentes}
+              </div>
               <div className="text-sm text-gray-600">Ausentes</div>
             </div>
             <div className="text-center p-4 bg-purple-50 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600">{operacionalData.equipe.online}</div>
+              <div className="text-2xl font-bold text-purple-600">
+                {operacionalData.equipe.online}
+              </div>
               <div className="text-sm text-gray-600">Total Online</div>
             </div>
           </div>

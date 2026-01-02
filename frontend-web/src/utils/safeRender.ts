@@ -28,7 +28,9 @@ export const safeRender = (value: any): string => {
   return String(value);
 };
 
-export const safeRenderContact = (contato: any): { nome: string; email: string; telefone: string } => {
+export const safeRenderContact = (
+  contato: any,
+): { nome: string; email: string; telefone: string } => {
   if (!contato || typeof contato !== 'object') {
     console.error('❌ Invalid contact object:', contato);
     return { nome: '', email: '', telefone: '' };
@@ -37,7 +39,8 @@ export const safeRenderContact = (contato: any): { nome: string; email: string; 
   return {
     nome: typeof contato.nome === 'string' ? contato.nome : String(contato.nome || ''),
     email: typeof contato.email === 'string' ? contato.email : String(contato.email || ''),
-    telefone: typeof contato.telefone === 'string' ? contato.telefone : String(contato.telefone || ''),
+    telefone:
+      typeof contato.telefone === 'string' ? contato.telefone : String(contato.telefone || ''),
   };
 };
 
@@ -50,12 +53,23 @@ export const validateAndSanitizeContact = (contato: any): any => {
   const sanitized = { ...contato };
 
   // Ensure all string properties are actually strings
-  const stringFields = ['id', 'nome', 'email', 'telefone', 'documento', 'status', 'empresa', 'cargo'];
+  const stringFields = [
+    'id',
+    'nome',
+    'email',
+    'telefone',
+    'documento',
+    'status',
+    'empresa',
+    'cargo',
+  ];
 
-  stringFields.forEach(field => {
+  stringFields.forEach((field) => {
     if (sanitized[field] && typeof sanitized[field] === 'object') {
       console.warn(`🚨 Object found in ${field}:`, sanitized[field]);
-      sanitized[field] = String(sanitized[field].toString ? sanitized[field].toString() : JSON.stringify(sanitized[field]));
+      sanitized[field] = String(
+        sanitized[field].toString ? sanitized[field].toString() : JSON.stringify(sanitized[field]),
+      );
     } else if (sanitized[field] !== null && sanitized[field] !== undefined) {
       sanitized[field] = String(sanitized[field]);
     } else {

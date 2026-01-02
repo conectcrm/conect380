@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { Contrato } from './contrato.entity';
 import { User } from '../../users/user.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 export enum TipoAssinatura {
   DIGITAL = 'digital',
@@ -26,6 +27,13 @@ export enum StatusAssinatura {
 export class AssinaturaContrato {
   @PrimaryGeneratedColumn()
   id: number;
+
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column()
   contratoId: number;

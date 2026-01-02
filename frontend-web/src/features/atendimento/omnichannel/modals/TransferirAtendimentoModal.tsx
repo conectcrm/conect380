@@ -24,7 +24,7 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
   isOpen,
   onClose,
   onConfirm,
-  ticketAtual
+  ticketAtual,
 }) => {
   const { currentPalette } = useTheme();
 
@@ -39,13 +39,11 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
     { id: 'a1', nome: 'Ana Silva', avatar: 'AS', status: 'online', atendimentos: 3 },
     { id: 'a2', nome: 'Carlos Santos', avatar: 'CS', status: 'online', atendimentos: 5 },
     { id: 'a3', nome: 'Beatriz Lima', avatar: 'BL', status: 'ocupado', atendimentos: 8 },
-    { id: 'a4', nome: 'Diego Costa', avatar: 'DC', status: 'offline', atendimentos: 0 }
+    { id: 'a4', nome: 'Diego Costa', avatar: 'DC', status: 'offline', atendimentos: 0 },
   ];
 
   const agentesFiltrados = buscaAgente
-    ? agentesMock.filter(a =>
-      a.nome.toLowerCase().includes(buscaAgente.toLowerCase())
-    )
+    ? agentesMock.filter((a) => a.nome.toLowerCase().includes(buscaAgente.toLowerCase()))
     : agentesMock;
 
   const motivosComuns = [
@@ -53,7 +51,7 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
     'Sobrecarga de atendimentos',
     'Ausência temporária',
     'Solicitação do cliente',
-    'Melhor adequação ao perfil'
+    'Melhor adequação ao perfil',
   ];
 
   const handleConfirmar = () => {
@@ -66,7 +64,7 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
       agenteId: agenteSelecionado.id,
       motivo,
       notaInterna: notaInterna || undefined,
-      notificarAgente
+      notificarAgente,
     };
 
     onConfirm(dados);
@@ -87,19 +85,27 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'online': return '#10B981';
-      case 'ocupado': return '#F59E0B';
-      case 'offline': return '#6B7280';
-      default: return '#6B7280';
+      case 'online':
+        return '#10B981';
+      case 'ocupado':
+        return '#F59E0B';
+      case 'offline':
+        return '#6B7280';
+      default:
+        return '#6B7280';
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'online': return 'Disponível';
-      case 'ocupado': return 'Ocupado';
-      case 'offline': return 'Offline';
-      default: return status;
+      case 'online':
+        return 'Disponível';
+      case 'ocupado':
+        return 'Ocupado';
+      case 'offline':
+        return 'Offline';
+      default:
+        return status;
     }
   };
 
@@ -119,13 +125,9 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
               <UserPlus className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
-                Transferir Atendimento
-              </h2>
+              <h2 className="text-xl font-semibold text-gray-900">Transferir Atendimento</h2>
               {ticketAtual && (
-                <p className="text-sm text-gray-500">
-                  Cliente: {ticketAtual.contato.nome}
-                </p>
+                <p className="text-sm text-gray-500">Cliente: {ticketAtual.contato.nome}</p>
               )}
             </div>
           </div>
@@ -183,9 +185,7 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
                             />
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-gray-900">
-                              {agente.nome}
-                            </p>
+                            <p className="text-sm font-medium text-gray-900">{agente.nome}</p>
                             <p className="text-xs text-gray-500">
                               {getStatusLabel(agente.status)} • {agente.atendimentos} atendimentos
                             </p>
@@ -195,7 +195,7 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
                           className="px-3 py-1 rounded-full text-xs font-medium"
                           style={{
                             backgroundColor: `${getStatusColor(agente.status)}20`,
-                            color: getStatusColor(agente.status)
+                            color: getStatusColor(agente.status),
                           }}
                         >
                           {agente.atendimentos === 0 ? 'Livre' : `${agente.atendimentos} tickets`}
@@ -221,11 +221,10 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
                       />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {agenteSelecionado.nome}
-                      </p>
+                      <p className="text-sm font-medium text-gray-900">{agenteSelecionado.nome}</p>
                       <p className="text-xs text-gray-500">
-                        {getStatusLabel(agenteSelecionado.status)} • {agenteSelecionado.atendimentos} atendimentos ativos
+                        {getStatusLabel(agenteSelecionado.status)} •{' '}
+                        {agenteSelecionado.atendimentos} atendimentos ativos
                       </p>
                     </div>
                   </div>
@@ -249,12 +248,11 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
                   <button
                     key={m}
                     onClick={() => setMotivo(m)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${motivo === m
-                      ? 'text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                      motivo === m ? 'text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
                     style={{
-                      backgroundColor: motivo === m ? currentPalette.colors.primary : undefined
+                      backgroundColor: motivo === m ? currentPalette.colors.primary : undefined,
                     }}
                   >
                     {m}
@@ -297,10 +295,12 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
                 checked={notificarAgente}
                 onChange={(e) => setNotificarAgente(e.target.checked)}
                 className="w-4 h-4 rounded border-gray-300 focus:ring-2 focus:ring-offset-0"
-                style={{
-                  accentColor: currentPalette.colors.primary,
-                  '--tw-ring-color': currentPalette.colors.primary
-                } as any}
+                style={
+                  {
+                    accentColor: currentPalette.colors.primary,
+                    '--tw-ring-color': currentPalette.colors.primary,
+                  } as any
+                }
               />
               <label htmlFor="notificar" className="text-sm text-gray-700 cursor-pointer flex-1">
                 Notificar o agente sobre a transferência
@@ -316,8 +316,8 @@ export const TransferirAtendimentoModal: React.FC<TransferirAtendimentoModalProp
               <div className="text-sm text-yellow-800">
                 <p className="font-medium mb-1">Atenção!</p>
                 <p className="text-xs">
-                  Ao transferir o atendimento, você não terá mais acesso a esta conversa.
-                  O novo agente assumirá toda a responsabilidade pelo cliente.
+                  Ao transferir o atendimento, você não terá mais acesso a esta conversa. O novo
+                  agente assumirá toda a responsabilidade pelo cliente.
                 </p>
               </div>
             </div>

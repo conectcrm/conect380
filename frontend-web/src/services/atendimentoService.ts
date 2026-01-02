@@ -1,6 +1,11 @@
-import axios from 'axios';
+import api from './api';
+import { getErrorMessage } from '../utils/errorHandling';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+type ApiResponse<T> = {
+  success: boolean;
+  data: T;
+  total?: number;
+};
 
 export interface Ticket {
   id: string;
@@ -33,8 +38,8 @@ export interface Mensagem {
   remetente: 'CLIENTE' | 'ATENDENTE' | 'SISTEMA';
   atendenteId?: string;
   identificadorExterno?: string;
-  anexos?: any;
-  metadata?: any;
+  anexos?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
   criadoEm: string;
 }
 
@@ -56,51 +61,48 @@ class AtendimentoService {
    * Buscar todos os tickets de uma empresa
    * 🔐 SEGURANÇA: empresaId agora vem do JWT no backend
    */
-  async listarTickets(
-    filtros?: {
-      status?: string[];
-      atendenteId?: string;
-      canalId?: string;
-      prioridade?: string;
-      dataInicio?: string;
-      dataFim?: string;
-      busca?: string;
-    }
-  ): Promise<Ticket[]> {
+  async listarTickets(filtros?: {
+    status?: string[];
+    atendenteId?: string;
+    canalId?: string;
+    prioridade?: string;
+    dataInicio?: string;
+    dataFim?: string;
+    busca?: string;
+  }): Promise<Ticket[]> {
     try {
-      const params = new URLSearchParams();
-      // 🔐 empresaId removido - vem do JWT automaticamente no backend
+      const params: Record<string, string> = {};
 
       if (filtros?.status?.length) {
-        params.append('status', filtros.status.join(','));
+        params.status = filtros.status.join(',');
       }
       if (filtros?.atendenteId) {
-        params.append('atendenteId', filtros.atendenteId);
+        params.atendenteId = filtros.atendenteId;
       }
       if (filtros?.canalId) {
-        params.append('canalId', filtros.canalId);
+        params.canalId = filtros.canalId;
       }
       if (filtros?.prioridade) {
-        params.append('prioridade', filtros.prioridade);
+        params.prioridade = filtros.prioridade;
       }
       if (filtros?.dataInicio) {
-        params.append('dataInicio', filtros.dataInicio);
+        params.dataInicio = filtros.dataInicio;
       }
       if (filtros?.dataFim) {
-        params.append('dataFim', filtros.dataFim);
+        params.dataFim = filtros.dataFim;
       }
       if (filtros?.busca) {
-        params.append('busca', filtros.busca);
+        params.busca = filtros.busca;
       }
 
-      const response = await axios.get<{ success: boolean; data: Ticket[]; total: number }>(
-        `${API_URL}/api/atendimento/tickets?${params.toString()}`
-      );
+      const response = await api.get<ApiResponse<Ticket[]>>('/api/atendimento/tickets', {
+        params,
+      });
 
-      return response.data.data || [];
-    } catch (error) {
-      console.error('[AtendimentoService] Erro ao listar tickets:', error);
-      throw error;
+      return response.data?.data ?? [];
+    } catch (err: unknown) {
+      console.error('[AtendimentoService] Erro ao listar tickets:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao listar tickets'));
     }
   }
 
@@ -109,44 +111,43 @@ class AtendimentoService {
    */
   async buscarTicket(ticketId: string): Promise<Ticket> {
     try {
-      const response = await axios.get<{ success: boolean; data: Ticket }>(
-        `${API_URL}/api/atendimento/tickets/${ticketId}`
-      );
+      const response = await api.get<ApiResponse<Ticket>>(`/api/atendimento/tickets/${ticketId}`);
 
-      return response.data.data;
-    } catch (error) {
-      console.error('[AtendimentoService] Erro ao buscar ticket:', error);
-      throw error;
+      const ticket = response.data?.data;
+
+      if (!ticket) {
+        throw new Error('Ticket não encontrado');
+      }
+
+      return ticket;
+    } catch (err: unknown) {
+      console.error('[AtendimentoService] Erro ao buscar ticket:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao buscar ticket'));
     }
   }
 
   /**
    * Buscar mensagens de um ticket
    */
-  async listarMensagens(
-    ticketId: string,
-    limite?: number,
-    offset?: number
-  ): Promise<Mensagem[]> {
+  async listarMensagens(ticketId: string, limite?: number, offset?: number): Promise<Mensagem[]> {
     try {
-      const params = new URLSearchParams();
-      params.append('ticketId', ticketId);
+      const params: Record<string, string> = { ticketId };
 
       if (limite) {
-        params.append('limite', limite.toString());
+        params.limite = limite.toString();
       }
       if (offset) {
-        params.append('offset', offset.toString());
+        params.offset = offset.toString();
       }
 
-      const response = await axios.get<{ success: boolean; data: Mensagem[]; total: number }>(
-        `${API_URL}/api/atendimento/mensagens?${params.toString()}`
-      );
+      const response = await api.get<ApiResponse<Mensagem[]>>('/api/atendimento/mensagens', {
+        params,
+      });
 
-      return response.data.data || [];
-    } catch (error) {
-      console.error('[AtendimentoService] Erro ao listar mensagens:', error);
-      throw error;
+      return response.data?.data ?? [];
+    } catch (err: unknown) {
+      console.error('[AtendimentoService] Erro ao listar mensagens:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao listar mensagens'));
     }
   }
 
@@ -155,58 +156,56 @@ class AtendimentoService {
    */
   async enviarMensagemWhatsApp(
     empresaId: string,
-    dados: EnviarMensagemRequest
+    dados: EnviarMensagemRequest,
   ): Promise<EnviarMensagemResponse> {
     try {
-      const response = await axios.post<EnviarMensagemResponse>(
-        `${API_URL}/api/atendimento/webhooks/whatsapp/${empresaId}/enviar`,
-        dados
+      const response = await api.post<ApiResponse<EnviarMensagemResponse>>(
+        `/api/atendimento/webhooks/whatsapp/${empresaId}/enviar`,
+        dados,
       );
 
-      return response.data;
-    } catch (error) {
-      console.error('[AtendimentoService] Erro ao enviar mensagem:', error);
-      throw error;
+      const payload = response.data?.data;
+
+      if (!payload) {
+        throw new Error('Resposta inválida ao enviar mensagem');
+      }
+
+      return payload;
+    } catch (err: unknown) {
+      console.error('[AtendimentoService] Erro ao enviar mensagem:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao enviar mensagem via WhatsApp'));
     }
   }
 
   /**
    * Atualizar status do ticket
    */
-  async atualizarStatusTicket(
-    ticketId: string,
-    status: Ticket['status']
-  ): Promise<Ticket> {
+  async atualizarStatusTicket(ticketId: string, status: Ticket['status']): Promise<Ticket> {
     try {
-      const response = await axios.patch<Ticket>(
-        `${API_URL}/api/atendimento/tickets/${ticketId}/status`,
-        { status }
-      );
+      const response = await api.patch<Ticket>(`/api/atendimento/tickets/${ticketId}/status`, {
+        status,
+      });
 
       return response.data;
-    } catch (error) {
-      console.error('[AtendimentoService] Erro ao atualizar status:', error);
-      throw error;
+    } catch (err: unknown) {
+      console.error('[AtendimentoService] Erro ao atualizar status:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao atualizar status do ticket'));
     }
   }
 
   /**
    * Atribuir ticket para um atendente
    */
-  async atribuirTicket(
-    ticketId: string,
-    atendenteId: string
-  ): Promise<Ticket> {
+  async atribuirTicket(ticketId: string, atendenteId: string): Promise<Ticket> {
     try {
-      const response = await axios.patch<Ticket>(
-        `${API_URL}/api/atendimento/tickets/${ticketId}/atribuir`,
-        { atendenteId }
-      );
+      const response = await api.patch<Ticket>(`/api/atendimento/tickets/${ticketId}/atribuir`, {
+        atendenteId,
+      });
 
       return response.data;
-    } catch (error) {
-      console.error('[AtendimentoService] Erro ao atribuir ticket:', error);
-      throw error;
+    } catch (err: unknown) {
+      console.error('[AtendimentoService] Erro ao atribuir ticket:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao atribuir ticket'));
     }
   }
 
@@ -215,18 +214,17 @@ class AtendimentoService {
    */
   async atualizarPrioridadeTicket(
     ticketId: string,
-    prioridade: Ticket['prioridade']
+    prioridade: Ticket['prioridade'],
   ): Promise<Ticket> {
     try {
-      const response = await axios.patch<Ticket>(
-        `${API_URL}/api/atendimento/tickets/${ticketId}/prioridade`,
-        { prioridade }
-      );
+      const response = await api.patch<Ticket>(`/api/atendimento/tickets/${ticketId}/prioridade`, {
+        prioridade,
+      });
 
       return response.data;
-    } catch (error) {
-      console.error('[AtendimentoService] Erro ao atualizar prioridade:', error);
-      throw error;
+    } catch (err: unknown) {
+      console.error('[AtendimentoService] Erro ao atualizar prioridade:', err);
+      throw new Error(getErrorMessage(err, 'Erro ao atualizar prioridade do ticket'));
     }
   }
 }

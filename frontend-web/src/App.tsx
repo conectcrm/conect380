@@ -97,8 +97,13 @@ import CotacaoPage from './features/comercial/pages/CotacaoPage';
 import MinhasAprovacoesPage from './features/comercial/pages/MinhasAprovacoesPage';
 import DepartamentosPage from './features/gestao/pages/DepartamentosPage';
 import ConfigurarCanalEmail from './pages/ConfigurarCanalEmail';
-import DemandasPage from './pages/DemandasPage';
-import DemandaDetailPage from './pages/DemandaDetailPage';
+// ⚠️ Demandas agora são Tickets - imports removidos (apenas redirects mantidos)
+import GestaoTicketsPage from './pages/GestaoTicketsPage'; // Sprint 2 - Fase 6: Sistema Unificado
+import TicketDetailPage from './pages/TicketDetailPage'; // Sprint 2 - Fase 7: Detalhes do Ticket
+// Sprint 2 - Fase 3e: Admin Console Tickets Configuráveis
+import GestaoNiveisAtendimentoPage from './pages/GestaoNiveisAtendimentoPage';
+import GestaoStatusCustomizadosPage from './pages/GestaoStatusCustomizadosPage';
+import GestaoTiposServicoPage from './pages/GestaoTiposServicoPage';
 
 // Configuração do React Query
 const queryClient = new QueryClient({
@@ -368,18 +373,44 @@ const AppRoutes: React.FC = () => {
                     element={<ConfiguracaoDistribuicaoPage />}
                   />
                   <Route path="/nuclei/atendimento/distribuicao/skills" element={<GestaoSkillsPage />} />
-                  {/* Sistema de Demandas */}
-                  <Route path="/nuclei/atendimento/demandas" element={<DemandasPage />} />
-                  <Route path="/nuclei/atendimento/demandas/:id" element={<DemandaDetailPage />} />
-                  {/* Sprint 2: Redirects para modelo unificado Tickets (manter 6 meses) */}
-                  <Route 
-                    path="/demandas" 
-                    element={<Navigate to="/nuclei/atendimento/demandas" replace />} 
+                  
+                  {/* Sprint 2 - Fase 6: Gestão Unificada de Tickets (substitui Demandas) */}
+                  <Route path="/nuclei/atendimento/tickets" element={<GestaoTicketsPage />} />
+                  {/* Sprint 2 - Fase 7: Detalhes do Ticket */}
+                  <Route path="/nuclei/atendimento/tickets/:id" element={<TicketDetailPage />} />
+                  
+                  {/* ⚠️ DEPRECATED: Demandas agora são Tickets (tipo='suporte') - Redirects para compatibilidade */}
+                  <Route
+                    path="/nuclei/atendimento/demandas"
+                    element={<Navigate to="/nuclei/atendimento/tickets?tipo=suporte" replace />}
                   />
-                  <Route 
-                    path="/demandas/:id" 
-                    element={<Navigate to="/nuclei/atendimento/demandas/:id" replace />} 
+                  <Route
+                    path="/nuclei/atendimento/demandas/:id"
+                    element={<Navigate to="/nuclei/atendimento/tickets/:id" replace />}
                   />
+                  <Route
+                    path="/demandas"
+                    element={<Navigate to="/nuclei/atendimento/tickets?tipo=suporte" replace />}
+                  />
+                  <Route
+                    path="/demandas/:id"
+                    element={<Navigate to="/nuclei/atendimento/tickets/:id" replace />}
+                  />
+                  
+                  {/* Sprint 2 - Fase 3e: Admin Console para Configurações de Tickets */}
+                  <Route
+                    path="/nuclei/configuracoes/tickets/niveis"
+                    element={<GestaoNiveisAtendimentoPage />}
+                  />
+                  <Route
+                    path="/nuclei/configuracoes/tickets/status"
+                    element={<GestaoStatusCustomizadosPage />}
+                  />
+                  <Route
+                    path="/nuclei/configuracoes/tickets/tipos"
+                    element={<GestaoTiposServicoPage />}
+                  />
+                  
                   {/* Rotas legadas - Redirects para compatibilidade */}
                   <Route path="/gestao/empresas" element={<Navigate to="/admin/empresas" replace />} />{' '}
                   {/* Redirect para gestão admin */}

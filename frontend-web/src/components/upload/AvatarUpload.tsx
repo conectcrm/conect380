@@ -20,7 +20,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
   onAvatarChange,
   size = 'md',
   disabled = false,
-  className = ''
+  className = '',
 }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentAvatar || null);
@@ -28,13 +28,13 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
   const sizes = {
     sm: 'w-16 h-16',
     md: 'w-24 h-24',
-    lg: 'w-32 h-32'
+    lg: 'w-32 h-32',
   };
 
   const iconSizes = {
     sm: 'w-4 h-4',
     md: 'w-5 h-5',
-    lg: 'w-6 h-6'
+    lg: 'w-6 h-6',
   };
 
   const handleUploadSuccess = (results: UploadResult[]) => {
@@ -54,17 +54,15 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
   return (
     <div className={`relative inline-block ${className}`}>
       {/* Preview do Avatar */}
-      <div className={`
+      <div
+        className={`
         ${sizes[size]} rounded-full overflow-hidden border-4 border-white shadow-lg
         bg-gradient-to-br from-gray-100 to-gray-200
         ${disabled ? 'opacity-50' : ''}
-      `}>
+      `}
+      >
         {previewUrl ? (
-          <img
-            src={previewUrl}
-            alt="Avatar"
-            className="w-full h-full object-cover"
-          />
+          <img src={previewUrl} alt="Avatar" className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gray-100">
             <User className={`${iconSizes[size]} text-gray-400`} />
@@ -85,12 +83,14 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
           acceptedFileTypes="image/*"
           className="relative"
         >
-          <div className={`
+          <div
+            className={`
             ${size === 'sm' ? 'w-6 h-6' : size === 'md' ? 'w-8 h-8' : 'w-10 h-10'}
             bg-[#159A9C] rounded-full flex items-center justify-center
             text-white shadow-lg hover:bg-[#138A8C] transition-all duration-200
             ${disabled || isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-          `}>
+          `}
+          >
             {isUploading ? (
               <Loader2 className={`${iconSizes[size]} animate-spin`} />
             ) : (

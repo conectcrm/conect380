@@ -39,9 +39,7 @@ const getIconBgClass = (iconType: string) => {
   }
 };
 
-export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
-  confirmationState
-}) => {
+export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ confirmationState }) => {
   const { isOpen, options, onConfirm, onCancel } = confirmationState;
 
   if (!isOpen) return null;
@@ -51,20 +49,18 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
         <div className="p-6">
           <div className="flex items-center space-x-3 mb-4">
-            <div className={`w-12 h-12 ${getIconBgClass(options.icon || 'warning')} rounded-full flex items-center justify-center`}>
+            <div
+              className={`w-12 h-12 ${getIconBgClass(options.icon || 'warning')} rounded-full flex items-center justify-center`}
+            >
               {getIconComponent(options.icon || 'warning')}
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">
-                {options.title}
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900">{options.title}</h3>
             </div>
           </div>
-          
-          <p className="text-gray-700 mb-6">
-            {options.message}
-          </p>
-          
+
+          <p className="text-gray-700 mb-6">{options.message}</p>
+
           <div className="flex justify-end space-x-3">
             <button
               onClick={onCancel}

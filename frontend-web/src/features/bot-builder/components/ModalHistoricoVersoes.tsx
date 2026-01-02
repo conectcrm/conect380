@@ -41,7 +41,7 @@ export const ModalHistoricoVersoes: React.FC<ModalHistoricoVersoesProps> = ({
       const token = localStorage.getItem('token');
       const response = await fetch(`http://localhost:3001/fluxos/${fluxoId}/historico`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
@@ -61,7 +61,7 @@ export const ModalHistoricoVersoes: React.FC<ModalHistoricoVersoesProps> = ({
   };
 
   const handleRestore = async (numeroVersao: number) => {
-    const versao = versoes.find(v => v.numero === numeroVersao);
+    const versao = versoes.find((v) => v.numero === numeroVersao);
     const confirmMessage = versao?.publicada
       ? `⚠️ Esta versão está publicada. Tem certeza que deseja restaurar para a versão ${numeroVersao}?\n\nIsso criará um novo snapshot da versão atual antes de restaurar.`
       : `Tem certeza que deseja restaurar para a versão ${numeroVersao}?\n\nA versão atual será salva antes de restaurar.`;
@@ -78,7 +78,7 @@ export const ModalHistoricoVersoes: React.FC<ModalHistoricoVersoesProps> = ({
       const response = await fetch(`http://localhost:3001/fluxos/${fluxoId}/restaurar-versao`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ numeroVersao }),
@@ -102,7 +102,9 @@ export const ModalHistoricoVersoes: React.FC<ModalHistoricoVersoesProps> = ({
     } catch (err) {
       console.error('Erro ao restaurar versão:', err);
       setError(err instanceof Error ? err.message : 'Erro ao restaurar versão');
-      alert(`❌ Erro ao restaurar versão: ${err instanceof Error ? err.message : 'Erro desconhecido'}`);
+      alert(
+        `❌ Erro ao restaurar versão: ${err instanceof Error ? err.message : 'Erro desconhecido'}`,
+      );
     } finally {
       setRestoring(null);
     }
@@ -196,17 +198,16 @@ export const ModalHistoricoVersoes: React.FC<ModalHistoricoVersoesProps> = ({
               {versoes.map((versao, index) => (
                 <div
                   key={`${versao.numero}-${index}`}
-                  className={`border rounded-xl p-4 transition-all ${versao.publicada
-                    ? 'border-green-300 bg-green-50/50 hover:border-green-400 hover:shadow-md'
-                    : 'border-gray-200 bg-white hover:border-purple-300 hover:shadow-md'
-                    }`}
+                  className={`border rounded-xl p-4 transition-all ${
+                    versao.publicada
+                      ? 'border-green-300 bg-green-50/50 hover:border-green-400 hover:shadow-md'
+                      : 'border-gray-200 bg-white hover:border-purple-300 hover:shadow-md'
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-2 flex-wrap">
-                        <span className="text-xl font-bold text-purple-600">
-                          v{versao.numero}
-                        </span>
+                        <span className="text-xl font-bold text-purple-600">v{versao.numero}</span>
                         {versao.publicada && (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
                             <CheckCircle2 className="w-3.5 h-3.5" />
@@ -222,19 +223,18 @@ export const ModalHistoricoVersoes: React.FC<ModalHistoricoVersoesProps> = ({
                         {versao.descricao || 'Sem descrição'}
                       </p>
 
-                      <p className="text-xs text-gray-500">
-                        Autor: {versao.autor || 'Sistema'}
-                      </p>
+                      <p className="text-xs text-gray-500">Autor: {versao.autor || 'Sistema'}</p>
                     </div>
 
                     <div className="flex-shrink-0">
                       <button
                         onClick={() => handleRestore(versao.numero)}
                         disabled={loading || restoring !== null}
-                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all ${restoring === versao.numero
-                          ? 'bg-purple-200 text-purple-900 cursor-wait'
-                          : 'text-purple-600 bg-purple-50 hover:bg-purple-100 active:bg-purple-200'
-                          } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                          restoring === versao.numero
+                            ? 'bg-purple-200 text-purple-900 cursor-wait'
+                            : 'text-purple-600 bg-purple-50 hover:bg-purple-100 active:bg-purple-200'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
                         {restoring === versao.numero ? (
                           <>
@@ -261,8 +261,8 @@ export const ModalHistoricoVersoes: React.FC<ModalHistoricoVersoesProps> = ({
           <div className="flex items-start gap-2 text-sm text-gray-600">
             <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-500" />
             <p>
-              <strong>Dica:</strong> Ao restaurar uma versão, a versão atual será salva automaticamente
-              antes da restauração, garantindo que nada seja perdido.
+              <strong>Dica:</strong> Ao restaurar uma versão, a versão atual será salva
+              automaticamente antes da restauração, garantindo que nada seja perdido.
             </p>
           </div>
         </div>

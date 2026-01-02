@@ -5,7 +5,7 @@ import { Package, Plus, Search, Filter, MoreVertical, Edit, Trash2 } from 'lucid
 
 /**
  * Exemplo Completo: Header Sem Logo
- * 
+ *
  * Demonstra como o header otimizado se comporta em uma página real
  * com conteúdo dinâmico e diferentes resoluções
  */
@@ -24,35 +24,35 @@ export const ExemploHeaderSemLogo: React.FC = () => {
       id: 1,
       nome: 'Smartphone Galaxy S23',
       codigo: 'PROD001',
-      preco: 2899.90,
+      preco: 2899.9,
       categoria: 'eletrônicos',
       status: 'ativo',
-      descricao: 'Smartphone premium com câmera avançada'
+      descricao: 'Smartphone premium com câmera avançada',
     },
     {
       id: 2,
       nome: 'Notebook Dell Inspiron',
       codigo: 'PROD002',
-      preco: 3299.90,
+      preco: 3299.9,
       categoria: 'eletrônicos',
       status: 'ativo',
-      descricao: 'Notebook para uso profissional'
+      descricao: 'Notebook para uso profissional',
     },
     {
       id: 3,
       nome: 'Camiseta Polo',
       codigo: 'PROD003',
-      preco: 89.90,
+      preco: 89.9,
       categoria: 'roupas',
       status: 'inativo',
-      descricao: 'Camiseta polo em algodão'
-    }
+      descricao: 'Camiseta polo em algodão',
+    },
   ];
 
   const handleSaveProduto = async (data: any) => {
     // Simular chamada da API
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
     console.log('Produto salvo:', data);
     // Aqui você faria a chamada real para a API
   };
@@ -71,11 +71,13 @@ export const ExemploHeaderSemLogo: React.FC = () => {
     const styles = {
       ativo: 'bg-green-100 text-green-800 border-green-200',
       inativo: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      descontinuado: 'bg-red-100 text-red-800 border-red-200'
+      descontinuado: 'bg-red-100 text-red-800 border-red-200',
     };
 
     return (
-      <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border ${styles[status as keyof typeof styles]}`}>
+      <span
+        className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border ${styles[status as keyof typeof styles]}`}
+      >
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </span>
     );
@@ -88,7 +90,7 @@ export const ExemploHeaderSemLogo: React.FC = () => {
         userInfo={{
           name: 'João Silva',
           role: 'Administrador',
-          email: 'joao.silva@empresa.com'
+          email: 'joao.silva@empresa.com',
         }}
         companyName="Fênix CRM Demo"
         onThemeToggle={handleThemeToggle}
@@ -114,15 +116,24 @@ export const ExemploHeaderSemLogo: React.FC = () => {
             <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
               Principal
             </div>
-            <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-blue-600 bg-blue-50 border border-blue-200">
+            <a
+              href="#"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-blue-600 bg-blue-50 border border-blue-200"
+            >
               <Package className="w-4 h-4" />
               <span className="text-sm font-medium">Produtos</span>
             </a>
-            <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100">
+            <a
+              href="#"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100"
+            >
               <span className="w-4 h-4">👥</span>
               <span className="text-sm">Clientes</span>
             </a>
-            <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100">
+            <a
+              href="#"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100"
+            >
               <span className="w-4 h-4">📋</span>
               <span className="text-sm">Propostas</span>
             </a>
@@ -141,9 +152,7 @@ export const ExemploHeaderSemLogo: React.FC = () => {
                   <Package className="w-6 h-6 text-blue-600" />
                   Produtos
                 </h1>
-                <p className="text-gray-600 text-sm mt-1">
-                  Gerencie seu catálogo de produtos
-                </p>
+                <p className="text-gray-600 text-sm mt-1">Gerencie seu catálogo de produtos</p>
               </div>
 
               <button
@@ -192,44 +201,35 @@ export const ExemploHeaderSemLogo: React.FC = () => {
             {/* Linhas da Tabela */}
             <div className="divide-y divide-gray-200">
               {produtos.map((produto) => (
-                <div
-                  key={produto.id}
-                  className="px-6 py-4 hover:bg-gray-50 transition-colors"
-                >
+                <div key={produto.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                   <div className="grid grid-cols-12 gap-4 items-center">
                     <div className="col-span-3">
                       <div>
-                        <p className="font-medium text-gray-900 text-sm">
-                          {produto.nome}
-                        </p>
+                        <p className="font-medium text-gray-900 text-sm">{produto.nome}</p>
                         <p className="text-gray-500 text-xs mt-1 line-clamp-1">
                           {produto.descricao}
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="col-span-2">
                       <code className="px-2 py-1 bg-gray-100 rounded text-xs font-mono text-gray-700">
                         {produto.codigo}
                       </code>
                     </div>
-                    
+
                     <div className="col-span-2">
-                      <span className="text-sm text-gray-700 capitalize">
-                        {produto.categoria}
-                      </span>
+                      <span className="text-sm text-gray-700 capitalize">{produto.categoria}</span>
                     </div>
-                    
+
                     <div className="col-span-2">
                       <span className="font-medium text-gray-900 text-sm">
                         R$ {produto.preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
-                    
-                    <div className="col-span-2">
-                      {getStatusBadge(produto.status)}
-                    </div>
-                    
+
+                    <div className="col-span-2">{getStatusBadge(produto.status)}</div>
+
                     <div className="col-span-1">
                       <div className="flex items-center gap-1">
                         <button
@@ -239,7 +239,7 @@ export const ExemploHeaderSemLogo: React.FC = () => {
                         >
                           <Edit className="w-3.5 h-3.5" />
                         </button>
-                        
+
                         <button className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500 transition-colors">
                           <MoreVertical className="w-3.5 h-3.5" />
                         </button>
@@ -253,7 +253,9 @@ export const ExemploHeaderSemLogo: React.FC = () => {
             {/* Footer da Tabela */}
             <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
               <div className="flex items-center justify-between text-sm text-gray-600">
-                <span>Mostrando {produtos.length} de {produtos.length} produtos</span>
+                <span>
+                  Mostrando {produtos.length} de {produtos.length} produtos
+                </span>
                 <div className="flex items-center gap-2">
                   <span>Linhas por página:</span>
                   <select className="border border-gray-200 rounded px-2 py-1 text-xs">

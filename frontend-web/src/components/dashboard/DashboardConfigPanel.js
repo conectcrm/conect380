@@ -1,9 +1,11 @@
-"use strict";
+'use strict';
 exports.__esModule = true;
-var react_1 = require("react");
+var react_1 = require('react');
 var DashboardConfigPanel = function () {
-    return (<div className="dashboard-config-panel">
+  return (
+    <div className="dashboard-config-panel">
       {/* Implementação futura do painel de configuração */}
-    </div>);
+    </div>
+  );
 };
-exports["default"] = DashboardConfigPanel;
+exports['default'] = DashboardConfigPanel;

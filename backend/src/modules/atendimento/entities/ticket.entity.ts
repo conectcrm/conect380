@@ -15,6 +15,7 @@ import {
 import { Fila } from './fila.entity';
 import { Tag } from './tag.entity';
 import { User } from '../../users/user.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 export enum StatusTicket {
   FILA = 'FILA',
@@ -123,6 +124,10 @@ export class Ticket {
 
   @Column({ type: 'uuid', name: 'empresa_id' })
   empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   // ========================================
   // NOVOS CAMPOS - Sprint 1 (Unificação Ticket + Demanda)

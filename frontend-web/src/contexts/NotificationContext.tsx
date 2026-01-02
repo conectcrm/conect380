@@ -79,12 +79,17 @@ interface NotificationContextData {
   showError: (title: string, message: string, action?: Notification['action']) => void;
   showWarning: (title: string, message: string, action?: Notification['action']) => void;
   showInfo: (title: string, message: string, action?: Notification['action']) => void;
-  showReminder: (title: string, message: string, entityType: Notification['entityType'], entityId: string) => void;
+  showReminder: (
+    title: string,
+    message: string,
+    entityType: Notification['entityType'],
+    entityId: string,
+  ) => void;
 }
 
 const NotificationContext = createContext<NotificationContextData | undefined>(undefined);
 
-type AddNotificationInput = Omit<Notification, 'timestamp' | 'read' | 'priority'> &
+type AddNotificationInput = Omit<Notification, 'id' | 'timestamp' | 'read' | 'priority'> &
   Partial<Pick<Notification, 'id' | 'priority'>>;
 
 export const useNotifications = () => {
@@ -100,6 +105,7 @@ interface NotificationProviderProps {
 }
 
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
+  // ✅ Garantir que estados iniciais sejam arrays válidos
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [reminders, setReminders] = useState<NotificationReminder[]>([]);
   const [settings, setSettings] = useState({
@@ -112,8 +118,13 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   const generateId = () => `notification-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
   // Normaliza a estrutura de lembretes independente da origem do dado
-  const normalizeReminder = (reminder: NotificationReminderInput, existingId?: string): NotificationReminder => {
-    const normalizeEntityType = (entityType?: NotificationReminderInput['entityType']): ReminderEntityType => {
+  const normalizeReminder = (
+    reminder: NotificationReminderInput,
+    existingId?: string,
+  ): NotificationReminder => {
+    const normalizeEntityType = (
+      entityType?: NotificationReminderInput['entityType'],
+    ): ReminderEntityType => {
       switch (entityType) {
         case 'client':
           return 'cliente';
@@ -130,13 +141,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       }
     };
 
-    const scheduledForValue = reminder.scheduledFor instanceof Date
-      ? reminder.scheduledFor
-      : new Date(reminder.scheduledFor);
+    const scheduledForValue =
+      reminder.scheduledFor instanceof Date
+        ? reminder.scheduledFor
+        : new Date(reminder.scheduledFor);
 
-    const scheduledFor = Number.isNaN(scheduledForValue.getTime())
-      ? new Date()
-      : scheduledForValue;
+    const scheduledFor = Number.isNaN(scheduledForValue.getTime()) ? new Date() : scheduledForValue;
 
     return {
       id: existingId ?? generateId(),
@@ -165,6 +175,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     if (savedReminders) {
       try {
         const parsed = JSON.parse(savedReminders);
+        // ✅ Garantir que parsed é um array válido
+        if (!Array.isArray(parsed)) {
+          console.warn('⚠️ savedReminders não é um array, ignorando:', parsed);
+          localStorage.removeItem('conect-reminders');
+          return;
+        }
         const validReminders = parsed
           .map((r: any) => {
             try {
@@ -178,14 +194,17 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
                   recurring: r.recurring,
                   active: r.active,
                 },
-                r.id
+                r.id,
               );
             } catch (innerError) {
               console.warn('Lembrete inválido ignorado:', innerError);
               return null;
             }
           })
-          .filter((reminder: NotificationReminder | null): reminder is NotificationReminder => reminder !== null);
+          .filter(
+            (reminder: NotificationReminder | null): reminder is NotificationReminder =>
+              reminder !== null,
+          );
         setReminders(validReminders);
       } catch (error) {
         console.error('Erro ao carregar lembretes:', error);
@@ -227,8 +246,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       const now = new Date();
       const reminderTime = new Date(now.getTime() + settings.reminderInterval * 60000);
 
-      reminders.forEach(reminder => {
-        if (reminder.active && reminder.scheduledFor <= reminderTime && reminder.scheduledFor > now) {
+      reminders.forEach((reminder) => {
+        if (
+          reminder.active &&
+          reminder.scheduledFor <= reminderTime &&
+          reminder.scheduledFor > now
+        ) {
           // Criar notificação para o lembrete
           addNotification({
             type: 'reminder',
@@ -259,12 +282,13 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     // Verificar se já existe uma notificação similar muito recente (últimos 2 minutos para erros)
     const timeWindow = notification.type === 'error' ? 2 * 60 * 1000 : 5 * 60 * 1000;
     const recentTimeAgo = new Date(Date.now() - timeWindow);
-    const recentSimilar = notifications.find(existing =>
-      existing.title === notification.title &&
-      existing.type === notification.type &&
-      existing.message === notification.message &&
-      existing.entityType === notification.entityType &&
-      existing.timestamp > recentTimeAgo
+    const recentSimilar = notifications.find(
+      (existing) =>
+        existing.title === notification.title &&
+        existing.type === notification.type &&
+        existing.message === notification.message &&
+        existing.entityType === notification.entityType &&
+        existing.timestamp > recentTimeAgo,
     );
 
     // Se encontrou notificação similar recente, não criar nova
@@ -284,11 +308,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       priority: notification.priority ?? 'medium',
     };
 
-    setNotifications(prev => [newNotification, ...prev]);
+    setNotifications((prev) => [newNotification, ...prev]);
 
     // Mostrar toast
     const toastOptions = {
-      duration: notification.autoClose !== false ? (notification.duration || 4000) : Infinity,
+      duration: notification.autoClose !== false ? notification.duration || 4000 : Infinity,
       position: 'top-right' as const,
     };
 
@@ -303,27 +327,31 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         toast(notification.message, {
           ...toastOptions,
           icon: '⚠️',
-          style: { borderLeft: '4px solid #f59e0b' }
+          style: { borderLeft: '4px solid #f59e0b' },
         });
         break;
       case 'info':
         toast(notification.message, {
           ...toastOptions,
           icon: 'ℹ️',
-          style: { borderLeft: '4px solid #3b82f6' }
+          style: { borderLeft: '4px solid #3b82f6' },
         });
         break;
       case 'reminder':
         toast(notification.message, {
           ...toastOptions,
           icon: '🔔',
-          style: { borderLeft: '4px solid #8b5cf6' }
+          style: { borderLeft: '4px solid #8b5cf6' },
         });
         break;
     }
 
     // Notificação do navegador
-    if (settings.browserNotifications && 'Notification' in window && Notification.permission === 'granted') {
+    if (
+      settings.browserNotifications &&
+      'Notification' in window &&
+      Notification.permission === 'granted'
+    ) {
       new Notification(notification.title, {
         body: notification.message,
         icon: '/favicon.ico',
@@ -396,11 +424,16 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   const markAsRead = async (id: string) => {
     try {
       // Atualizar estado local imediatamente (UX responsivo)
-      setNotifications(prev =>
-        prev.map(notification =>
-          notification.id === id ? { ...notification, read: true } : notification
-        )
-      );
+      setNotifications((prev) => {
+        // ✅ Garantir que prev é um array válido
+        if (!Array.isArray(prev)) {
+          console.warn('⚠️ notifications não é um array em markAsRead, resetando');
+          return [];
+        }
+        return prev.map((notification) =>
+          notification.id === id ? { ...notification, read: true } : notification,
+        );
+      });
 
       // Persistir no backend
       const notificationService = await import('../services/notificationService');
@@ -414,9 +447,14 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   const markAllAsRead = async () => {
     try {
       // Atualizar estado local imediatamente (UX responsivo)
-      setNotifications(prev =>
-        prev.map(notification => ({ ...notification, read: true }))
-      );
+      setNotifications((prev) => {
+        // ✅ Garantir que prev é um array válido
+        if (!Array.isArray(prev)) {
+          console.warn('⚠️ notifications não é um array em markAllAsRead, resetando');
+          return [];
+        }
+        return prev.map((notification) => ({ ...notification, read: true }));
+      });
 
       // Persistir no backend
       const notificationService = await import('../services/notificationService');
@@ -430,7 +468,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   const removeNotification = async (id: string) => {
     try {
       // Remover do estado local imediatamente (UX responsivo)
-      setNotifications(prev => prev.filter(notification => notification.id !== id));
+      setNotifications((prev) => prev.filter((notification) => notification.id !== id));
 
       // Remover do backend
       await api.delete(`/notifications/${id}`);
@@ -454,24 +492,27 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
   const addReminder = (reminder: NotificationReminderInput) => {
     const newReminder = normalizeReminder(reminder);
-    setReminders(prev => [...prev, newReminder]);
+    setReminders((prev) => [...prev, newReminder]);
     return newReminder.id;
   };
 
   const updateReminder = (id: string, updates: Partial<NotificationReminder>) => {
-    setReminders(prev =>
-      prev.map(reminder =>
-        reminder.id === id ? { ...reminder, ...updates } : reminder
-      )
-    );
+    setReminders((prev) => {
+      // ✅ Garantir que prev é um array válido
+      if (!Array.isArray(prev)) {
+        console.warn('⚠️ reminders não é um array em updateReminder, resetando');
+        return [];
+      }
+      return prev.map((reminder) => (reminder.id === id ? { ...reminder, ...updates } : reminder));
+    });
   };
 
   const removeReminder = (id: string) => {
-    setReminders(prev => prev.filter(reminder => reminder.id !== id));
+    setReminders((prev) => prev.filter((reminder) => reminder.id !== id));
   };
 
   const updateSettings = (newSettings: Partial<NotificationContextData['settings']>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
+    setSettings((prev) => ({ ...prev, ...newSettings }));
   };
 
   // Métodos de conveniência
@@ -491,7 +532,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     addNotification({ type: 'info', title, message, priority: 'low', action });
   };
 
-  const showReminder = (title: string, message: string, entityType: Notification['entityType'], entityId: string) => {
+  const showReminder = (
+    title: string,
+    message: string,
+    entityType: Notification['entityType'],
+    entityId: string,
+  ) => {
     addNotification({
       type: 'reminder',
       title,
@@ -499,11 +545,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       priority: 'high',
       entityType,
       entityId,
-      autoClose: false
+      autoClose: false,
     });
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   const value: NotificationContextData = {
     notifications,
@@ -526,11 +572,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     showReminder,
   };
 
-  return (
-    <NotificationContext.Provider value={value}>
-      {children}
-    </NotificationContext.Provider>
-  );
+  return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
 };
 
 export default NotificationContext;

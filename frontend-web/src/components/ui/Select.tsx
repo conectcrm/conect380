@@ -27,7 +27,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         {children}
       </select>
     );
-  }
+  },
 );
 Select.displayName = 'Select';
 
@@ -35,7 +35,9 @@ export const SelectTrigger = Select;
 
 export const SelectValue: React.FC<{ placeholder?: string }> = () => null;
 
-export const SelectContent: React.FC<{ children: React.ReactNode }> = ({ children }) => <>{children}</>;
+export const SelectContent: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <>{children}</>
+);
 
 interface SelectItemProps extends React.OptionHTMLAttributes<HTMLOptionElement> {
   children: React.ReactNode;
@@ -43,14 +45,10 @@ interface SelectItemProps extends React.OptionHTMLAttributes<HTMLOptionElement> 
 
 export const SelectItem = React.forwardRef<HTMLOptionElement, SelectItemProps>(
   ({ className = '', children, ...props }, ref) => (
-    <option
-      ref={ref}
-      className={`py-2 px-3 text-gray-900 ${className}`.trim()}
-      {...props}
-    >
+    <option ref={ref} className={`py-2 px-3 text-gray-900 ${className}`.trim()} {...props}>
       {children}
     </option>
-  )
+  ),
 );
 SelectItem.displayName = 'SelectItem';
 
@@ -61,7 +59,10 @@ interface SeparatorProps {
   orientation?: 'horizontal' | 'vertical';
 }
 
-export const Separator: React.FC<SeparatorProps> = ({ className = '', orientation = 'horizontal' }) => {
+export const Separator: React.FC<SeparatorProps> = ({
+  className = '',
+  orientation = 'horizontal',
+}) => {
   const baseClasses = orientation === 'horizontal' ? 'w-full h-px my-4' : 'h-full w-px mx-4';
   return <hr className={`${baseClasses} bg-gray-200 ${className}`.trim()} />;
 };

@@ -1,6 +1,6 @@
 /**
  * Arquivo de exports centralizados dos componentes base do Fênix CRM
- * 
+ *
  * Importe este arquivo para ter acesso a todos os componentes base:
  * import { BaseModal, FormField, BaseButton } from '@/components/base';
  */

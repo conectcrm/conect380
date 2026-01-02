@@ -19,7 +19,7 @@ import {
   Linkedin,
   Twitter,
   Facebook,
-  Instagram
+  Instagram,
 } from 'lucide-react';
 import { Contato } from '../../features/contatos/services/contatosService';
 import { safeRender, validateAndSanitizeContact } from '../../utils/safeRender';
@@ -31,12 +31,7 @@ interface ModalContatoProps {
   onEdit: (contato: Contato) => void;
 }
 
-export const ModalContato: React.FC<ModalContatoProps> = ({
-  contato,
-  isOpen,
-  onClose,
-  onEdit
-}) => {
+export const ModalContato: React.FC<ModalContatoProps> = ({ contato, isOpen, onClose, onEdit }) => {
   if (!isOpen || !contato) return null;
 
   // Validar e sanitizar dados do contato
@@ -74,7 +69,7 @@ export const ModalContato: React.FC<ModalContatoProps> = ({
     return new Date(data).toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric'
+      year: 'numeric',
     });
   };
 
@@ -108,13 +103,19 @@ export const ModalContato: React.FC<ModalContatoProps> = ({
           <div className="flex items-center gap-4">
             {/* Avatar */}
             <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center text-white font-bold text-xl">
-              {safeRender(safeContato.nome).split(' ').map(n => n[0]).join('').slice(0, 2)}
+              {safeRender(safeContato.nome)
+                .split(' ')
+                .map((n) => n[0])
+                .join('')
+                .slice(0, 2)}
             </div>
 
             <div>
               <h1 className="text-2xl font-bold text-white">{safeRender(safeContato.nome)}</h1>
               <div className="flex items-center gap-3 mt-1">
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border bg-white bg-opacity-20 backdrop-blur-sm text-white border-white border-opacity-30`}>
+                <span
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border bg-white bg-opacity-20 backdrop-blur-sm text-white border-white border-opacity-30`}
+                >
                   {safeRender(safeContato.status)}
                 </span>
                 {safeContato.pontuacao_lead > 0 && (
@@ -149,10 +150,8 @@ export const ModalContato: React.FC<ModalContatoProps> = ({
         <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
           <div className="p-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
               {/* Coluna Principal */}
               <div className="lg:col-span-2 space-y-6">
-
                 {/* Informações de Contato */}
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                   <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
@@ -165,7 +164,10 @@ export const ModalContato: React.FC<ModalContatoProps> = ({
                       <label className="text-sm font-medium text-gray-600">Email</label>
                       <div className="flex items-center gap-2 mt-1">
                         <Mail className="w-4 h-4 text-gray-400" />
-                        <a href={`mailto:${safeRender(safeContato.email)}`} className="text-[#159A9C] hover:underline">
+                        <a
+                          href={`mailto:${safeRender(safeContato.email)}`}
+                          className="text-[#159A9C] hover:underline"
+                        >
                           {safeRender(safeContato.email)}
                         </a>
                       </div>
@@ -175,7 +177,10 @@ export const ModalContato: React.FC<ModalContatoProps> = ({
                       <label className="text-sm font-medium text-gray-600">Telefone</label>
                       <div className="flex items-center gap-2 mt-1">
                         <Phone className="w-4 h-4 text-gray-400" />
-                        <a href={`tel:${safeRender(safeContato.telefone)}`} className="text-[#159A9C] hover:underline">
+                        <a
+                          href={`tel:${safeRender(safeContato.telefone)}`}
+                          className="text-[#159A9C] hover:underline"
+                        >
                           {formatarTelefone(safeRender(safeContato.telefone))}
                         </a>
                       </div>
@@ -206,8 +211,14 @@ export const ModalContato: React.FC<ModalContatoProps> = ({
                         <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
                         <div>
                           <div>{safeRender(safeContato.endereco.rua)}</div>
-                          <div>{safeRender(safeContato.endereco.cidade)} - {safeRender(safeContato.endereco.estado)}</div>
-                          <div>{safeRender(safeContato.endereco.cep)} - {safeRender(safeContato.endereco.pais)}</div>
+                          <div>
+                            {safeRender(safeContato.endereco.cidade)} -{' '}
+                            {safeRender(safeContato.endereco.estado)}
+                          </div>
+                          <div>
+                            {safeRender(safeContato.endereco.cep)} -{' '}
+                            {safeRender(safeContato.endereco.pais)}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -215,31 +226,34 @@ export const ModalContato: React.FC<ModalContatoProps> = ({
                 </div>
 
                 {/* Redes Sociais */}
-                {safeContato.redes_sociais && typeof safeContato.redes_sociais === 'object' && Object.keys(safeContato.redes_sociais).length > 0 && (
-                  <div className="bg-white border border-gray-200 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
-                      <Globe className="w-5 h-5" />
-                      Redes Sociais
-                    </h3>
+                {safeContato.redes_sociais &&
+                  typeof safeContato.redes_sociais === 'object' &&
+                  Object.keys(safeContato.redes_sociais).length > 0 && (
+                    <div className="bg-white border border-gray-200 rounded-lg p-6">
+                      <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
+                        <Globe className="w-5 h-5" />
+                        Redes Sociais
+                      </h3>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {Object.entries(safeContato.redes_sociais).map(([platform, url]) => (
-                        url && (
-                          <a
-                            key={platform}
-                            href={safeRender(url)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                          >
-                            {getSocialIcon(platform)}
-                            <span className="capitalize">{safeRender(platform)}</span>
-                          </a>
-                        )
-                      ))}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {Object.entries(safeContato.redes_sociais).map(
+                          ([platform, url]) =>
+                            url && (
+                              <a
+                                key={platform}
+                                href={safeRender(url)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                              >
+                                {getSocialIcon(platform)}
+                                <span className="capitalize">{safeRender(platform)}</span>
+                              </a>
+                            ),
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {/* Notas */}
                 {safeContato.notas && (
@@ -248,38 +262,43 @@ export const ModalContato: React.FC<ModalContatoProps> = ({
                       <FileText className="w-5 h-5" />
                       Notas
                     </h3>
-                    <p className="text-gray-700 whitespace-pre-wrap">{safeRender(safeContato.notas)}</p>
+                    <p className="text-gray-700 whitespace-pre-wrap">
+                      {safeRender(safeContato.notas)}
+                    </p>
                   </div>
                 )}
 
                 {/* Tags */}
-                {safeContato.tags && Array.isArray(safeContato.tags) && safeContato.tags.length > 0 && (
-                  <div className="bg-white border border-gray-200 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
-                      <Tag className="w-5 h-5" />
-                      Tags
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {safeContato.tags.map((tag, index) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
-                        >
-                          <Tag className="w-3 h-3" />
-                          {safeRender(tag)}
-                        </span>
-                      ))}
+                {safeContato.tags &&
+                  Array.isArray(safeContato.tags) &&
+                  safeContato.tags.length > 0 && (
+                    <div className="bg-white border border-gray-200 rounded-lg p-6">
+                      <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
+                        <Tag className="w-5 h-5" />
+                        Tags
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {safeContato.tags.map((tag, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
+                          >
+                            <Tag className="w-3 h-3" />
+                            {safeRender(tag)}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
 
               {/* Sidebar */}
               <div className="space-y-6">
-
                 {/* Informações do Sistema */}
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-[#002333] mb-4">Informações do Sistema</h3>
+                  <h3 className="text-lg font-semibold text-[#002333] mb-4">
+                    Informações do Sistema
+                  </h3>
 
                   <div className="space-y-3">
                     <div>
@@ -313,7 +332,11 @@ export const ModalContato: React.FC<ModalContatoProps> = ({
                         <span>
                           {formatarData(safeRender(safeContato.data_ultima_interacao))}
                           <span className="text-gray-500 text-sm ml-1">
-                            ({calcularDiasDesdeUltimoContato(safeRender(safeContato.data_ultima_interacao))} dias atrás)
+                            (
+                            {calcularDiasDesdeUltimoContato(
+                              safeRender(safeContato.data_ultima_interacao),
+                            )}{' '}
+                            dias atrás)
                           </span>
                         </span>
                       </div>
@@ -341,7 +364,9 @@ export const ModalContato: React.FC<ModalContatoProps> = ({
                         <Star className="w-4 h-4 text-blue-600" />
                         <span className="text-sm font-medium text-blue-900">Pontuação Lead</span>
                       </div>
-                      <span className="text-lg font-bold text-blue-600">{safeRender(safeContato.pontuacao_lead)}</span>
+                      <span className="text-lg font-bold text-blue-600">
+                        {safeRender(safeContato.pontuacao_lead)}
+                      </span>
                     </div>
 
                     <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
@@ -352,7 +377,7 @@ export const ModalContato: React.FC<ModalContatoProps> = ({
                       <span className="text-lg font-bold text-green-600">
                         {new Intl.NumberFormat('pt-BR', {
                           style: 'currency',
-                          currency: 'BRL'
+                          currency: 'BRL',
                         }).format(Number(safeContato.valor_potencial) || 0)}
                       </span>
                     </div>
@@ -362,7 +387,9 @@ export const ModalContato: React.FC<ModalContatoProps> = ({
                         <Activity className="w-4 h-4 text-purple-600" />
                         <span className="text-sm font-medium text-purple-900">Atividades</span>
                       </div>
-                      <span className="text-lg font-bold text-purple-600">{safeRender(safeContato.atividades_recentes)}</span>
+                      <span className="text-lg font-bold text-purple-600">
+                        {safeRender(safeContato.atividades_recentes)}
+                      </span>
                     </div>
 
                     <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
@@ -370,13 +397,16 @@ export const ModalContato: React.FC<ModalContatoProps> = ({
                         <TrendingUp className="w-4 h-4 text-orange-600" />
                         <span className="text-sm font-medium text-orange-900">Oportunidades</span>
                       </div>
-                      <span className="text-lg font-bold text-orange-600">{safeRender(safeContato.oportunidades_abertas)}</span>
+                      <span className="text-lg font-bold text-orange-600">
+                        {safeRender(safeContato.oportunidades_abertas)}
+                      </span>
                     </div>
                   </div>
                 </div>
 
                 {/* Histórico de Vendas */}
-                {((Number(safeContato.vendas_realizadas) || 0) > 0 || (Number(safeContato.valor_total_vendas) || 0) > 0) && (
+                {((Number(safeContato.vendas_realizadas) || 0) > 0 ||
+                  (Number(safeContato.valor_total_vendas) || 0) > 0) && (
                   <div className="bg-white border border-gray-200 rounded-lg p-6">
                     <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
                       <DollarSign className="w-5 h-5" />
@@ -386,7 +416,9 @@ export const ModalContato: React.FC<ModalContatoProps> = ({
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">Vendas Realizadas</span>
-                        <span className="font-semibold">{safeRender(safeContato.vendas_realizadas)}</span>
+                        <span className="font-semibold">
+                          {safeRender(safeContato.vendas_realizadas)}
+                        </span>
                       </div>
 
                       <div className="flex justify-between items-center">
@@ -394,7 +426,7 @@ export const ModalContato: React.FC<ModalContatoProps> = ({
                         <span className="font-semibold text-[#159A9C]">
                           {new Intl.NumberFormat('pt-BR', {
                             style: 'currency',
-                            currency: 'BRL'
+                            currency: 'BRL',
                           }).format(Number(safeContato.valor_total_vendas) || 0)}
                         </span>
                       </div>

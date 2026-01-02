@@ -5,11 +5,7 @@ import * as yup from 'yup';
 import toast from 'react-hot-toast';
 import { CalendarEvent } from '../../types/calendar';
 import { useResponsive, useBodyOverflow } from '../../hooks/useResponsive';
-import {
-  ResponsiveModal,
-  AdaptiveColumns,
-  ResponsiveCard
-} from '../layout/ResponsiveLayout';
+import { ResponsiveModal, AdaptiveColumns, ResponsiveCard } from '../layout/ResponsiveLayout';
 import {
   FormField,
   BaseInput,
@@ -17,11 +13,11 @@ import {
   BaseTextarea,
   BaseButton,
   StatusPanel,
-  StatusBadge
+  StatusBadge,
 } from '../base';
-import { 
-  Save, 
-  X, 
+import {
+  Save,
+  X,
   Calendar,
   Clock,
   MapPin,
@@ -32,7 +28,7 @@ import {
   Plus,
   UserPlus,
   Mail,
-  Phone
+  Phone,
 } from 'lucide-react';
 
 interface Participant {
@@ -74,44 +70,30 @@ const schema = yup.object({
     .string()
     .required('Título é obrigatório')
     .min(3, 'Título deve ter pelo menos 3 caracteres'),
-    
-  start: yup
-    .string()
-    .required('Data/hora de início é obrigatória'),
-    
+
+  start: yup.string().required('Data/hora de início é obrigatória'),
+
   end: yup
     .string()
     .required('Data/hora de fim é obrigatória')
-    .test('after-start', 'Fim deve ser após o início', function(value) {
+    .test('after-start', 'Fim deve ser após o início', function (value) {
       const { start } = this.parent;
       if (!start || !value) return true;
       return new Date(value) > new Date(start);
     }),
-    
-  type: yup
-    .string()
-    .required('Tipo é obrigatório'),
-    
-  priority: yup
-    .string()
-    .required('Prioridade é obrigatória'),
-    
-  status: yup
-    .string()
-    .required('Status é obrigatório'),
-    
-  description: yup
-    .string()
-    .max(1000, 'Descrição deve ter no máximo 1000 caracteres'),
-    
-  location: yup
-    .string()
-    .max(200, 'Localização deve ter no máximo 200 caracteres'),
-    
-  collaborator: yup
-    .string()
-    .required('Colaborador responsável é obrigatório'),
-    
+
+  type: yup.string().required('Tipo é obrigatório'),
+
+  priority: yup.string().required('Prioridade é obrigatória'),
+
+  status: yup.string().required('Status é obrigatório'),
+
+  description: yup.string().max(1000, 'Descrição deve ter no máximo 1000 caracteres'),
+
+  location: yup.string().max(200, 'Localização deve ter no máximo 200 caracteres'),
+
+  collaborator: yup.string().required('Colaborador responsável é obrigatório'),
+
   participants: yup
     .array()
     .of(
@@ -119,10 +101,10 @@ const schema = yup.object({
         name: yup.string().required('Nome é obrigatório'),
         email: yup.string().email('E-mail inválido').required('E-mail é obrigatório'),
         phone: yup.string().optional(),
-        role: yup.string().oneOf(['organizer', 'attendee', 'optional']).required()
-      })
+        role: yup.string().oneOf(['organizer', 'attendee', 'optional']).required(),
+      }),
     )
-    .min(0, 'Pelo menos um participante deve ser adicionado')
+    .min(0, 'Pelo menos um participante deve ser adicionado'),
 });
 
 export const EventModal: React.FC<EventModalProps> = ({
@@ -133,18 +115,18 @@ export const EventModal: React.FC<EventModalProps> = ({
   onDuplicate,
   event,
   initialDate,
-  isLoading = false
+  isLoading = false,
 }) => {
   const { isMobile, isTablet } = useResponsive();
   const { lockScroll, unlockScroll } = useBodyOverflow();
-  
+
   // Estado para gerenciar participantes
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [newParticipant, setNewParticipant] = useState<Partial<Participant>>({
     name: '',
     email: '',
     phone: '',
-    role: 'attendee'
+    role: 'attendee',
   });
 
   const {
@@ -153,7 +135,7 @@ export const EventModal: React.FC<EventModalProps> = ({
     formState: { errors, isValid },
     reset,
     watch,
-    setValue
+    setValue,
   } = useForm<EventFormData>({
     resolver: yupResolver(schema),
     mode: 'onChange',
@@ -168,8 +150,8 @@ export const EventModal: React.FC<EventModalProps> = ({
       location: '',
       collaborator: '',
       participants: [],
-      allDay: false
-    }
+      allDay: false,
+    },
   });
 
   // Gerenciar scroll do body
@@ -188,19 +170,19 @@ export const EventModal: React.FC<EventModalProps> = ({
     { value: 'call', label: '📞 Ligação' },
     { value: 'task', label: '✅ Tarefa' },
     { value: 'event', label: '📅 Evento' },
-    { value: 'follow-up', label: '📧 Follow-up' }
+    { value: 'follow-up', label: '📧 Follow-up' },
   ];
 
   const priorityOptions = [
     { value: 'low', label: 'Baixa' },
     { value: 'medium', label: 'Média' },
-    { value: 'high', label: 'Alta' }
+    { value: 'high', label: 'Alta' },
   ];
 
   const statusOptions = [
     { value: 'confirmed', label: 'Confirmado' },
     { value: 'pending', label: 'Pendente' },
-    { value: 'cancelled', label: 'Cancelado' }
+    { value: 'cancelled', label: 'Cancelado' },
   ];
 
   // Opções de colaboradores (dados mock - em produção viriam da API)
@@ -210,7 +192,7 @@ export const EventModal: React.FC<EventModalProps> = ({
     { value: 'Pedro Costa', label: 'Pedro Costa' },
     { value: 'Ana Oliveira', label: 'Ana Oliveira' },
     { value: 'Carlos Ferreira', label: 'Carlos Ferreira' },
-    { value: 'Lucia Mendes', label: 'Lucia Mendes' }
+    { value: 'Lucia Mendes', label: 'Lucia Mendes' },
   ];
 
   // Funções para gerenciar participantes
@@ -221,32 +203,30 @@ export const EventModal: React.FC<EventModalProps> = ({
         name: newParticipant.name!,
         email: newParticipant.email!,
         phone: newParticipant.phone || '',
-        role: newParticipant.role as 'organizer' | 'attendee' | 'optional' || 'attendee'
+        role: (newParticipant.role as 'organizer' | 'attendee' | 'optional') || 'attendee',
       };
-      
-      setParticipants(prev => [...prev, participant]);
+
+      setParticipants((prev) => [...prev, participant]);
       setValue('participants', [...participants, participant]);
-      
+
       // Limpar formulário de novo participante
       setNewParticipant({
         name: '',
         email: '',
         phone: '',
-        role: 'attendee'
+        role: 'attendee',
       });
     }
   };
 
   const removeParticipant = (id: string) => {
-    const updatedParticipants = participants.filter(p => p.id !== id);
+    const updatedParticipants = participants.filter((p) => p.id !== id);
     setParticipants(updatedParticipants);
     setValue('participants', updatedParticipants);
   };
 
   const updateParticipantRole = (id: string, role: Participant['role']) => {
-    const updatedParticipants = participants.map(p => 
-      p.id === id ? { ...p, role } : p
-    );
+    const updatedParticipants = participants.map((p) => (p.id === id ? { ...p, role } : p));
     setParticipants(updatedParticipants);
     setValue('participants', updatedParticipants);
   };
@@ -257,17 +237,18 @@ export const EventModal: React.FC<EventModalProps> = ({
       if (event) {
         const startStr = event.start.toISOString().slice(0, 16);
         const endStr = event.end.toISOString().slice(0, 16);
-        
+
         // Converter attendees antigo para participantes
-        const eventParticipants: Participant[] = event.attendees?.map((email, index) => ({
-          id: `${index}`,
-          name: email.split('@')[0], // Nome básico do email
-          email: email,
-          role: 'attendee' as const
-        })) || [];
-        
+        const eventParticipants: Participant[] =
+          event.attendees?.map((email, index) => ({
+            id: `${index}`,
+            name: email.split('@')[0], // Nome básico do email
+            email: email,
+            role: 'attendee' as const,
+          })) || [];
+
         setParticipants(eventParticipants);
-        
+
         reset({
           title: event.title,
           description: event.description || '',
@@ -279,14 +260,14 @@ export const EventModal: React.FC<EventModalProps> = ({
           location: event.location || '',
           collaborator: event.collaborator || '',
           participants: eventParticipants,
-          allDay: event.allDay || false
+          allDay: event.allDay || false,
         });
       } else if (initialDate) {
         const start = new Date(initialDate);
         const end = new Date(start.getTime() + 60 * 60 * 1000); // +1 hora
-        
+
         setParticipants([]);
-        
+
         reset({
           title: '',
           description: '',
@@ -298,7 +279,7 @@ export const EventModal: React.FC<EventModalProps> = ({
           location: '',
           collaborator: '',
           participants: [],
-          allDay: false
+          allDay: false,
         });
       }
     }
@@ -306,7 +287,7 @@ export const EventModal: React.FC<EventModalProps> = ({
 
   // Watch para allDay
   const allDay = watch('allDay');
-  
+
   useEffect(() => {
     if (allDay) {
       const startDate = watch('start');
@@ -319,9 +300,7 @@ export const EventModal: React.FC<EventModalProps> = ({
   }, [allDay, setValue, watch]);
 
   const onSubmit = async (data: EventFormData) => {
-    const toastId = toast.loading(
-      event ? 'Atualizando evento...' : 'Criando evento...'
-    );
+    const toastId = toast.loading(event ? 'Atualizando evento...' : 'Criando evento...');
 
     try {
       const eventData: Omit<CalendarEvent, 'id'> = {
@@ -334,27 +313,22 @@ export const EventModal: React.FC<EventModalProps> = ({
         status: data.status,
         location: data.location,
         collaborator: data.collaborator,
-        attendees: participants.map(p => p.email), // Converter participantes para emails
-        allDay: data.allDay
+        attendees: participants.map((p) => p.email), // Converter participantes para emails
+        allDay: data.allDay,
       };
 
       await onSave(eventData);
-      
-      toast.success(
-        event ? 'Evento atualizado com sucesso!' : 'Evento criado com sucesso!',
-        { id: toastId }
-      );
-      
+
+      toast.success(event ? 'Evento atualizado com sucesso!' : 'Evento criado com sucesso!', {
+        id: toastId,
+      });
+
       setTimeout(() => {
         handleClose();
       }, 1000);
-      
     } catch (error) {
       console.error('Erro ao salvar evento:', error);
-      toast.error(
-        event ? 'Erro ao atualizar evento' : 'Erro ao criar evento',
-        { id: toastId }
-      );
+      toast.error(event ? 'Erro ao atualizar evento' : 'Erro ao criar evento', { id: toastId });
     }
   };
 
@@ -365,18 +339,18 @@ export const EventModal: React.FC<EventModalProps> = ({
       name: '',
       email: '',
       phone: '',
-      role: 'attendee'
+      role: 'attendee',
     });
     onClose();
   };
 
   const handleDelete = async () => {
     if (!event || !onDelete) return;
-    
+
     // eslint-disable-next-line no-restricted-globals
     if (window.confirm('Tem certeza que deseja excluir este evento?')) {
       const toastId = toast.loading('Excluindo evento...');
-      
+
       try {
         await onDelete(event.id);
         toast.success('Evento excluído com sucesso!', { id: toastId });
@@ -415,11 +389,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                 📋 Informações Básicas
               </h3>
               <div className="space-y-4">
-                <FormField
-                  label="Título do Evento"
-                  error={errors.title?.message}
-                  required
-                >
+                <FormField label="Título do Evento" error={errors.title?.message} required>
                   <BaseInput
                     {...register('title')}
                     placeholder="Ex: Reunião com cliente"
@@ -428,11 +398,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                   />
                 </FormField>
 
-                <FormField
-                  label="Tipo de Evento"
-                  error={errors.type?.message}
-                  required
-                >
+                <FormField label="Tipo de Evento" error={errors.type?.message} required>
                   <BaseSelect
                     {...register('type')}
                     error={!!errors.type}
@@ -442,11 +408,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                 </FormField>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <FormField
-                    label="Prioridade"
-                    error={errors.priority?.message}
-                    required
-                  >
+                  <FormField label="Prioridade" error={errors.priority?.message} required>
                     <BaseSelect
                       {...register('priority')}
                       error={!!errors.priority}
@@ -455,11 +417,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                     />
                   </FormField>
 
-                  <FormField
-                    label="Status"
-                    error={errors.status?.message}
-                    required
-                  >
+                  <FormField label="Status" error={errors.status?.message} required>
                     <BaseSelect
                       {...register('status')}
                       error={!!errors.status}
@@ -483,9 +441,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                   </FormField>
                 </div>
 
-                <FormField
-                  label="Evento de dia inteiro"
-                >
+                <FormField label="Evento de dia inteiro">
                   <label className="flex items-center space-x-2 cursor-pointer">
                     <input
                       type="checkbox"
@@ -504,11 +460,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                 🕒 Data e Hora
               </h3>
               <div className="space-y-4">
-                <FormField
-                  label="Início"
-                  error={errors.start?.message}
-                  required
-                >
+                <FormField label="Início" error={errors.start?.message} required>
                   <BaseInput
                     {...register('start')}
                     type="datetime-local"
@@ -517,11 +469,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                   />
                 </FormField>
 
-                <FormField
-                  label="Fim"
-                  error={errors.end?.message}
-                  required
-                >
+                <FormField label="Fim" error={errors.end?.message} required>
                   <BaseInput
                     {...register('end')}
                     type="datetime-local"
@@ -530,10 +478,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                   />
                 </FormField>
 
-                <FormField
-                  label="Localização"
-                  error={errors.location?.message}
-                >
+                <FormField label="Localização" error={errors.location?.message}>
                   <BaseInput
                     {...register('location')}
                     placeholder="Ex: Sala de reuniões, Online - Teams"
@@ -542,18 +487,14 @@ export const EventModal: React.FC<EventModalProps> = ({
                   />
                 </FormField>
 
-                <FormField
-                  label="Evento de dia inteiro"
-                >
+                <FormField label="Evento de dia inteiro">
                   <div className="flex items-center">
                     <input
                       {...register('allDay')}
                       type="checkbox"
                       className="rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
                     />
-                    <span className="ml-2 text-sm text-gray-700">
-                      Este evento dura o dia todo
-                    </span>
+                    <span className="ml-2 text-sm text-gray-700">Este evento dura o dia todo</span>
                   </div>
                 </FormField>
               </div>
@@ -564,12 +505,15 @@ export const EventModal: React.FC<EventModalProps> = ({
               <h3 className="font-semibold text-gray-900 mb-4 text-responsive border-b pb-2">
                 👥 Participantes
               </h3>
-              
+
               {/* Lista de participantes existentes */}
               {participants.length > 0 && (
                 <div className="space-y-2 mb-4">
                   {participants.map((participant) => (
-                    <div key={participant.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div
+                      key={participant.id}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    >
                       <div className="flex-1">
                         <div className="flex items-center space-x-2">
                           <div className="w-8 h-8 bg-[#159A9C] text-white rounded-full flex items-center justify-center text-sm font-medium">
@@ -587,7 +531,12 @@ export const EventModal: React.FC<EventModalProps> = ({
                       <div className="flex items-center space-x-2">
                         <select
                           value={participant.role}
-                          onChange={(e) => updateParticipantRole(participant.id, e.target.value as Participant['role'])}
+                          onChange={(e) =>
+                            updateParticipantRole(
+                              participant.id,
+                              e.target.value as Participant['role'],
+                            )
+                          }
                           className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-900"
                         >
                           <option value="organizer">Organizador</option>
@@ -613,21 +562,21 @@ export const EventModal: React.FC<EventModalProps> = ({
                   <UserPlus className="w-4 h-4 mr-2" />
                   Adicionar Participante
                 </h4>
-                
+
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Nome *
-                    </label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Nome *</label>
                     <input
                       type="text"
                       value={newParticipant.name || ''}
-                      onChange={(e) => setNewParticipant(prev => ({ ...prev, name: e.target.value }))}
+                      onChange={(e) =>
+                        setNewParticipant((prev) => ({ ...prev, name: e.target.value }))
+                      }
                       placeholder="Nome completo"
                       className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C] text-sm bg-white text-gray-900"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       <Mail className="w-3 h-3 inline mr-1" />
@@ -636,12 +585,14 @@ export const EventModal: React.FC<EventModalProps> = ({
                     <input
                       type="email"
                       value={newParticipant.email || ''}
-                      onChange={(e) => setNewParticipant(prev => ({ ...prev, email: e.target.value }))}
+                      onChange={(e) =>
+                        setNewParticipant((prev) => ({ ...prev, email: e.target.value }))
+                      }
                       placeholder="email@exemplo.com"
                       className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C] text-sm bg-white text-gray-900"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       <Phone className="w-3 h-3 inline mr-1" />
@@ -650,19 +601,24 @@ export const EventModal: React.FC<EventModalProps> = ({
                     <input
                       type="tel"
                       value={newParticipant.phone || ''}
-                      onChange={(e) => setNewParticipant(prev => ({ ...prev, phone: e.target.value }))}
+                      onChange={(e) =>
+                        setNewParticipant((prev) => ({ ...prev, phone: e.target.value }))
+                      }
                       placeholder="(11) 99999-9999"
                       className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C] text-sm bg-white text-gray-900"
                     />
                   </div>
-                  
+
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Função
-                    </label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Função</label>
                     <select
                       value={newParticipant.role || 'attendee'}
-                      onChange={(e) => setNewParticipant(prev => ({ ...prev, role: e.target.value as Participant['role'] }))}
+                      onChange={(e) =>
+                        setNewParticipant((prev) => ({
+                          ...prev,
+                          role: e.target.value as Participant['role'],
+                        }))
+                      }
                       className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C] text-sm bg-white text-gray-900"
                     >
                       <option value="attendee">Participante</option>
@@ -670,7 +626,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                       <option value="optional">Opcional</option>
                     </select>
                   </div>
-                  
+
                   <button
                     type="button"
                     onClick={addParticipant}
@@ -704,10 +660,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                   />
                 </FormField>
 
-                <FormField
-                  label="Descrição"
-                  error={errors.description?.message}
-                >
+                <FormField label="Descrição" error={errors.description?.message}>
                   <BaseTextarea
                     {...register('description')}
                     rows={isMobile ? 4 : 6}
@@ -726,11 +679,17 @@ export const EventModal: React.FC<EventModalProps> = ({
                       </label>
                       <div className="mt-1 flex items-center space-x-2">
                         <StatusBadge
-                          status={currentStatus === 'confirmed' ? 'success' : currentStatus === 'pending' ? 'warning' : 'error'}
-                          text={statusOptions.find(s => s.value === currentStatus)?.label}
+                          status={
+                            currentStatus === 'confirmed'
+                              ? 'success'
+                              : currentStatus === 'pending'
+                                ? 'warning'
+                                : 'error'
+                          }
+                          text={statusOptions.find((s) => s.value === currentStatus)?.label}
                         />
                         <span className="text-sm text-gray-600">
-                          {typeOptions.find(t => t.value === currentType)?.label}
+                          {typeOptions.find((t) => t.value === currentType)?.label}
                         </span>
                       </div>
                     </div>
@@ -741,9 +700,11 @@ export const EventModal: React.FC<EventModalProps> = ({
                       </label>
                       <div className="mt-1">
                         <span className="text-sm text-gray-700">
-                          {participants.length === 0 ? 'Nenhum participante' : 
-                           participants.length === 1 ? '1 participante' : 
-                           `${participants.length} participantes`}
+                          {participants.length === 0
+                            ? 'Nenhum participante'
+                            : participants.length === 1
+                              ? '1 participante'
+                              : `${participants.length} participantes`}
                         </span>
                         {participants.length > 0 && (
                           <div className="mt-1 flex -space-x-1">
@@ -765,14 +726,14 @@ export const EventModal: React.FC<EventModalProps> = ({
                         )}
                       </div>
                     </div>
-                    
+
                     {currentPriority === 'high' && (
                       <div className="flex items-center text-sm text-red-600">
                         <AlertTriangle className="w-4 h-4 mr-2" />
                         <span>Alta prioridade</span>
                       </div>
                     )}
-                    
+
                     <div className="flex items-center text-sm text-gray-500">
                       <Calendar className="w-4 h-4 mr-2 flex-shrink-0" />
                       <span className="break-words">
@@ -803,7 +764,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                     Duplicar
                   </BaseButton>
                 )}
-                
+
                 {onDelete && (
                   <BaseButton
                     type="button"
@@ -829,7 +790,7 @@ export const EventModal: React.FC<EventModalProps> = ({
               >
                 Cancelar
               </BaseButton>
-              
+
               <BaseButton
                 type="submit"
                 variant="primary"

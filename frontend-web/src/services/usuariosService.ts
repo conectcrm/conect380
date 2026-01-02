@@ -1,14 +1,12 @@
-import axios from 'axios';
+import { api } from './api';
 import {
   Usuario,
   NovoUsuario,
   AtualizarUsuario,
   FiltrosUsuarios,
-  EstatisticasUsuarios
+  EstatisticasUsuarios,
 } from '../types/usuarios/index';
 import { User } from '../types';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 export interface ListarUsuariosResponse {
   usuarios: Usuario[];
@@ -18,27 +16,15 @@ export interface ListarUsuariosResponse {
 }
 
 class UsuariosService {
-  private api = axios.create({
-    baseURL: `${API_BASE_URL}/users`,
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  });
+  private readonly basePath = '/users';
 
-  constructor() {
-    // Interceptor para adicionar token de autenticação
-    this.api.interceptors.request.use((config) => {
-      const token = localStorage.getItem('auth_token') || localStorage.getItem('authToken');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      return config;
-    });
+  private getUrl(path: string = ''): string {
+    return `${this.basePath}${path}`;
   }
 
   // CRUD Usuários
   async listarUsuarios(filtros?: Partial<FiltrosUsuarios>): Promise<ListarUsuariosResponse> {
-    const response = await this.api.get('/', { params: filtros });
+    const response = await api.get(this.getUrl(), { params: filtros });
 
     const payload = response.data;
 
@@ -78,7 +64,7 @@ class UsuariosService {
   }
 
   async obterUsuario(id: string): Promise<Usuario> {
-    const response = await this.api.get(`/${id}`);
+    const response = await api.get(this.getUrl(`/${id}`));
     return this.formatarUsuario(response.data);
   }
 
@@ -97,13 +83,13 @@ class UsuariosService {
         tema: 'light',
         notificacoes: {
           email: true,
-          push: true
-        }
+          push: true,
+        },
       },
-      ativo: usuario.ativo !== undefined ? usuario.ativo : true
+      ativo: usuario.ativo !== undefined ? usuario.ativo : true,
     };
 
-    const response = await this.api.post('/', dadosBackend);
+    const response = await api.post(this.getUrl(), dadosBackend);
     return this.formatarUsuario(response.data.data);
   }
 
@@ -119,32 +105,32 @@ class UsuariosService {
       avatar_url: dados.avatar_url,
       idioma_preferido: dados.idioma_preferido,
       configuracoes: dados.configuracoes,
-      ativo: dados.ativo
+      ativo: dados.ativo,
     };
 
-    const response = await this.api.put(`/${id}`, dadosBackend);
+    const response = await api.put(this.getUrl(`/${id}`), dadosBackend);
     return this.formatarUsuario(response.data.data);
   }
 
   async excluirUsuario(id: string): Promise<void> {
-    await this.api.delete(`/${id}`);
+    await api.delete(this.getUrl(`/${id}`));
   }
 
   async alterarStatusUsuario(id: string, ativo: boolean): Promise<Usuario> {
-    const response = await this.api.patch(`/${id}/status`, { ativo });
+    const response = await api.patch(this.getUrl(`/${id}/status`), { ativo });
     return this.formatarUsuario(response.data.data);
   }
 
   // Listar usuários com permissão de atendimento
   async listarAtendentes(): Promise<Usuario[]> {
-    const response = await this.api.get('/atendentes');
+    const response = await api.get(this.getUrl('/atendentes'));
     return response.data.data.map((usuario: any) => this.formatarUsuario(usuario));
   }
 
   // Buscar usuários da equipe/empresa
   async buscarUsuariosEquipe(): Promise<User[]> {
     try {
-      const response = await this.api.get('/team');
+      const response = await api.get(this.getUrl('/team'));
       return response.data.data.map((usuario: any) => this.formatarUsuarioParaUser(usuario));
     } catch (error) {
       console.error('Erro ao buscar usuários da equipe:', error);
@@ -155,7 +141,7 @@ class UsuariosService {
   // Buscar perfil do usuário atual
   async buscarPerfilAtual(): Promise<User> {
     try {
-      const response = await this.api.get('/profile');
+      const response = await api.get(this.getUrl('/profile'));
       return this.formatarUsuarioParaUser(response.data.data);
     } catch (error) {
       console.error('Erro ao buscar perfil atual:', error);
@@ -176,13 +162,13 @@ class UsuariosService {
       empresa: {
         id: usuario.empresa_id || '1',
         nome: usuario.empresa?.nome || 'Empresa',
-        slug: usuario.empresa?.slug || 'empresa'
-      }
+        slug: usuario.empresa?.slug || 'empresa',
+      },
     };
   }
 
   async resetarSenha(id: string): Promise<string> {
-    const response = await this.api.put(`/${id}/reset-senha`);
+    const response = await api.put(this.getUrl(`/${id}/reset-senha`));
     const payload = response.data;
 
     const novaSenha = payload?.data?.novaSenha ?? payload?.novaSenha ?? payload?.data?.senhaTemp;
@@ -201,7 +187,7 @@ class UsuariosService {
   // Estatísticas
   async obterEstatisticas(): Promise<EstatisticasUsuarios> {
     try {
-      const response = await this.api.get('/estatisticas');
+      const response = await api.get(this.getUrl('/estatisticas'));
 
       // O backend retorna um objeto com {success: true, data: {...}}
       const backendData = response.data.data || response.data;
@@ -215,9 +201,9 @@ class UsuariosService {
           admin: 0,
           manager: 0,
           vendedor: 0,
-          user: 0
+          user: 0,
         },
-        ultimosLogins: backendData.ativos_30_dias || 0
+        ultimosLogins: backendData.ativos_30_dias || 0,
       };
     } catch (error) {
       console.error('Erro ao obter estatísticas:', error);
@@ -230,22 +216,22 @@ class UsuariosService {
           admin: 0,
           manager: 0,
           vendedor: 0,
-          user: 0
+          user: 0,
         },
-        ultimosLogins: 0
+        ultimosLogins: 0,
       };
     }
   }
 
   // Método para obter perfil do usuário logado
   async obterPerfil(): Promise<Usuario> {
-    const response = await this.api.get('/profile');
+    const response = await api.get(this.getUrl('/profile'));
     return this.formatarUsuario(response.data.data);
   }
 
   // Método para atualizar perfil do usuário logado
   async atualizarPerfil(dados: Partial<NovoUsuario>): Promise<Usuario> {
-    const response = await this.api.put('/profile', dados);
+    const response = await api.put(this.getUrl('/profile'), dados);
     return this.formatarUsuario(response.data.data);
   }
 
@@ -265,15 +251,15 @@ class UsuariosService {
         tema: 'light',
         notificacoes: {
           email: true,
-          push: true
-        }
+          push: true,
+        },
       },
       ativo: usuario.ativo,
       deve_trocar_senha: Boolean(usuario.deve_trocar_senha),
       ultimo_login: usuario.ultimo_login ? new Date(usuario.ultimo_login) : undefined,
       created_at: new Date(usuario.created_at),
       updated_at: new Date(usuario.updated_at),
-      empresa: usuario.empresa
+      empresa: usuario.empresa,
     };
   }
 }

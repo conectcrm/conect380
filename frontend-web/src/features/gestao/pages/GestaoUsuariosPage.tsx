@@ -1,11 +1,11 @@
 /**
  * GESTÃO DE USUÁRIOS - CONECT CRM
- * 
+ *
  * Tela unificada de gestão de usuários do sistema.
  * Substitui a antiga GestaoAtendentesPage, consolidando gestão de:
  * - Usuários gerais (todos os roles)
  * - Atendentes (usuários com permissão ATENDIMENTO)
- * 
+ *
  * Padrão: HubSpot/Salesforce/Pipedrive
  * Tema: Crevasse Professional
  * Cor primary: #159A9C (Crevasse-2 teal)
@@ -24,7 +24,6 @@ import {
   Users,
   Shield,
   UserCheck,
-  Clock,
   Key,
   Mail,
   Phone,
@@ -40,7 +39,6 @@ import {
   NovoUsuario,
   AtualizarUsuario,
   UserRole,
-  StatusAtendente,
   ROLE_LABELS,
   ROLE_COLORS,
   STATUS_ATENDENTE_LABELS,
@@ -64,6 +62,40 @@ type ConfirmDialogState = {
   variant?: 'primary' | 'danger';
   onConfirm?: () => Promise<void> | void;
   errorMessage?: string;
+};
+
+type ApiErrorResponse = {
+  response?: {
+    data?: {
+      message?: string | string[];
+    };
+  };
+};
+
+const extractApiMessage = (error: unknown): string | undefined => {
+  if (typeof error !== 'object' || error === null) {
+    return undefined;
+  }
+
+  const message = (error as ApiErrorResponse).response?.data?.message;
+  if (Array.isArray(message)) {
+    return message.join('. ');
+  }
+
+  return typeof message === 'string' ? message : undefined;
+};
+
+const getErrorMessage = (error: unknown, fallback?: string): string => {
+  const apiMessage = extractApiMessage(error);
+  if (apiMessage) {
+    return apiMessage;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return fallback ?? 'Erro inesperado';
 };
 
 const GestaoUsuariosPage: React.FC = () => {
@@ -110,11 +142,11 @@ const GestaoUsuariosPage: React.FC = () => {
   const [novaSenhaGerada, setNovaSenhaGerada] = useState<string | null>(null);
   const [resetSenhaError, setResetSenhaError] = useState<string | null>(null);
 
-  const showFeedback = (type: FeedbackState['type'], message: string, title?: string) => {
+  const showFeedback = (type: FeedbackState['type'], message: string, title?: string): void => {
     setFeedback({ type, message, title });
   };
 
-  const dismissFeedback = () => setFeedback(null);
+  const dismissFeedback = (): void => setFeedback(null);
 
   const feedbackStyles: Record<FeedbackState['type'], { container: string; icon: string }> = {
     success: {
@@ -146,12 +178,12 @@ const GestaoUsuariosPage: React.FC = () => {
     info: Info,
   };
 
-  const getConfirmButtonClasses = (variant?: 'primary' | 'danger') =>
+  const getConfirmButtonClasses = (variant?: 'primary' | 'danger'): string =>
     variant === 'danger'
       ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
       : 'bg-[#159A9C] hover:bg-[#0F7B7D] focus:ring-[#159A9C]';
 
-  const openConfirmDialog = (config: Omit<ConfirmDialogState, 'open'>) => {
+  const openConfirmDialog = (config: Omit<ConfirmDialogState, 'open'>): void => {
     setConfirmDialog({
       open: true,
       ...config,
@@ -159,7 +191,7 @@ const GestaoUsuariosPage: React.FC = () => {
     });
   };
 
-  const closeConfirmDialog = () => {
+  const closeConfirmDialog = (): void => {
     setConfirmLoading(false);
     setConfirmDialog({
       open: false,
@@ -173,7 +205,7 @@ const GestaoUsuariosPage: React.FC = () => {
     });
   };
 
-  const handleConfirmDialog = async () => {
+  const handleConfirmDialog = async (): Promise<void> => {
     if (!confirmDialog.onConfirm) {
       closeConfirmDialog();
       return;
@@ -186,12 +218,7 @@ const GestaoUsuariosPage: React.FC = () => {
     } catch (error) {
       console.error('Erro na ação confirmada:', error);
       setConfirmLoading(false);
-      const responseMessage = (error as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = error instanceof Error ? error.message : undefined;
-      const message = normalizedMessage || fallbackMessage || 'Não foi possível concluir a ação. Tente novamente.';
+      const message = getErrorMessage(error, 'Não foi possível concluir a ação. Tente novamente.');
       setConfirmDialog((prev) => ({
         ...prev,
         errorMessage: message,
@@ -214,21 +241,19 @@ const GestaoUsuariosPage: React.FC = () => {
     }
   }, [abaAtiva]);
 
-  const carregarDados = async () => {
+  const carregarDados = async (): Promise<void> => {
     try {
       setLoading(true);
       setError(null);
-      const { usuarios: lista, total } = await usuariosService.listarUsuarios({ limite: 1000, pagina: 1 });
+      const { usuarios: lista, total } = await usuariosService.listarUsuarios({
+        limite: 1000,
+        pagina: 1,
+      });
       setUsuarios(lista);
       setTotalUsuariosSistema(total);
     } catch (err: unknown) {
       console.error('Erro ao carregar usuários:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      setError(normalizedMessage || fallbackMessage || 'Erro ao carregar usuários');
+      setError(getErrorMessage(err, 'Erro ao carregar usuários'));
       setUsuarios([]);
       setTotalUsuariosSistema(0);
     } finally {
@@ -237,7 +262,7 @@ const GestaoUsuariosPage: React.FC = () => {
   };
 
   // Filtrar usuários
-  const usuariosFiltrados = usuarios.filter(usuario => {
+  const usuariosFiltrados = usuarios.filter((usuario) => {
     // Filtro de busca (nome ou email)
     if (busca) {
       const buscaLower = busca.toLowerCase();
@@ -264,16 +289,18 @@ const GestaoUsuariosPage: React.FC = () => {
 
   // Calcular KPIs
   const totalUsuarios = totalUsuariosSistema;
-  const usuariosAtivos = usuarios.filter(u => u.ativo).length;
-  const administradores = usuarios.filter(u => u.role === UserRole.ADMIN).length;
-  const onlineHoje = usuarios.filter(u => {
+  const usuariosAtivos = usuarios.filter((u) => u.ativo).length;
+  const administradores = usuarios.filter(
+    (u) => u.role === UserRole.ADMIN || u.role === UserRole.SUPERADMIN,
+  ).length;
+  const onlineHoje = usuarios.filter((u) => {
     if (!u.ultimo_login) return false;
     const hoje = new Date();
     const ultimoLogin = new Date(u.ultimo_login);
     return ultimoLogin.toDateString() === hoje.toDateString();
   }).length;
 
-  const handleOpenDialog = (usuario?: Usuario) => {
+  const handleOpenDialog = (usuario?: Usuario): void => {
     setFormError(null);
     if (usuario) {
       setEditingUsuario(usuario);
@@ -303,7 +330,7 @@ const GestaoUsuariosPage: React.FC = () => {
     setShowDialog(true);
   };
 
-  const handleCloseDialog = () => {
+  const handleCloseDialog = (): void => {
     setShowDialog(false);
     setEditingUsuario(null);
     setFormError(null);
@@ -319,7 +346,7 @@ const GestaoUsuariosPage: React.FC = () => {
     });
   };
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     try {
       setFormError(null);
       let successMessage = '';
@@ -337,8 +364,8 @@ const GestaoUsuariosPage: React.FC = () => {
           idioma_preferido: formData.idioma_preferido,
         };
         await usuariosService.atualizarUsuario(dadosAtualizacao);
-        setUsuarios(prev =>
-          prev.map(u => (u.id === editingUsuario.id ? { ...u, ...dadosAtualizacao } : u))
+        setUsuarios((prev) =>
+          prev.map((u) => (u.id === editingUsuario.id ? { ...u, ...dadosAtualizacao } : u)),
         );
         successMessage = 'Usuário atualizado com sucesso.';
       } else {
@@ -347,7 +374,7 @@ const GestaoUsuariosPage: React.FC = () => {
           return;
         }
         const novoUsuario = await usuariosService.criarUsuario(formData as NovoUsuario);
-        setUsuarios(prev => [...prev, novoUsuario]);
+        setUsuarios((prev) => [...prev, novoUsuario]);
         successMessage = 'Usuário criado com sucesso.';
       }
 
@@ -356,18 +383,13 @@ const GestaoUsuariosPage: React.FC = () => {
       showFeedback('success', successMessage);
     } catch (err: unknown) {
       console.error('Erro ao salvar usuário:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      const message = normalizedMessage || fallbackMessage || 'Erro ao salvar usuário';
+      const message = getErrorMessage(err, 'Erro ao salvar usuário');
       setFormError(message);
       showFeedback('error', message);
     }
   };
 
-  const handleDelete = (usuario: Usuario) => {
+  const handleDelete = (usuario: Usuario): void => {
     openConfirmDialog({
       title: 'Excluir usuário',
       description: `Deseja realmente excluir o usuário "${usuario.nome}"? Esta ação não pode ser desfeita.`,
@@ -377,45 +399,35 @@ const GestaoUsuariosPage: React.FC = () => {
       onConfirm: async () => {
         try {
           await usuariosService.excluirUsuario(usuario.id);
-          setUsuarios(prev => prev.filter(u => u.id !== usuario.id));
+          setUsuarios((prev) => prev.filter((u) => u.id !== usuario.id));
           showFeedback('success', `Usuário "${usuario.nome}" excluído com sucesso.`);
         } catch (err: unknown) {
           console.error('Erro ao excluir usuário:', err);
-          const responseMessage = (err as any)?.response?.data?.message;
-          const normalizedMessage = Array.isArray(responseMessage)
-            ? responseMessage.join('. ')
-            : responseMessage;
-          const fallbackMessage = err instanceof Error ? err.message : undefined;
-          const message = normalizedMessage || fallbackMessage || 'Erro ao excluir usuário';
+          const message = getErrorMessage(err, 'Erro ao excluir usuário');
           throw new Error(message);
         }
       },
     });
   };
 
-  const handleToggleStatus = async (usuario: Usuario) => {
+  const handleToggleStatus = async (usuario: Usuario): Promise<void> => {
     try {
       const novoStatus = !usuario.ativo;
       await usuariosService.alterarStatusUsuario(usuario.id, novoStatus);
-      setUsuarios(prev =>
-        prev.map(u => (u.id === usuario.id ? { ...u, ativo: novoStatus } : u))
+      setUsuarios((prev) =>
+        prev.map((u) => (u.id === usuario.id ? { ...u, ativo: novoStatus } : u)),
       );
       showFeedback(
         'success',
-        `Usuário "${usuario.nome}" ${novoStatus ? 'ativado' : 'desativado'} com sucesso.`
+        `Usuário "${usuario.nome}" ${novoStatus ? 'ativado' : 'desativado'} com sucesso.`,
       );
     } catch (err: unknown) {
       console.error('Erro ao alterar status:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      showFeedback('error', normalizedMessage || fallbackMessage || 'Erro ao alterar status do usuário');
+      showFeedback('error', getErrorMessage(err, 'Erro ao alterar status do usuário'));
     }
   };
 
-  const handleResetSenha = (usuario: Usuario) => {
+  const handleResetSenha = (usuario: Usuario): void => {
     setUsuarioResetSenha(usuario);
     setNovaSenhaGerada(null);
     setResetSenhaError(null);
@@ -423,7 +435,7 @@ const GestaoUsuariosPage: React.FC = () => {
     setShowResetSenhaDialog(true);
   };
 
-  const handleConfirmResetSenha = async () => {
+  const handleConfirmResetSenha = async (): Promise<void> => {
     if (!usuarioResetSenha) return;
 
     try {
@@ -434,12 +446,7 @@ const GestaoUsuariosPage: React.FC = () => {
       showFeedback('success', `Senha temporária gerada para ${usuarioResetSenha.email}.`);
     } catch (err: unknown) {
       console.error('Erro ao resetar senha:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
-      const fallbackMessage = err instanceof Error ? err.message : undefined;
-      const message = normalizedMessage || fallbackMessage || 'Erro ao resetar senha do usuário';
+      const message = getErrorMessage(err, 'Erro ao resetar senha do usuário');
       setResetSenhaError(message);
       showFeedback('error', message);
     } finally {
@@ -447,7 +454,7 @@ const GestaoUsuariosPage: React.FC = () => {
     }
   };
 
-  const handleCloseResetSenhaDialog = () => {
+  const handleCloseResetSenhaDialog = (): void => {
     setShowResetSenhaDialog(false);
     setUsuarioResetSenha(null);
     setNovaSenhaGerada(null);
@@ -455,7 +462,7 @@ const GestaoUsuariosPage: React.FC = () => {
     setResetSenhaLoading(false);
   };
 
-  const handleCopyNovaSenha = async () => {
+  const handleCopyNovaSenha = async (): Promise<void> => {
     if (!novaSenhaGerada) return;
 
     try {
@@ -471,23 +478,21 @@ const GestaoUsuariosPage: React.FC = () => {
     }
   };
 
-  const handleToggleSelecionado = (usuarioId: string) => {
-    setUsuariosSelecionados(prev =>
-      prev.includes(usuarioId)
-        ? prev.filter(id => id !== usuarioId)
-        : [...prev, usuarioId]
+  const handleToggleSelecionado = (usuarioId: string): void => {
+    setUsuariosSelecionados((prev) =>
+      prev.includes(usuarioId) ? prev.filter((id) => id !== usuarioId) : [...prev, usuarioId],
     );
   };
 
-  const handleSelecionarTodos = () => {
+  const handleSelecionarTodos = (): void => {
     if (usuariosSelecionados.length === usuariosFiltrados.length) {
       setUsuariosSelecionados([]);
     } else {
-      setUsuariosSelecionados(usuariosFiltrados.map(u => u.id));
+      setUsuariosSelecionados(usuariosFiltrados.map((u) => u.id));
     }
   };
 
-  const handleBulkAction = (acao: 'ativar' | 'desativar' | 'excluir') => {
+  const handleBulkAction = (acao: 'ativar' | 'desativar' | 'excluir'): void => {
     if (usuariosSelecionados.length === 0) {
       showFeedback('info', 'Selecione pelo menos um usuário para realizar a ação.');
       return;
@@ -496,9 +501,7 @@ const GestaoUsuariosPage: React.FC = () => {
     const quantidade = usuariosSelecionados.length;
     const descricaoAcao = `Deseja ${acao} ${quantidade} usuário(s) selecionado(s)?`;
     const tituloAcao =
-      acao === 'excluir'
-        ? 'Excluir usuários selecionados'
-        : 'Atualizar status dos usuários';
+      acao === 'excluir' ? 'Excluir usuários selecionados' : 'Atualizar status dos usuários';
 
     openConfirmDialog({
       title: tituloAcao,
@@ -511,54 +514,55 @@ const GestaoUsuariosPage: React.FC = () => {
           if (acao === 'ativar' || acao === 'desativar') {
             const novoStatus = acao === 'ativar';
             await Promise.all(
-              usuariosSelecionados.map((id) => usuariosService.alterarStatusUsuario(id, novoStatus))
+              usuariosSelecionados.map((id) =>
+                usuariosService.alterarStatusUsuario(id, novoStatus),
+              ),
             );
-            setUsuarios(prev =>
-              prev.map(u =>
-                usuariosSelecionados.includes(u.id) ? { ...u, ativo: novoStatus } : u
-              )
+            setUsuarios((prev) =>
+              prev.map((u) =>
+                usuariosSelecionados.includes(u.id) ? { ...u, ativo: novoStatus } : u,
+              ),
             );
             showFeedback(
               'success',
-              `Usuários ${novoStatus ? 'ativados' : 'desativados'} com sucesso.`
+              `Usuários ${novoStatus ? 'ativados' : 'desativados'} com sucesso.`,
             );
           } else {
             await Promise.all(usuariosSelecionados.map((id) => usuariosService.excluirUsuario(id)));
-            setUsuarios(prev => prev.filter(u => !usuariosSelecionados.includes(u.id)));
+            setUsuarios((prev) => prev.filter((u) => !usuariosSelecionados.includes(u.id)));
             showFeedback('success', 'Usuários excluídos com sucesso.');
           }
 
           setUsuariosSelecionados([]);
         } catch (err: unknown) {
           console.error(`Erro ao ${acao} usuários:`, err);
-          const responseMessage = (err as any)?.response?.data?.message;
-          const normalizedMessage = Array.isArray(responseMessage)
-            ? responseMessage.join('. ')
-            : responseMessage;
-          const fallbackMessage = err instanceof Error ? err.message : undefined;
-          const message = normalizedMessage || fallbackMessage || `Erro ao ${acao} usuários`;
+          const message = getErrorMessage(err, `Erro ao ${acao} usuários`);
           throw new Error(message);
         }
       },
     });
   };
 
-  const handleTogglePermissao = (permissao: string) => {
-    setFormData(prev => ({
+  const handleTogglePermissao = (permissao: string): void => {
+    setFormData((prev) => ({
       ...prev,
       permissoes: prev.permissoes?.includes(permissao)
-        ? prev.permissoes.filter(p => p !== permissao)
+        ? prev.permissoes.filter((p) => p !== permissao)
         : [...(prev.permissoes || []), permissao],
     }));
   };
 
-  const formatarDataHora = (data?: Date | string) => {
+  const formatarDataHora = (data?: Date | string): string => {
     if (!data) return '-';
     const d = new Date(data);
-    return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return (
+      d.toLocaleDateString('pt-BR') +
+      ' ' +
+      d.toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    );
   };
 
   return (
@@ -578,9 +582,7 @@ const GestaoUsuariosPage: React.FC = () => {
             })()}
             <div className="flex-1">
               {feedback.title && (
-                <p className="text-sm font-semibold leading-5 text-inherit">
-                  {feedback.title}
-                </p>
+                <p className="text-sm font-semibold leading-5 text-inherit">{feedback.title}</p>
               )}
               <p className="text-sm leading-5 text-inherit">{feedback.message}</p>
             </div>
@@ -604,7 +606,6 @@ const GestaoUsuariosPage: React.FC = () => {
       {/* Container principal */}
       <div className="p-6">
         <div className="max-w-7xl mx-auto">
-
           {/* Header da página */}
           <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -645,9 +646,7 @@ const GestaoUsuariosPage: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total de Usuários</p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">
-                    {totalUsuarios}
-                  </p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">{totalUsuarios}</p>
                 </div>
                 <div className="p-4 bg-[#159A9C]/10 rounded-xl">
                   <Users className="h-8 w-8 text-[#159A9C]" />
@@ -660,9 +659,7 @@ const GestaoUsuariosPage: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Usuários Ativos</p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">
-                    {usuariosAtivos}
-                  </p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">{usuariosAtivos}</p>
                 </div>
                 <div className="p-4 bg-green-500/10 rounded-xl">
                   <CheckCircle className="h-8 w-8 text-green-600" />
@@ -675,9 +672,7 @@ const GestaoUsuariosPage: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Administradores</p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">
-                    {administradores}
-                  </p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">{administradores}</p>
                 </div>
                 <div className="p-4 bg-red-500/10 rounded-xl">
                   <Shield className="h-8 w-8 text-red-600" />
@@ -690,9 +685,7 @@ const GestaoUsuariosPage: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Online Hoje</p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">
-                    {onlineHoje}
-                  </p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">{onlineHoje}</p>
                 </div>
                 <div className="p-4 bg-[#159A9C]/10 rounded-xl">
                   <UserCheck className="h-8 w-8 text-[#159A9C]" />
@@ -708,8 +701,8 @@ const GestaoUsuariosPage: React.FC = () => {
                 <button
                   onClick={() => setAbaAtiva('todos')}
                   className={`px-6 py-3 font-medium transition-colors border-b-2 ${abaAtiva === 'todos'
-                    ? 'border-[#159A9C] text-[#159A9C]'
-                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                      ? 'border-[#159A9C] text-[#159A9C]'
+                      : 'border-transparent text-gray-600 hover:text-gray-900'
                     }`}
                 >
                   Todos os Usuários
@@ -717,8 +710,8 @@ const GestaoUsuariosPage: React.FC = () => {
                 <button
                   onClick={() => setAbaAtiva('atendentes')}
                   className={`px-6 py-3 font-medium transition-colors border-b-2 ${abaAtiva === 'atendentes'
-                    ? 'border-[#159A9C] text-[#159A9C]'
-                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                      ? 'border-[#159A9C] text-[#159A9C]'
+                      : 'border-transparent text-gray-600 hover:text-gray-900'
                     }`}
                 >
                   Atendentes
@@ -749,6 +742,7 @@ const GestaoUsuariosPage: React.FC = () => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent appearance-none bg-white pr-10"
                   >
                     <option value="">Todos os papéis</option>
+                    <option value={UserRole.SUPERADMIN}>Super Admin</option>
                     <option value={UserRole.ADMIN}>Administrador</option>
                     <option value={UserRole.MANAGER}>Gerente</option>
                     <option value={UserRole.VENDEDOR}>Vendedor</option>
@@ -915,10 +909,7 @@ const GestaoUsuariosPage: React.FC = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {usuariosFiltrados.map((usuario) => (
-                      <tr
-                        key={usuario.id}
-                        className="hover:bg-gray-50 transition-colors"
-                      >
+                      <tr key={usuario.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4">
                           <input
                             type="checkbox"
@@ -948,29 +939,33 @@ const GestaoUsuariosPage: React.FC = () => {
                               <div className="text-sm font-medium text-gray-900">
                                 {usuario.nome}
                               </div>
-                              <div className="text-sm text-gray-500">
-                                {usuario.email}
-                              </div>
+                              <div className="text-sm text-gray-500">{usuario.email}</div>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[usuario.role]}`}>
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[usuario.role]}`}
+                          >
                             {ROLE_LABELS[usuario.role]}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${usuario.ativo
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                            }`}>
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${usuario.ativo
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                              }`}
+                          >
                             {usuario.ativo ? 'Ativo' : 'Inativo'}
                           </span>
                         </td>
                         {abaAtiva === 'atendentes' && (
                           <td className="px-6 py-4 whitespace-nowrap">
                             {usuario.status_atendente ? (
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_ATENDENTE_COLORS[usuario.status_atendente]}`}>
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_ATENDENTE_COLORS[usuario.status_atendente]}`}
+                              >
                                 {STATUS_ATENDENTE_LABELS[usuario.status_atendente]}
                               </span>
                             ) : (
@@ -993,8 +988,8 @@ const GestaoUsuariosPage: React.FC = () => {
                             <button
                               onClick={() => handleToggleStatus(usuario)}
                               className={`${usuario.ativo
-                                ? 'text-yellow-600 hover:text-yellow-900 hover:bg-yellow-50'
-                                : 'text-green-600 hover:text-green-900 hover:bg-green-50'
+                                  ? 'text-yellow-600 hover:text-yellow-900 hover:bg-yellow-50'
+                                  : 'text-green-600 hover:text-green-900 hover:bg-green-50'
                                 } p-1 rounded transition-colors`}
                               title={usuario.ativo ? 'Desativar' : 'Ativar'}
                             >
@@ -1057,9 +1052,7 @@ const GestaoUsuariosPage: React.FC = () => {
                 <input
                   type="text"
                   value={formData.nome || ''}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, nome: e.target.value }))
-                  }
+                  onChange={(e) => setFormData((prev) => ({ ...prev, nome: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                   placeholder="Nome completo do usuário"
                   required
@@ -1076,9 +1069,7 @@ const GestaoUsuariosPage: React.FC = () => {
                   <input
                     type="email"
                     value={formData.email || ''}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, email: e.target.value }))
-                    }
+                    onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                     placeholder="email@exemplo.com"
                     required
@@ -1088,17 +1079,13 @@ const GestaoUsuariosPage: React.FC = () => {
 
               {/* Telefone */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Telefone
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Telefone</label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <input
                     type="tel"
                     value={formData.telefone || ''}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, telefone: e.target.value }))
-                    }
+                    onChange={(e) => setFormData((prev) => ({ ...prev, telefone: e.target.value }))}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                     placeholder="(11) 99999-9999"
                   />
@@ -1114,9 +1101,7 @@ const GestaoUsuariosPage: React.FC = () => {
                   <input
                     type="password"
                     value={formData.senha || ''}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, senha: e.target.value }))
-                    }
+                    onChange={(e) => setFormData((prev) => ({ ...prev, senha: e.target.value }))}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                     placeholder="Mínimo 6 caracteres"
                     required
@@ -1137,6 +1122,9 @@ const GestaoUsuariosPage: React.FC = () => {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                   required
                 >
+                  {editingUsuario?.role === UserRole.SUPERADMIN && (
+                    <option value={UserRole.SUPERADMIN}>Super Admin</option>
+                  )}
                   <option value={UserRole.USER}>Usuário</option>
                   <option value={UserRole.VENDEDOR}>Vendedor</option>
                   <option value={UserRole.MANAGER}>Gerente</option>
@@ -1146,9 +1134,7 @@ const GestaoUsuariosPage: React.FC = () => {
 
               {/* Permissões */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Permissões
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Permissões</label>
                 <div className="space-y-2 border border-gray-300 rounded-lg p-4">
                   {['COMERCIAL', 'ATENDIMENTO', 'FINANCEIRO', 'GESTAO'].map((perm) => (
                     <label key={perm} className="flex items-center cursor-pointer">
@@ -1166,9 +1152,7 @@ const GestaoUsuariosPage: React.FC = () => {
 
               {/* Avatar URL */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Avatar (URL)
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Avatar (URL)</label>
                 <div className="relative">
                   <Upload className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <input
@@ -1189,9 +1173,7 @@ const GestaoUsuariosPage: React.FC = () => {
                   type="checkbox"
                   id="ativo"
                   checked={formData.ativo || false}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, ativo: e.target.checked }))
-                  }
+                  onChange={(e) => setFormData((prev) => ({ ...prev, ativo: e.target.checked }))}
                   className="h-4 w-4 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
                 />
                 <label htmlFor="ativo" className="ml-2 text-sm text-gray-700 cursor-pointer">
@@ -1254,13 +1236,16 @@ const GestaoUsuariosPage: React.FC = () => {
                 <>
                   <div>
                     <p className="text-gray-700">
-                      Uma senha temporária foi gerada para o usuário <span className="font-medium">{usuarioResetSenha.nome}</span>.
+                      Uma senha temporária foi gerada para o usuário{' '}
+                      <span className="font-medium">{usuarioResetSenha.nome}</span>.
                     </p>
                     <p className="text-sm text-gray-600 mt-2">
-                      Compartilhe esta senha de forma segura e oriente o usuário a alterá-la após o próximo acesso.
+                      Compartilhe esta senha de forma segura e oriente o usuário a alterá-la após o
+                      próximo acesso.
                     </p>
                     <p className="text-sm text-gray-600 mt-2">
-                      No próximo login, o sistema solicitará obrigatoriamente o cadastro de uma nova senha pessoal.
+                      No próximo login, o sistema solicitará obrigatoriamente o cadastro de uma nova
+                      senha pessoal.
                     </p>
                   </div>
                   <div className="rounded-lg border border-[#B4BEC9] bg-[#DEEFE7] px-4 py-3">
@@ -1276,7 +1261,8 @@ const GestaoUsuariosPage: React.FC = () => {
               ) : (
                 <>
                   <p className="text-gray-700">
-                    Geraremos uma senha temporária forte e segura para que o usuário acesse novamente a plataforma.
+                    Geraremos uma senha temporária forte e segura para que o usuário acesse
+                    novamente a plataforma.
                   </p>
                   <div className="rounded-lg border border-[#B4BEC9] bg-white px-4 py-3">
                     <p className="text-sm text-gray-600">Usuário selecionado</p>
@@ -1284,7 +1270,8 @@ const GestaoUsuariosPage: React.FC = () => {
                     <p className="text-sm text-gray-600">{usuarioResetSenha.email}</p>
                   </div>
                   <p className="text-sm text-gray-600">
-                    Após a geração, exibiremos a senha temporária para compartilhamento. Ao acessar com ela, o sistema exigirá o cadastro de uma nova senha definitiva.
+                    Após a geração, exibiremos a senha temporária para compartilhamento. Ao acessar
+                    com ela, o sistema exigirá o cadastro de uma nova senha definitiva.
                   </p>
                 </>
               )}
@@ -1334,9 +1321,7 @@ const GestaoUsuariosPage: React.FC = () => {
                   {confirmDialog.title || 'Confirmação necessária'}
                 </h3>
                 {confirmDialog.description && (
-                  <p className="mt-2 text-sm text-gray-600">
-                    {confirmDialog.description}
-                  </p>
+                  <p className="mt-2 text-sm text-gray-600">{confirmDialog.description}</p>
                 )}
               </div>
               <button

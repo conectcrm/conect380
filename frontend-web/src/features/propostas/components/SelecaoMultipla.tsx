@@ -9,7 +9,7 @@ import {
   Trash2,
   UserCheck,
   AlertTriangle,
-  X
+  X,
 } from 'lucide-react';
 
 interface SelecaoMultiplaProps {
@@ -29,7 +29,7 @@ export const SelecaoMultipla: React.FC<SelecaoMultiplaProps> = ({
   onDeselectAll,
   onExportarSelecionadas,
   onAcoesMassa,
-  visible
+  visible,
 }) => {
   const [showAcoes, setShowAcoes] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -43,43 +43,43 @@ export const SelecaoMultipla: React.FC<SelecaoMultiplaProps> = ({
       label: 'Enviar por Email',
       icon: Send,
       color: 'blue',
-      description: 'Enviar propostas selecionadas por email'
+      description: 'Enviar propostas selecionadas por email',
     },
     {
       id: 'gerar-contratos',
       label: 'Gerar Contratos',
       icon: FileSignature,
       color: 'green',
-      description: 'Gerar contratos para propostas aprovadas'
+      description: 'Gerar contratos para propostas aprovadas',
     },
     {
       id: 'criar-faturas',
       label: 'Criar Faturas',
       icon: Receipt,
       color: 'purple',
-      description: 'Criar faturas em lote'
+      description: 'Criar faturas em lote',
     },
     {
       id: 'avancar-fluxo',
       label: 'Avançar Fluxo',
       icon: UserCheck,
       color: 'indigo',
-      description: 'Avançar para próxima etapa do fluxo'
+      description: 'Avançar para próxima etapa do fluxo',
     },
     {
       id: 'exportar-pdf',
       label: 'Exportar PDF',
       icon: Download,
       color: 'gray',
-      description: 'Baixar propostas em PDF'
+      description: 'Baixar propostas em PDF',
     },
     {
       id: 'excluir',
       label: 'Excluir',
       icon: Trash2,
       color: 'red',
-      description: 'Excluir propostas selecionadas'
-    }
+      description: 'Excluir propostas selecionadas',
+    },
   ];
 
   const handleAcao = async (acaoId: string) => {
@@ -88,14 +88,18 @@ export const SelecaoMultipla: React.FC<SelecaoMultiplaProps> = ({
       return;
     }
 
-    const acao = acoesMassa.find(a => a.id === acaoId);
+    const acao = acoesMassa.find((a) => a.id === acaoId);
 
     if (acaoId === 'excluir') {
-      if (!window.confirm(`Tem certeza que deseja excluir ${quantidade} proposta(s) selecionada(s)?`)) {
+      if (
+        !window.confirm(`Tem certeza que deseja excluir ${quantidade} proposta(s) selecionada(s)?`)
+      ) {
         return;
       }
     } else if (acao) {
-      if (!window.confirm(`Executar "${acao.label}" em ${quantidade} proposta(s) selecionada(s)?`)) {
+      if (
+        !window.confirm(`Executar "${acao.label}" em ${quantidade} proposta(s) selecionada(s)?`)
+      ) {
         return;
       }
     }
@@ -175,7 +179,9 @@ export const SelecaoMultipla: React.FC<SelecaoMultiplaProps> = ({
               ) : (
                 <>
                   <span>Ações</span>
-                  <ChevronDown className={`w-4 h-4 transition-transform ${showAcoes ? 'rotate-180' : ''}`} />
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform ${showAcoes ? 'rotate-180' : ''}`}
+                  />
                 </>
               )}
             </button>
@@ -196,7 +202,7 @@ export const SelecaoMultipla: React.FC<SelecaoMultiplaProps> = ({
                     purple: 'text-purple-600 hover:bg-purple-50',
                     indigo: 'text-indigo-600 hover:bg-indigo-50',
                     gray: 'text-gray-600 hover:bg-gray-50',
-                    red: 'text-red-600 hover:bg-red-50'
+                    red: 'text-red-600 hover:bg-red-50',
                   };
 
                   return (

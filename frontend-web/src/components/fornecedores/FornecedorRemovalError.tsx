@@ -30,7 +30,7 @@ export const FornecedorRemovalError: React.FC<FornecedorRemovalErrorProps> = ({
   fornecedorNome,
   onDesativar,
   onCancelar,
-  onVerContas
+  onVerContas,
 }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -41,12 +41,8 @@ export const FornecedorRemovalError: React.FC<FornecedorRemovalErrorProps> = ({
             <AlertTriangle className="w-6 h-6 text-red-600" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-gray-900">
-              Exclusão não permitida
-            </h3>
-            <p className="text-sm text-gray-600">
-              {fornecedorNome}
-            </p>
+            <h3 className="text-lg font-bold text-gray-900">Exclusão não permitida</h3>
+            <p className="text-sm text-gray-600">{fornecedorNome}</p>
           </div>
         </div>
 
@@ -104,10 +100,15 @@ export const FornecedorRemovalError: React.FC<FornecedorRemovalErrorProps> = ({
             </h5>
             <div className="space-y-1">
               {details.contasDetalhes.slice(0, 3).map((conta, index) => (
-                <div key={index} className="text-xs bg-yellow-50 p-2 rounded border-l-2 border-yellow-400">
+                <div
+                  key={index}
+                  className="text-xs bg-yellow-50 p-2 rounded border-l-2 border-yellow-400"
+                >
                   <div className="font-medium">{conta.descricao}</div>
                   <div className="flex justify-between text-gray-600">
-                    <span>R$ {conta.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span>
+                      R$ {conta.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
                     <span>{new Date(conta.vencimento).toLocaleDateString('pt-BR')}</span>
                   </div>
                 </div>
@@ -119,9 +120,11 @@ export const FornecedorRemovalError: React.FC<FornecedorRemovalErrorProps> = ({
         {/* Explicação */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
           <p className="text-sm text-blue-800">
-            <strong>Por que não posso excluir?</strong><br />
-            Para manter a integridade financeira, fornecedores com contas vinculadas não podem ser excluídos.
-            Isso preserva o histórico de pagamentos e evita inconsistências nos relatórios.
+            <strong>Por que não posso excluir?</strong>
+            <br />
+            Para manter a integridade financeira, fornecedores com contas vinculadas não podem ser
+            excluídos. Isso preserva o histórico de pagamentos e evita inconsistências nos
+            relatórios.
           </p>
         </div>
 

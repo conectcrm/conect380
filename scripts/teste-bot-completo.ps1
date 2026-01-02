@@ -18,7 +18,7 @@ $loginUrl = "$baseUrl/auth/login"
 
 # Credenciais de teste
 $loginBody = @{
-  email = "admin@conectcrm.com"
+  email = "admin@conectsuite.com.br"
   senha = "admin123"
 } | ConvertTo-Json
 

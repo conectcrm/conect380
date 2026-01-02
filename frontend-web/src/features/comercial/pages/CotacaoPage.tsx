@@ -2,7 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cotacaoService } from '../../../services/cotacaoService';
 import { fornecedorService } from '../../../services/fornecedorService';
-import { Cotacao, FiltroCotacao, StatusCotacao, PrioridadeCotacao } from '../../../types/cotacaoTypes';
+import {
+  Cotacao,
+  FiltroCotacao,
+  StatusCotacao,
+  PrioridadeCotacao,
+} from '../../../types/cotacaoTypes';
 import ModalCadastroCotacao from '../../../components/modals/ModalCadastroCotacao';
 import ModalDetalhesCotacao from '../../../components/modals/ModalDetalhesCotacao';
 import {
@@ -29,7 +34,7 @@ import {
   User,
   Mail,
   Copy,
-  Send
+  Send,
 } from 'lucide-react';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 
@@ -48,11 +53,11 @@ const useConfirmacaoInteligente = () => ({
     if (confirmed) {
       callback();
     }
-  }
+  },
 });
 
 const useValidacaoFinanceira = () => ({
-  validar: () => true
+  validar: () => true,
 });
 
 function CotacaoPage() {
@@ -71,7 +76,7 @@ function CotacaoPage() {
     cotacoesPendentes: 0,
     cotacoesAprovadas: 0,
     cotacoesReprovadas: 0,
-    cotacoesVencidas: 0
+    cotacoesVencidas: 0,
   });
 
   const confirmacao = useConfirmacaoInteligente();
@@ -90,7 +95,10 @@ function CotacaoPage() {
     try {
       const filtros: FiltroCotacao = {
         busca: busca || undefined,
-        status: (filtroStatus !== 'todos' && filtroStatus !== 'vencida') ? [filtroStatus as any] : undefined
+        status:
+          filtroStatus !== 'todos' && filtroStatus !== 'vencida'
+            ? [filtroStatus as any]
+            : undefined,
       };
       const dados = await cotacaoService.listar(filtros);
       let listaNormalizada = Array.isArray(dados.items) ? dados.items : [];
@@ -98,9 +106,12 @@ function CotacaoPage() {
       // Filtro especial para vencidas (client-side)
       if (filtroStatus === 'vencida') {
         const hoje = new Date();
-        listaNormalizada = listaNormalizada.filter(c => {
+        listaNormalizada = listaNormalizada.filter((c) => {
           const vencimento = new Date(c.dataVencimento);
-          return vencimento < hoje && !['aprovada', 'convertida', 'cancelada', 'rejeitada'].includes(c.status);
+          return (
+            vencimento < hoje &&
+            !['aprovada', 'convertida', 'cancelada', 'rejeitada'].includes(c.status)
+          );
         });
       }
 
@@ -116,21 +127,20 @@ function CotacaoPage() {
   const calcularDashboard = (cotacoes: Cotacao[]) => {
     const hoje = new Date();
 
-    const pendentes = cotacoes.filter(c =>
-      ['rascunho', 'enviada', 'em_analise'].includes(c.status)
+    const pendentes = cotacoes.filter((c) =>
+      ['rascunho', 'enviada', 'em_analise'].includes(c.status),
     ).length;
 
-    const aprovadas = cotacoes.filter(c =>
-      ['aprovada', 'convertida'].includes(c.status)
-    ).length;
+    const aprovadas = cotacoes.filter((c) => ['aprovada', 'convertida'].includes(c.status)).length;
 
-    const reprovadas = cotacoes.filter(c =>
-      c.status === 'rejeitada'
-    ).length;
+    const reprovadas = cotacoes.filter((c) => c.status === 'rejeitada').length;
 
-    const vencidas = cotacoes.filter(c => {
+    const vencidas = cotacoes.filter((c) => {
       const vencimento = new Date(c.dataVencimento);
-      return vencimento < hoje && !['aprovada', 'convertida', 'cancelada', 'rejeitada'].includes(c.status);
+      return (
+        vencimento < hoje &&
+        !['aprovada', 'convertida', 'cancelada', 'rejeitada'].includes(c.status)
+      );
     }).length;
 
     setDashboardCards({
@@ -138,7 +148,7 @@ function CotacaoPage() {
       cotacoesPendentes: pendentes,
       cotacoesAprovadas: aprovadas,
       cotacoesReprovadas: reprovadas,
-      cotacoesVencidas: vencidas
+      cotacoesVencidas: vencidas,
     });
   };
 
@@ -172,12 +182,10 @@ function CotacaoPage() {
   };
 
   const handleAlterarStatus = (cotacaoId: string, novoStatus: StatusCotacao) => {
-    setCotacoes(prevCotacoes =>
-      prevCotacoes.map(cotacao =>
-        cotacao.id === cotacaoId
-          ? { ...cotacao, status: novoStatus }
-          : cotacao
-      )
+    setCotacoes((prevCotacoes) =>
+      prevCotacoes.map((cotacao) =>
+        cotacao.id === cotacaoId ? { ...cotacao, status: novoStatus } : cotacao,
+      ),
     );
   };
 
@@ -194,29 +202,34 @@ function CotacaoPage() {
   };
 
   const enviarParaAprovacao = async (cotacao: Cotacao) => {
-    if (window.confirm(`Deseja enviar a cotação #${cotacao.numero} para aprovação?\n\nApós enviar, o aprovador será notificado.`)) {
+    if (
+      window.confirm(
+        `Deseja enviar a cotação #${cotacao.numero} para aprovação?\n\nApós enviar, o aprovador será notificado.`,
+      )
+    ) {
       try {
         await cotacaoService.enviarParaAprovacao(cotacao.id);
-        alert(`✅ Cotação #${cotacao.numero} enviada para aprovação com sucesso!\n\nO aprovador foi notificado.`);
+        alert(
+          `✅ Cotação #${cotacao.numero} enviada para aprovação com sucesso!\n\nO aprovador foi notificado.`,
+        );
         carregarCotacoes(); // Recarregar lista
       } catch (error: any) {
         console.error('Erro ao enviar cotação para aprovação:', error);
-        const errorMessage = error.response?.data?.message || error.message || 'Erro ao enviar cotação para aprovação';
+        const errorMessage =
+          error.response?.data?.message || error.message || 'Erro ao enviar cotação para aprovação';
         alert(`Erro ao enviar para aprovação:\n\n${errorMessage}`);
       }
     }
   };
 
   const toggleSelecionarCotacao = (id: string) => {
-    setCotacoesSelecionadas(prev =>
-      prev.includes(id)
-        ? prev.filter(item => item !== id)
-        : [...prev, id]
+    setCotacoesSelecionadas((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
   };
 
   const selecionarTodos = () => {
-    setCotacoesSelecionadas(cotacoes.map(c => c.id));
+    setCotacoesSelecionadas(cotacoes.map((c) => c.id));
   };
 
   const deselecionarTodos = () => {
@@ -239,7 +252,11 @@ function CotacaoPage() {
   const mostrarAcoesMassa = cotacoesSelecionadas.length > 0;
 
   const alterarStatusSelecionadas = async (novoStatus: StatusCotacao) => {
-    if (!window.confirm(`Tem certeza que deseja alterar o status de ${cotacoesSelecionadas.length} cotação(ões)?`)) {
+    if (
+      !window.confirm(
+        `Tem certeza que deseja alterar o status de ${cotacoesSelecionadas.length} cotação(ões)?`,
+      )
+    ) {
       return;
     }
 
@@ -255,13 +272,17 @@ function CotacaoPage() {
   };
 
   const excluirSelecionadas = async () => {
-    confirmacao.confirmar('excluir-categoria-financeira', async () => {
-      for (const id of cotacoesSelecionadas) {
-        await cotacaoService.deletar(id);
-      }
-      deselecionarTodos();
-      carregarCotacoes();
-    }, { quantidadeItens: cotacoesSelecionadas.length });
+    confirmacao.confirmar(
+      'excluir-categoria-financeira',
+      async () => {
+        for (const id of cotacoesSelecionadas) {
+          await cotacaoService.deletar(id);
+        }
+        deselecionarTodos();
+        carregarCotacoes();
+      },
+      { quantidadeItens: cotacoesSelecionadas.length },
+    );
   };
 
   // Funções de exportação
@@ -272,9 +293,14 @@ function CotacaoPage() {
       { key: 'fornecedor.nome', title: 'Fornecedor' },
       { key: 'status', title: 'Status', formatter: formatStatusForExport },
       { key: 'prioridade', title: 'Prioridade' },
-      { key: 'valorTotal', title: 'Valor Total', formatter: (valor: number) => `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` },
+      {
+        key: 'valorTotal',
+        title: 'Valor Total',
+        formatter: (valor: number) =>
+          `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+      },
       { key: 'prazoResposta', title: 'Prazo Resposta', formatter: formatDateForExport },
-      { key: 'dataCriacao', title: 'Data Criação', formatter: formatDateForExport }
+      { key: 'dataCriacao', title: 'Data Criação', formatter: formatDateForExport },
     ];
     exportToCSV(cotacoes, colunas, 'cotacoes');
   };
@@ -288,19 +314,26 @@ function CotacaoPage() {
       { key: 'prioridade', title: 'Prioridade' },
       { key: 'valorTotal', title: 'Valor Total', formatter: (valor: number) => valor },
       { key: 'prazoResposta', title: 'Prazo Resposta', formatter: formatDateForExport },
-      { key: 'dataCriacao', title: 'Data Criação', formatter: formatDateForExport }
+      { key: 'dataCriacao', title: 'Data Criação', formatter: formatDateForExport },
     ];
     exportToExcel(cotacoes, colunas, 'cotacoes');
   };
 
   const exportarSelecionadas = () => {
-    const cotacoesSelecionadasData = cotacoes.filter(cotacao => cotacoesSelecionadas.includes(cotacao.id));
+    const cotacoesSelecionadasData = cotacoes.filter((cotacao) =>
+      cotacoesSelecionadas.includes(cotacao.id),
+    );
     const colunas = [
       { key: 'numero', title: 'Número' },
       { key: 'titulo', title: 'Título' },
       { key: 'fornecedor.nome', title: 'Fornecedor' },
       { key: 'status', title: 'Status', formatter: formatStatusForExport },
-      { key: 'valorTotal', title: 'Valor Total', formatter: (valor: number) => `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` }
+      {
+        key: 'valorTotal',
+        title: 'Valor Total',
+        formatter: (valor: number) =>
+          `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+      },
     ];
     exportToCSV(cotacoesSelecionadasData, colunas, 'cotacoes-selecionadas');
   };
@@ -315,7 +348,7 @@ function CotacaoPage() {
       rejeitada: 'Rejeitada',
       vencida: 'Vencida',
       convertida: 'Convertida',
-      cancelada: 'Cancelada'
+      cancelada: 'Cancelada',
     };
     return statusMap[status] || status;
   };
@@ -343,12 +376,14 @@ function CotacaoPage() {
       rejeitada: { bg: 'bg-red-100', text: 'text-red-800', label: 'Rejeitada' },
       vencida: { bg: 'bg-red-100', text: 'text-red-800', label: 'Vencida' },
       convertida: { bg: 'bg-green-100', text: 'text-green-800', label: 'Convertida' },
-      cancelada: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Cancelada' }
+      cancelada: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Cancelada' },
     };
 
     const config = configs[status];
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
+      <span
+        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}
+      >
         {config.label}
       </span>
     );
@@ -359,12 +394,14 @@ function CotacaoPage() {
       baixa: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Baixa' },
       media: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Média' },
       alta: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Alta' },
-      urgente: { bg: 'bg-red-100', text: 'text-red-800', label: 'Urgente' }
+      urgente: { bg: 'bg-red-100', text: 'text-red-800', label: 'Urgente' },
     };
 
     const config = configs[prioridade];
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
+      <span
+        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}
+      >
         {config.label}
       </span>
     );
@@ -382,10 +419,7 @@ function CotacaoPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusName="Comercial"
-          nucleusPath="/nuclei/comercial"
-        />
+        <BackToNucleus nucleusName="Comercial" nucleusPath="/nuclei/comercial" />
       </div>
 
       <div className="p-6">
@@ -403,7 +437,9 @@ function CotacaoPage() {
                     )}
                   </h1>
                   <p className="mt-2 text-[#B4BEC9]">
-                    {carregando ? 'Carregando cotações...' : `Gerencie suas ${dashboardCards.totalCotacoes} cotações e orçamentos`}
+                    {carregando
+                      ? 'Carregando cotações...'
+                      : `Gerencie suas ${dashboardCards.totalCotacoes} cotações e orçamentos`}
                   </p>
                 </div>
                 <div className="mt-4 sm:mt-0 flex items-center gap-3">
@@ -423,13 +459,20 @@ function CotacaoPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
             <div
               onClick={() => setFiltroStatus('todos')}
-              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${filtroStatus === 'todos' ? 'border-[#159A9C] ring-2 ring-[#159A9C]/20' : 'border-[#DEEFE7]'
-                }`}
+              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${
+                filtroStatus === 'todos'
+                  ? 'border-[#159A9C] ring-2 ring-[#159A9C]/20'
+                  : 'border-[#DEEFE7]'
+              }`}
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Total de Cotações</p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.totalCotacoes}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                    Total de Cotações
+                  </p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">
+                    {dashboardCards.totalCotacoes}
+                  </p>
                   <p className="text-sm text-[#002333]/70 mt-3">📊 Visão geral</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
@@ -440,13 +483,20 @@ function CotacaoPage() {
 
             <div
               onClick={() => setFiltroStatus('em_analise')}
-              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${filtroStatus === 'em_analise' ? 'border-yellow-500 ring-2 ring-yellow-500/20' : 'border-[#DEEFE7]'
-                }`}
+              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${
+                filtroStatus === 'em_analise'
+                  ? 'border-yellow-500 ring-2 ring-yellow-500/20'
+                  : 'border-[#DEEFE7]'
+              }`}
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Pendentes</p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.cotacoesPendentes}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                    Pendentes
+                  </p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">
+                    {dashboardCards.cotacoesPendentes}
+                  </p>
                   <p className="text-sm text-[#002333]/70 mt-3">⏳ Em andamento</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
@@ -457,13 +507,20 @@ function CotacaoPage() {
 
             <div
               onClick={() => setFiltroStatus('aprovada')}
-              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${filtroStatus === 'aprovada' ? 'border-green-500 ring-2 ring-green-500/20' : 'border-[#DEEFE7]'
-                }`}
+              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${
+                filtroStatus === 'aprovada'
+                  ? 'border-green-500 ring-2 ring-green-500/20'
+                  : 'border-[#DEEFE7]'
+              }`}
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Aprovadas</p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.cotacoesAprovadas}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                    Aprovadas
+                  </p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">
+                    {dashboardCards.cotacoesAprovadas}
+                  </p>
                   <p className="text-sm text-[#002333]/70 mt-3">✅ Aprovadas</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
@@ -474,13 +531,20 @@ function CotacaoPage() {
 
             <div
               onClick={() => setFiltroStatus('rejeitada')}
-              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${filtroStatus === 'rejeitada' ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DEEFE7]'
-                }`}
+              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${
+                filtroStatus === 'rejeitada'
+                  ? 'border-red-500 ring-2 ring-red-500/20'
+                  : 'border-[#DEEFE7]'
+              }`}
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Reprovadas</p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.cotacoesReprovadas}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                    Reprovadas
+                  </p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">
+                    {dashboardCards.cotacoesReprovadas}
+                  </p>
                   <p className="text-sm text-[#002333]/70 mt-3">❌ Rejeitadas</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center shadow-sm">
@@ -491,13 +555,20 @@ function CotacaoPage() {
 
             <div
               onClick={() => setFiltroStatus('vencida')}
-              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${filtroStatus === 'vencida' ? 'border-orange-500 ring-2 ring-orange-500/20' : 'border-[#DEEFE7]'
-                }`}
+              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${
+                filtroStatus === 'vencida'
+                  ? 'border-orange-500 ring-2 ring-orange-500/20'
+                  : 'border-[#DEEFE7]'
+              }`}
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Vencidas</p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">{dashboardCards.cotacoesVencidas}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
+                    Vencidas
+                  </p>
+                  <p className="text-3xl font-bold text-[#002333] mt-2">
+                    {dashboardCards.cotacoesVencidas}
+                  </p>
                   <p className="text-sm text-[#002333]/70 mt-3">⚠️ Atrasadas</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-orange-500/10 flex items-center justify-center shadow-sm">
@@ -511,7 +582,9 @@ function CotacaoPage() {
           <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
             <div className="flex flex-col sm:flex-row gap-4 items-end">
               <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Buscar Cotações</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Buscar Cotações
+                </label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <input
@@ -646,12 +719,13 @@ function CotacaoPage() {
             ) : cotacoes.length === 0 ? (
               <div className="p-8 text-center">
                 <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma cotação encontrada</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Nenhuma cotação encontrada
+                </h3>
                 <p className="text-gray-600 mb-4">
                   {busca || filtroStatus !== 'todos'
                     ? 'Tente ajustar os filtros ou criar uma nova cotação.'
-                    : 'Comece criando sua primeira cotação.'
-                  }
+                    : 'Comece criando sua primeira cotação.'}
                 </p>
                 <button
                   onClick={abrirModalNovo}
@@ -670,8 +744,12 @@ function CotacaoPage() {
                         <div className="flex items-center">
                           <input
                             type="checkbox"
-                            checked={cotacoesSelecionadas.length === cotacoes.length && cotacoes.length > 0}
-                            onChange={(e) => e.target.checked ? selecionarTodos() : deselecionarTodos()}
+                            checked={
+                              cotacoesSelecionadas.length === cotacoes.length && cotacoes.length > 0
+                            }
+                            onChange={(e) =>
+                              e.target.checked ? selecionarTodos() : deselecionarTodos()
+                            }
                             className="w-4 h-4 text-[#159A9C] bg-gray-100 border-gray-300 rounded focus:ring-[#159A9C] focus:ring-2"
                           />
                         </div>
@@ -733,12 +811,16 @@ function CotacaoPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div>
-                            <div className="text-sm font-medium text-gray-900">#{cotacao.numero}</div>
+                            <div className="text-sm font-medium text-gray-900">
+                              #{cotacao.numero}
+                            </div>
                             <div className="text-sm text-gray-500">{cotacao.titulo}</div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{cotacao.fornecedor?.nome || 'Fornecedor não informado'}</div>
+                          <div className="text-sm text-gray-900">
+                            {cotacao.fornecedor?.nome || 'Fornecedor não informado'}
+                          </div>
                           {cotacao.fornecedor?.email && (
                             <div className="text-sm text-gray-500">{cotacao.fornecedor.email}</div>
                           )}
@@ -751,13 +833,18 @@ function CotacaoPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">
-                            {cotacao.valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            {cotacao.valorTotal.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {cotacao.dataVencimento ? (
                             <>
-                              <div className={`text-sm ${isVencida(cotacao.dataVencimento, cotacao.status) ? 'text-red-600 font-medium' : 'text-gray-900'}`}>
+                              <div
+                                className={`text-sm ${isVencida(cotacao.dataVencimento, cotacao.status) ? 'text-red-600 font-medium' : 'text-gray-900'}`}
+                              >
                                 {new Date(cotacao.dataVencimento).toLocaleDateString('pt-BR')}
                               </div>
                               {isVencida(cotacao.dataVencimento, cotacao.status) && (
@@ -817,7 +904,6 @@ function CotacaoPage() {
           </div>
         </div>
       </div>
-
 
       {/* Modais */}
       <ModalCadastroCotacao

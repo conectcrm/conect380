@@ -43,26 +43,26 @@ export const themePalettes: Record<string, ThemePalette> = {
     name: 'Crevasse Professional',
     description: 'Paleta moderna com tons teal e azul profissional',
     colors: {
-      primary: '#159A9C',        // Crevasse-2: Teal principal
-      primaryHover: '#0F7B7D',   // Variação mais escura do teal
-      primaryLight: '#DEEFE7',   // Crevasse-4: Verde claro suave
-      primaryDark: '#0A5F61',    // Ainda mais escuro do teal
-      secondary: '#B4BEC9',      // Crevasse-1: Cinza azulado
+      primary: '#159A9C', // Crevasse-2: Teal principal
+      primaryHover: '#0F7B7D', // Variação mais escura do teal
+      primaryLight: '#DEEFE7', // Crevasse-4: Verde claro suave
+      primaryDark: '#0A5F61', // Ainda mais escuro do teal
+      secondary: '#B4BEC9', // Crevasse-1: Cinza azulado
       secondaryLight: '#E5EAF0', // Variação mais clara do cinza azulado
-      accent: '#159A9C',         // Mesmo que primary para consistência
-      accentLight: '#DEEFE7',    // Crevasse-4: Verde claro
-      success: '#10b981',        // Verde success padrão
-      warning: '#f59e0b',        // Amarelo warning padrão
-      error: '#ef4444',          // Vermelho error padrão
-      neutral: '#B4BEC9',        // Crevasse-1: Cinza azulado neutro
-      neutralLight: '#f8fafc',   // Quase branco
-      neutralDark: '#002333',    // Crevasse-3: Azul escuro profundo
-      background: '#FFFFFF',     // Crevasse-5: Branco puro
+      accent: '#159A9C', // Mesmo que primary para consistência
+      accentLight: '#DEEFE7', // Crevasse-4: Verde claro
+      success: '#10b981', // Verde success padrão
+      warning: '#f59e0b', // Amarelo warning padrão
+      error: '#ef4444', // Vermelho error padrão
+      neutral: '#B4BEC9', // Crevasse-1: Cinza azulado neutro
+      neutralLight: '#f8fafc', // Quase branco
+      neutralDark: '#002333', // Crevasse-3: Azul escuro profundo
+      background: '#FFFFFF', // Crevasse-5: Branco puro
       backgroundSecondary: '#DEEFE7', // Crevasse-4: Fundo secundário suave
-      text: '#002333',           // Crevasse-3: Texto principal escuro
-      textSecondary: '#B4BEC9',  // Crevasse-1: Texto secundário
-      border: '#B4BEC9',         // Crevasse-1: Bordas sutis
-      borderLight: '#DEEFE7',    // Crevasse-4: Bordas mais claras
+      text: '#002333', // Crevasse-3: Texto principal escuro
+      textSecondary: '#B4BEC9', // Crevasse-1: Texto secundário
+      border: '#B4BEC9', // Crevasse-1: Bordas sutis
+      borderLight: '#DEEFE7', // Crevasse-4: Bordas mais claras
     },
     gradients: {
       primary: 'linear-gradient(135deg, #159A9C 0%, #0F7B7D 100%)',
@@ -270,7 +270,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   useEffect(() => {
     const savedTheme = localStorage.getItem('crm-theme');
     const savedPalette = localStorage.getItem('crm-palette');
-    
+
     if (savedTheme) {
       try {
         const parsedTheme = JSON.parse(savedTheme);
@@ -279,7 +279,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
         console.warn('Erro ao carregar tema salvo:', error);
       }
     }
-    
+
     if (savedPalette && themePalettes[savedPalette]) {
       setCurrentPaletteId(savedPalette);
     }
@@ -290,7 +290,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     const palette = themePalettes[currentPaletteId];
     if (palette) {
       const root = document.documentElement;
-      
+
       // Aplicar cores CSS customizadas
       Object.entries(palette.colors).forEach(([key, value]) => {
         root.style.setProperty(`--color-${key}`, value);

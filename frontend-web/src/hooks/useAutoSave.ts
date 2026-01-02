@@ -19,7 +19,7 @@ export const useAutoSave = ({
   enabled = true,
   onSave,
   hasUnsavedChanges,
-  isFormValid
+  isFormValid,
 }: UseAutoSaveOptions) => {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSaveAttempt = useRef<number>(0);
@@ -36,8 +36,8 @@ export const useAutoSave = ({
         duration: 2000,
         style: {
           fontSize: '14px',
-          padding: '8px 12px'
-        }
+          padding: '8px 12px',
+        },
       });
     } catch (error) {
       console.error('Erro no auto-save:', error);
@@ -45,8 +45,8 @@ export const useAutoSave = ({
         duration: 3000,
         style: {
           fontSize: '14px',
-          padding: '8px 12px'
-        }
+          padding: '8px 12px',
+        },
       });
     }
   }, [enabled, hasUnsavedChanges, isFormValid, onSave]);
@@ -86,6 +86,6 @@ export const useAutoSave = ({
 
   return {
     lastSaveAttempt: lastSaveAttempt.current,
-    performManualSave: performAutoSave
+    performManualSave: performAutoSave,
   };
 };

@@ -10,9 +10,11 @@ export const QuestionBlock: React.FC<NodeProps<BlockData>> = ({ data, selected }
   const preview = mensagem.length > 50 ? mensagem.substring(0, 50) + '...' : mensagem;
 
   return (
-    <div className={`relative bg-white rounded-lg shadow-md border-2 ${selected ? 'border-yellow-500' : 'border-gray-300'
-      } transition-all hover:shadow-lg min-w-[200px] max-w-[300px]`}>
-
+    <div
+      className={`relative bg-white rounded-lg shadow-md border-2 ${
+        selected ? 'border-yellow-500' : 'border-gray-300'
+      } transition-all hover:shadow-lg min-w-[200px] max-w-[300px]`}
+    >
       {/* Handle de entrada (top) */}
       <Handle
         type="target"
@@ -28,13 +30,9 @@ export const QuestionBlock: React.FC<NodeProps<BlockData>> = ({ data, selected }
 
       {/* Body */}
       <div className="p-3">
-        <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
-          {preview}
-        </p>
+        <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{preview}</p>
         <div className="mt-2 pt-2 border-t text-xs text-gray-500">
-          <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-            Aguarda resposta
-          </span>
+          <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Aguarda resposta</span>
         </div>
       </div>
 

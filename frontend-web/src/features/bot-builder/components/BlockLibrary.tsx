@@ -1,14 +1,7 @@
 // Biblioteca de Blocos - Sidebar com blocos arrastavéis
 
 import React from 'react';
-import {
-  MessageSquare,
-  List,
-  HelpCircle,
-  GitBranch,
-  Zap,
-  CheckCircle
-} from 'lucide-react';
+import { MessageSquare, List, HelpCircle, GitBranch, Zap, CheckCircle } from 'lucide-react';
 
 interface BlockTemplate {
   id: string;
@@ -70,7 +63,7 @@ const blockTemplates: BlockTemplate[] = [
   },
 ];
 
-const colorClasses: Record<string, { bg: string, text: string, hover: string }> = {
+const colorClasses: Record<string, { bg: string; text: string; hover: string }> = {
   blue: { bg: 'bg-blue-100', text: 'text-blue-700', hover: 'hover:bg-blue-200' },
   purple: { bg: 'bg-purple-100', text: 'text-purple-700', hover: 'hover:bg-purple-200' },
   yellow: { bg: 'bg-yellow-100', text: 'text-yellow-700', hover: 'hover:bg-yellow-200' },
@@ -93,12 +86,8 @@ export const BlockLibrary: React.FC<BlockLibraryProps> = ({ onAddBlock }) => {
     <div className="w-64 bg-white border-r border-gray-200 overflow-y-auto">
       {/* Header */}
       <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 z-10">
-        <h3 className="text-sm font-bold text-[#002333] uppercase tracking-wide">
-          📦 Blocos
-        </h3>
-        <p className="text-xs text-gray-500 mt-1">
-          Arraste os blocos para o canvas
-        </p>
+        <h3 className="text-sm font-bold text-[#002333] uppercase tracking-wide">📦 Blocos</h3>
+        <p className="text-xs text-gray-500 mt-1">Arraste os blocos para o canvas</p>
       </div>
 
       {/* Lista de blocos */}
@@ -121,16 +110,10 @@ export const BlockLibrary: React.FC<BlockLibraryProps> = ({ onAddBlock }) => {
               `}
             >
               <div className="flex items-start gap-3">
-                <div className="flex-shrink-0">
-                  {block.icon}
-                </div>
+                <div className="flex-shrink-0">{block.icon}</div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-semibold truncate">
-                    {block.label}
-                  </h4>
-                  <p className="text-xs opacity-75 mt-1">
-                    {block.description}
-                  </p>
+                  <h4 className="text-sm font-semibold truncate">{block.label}</h4>
+                  <p className="text-xs opacity-75 mt-1">{block.description}</p>
                 </div>
               </div>
             </div>
@@ -142,7 +125,8 @@ export const BlockLibrary: React.FC<BlockLibraryProps> = ({ onAddBlock }) => {
       <div className="sticky bottom-0 bg-gradient-to-t from-gray-50 to-transparent p-4">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
           <p className="text-xs text-blue-800">
-            <span className="font-semibold">💡 Dica:</span> Arraste um bloco para o canvas ou clique para adicionar no final
+            <span className="font-semibold">💡 Dica:</span> Arraste um bloco para o canvas ou clique
+            para adicionar no final
           </p>
         </div>
       </div>

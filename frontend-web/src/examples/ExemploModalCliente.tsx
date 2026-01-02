@@ -6,10 +6,8 @@ export const ExemploModalCliente: React.FC = () => {
 
   return (
     <div>
-      <button onClick={() => setIsModalOpen(true)}>
-        Abrir Modal Cliente
-      </button>
-      
+      <button onClick={() => setIsModalOpen(true)}>Abrir Modal Cliente</button>
+
       <ModalCadastroCliente
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

@@ -29,11 +29,16 @@ const ForgotPasswordPage: React.FC = () => {
       const response = await authService.solicitarRecuperacaoSenha(email.trim().toLowerCase());
 
       setFeedback('success');
-      setMessage(response.message || 'Se o e-mail estiver cadastrado, enviaremos as instruções em instantes.');
+      setMessage(
+        response.message ||
+          'Se o e-mail estiver cadastrado, enviaremos as instruções em instantes.',
+      );
       toast.success('Verifique sua caixa de entrada ou a pasta de spam.');
     } catch (error: unknown) {
       console.error('Erro ao solicitar recuperação de senha:', error);
-      const fallbackMessage = (error as any)?.response?.data?.message || 'Não foi possível processar sua solicitação. Tente novamente em instantes.';
+      const fallbackMessage =
+        (error as any)?.response?.data?.message ||
+        'Não foi possível processar sua solicitação. Tente novamente em instantes.';
       setFeedback('error');
       setMessage(fallbackMessage);
       toast.error(fallbackMessage);
@@ -69,10 +74,11 @@ const ForgotPasswordPage: React.FC = () => {
 
           {feedback && (
             <div
-              className={`flex items-start gap-3 rounded-xl border px-4 py-3 mb-6 ${feedback === 'success'
+              className={`flex items-start gap-3 rounded-xl border px-4 py-3 mb-6 ${
+                feedback === 'success'
                   ? 'border-green-200 bg-green-50 text-green-800'
                   : 'border-red-200 bg-red-50 text-red-700'
-                }`}
+              }`}
             >
               {feedback === 'success' ? (
                 <CheckCircle2 className="h-5 w-5 mt-0.5" />

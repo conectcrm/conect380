@@ -1,5 +1,9 @@
 import React from 'react';
-import { FiltrosUsuarios as IFiltrosUsuarios, UserRole, ROLE_LABELS } from '../../../../types/usuarios/index';
+import {
+  FiltrosUsuarios as IFiltrosUsuarios,
+  UserRole,
+  ROLE_LABELS,
+} from '../../../../types/usuarios/index';
 import { X, Filter, Calendar, Clock } from 'lucide-react';
 
 interface FiltrosUsuariosProps {
@@ -9,30 +13,36 @@ interface FiltrosUsuariosProps {
   onClose: () => void;
 }
 
+type OrdenacaoCampo = NonNullable<IFiltrosUsuarios['ordenacao']>;
+type DirecaoOrdenacao = NonNullable<IFiltrosUsuarios['direcao']>;
+
 export const FiltrosUsuarios: React.FC<FiltrosUsuariosProps> = ({
   filtros,
   aplicarFiltros,
   limparFiltros,
-  onClose
+  onClose,
 }) => {
-  const handleRoleChange = (role: string) => {
-    aplicarFiltros({ role: role as UserRole | '' });
+  const ordenacaoAtual: OrdenacaoCampo = filtros.ordenacao || 'nome';
+  const direcaoAtual: DirecaoOrdenacao = filtros.direcao || 'asc';
+
+  const handleRoleChange = (role: UserRole | ''): void => {
+    aplicarFiltros({ role });
   };
 
-  const handleAtivoChange = (ativo: string) => {
-    aplicarFiltros({ 
-      ativo: ativo === '' ? '' : ativo === 'true' 
+  const handleAtivoChange = (ativo: '' | 'true' | 'false'): void => {
+    aplicarFiltros({
+      ativo: ativo === '' ? '' : ativo === 'true',
     });
   };
 
-  const handleOrdenacaoChange = (ordenacao: string, direcao: string) => {
-    aplicarFiltros({ 
-      ordenacao: ordenacao as any,
-      direcao: direcao as 'asc' | 'desc'
+  const handleOrdenacaoChange = (ordenacao: OrdenacaoCampo, direcao: DirecaoOrdenacao): void => {
+    aplicarFiltros({
+      ordenacao,
+      direcao,
     });
   };
 
-  const temFiltrosAtivos = Object.keys(filtros).some(key => {
+  const temFiltrosAtivos = Object.keys(filtros).some((key) => {
     const valor = filtros[key as keyof typeof filtros];
     return valor !== undefined && valor !== '' && valor !== null;
   });
@@ -55,12 +65,10 @@ export const FiltrosUsuarios: React.FC<FiltrosUsuariosProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Perfil */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Perfil
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Perfil</label>
           <select
             value={filtros.role || ''}
-            onChange={(e) => handleRoleChange(e.target.value)}
+            onChange={(e) => handleRoleChange(e.target.value as UserRole | '')}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C]"
           >
             <option value="">Todos os perfis</option>
@@ -74,12 +82,10 @@ export const FiltrosUsuarios: React.FC<FiltrosUsuariosProps> = ({
 
         {/* Status */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Status
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
           <select
             value={filtros.ativo === '' ? '' : filtros.ativo ? 'true' : 'false'}
-            onChange={(e) => handleAtivoChange(e.target.value)}
+            onChange={(e) => handleAtivoChange(e.target.value as '' | 'true' | 'false')}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C]"
           >
             <option value="">Todos</option>
@@ -90,12 +96,10 @@ export const FiltrosUsuarios: React.FC<FiltrosUsuariosProps> = ({
 
         {/* Ordenação */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Ordenar por
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Ordenar por</label>
           <select
-            value={filtros.ordenacao || 'nome'}
-            onChange={(e) => handleOrdenacaoChange(e.target.value, filtros.direcao || 'asc')}
+            value={ordenacaoAtual}
+            onChange={(e) => handleOrdenacaoChange(e.target.value as OrdenacaoCampo, direcaoAtual)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C]"
           >
             <option value="nome">Nome</option>
@@ -108,12 +112,12 @@ export const FiltrosUsuarios: React.FC<FiltrosUsuariosProps> = ({
 
         {/* Direção */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Direção
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Direção</label>
           <select
-            value={filtros.direcao || 'asc'}
-            onChange={(e) => handleOrdenacaoChange(filtros.ordenacao || 'nome', e.target.value)}
+            value={direcaoAtual}
+            onChange={(e) =>
+              handleOrdenacaoChange(ordenacaoAtual, e.target.value as DirecaoOrdenacao)
+            }
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C]"
           >
             <option value="asc">Crescente</option>
@@ -186,7 +190,7 @@ export const FiltrosUsuarios: React.FC<FiltrosUsuariosProps> = ({
         <div className="text-sm text-gray-500">
           {temFiltrosAtivos ? 'Filtros aplicados' : 'Nenhum filtro aplicado'}
         </div>
-        
+
         <div className="flex items-center space-x-3">
           {temFiltrosAtivos && (
             <button
@@ -196,7 +200,7 @@ export const FiltrosUsuarios: React.FC<FiltrosUsuariosProps> = ({
               Limpar filtros
             </button>
           )}
-          
+
           <button
             onClick={onClose}
             className="bg-[#159A9C] text-white px-4 py-2 rounded-lg hover:bg-[#138A8C] transition-colors"

@@ -1,7 +1,7 @@
 /**
  * Hook para formatação de moeda brasileira (BRL)
  * Formata valores para o padrão brasileiro: R$ 1.234,56
- * 
+ *
  * Funcionalidades:
  * - Formatação automática durante digitação
  * - Separador de milhares (ponto)
@@ -28,79 +28,87 @@ interface UseCurrencyFormatOptions {
   showSymbol?: boolean;
 }
 
-export const useCurrencyFormat = (options: UseCurrencyFormatOptions = {}): UseCurrencyFormatReturn => {
-  const {
-    initialValue = 0,
-    allowNegative = false,
-    maxDigits = 12,
-    showSymbol = true
-  } = options;
+export const useCurrencyFormat = (
+  options: UseCurrencyFormatOptions = {},
+): UseCurrencyFormatReturn => {
+  const { initialValue = 0, allowNegative = false, maxDigits = 12, showSymbol = true } = options;
 
   const [numericValue, setNumericValue] = useState<number>(initialValue);
 
   // Formata número para exibição brasileira
-  const formatToBRL = useCallback((value: number): string => {
-    const formatter = new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+  const formatToBRL = useCallback(
+    (value: number): string => {
+      const formatter = new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
 
-    return showSymbol ? formatter.format(value) : formatter.format(value).replace('R$', '').trim();
-  }, [showSymbol]);
+      return showSymbol
+        ? formatter.format(value)
+        : formatter.format(value).replace('R$', '').trim();
+    },
+    [showSymbol],
+  );
 
   // Remove formatação e converte para número
-  const parseFromBRL = useCallback((value: string): number => {
-    // Remove todos os caracteres que não são dígitos, vírgula ou sinal negativo
-    let cleaned = value.replace(/[^\d,-]/g, '');
-    
-    // Se não permitir negativo, remove o sinal
-    if (!allowNegative) {
-      cleaned = cleaned.replace('-', '');
-    }
+  const parseFromBRL = useCallback(
+    (value: string): number => {
+      // Remove todos os caracteres que não são dígitos, vírgula ou sinal negativo
+      let cleaned = value.replace(/[^\d,-]/g, '');
 
-    // Se está vazio, retorna 0
-    if (!cleaned || cleaned === '-') {
-      return 0;
-    }
+      // Se não permitir negativo, remove o sinal
+      if (!allowNegative) {
+        cleaned = cleaned.replace('-', '');
+      }
 
-    // Substitui vírgula por ponto para conversão
-    cleaned = cleaned.replace(',', '.');
+      // Se está vazio, retorna 0
+      if (!cleaned || cleaned === '-') {
+        return 0;
+      }
 
-    const parsed = parseFloat(cleaned);
-    return isNaN(parsed) ? 0 : parsed;
-  }, [allowNegative]);
+      // Substitui vírgula por ponto para conversão
+      cleaned = cleaned.replace(',', '.');
+
+      const parsed = parseFloat(cleaned);
+      return isNaN(parsed) ? 0 : parsed;
+    },
+    [allowNegative],
+  );
 
   // Formata valor durante a digitação
-  const formatDuringTyping = useCallback((value: string): string => {
-    // Remove tudo exceto dígitos
-    let digitsOnly = value.replace(/\D/g, '');
-    
-    // Limita o número de dígitos
-    if (digitsOnly.length > maxDigits) {
-      digitsOnly = digitsOnly.slice(0, maxDigits);
-    }
+  const formatDuringTyping = useCallback(
+    (value: string): string => {
+      // Remove tudo exceto dígitos
+      let digitsOnly = value.replace(/\D/g, '');
 
-    // Se vazio, retorna string vazia
-    if (!digitsOnly) {
-      return '';
-    }
+      // Limita o número de dígitos
+      if (digitsOnly.length > maxDigits) {
+        digitsOnly = digitsOnly.slice(0, maxDigits);
+      }
 
-    // Converte para número considerando os centavos
-    const numericValue = parseInt(digitsOnly) / 100;
+      // Se vazio, retorna string vazia
+      if (!digitsOnly) {
+        return '';
+      }
 
-    // Formata para BRL
-    return formatToBRL(numericValue);
-  }, [maxDigits, formatToBRL]);
+      // Converte para número considerando os centavos
+      const numericValue = parseInt(digitsOnly) / 100;
+
+      // Formata para BRL
+      return formatToBRL(numericValue);
+    },
+    [maxDigits, formatToBRL],
+  );
 
   // Handler para mudança no input
   const handleChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = event.target.value;
-    
+
     // Remove tudo exceto dígitos
     const digitsOnly = inputValue.replace(/\D/g, '');
-    
+
     // Se vazio, zera o valor
     if (!digitsOnly) {
       setNumericValue(0);
@@ -113,14 +121,17 @@ export const useCurrencyFormat = (options: UseCurrencyFormatOptions = {}): UseCu
   }, []);
 
   // Define valor programaticamente
-  const setValue = useCallback((value: number | string) => {
-    if (typeof value === 'string') {
-      const parsed = parseFromBRL(value);
-      setNumericValue(parsed);
-    } else {
-      setNumericValue(value);
-    }
-  }, [parseFromBRL]);
+  const setValue = useCallback(
+    (value: number | string) => {
+      if (typeof value === 'string') {
+        const parsed = parseFromBRL(value);
+        setNumericValue(parsed);
+      } else {
+        setNumericValue(value);
+      }
+    },
+    [parseFromBRL],
+  );
 
   // Reset para valor inicial
   const reset = useCallback(() => {
@@ -137,23 +148,23 @@ export const useCurrencyFormat = (options: UseCurrencyFormatOptions = {}): UseCu
     formattedValue,
     handleChange,
     setValue,
-    reset
+    reset,
   };
 };
 
 // Hook simplificado para campos de moeda
 export const useMoney = (initialValue = 0) => {
-  return useCurrencyFormat({ 
-    initialValue, 
-    showSymbol: true 
+  return useCurrencyFormat({
+    initialValue,
+    showSymbol: true,
   });
 };
 
 // Hook para valores sem símbolo de moeda
 export const useNumericCurrency = (initialValue = 0) => {
-  return useCurrencyFormat({ 
-    initialValue, 
-    showSymbol: false 
+  return useCurrencyFormat({
+    initialValue,
+    showSymbol: false,
   });
 };
 

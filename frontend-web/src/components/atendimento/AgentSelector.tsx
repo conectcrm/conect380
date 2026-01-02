@@ -79,7 +79,7 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
     if (multiSelect) {
       // Múltipla seleção
       if (selectedAgentIds.includes(agentId)) {
-        onSelectionChange(selectedAgentIds.filter(id => id !== agentId));
+        onSelectionChange(selectedAgentIds.filter((id) => id !== agentId));
       } else {
         onSelectionChange([...selectedAgentIds, agentId]);
       }
@@ -90,7 +90,7 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
   };
 
   const removeAgent = (agentId: string) => {
-    onSelectionChange(selectedAgentIds.filter(id => id !== agentId));
+    onSelectionChange(selectedAgentIds.filter((id) => id !== agentId));
   };
 
   const clearAll = () => {
@@ -106,21 +106,19 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
 
     // Filtro: apenas ativos
     if (onlyActive) {
-      filtrados = filtrados.filter(a => a.ativo);
+      filtrados = filtrados.filter((a) => a.ativo);
     }
 
     // Filtro: por status
     if (statusFilter && statusFilter.length > 0) {
-      filtrados = filtrados.filter(a => statusFilter.includes(a.status));
+      filtrados = filtrados.filter((a) => statusFilter.includes(a.status));
     }
 
     // Filtro: busca por nome/email
     if (searchTerm.trim()) {
       const termo = searchTerm.toLowerCase();
       filtrados = filtrados.filter(
-        a =>
-          a.nome.toLowerCase().includes(termo) ||
-          a.email.toLowerCase().includes(termo)
+        (a) => a.nome.toLowerCase().includes(termo) || a.email.toLowerCase().includes(termo),
       );
     }
 
@@ -128,7 +126,7 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
   }, [atendentes, onlyActive, statusFilter, searchTerm]);
 
   const atendentesSelecionados = useMemo(() => {
-    return atendentes.filter(a => selectedAgentIds.includes(a.id));
+    return atendentes.filter((a) => selectedAgentIds.includes(a.id));
   }, [atendentes, selectedAgentIds]);
 
   // ========================================================================
@@ -228,7 +226,7 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
               </button>
             )}
           </div>
-          {atendentesSelecionados.map(atendente => (
+          {atendentesSelecionados.map((atendente) => (
             <div
               key={atendente.id}
               className="inline-flex items-center gap-2 px-3 py-1 bg-white border border-purple-300 rounded-full text-sm"
@@ -257,22 +255,19 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
           <div className="flex flex-col items-center justify-center py-8 text-gray-500">
             <User className="h-12 w-12 mb-2 text-gray-400" />
             <p className="font-medium">Nenhum atendente encontrado</p>
-            {searchTerm && (
-              <p className="text-sm">Tente ajustar sua busca</p>
-            )}
+            {searchTerm && <p className="text-sm">Tente ajustar sua busca</p>}
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
-            {atendentesFiltrados.map(atendente => {
+            {atendentesFiltrados.map((atendente) => {
               const isSelected = selectedAgentIds.includes(atendente.id);
               return (
                 <button
                   key={atendente.id}
                   onClick={() => toggleAgent(atendente.id)}
-                  className={`w-full text-left p-4 transition-colors ${isSelected
-                      ? 'bg-purple-50 hover:bg-purple-100'
-                      : 'bg-white hover:bg-gray-50'
-                    }`}
+                  className={`w-full text-left p-4 transition-colors ${
+                    isSelected ? 'bg-purple-50 hover:bg-purple-100' : 'bg-white hover:bg-gray-50'
+                  }`}
                 >
                   <div className="flex items-start gap-3">
                     {/* Avatar */}
@@ -285,25 +280,21 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium text-gray-900 truncate">
-                          {atendente.nome}
-                        </p>
+                        <p className="font-medium text-gray-900 truncate">{atendente.nome}</p>
                         {isSelected && (
                           <CheckCircle className="h-4 w-4 text-purple-600 flex-shrink-0" />
                         )}
                       </div>
 
                       {!compact && (
-                        <p className="text-sm text-gray-600 truncate mb-1">
-                          {atendente.email}
-                        </p>
+                        <p className="text-sm text-gray-600 truncate mb-1">{atendente.email}</p>
                       )}
 
                       <div className="flex items-center gap-2 flex-wrap">
                         {/* Badge de status */}
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(
-                            atendente.status
+                            atendente.status,
                           )}`}
                         >
                           {getStatusLabel(atendente.status)}

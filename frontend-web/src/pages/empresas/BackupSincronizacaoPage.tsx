@@ -32,7 +32,7 @@ import {
   Label,
   Input,
   Switch,
-  Textarea
+  Textarea,
 } from '../../components/ui';
 import { useEmpresas } from '../../contexts/EmpresaContextAPIReal';
 import {
@@ -58,7 +58,7 @@ import {
   Zap,
   Server,
   Copy,
-  CloudOff
+  CloudOff,
 } from 'lucide-react';
 
 interface BackupItem {
@@ -112,7 +112,7 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
   const [backupEmAndamento, setBackupEmAndamento] = useState(false);
 
   // Empresa para backup/sincronização
-  const empresa = empresas.find(e => e.id === empresaId) || empresaAtiva;
+  const empresa = empresas.find((e) => e.id === empresaId) || empresaAtiva;
 
   // Estados para novo backup
   const [novoBackup, setNovoBackup] = useState({
@@ -123,16 +123,16 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
       configuracoes: true,
       usuarios: false,
       anexos: true,
-      logs: false
+      logs: false,
     },
-    localizacao: 'ambos' as 'local' | 'nuvem' | 'ambos'
+    localizacao: 'ambos' as 'local' | 'nuvem' | 'ambos',
   });
 
   // Estados para nova sincronização
   const [novaSincronizacao, setNovaSincronizacao] = useState({
     empresaDestino: '',
     tipo: 'clientes' as 'clientes' | 'propostas' | 'configuracoes' | 'completo',
-    sobrescrever: false
+    sobrescrever: false,
   });
 
   // Dados mockados para demonstração
@@ -153,9 +153,9 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
         configuracoes: true,
         usuarios: true,
         anexos: true,
-        logs: false
+        logs: false,
       },
-      duracao: 127
+      duracao: 127,
     },
     {
       id: '2',
@@ -173,9 +173,9 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
         configuracoes: true,
         usuarios: true,
         anexos: true,
-        logs: true
+        logs: true,
       },
-      duracao: 183
+      duracao: 183,
     },
     {
       id: '3',
@@ -193,10 +193,10 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
         configuracoes: true,
         usuarios: true,
         anexos: true,
-        logs: false
+        logs: false,
       },
-      erro: 'Falha na conexão com o serviço de nuvem'
-    }
+      erro: 'Falha na conexão com o serviço de nuvem',
+    },
   ];
 
   const sincronizacoesMock: SincronizacaoItem[] = [
@@ -211,7 +211,7 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
       progresso: 100,
       itensTotal: 150,
       itensSincronizados: 150,
-      erros: []
+      erros: [],
     },
     {
       id: '2',
@@ -223,8 +223,8 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
       progresso: 67,
       itensTotal: 89,
       itensSincronizados: 60,
-      erros: []
-    }
+      erros: [],
+    },
   ];
 
   useEffect(() => {
@@ -241,7 +241,7 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
       em_progresso: { variant: 'secondary' as const, icon: RefreshCw, color: 'text-blue-600' },
       falhado: { variant: 'destructive' as const, icon: XCircle, color: 'text-red-600' },
       agendado: { variant: 'outline' as const, icon: Clock, color: 'text-orange-600' },
-      pendente: { variant: 'outline' as const, icon: Clock, color: 'text-orange-600' }
+      pendente: { variant: 'outline' as const, icon: Clock, color: 'text-orange-600' },
     };
 
     const config = variants[status];
@@ -281,24 +281,26 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
       dataBackup: new Date(),
       tamanho: 0,
       localizacao: novoBackup.localizacao,
-      conteudo: novoBackup.conteudo
+      conteudo: novoBackup.conteudo,
     };
 
-    setBackups(prev => [novoBackupItem, ...prev]);
+    setBackups((prev) => [novoBackupItem, ...prev]);
     setModalNovoBackup(false);
 
     // Simular progresso do backup
     setTimeout(() => {
-      setBackups(prev => prev.map(backup =>
-        backup.id === novoBackupItem.id
-          ? {
-            ...backup,
-            status: 'concluido' as const,
-            tamanho: Math.random() * 50 + 20,
-            duracao: Math.floor(Math.random() * 200 + 60)
-          }
-          : backup
-      ));
+      setBackups((prev) =>
+        prev.map((backup) =>
+          backup.id === novoBackupItem.id
+            ? {
+                ...backup,
+                status: 'concluido' as const,
+                tamanho: Math.random() * 50 + 20,
+                duracao: Math.floor(Math.random() * 200 + 60),
+              }
+            : backup,
+        ),
+      );
       setBackupEmAndamento(false);
     }, 5000);
   };
@@ -314,38 +316,40 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
       progresso: 0,
       itensTotal: Math.floor(Math.random() * 200 + 50),
       itensSincronizados: 0,
-      erros: []
+      erros: [],
     };
 
-    setSincronizacoes(prev => [novaSincronizacaoItem, ...prev]);
+    setSincronizacoes((prev) => [novaSincronizacaoItem, ...prev]);
     setModalNovaSincronizacao(false);
 
     // Simular progresso da sincronização
     const interval = setInterval(() => {
-      setSincronizacoes(prev => prev.map(sync => {
-        if (sync.id === novaSincronizacaoItem.id && sync.progresso < 100) {
-          const novoProgresso = Math.min(sync.progresso + Math.random() * 20, 100);
-          const itensSincronizados = Math.floor((novoProgresso / 100) * sync.itensTotal);
+      setSincronizacoes((prev) =>
+        prev.map((sync) => {
+          if (sync.id === novaSincronizacaoItem.id && sync.progresso < 100) {
+            const novoProgresso = Math.min(sync.progresso + Math.random() * 20, 100);
+            const itensSincronizados = Math.floor((novoProgresso / 100) * sync.itensTotal);
 
-          if (novoProgresso >= 100) {
-            clearInterval(interval);
+            if (novoProgresso >= 100) {
+              clearInterval(interval);
+              return {
+                ...sync,
+                status: 'concluido' as const,
+                progresso: 100,
+                itensSincronizados: sync.itensTotal,
+                dataFim: new Date(),
+              };
+            }
+
             return {
               ...sync,
-              status: 'concluido' as const,
-              progresso: 100,
-              itensSincronizados: sync.itensTotal,
-              dataFim: new Date()
+              progresso: novoProgresso,
+              itensSincronizados,
             };
           }
-
-          return {
-            ...sync,
-            progresso: novoProgresso,
-            itensSincronizados
-          };
-        }
-        return sync;
-      }));
+          return sync;
+        }),
+      );
     }, 1000);
   };
 
@@ -370,9 +374,7 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
           <h1 className="text-2xl font-bold text-gray-900">
             Backup e Sincronização - {empresa.nome}
           </h1>
-          <p className="text-gray-600 mt-1">
-            Gerencie backups e sincronize dados entre empresas
-          </p>
+          <p className="text-gray-600 mt-1">Gerencie backups e sincronize dados entre empresas</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -393,7 +395,7 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
                   <Input
                     id="nome-backup"
                     value={novoBackup.nome}
-                    onChange={(e) => setNovoBackup(prev => ({ ...prev, nome: e.target.value }))}
+                    onChange={(e) => setNovoBackup((prev) => ({ ...prev, nome: e.target.value }))}
                     placeholder="Digite um nome para identificar este backup"
                   />
                 </div>
@@ -406,15 +408,19 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
                         <Switch
                           id={key}
                           checked={value}
-                          onCheckedChange={(checked) => setNovoBackup(prev => ({
-                            ...prev,
-                            conteudo: { ...prev.conteudo, [key]: checked }
-                          }))}
+                          onCheckedChange={(checked) =>
+                            setNovoBackup((prev) => ({
+                              ...prev,
+                              conteudo: { ...prev.conteudo, [key]: checked },
+                            }))
+                          }
                         />
                         <Label htmlFor={key} className="capitalize">
-                          {key === 'usuarios' ? 'Usuários' :
-                            key === 'configuracoes' ? 'Configurações' :
-                              key}
+                          {key === 'usuarios'
+                            ? 'Usuários'
+                            : key === 'configuracoes'
+                              ? 'Configurações'
+                              : key}
                         </Label>
                       </div>
                     ))}
@@ -425,7 +431,9 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
                   <Label htmlFor="localizacao">Localização</Label>
                   <Select
                     value={novoBackup.localizacao}
-                    onValueChange={(value: any) => setNovoBackup(prev => ({ ...prev, localizacao: value }))}
+                    onValueChange={(value: any) =>
+                      setNovoBackup((prev) => ({ ...prev, localizacao: value }))
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -439,15 +447,10 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
                 </div>
 
                 <div className="flex justify-end gap-2 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setModalNovoBackup(false)}
-                  >
+                  <Button variant="outline" onClick={() => setModalNovoBackup(false)}>
                     Cancelar
                   </Button>
-                  <Button onClick={handleExecutarBackup}>
-                    Executar Backup
-                  </Button>
+                  <Button onClick={handleExecutarBackup}>Executar Backup</Button>
                 </div>
               </div>
             </DialogContent>
@@ -469,17 +472,21 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
                   <Label htmlFor="empresa-destino">Empresa Destino</Label>
                   <Select
                     value={novaSincronizacao.empresaDestino}
-                    onValueChange={(value) => setNovaSincronizacao(prev => ({ ...prev, empresaDestino: value }))}
+                    onValueChange={(value) =>
+                      setNovaSincronizacao((prev) => ({ ...prev, empresaDestino: value }))
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione a empresa destino" />
                     </SelectTrigger>
                     <SelectContent>
-                      {empresas.filter(e => e.id !== empresa.id).map(emp => (
-                        <SelectItem key={emp.id} value={emp.id}>
-                          {emp.nome}
-                        </SelectItem>
-                      ))}
+                      {empresas
+                        .filter((e) => e.id !== empresa.id)
+                        .map((emp) => (
+                          <SelectItem key={emp.id} value={emp.id}>
+                            {emp.nome}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -488,7 +495,9 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
                   <Label htmlFor="tipo-sync">Tipo de Sincronização</Label>
                   <Select
                     value={novaSincronizacao.tipo}
-                    onValueChange={(value: any) => setNovaSincronizacao(prev => ({ ...prev, tipo: value }))}
+                    onValueChange={(value: any) =>
+                      setNovaSincronizacao((prev) => ({ ...prev, tipo: value }))
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -506,7 +515,9 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
                   <Switch
                     id="sobrescrever"
                     checked={novaSincronizacao.sobrescrever}
-                    onCheckedChange={(checked) => setNovaSincronizacao(prev => ({ ...prev, sobrescrever: checked }))}
+                    onCheckedChange={(checked) =>
+                      setNovaSincronizacao((prev) => ({ ...prev, sobrescrever: checked }))
+                    }
                   />
                   <Label htmlFor="sobrescrever">
                     Sobrescrever dados existentes na empresa destino
@@ -516,16 +527,14 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
-                    Esta ação irá sincronizar os dados selecionados da empresa atual
-                    para a empresa destino. {novaSincronizacao.sobrescrever && 'Os dados existentes serão sobrescritos.'}
+                    Esta ação irá sincronizar os dados selecionados da empresa atual para a empresa
+                    destino.{' '}
+                    {novaSincronizacao.sobrescrever && 'Os dados existentes serão sobrescritos.'}
                   </AlertDescription>
                 </Alert>
 
                 <div className="flex justify-end gap-2 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setModalNovaSincronizacao(false)}
-                  >
+                  <Button variant="outline" onClick={() => setModalNovaSincronizacao(false)}>
                     Cancelar
                   </Button>
                   <Button
@@ -565,7 +574,7 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
               </div>
               <div>
                 <p className="text-2xl font-bold">
-                  {backups.filter(b => b.status === 'concluido').length}
+                  {backups.filter((b) => b.status === 'concluido').length}
                 </p>
                 <p className="text-sm text-gray-600">Backups Concluídos</p>
               </div>
@@ -581,7 +590,7 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
               </div>
               <div>
                 <p className="text-2xl font-bold">
-                  {sincronizacoes.filter(s => s.status === 'em_progresso').length}
+                  {sincronizacoes.filter((s) => s.status === 'em_progresso').length}
                 </p>
                 <p className="text-sm text-gray-600">Sincronizações Ativas</p>
               </div>
@@ -665,9 +674,7 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
                       </TableCell>
                       <TableCell>
                         {getStatusBadge(backup.status)}
-                        {backup.erro && (
-                          <p className="text-xs text-red-600 mt-1">{backup.erro}</p>
-                        )}
+                        {backup.erro && <p className="text-xs text-red-600 mt-1">{backup.erro}</p>}
                       </TableCell>
                       <TableCell>
                         <span className="text-sm">
@@ -680,8 +687,12 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          {backup.localizacao === 'local' && <HardDrive className="w-4 h-4 text-gray-600" />}
-                          {backup.localizacao === 'nuvem' && <Cloud className="w-4 h-4 text-blue-600" />}
+                          {backup.localizacao === 'local' && (
+                            <HardDrive className="w-4 h-4 text-gray-600" />
+                          )}
+                          {backup.localizacao === 'nuvem' && (
+                            <Cloud className="w-4 h-4 text-blue-600" />
+                          )}
                           {backup.localizacao === 'ambos' && (
                             <>
                               <HardDrive className="w-4 h-4 text-gray-600" />
@@ -733,7 +744,8 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <h4 className="font-medium">
-                              Sincronização de {sync.tipo.charAt(0).toUpperCase() + sync.tipo.slice(1)}
+                              Sincronização de{' '}
+                              {sync.tipo.charAt(0).toUpperCase() + sync.tipo.slice(1)}
                             </h4>
                             {getStatusBadge(sync.status)}
                           </div>
@@ -741,14 +753,17 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
                           <p className="text-sm text-gray-600 mb-3">
                             De <strong>{empresa.nome}</strong> para{' '}
                             <strong>
-                              {empresas.find(e => e.id === sync.empresaDestino)?.nome || 'Empresa Destino'}
+                              {empresas.find((e) => e.id === sync.empresaDestino)?.nome ||
+                                'Empresa Destino'}
                             </strong>
                           </p>
 
                           {sync.status === 'em_progresso' && (
                             <div className="space-y-2">
                               <div className="flex justify-between text-sm">
-                                <span>Progresso: {sync.itensSincronizados} de {sync.itensTotal} itens</span>
+                                <span>
+                                  Progresso: {sync.itensSincronizados} de {sync.itensTotal} itens
+                                </span>
                                 <span>{sync.progresso.toFixed(0)}%</span>
                               </div>
                               <Progress value={sync.progresso} className="h-2" />
@@ -792,8 +807,12 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
                 {sincronizacoes.length === 0 && (
                   <div className="text-center py-8">
                     <CloudOff className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900">Nenhuma sincronização encontrada</h3>
-                    <p className="text-gray-600">Inicie uma nova sincronização para ver o histórico aqui.</p>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Nenhuma sincronização encontrada
+                    </h3>
+                    <p className="text-gray-600">
+                      Inicie uma nova sincronização para ver o histórico aqui.
+                    </p>
                   </div>
                 )}
               </div>
@@ -839,30 +858,17 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
 
                   <div>
                     <Label htmlFor="horario">Horário</Label>
-                    <Input
-                      type="time"
-                      defaultValue="03:00"
-                    />
+                    <Input type="time" defaultValue="03:00" />
                   </div>
 
                   <div>
                     <Label htmlFor="retencao">Retenção (dias)</Label>
-                    <Input
-                      type="number"
-                      defaultValue="30"
-                      min="7"
-                      max="365"
-                    />
+                    <Input type="number" defaultValue="30" min="7" max="365" />
                   </div>
 
                   <div>
                     <Label htmlFor="max-backups">Máximo de Backups</Label>
-                    <Input
-                      type="number"
-                      defaultValue="10"
-                      min="5"
-                      max="50"
-                    />
+                    <Input type="number" defaultValue="10" min="5" max="50" />
                   </div>
                 </div>
 
@@ -870,7 +876,8 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
                   <div>
                     <Label className="text-sm font-medium">Incluir Anexos</Label>
                     <p className="text-sm text-gray-600">
-                      Incluir arquivos anexos nos backups (pode aumentar significativamente o tamanho)
+                      Incluir arquivos anexos nos backups (pode aumentar significativamente o
+                      tamanho)
                     </p>
                   </div>
                   <Switch defaultChecked />
@@ -924,9 +931,7 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="bucket">Bucket/Container</Label>
-                    <Input
-                      placeholder="nome-do-bucket"
-                    />
+                    <Input placeholder="nome-do-bucket" />
                   </div>
 
                   <div>
@@ -985,17 +990,24 @@ export const BackupSincronizacaoPage: React.FC<BackupSincronizacaoPageProps> = (
                 </div>
 
                 <div>
-                  <Label htmlFor="empresas-autorizadas">Empresas Autorizadas para Sincronização</Label>
+                  <Label htmlFor="empresas-autorizadas">
+                    Empresas Autorizadas para Sincronização
+                  </Label>
                   <div className="mt-2 space-y-2">
-                    {empresas.filter(e => e.id !== empresa.id).map(emp => (
-                      <div key={emp.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <p className="font-medium">{emp.nome}</p>
-                          <p className="text-sm text-gray-600">{emp.email}</p>
+                    {empresas
+                      .filter((e) => e.id !== empresa.id)
+                      .map((emp) => (
+                        <div
+                          key={emp.id}
+                          className="flex items-center justify-between p-3 border rounded-lg"
+                        >
+                          <div>
+                            <p className="font-medium">{emp.nome}</p>
+                            <p className="text-sm text-gray-600">{emp.email}</p>
+                          </div>
+                          <Switch />
                         </div>
-                        <Switch />
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 </div>
               </CardContent>

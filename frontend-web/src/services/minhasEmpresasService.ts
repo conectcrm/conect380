@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios';
 import { api } from './api';
 
 export interface EmpresaCoresConfig {
@@ -139,7 +140,9 @@ export interface EmpresaCompleta {
   cnpj: string;
   email: string;
   telefone: string;
-  endereco: string | {
+  endereco:
+  | string
+  | {
     rua: string;
     numero: string;
     complemento?: string;
@@ -230,11 +233,10 @@ export interface SwitchEmpresaResponse {
   success: boolean;
   empresaId: string;
   token?: string; // Novo token com contexto da empresa
-  configuracoes: any;
+  configuracoes: EmpresaConfiguracoes;
 }
 
 class MinhasEmpresasService {
-
   /**
    * Buscar todas as empresas do usuário atual
    */
@@ -267,7 +269,7 @@ class MinhasEmpresasService {
   async switchEmpresa(empresaId: string): Promise<SwitchEmpresaResponse> {
     try {
       const response = await api.post<SwitchEmpresaResponse>('/minhas-empresas/switch', {
-        empresaId
+        empresaId,
       });
 
       // Atualizar token se fornecido
@@ -293,13 +295,15 @@ class MinhasEmpresasService {
     try {
       const response = await api.post<EmpresaCompleta>('/minhas-empresas', dadosEmpresa);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao criar empresa:', error);
-      if (error.response?.status === 409) {
-        throw new Error('CNPJ já cadastrado no sistema');
-      }
-      if (error.response?.status === 422) {
-        throw new Error('Dados inválidos. Verifique as informações fornecidas');
+      if (isAxiosError(error)) {
+        if (error.response?.status === 409) {
+          throw new Error('CNPJ já cadastrado no sistema');
+        }
+        if (error.response?.status === 422) {
+          throw new Error('Dados inválidos. Verifique as informações fornecidas');
+        }
       }
       throw new Error('Não foi possível criar a empresa');
     }
@@ -323,12 +327,12 @@ class MinhasEmpresasService {
    */
   async atualizarConfiguracoes(
     empresaId: string,
-    configuracoes: Partial<EmpresaCompleta['configuracoes']>
+    configuracoes: Partial<EmpresaCompleta['configuracoes']>,
   ): Promise<EmpresaCompleta['configuracoes']> {
     try {
       const response = await api.patch<{ configuracoes: EmpresaCompleta['configuracoes'] }>(
         `/minhas-empresas/${empresaId}/configuracoes`,
-        { configuracoes }
+        { configuracoes },
       );
       return response.data.configuracoes;
     } catch (error) {
@@ -340,11 +344,14 @@ class MinhasEmpresasService {
   /**
    * Buscar estatísticas detalhadas da empresa
    */
-  async getEstatisticasEmpresa(empresaId: string, periodo?: 'mes' | 'trimestre' | 'ano'): Promise<EmpresaCompleta['estatisticas']> {
+  async getEstatisticasEmpresa(
+    empresaId: string,
+    periodo?: 'mes' | 'trimestre' | 'ano',
+  ): Promise<EmpresaCompleta['estatisticas']> {
     try {
       const response = await api.get<{ estatisticas: EmpresaCompleta['estatisticas'] }>(
         `/minhas-empresas/${empresaId}/estatisticas`,
-        { params: { periodo: periodo || 'mes' } }
+        { params: { periodo: periodo || 'mes' } },
       );
       return response.data.estatisticas;
     } catch (error) {
@@ -383,7 +390,7 @@ class MinhasEmpresasService {
   async excluirEmpresa(empresaId: string, confirmacao: string): Promise<void> {
     try {
       await api.delete(`/minhas-empresas/${empresaId}`, {
-        data: { confirmacao }
+        data: { confirmacao },
       });
     } catch (error) {
       console.error('Erro ao excluir empresa:', error);
@@ -411,7 +418,7 @@ class MinhasEmpresasService {
     try {
       const response = await api.post<EmpresaCompleta>(
         `/minhas-empresas/${empresaId}/alterar-plano`,
-        { planoId: novoPlanoId }
+        { planoId: novoPlanoId },
       );
       return response.data;
     } catch (error) {
@@ -423,12 +430,14 @@ class MinhasEmpresasService {
   /**
    * Buscar atividades recentes da empresa
    */
-  async getAtividadesRecentes(empresaId: string, limit: number = 10): Promise<EmpresaCompleta['estatisticas']['ultimasAtividades']> {
+  async getAtividadesRecentes(
+    empresaId: string,
+    limit: number = 10,
+  ): Promise<EmpresaCompleta['estatisticas']['ultimasAtividades']> {
     try {
-      const response = await api.get<{ atividades: EmpresaCompleta['estatisticas']['ultimasAtividades'] }>(
-        `/minhas-empresas/${empresaId}/atividades`,
-        { params: { limit } }
-      );
+      const response = await api.get<{
+        atividades: EmpresaCompleta['estatisticas']['ultimasAtividades'];
+      }>(`/minhas-empresas/${empresaId}/atividades`, { params: { limit } });
       return response.data.atividades;
     } catch (error) {
       console.error('Erro ao buscar atividades:', error);
@@ -442,7 +451,7 @@ class MinhasEmpresasService {
   async gerarBackup(empresaId: string): Promise<{ backupId: string; downloadUrl: string }> {
     try {
       const response = await api.post<{ backupId: string; downloadUrl: string }>(
-        `/minhas-empresas/${empresaId}/backup`
+        `/minhas-empresas/${empresaId}/backup`,
       );
       return response.data;
     } catch (error) {
@@ -454,11 +463,14 @@ class MinhasEmpresasService {
   /**
    * Validar CNPJ
    */
-  async validarCNPJ(cnpj: string): Promise<{ valido: boolean; empresa?: any }> {
+  async validarCNPJ(cnpj: string): Promise<{ valido: boolean; empresa?: Record<string, unknown> }> {
     try {
-      const response = await api.post<{ valido: boolean; empresa?: any }>('/validar-cnpj', {
-        cnpj: cnpj.replace(/\D/g, '')
-      });
+      const response = await api.post<{ valido: boolean; empresa?: Record<string, unknown> }>(
+        '/validar-cnpj',
+        {
+          cnpj: cnpj.replace(/\D/g, ''),
+        },
+      );
       return response.data;
     } catch (error) {
       console.error('Erro ao validar CNPJ:', error);

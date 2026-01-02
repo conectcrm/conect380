@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Plano } from './plano.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 @Entity('assinaturas_empresas')
 export class AssinaturaEmpresa {
@@ -16,6 +17,10 @@ export class AssinaturaEmpresa {
 
   @Column({ name: 'empresa_id' })
   empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   // Relacionamento com Plano
   @ManyToOne(() => Plano, (plano) => plano.assinaturas, { onDelete: 'RESTRICT' })

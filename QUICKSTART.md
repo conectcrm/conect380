@@ -136,7 +136,7 @@ You can now view conectcrm-frontend in the browser.
 URL: http://localhost:3000/login
 
 Credenciais padrão:
-Email: admin@conectcrm.com
+Email: admin@conectsuite.com.br
 Senha: admin123
 ```
 

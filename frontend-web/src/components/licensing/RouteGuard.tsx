@@ -14,15 +14,15 @@ interface RouteGuardProps {
 
 /**
  * Guard para proteger rotas que requerem módulo específico licenciado
- * 
+ *
  * Se o módulo não estiver ativo, exibe tela de bloqueio com opção de contratar
- * 
+ *
  * @example
  * // Em App.tsx
- * <Route 
- *   path="/crm/clientes" 
+ * <Route
+ *   path="/crm/clientes"
  *   element={
- *     <RouteGuard 
+ *     <RouteGuard
  *       modulo={ModuloEnum.CRM}
  *       moduloNome="CRM"
  *       moduloDescricao="Gestão completa de clientes, contatos e relacionamento"
@@ -31,7 +31,7 @@ interface RouteGuardProps {
  *     >
  *       <ClientesPage />
  *     </RouteGuard>
- *   } 
+ *   }
  * />
  */
 export const RouteGuard: React.FC<RouteGuardProps> = ({
@@ -40,7 +40,7 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
   moduloDescricao,
   preco,
   recursos = [],
-  children
+  children,
 }) => {
   const [isAtivo, loading] = useModuloAtivo(modulo);
 

@@ -21,7 +21,7 @@ export const SaveStatus: React.FC<SaveStatusProps> = ({
   isFormValid,
   lastSaveTime,
   autoSaveEnabled = false,
-  className = ''
+  className = '',
 }) => {
   const getStatus = () => {
     if (isSubmitting) {
@@ -29,7 +29,7 @@ export const SaveStatus: React.FC<SaveStatusProps> = ({
         icon: <Save className="w-4 h-4 animate-pulse" />,
         text: 'Salvando...',
         color: 'text-blue-600',
-        bgColor: 'bg-blue-50'
+        bgColor: 'bg-blue-50',
       };
     }
 
@@ -38,7 +38,7 @@ export const SaveStatus: React.FC<SaveStatusProps> = ({
         icon: <AlertCircle className="w-4 h-4" />,
         text: 'Formulário inválido',
         color: 'text-red-600',
-        bgColor: 'bg-red-50'
+        bgColor: 'bg-red-50',
       };
     }
 
@@ -47,7 +47,7 @@ export const SaveStatus: React.FC<SaveStatusProps> = ({
         icon: <Clock className="w-4 h-4" />,
         text: autoSaveEnabled ? 'Alterações detectadas' : 'Não salvo',
         color: 'text-amber-600',
-        bgColor: 'bg-amber-50'
+        bgColor: 'bg-amber-50',
       };
     }
 
@@ -55,17 +55,19 @@ export const SaveStatus: React.FC<SaveStatusProps> = ({
       icon: <Check className="w-4 h-4" />,
       text: lastSaveTime ? `Salvo ${formatLastSave(lastSaveTime)}` : 'Salvo',
       color: 'text-green-600',
-      bgColor: 'bg-green-50'
+      bgColor: 'bg-green-50',
     };
   };
 
   const formatLastSave = (timestamp: number) => {
     const now = Date.now();
     const diff = now - timestamp;
-    
-    if (diff < 60000) { // menos de 1 minuto
+
+    if (diff < 60000) {
+      // menos de 1 minuto
       return 'agora';
-    } else if (diff < 3600000) { // menos de 1 hora
+    } else if (diff < 3600000) {
+      // menos de 1 hora
       const minutes = Math.floor(diff / 60000);
       return `há ${minutes}m`;
     } else {
@@ -77,10 +79,12 @@ export const SaveStatus: React.FC<SaveStatusProps> = ({
   const status = getStatus();
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${status.bgColor} ${status.color} ${className}`}>
+    <div
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${status.bgColor} ${status.color} ${className}`}
+    >
       {status.icon}
       <span className="text-sm font-medium">{status.text}</span>
-      
+
       {autoSaveEnabled && (
         <div className="flex items-center gap-1 ml-1 opacity-70">
           <Wifi className="w-3 h-3" />

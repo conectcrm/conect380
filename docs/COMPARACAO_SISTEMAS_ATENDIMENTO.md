@@ -122,7 +122,7 @@ http://localhost:3000/atendimento
 
 | Canal | Status | Adapter | Webhook |
 |-------|--------|---------|---------|
-| WhatsApp Business API | ✅ Implementado | `WhatsAppAdapter` | `/webhooks/whatsapp` |
+| WhatsApp Business API | ✅ Implementado | `WhatsAppAdapter` | `/api/atendimento/webhooks/whatsapp/:empresaId` |
 | Email (SMTP/SendGrid/SES) | ✅ Implementado | `EmailAdapter` | N/A |
 | Telegram Bot | ✅ Implementado | `TelegramAdapter` | `/webhooks/telegram` |
 | Web Chat | ✅ Implementado | `WebChatAdapter` | N/A |

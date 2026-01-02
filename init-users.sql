@@ -51,7 +51,7 @@ INSERT INTO users (
 ) VALUES (
   gen_random_uuid(),
   'Administrador',
-  'admin@conectcrm.com',
+  'admin@conectsuite.com.br',
   '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', -- admin123
   'admin',
   true,
@@ -138,22 +138,22 @@ INSERT INTO user_activities (
   created_at
 ) VALUES 
 (
-  (SELECT id FROM users WHERE email = 'admin@conectcrm.com'),
-  (SELECT empresa_id FROM users WHERE email = 'admin@conectcrm.com'),
+  (SELECT id FROM users WHERE email = 'admin@conectsuite.com.br'),
+  (SELECT empresa_id FROM users WHERE email = 'admin@conectsuite.com.br'),
   'LOGIN',
   'Efetuou login no sistema',
   NOW() - INTERVAL '2 hours'
 ),
 (
-  (SELECT id FROM users WHERE email = 'admin@conectcrm.com'),
-  (SELECT empresa_id FROM users WHERE email = 'admin@conectcrm.com'),
+  (SELECT id FROM users WHERE email = 'admin@conectsuite.com.br'),
+  (SELECT empresa_id FROM users WHERE email = 'admin@conectsuite.com.br'),
   'CRIACAO',
   'Criou novo usuário: Carlos Ferreira',
   NOW() - INTERVAL '1 day'
 ),
 (
-  (SELECT id FROM users WHERE email = 'admin@conectcrm.com'),
-  (SELECT empresa_id FROM users WHERE email = 'admin@conectcrm.com'),
+  (SELECT id FROM users WHERE email = 'admin@conectsuite.com.br'),
+  (SELECT empresa_id FROM users WHERE email = 'admin@conectsuite.com.br'),
   'ALTERACAO_STATUS',
   'Alterou status de usuário para inativo',
   NOW() - INTERVAL '3 days'
@@ -235,7 +235,7 @@ ORDER BY ua.created_at DESC;
 -- ==========================================
 -- CREDENCIAIS CRIADAS:
 -- ==========================================
--- Email: admin@conectcrm.com     | Senha: admin123
+-- Email: admin@conectsuite.com.br     | Senha: admin123
 -- Email: maria@conectcrm.com     | Senha: manager123  
 -- Email: joao@conectcrm.com      | Senha: vendedor123
 -- ==========================================

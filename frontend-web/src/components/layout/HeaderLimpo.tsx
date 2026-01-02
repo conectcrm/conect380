@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { 
-  Bell, 
-  Search, 
-  Settings, 
-  User, 
+import {
+  Bell,
+  Search,
+  Settings,
+  User,
   ChevronDown,
   LogOut,
   Moon,
   Sun,
   Globe,
-  HelpCircle
+  MessageCircle,
 } from 'lucide-react';
 
 interface HeaderLimpoProps {
@@ -26,7 +26,7 @@ interface HeaderLimpoProps {
 
 /**
  * Header Limpo - Sem Logo, Focado em Funcionalidades Essenciais
- * 
+ *
  * Princípios aplicados:
  * - Sem redundância de logo (já existe na sidebar)
  * - Sem breadcrumbs (título da página já informa onde está)
@@ -34,14 +34,14 @@ interface HeaderLimpoProps {
  * - Design minimalista e funcional
  */
 export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
-  userInfo = { 
-    name: 'João Silva', 
+  userInfo = {
+    name: 'João Silva',
     role: 'Administrador',
-    email: 'joao.silva@empresa.com'
+    email: 'joao.silva@empresa.com',
   },
   onThemeToggle,
   isDarkMode = false,
-  className = ''
+  className = '',
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -54,32 +54,33 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
       title: 'Novo lead: Maria Santos',
       message: 'Lead qualificado aguardando contato',
       time: 'há 5 minutos',
-      unread: true
+      unread: true,
     },
     {
       id: 2,
       title: 'Proposta aprovada',
       message: 'Cliente ABC aprovou proposta #1234',
       time: 'há 2 horas',
-      unread: true
+      unread: true,
     },
     {
       id: 3,
       title: 'Meta de vendas',
       message: 'Você atingiu 85% da meta mensal',
       time: 'há 1 dia',
-      unread: false
-    }
+      unread: false,
+    },
   ];
 
-  const unreadCount = notifications.filter(n => n.unread).length;
+  const unreadCount = notifications.filter((n) => n.unread).length;
 
   return (
     <>
       {/* Header Principal */}
-      <header className={`bg-white/95 backdrop-blur-sm border-b border-gray-200/80 sticky top-0 z-40 ${className}`}>
+      <header
+        className={`bg-white/95 backdrop-blur-sm border-b border-gray-200/80 sticky top-0 z-40 ${className}`}
+      >
         <div className="h-14 px-6 flex items-center justify-between">
-          
           {/* Seção Esquerda: Busca Global */}
           <div className="flex-1 max-w-md">
             <div className="relative">
@@ -91,7 +92,7 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
                 onFocus={() => setShowSearch(true)}
                 onBlur={() => setTimeout(() => setShowSearch(false), 200)}
               />
-              
+
               {/* Dropdown de Busca Rápida */}
               {showSearch && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
@@ -117,7 +118,6 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
 
           {/* Seção Direita: Ações e Usuário */}
           <div className="flex items-center gap-2">
-            
             {/* Toggle Tema */}
             <button
               onClick={onThemeToggle}
@@ -136,7 +136,7 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
               className="p-2 rounded-lg hover:bg-gray-100/80 transition-colors group"
               title="Ajuda e suporte"
             >
-              <HelpCircle className="w-4 h-4 text-gray-600 group-hover:text-blue-500 transition-colors" />
+              <MessageCircle className="w-4 h-4 text-gray-600 group-hover:text-blue-500 transition-colors" />
             </button>
 
             {/* Notificações */}
@@ -167,28 +167,24 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
                       )}
                     </div>
                   </div>
-                  
+
                   <div className="max-h-80 overflow-y-auto">
                     {notifications.map((notification) => (
                       <div
                         key={notification.id}
-                        className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors ${
-                          notification.unread ? 'bg-blue-50/50' : ''
-                        }`}
+                        className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors ${notification.unread ? 'bg-blue-50/50' : ''
+                          }`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-medium ${
-                              notification.unread ? 'text-gray-900' : 'text-gray-700'
-                            }`}>
+                            <p
+                              className={`text-sm font-medium ${notification.unread ? 'text-gray-900' : 'text-gray-700'
+                                }`}
+                            >
                               {notification.title}
                             </p>
-                            <p className="text-sm text-gray-600 mt-1">
-                              {notification.message}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-2">
-                              {notification.time}
-                            </p>
+                            <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
+                            <p className="text-xs text-gray-500 mt-2">{notification.time}</p>
                           </div>
                           {notification.unread && (
                             <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
@@ -197,7 +193,7 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
                       </div>
                     ))}
                   </div>
-                  
+
                   <div className="p-3 border-t border-gray-100 bg-gray-50/50">
                     <button className="w-full text-sm text-blue-600 hover:text-blue-700 font-medium">
                       Ver todas as notificações
@@ -227,20 +223,20 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
                 {/* Avatar */}
                 <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
                   <span className="text-white font-medium text-sm">
-                    {userInfo.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                    {userInfo.name
+                      .split(' ')
+                      .map((n) => n[0])
+                      .join('')
+                      .toUpperCase()}
                   </span>
                 </div>
-                
+
                 {/* Info do Usuário */}
                 <div className="text-left min-w-0 hidden sm:block">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {userInfo.name}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {userInfo.role}
-                  </p>
+                  <p className="text-sm font-medium text-gray-900 truncate">{userInfo.name}</p>
+                  <p className="text-xs text-gray-500 truncate">{userInfo.role}</p>
                 </div>
-                
+
                 <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
               </button>
 
@@ -252,7 +248,11 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                         <span className="text-white font-medium">
-                          {userInfo.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                          {userInfo.name
+                            .split(' ')
+                            .map((n) => n[0])
+                            .join('')
+                            .toUpperCase()}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -261,7 +261,7 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Menu de ações */}
                   <div className="py-2">
                     <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors">
@@ -277,7 +277,7 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
                       Idioma
                     </button>
                   </div>
-                  
+
                   {/* Ações críticas */}
                   <div className="border-t border-gray-100 py-2">
                     <button className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors">
@@ -294,7 +294,7 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
 
       {/* Overlay para fechar dropdowns */}
       {(showUserMenu || showNotifications) && (
-        <div 
+        <div
           className="fixed inset-0 z-30"
           onClick={() => {
             setShowUserMenu(false);

@@ -1,285 +1,227 @@
-# 📚 Índice de Documentação - ConectCRM Omnichannel
+# 📚 ÍNDICE DE DOCUMENTAÇÃO - ConectCRM
 
-Navegue facilmente por toda a documentação do projeto.
-
----
-
-## 🚀 Início Rápido
-
-| Documento | Descrição | Tempo | Link |
-|-----------|-----------|-------|------|
-| **QUICKSTART.md** | Guia para começar em 5 minutos | ⚡ 5 min | [Ver](../QUICKSTART.md) |
-| **NGROK_README.md** | 🆕 Guia rápido ngrok (webhooks) | ⚡ 3 min | [Ver](../NGROK_README.md) |
-| **README.md** | Visão geral do projeto | 📖 10 min | [Ver](../README.md) |
-| **RESUMO_COMPLETO_OMNICHANNEL.md** | Resumo de toda implementação | 📊 15 min | [Ver](./RESUMO_COMPLETO_OMNICHANNEL.md) |
+**Atualizado**: 19/12/2025  
+**Versão**: 2.0
 
 ---
 
-## 🏗️ Arquitetura e Configuração
+## 🎯 Documentação Principal (LEIA PRIMEIRO)
 
-| Documento | Descrição | Linhas | Link |
-|-----------|-----------|--------|------|
-| **OMNICHANNEL_CONFIGURACOES_INTEGRACOES.md** | Configuração de 5 integrações externas | 800+ | [Ver](./OMNICHANNEL_CONFIGURACOES_INTEGRACOES.md) |
-| **API_DOCUMENTATION.md** | Todas APIs REST + WebSocket | 800+ | [Ver](./API_DOCUMENTATION.md) |
-| **websocket-events.md** | Eventos WebSocket detalhados | 400+ | [Ver](./websocket-events.md) |
-| **GUIA_DEPLOY.md** | Deploy em produção (Ubuntu, Nginx, PM2) | 500+ | [Ver](./GUIA_DEPLOY.md) |
-| **GUIA_NGROK_WEBHOOKS.md** | 🆕 Configuração ngrok para webhooks | 600+ | [Ver](./GUIA_NGROK_WEBHOOKS.md) |
-| **NGROK_REFERENCIA_RAPIDA.md** | 🆕 Referência rápida ngrok | 200+ | [Ver](./NGROK_REFERENCIA_RAPIDA.md) |
+### 1. **VISAO_SISTEMA_2025.md** ⭐ ESSENCIAL
+**Posicionamento oficial do sistema**
 
----
+- Definição: ConectCRM como Suite All-in-One
+- Concorrentes reais: HubSpot, Zoho CRM, RD Station
+- 8 Módulos principais
+- Diferenciais competitivos
+- Roadmap 2026
+- Mensagem para o time (dev, vendas, product)
 
-## 🎨 Frontend
-
-| Documento | Descrição | Linhas | Link |
-|-----------|-----------|--------|------|
-| **FRONTEND_CHAT_REALTIME.md** | Componentes React de chat em tempo real | 300+ | [Ver](./FRONTEND_CHAT_REALTIME.md) |
-| **IntegracoesPage.tsx** | Código da página de configurações | 870 | [Ver](../frontend-web/src/pages/configuracoes/IntegracoesPage.tsx) |
-| **useWebSocket.tsx** | Hook customizado para WebSocket | 150+ | [Ver](../frontend-web/src/hooks/useWebSocket.tsx) |
-| **useChat.tsx** | Hook customizado para chat | 200+ | [Ver](../frontend-web/src/hooks/useChat.tsx) |
+📖 [Ler documento](../VISAO_SISTEMA_2025.md)
 
 ---
 
-## 🤖 Backend
+### 2. **README.md** ⭐ ESSENCIAL
+**Documentação técnica completa**
 
-| Documento | Descrição | Linhas | Link |
-|-----------|-----------|--------|------|
-| **IA_CHATBOT_DOCS.md** | Integração IA (OpenAI + Anthropic) | 400+ | [Ver](./IA_CHATBOT_DOCS.md) |
-| **atendimento.gateway.ts** | WebSocket Gateway | 350+ | [Ver](../backend/src/modules/atendimento/atendimento.gateway.ts) |
-| **validacao-integracoes.service.ts** | Validação de credenciais (5 APIs) | 425 | [Ver](../backend/src/modules/atendimento/services/validacao-integracoes.service.ts) |
-| **ia.service.ts** | Serviço de IA | 300+ | [Ver](../backend/src/modules/atendimento/services/ia.service.ts) |
+- Overview dos 8 módulos
+- Stack tecnológico (NestJS + React)
+- Guia de instalação
+- Deploy com Docker
+- Variáveis de ambiente
 
----
-
-## 🧪 Testes
-
-| Documento | Descrição | Testes | Link |
-|-----------|-----------|--------|------|
-| **TESTES_INTEGRACOES.md** | Guia completo de testes | - | [Ver](./TESTES_INTEGRACOES.md) |
-| **E2E_TESTS_DOCS.md** | Documentação de testes E2E | 36 | [Ver](./E2E_TESTS_DOCS.md) |
-| **integracoes.spec.ts** | Testes E2E de integrações | 28 | [Ver](../e2e/integracoes.spec.ts) |
-| **atendimento.spec.ts** | Testes E2E de atendimento | 36 | [Ver](../e2e/atendimento.spec.ts) |
+📖 [Ler documento](../README.md)
 
 ---
 
-## 🛠️ Desenvolvimento
+## 📊 Análises e Comparativos
 
-| Documento | Descrição | Link |
-|-----------|-----------|------|
-| **CONVENCOES_DESENVOLVIMENTO.md** | Padrões de código e nomenclatura | [Ver](./CONVENCOES_DESENVOLVIMENTO.md) |
-| **COPILOT_DOCUMENTATION_GUIDELINES.md** | Guia para documentar código | [Ver](./COPILOT_DOCUMENTATION_GUIDELINES.md) |
-| **GUIA_LIMPEZA_DESENVOLVIMENTO.md** | Manter projeto limpo e organizado | [Ver](./GUIA_LIMPEZA_DESENVOLVIMENTO.md) |
-| **SETUP_PADRONIZACAO.md** | Configuração inicial do ambiente | [Ver](./SETUP_PADRONIZACAO.md) |
+### 3. **ANALISE_COMPARATIVA_CRM_MERCADO.md**
+**Benchmark detalhado vs concorrentes**
 
----
+- Comparação com Salesforce, HubSpot, Pipedrive, Zoho, RD Station
+- Score por categoria (64 funcionalidades)
+- Gaps identificados
+- Pontuação: 34% (básico+)
 
-## 📖 Por Categoria
-
-### **1. Começando**
-1. [QUICKSTART.md](../QUICKSTART.md) - Iniciar em 5 minutos
-2. [README.md](../README.md) - Visão geral
-3. [SETUP_PADRONIZACAO.md](./SETUP_PADRONIZACAO.md) - Configuração inicial
-
-### **2. Funcionalidades Omnichannel**
-1. [RESUMO_COMPLETO_OMNICHANNEL.md](./RESUMO_COMPLETO_OMNICHANNEL.md) - Resumo completo
-2. [OMNICHANNEL_CONFIGURACOES_INTEGRACOES.md](./OMNICHANNEL_CONFIGURACOES_INTEGRACOES.md) - Configurar integrações
-3. [FRONTEND_CHAT_REALTIME.md](./FRONTEND_CHAT_REALTIME.md) - Chat em tempo real
-4. [IA_CHATBOT_DOCS.md](./IA_CHATBOT_DOCS.md) - IA e chatbot
-
-### **3. APIs e WebSocket**
-1. [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) - Todas APIs REST
-2. [websocket-events.md](./websocket-events.md) - Eventos WebSocket
-3. Exemplos de uso em cada documento
-
-### **4. Testes**
-1. [TESTES_INTEGRACOES.md](./TESTES_INTEGRACOES.md) - Testar integrações
-2. [E2E_TESTS_DOCS.md](./E2E_TESTS_DOCS.md) - Testes E2E gerais
-3. [integracoes.spec.ts](../e2e/integracoes.spec.ts) - Código dos testes
-
-### **5. Deploy e Produção**
-1. [GUIA_DEPLOY.md](./GUIA_DEPLOY.md) - Deploy em produção
-2. [GUIA_MIGRACAO_AMBIENTE.md](./GUIA_MIGRACAO_AMBIENTE.md) - Migrar ambiente
-3. Configuração de variáveis de ambiente
-
-### **6. Desenvolvimento**
-1. [CONVENCOES_DESENVOLVIMENTO.md](./CONVENCOES_DESENVOLVIMENTO.md) - Padrões de código
-2. [COPILOT_DOCUMENTATION_GUIDELINES.md](./COPILOT_DOCUMENTATION_GUIDELINES.md) - Documentar código
-3. [GUIA_LIMPEZA_DESENVOLVIMENTO.md](./GUIA_LIMPEZA_DESENVOLVIMENTO.md) - Manter projeto limpo
+📖 [Ler documento](archive/2025/ANALISE_COMPARATIVA_CRM_MERCADO.md)
 
 ---
 
-## 📊 Por Tipo de Usuário
+### 4. **ANALISE_DOCUMENTACAO_DESATUALIZADA.md**
+**Análise crítica da documentação antiga**
 
-### **👨‍💻 Desenvolvedor Frontend**
-1. [FRONTEND_CHAT_REALTIME.md](./FRONTEND_CHAT_REALTIME.md)
-2. [IntegracoesPage.tsx](../frontend-web/src/pages/configuracoes/IntegracoesPage.tsx)
-3. [useWebSocket.tsx](../frontend-web/src/hooks/useWebSocket.tsx)
-4. [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) - Seção de APIs REST
+- Identificação de inconsistências
+- Comparação: visão antiga vs real
+- Documentos obsoletos listados
+- Ações de correção tomadas
 
-### **👨‍💻 Desenvolvedor Backend**
-1. [API_DOCUMENTATION.md](./API_DOCUMENTATION.md)
-2. [websocket-events.md](./websocket-events.md)
-3. [IA_CHATBOT_DOCS.md](./IA_CHATBOT_DOCS.md)
-4. [validacao-integracoes.service.ts](../backend/src/modules/atendimento/services/validacao-integracoes.service.ts)
-
-### **🧪 QA / Tester**
-1. [TESTES_INTEGRACOES.md](./TESTES_INTEGRACOES.md)
-2. [E2E_TESTS_DOCS.md](./E2E_TESTS_DOCS.md)
-3. [integracoes.spec.ts](../e2e/integracoes.spec.ts)
-
-### **🚀 DevOps / SysAdmin**
-1. [GUIA_DEPLOY.md](./GUIA_DEPLOY.md)
-2. [GUIA_MIGRACAO_AMBIENTE.md](./GUIA_MIGRACAO_AMBIENTE.md)
-3. [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) - Seção de Deploy
-
-### **👔 Product Owner / Manager**
-1. [README.md](../README.md)
-2. [RESUMO_COMPLETO_OMNICHANNEL.md](./RESUMO_COMPLETO_OMNICHANNEL.md)
-3. [OMNICHANNEL_CONFIGURACOES_INTEGRACOES.md](./OMNICHANNEL_CONFIGURACOES_INTEGRACOES.md) - Seção de Features
+📖 [Ler documento](../ANALISE_DOCUMENTACAO_DESATUALIZADA.md)
 
 ---
 
-## 🔍 Busca Rápida
+## 🤖 Bot de Triagem
 
-### **Encontrar informações sobre...**
+### 5. **BOT_STATUS_ATUALIZADO.md**
+**Status atual do bot de triagem**
 
-#### **Integrações:**
-- WhatsApp: [OMNICHANNEL_CONFIGURACOES_INTEGRACOES.md](./OMNICHANNEL_CONFIGURACOES_INTEGRACOES.md) → Seção WhatsApp
-- OpenAI: [IA_CHATBOT_DOCS.md](./IA_CHATBOT_DOCS.md) → Seção OpenAI
-- Anthropic: [IA_CHATBOT_DOCS.md](./IA_CHATBOT_DOCS.md) → Seção Anthropic
-- Telegram: [OMNICHANNEL_CONFIGURACOES_INTEGRACOES.md](./OMNICHANNEL_CONFIGURACOES_INTEGRACOES.md) → Seção Telegram
-- Twilio: [OMNICHANNEL_CONFIGURACOES_INTEGRACOES.md](./OMNICHANNEL_CONFIGURACOES_INTEGRACOES.md) → Seção Twilio
+- Bot está CONFIGURADO e FUNCIONANDO
+- 1 fluxo publicado (Triagem Inteligente v3.0)
+- 3 núcleos visíveis no bot
+- 2 triagens concluídas em 24h
 
-#### **APIs:**
-- REST Endpoints: [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) → Seção APIs REST
-- WebSocket Events: [websocket-events.md](./websocket-events.md) ou [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) → Seção WebSocket
-- Autenticação: [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) → Seção Autenticação
-
-#### **Componentes:**
-- ChatWindow: [FRONTEND_CHAT_REALTIME.md](./FRONTEND_CHAT_REALTIME.md) → Seção ChatWindow
-- IntegracoesPage: [OMNICHANNEL_CONFIGURACOES_INTEGRACOES.md](./OMNICHANNEL_CONFIGURACOES_INTEGRACOES.md) → Seção Frontend
-- Hooks: [FRONTEND_CHAT_REALTIME.md](./FRONTEND_CHAT_REALTIME.md) → Seção Hooks
-
-#### **Deploy:**
-- Ubuntu: [GUIA_DEPLOY.md](./GUIA_DEPLOY.md) → Seção Preparação do Ambiente
-- Nginx: [GUIA_DEPLOY.md](./GUIA_DEPLOY.md) → Seção Configurar Nginx
-- PM2: [GUIA_DEPLOY.md](./GUIA_DEPLOY.md) → Seção Deploy do Backend
-- SSL: [GUIA_DEPLOY.md](./GUIA_DEPLOY.md) → Seção Configurar SSL
-
-#### **Testes:**
-- Testes manuais: [TESTES_INTEGRACOES.md](./TESTES_INTEGRACOES.md) → Seção Testes Manuais
-- Testes E2E: [E2E_TESTS_DOCS.md](./E2E_TESTS_DOCS.md)
-- Playwright: [TESTES_INTEGRACOES.md](./TESTES_INTEGRACOES.md) → Seção Testes E2E
+📖 [Ler documento](../BOT_STATUS_ATUALIZADO.md)
 
 ---
 
-## 📈 Estatísticas da Documentação
+### 6. **BOTOES_INTERATIVOS_WHATSAPP.md**
+**Implementação de botões no WhatsApp**
 
-| Métrica | Valor |
-|---------|-------|
-| **Total de documentos** | 15+ arquivos MD |
-| **Linhas de documentação** | 6.000+ linhas |
-| **Exemplos de código** | 100+ snippets |
-| **Guias passo-a-passo** | 10+ tutoriais |
-| **Diagramas** | 5+ diagramas ASCII |
-| **Comandos documentados** | 200+ comandos |
+- Reply Buttons (1-3 opções)
+- List Messages (4-10 opções)
+- Fallback automático para texto
+- Estrutura da API
 
----
-
-## 🎯 Fluxo de Leitura Recomendado
-
-### **Para Novos Desenvolvedores:**
-
-```
-1. QUICKSTART.md (5 min)
-   ↓
-2. README.md (10 min)
-   ↓
-3. OMNICHANNEL_CONFIGURACOES_INTEGRACOES.md (30 min)
-   ↓
-4. API_DOCUMENTATION.md (30 min)
-   ↓
-5. FRONTEND_CHAT_REALTIME.md ou IA_CHATBOT_DOCS.md (30 min)
-   ↓
-6. TESTES_INTEGRACOES.md (20 min)
-   ↓
-7. Começar a desenvolver! 🚀
-```
-
-### **Para Configuração Rápida:**
-
-```
-1. QUICKSTART.md (5 min)
-   ↓
-2. OMNICHANNEL_CONFIGURACOES_INTEGRACOES.md → Seção "Como Configurar" (10 min)
-   ↓
-3. Testar no navegador! ✅
-```
-
-### **Para Deploy:**
-
-```
-1. GUIA_DEPLOY.md → Ler tudo (1h)
-   ↓
-2. GUIA_MIGRACAO_AMBIENTE.md → Se migrar de outro ambiente (30 min)
-   ↓
-3. API_DOCUMENTATION.md → Seção de Testes Pós-Deploy (20 min)
-   ↓
-4. Deploy! 🚀
-```
+📖 [Ler documento](../BOTOES_INTERATIVOS_WHATSAPP.md)
 
 ---
 
-## 💡 Dicas de Navegação
+## 🚀 Implementação e Guias
 
-### **Atalhos:**
-- `Ctrl + F` - Buscar dentro do documento
-- `Ctrl + Click` - Abrir link em nova aba
-- Use o índice no topo de cada documento
+### 7. **docs/handbook/**
+**Guias práticos de implementação**
 
-### **Estrutura Padrão dos Documentos:**
-```
-1. 📋 Índice (links rápidos)
-2. 🔧 Pré-requisitos
-3. 📖 Conteúdo principal
-4. 💡 Exemplos práticos
-5. 🐛 Troubleshooting
-6. 📚 Links relacionados
-```
+- GUIA_TESTES_TRIAGEM_BOT.md - Como testar o bot
+- GUIA_IMPLEMENTACAO_MELHORIAS_BOT.md - NLP e melhorias
 
-### **Convenções:**
-- ✅ - Concluído / Sucesso
-- ⏳ - Em progresso / Aguardando
-- ❌ - Erro / Falha
-- 📖 - Leitura recomendada
-- 🔧 - Ação necessária
-- 💡 - Dica / Sugestão
-- ⚠️ - Atenção / Cuidado
+📁 [Ver pasta](handbook/)
 
 ---
 
-## 🔄 Atualizações
+### 8. **docs/runbooks/**
+**Procedimentos operacionais**
 
-**Última atualização:** 11 de outubro de 2025
+- Integração bot + núcleos
+- Checklist de testes completo
+- Próximos passos triagem
 
-### **Versão 1.0.0 (11/10/2025)**
-- ✅ Documentação inicial completa
-- ✅ 15+ documentos criados
-- ✅ 6.000+ linhas de documentação
-- ✅ Cobertura de 100% das features
-
----
-
-## 📞 Suporte
-
-**Dúvidas sobre documentação?**
-- Abra uma issue no GitHub
-- Entre em contato com a equipe de desenvolvimento
-
-**Documentação desatualizada?**
-- Verifique a data de última atualização
-- Consulte o README.md para versão mais recente
-- Contribua com melhorias via Pull Request
+📁 [Ver pasta](runbooks/)
 
 ---
 
-**Desenvolvido com ❤️ pela Equipe ConectCRM**
+## 🗂️ Documentação Arquivada
+
+### 9. **docs/archive/2025/deprecated-omnichannel/**
+⚠️ **DOCUMENTAÇÃO OBSOLETA - NÃO USAR**
+
+**Arquivamento 1** (deprecated-omnichannel/):
+- ❌ OMNICHANNEL_RESUMO_EXECUTIVO.md
+- ❌ TODO_OMNICHANNEL.md  
+- ❌ OMNICHANNEL_ANALISE_MANTER_VS_REMOVER.md
+
+**Arquivamento 2** (deprecated-omnichannel-old/):
+- ❌ OMNICHANNEL_INDICE.md
+- ❌ OMNICHANNEL_ROADMAP_MELHORIAS.md
+- ❌ OMNICHANNEL_GUIA_VISUAL.md
+- ❌ OMNICHANNEL_O_QUE_REMOVER.md
+- ❌ MELHORIAS_CHAT_OMNICHANNEL.md
+- ❌ RESUMO_MELHORIAS_CONFIGURACOES.md
+- ❌ ANALISE_ESTAGIOS_OMNICHANNEL_TEMPO_REAL.md
+- ❌ APRESENTACAO_EXECUTIVA_5MIN.md
+- ❌ ANTES_DEPOIS_UX_BOT.md
+- ❌ VALIDACAO_CONFIGURACOES_VS_MERCADO.md
+- ❌ MVP_TRIAGEM_CONCLUIDO.md
+- ❌ PROPOSTA_SIMPLIFICACAO_ESTAGIOS_ATENDIMENTO.md
+
+**Por que foram arquivados:**
+- Tratavam ConectCRM como "sistema de atendimento" (ERRADO: é suite all-in-one)
+- Comparavam apenas com Zendesk/Intercom (ERRADO: competimos com HubSpot/Zoho)
+- Propunham remover Pipeline/Financeiro (ERRADO: são diferenciais)
+- Focavam 80%+ em omnichannel, ignorando outros 6 módulos
+
+📖 [Ver README do arquivo 1](archive/2025/deprecated-omnichannel/README_ARQUIVADO.md)  
+📖 [Ver README do arquivo 2](archive/2025/deprecated-omnichannel-old/README_ARQUIVADO.md)
+
+---
+
+## 📋 Outros Documentos Importantes
+
+### Pitch e Apresentações
+- ConectCRM_Pitch_Deck.html - Apresentação para investidores
+
+### Design System
+- DESIGN_GUIDELINES.md - Tema Crevasse (paleta de cores)
+- COMPONENTS_GUIDE.md - Guia de componentes
+
+### Histórico de Implementações
+- docs/archive/2025/ - Documentos históricos de implementação
+
+---
+
+## 🎯 Guia Rápido por Perfil
+
+### Para Desenvolvedores:
+1. ✅ Ler [VISAO_SISTEMA_2025.md](../VISAO_SISTEMA_2025.md) - Entender escopo
+2. ✅ Ler [README.md](../README.md) - Setup técnico
+3. ✅ Ler [DIFERENCIAL_INTEGRACAO_NATIVA.md](../DIFERENCIAL_INTEGRACAO_NATIVA.md) - Backend único (arquitetura)
+4. ✅ Ler [ANALISE_COMPARATIVA_CRM_MERCADO.md](archive/2025/ANALISE_COMPARATIVA_CRM_MERCADO.md) - Features vs mercado
+5. ❌ **NÃO** ler documentação em deprecated-omnichannel/ ou deprecated-omnichannel-old/
+
+### Para Product Managers:
+1. ✅ Ler [VISAO_SISTEMA_2025.md](../VISAO_SISTEMA_2025.md) - Posicionamento e roadmap
+2. ✅ Ler [DIFERENCIAL_INTEGRACAO_NATIVA.md](../DIFERENCIAL_INTEGRACAO_NATIVA.md) - DIFERENCIAL #1 vs Zoho/HubSpot
+3. ✅ Ler [ANALISE_COMPARATIVA_CRM_MERCADO.md](archive/2025/ANALISE_COMPARATIVA_CRM_MERCADO.md) - Gaps vs concorrentes
+4. ✅ Ler [ANALISE_DOCUMENTACAO_DESATUALIZADA.md](../ANALISE_DOCUMENTACAO_DESATUALIZADA.md) - Entender correções
+
+### Para Vendas:
+1. ✅ Ler [KIT_VENDAS_CONECTCRM.md](../KIT_VENDAS_CONECTCRM.md) - Scripts prontos, objeções, comparativos
+2. ✅ Ler [DIFERENCIAL_INTEGRACAO_NATIVA.md](../DIFERENCIAL_INTEGRACAO_NATIVA.md) - Frases, casos, ROI (R$148k/ano)
+3. ✅ Ler [VISAO_SISTEMA_2025.md](../VISAO_SISTEMA_2025.md) - Seção "Mensagem para Vendas"
+4. ✅ Ver [ConectCRM_Pitch_Deck.html](../ConectCRM_Pitch_Deck.html) - Apresentação pronta
+5. ✅ Memorizar: "Um único sistema que faz tudo - não produtos separados como Zoho"
+
+### Para Investidores:
+1. ✅ Ler [PITCH_DECK_INVESTIDORES.md](../PITCH_DECK_INVESTIDORES.md) - 7 seções (problema, solução, mercado, tração, roadmap, time, ask)
+2. ✅ Ler [VISAO_SISTEMA_2025.md](../VISAO_SISTEMA_2025.md) - Seções "Posicionamento" e "Métricas"
+3. ✅ Ver [ConectCRM_Pitch_Deck.html](../ConectCRM_Pitch_Deck.html) - Apresentação visual
+
+---
+
+## ⚠️ AVISO IMPORTANTE
+
+### ❌ Documentos que NÃO devem ser usados:
+- Qualquer documento em **docs/archive/2025/deprecated-omnichannel/** (3 arquivos)
+- Qualquer documento em **docs/archive/2025/deprecated-omnichannel-old/** (12 arquivos)
+- Qualquer documento que compare ConectCRM apenas com Zendesk/Intercom
+- Qualquer documento que trate sistema como "apenas atendimento"
+- Qualquer roadmap que proponha remover Pipeline ou Financeiro
+
+**Por que foram arquivados:**
+- Visão ERRADA: tratavam ConectCRM como "clone do Zendesk"
+- Competidores ERRADOS: ignoravam HubSpot/Zoho (verdadeiros concorrentes)
+- Escopo ERRADO: focavam 80%+ em omnichannel, ignorando outros 6 módulos
+- Roadmap ERRADO: propunham integrar Discord/Slack em vez de Email/Templates
+- Diferencial IGNORADO: não mencionavam backend único (R$148k/ano de economia)
+
+### ✅ Documentos oficiais atualizados (use ESTES):
+- **VISAO_SISTEMA_2025.md** - Posicionamento, escopo, roadmap
+- **README.md** - Setup técnico, comandos
+- **KIT_VENDAS_CONECTCRM.md** - Scripts, objeções, comparativos (42 páginas)
+- **DIFERENCIAL_INTEGRACAO_NATIVA.md** - Backend único vs Zoho/HubSpot (40+ páginas, ROI R$148k/ano)
+- **PITCH_DECK_INVESTIDORES.md** - 7 seções para investidores
+- **ANALISE_COMPARATIVA_CRM_MERCADO.md** - Benchmark features vs mercado
+
+---
+
+## 🔄 Histórico de Atualizações
+
+| Data | Versão | Mudanças |
+|------|--------|----------|
+| 19/01/2025 | 3.0 | Arquivados 12 docs adicionais (deprecated-omnichannel-old/), criado DIFERENCIAL_INTEGRACAO_NATIVA.md, KIT_VENDAS_CONECTCRM.md, PITCH_DECK_INVESTIDORES.md atualizados |
+| 19/12/2025 | 2.0 | Criado novo índice, arquivada documentação omnichannel desatualizada (3 docs) |
+| 19/12/2025 | 2.0 | Criado VISAO_SISTEMA_2025.md como documento oficial |
+| 19/12/2025 | 2.0 | Atualizado README.md com foco em suite all-in-one |
+
+---
+
+**Próxima revisão**: Trimestral ou quando lançar novo módulo

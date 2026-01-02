@@ -1,8 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Bell, X, Check, Clock, AlertTriangle, Info, CheckCircle,
-  Settings, Filter, Search, BellRing, Volume2, VolumeX,
-  Star, Archive, Trash2, Eye, Users, Calendar
+  Bell,
+  X,
+  Check,
+  Clock,
+  AlertTriangle,
+  Info,
+  CheckCircle,
+  Settings,
+  Filter,
+  Search,
+  BellRing,
+  Volume2,
+  VolumeX,
+  Star,
+  Archive,
+  Trash2,
+  Eye,
+  Users,
+  Calendar,
 } from 'lucide-react';
 import { Fatura, StatusFatura } from '../../services/faturamentoService';
 
@@ -80,8 +96,13 @@ const NOTIFICACOES_MOCKADAS: Notificacao[] = [
     remetente: { nome: 'Sistema de Faturamento', tipo: 'sistema' },
     acoes: [
       { id: 'ver_faturas', label: 'Ver Faturas', tipo: 'primary', acao: 'navegar_faturas' },
-      { id: 'enviar_cobranca', label: 'Enviar Cobrança', tipo: 'secondary', acao: 'enviar_cobranca_lote' }
-    ]
+      {
+        id: 'enviar_cobranca',
+        label: 'Enviar Cobrança',
+        tipo: 'secondary',
+        acao: 'enviar_cobranca_lote',
+      },
+    ],
   },
   {
     id: '2',
@@ -97,8 +118,13 @@ const NOTIFICACOES_MOCKADAS: Notificacao[] = [
     remetente: { nome: 'Gateway de Pagamento', tipo: 'sistema' },
     acoes: [
       { id: 'ver_fatura', label: 'Ver Fatura', tipo: 'primary', acao: 'abrir_fatura' },
-      { id: 'baixar_comprovante', label: 'Baixar Comprovante', tipo: 'secondary', acao: 'download_comprovante' }
-    ]
+      {
+        id: 'baixar_comprovante',
+        label: 'Baixar Comprovante',
+        tipo: 'secondary',
+        acao: 'download_comprovante',
+      },
+    ],
   },
   {
     id: '3',
@@ -114,21 +140,27 @@ const NOTIFICACOES_MOCKADAS: Notificacao[] = [
     remetente: { nome: 'Análise de Risco', tipo: 'sistema' },
     acoes: [
       { id: 'ver_cliente', label: 'Ver Cliente', tipo: 'primary', acao: 'abrir_cliente' },
-      { id: 'iniciar_cobranca', label: 'Iniciar Cobrança', tipo: 'danger', acao: 'workflow_cobranca' }
-    ]
+      {
+        id: 'iniciar_cobranca',
+        label: 'Iniciar Cobrança',
+        tipo: 'danger',
+        acao: 'workflow_cobranca',
+      },
+    ],
   },
   {
     id: '4',
     tipo: 'meta_atingida',
     prioridade: 'baixa',
     titulo: 'Meta mensal atingida! 🎉',
-    mensagem: 'Parabéns! A meta de faturamento de R$ 50.000,00 foi atingida com 5 dias de antecedência',
+    mensagem:
+      'Parabéns! A meta de faturamento de R$ 50.000,00 foi atingida com 5 dias de antecedência',
     dados: { meta: 50000, atual: 52300, diasRestantes: 5 },
     lida: false,
     arquivada: false,
     favorita: true,
     criadaEm: new Date(Date.now() - 900000), // 15 min atrás
-    remetente: { nome: 'Dashboard Analytics', tipo: 'sistema' }
+    remetente: { nome: 'Dashboard Analytics', tipo: 'sistema' },
   },
   {
     id: '5',
@@ -141,8 +173,8 @@ const NOTIFICACOES_MOCKADAS: Notificacao[] = [
     arquivada: false,
     favorita: false,
     criadaEm: new Date(Date.now() - 3600000), // 1 hora atrás
-    remetente: { nome: 'Automação de Workflows', tipo: 'workflow' }
-  }
+    remetente: { nome: 'Automação de Workflows', tipo: 'workflow' },
+  },
 ];
 
 const CONFIG_INICIAL: ConfigNotificacao = {
@@ -154,27 +186,30 @@ const CONFIG_INICIAL: ConfigNotificacao = {
     sistema_alerta: true,
     workflow_executado: false,
     relatorio_disponivel: true,
-    backup_concluido: false
+    backup_concluido: false,
   },
   prioridades: {
     baixa: true,
     media: true,
     alta: true,
-    critica: true
+    critica: true,
   },
   horarioSilencioso: {
     ativo: false,
     inicio: '22:00',
-    fim: '07:00'
+    fim: '07:00',
   },
   gruposPorTipo: true,
   limiteHistorico: 100,
   somAtivo: true,
   emailAtivo: false,
-  pushAtivo: true
+  pushAtivo: true,
 };
 
-export default function NotificacoesInteligentes({ faturas, onAcaoNotificacao }: NotificacoesInteligentesProps) {
+export default function NotificacoesInteligentes({
+  faturas,
+  onAcaoNotificacao,
+}: NotificacoesInteligentesProps) {
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>(NOTIFICACOES_MOCKADAS);
   const [config, setConfig] = useState<ConfigNotificacao>(CONFIG_INICIAL);
   const [filtro, setFiltro] = useState<'todas' | 'nao_lidas' | 'favoritas' | 'arquivadas'>('todas');
@@ -187,7 +222,11 @@ export default function NotificacoesInteligentes({ faturas, onAcaoNotificacao }:
     const interval = setInterval(() => {
       // Simula 30% de chance de nova notificação a cada 30 segundos
       if (Math.random() < 0.3) {
-        const tiposDisponiveis: TipoNotificacao[] = ['fatura_vencendo', 'pagamento_recebido', 'sistema_alerta'];
+        const tiposDisponiveis: TipoNotificacao[] = [
+          'fatura_vencendo',
+          'pagamento_recebido',
+          'sistema_alerta',
+        ];
         const tipo = tiposDisponiveis[Math.floor(Math.random() * tiposDisponiveis.length)];
 
         const novaNotificacao: Notificacao = {
@@ -200,10 +239,10 @@ export default function NotificacoesInteligentes({ faturas, onAcaoNotificacao }:
           arquivada: false,
           favorita: false,
           criadaEm: new Date(),
-          remetente: { nome: 'Sistema', tipo: 'sistema' }
+          remetente: { nome: 'Sistema', tipo: 'sistema' },
         };
 
-        setNotificacoes(prev => [novaNotificacao, ...prev.slice(0, 49)]);
+        setNotificacoes((prev) => [novaNotificacao, ...prev.slice(0, 49)]);
 
         // Toca som se habilitado
         if (config.somAtivo) {
@@ -217,29 +256,23 @@ export default function NotificacoesInteligentes({ faturas, onAcaoNotificacao }:
   }, [config.somAtivo]);
 
   const marcarComoLida = (id: string) => {
-    setNotificacoes(prev => prev.map(n =>
-      n.id === id ? { ...n, lida: true } : n
-    ));
+    setNotificacoes((prev) => prev.map((n) => (n.id === id ? { ...n, lida: true } : n)));
   };
 
   const marcarTodasComoLidas = () => {
-    setNotificacoes(prev => prev.map(n => ({ ...n, lida: true })));
+    setNotificacoes((prev) => prev.map((n) => ({ ...n, lida: true })));
   };
 
   const toggleFavorita = (id: string) => {
-    setNotificacoes(prev => prev.map(n =>
-      n.id === id ? { ...n, favorita: !n.favorita } : n
-    ));
+    setNotificacoes((prev) => prev.map((n) => (n.id === id ? { ...n, favorita: !n.favorita } : n)));
   };
 
   const arquivar = (id: string) => {
-    setNotificacoes(prev => prev.map(n =>
-      n.id === id ? { ...n, arquivada: true } : n
-    ));
+    setNotificacoes((prev) => prev.map((n) => (n.id === id ? { ...n, arquivada: true } : n)));
   };
 
   const excluir = (id: string) => {
-    setNotificacoes(prev => prev.filter(n => n.id !== id));
+    setNotificacoes((prev) => prev.filter((n) => n.id !== id));
   };
 
   const executarAcao = async (acao: AcaoNotificacao, notificacao: Notificacao) => {
@@ -247,7 +280,7 @@ export default function NotificacoesInteligentes({ faturas, onAcaoNotificacao }:
       await onAcaoNotificacao(acao.acao, {
         ...acao.parametros,
         notificacaoId: notificacao.id,
-        dadosNotificacao: notificacao.dados
+        dadosNotificacao: notificacao.dados,
       });
       marcarComoLida(notificacao.id);
     } catch (error) {
@@ -257,28 +290,41 @@ export default function NotificacoesInteligentes({ faturas, onAcaoNotificacao }:
 
   const getPrioridadeColor = (prioridade: PrioridadeNotificacao) => {
     switch (prioridade) {
-      case 'baixa': return 'border-l-gray-400 bg-gray-50';
-      case 'media': return 'border-l-blue-400 bg-blue-50';
-      case 'alta': return 'border-l-yellow-400 bg-yellow-50';
-      case 'critica': return 'border-l-red-400 bg-red-50';
+      case 'baixa':
+        return 'border-l-gray-400 bg-gray-50';
+      case 'media':
+        return 'border-l-blue-400 bg-blue-50';
+      case 'alta':
+        return 'border-l-yellow-400 bg-yellow-50';
+      case 'critica':
+        return 'border-l-red-400 bg-red-50';
     }
   };
 
   const getTipoIcon = (tipo: TipoNotificacao) => {
     switch (tipo) {
-      case 'fatura_vencendo': return <Clock className="w-5 h-5 text-yellow-600" />;
-      case 'pagamento_recebido': return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case 'cliente_inadimplente': return <AlertTriangle className="w-5 h-5 text-red-600" />;
-      case 'meta_atingida': return <Star className="w-5 h-5 text-purple-600" />;
-      case 'sistema_alerta': return <Info className="w-5 h-5 text-blue-600" />;
-      case 'workflow_executado': return <Settings className="w-5 h-5 text-gray-600" />;
-      case 'relatorio_disponivel': return <Calendar className="w-5 h-5 text-indigo-600" />;
-      case 'backup_concluido': return <Archive className="w-5 h-5 text-green-600" />;
-      default: return <Bell className="w-5 h-5 text-gray-600" />;
+      case 'fatura_vencendo':
+        return <Clock className="w-5 h-5 text-yellow-600" />;
+      case 'pagamento_recebido':
+        return <CheckCircle className="w-5 h-5 text-green-600" />;
+      case 'cliente_inadimplente':
+        return <AlertTriangle className="w-5 h-5 text-red-600" />;
+      case 'meta_atingida':
+        return <Star className="w-5 h-5 text-purple-600" />;
+      case 'sistema_alerta':
+        return <Info className="w-5 h-5 text-blue-600" />;
+      case 'workflow_executado':
+        return <Settings className="w-5 h-5 text-gray-600" />;
+      case 'relatorio_disponivel':
+        return <Calendar className="w-5 h-5 text-indigo-600" />;
+      case 'backup_concluido':
+        return <Archive className="w-5 h-5 text-green-600" />;
+      default:
+        return <Bell className="w-5 h-5 text-gray-600" />;
     }
   };
 
-  const notificacoesFiltradas = notificacoes.filter(notificacao => {
+  const notificacoesFiltradas = notificacoes.filter((notificacao) => {
     // Filtro por status
     if (filtro === 'nao_lidas' && notificacao.lida) return false;
     if (filtro === 'favoritas' && !notificacao.favorita) return false;
@@ -286,8 +332,11 @@ export default function NotificacoesInteligentes({ faturas, onAcaoNotificacao }:
     if (filtro === 'todas' && notificacao.arquivada) return false;
 
     // Filtro por busca
-    if (busca && !notificacao.titulo.toLowerCase().includes(busca.toLowerCase()) &&
-      !notificacao.mensagem.toLowerCase().includes(busca.toLowerCase())) {
+    if (
+      busca &&
+      !notificacao.titulo.toLowerCase().includes(busca.toLowerCase()) &&
+      !notificacao.mensagem.toLowerCase().includes(busca.toLowerCase())
+    ) {
       return false;
     }
 
@@ -298,7 +347,7 @@ export default function NotificacoesInteligentes({ faturas, onAcaoNotificacao }:
     return true;
   });
 
-  const contadorNaoLidas = notificacoes.filter(n => !n.lida && !n.arquivada).length;
+  const contadorNaoLidas = notificacoes.filter((n) => !n.lida && !n.arquivada).length;
 
   return (
     <div className="space-y-6">
@@ -378,24 +427,31 @@ export default function NotificacoesInteligentes({ faturas, onAcaoNotificacao }:
         {notificacoesFiltradas.length === 0 ? (
           <div className="p-12 text-center">
             <Bell className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma notificação encontrada</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Nenhuma notificação encontrada
+            </h3>
             <p className="text-gray-600">
-              {filtro === 'nao_lidas' ? 'Todas as notificações foram lidas!' : 'Não há notificações para exibir.'}
+              {filtro === 'nao_lidas'
+                ? 'Todas as notificações foram lidas!'
+                : 'Não há notificações para exibir.'}
             </p>
           </div>
         ) : (
           <div className="divide-y">
-            {notificacoesFiltradas.map(notificacao => (
+            {notificacoesFiltradas.map((notificacao) => (
               <div
                 key={notificacao.id}
-                className={`p-6 border-l-4 ${getPrioridadeColor(notificacao.prioridade)} ${!notificacao.lida ? 'bg-blue-25' : ''
-                  }`}
+                className={`p-6 border-l-4 ${getPrioridadeColor(notificacao.prioridade)} ${
+                  !notificacao.lida ? 'bg-blue-25' : ''
+                }`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       {getTipoIcon(notificacao.tipo)}
-                      <h4 className={`font-medium ${!notificacao.lida ? 'text-gray-900 font-semibold' : 'text-gray-700'}`}>
+                      <h4
+                        className={`font-medium ${!notificacao.lida ? 'text-gray-900 font-semibold' : 'text-gray-700'}`}
+                      >
                         {notificacao.titulo}
                       </h4>
                       {!notificacao.lida && (
@@ -410,23 +466,24 @@ export default function NotificacoesInteligentes({ faturas, onAcaoNotificacao }:
 
                     <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
                       <span>{notificacao.criadaEm.toLocaleString('pt-BR')}</span>
-                      {notificacao.remetente && (
-                        <span>• {notificacao.remetente.nome}</span>
-                      )}
+                      {notificacao.remetente && <span>• {notificacao.remetente.nome}</span>}
                       <span className="capitalize">• {notificacao.prioridade}</span>
                     </div>
 
                     {/* Ações da Notificação */}
                     {notificacao.acoes && notificacao.acoes.length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-4">
-                        {notificacao.acoes.map(acao => (
+                        {notificacao.acoes.map((acao) => (
                           <button
                             key={acao.id}
                             onClick={() => executarAcao(acao, notificacao)}
-                            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${acao.tipo === 'primary' ? 'bg-blue-600 text-white hover:bg-blue-700' :
-                                acao.tipo === 'danger' ? 'bg-red-600 text-white hover:bg-red-700' :
-                                  'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                              }`}
+                            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                              acao.tipo === 'primary'
+                                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                : acao.tipo === 'danger'
+                                  ? 'bg-red-600 text-white hover:bg-red-700'
+                                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
                           >
                             {acao.label}
                           </button>
@@ -449,11 +506,14 @@ export default function NotificacoesInteligentes({ faturas, onAcaoNotificacao }:
 
                     <button
                       onClick={() => toggleFavorita(notificacao.id)}
-                      className={`p-2 rounded-lg transition-colors ${notificacao.favorita
+                      className={`p-2 rounded-lg transition-colors ${
+                        notificacao.favorita
                           ? 'text-yellow-500 hover:bg-yellow-50'
                           : 'text-gray-400 hover:bg-gray-50'
-                        }`}
-                      title={notificacao.favorita ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                      }`}
+                      title={
+                        notificacao.favorita ? 'Remover dos favoritos' : 'Adicionar aos favoritos'
+                      }
                     >
                       <Star className={`w-4 h-4 ${notificacao.favorita ? 'fill-current' : ''}`} />
                     </button>
@@ -507,10 +567,12 @@ export default function NotificacoesInteligentes({ faturas, onAcaoNotificacao }:
                       <input
                         type="checkbox"
                         checked={ativo}
-                        onChange={(e) => setConfig(prev => ({
-                          ...prev,
-                          tipos: { ...prev.tipos, [tipo]: e.target.checked }
-                        }))}
+                        onChange={(e) =>
+                          setConfig((prev) => ({
+                            ...prev,
+                            tipos: { ...prev.tipos, [tipo]: e.target.checked },
+                          }))
+                        }
                         className="rounded"
                       />
                       <span className="capitalize">{tipo.replace('_', ' ')}</span>
@@ -527,7 +589,9 @@ export default function NotificacoesInteligentes({ faturas, onAcaoNotificacao }:
                     <input
                       type="checkbox"
                       checked={config.somAtivo}
-                      onChange={(e) => setConfig(prev => ({ ...prev, somAtivo: e.target.checked }))}
+                      onChange={(e) =>
+                        setConfig((prev) => ({ ...prev, somAtivo: e.target.checked }))
+                      }
                       className="rounded"
                     />
                     <Volume2 className="w-4 h-4" />
@@ -538,7 +602,9 @@ export default function NotificacoesInteligentes({ faturas, onAcaoNotificacao }:
                     <input
                       type="checkbox"
                       checked={config.emailAtivo}
-                      onChange={(e) => setConfig(prev => ({ ...prev, emailAtivo: e.target.checked }))}
+                      onChange={(e) =>
+                        setConfig((prev) => ({ ...prev, emailAtivo: e.target.checked }))
+                      }
                       className="rounded"
                     />
                     <span>Notificações por email</span>
@@ -548,7 +614,9 @@ export default function NotificacoesInteligentes({ faturas, onAcaoNotificacao }:
                     <input
                       type="checkbox"
                       checked={config.pushAtivo}
-                      onChange={(e) => setConfig(prev => ({ ...prev, pushAtivo: e.target.checked }))}
+                      onChange={(e) =>
+                        setConfig((prev) => ({ ...prev, pushAtivo: e.target.checked }))
+                      }
                       className="rounded"
                     />
                     <span>Notificações push</span>
@@ -563,10 +631,12 @@ export default function NotificacoesInteligentes({ faturas, onAcaoNotificacao }:
                   <input
                     type="checkbox"
                     checked={config.horarioSilencioso.ativo}
-                    onChange={(e) => setConfig(prev => ({
-                      ...prev,
-                      horarioSilencioso: { ...prev.horarioSilencioso, ativo: e.target.checked }
-                    }))}
+                    onChange={(e) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        horarioSilencioso: { ...prev.horarioSilencioso, ativo: e.target.checked },
+                      }))
+                    }
                     className="rounded"
                   />
                   <span>Ativar horário silencioso</span>
@@ -577,20 +647,24 @@ export default function NotificacoesInteligentes({ faturas, onAcaoNotificacao }:
                     <input
                       type="time"
                       value={config.horarioSilencioso.inicio}
-                      onChange={(e) => setConfig(prev => ({
-                        ...prev,
-                        horarioSilencioso: { ...prev.horarioSilencioso, inicio: e.target.value }
-                      }))}
+                      onChange={(e) =>
+                        setConfig((prev) => ({
+                          ...prev,
+                          horarioSilencioso: { ...prev.horarioSilencioso, inicio: e.target.value },
+                        }))
+                      }
                       className="px-3 py-2 border border-gray-300 rounded-md"
                     />
                     <span>até</span>
                     <input
                       type="time"
                       value={config.horarioSilencioso.fim}
-                      onChange={(e) => setConfig(prev => ({
-                        ...prev,
-                        horarioSilencioso: { ...prev.horarioSilencioso, fim: e.target.value }
-                      }))}
+                      onChange={(e) =>
+                        setConfig((prev) => ({
+                          ...prev,
+                          horarioSilencioso: { ...prev.horarioSilencioso, fim: e.target.value },
+                        }))
+                      }
                       className="px-3 py-2 border border-gray-300 rounded-md"
                     />
                   </div>

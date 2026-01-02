@@ -9,6 +9,7 @@ import {
 import { Ticket } from './ticket.entity';
 import { User } from '../../users/user.entity';
 import { Fila } from './fila.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 /**
  * Log de Distribuição de Tickets
@@ -20,6 +21,13 @@ import { Fila } from './fila.entity';
 export class DistribuicaoLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column('uuid')
   ticketId: string;

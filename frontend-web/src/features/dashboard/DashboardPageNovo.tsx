@@ -10,12 +10,30 @@ import {
   PropostasChart,
   FunnelChart,
   VendedoresChart,
-  AtividadesChart
+  AtividadesChart,
 } from '../../components/charts/DashboardCharts';
 import {
-  AlertTriangle, Activity, Target, Users, FileText, DollarSign,
-  TrendingUp, UserPlus, BarChart3, ChevronRight, Filter, ArrowUp, ArrowDown,
-  CheckSquare, Clock, Eye, Edit, Plus, Calendar, Bell, RefreshCw
+  AlertTriangle,
+  Activity,
+  Target,
+  Users,
+  FileText,
+  DollarSign,
+  TrendingUp,
+  UserPlus,
+  BarChart3,
+  ChevronRight,
+  Filter,
+  ArrowUp,
+  ArrowDown,
+  CheckSquare,
+  Clock,
+  Eye,
+  Edit,
+  Plus,
+  Calendar,
+  Bell,
+  RefreshCw,
 } from 'lucide-react';
 
 const DashboardPage: React.FC = () => {
@@ -23,9 +41,9 @@ const DashboardPage: React.FC = () => {
   const { currentPalette } = useTheme();
 
   const [filtros, setFiltros] = useState({
-    periodo: "mensal",
-    vendedor: "Todos",
-    regiao: "Todas"
+    periodo: 'mensal',
+    vendedor: 'Todos',
+    regiao: 'Todas',
   });
 
   const [showPaletteSelector, setShowPaletteSelector] = useState(false);
@@ -36,7 +54,7 @@ const DashboardPage: React.FC = () => {
     vendedorId: filtros.vendedor === 'Todos' ? undefined : filtros.vendedor,
     regiao: filtros.regiao === 'Todas' ? undefined : filtros.regiao,
     autoRefresh: true,
-    refreshInterval: 15 * 60 * 1000 // 15 minutos
+    refreshInterval: 15 * 60 * 1000, // 15 minutos
   });
 
   // Atualizar filtros quando o usuário muda
@@ -45,7 +63,7 @@ const DashboardPage: React.FC = () => {
     updateFilters({
       periodo: novosFiltros.periodo,
       vendedorId: novosFiltros.vendedor === 'Todos' ? undefined : novosFiltros.vendedor,
-      regiao: novosFiltros.regiao === 'Todas' ? undefined : novosFiltros.regiao
+      regiao: novosFiltros.regiao === 'Todas' ? undefined : novosFiltros.regiao,
     });
   };
 
@@ -56,7 +74,7 @@ const DashboardPage: React.FC = () => {
         <div className="animate-pulse">
           <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {[1, 2, 3, 4].map(i => (
+            {[1, 2, 3, 4].map((i) => (
               <div key={i} className="bg-gray-200 h-32 rounded-lg"></div>
             ))}
           </div>
@@ -162,7 +180,7 @@ const DashboardPage: React.FC = () => {
                   </div>
                   {alerta.acao && (
                     <button
-                      onClick={() => window.location.href = alerta.acao!.url}
+                      onClick={() => (window.location.href = alerta.acao!.url)}
                       className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors"
                     >
                       {alerta.acao.texto}
@@ -183,7 +201,7 @@ const DashboardPage: React.FC = () => {
             className="rounded-xl p-6 border shadow-sm hover:shadow-md transition-all relative"
             style={{
               backgroundColor: currentPalette.colors.background,
-              borderColor: currentPalette.colors.border
+              borderColor: currentPalette.colors.border,
             }}
           >
             <div className="flex items-center justify-between mb-3">
@@ -197,43 +215,33 @@ const DashboardPage: React.FC = () => {
                 className="p-2 rounded-full"
                 style={{ backgroundColor: currentPalette.colors.neutralLight }}
               >
-                <DollarSign
-                  className="w-6 h-6"
-                  style={{ color: currentPalette.colors.neutral }}
-                />
+                <DollarSign className="w-6 h-6" style={{ color: currentPalette.colors.neutral }} />
               </div>
             </div>
-            <div
-              className="text-4xl font-black mb-2"
-              style={{ color: currentPalette.colors.text }}
-            >
+            <div className="text-4xl font-black mb-2" style={{ color: currentPalette.colors.text }}>
               {data.kpis.faturamentoTotal.valor.toLocaleString('pt-BR', {
                 style: 'currency',
                 currency: 'BRL',
-                minimumFractionDigits: 0
+                minimumFractionDigits: 0,
               })}
             </div>
             <div className="flex items-center gap-2">
               {data.kpis.faturamentoTotal.variacao >= 0 ? (
-                <ArrowUp
-                  className="w-5 h-5"
-                  style={{ color: currentPalette.colors.success }}
-                />
+                <ArrowUp className="w-5 h-5" style={{ color: currentPalette.colors.success }} />
               ) : (
-                <ArrowDown
-                  className="w-5 h-5"
-                  style={{ color: currentPalette.colors.error }}
-                />
+                <ArrowDown className="w-5 h-5" style={{ color: currentPalette.colors.error }} />
               )}
               <span
                 className="text-sm font-bold"
                 style={{
-                  color: data.kpis.faturamentoTotal.variacao >= 0
-                    ? currentPalette.colors.success
-                    : currentPalette.colors.error
+                  color:
+                    data.kpis.faturamentoTotal.variacao >= 0
+                      ? currentPalette.colors.success
+                      : currentPalette.colors.error,
                 }}
               >
-                {data.kpis.faturamentoTotal.variacao >= 0 ? '+' : ''}{data.kpis.faturamentoTotal.variacao}% {data.kpis.faturamentoTotal.periodo}
+                {data.kpis.faturamentoTotal.variacao >= 0 ? '+' : ''}
+                {data.kpis.faturamentoTotal.variacao}% {data.kpis.faturamentoTotal.periodo}
               </span>
             </div>
             {/* Barra de progresso da meta */}
@@ -243,21 +251,26 @@ const DashboardPage: React.FC = () => {
                   className="text-xs font-medium"
                   style={{ color: currentPalette.colors.textSecondary }}
                 >
-                  Meta: {data.kpis.faturamentoTotal.meta.toLocaleString('pt-BR', {
+                  Meta:{' '}
+                  {data.kpis.faturamentoTotal.meta.toLocaleString('pt-BR', {
                     style: 'currency',
                     currency: 'BRL',
-                    minimumFractionDigits: 0
+                    minimumFractionDigits: 0,
                   })}
                 </span>
                 <span
                   className="text-xs font-bold"
                   style={{
-                    color: (data.kpis.faturamentoTotal.valor / data.kpis.faturamentoTotal.meta) >= 1
-                      ? currentPalette.colors.success
-                      : currentPalette.colors.primary
+                    color:
+                      data.kpis.faturamentoTotal.valor / data.kpis.faturamentoTotal.meta >= 1
+                        ? currentPalette.colors.success
+                        : currentPalette.colors.primary,
                   }}
                 >
-                  {Math.round((data.kpis.faturamentoTotal.valor / data.kpis.faturamentoTotal.meta) * 100)}%
+                  {Math.round(
+                    (data.kpis.faturamentoTotal.valor / data.kpis.faturamentoTotal.meta) * 100,
+                  )}
+                  %
                 </span>
               </div>
               <div
@@ -268,15 +281,16 @@ const DashboardPage: React.FC = () => {
                   className="h-3 rounded-full transition-all duration-1000 ease-out"
                   style={{
                     width: `${Math.min((data.kpis.faturamentoTotal.valor / data.kpis.faturamentoTotal.meta) * 100, 100)}%`,
-                    backgroundColor: (data.kpis.faturamentoTotal.valor / data.kpis.faturamentoTotal.meta) >= 1
-                      ? currentPalette.colors.success
-                      : currentPalette.colors.primary
+                    backgroundColor:
+                      data.kpis.faturamentoTotal.valor / data.kpis.faturamentoTotal.meta >= 1
+                        ? currentPalette.colors.success
+                        : currentPalette.colors.primary,
                   }}
                 />
               </div>
             </div>
             {/* Badge de meta superada */}
-            {(data.kpis.faturamentoTotal.valor / data.kpis.faturamentoTotal.meta) >= 1 && (
+            {data.kpis.faturamentoTotal.valor / data.kpis.faturamentoTotal.meta >= 1 && (
               <div className="absolute top-2 right-2">
                 <div className="bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded-full">
                   🔥 Meta Superada!
@@ -290,7 +304,7 @@ const DashboardPage: React.FC = () => {
             className="rounded-xl p-6 border shadow-sm hover:shadow-md transition-all"
             style={{
               backgroundColor: currentPalette.colors.background,
-              borderColor: currentPalette.colors.border
+              borderColor: currentPalette.colors.border,
             }}
           >
             <div className="flex items-center justify-between mb-3">
@@ -304,43 +318,33 @@ const DashboardPage: React.FC = () => {
                 className="p-2 rounded-full"
                 style={{ backgroundColor: currentPalette.colors.primaryLight }}
               >
-                <Target
-                  className="w-6 h-6"
-                  style={{ color: currentPalette.colors.primary }}
-                />
+                <Target className="w-6 h-6" style={{ color: currentPalette.colors.primary }} />
               </div>
             </div>
-            <div
-              className="text-3xl font-black mb-2"
-              style={{ color: currentPalette.colors.text }}
-            >
+            <div className="text-3xl font-black mb-2" style={{ color: currentPalette.colors.text }}>
               {data.kpis.ticketMedio.valor.toLocaleString('pt-BR', {
                 style: 'currency',
                 currency: 'BRL',
-                minimumFractionDigits: 0
+                minimumFractionDigits: 0,
               })}
             </div>
             <div className="flex items-center gap-2">
               {data.kpis.ticketMedio.variacao >= 0 ? (
-                <ArrowUp
-                  className="w-5 h-5"
-                  style={{ color: currentPalette.colors.primary }}
-                />
+                <ArrowUp className="w-5 h-5" style={{ color: currentPalette.colors.primary }} />
               ) : (
-                <ArrowDown
-                  className="w-5 h-5"
-                  style={{ color: currentPalette.colors.error }}
-                />
+                <ArrowDown className="w-5 h-5" style={{ color: currentPalette.colors.error }} />
               )}
               <span
                 className="text-sm font-bold"
                 style={{
-                  color: data.kpis.ticketMedio.variacao >= 0
-                    ? currentPalette.colors.primary
-                    : currentPalette.colors.error
+                  color:
+                    data.kpis.ticketMedio.variacao >= 0
+                      ? currentPalette.colors.primary
+                      : currentPalette.colors.error,
                 }}
               >
-                {data.kpis.ticketMedio.variacao >= 0 ? '+' : ''}{data.kpis.ticketMedio.variacao}% {data.kpis.ticketMedio.periodo}
+                {data.kpis.ticketMedio.variacao >= 0 ? '+' : ''}
+                {data.kpis.ticketMedio.variacao}% {data.kpis.ticketMedio.periodo}
               </span>
             </div>
           </div>
@@ -350,7 +354,7 @@ const DashboardPage: React.FC = () => {
             className="rounded-xl p-6 border shadow-sm hover:shadow-md transition-all"
             style={{
               backgroundColor: currentPalette.colors.background,
-              borderColor: currentPalette.colors.border
+              borderColor: currentPalette.colors.border,
             }}
           >
             <div className="flex items-center justify-between mb-3">
@@ -364,39 +368,29 @@ const DashboardPage: React.FC = () => {
                 className="p-2 rounded-full"
                 style={{ backgroundColor: currentPalette.colors.neutralLight }}
               >
-                <CheckSquare
-                  className="w-6 h-6"
-                  style={{ color: currentPalette.colors.neutral }}
-                />
+                <CheckSquare className="w-6 h-6" style={{ color: currentPalette.colors.neutral }} />
               </div>
             </div>
-            <div
-              className="text-3xl font-black mb-2"
-              style={{ color: currentPalette.colors.text }}
-            >
+            <div className="text-3xl font-black mb-2" style={{ color: currentPalette.colors.text }}>
               {data.kpis.vendasFechadas.quantidade}
             </div>
             <div className="flex items-center gap-2">
               {data.kpis.vendasFechadas.variacao >= 0 ? (
-                <ArrowUp
-                  className="w-5 h-5"
-                  style={{ color: currentPalette.colors.success }}
-                />
+                <ArrowUp className="w-5 h-5" style={{ color: currentPalette.colors.success }} />
               ) : (
-                <ArrowDown
-                  className="w-5 h-5"
-                  style={{ color: currentPalette.colors.error }}
-                />
+                <ArrowDown className="w-5 h-5" style={{ color: currentPalette.colors.error }} />
               )}
               <span
                 className="text-sm font-bold"
                 style={{
-                  color: data.kpis.vendasFechadas.variacao >= 0
-                    ? currentPalette.colors.success
-                    : currentPalette.colors.error
+                  color:
+                    data.kpis.vendasFechadas.variacao >= 0
+                      ? currentPalette.colors.success
+                      : currentPalette.colors.error,
                 }}
               >
-                {data.kpis.vendasFechadas.variacao >= 0 ? '+' : ''}{data.kpis.vendasFechadas.variacao}% {data.kpis.vendasFechadas.periodo}
+                {data.kpis.vendasFechadas.variacao >= 0 ? '+' : ''}
+                {data.kpis.vendasFechadas.variacao}% {data.kpis.vendasFechadas.periodo}
               </span>
             </div>
           </div>
@@ -406,7 +400,7 @@ const DashboardPage: React.FC = () => {
             className="rounded-xl p-6 border shadow-sm hover:shadow-md transition-all"
             style={{
               backgroundColor: currentPalette.colors.background,
-              borderColor: currentPalette.colors.border
+              borderColor: currentPalette.colors.border,
             }}
           >
             <div className="flex items-center justify-between mb-3">
@@ -420,28 +414,19 @@ const DashboardPage: React.FC = () => {
                 className="p-2 rounded-full"
                 style={{ backgroundColor: currentPalette.colors.neutralLight }}
               >
-                <Clock
-                  className="w-6 h-6"
-                  style={{ color: currentPalette.colors.neutral }}
-                />
+                <Clock className="w-6 h-6" style={{ color: currentPalette.colors.neutral }} />
               </div>
             </div>
-            <div
-              className="text-3xl font-black mb-2"
-              style={{ color: currentPalette.colors.text }}
-            >
+            <div className="text-3xl font-black mb-2" style={{ color: currentPalette.colors.text }}>
               {(data.kpis.emNegociacao.valor || 0).toLocaleString('pt-BR', {
                 style: 'currency',
                 currency: 'BRL',
-                minimumFractionDigits: 0
+                minimumFractionDigits: 0,
               })}
             </div>
             <div className="flex items-center gap-2">
-              <span
-                className="text-sm font-bold"
-                style={{ color: currentPalette.colors.primary }}
-              >
-                {(data.kpis.emNegociacao.quantidade || 0)} propostas ativas
+              <span className="text-sm font-bold" style={{ color: currentPalette.colors.primary }}>
+                {data.kpis.emNegociacao.quantidade || 0} propostas ativas
               </span>
             </div>
           </div>
@@ -457,7 +442,7 @@ const DashboardPage: React.FC = () => {
           trend={{
             value: data.kpis?.novosClientesMes.variacao || 0,
             isPositive: (data.kpis?.novosClientesMes.variacao || 0) >= 0,
-            period: "vs mês anterior"
+            period: 'vs mês anterior',
           }}
           currentPalette={currentPalette}
         />
@@ -469,7 +454,7 @@ const DashboardPage: React.FC = () => {
           trend={{
             value: data.kpis?.leadsQualificados.variacao || 0,
             isPositive: (data.kpis?.leadsQualificados.variacao || 0) >= 0,
-            period: "vs mês anterior"
+            period: 'vs mês anterior',
           }}
           currentPalette={currentPalette}
         />
@@ -482,7 +467,7 @@ const DashboardPage: React.FC = () => {
           trend={{
             value: data.kpis?.propostasEnviadas.variacao || 0,
             isPositive: (data.kpis?.propostasEnviadas.variacao || 0) >= 0,
-            period: "vs mês anterior"
+            period: 'vs mês anterior',
           }}
           currentPalette={currentPalette}
         />
@@ -495,7 +480,7 @@ const DashboardPage: React.FC = () => {
           trend={{
             value: data.kpis?.taxaSucessoGeral.variacao || 0,
             isPositive: (data.kpis?.taxaSucessoGeral.variacao || 0) >= 0,
-            period: "vs mês anterior"
+            period: 'vs mês anterior',
           }}
           currentPalette={currentPalette}
         />
@@ -520,7 +505,7 @@ const DashboardPage: React.FC = () => {
             className="rounded-xl p-6 border shadow-sm"
             style={{
               backgroundColor: currentPalette.colors.background,
-              borderColor: currentPalette.colors.border
+              borderColor: currentPalette.colors.border,
             }}
           >
             <h3 className="text-xl font-bold mb-4" style={{ color: currentPalette.colors.text }}>
@@ -545,22 +530,30 @@ const DashboardPage: React.FC = () => {
                         {vendedor.vendas.toLocaleString('pt-BR', {
                           style: 'currency',
                           currency: 'BRL',
-                          minimumFractionDigits: 0
-                        })} de {vendedor.meta.toLocaleString('pt-BR', {
+                          minimumFractionDigits: 0,
+                        })}{' '}
+                        de{' '}
+                        {vendedor.meta.toLocaleString('pt-BR', {
                           style: 'currency',
                           currency: 'BRL',
-                          minimumFractionDigits: 0
+                          minimumFractionDigits: 0,
                         })}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-right">
-                      <div className="text-sm font-semibold" style={{ color: currentPalette.colors.text }}>
+                      <div
+                        className="text-sm font-semibold"
+                        style={{ color: currentPalette.colors.text }}
+                      >
                         {Math.round((vendedor.vendas / vendedor.meta) * 100)}%
                       </div>
-                      <div className={`text-xs ${vendedor.variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {vendedor.variacao >= 0 ? '+' : ''}{vendedor.variacao}%
+                      <div
+                        className={`text-xs ${vendedor.variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                      >
+                        {vendedor.variacao >= 0 ? '+' : ''}
+                        {vendedor.variacao}%
                       </div>
                     </div>
                     {vendedor.badges.length > 0 && (
@@ -603,7 +596,6 @@ const DashboardPage: React.FC = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };

@@ -199,7 +199,7 @@ node backend/reset-admin-password.js
 // Ou via SQL (hash bcrypt de "Admin@123")
 UPDATE usuarios 
 SET senha = '$2b$10$YourBcryptHashHere'
-WHERE email = 'admin@conectcrm.com';
+WHERE email = 'admin@conectsuite.com.br';
 ```
 
 **Opção 2: Usuário inativo**

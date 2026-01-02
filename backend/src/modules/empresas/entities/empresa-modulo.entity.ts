@@ -31,8 +31,8 @@ export class EmpresaModulo {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
-  empresa_id: string;
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
 
   @ManyToOne(() => Empresa, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'empresa_id' })

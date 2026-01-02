@@ -19,7 +19,7 @@ interface UseConfirmacaoInteligenteReturn {
   confirmar: (
     tipo: TipoConfirmacao,
     acao: () => Promise<void> | void,
-    dados?: DadosContexto
+    dados?: DadosContexto,
   ) => void;
   fechar: () => void;
   executarConfirmacao: () => void;
@@ -33,57 +33,63 @@ export const useConfirmacaoInteligente = (): UseConfirmacaoInteligenteReturn => 
   const [acaoPendente, setAcaoPendente] = useState<(() => Promise<void> | void) | null>(null);
   const [tipo, setTipo] = useState<TipoConfirmacao | null>(null);
   const [dados, setDados] = useState<DadosContexto | undefined>(undefined);
-  
+
   // Hook de notificações para feedback de sucesso
   const notificacao = useNotificacaoFinanceira();
 
-  const mostrarNotificacaoSucesso = useCallback((tipo: TipoConfirmacao, dados?: DadosContexto) => {
-    switch (tipo) {
-      case 'excluir-fatura':
-        notificacao.sucesso.faturaExcluida(dados?.numero);
-        break;
-      case 'excluir-multiplas-faturas':
-        notificacao.sucesso.faturasExcluidasEmMassa(dados?.quantidadeItens || 0);
-        break;
-      case 'cancelar-fatura':
-      case 'cancelar-fatura-vencida':
-        notificacao.sucesso.faturaCancelada(dados?.numero);
-        break;
-      case 'estornar-pagamento':
-        notificacao.sucesso.pagamentoEstornado(dados?.valor);
-        break;
-      case 'excluir-pagamento':
-        notificacao.sucesso.pagamentoRegistrado(dados?.valor);
-        break;
-      case 'excluir-transacao':
-        if (dados?.cliente) {
-          // Se tem cliente, é fornecedor
-          notificacao.sucesso.fornecedorExcluido(dados.cliente);
-        } else {
-          notificacao.mostrarSucesso('Transação Excluída', 'Transação excluída com sucesso.');
-        }
-        break;
-      case 'excluir-categoria-financeira':
-        notificacao.mostrarSucesso(
-          'Exclusão Concluída', 
-          `${dados?.quantidadeItens || 1} item(ns) excluído(s) com sucesso.`
-        );
-        break;
-      default:
-        notificacao.mostrarSucesso('Operação Concluída', 'Ação executada com sucesso.');
-    }
-  }, [notificacao]);
+  const mostrarNotificacaoSucesso = useCallback(
+    (tipo: TipoConfirmacao, dados?: DadosContexto) => {
+      switch (tipo) {
+        case 'excluir-fatura':
+          notificacao.sucesso.faturaExcluida(dados?.numero);
+          break;
+        case 'excluir-multiplas-faturas':
+          notificacao.sucesso.faturasExcluidasEmMassa(dados?.quantidadeItens || 0);
+          break;
+        case 'cancelar-fatura':
+        case 'cancelar-fatura-vencida':
+          notificacao.sucesso.faturaCancelada(dados?.numero);
+          break;
+        case 'estornar-pagamento':
+          notificacao.sucesso.pagamentoEstornado(dados?.valor);
+          break;
+        case 'excluir-pagamento':
+          notificacao.sucesso.pagamentoRegistrado(dados?.valor);
+          break;
+        case 'excluir-transacao':
+          if (dados?.cliente) {
+            // Se tem cliente, é fornecedor
+            notificacao.sucesso.fornecedorExcluido(dados.cliente);
+          } else {
+            notificacao.mostrarSucesso('Transação Excluída', 'Transação excluída com sucesso.');
+          }
+          break;
+        case 'excluir-categoria-financeira':
+          notificacao.mostrarSucesso(
+            'Exclusão Concluída',
+            `${dados?.quantidadeItens || 1} item(ns) excluído(s) com sucesso.`,
+          );
+          break;
+        default:
+          notificacao.mostrarSucesso('Operação Concluída', 'Ação executada com sucesso.');
+      }
+    },
+    [notificacao],
+  );
 
-  const confirmar = useCallback((
-    tipoConfirmacao: TipoConfirmacao,
-    acao: () => Promise<void> | void,
-    dadosContexto?: DadosContexto
-  ) => {
-    setTipo(tipoConfirmacao);
-    setDados(dadosContexto);
-    setAcaoPendente(() => acao);
-    setIsOpen(true);
-  }, []);
+  const confirmar = useCallback(
+    (
+      tipoConfirmacao: TipoConfirmacao,
+      acao: () => Promise<void> | void,
+      dadosContexto?: DadosContexto,
+    ) => {
+      setTipo(tipoConfirmacao);
+      setDados(dadosContexto);
+      setAcaoPendente(() => acao);
+      setIsOpen(true);
+    },
+    [],
+  );
 
   const fechar = useCallback(() => {
     setIsOpen(false);
@@ -99,19 +105,22 @@ export const useConfirmacaoInteligente = (): UseConfirmacaoInteligenteReturn => 
     try {
       setLoading(true);
       await acaoPendente();
-      
+
       // Mostrar notificação de sucesso baseada no tipo de ação
       if (tipo) {
         mostrarNotificacaoSucesso(tipo, dados);
       }
-      
+
       fechar();
     } catch (error) {
       console.error('Erro ao executar ação:', error);
       setLoading(false);
-      
+
       // Mostrar notificação de erro
-      notificacao.erro.operacaoFalhou('executar ação', error instanceof Error ? error.message : 'Erro desconhecido');
+      notificacao.erro.operacaoFalhou(
+        'executar ação',
+        error instanceof Error ? error.message : 'Erro desconhecido',
+      );
     }
   }, [acaoPendente, fechar, tipo, dados]);
 
@@ -122,7 +131,7 @@ export const useConfirmacaoInteligente = (): UseConfirmacaoInteligenteReturn => 
     fechar,
     executarConfirmacao,
     tipo,
-    dados
+    dados,
   };
 };
 
@@ -140,11 +149,11 @@ export const useValidacaoFinanceira = (): UseValidacaoFinanceiraReturn => {
     if (fatura.status === 'paga' || fatura.status === 'PAGA') {
       return 'excluir-fatura-paga';
     }
-    
+
     if (fatura.pagamentos && fatura.pagamentos.length > 0) {
       return 'excluir-fatura-com-pagamentos';
     }
-    
+
     return 'excluir-fatura';
   }, []);
 
@@ -152,11 +161,11 @@ export const useValidacaoFinanceira = (): UseValidacaoFinanceiraReturn => {
     if (contrato.status === 'assinado' || contrato.assinado) {
       return 'excluir-contrato-assinado';
     }
-    
+
     if (contrato.faturas && contrato.faturas.length > 0) {
       return 'excluir-contrato-com-faturas';
     }
-    
+
     return 'excluir-contrato';
   }, []);
 
@@ -164,7 +173,7 @@ export const useValidacaoFinanceira = (): UseValidacaoFinanceiraReturn => {
     if (pagamento.status === 'processado' || pagamento.confirmado) {
       return 'estornar-pagamento';
     }
-    
+
     return 'excluir-pagamento';
   }, []);
 
@@ -172,7 +181,7 @@ export const useValidacaoFinanceira = (): UseValidacaoFinanceiraReturn => {
     if (assinatura.status === 'pausada') {
       return 'cancelar-assinatura';
     }
-    
+
     return 'cancelar-assinatura';
   }, []);
 
@@ -190,8 +199,9 @@ export const useValidacaoFinanceira = (): UseValidacaoFinanceiraReturn => {
         dados.valor = item.valor || item.total;
         dados.cliente = item.cliente?.nome || item.clienteNome || item.cliente;
         dados.status = item.status;
-        dados.dataVencimento = item.dataVencimento ? 
-          new Date(item.dataVencimento).toLocaleDateString('pt-BR') : undefined;
+        dados.dataVencimento = item.dataVencimento
+          ? new Date(item.dataVencimento).toLocaleDateString('pt-BR')
+          : undefined;
         break;
 
       case 'excluir-contrato':
@@ -242,7 +252,7 @@ export const useValidacaoFinanceira = (): UseValidacaoFinanceiraReturn => {
     validarExclusaoContrato,
     validarExclusaoPagamento,
     validarCancelamentoAssinatura,
-    obterDadosContexto
+    obterDadosContexto,
   };
 };
 

@@ -43,7 +43,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 localStorage.setItem('empresaAtiva', profileResponse.data.empresa.id);
               }
             } else {
-              console.warn('⚠️ [AuthContext] Resposta inesperada ao verificar perfil:', profileResponse);
+              console.warn(
+                '⚠️ [AuthContext] Resposta inesperada ao verificar perfil:',
+                profileResponse,
+              );
               // Manter o usuário salvo mesmo se a verificação falhar
               setUser(savedUser);
             }
@@ -57,7 +60,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               setUser(null);
             } else {
               // Para outros erros (rede, servidor, etc), manter o usuário logado
-              console.warn('⚠️ [AuthContext] Erro de rede/servidor - Mantendo sessão com dados salvos');
+              console.warn(
+                '⚠️ [AuthContext] Erro de rede/servidor - Mantendo sessão com dados salvos',
+              );
               setUser(savedUser);
             }
           }

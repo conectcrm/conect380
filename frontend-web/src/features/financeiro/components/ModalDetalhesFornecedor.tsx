@@ -1,5 +1,16 @@
 import React from 'react';
-import { Edit3, Building2, User, Mail, Phone, MapPin, FileText, Calendar, CheckCircle, XCircle } from 'lucide-react';
+import {
+  Edit3,
+  Building2,
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  FileText,
+  Calendar,
+  CheckCircle,
+  XCircle,
+} from 'lucide-react';
 import { Fornecedor } from '../../../services/fornecedorService';
 import { BaseModal } from '../../../components/modals/BaseModal';
 
@@ -14,9 +25,8 @@ export default function ModalDetalhesFornecedor({
   isOpen,
   onClose,
   fornecedor,
-  onEdit
+  onEdit,
 }: ModalDetalhesFornecedorProps) {
-  
   const formatarTelefone = (telefone: string): string => {
     if (!telefone) return '';
     const numeros = telefone.replace(/\D/g, '');
@@ -54,7 +64,7 @@ export default function ModalDetalhesFornecedor({
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
@@ -80,11 +90,11 @@ export default function ModalDetalhesFornecedor({
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-              fornecedor.ativo 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-red-100 text-red-800'
-            }`}>
+            <span
+              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                fornecedor.ativo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              }`}
+            >
               {fornecedor.ativo ? (
                 <CheckCircle className="w-4 h-4 mr-1" />
               ) : (
@@ -102,7 +112,7 @@ export default function ModalDetalhesFornecedor({
             <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
               Identificação
             </h4>
-            
+
             {fornecedor.cnpj && (
               <div className="flex items-start space-x-3">
                 <FileText className="w-4 h-4 text-gray-400 mt-0.5" />
@@ -136,10 +146,8 @@ export default function ModalDetalhesFornecedor({
 
           {/* Dados de Contato */}
           <div className="space-y-4">
-            <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-              Contato
-            </h4>
-            
+            <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Contato</h4>
+
             {fornecedor.email && (
               <div className="flex items-start space-x-3">
                 <Mail className="w-4 h-4 text-gray-400 mt-0.5" />
@@ -177,12 +185,12 @@ export default function ModalDetalhesFornecedor({
                     {fornecedor.numero && `, ${fornecedor.numero}`}
                   </p>
                 )}
-                {fornecedor.bairro && (
-                  <p className="text-sm text-gray-600">{fornecedor.bairro}</p>
-                )}
+                {fornecedor.bairro && <p className="text-sm text-gray-600">{fornecedor.bairro}</p>}
                 {(fornecedor.cidade || fornecedor.estado) && (
                   <p className="text-sm text-gray-600">
-                    {fornecedor.cidade}{fornecedor.cidade && fornecedor.estado && ', '}{fornecedor.estado}
+                    {fornecedor.cidade}
+                    {fornecedor.cidade && fornecedor.estado && ', '}
+                    {fornecedor.estado}
                   </p>
                 )}
                 {fornecedor.cep && (

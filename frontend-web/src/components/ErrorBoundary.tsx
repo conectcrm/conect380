@@ -26,12 +26,12 @@ class ErrorBoundary extends Component<Props, State> {
     console.error('📊 Detalhes do erro:', {
       message: error.message,
       stack: error.stack,
-      componentStack: errorInfo.componentStack
+      componentStack: errorInfo.componentStack,
     });
 
     this.setState({
       error,
-      errorInfo
+      errorInfo,
     });
   }
 
@@ -50,9 +50,7 @@ class ErrorBoundary extends Component<Props, State> {
             <div className="space-y-4">
               <div className="bg-red-100 border border-red-300 rounded p-3">
                 <h3 className="font-semibold text-red-800 mb-2">Mensagem do Erro:</h3>
-                <p className="text-red-700 font-mono text-sm">
-                  {this.state.error?.message}
-                </p>
+                <p className="text-red-700 font-mono text-sm">{this.state.error?.message}</p>
               </div>
 
               {this.state.errorInfo && (
@@ -68,8 +66,12 @@ class ErrorBoundary extends Component<Props, State> {
                 <h3 className="font-semibold text-blue-800 mb-2">Possível Solução:</h3>
                 <p className="text-blue-700 text-sm">
                   Este erro geralmente ocorre quando um objeto é renderizado diretamente no JSX.
-                  Verifique se há algo como <code className="bg-blue-200 px-1 rounded">{'<div>{objeto}</div>'}</code>
-                  ao invés de <code className="bg-blue-200 px-1 rounded">{'<div>{objeto.propriedade}</div>'}</code>
+                  Verifique se há algo como{' '}
+                  <code className="bg-blue-200 px-1 rounded">{'<div>{objeto}</div>'}</code>
+                  ao invés de{' '}
+                  <code className="bg-blue-200 px-1 rounded">
+                    {'<div>{objeto.propriedade}</div>'}
+                  </code>
                 </p>
               </div>
 

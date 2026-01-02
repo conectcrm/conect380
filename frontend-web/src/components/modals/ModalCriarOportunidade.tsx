@@ -18,7 +18,7 @@ import {
   Search,
   ChevronDown,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
 } from 'lucide-react';
 import './ModalCriarOportunidade.css';
 
@@ -30,19 +30,27 @@ interface ModalCriarOportunidadeProps {
 }
 
 const estagios = [
-  { value: 'leads', label: 'Leads', badgeClasses: 'bg-[#DEEFE7] text-[#002333] border border-[#B4BEC9]' },
+  {
+    value: 'leads',
+    label: 'Leads',
+    badgeClasses: 'bg-[#DEEFE7] text-[#002333] border border-[#B4BEC9]',
+  },
   { value: 'qualification', label: 'Qualificação', badgeClasses: 'bg-[#B4BEC9] text-[#002333]' },
   { value: 'proposal', label: 'Proposta', badgeClasses: 'bg-[#159A9C] text-white' },
   { value: 'negotiation', label: 'Negociação', badgeClasses: 'bg-[#0F7B7D] text-white' },
   { value: 'closing', label: 'Fechamento', badgeClasses: 'bg-[#002333] text-white' },
   { value: 'won', label: 'Ganho', badgeClasses: 'bg-[#159A9C] text-white' },
-  { value: 'lost', label: 'Perdido', badgeClasses: 'bg-white text-[#002333] border border-[#B4BEC9]' }
+  {
+    value: 'lost',
+    label: 'Perdido',
+    badgeClasses: 'bg-white text-[#002333] border border-[#B4BEC9]',
+  },
 ];
 
 const prioridades = [
   { value: 'low', label: 'Baixa', textClasses: 'text-[#159A9C]' },
   { value: 'medium', label: 'Média', textClasses: 'text-[#0F7B7D]' },
-  { value: 'high', label: 'Alta', textClasses: 'text-[#002333]' }
+  { value: 'high', label: 'Alta', textClasses: 'text-[#002333]' },
 ];
 
 const origens = [
@@ -53,7 +61,7 @@ const origens = [
   { value: 'redes_sociais', label: 'Redes Sociais' },
   { value: 'evento', label: 'Evento' },
   { value: 'parceiro', label: 'Parceiro' },
-  { value: 'campanha', label: 'Campanha' }
+  { value: 'campanha', label: 'Campanha' },
 ];
 
 const getStageBadgeClasses = (stageValue: string) =>
@@ -89,7 +97,7 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
   isOpen,
   onClose,
   onSave,
-  isLoading = false
+  isLoading = false,
 }) => {
   const [formData, setFormData] = useState({
     titulo: '',
@@ -110,7 +118,7 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
 
     // Tags
     tags: [] as string[],
-    novaTag: ''
+    novaTag: '',
   });
 
   const [step, setStep] = useState(1);
@@ -124,13 +132,13 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
   // Sugestões inteligentes de probabilidade baseadas no estágio (inspirado no Salesforce)
   const getSuggestedProbability = (estagio: string): number => {
     const probabilities: Record<string, number> = {
-      'leads': 20,
-      'qualification': 40,
-      'proposal': 65,
-      'negotiation': 80,
-      'closing': 90,
-      'won': 100,
-      'lost': 0
+      leads: 20,
+      qualification: 40,
+      proposal: 65,
+      negotiation: 80,
+      closing: 90,
+      won: 100,
+      lost: 0,
     };
     return probabilities[estagio] || 50;
   };
@@ -242,7 +250,7 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
   useEffect(() => {
     const suggestedProb = getSuggestedProbability(formData.estagio);
     if (Math.abs(formData.probabilidade - suggestedProb) > 20) {
-      setFormData(prev => ({ ...prev, probabilidade: suggestedProb }));
+      setFormData((prev) => ({ ...prev, probabilidade: suggestedProb }));
     }
   }, [formData.estagio]);
 
@@ -264,10 +272,11 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
     return () => clearTimeout(timer);
   }, [searchCliente]);
 
-  const clientesFiltrados = clientes.filter(cliente =>
-    cliente.nome.toLowerCase().includes(searchCliente.toLowerCase()) ||
-    (cliente.empresa && cliente.empresa.toLowerCase().includes(searchCliente.toLowerCase())) ||
-    cliente.email.toLowerCase().includes(searchCliente.toLowerCase())
+  const clientesFiltrados = clientes.filter(
+    (cliente) =>
+      cliente.nome.toLowerCase().includes(searchCliente.toLowerCase()) ||
+      (cliente.empresa && cliente.empresa.toLowerCase().includes(searchCliente.toLowerCase())) ||
+      cliente.email.toLowerCase().includes(searchCliente.toLowerCase()),
   );
 
   const resetForm = () => {
@@ -286,7 +295,7 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
       telefoneContato: '',
       empresaContato: '',
       tags: [],
-      novaTag: ''
+      novaTag: '',
     });
     setStep(1);
     setSearchCliente('');
@@ -387,7 +396,8 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
         }
         if (value) {
           // Regex robusta para validação de email
-          const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+          const emailRegex =
+            /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
           if (!emailRegex.test(value)) {
             return 'E-mail inválido';
           }
@@ -410,7 +420,75 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
           // Validação básica de DDD brasileiro
           if (cleanPhone.length >= 10 && cleanPhone.length <= 11) {
             const ddd = cleanPhone.substring(0, 2);
-            const validDDDs = ['11', '12', '13', '14', '15', '16', '17', '18', '19', '21', '22', '24', '27', '28', '31', '32', '33', '34', '35', '37', '38', '41', '42', '43', '44', '45', '46', '47', '48', '49', '51', '53', '54', '55', '61', '62', '63', '64', '65', '66', '67', '68', '69', '71', '73', '74', '75', '77', '79', '81', '82', '83', '84', '85', '86', '87', '88', '89', '91', '92', '93', '94', '95', '96', '97', '98', '99'];
+            const validDDDs = [
+              '11',
+              '12',
+              '13',
+              '14',
+              '15',
+              '16',
+              '17',
+              '18',
+              '19',
+              '21',
+              '22',
+              '24',
+              '27',
+              '28',
+              '31',
+              '32',
+              '33',
+              '34',
+              '35',
+              '37',
+              '38',
+              '41',
+              '42',
+              '43',
+              '44',
+              '45',
+              '46',
+              '47',
+              '48',
+              '49',
+              '51',
+              '53',
+              '54',
+              '55',
+              '61',
+              '62',
+              '63',
+              '64',
+              '65',
+              '66',
+              '67',
+              '68',
+              '69',
+              '71',
+              '73',
+              '74',
+              '75',
+              '77',
+              '79',
+              '81',
+              '82',
+              '83',
+              '84',
+              '85',
+              '86',
+              '87',
+              '88',
+              '89',
+              '91',
+              '92',
+              '93',
+              '94',
+              '95',
+              '96',
+              '97',
+              '98',
+              '99',
+            ];
             if (!validDDDs.includes(ddd)) {
               return 'DDD inválido';
             }
@@ -487,13 +565,13 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
       formattedValue = value.toLowerCase();
     }
 
-    setFormData(prev => ({ ...prev, [fieldName]: formattedValue }));
+    setFormData((prev) => ({ ...prev, [fieldName]: formattedValue }));
 
     // Validação em tempo real
     const error = validateField(fieldName, formattedValue);
-    setErrors(prev => ({
+    setErrors((prev) => ({
       ...prev,
-      [fieldName]: error
+      [fieldName]: error,
     }));
   };
 
@@ -505,7 +583,10 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
       newErrors.titulo = validateField('titulo', formData.titulo);
       newErrors.valor = validateField('valor', formData.valor);
       newErrors.probabilidade = validateField('probabilidade', formData.probabilidade);
-      newErrors.dataFechamentoEsperado = validateField('dataFechamentoEsperado', formData.dataFechamentoEsperado);
+      newErrors.dataFechamentoEsperado = validateField(
+        'dataFechamentoEsperado',
+        formData.dataFechamentoEsperado,
+      );
       newErrors.descricao = validateField('descricao', formData.descricao);
 
       // Validação de lógica de negócio (inspirada no Salesforce)
@@ -531,7 +612,7 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
 
     // Filtrar erros vazios
     const filteredErrors = Object.fromEntries(
-      Object.entries(newErrors).filter(([_, value]) => value !== '')
+      Object.entries(newErrors).filter(([_, value]) => value !== ''),
     );
 
     setErrors(filteredErrors);
@@ -580,25 +661,25 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
   };
 
   const handleSelectCliente = (cliente: ClienteAPI) => {
-    setFormData(prev => ({ ...prev, clienteExistente: cliente }));
+    setFormData((prev) => ({ ...prev, clienteExistente: cliente }));
     setSearchCliente(cliente.nome);
     setShowClienteDropdown(false);
   };
 
   const handleAddTag = () => {
     if (formData.novaTag.trim() && !formData.tags.includes(formData.novaTag.trim())) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         tags: [...prev.tags, prev.novaTag.trim()],
-        novaTag: ''
+        novaTag: '',
       }));
     }
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
+      tags: prev.tags.filter((tag) => tag !== tagToRemove),
     }));
   };
 
@@ -636,7 +717,7 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
           origem: typeof oportunidadeData.origem,
           responsavel_id: typeof oportunidadeData.responsavel_id,
           cliente_id: typeof oportunidadeData.cliente_id,
-        }
+        },
       });
       onSave(oportunidadeData);
     }
@@ -662,7 +743,12 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
             <div>
               <h2 className="text-xl font-bold text-white">Nova Oportunidade</h2>
               <p className="text-white text-opacity-80 text-sm">
-                Passo {step} de 3 - {step === 1 ? 'Informações Básicas' : step === 2 ? 'Cliente & Contato' : 'Finalização'}
+                Passo {step} de 3 -{' '}
+                {step === 1
+                  ? 'Informações Básicas'
+                  : step === 2
+                    ? 'Cliente & Contato'
+                    : 'Finalização'}
               </p>
             </div>
           </div>
@@ -679,19 +765,23 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
           <div className="flex items-center justify-between">
             {[1, 2, 3].map((stepNumber) => (
               <div key={stepNumber} className="flex items-center">
-                <div className={`progress-step w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= stepNumber
-                  ? step === stepNumber ? 'active' : 'completed'
-                  : 'bg-[#DEEFE7] text-[#B4BEC9]'
-                  }`}>
-                  {step > stepNumber ? (
-                    <CheckCircle2 className="w-4 h-4" />
-                  ) : (
-                    stepNumber
-                  )}
+                <div
+                  className={`progress-step w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                    step >= stepNumber
+                      ? step === stepNumber
+                        ? 'active'
+                        : 'completed'
+                      : 'bg-[#DEEFE7] text-[#B4BEC9]'
+                  }`}
+                >
+                  {step > stepNumber ? <CheckCircle2 className="w-4 h-4" /> : stepNumber}
                 </div>
                 {stepNumber < 3 && (
-                  <div className={`progress-line w-24 h-1 mx-2 ${step > stepNumber ? 'completed' : ''
-                    }`} />
+                  <div
+                    className={`progress-line w-24 h-1 mx-2 ${
+                      step > stepNumber ? 'completed' : ''
+                    }`}
+                  />
                 )}
               </div>
             ))}
@@ -699,7 +789,10 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6 flex-1 overflow-y-auto custom-scrollbar" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+        <div
+          className="p-6 flex-1 overflow-y-auto custom-scrollbar"
+          style={{ maxHeight: 'calc(100vh - 280px)' }}
+        >
           {/* Step 1: Informações Básicas */}
           {step === 1 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -720,8 +813,9 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                         type="text"
                         value={formData.titulo}
                         onChange={(e) => handleInputChange('titulo', e.target.value)}
-                        className={`form-input w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.titulo ? 'error border-red-300' : 'border-[#B4BEC9]'
-                          }`}
+                        className={`form-input w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                          errors.titulo ? 'error border-red-300' : 'border-[#B4BEC9]'
+                        }`}
                         placeholder="Ex: Sistema CRM para empresa ABC"
                       />
                       {errors.titulo && (
@@ -757,8 +851,9 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                             type="text" // SEMPRE text, nunca number para campos monetários
                             value={formData.valor}
                             onChange={(e) => handleInputChange('valor', e.target.value)}
-                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.valor ? 'border-red-300' : 'border-[#B4BEC9]'
-                              }`}
+                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                              errors.valor ? 'border-red-300' : 'border-[#B4BEC9]'
+                            }`}
                             placeholder="R$ 0,00"
                           />
                         </div>
@@ -779,9 +874,14 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                           <input
                             type="date"
                             value={formData.dataFechamentoEsperado}
-                            onChange={(e) => handleInputChange('dataFechamentoEsperado', e.target.value)}
-                            className={`form-input w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.dataFechamentoEsperado ? 'error border-red-300' : 'border-[#B4BEC9]'
-                              }`}
+                            onChange={(e) =>
+                              handleInputChange('dataFechamentoEsperado', e.target.value)
+                            }
+                            className={`form-input w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                              errors.dataFechamentoEsperado
+                                ? 'error border-red-300'
+                                : 'border-[#B4BEC9]'
+                            }`}
                             min={new Date().toISOString().split('T')[0]}
                           />
                         </div>
@@ -792,7 +892,8 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                           </p>
                         )}
                         <p className="mt-1 text-xs text-[#B4BEC9]">
-                          💡 Dica: Oportunidades com prazo definido têm 40% mais chance de fechamento
+                          💡 Dica: Oportunidades com prazo definido têm 40% mais chance de
+                          fechamento
                         </p>
                       </div>
                     </div>
@@ -815,7 +916,9 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                       </label>
                       <select
                         value={formData.estagio}
-                        onChange={(e) => setFormData(prev => ({ ...prev, estagio: e.target.value }))}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, estagio: e.target.value }))
+                        }
                         className="w-full px-4 py-3 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                       >
                         {estagios.map((estagio) => (
@@ -833,7 +936,9 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                           <span className="ml-2 text-xs text-[#159A9C]">🎯 Alta probabilidade</span>
                         )}
                         {formData.probabilidade <= 20 && (
-                          <span className="ml-2 text-xs text-[#002333] opacity-70">⚠️ Baixa probabilidade</span>
+                          <span className="ml-2 text-xs text-[#002333] opacity-70">
+                            ⚠️ Baixa probabilidade
+                          </span>
                         )}
                       </label>
                       <input
@@ -841,10 +946,12 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                         min="0"
                         max="100"
                         value={formData.probabilidade}
-                        onChange={(e) => handleInputChange('probabilidade', parseInt(e.target.value))}
+                        onChange={(e) =>
+                          handleInputChange('probabilidade', parseInt(e.target.value))
+                        }
                         className="probability-slider w-full h-2 bg-[#DEEFE7] rounded-lg appearance-none cursor-pointer"
                         style={{
-                          background: `linear-gradient(to right, #159A9C 0%, #159A9C ${formData.probabilidade}%, #DEEFE7 ${formData.probabilidade}%, #DEEFE7 100%)`
+                          background: `linear-gradient(to right, #159A9C 0%, #159A9C ${formData.probabilidade}%, #DEEFE7 ${formData.probabilidade}%, #DEEFE7 100%)`,
                         }}
                       />
                       <div className="flex justify-between text-xs text-[#B4BEC9] mt-1">
@@ -861,7 +968,8 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                         </p>
                       )}
                       <p className="mt-1 text-xs text-[#B4BEC9]">
-                        💡 Ajuste baseado no estágio: Leads (10-30%), Qualificação (30-50%), Proposta (50-80%)
+                        💡 Ajuste baseado no estágio: Leads (10-30%), Qualificação (30-50%),
+                        Proposta (50-80%)
                       </p>
                     </div>
 
@@ -872,7 +980,9 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                         </label>
                         <select
                           value={formData.prioridade}
-                          onChange={(e) => setFormData(prev => ({ ...prev, prioridade: e.target.value }))}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, prioridade: e.target.value }))
+                          }
                           className="w-full px-4 py-3 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                         >
                           {prioridades.map((prioridade) => (
@@ -889,7 +999,9 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                         </label>
                         <select
                           value={formData.origem}
-                          onChange={(e) => setFormData(prev => ({ ...prev, origem: e.target.value }))}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, origem: e.target.value }))
+                          }
                           className="w-full px-4 py-3 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                         >
                           {origens.map((origem) => (
@@ -905,7 +1017,9 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
 
                 {/* Preview Card */}
                 <div className="bg-white border-2 border-dashed border-[#DEEFE7] p-4 rounded-lg">
-                  <h4 className="text-sm font-medium text-[#0F7B7D] mb-3">Preview da Oportunidade</h4>
+                  <h4 className="text-sm font-medium text-[#0F7B7D] mb-3">
+                    Preview da Oportunidade
+                  </h4>
                   <div className="space-y-2">
                     <div className="font-medium text-[#002333]">
                       {formData.titulo || 'Título da oportunidade'}
@@ -914,8 +1028,10 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                       {formData.valor || 'R$ 0,00'}
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStageBadgeClasses(formData.estagio)}`}>
-                        {estagios.find(e => e.value === formData.estagio)?.label}
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${getStageBadgeClasses(formData.estagio)}`}
+                      >
+                        {estagios.find((e) => e.value === formData.estagio)?.label}
                       </span>
                       <span className="text-sm text-[#B4BEC9]">
                         {formData.probabilidade}% de chance
@@ -940,15 +1056,21 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                 <div className="flex space-x-4 mb-6">
                   <button
                     onClick={() => setTipoContato('existente')}
-                    className={`contact-type-button px-6 py-3 rounded-lg font-medium transition-colors ${tipoContato === 'existente' ? 'active' : 'bg-white text-[#0F7B7D] border border-[#B4BEC9] hover:border-[#159A9C]'
-                      }`}
+                    className={`contact-type-button px-6 py-3 rounded-lg font-medium transition-colors ${
+                      tipoContato === 'existente'
+                        ? 'active'
+                        : 'bg-white text-[#0F7B7D] border border-[#B4BEC9] hover:border-[#159A9C]'
+                    }`}
                   >
                     Cliente Existente
                   </button>
                   <button
                     onClick={() => setTipoContato('novo')}
-                    className={`contact-type-button px-6 py-3 rounded-lg font-medium transition-colors ${tipoContato === 'novo' ? 'active' : 'bg-white text-[#0F7B7D] border border-[#B4BEC9] hover:border-[#159A9C]'
-                      }`}
+                    className={`contact-type-button px-6 py-3 rounded-lg font-medium transition-colors ${
+                      tipoContato === 'novo'
+                        ? 'active'
+                        : 'bg-white text-[#0F7B7D] border border-[#B4BEC9] hover:border-[#159A9C]'
+                    }`}
                   >
                     Novo Contato
                   </button>
@@ -970,8 +1092,9 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                             setShowClienteDropdown(true);
                           }}
                           onFocus={() => setShowClienteDropdown(true)}
-                          className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.clienteExistente ? 'border-red-300' : 'border-[#B4BEC9]'
-                            }`}
+                          className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                            errors.clienteExistente ? 'border-red-300' : 'border-[#B4BEC9]'
+                          }`}
                           placeholder="Digite o nome ou empresa do cliente..."
                         />
                         <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[#B4BEC9]" />
@@ -994,10 +1117,14 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                                 <div className="flex items-center justify-between">
                                   <div>
                                     <div className="font-medium text-[#002333]">{cliente.nome}</div>
-                                    <div className="text-sm text-[#B4BEC9]">{cliente.empresa || 'Sem empresa'}</div>
+                                    <div className="text-sm text-[#B4BEC9]">
+                                      {cliente.empresa || 'Sem empresa'}
+                                    </div>
                                     <div className="text-sm text-[#B4BEC9]">{cliente.email}</div>
                                   </div>
-                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getClienteStatusBadgeClasses(cliente.status)}`}>
+                                  <span
+                                    className={`px-2 py-1 rounded-full text-xs font-medium ${getClienteStatusBadgeClasses(cliente.status)}`}
+                                  >
                                     {cliente.status}
                                   </span>
                                 </div>
@@ -1025,7 +1152,9 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
 
                     {formData.clienteExistente && (
                       <div className="bg-white p-4 rounded-lg border border-[#DEEFE7]">
-                        <h4 className="text-sm font-medium text-[#0F7B7D] mb-3">Cliente Selecionado</h4>
+                        <h4 className="text-sm font-medium text-[#0F7B7D] mb-3">
+                          Cliente Selecionado
+                        </h4>
                         <div className="space-y-2">
                           <div className="flex items-center">
                             <User className="w-4 h-4 mr-2 text-[#B4BEC9]" />
@@ -1033,15 +1162,21 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                           </div>
                           <div className="flex items-center">
                             <Building2 className="w-4 h-4 mr-2 text-[#B4BEC9]" />
-                            <span className="text-[#0F7B7D]">{formData.clienteExistente.empresa}</span>
+                            <span className="text-[#0F7B7D]">
+                              {formData.clienteExistente.empresa}
+                            </span>
                           </div>
                           <div className="flex items-center">
                             <Mail className="w-4 h-4 mr-2 text-[#B4BEC9]" />
-                            <span className="text-[#0F7B7D]">{formData.clienteExistente.email}</span>
+                            <span className="text-[#0F7B7D]">
+                              {formData.clienteExistente.email}
+                            </span>
                           </div>
                           <div className="flex items-center">
                             <Phone className="w-4 h-4 mr-2 text-[#B4BEC9]" />
-                            <span className="text-[#0F7B7D]">{formData.clienteExistente.telefone}</span>
+                            <span className="text-[#0F7B7D]">
+                              {formData.clienteExistente.telefone}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -1060,8 +1195,9 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                             type="text"
                             value={formData.nomeContato}
                             onChange={(e) => handleInputChange('nomeContato', e.target.value)}
-                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.nomeContato ? 'border-red-300' : 'border-[#B4BEC9]'
-                              }`}
+                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                              errors.nomeContato ? 'border-red-300' : 'border-[#B4BEC9]'
+                            }`}
                             placeholder="Nome completo"
                           />
                         </div>
@@ -1083,9 +1219,13 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                             type="email"
                             value={formData.emailContato}
                             onChange={(e) => handleInputChange('emailContato', e.target.value)}
-                            className={`form-input w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.emailContato ? 'error border-red-300' :
-                              formData.emailContato && !errors.emailContato ? 'border-[#159A9C]' : 'border-[#B4BEC9]'
-                              }`}
+                            className={`form-input w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                              errors.emailContato
+                                ? 'error border-red-300'
+                                : formData.emailContato && !errors.emailContato
+                                  ? 'border-[#159A9C]'
+                                  : 'border-[#B4BEC9]'
+                            }`}
                             placeholder="email@empresa.com"
                           />
                           {formData.emailContato && !errors.emailContato && (
@@ -1112,14 +1252,22 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                             type="tel"
                             value={formData.telefoneContato}
                             onChange={(e) => handleInputChange('telefoneContato', e.target.value)}
-                            className={`form-input w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.telefoneContato ? 'error border-red-300' :
-                              formData.telefoneContato && !errors.telefoneContato && formData.telefoneContato.length > 10 ? 'border-[#159A9C]' : 'border-[#B4BEC9]'
-                              }`}
+                            className={`form-input w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                              errors.telefoneContato
+                                ? 'error border-red-300'
+                                : formData.telefoneContato &&
+                                    !errors.telefoneContato &&
+                                    formData.telefoneContato.length > 10
+                                  ? 'border-[#159A9C]'
+                                  : 'border-[#B4BEC9]'
+                            }`}
                             placeholder="(11) 99999-9999"
                           />
-                          {formData.telefoneContato && !errors.telefoneContato && formData.telefoneContato.length > 10 && (
-                            <CheckCircle2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[#159A9C]" />
-                          )}
+                          {formData.telefoneContato &&
+                            !errors.telefoneContato &&
+                            formData.telefoneContato.length > 10 && (
+                              <CheckCircle2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[#159A9C]" />
+                            )}
                         </div>
                         {errors.telefoneContato && (
                           <p className="error-message mt-1 text-sm text-red-600 flex items-center">
@@ -1139,8 +1287,9 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                             type="text"
                             value={formData.empresaContato}
                             onChange={(e) => handleInputChange('empresaContato', e.target.value)}
-                            className={`form-input w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${errors.empresaContato ? 'error border-red-300' : 'border-[#B4BEC9]'
-                              }`}
+                            className={`form-input w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
+                              errors.empresaContato ? 'error border-red-300' : 'border-[#B4BEC9]'
+                            }`}
                             placeholder="Nome da empresa"
                           />
                         </div>
@@ -1194,7 +1343,9 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
 
                 {qualityFeedback.length > 0 && (
                   <div className="space-y-2">
-                    <h4 className="text-sm font-medium text-[#002333]">💡 Sugestões de melhoria:</h4>
+                    <h4 className="text-sm font-medium text-[#002333]">
+                      💡 Sugestões de melhoria:
+                    </h4>
                     <ul className="space-y-1">
                       {qualityFeedback.map((suggestion, index) => (
                         <li key={index} className="text-sm text-[#0F7B7D] flex items-center">
@@ -1222,7 +1373,9 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                       <input
                         type="text"
                         value={formData.novaTag}
-                        onChange={(e) => setFormData(prev => ({ ...prev, novaTag: e.target.value }))}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, novaTag: e.target.value }))
+                        }
                         onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
                         className="flex-1 px-4 py-3 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                         placeholder="Digite uma tag e pressione Enter"
@@ -1239,10 +1392,7 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                     {formData.tags.length > 0 && (
                       <div className="tag-input flex flex-wrap gap-2 mt-3 min-h-0 p-2">
                         {formData.tags.map((tag, index) => (
-                          <span
-                            key={index}
-                            className="tag-item"
-                          >
+                          <span key={index} className="tag-item">
                             {tag}
                             <button
                               type="button"
@@ -1281,8 +1431,10 @@ export const ModalCriarOportunidade: React.FC<ModalCriarOportunidadeProps> = ({
                     <div>
                       <span className="text-sm font-medium text-[#0F7B7D]">Estágio:</span>
                       <div>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStageBadgeClasses(formData.estagio)}`}>
-                          {estagios.find(e => e.value === formData.estagio)?.label}
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${getStageBadgeClasses(formData.estagio)}`}
+                        >
+                          {estagios.find((e) => e.value === formData.estagio)?.label}
                         </span>
                       </div>
                     </div>

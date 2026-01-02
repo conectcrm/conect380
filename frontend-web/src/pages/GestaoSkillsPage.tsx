@@ -163,8 +163,9 @@ const GestaoSkillsPage: React.FC = () => {
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
             key={star}
-            className={`h-4 w-4 ${star <= nivel ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
-              }`}
+            className={`h-4 w-4 ${
+              star <= nivel ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+            }`}
           />
         ))}
       </div>
@@ -172,17 +173,20 @@ const GestaoSkillsPage: React.FC = () => {
   };
 
   // Agrupar skills por atendente
-  const skillsPorAtendente = skillsFiltradas.reduce((acc, skill) => {
-    const atendenteId = skill.atendenteId;
-    if (!acc[atendenteId]) {
-      acc[atendenteId] = {
-        atendente: skill.atendente,
-        skills: [],
-      };
-    }
-    acc[atendenteId].skills.push(skill);
-    return acc;
-  }, {} as Record<string, { atendente: any; skills: AtendenteSkill[] }>);
+  const skillsPorAtendente = skillsFiltradas.reduce(
+    (acc, skill) => {
+      const atendenteId = skill.atendenteId;
+      if (!acc[atendenteId]) {
+        acc[atendenteId] = {
+          atendente: skill.atendente,
+          skills: [],
+        };
+      }
+      acc[atendenteId].skills.push(skill);
+      return acc;
+    },
+    {} as Record<string, { atendente: any; skills: AtendenteSkill[] }>,
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -225,10 +229,7 @@ const GestaoSkillsPage: React.FC = () => {
                 <h3 className="font-semibold text-red-900">Erro</h3>
                 <p className="text-red-700 text-sm mt-1">{error}</p>
               </div>
-              <button
-                onClick={() => setError(null)}
-                className="text-red-600 hover:text-red-800"
-              >
+              <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800">
                 <X className="h-5 w-5" />
               </button>
             </div>

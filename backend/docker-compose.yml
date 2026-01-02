@@ -28,7 +28,7 @@ services:
     container_name: conectcrm-pgadmin
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@conectcrm.com
+      PGADMIN_DEFAULT_EMAIL: admin@conectsuite.com.br
       PGADMIN_DEFAULT_PASSWORD: admin123
     ports:
       - "5050:80"

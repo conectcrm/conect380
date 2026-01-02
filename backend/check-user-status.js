@@ -1,7 +1,7 @@
 const { Client } = require('pg');
 
 async function checkUserStatus() {
-  console.log('🔍 Verificando status do usuário admin@conectcrm.com...\n');
+  console.log('🔍 Verificando status do usuário admin@conectsuite.com.br...\n');
 
   const client = new Client({
     host: 'localhost',
@@ -22,7 +22,7 @@ async function checkUserStatus() {
       WHERE email = $1
     `;
 
-    const result = await client.query(query, ['admin@conectcrm.com']);
+    const result = await client.query(query, ['admin@conectsuite.com.br']);
 
     if (result.rows.length === 0) {
       console.log('❌ Usuário não encontrado!');
@@ -47,7 +47,7 @@ async function checkUserStatus() {
       // Ativar o usuário
       console.log('\n🔧 Ativando o usuário...');
       const updateQuery = 'UPDATE users SET ativo = true WHERE email = $1';
-      await client.query(updateQuery, ['admin@conectcrm.com']);
+      await client.query(updateQuery, ['admin@conectsuite.com.br']);
       console.log('✅ Usuário ativado com sucesso!');
     } else {
       console.log('\n✅ Usuário está ATIVO');

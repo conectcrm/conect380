@@ -1,5 +1,14 @@
-import { Ticket as TicketAPI } from '../services/ticketsService';
-import { StatusTicket, PrioridadeTicket } from '../types/ticket';
+import {
+  Ticket as TicketAPI,
+  SeveridadeTicketApi,
+  NivelAtendimentoTicketApi,
+} from '../services/ticketsService';
+import {
+  StatusTicket,
+  PrioridadeTicket,
+  SeveridadeTicket,
+  NivelAtendimentoTicket,
+} from '../types/ticket';
 
 /**
  * Interface do ticket usado pelos componentes visuais
@@ -20,11 +29,18 @@ export interface TicketComponente {
   contatoTelefone?: string;
   clienteNome?: string;
   clienteVip?: boolean;
+  severity?: string;
+  assignedLevel?: string;
+  escalationReason?: string;
+  escalationAt?: string | Date;
+  slaTargetMinutes?: number;
+  slaExpiresAt?: string | Date;
   ultimaMensagemEm?: string | Date;
   ultimaMensagem?: string;
   mensagensNaoLidas?: number;
   criadoEm: Date | string;
   atualizadoEm?: Date | string;
+  filaId?: string;
 }
 
 /**
@@ -34,12 +50,19 @@ export function converterTicketAPIParaComponente(ticketAPI: TicketAPI): TicketCo
   return {
     id: ticketAPI.id,
     numero: ticketAPI.numero,
-    empresaId: ticketAPI.canalId, // Usando canalId como empresaId temporariamente
+    empresaId: ticketAPI.empresaId || ticketAPI.canalId,
     clienteId: ticketAPI.clienteId,
     canalId: ticketAPI.canalId,
+    filaId: ticketAPI.filaId,
     atendenteId: ticketAPI.atendenteId,
     status: converterStatusAPIParaComponente(ticketAPI.status),
     prioridade: converterPrioridadeAPIParaComponente(ticketAPI.prioridade),
+    severity: converterSeveridadeAPIParaComponente(ticketAPI.severity as SeveridadeTicketApi),
+    assignedLevel: converterNivelAPIParaComponente(ticketAPI.assignedLevel as NivelAtendimentoTicketApi),
+    escalationReason: ticketAPI.escalationReason,
+    escalationAt: ticketAPI.escalationAt,
+    slaTargetMinutes: ticketAPI.slaTargetMinutes,
+    slaExpiresAt: ticketAPI.slaExpiresAt,
     assunto: ticketAPI.assunto,
     contatoNome: ticketAPI.cliente?.nome,
     contatoTelefone: ticketAPI.cliente?.telefone,
@@ -55,30 +78,57 @@ export function converterTicketAPIParaComponente(ticketAPI: TicketAPI): TicketCo
 /**
  * Converte status da API para o formato do componente
  */
-function converterStatusAPIParaComponente(status: StatusTicket): string {
-  const mapeamento: Record<StatusTicket, string> = {
-    [StatusTicket.AGUARDANDO]: 'aguardando',
-    [StatusTicket.EM_ATENDIMENTO]: 'em_atendimento',
-    [StatusTicket.PENDENTE]: 'aguardando',
-    [StatusTicket.RESOLVIDO]: 'resolvido',
-    [StatusTicket.FECHADO]: 'fechado',
+function converterStatusAPIParaComponente(status: StatusTicket | string): string {
+  const valor = status?.toString().toUpperCase();
+  const mapeamento: Record<string, string> = {
+    AGUARDANDO: 'aguardando',
+    ABERTO: 'aguardando',
+    PENDENTE: 'aguardando',
+    EM_ATENDIMENTO: 'em_atendimento',
+    RESOLVIDO: 'resolvido',
+    FECHADO: 'fechado',
   };
 
-  return mapeamento[status] || 'aberto';
+  return mapeamento[valor || ''] || 'aguardando';
 }
 
 /**
  * Converte prioridade da API para o formato do componente
  */
-function converterPrioridadeAPIParaComponente(prioridade: PrioridadeTicket): string {
-  const mapeamento: Record<PrioridadeTicket, string> = {
-    [PrioridadeTicket.BAIXA]: 'baixa',
-    [PrioridadeTicket.NORMAL]: 'media',
-    [PrioridadeTicket.ALTA]: 'alta',
-    [PrioridadeTicket.URGENTE]: 'alta',
+function converterPrioridadeAPIParaComponente(prioridade: PrioridadeTicket | string): string {
+  const valor = prioridade?.toString().toLowerCase();
+  const mapeamento: Record<string, string> = {
+    baixa: 'baixa',
+    normal: 'media',
+    media: 'media',
+    alta: 'alta',
+    urgente: 'alta',
   };
 
-  return mapeamento[prioridade] || 'media';
+  return mapeamento[valor || ''] || 'media';
+}
+
+function converterSeveridadeAPIParaComponente(severity?: SeveridadeTicketApi | string): string {
+  const valor = severity?.toString().toLowerCase();
+  const mapeamento: Record<string, string> = {
+    baixa: SeveridadeTicket.BAIXA,
+    media: SeveridadeTicket.MEDIA,
+    alta: SeveridadeTicket.ALTA,
+    critica: SeveridadeTicket.CRITICA,
+  };
+
+  return mapeamento[valor || ''] || SeveridadeTicket.MEDIA;
+}
+
+function converterNivelAPIParaComponente(level?: NivelAtendimentoTicketApi | string): string {
+  const valor = level?.toString().toLowerCase();
+  const mapeamento: Record<string, string> = {
+    n1: NivelAtendimentoTicket.N1,
+    n2: NivelAtendimentoTicket.N2,
+    n3: NivelAtendimentoTicket.N3,
+  };
+
+  return mapeamento[valor || ''] || NivelAtendimentoTicket.N1;
 }
 
 /**
@@ -86,11 +136,11 @@ function converterPrioridadeAPIParaComponente(prioridade: PrioridadeTicket): str
  */
 export function converterStatusComponenteParaAPI(status: string): StatusTicket {
   const mapeamento: Record<string, StatusTicket> = {
-    'aguardando': StatusTicket.AGUARDANDO,
-    'em_atendimento': StatusTicket.EM_ATENDIMENTO,
-    'aberto': StatusTicket.AGUARDANDO,
-    'resolvido': StatusTicket.RESOLVIDO,
-    'fechado': StatusTicket.FECHADO,
+    aguardando: StatusTicket.AGUARDANDO,
+    em_atendimento: StatusTicket.EM_ATENDIMENTO,
+    aberto: StatusTicket.AGUARDANDO,
+    resolvido: StatusTicket.RESOLVIDO,
+    fechado: StatusTicket.FECHADO,
   };
 
   return mapeamento[status] || StatusTicket.AGUARDANDO;
@@ -101,11 +151,11 @@ export function converterStatusComponenteParaAPI(status: string): StatusTicket {
  */
 export function converterPrioridadeComponenteParaAPI(prioridade: string): PrioridadeTicket {
   const mapeamento: Record<string, PrioridadeTicket> = {
-    'baixa': PrioridadeTicket.BAIXA,
-    'media': PrioridadeTicket.NORMAL,
-    'normal': PrioridadeTicket.NORMAL,
-    'alta': PrioridadeTicket.ALTA,
-    'urgente': PrioridadeTicket.URGENTE,
+    baixa: PrioridadeTicket.BAIXA,
+    media: PrioridadeTicket.NORMAL,
+    normal: PrioridadeTicket.NORMAL,
+    alta: PrioridadeTicket.ALTA,
+    urgente: PrioridadeTicket.URGENTE,
   };
 
   return mapeamento[prioridade] || PrioridadeTicket.NORMAL;

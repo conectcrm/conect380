@@ -1,4 +1,5 @@
 import { api } from './api';
+import { getErrorMessage } from '../utils/errorHandling';
 
 export interface RegistrarEmpresaPayload {
   empresa: {
@@ -78,12 +79,9 @@ class EmpresaService {
     try {
       const response = await api.post<RegistrarEmpresaResponse>('/empresas/registro', dados);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao registrar empresa:', error);
-      throw new Error(
-        error.response?.data?.message ||
-        'Erro ao registrar empresa. Tente novamente.'
-      );
+      throw new Error(getErrorMessage(error, 'Erro ao registrar empresa. Tente novamente.'));
     }
   }
 
@@ -92,11 +90,11 @@ class EmpresaService {
     try {
       const response = await api.get(`/empresas/verificar-cnpj/${cnpj.replace(/\D/g, '')}`);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao verificar CNPJ:', error);
       return {
         disponivel: false,
-        message: 'Erro ao verificar CNPJ'
+        message: getErrorMessage(error, 'Erro ao verificar CNPJ'),
       };
     }
   }
@@ -106,11 +104,11 @@ class EmpresaService {
     try {
       const response = await api.get(`/empresas/verificar-email/${encodeURIComponent(email)}`);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao verificar email:', error);
       return {
         disponivel: false,
-        message: 'Erro ao verificar email'
+        message: getErrorMessage(error, 'Erro ao verificar email'),
       };
     }
   }
@@ -120,12 +118,9 @@ class EmpresaService {
     try {
       const response = await api.post('/empresas/verificar-email', { token });
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao verificar email de ativação:', error);
-      throw new Error(
-        error.response?.data?.message ||
-        'Token inválido ou expirado'
-      );
+      throw new Error(getErrorMessage(error, 'Token inválido ou expirado'));
     }
   }
 
@@ -134,12 +129,9 @@ class EmpresaService {
     try {
       const response = await api.post('/empresas/reenviar-ativacao', { email });
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao reenviar email:', error);
-      throw new Error(
-        error.response?.data?.message ||
-        'Erro ao reenviar email de ativação'
-      );
+      throw new Error(getErrorMessage(error, 'Erro ao reenviar email de ativação'));
     }
   }
 
@@ -148,32 +140,31 @@ class EmpresaService {
     try {
       const response = await api.get(`/empresas/subdominio/${subdominio}`);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao obter empresa:', error);
-      throw new Error(
-        error.response?.data?.message ||
-        'Empresa não encontrada'
-      );
+      throw new Error(getErrorMessage(error, 'Empresa não encontrada'));
     }
   }
 
   // Obter planos disponíveis
-  async obterPlanos(): Promise<Array<{
-    id: string;
-    nome: string;
-    preco: number;
-    descricao: string;
-    recursos: string[];
-    limites: {
-      usuarios: number;
-      clientes: number;
-      armazenamento: string;
-    };
-  }>> {
+  async obterPlanos(): Promise<
+    Array<{
+      id: string;
+      nome: string;
+      preco: number;
+      descricao: string;
+      recursos: string[];
+      limites: {
+        usuarios: number;
+        clientes: number;
+        armazenamento: string;
+      };
+    }>
+  > {
     try {
       const response = await api.get('/empresas/planos');
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao obter planos:', error);
       // Retornar planos padrão em caso de erro
       return [
@@ -187,13 +178,13 @@ class EmpresaService {
             'Até 1.000 clientes',
             'Módulos básicos',
             '5GB de armazenamento',
-            'Suporte por email'
+            'Suporte por email',
           ],
           limites: {
             usuarios: 3,
             clientes: 1000,
-            armazenamento: '5GB'
-          }
+            armazenamento: '5GB',
+          },
         },
         {
           id: 'professional',
@@ -206,13 +197,13 @@ class EmpresaService {
             'Todos os módulos',
             '50GB de armazenamento',
             'White label básico',
-            'Suporte prioritário'
+            'Suporte prioritário',
           ],
           limites: {
             usuarios: 10,
             clientes: 10000,
-            armazenamento: '50GB'
-          }
+            armazenamento: '50GB',
+          },
         },
         {
           id: 'enterprise',
@@ -225,14 +216,14 @@ class EmpresaService {
             'API completa',
             '500GB de armazenamento',
             'White label completo',
-            'Suporte dedicado'
+            'Suporte dedicado',
           ],
           limites: {
             usuarios: -1, // ilimitado
             clientes: -1, // ilimitado
-            armazenamento: '500GB'
-          }
-        }
+            armazenamento: '500GB',
+          },
+        },
       ];
     }
   }
@@ -257,7 +248,7 @@ class EmpresaService {
       if (cnpjLimpo.length !== 14) {
         return {
           valido: false,
-          message: 'CNPJ deve ter 14 dígitos'
+          message: 'CNPJ deve ter 14 dígitos',
         };
       }
 
@@ -267,14 +258,14 @@ class EmpresaService {
         empresa: {
           nome: 'Empresa de Exemplo',
           situacao: 'ATIVA',
-          endereco: 'Endereço de exemplo'
-        }
+          endereco: 'Endereço de exemplo',
+        },
       };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Erro ao validar CNPJ:', error);
       return {
         valido: false,
-        message: 'Erro ao validar CNPJ'
+        message: getErrorMessage(error, 'Erro ao validar CNPJ'),
       };
     }
   }
@@ -302,9 +293,9 @@ class EmpresaService {
       }
 
       return data;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Erro ao buscar CEP:', error);
-      throw new Error('CEP inválido ou não encontrado');
+      throw new Error(getErrorMessage(error, 'CEP inválido ou não encontrado'));
     }
   }
 
@@ -313,35 +304,32 @@ class EmpresaService {
     try {
       const response = await api.get(`/empresas/${id}`);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao obter empresa:', error);
-      throw new Error(
-        error.response?.data?.message ||
-        'Erro ao buscar dados da empresa'
-      );
+      throw new Error(getErrorMessage(error, 'Erro ao buscar dados da empresa'));
     }
   }
 
   // Atualizar dados da empresa
-  async atualizarEmpresa(id: string, dados: Partial<{
-    nome: string;
-    cnpj: string;
-    email: string;
-    telefone: string;
-    endereco: string;
-    cidade: string;
-    estado: string;
-    cep: string;
-  }>): Promise<EmpresaResponse> {
+  async atualizarEmpresa(
+    id: string,
+    dados: Partial<{
+      nome: string;
+      cnpj: string;
+      email: string;
+      telefone: string;
+      endereco: string;
+      cidade: string;
+      estado: string;
+      cep: string;
+    }>,
+  ): Promise<EmpresaResponse> {
     try {
       const response = await api.put(`/empresas/${id}`, dados);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao atualizar empresa:', error);
-      throw new Error(
-        error.response?.data?.message ||
-        'Erro ao atualizar dados da empresa'
-      );
+      throw new Error(getErrorMessage(error, 'Erro ao atualizar dados da empresa'));
     }
   }
 }

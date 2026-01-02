@@ -16,7 +16,7 @@ import {
   Palette,
   Shield,
   CheckCircle,
-  Star
+  Star,
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import { Plano } from '../../../hooks/useSubscription';
@@ -134,23 +134,19 @@ export const PlanosAdmin: React.FC<PlanosAdminProps> = ({ onEdit }) => {
   const formatarPreco = (preco: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(preco);
   };
 
   const getStatusBadge = (ativo: boolean) => {
-    return (
-      <Badge variant={ativo ? 'success' : 'secondary'}>
-        {ativo ? 'Ativo' : 'Inativo'}
-      </Badge>
-    );
+    return <Badge variant={ativo ? 'success' : 'secondary'}>{ativo ? 'Ativo' : 'Inativo'}</Badge>;
   };
 
   const getSuporteBadge = (suporte: string) => {
     const variants = {
-      'basico': 'secondary',
-      'prioritario': 'warning',
-      'vip': 'default'
+      basico: 'secondary',
+      prioritario: 'warning',
+      vip: 'default',
     } as const;
 
     // Verificação de segurança para suporte undefined/null
@@ -218,9 +214,7 @@ export const PlanosAdmin: React.FC<PlanosAdminProps> = ({ onEdit }) => {
             <CardContent className="space-y-4">
               {/* Preço */}
               <div className="text-center py-4">
-                <p className="text-3xl font-bold text-gray-900">
-                  {formatarPreco(plano.preco)}
-                </p>
+                <p className="text-3xl font-bold text-gray-900">{formatarPreco(plano.preco)}</p>
                 <p className="text-sm text-gray-600">por mês</p>
               </div>
 

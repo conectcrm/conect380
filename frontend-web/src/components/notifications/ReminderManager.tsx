@@ -13,7 +13,7 @@ import {
   Repeat,
   Bell,
   Save,
-  X
+  X,
 } from 'lucide-react';
 
 interface ReminderManagerProps {
@@ -34,7 +34,8 @@ interface NewReminderForm {
 }
 
 export const ReminderManager: React.FC<ReminderManagerProps> = ({ isOpen, onClose }) => {
-  const { reminders, addReminder, updateReminder, removeReminder, showSuccess } = useNotifications();
+  const { reminders, addReminder, updateReminder, removeReminder, showSuccess } =
+    useNotifications();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<NewReminderForm>({
@@ -159,13 +160,11 @@ export const ReminderManager: React.FC<ReminderManagerProps> = ({ isOpen, onClos
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Título */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Título
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>
                   <input
                     type="text"
                     value={formData.title}
-                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     placeholder="Ex: Ligar para cliente João"
                     required
@@ -180,7 +179,9 @@ export const ReminderManager: React.FC<ReminderManagerProps> = ({ isOpen, onClos
                   <input
                     type="datetime-local"
                     value={formData.scheduledFor}
-                    onChange={(e) => setFormData(prev => ({ ...prev, scheduledFor: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, scheduledFor: e.target.value }))
+                    }
                     min={getMinDateTime()}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     required
@@ -194,7 +195,12 @@ export const ReminderManager: React.FC<ReminderManagerProps> = ({ isOpen, onClos
                   </label>
                   <select
                     value={formData.entityType}
-                    onChange={(e) => setFormData(prev => ({ ...prev, entityType: e.target.value as ReminderEntityType }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        entityType: e.target.value as ReminderEntityType,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   >
                     <option value="cliente">Cliente</option>
@@ -212,7 +218,7 @@ export const ReminderManager: React.FC<ReminderManagerProps> = ({ isOpen, onClos
                   <input
                     type="text"
                     value={formData.entityId}
-                    onChange={(e) => setFormData(prev => ({ ...prev, entityId: e.target.value }))}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, entityId: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     placeholder="ID do cliente, proposta, etc."
                     required
@@ -222,12 +228,10 @@ export const ReminderManager: React.FC<ReminderManagerProps> = ({ isOpen, onClos
 
               {/* Mensagem */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Mensagem
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mensagem</label>
                 <textarea
                   value={formData.message}
-                  onChange={(e) => setFormData(prev => ({ ...prev, message: e.target.value }))}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, message: e.target.value }))}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   placeholder="Descrição detalhada do lembrete..."
@@ -271,8 +275,12 @@ export const ReminderManager: React.FC<ReminderManagerProps> = ({ isOpen, onClos
           {reminders.length === 0 ? (
             <div className="p-8 text-center">
               <Bell className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum lembrete configurado</h3>
-              <p className="text-gray-500 mb-4">Crie lembretes para não perder compromissos importantes.</p>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Nenhum lembrete configurado
+              </h3>
+              <p className="text-gray-500 mb-4">
+                Crie lembretes para não perder compromissos importantes.
+              </p>
               <button
                 onClick={() => setShowForm(true)}
                 className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 mx-auto"
@@ -285,22 +293,23 @@ export const ReminderManager: React.FC<ReminderManagerProps> = ({ isOpen, onClos
             <div className="divide-y divide-gray-200">
               {reminders.map((reminder) => {
                 const isOverdue = reminder.scheduledFor < new Date();
-                const isUpcoming = reminder.scheduledFor <= new Date(Date.now() + 24 * 60 * 60 * 1000); // próximas 24h
+                const isUpcoming =
+                  reminder.scheduledFor <= new Date(Date.now() + 24 * 60 * 60 * 1000); // próximas 24h
 
                 return (
                   <div
                     key={reminder.id}
-                    className={`p-6 hover:bg-gray-50 transition-colors ${!reminder.active ? 'opacity-50' : ''
-                      } ${isOverdue ? 'bg-red-50 border-l-4 border-l-red-500' : ''} ${isUpcoming && !isOverdue ? 'bg-yellow-50 border-l-4 border-l-yellow-500' : ''
-                      }`}
+                    className={`p-6 hover:bg-gray-50 transition-colors ${
+                      !reminder.active ? 'opacity-50' : ''
+                    } ${isOverdue ? 'bg-red-50 border-l-4 border-l-red-500' : ''} ${
+                      isUpcoming && !isOverdue ? 'bg-yellow-50 border-l-4 border-l-yellow-500' : ''
+                    }`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center space-x-2 mb-2">
                           {getEntityIcon(reminder.entityType)}
-                          <h3 className="text-lg font-medium text-gray-900">
-                            {reminder.title}
-                          </h3>
+                          <h3 className="text-lg font-medium text-gray-900">{reminder.title}</h3>
                           {reminder.recurring && (
                             <span className="flex items-center" aria-label="Recorrente">
                               <Repeat className="w-4 h-4 text-purple-500" aria-hidden="true" />
@@ -328,15 +337,11 @@ export const ReminderManager: React.FC<ReminderManagerProps> = ({ isOpen, onClos
                         </div>
 
                         {isOverdue && (
-                          <div className="mt-2 text-sm text-red-600 font-medium">
-                            ⚠️ Atrasado
-                          </div>
+                          <div className="mt-2 text-sm text-red-600 font-medium">⚠️ Atrasado</div>
                         )}
 
                         {isUpcoming && !isOverdue && (
-                          <div className="mt-2 text-sm text-yellow-600 font-medium">
-                            🔔 Próximo
-                          </div>
+                          <div className="mt-2 text-sm text-yellow-600 font-medium">🔔 Próximo</div>
                         )}
                       </div>
 
@@ -351,10 +356,11 @@ export const ReminderManager: React.FC<ReminderManagerProps> = ({ isOpen, onClos
                         </button>
                         <button
                           onClick={() => updateReminder(reminder.id, { active: !reminder.active })}
-                          className={`p-2 rounded-lg transition-colors ${reminder.active
-                            ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-                            : 'text-green-400 hover:text-green-600 hover:bg-green-50'
-                            }`}
+                          className={`p-2 rounded-lg transition-colors ${
+                            reminder.active
+                              ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                              : 'text-green-400 hover:text-green-600 hover:bg-green-50'
+                          }`}
                           title={reminder.active ? 'Desativar' : 'Ativar'}
                         >
                           <Bell className="w-4 h-4" />

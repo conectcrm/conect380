@@ -78,11 +78,11 @@ console.log('Agora:', new Date());
 
 | Usuário | Email | Role | Pode Criar Canais? |
 |---------|-------|------|-------------------|
-| Admin | admin@conectcrm.com | `admin` | ✅ SIM |
+| Admin | admin@conectsuite.com.br | `admin` | ✅ SIM |
 | Gerente | gerente@conectcrm.com | `manager` | ⚠️ Talvez |
 | Vendedor | vendedor@conectcrm.com | `user` | ❌ Provavelmente não |
 
-**Solução:** Use o usuário **admin@conectcrm.com**
+**Solução:** Use o usuário **admin@conectsuite.com.br**
 
 #### 3. Token Não Persistido Corretamente 💾
 
@@ -114,7 +114,7 @@ if (!token) {
 
 2. **Faça LOGIN novamente**
    - Acesse: `http://localhost:3000/login`
-   - Use: `admin@conectcrm.com` / `admin123`
+   - Use: `admin@conectsuite.com.br` / `admin123`
 
 3. **Tente salvar novamente**
    - Vá em Configurações → Integrações
@@ -296,7 +296,7 @@ Role: user (ou manager)
 
 **Solução:**
 1. Faça logout
-2. Faça login com `admin@conectcrm.com`
+2. Faça login com `admin@conectsuite.com.br`
 3. Tente salvar de novo
 
 ---
@@ -333,7 +333,7 @@ curl http://localhost:3001/api/atendimento/canais
 ```bash
 curl -X POST http://localhost:3001/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@conectcrm.com","senha":"admin123"}'
+  -d '{"email":"admin@conectsuite.com.br","senha":"admin123"}'
 
 # Deve retornar token JWT
 ```

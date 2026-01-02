@@ -1,20 +1,20 @@
 /**
  * Hook customizado para gerenciar notificações em tempo real via WebSocket
- * 
+ *
  * Conecta-se ao atendimento.gateway.ts e escuta eventos de:
  * - novo_ticket: Novo ticket criado
  * - ticket_atualizado: Status/dados do ticket mudaram
  * - ticket:atribuido: Ticket foi atribuído a um atendente
  * - nova_mensagem: Nova mensagem recebida
  * - notificacao: Notificação genérica do sistema
- * 
+ *
  * Features:
  * - Conexão automática ao montar
  * - Desconexão automática ao desmontar
  * - Reconnect automático em caso de falha
  * - Toast notifications com react-hot-toast
  * - Áudio de notificação (opcional)
- * 
+ *
  * @author ConectCRM
  * @date 2025-11-18
  */
@@ -22,9 +22,30 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import toast from 'react-hot-toast';
+import { resolveSocketBaseUrl } from '../utils/network';
 
-// WebSocket URL (ajustar conforme ambiente)
-const WS_URL = process.env.REACT_APP_WS_URL || 'http://localhost:3001';
+const WS_BASE_URL = resolveSocketBaseUrl({
+  envUrl: process.env.REACT_APP_WS_URL,
+  useWebSocketScheme: true,
+  onEnvIgnored: ({ envUrl, currentHost }) => {
+    console.warn(
+      '⚠️ [WebSocket] Ignorando REACT_APP_WS_URL local em acesso via rede:',
+      envUrl,
+      '→ host atual',
+      currentHost,
+    );
+  },
+});
+
+const DEBUG = process.env.REACT_APP_DEBUG_WS === 'true';
+
+const getNamespaceUrl = (namespace: string) => {
+  const base = WS_BASE_URL.endsWith('/') ? WS_BASE_URL.slice(0, -1) : WS_BASE_URL;
+  const path = namespace.startsWith('/') ? namespace : `/${namespace}`;
+  return `${base}${path}`;
+};
+
+const WS_NAMESPACE_URL = getNamespaceUrl('/atendimento');
 
 // Interface para notificação
 export interface Notificacao {
@@ -72,7 +93,7 @@ export interface NovaMensagemEvento {
 
 /**
  * Hook useNotifications
- * 
+ *
  * @param options - Opções de configuração
  * @returns Estado da conexão e funções de controle
  */
@@ -124,8 +145,18 @@ export const useNotifications = (options?: {
       gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
       gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
 
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.5);
+      // ✅ Garantir que AudioContext está rodando (requer interação do usuário)
+      if (audioContext.state === 'suspended') {
+        audioContext.resume().then(() => {
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.5);
+        }).catch((err) => {
+          console.warn('AudioContext precisa de interação do usuário:', err);
+        });
+      } else {
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.5);
+      }
     } catch (err) {
       console.warn('Não foi possível tocar som de notificação:', err);
     }
@@ -166,7 +197,7 @@ export const useNotifications = (options?: {
    */
   const connect = () => {
     if (socketRef.current?.connected) {
-      console.log('🔌 WebSocket já está conectado');
+      if (DEBUG) console.log('🔌 WebSocket já está conectado');
       return;
     }
 
@@ -180,20 +211,22 @@ export const useNotifications = (options?: {
         return; // ⚡ NÃO conectar sem token
       }
 
-      console.log('🔌 Conectando ao WebSocket:', WS_URL);
+      if (DEBUG) console.log('🔌 Conectando ao WebSocket:', WS_NAMESPACE_URL);
 
       // Criar conexão Socket.io
-      const socket = io(`${WS_URL}/atendimento`, {
+      const socket = io(WS_NAMESPACE_URL, {
         auth: { token },
         transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
+        // ✅ Suprimir warnings de conexão esperados em desenvolvimento (React StrictMode)
+        closeOnBeforeunload: false,
       });
 
       // Event: connect
       socket.on('connect', () => {
-        console.log('✅ WebSocket conectado:', socket.id);
+        if (DEBUG) console.log('✅ WebSocket conectado:', socket.id);
         setIsConnected(true);
         setError(null);
 
@@ -203,7 +236,7 @@ export const useNotifications = (options?: {
 
       // Event: disconnect
       socket.on('disconnect', (reason) => {
-        console.log('❌ WebSocket desconectado:', reason);
+        if (DEBUG) console.log('❌ WebSocket desconectado:', reason);
         setIsConnected(false);
       });
 
@@ -216,7 +249,7 @@ export const useNotifications = (options?: {
 
       // Event: novo_ticket
       socket.on('novo_ticket', (data: NovoTicketEvento) => {
-        console.log('🆕 Novo ticket recebido:', data);
+        if (DEBUG) console.log('🆕 Novo ticket recebido:', data);
 
         playNotificationSound();
         showToast({
@@ -231,7 +264,7 @@ export const useNotifications = (options?: {
 
       // Event: ticket_atualizado
       socket.on('ticket_atualizado', (data: TicketAtualizadoEvento) => {
-        console.log('🔄 Ticket atualizado:', data);
+        if (DEBUG) console.log('🔄 Ticket atualizado:', data);
 
         showToast({
           tipo: 'info',
@@ -245,7 +278,7 @@ export const useNotifications = (options?: {
 
       // Event: ticket:atribuido
       socket.on('ticket:atribuido', (data: TicketAtribuidoEvento) => {
-        console.log('👤 Ticket atribuído:', data);
+        if (DEBUG) console.log('👤 Ticket atribuído:', data);
 
         playNotificationSound();
         showToast({
@@ -260,7 +293,7 @@ export const useNotifications = (options?: {
 
       // Event: nova_mensagem
       socket.on('nova_mensagem', (data: NovaMensagemEvento) => {
-        console.log('💬 Nova mensagem:', data);
+        if (DEBUG) console.log('💬 Nova mensagem:', data);
 
         // Só notificar se for mensagem do cliente
         if (data.remetente === 'CLIENTE') {
@@ -278,7 +311,7 @@ export const useNotifications = (options?: {
 
       // Event: notificacao (genérica)
       socket.on('notificacao', (data: Notificacao) => {
-        console.log('🔔 Notificação:', data);
+        if (DEBUG) console.log('🔔 Notificação:', data);
 
         playNotificationSound();
         showToast(data);
@@ -298,10 +331,22 @@ export const useNotifications = (options?: {
    */
   const disconnect = () => {
     if (socketRef.current) {
-      console.log('🔌 Desconectando WebSocket...');
-      socketRef.current.disconnect();
-      socketRef.current = null;
-      setIsConnected(false);
+      try {
+        // ✅ Verificar se socket existe e está conectado antes de desconectar
+        const socket = socketRef.current;
+        if (socket && (socket.connected || socket.active)) {
+          if (DEBUG) console.log('🔌 Desconectando WebSocket...');
+          socket.disconnect();
+        } else {
+          if (DEBUG) console.log('🔌 WebSocket já estava desconectado');
+        }
+      } catch (err) {
+        // ✅ Ignorar erros de desconexão (socket já pode estar fechado)
+        if (DEBUG) console.log('⚠️ Erro ao desconectar (esperado em React StrictMode):', err);
+      } finally {
+        socketRef.current = null;
+        setIsConnected(false);
+      }
     }
   };
 
@@ -320,15 +365,25 @@ export const useNotifications = (options?: {
    * Effect: auto-connect ao montar
    */
   useEffect(() => {
-    if (autoConnect) {
+    let isCleanedUp = false;
+
+    // ✅ Evitar múltiplas conexões em React StrictMode
+    if (autoConnect && !socketRef.current) {
       connect();
     }
 
     // Cleanup ao desmontar
     return () => {
-      disconnect();
+      isCleanedUp = true;
+      // ✅ Pequeno delay para evitar desconexão prematura no StrictMode
+      setTimeout(() => {
+        if (isCleanedUp) {
+          disconnect();
+        }
+      }, 100);
     };
-  }, [autoConnect]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoConnect]); // Não incluir connect/disconnect nas dependências para evitar reconexões
 
   return {
     isConnected,

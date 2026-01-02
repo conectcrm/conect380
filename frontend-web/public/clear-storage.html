@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Limpar Storage - ConectCRM</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #002333 0%, #159A9C 100%);
+    }
+
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      max-width: 500px;
+      text-align: center;
+    }
+
+    h1 {
+      color: #002333;
+      margin-bottom: 1rem;
+    }
+
+    p {
+      color: #4B5563;
+      margin-bottom: 1.5rem;
+    }
+
+    button {
+      background: #159A9C;
+      color: white;
+      border: none;
+      padding: 0.75rem 2rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: #0F7B7D;
+    }
+
+    .success {
+      color: #16A34A;
+      font-weight: 600;
+      margin-top: 1rem;
+    }
+
+    .items {
+      text-align: left;
+      background: #F3F4F6;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-top: 1rem;
+      font-family: monospace;
+      font-size: 0.875rem;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>🧹 Limpar Storage</h1>
+    <p>Esta ferramenta limpa dados corrompidos do localStorage que podem estar causando erros no sistema.</p>
+
+    <button onclick="clearStorage()">Limpar Storage</button>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    function clearStorage() {
+      const result = document.getElementById('result');
+      const itemsToRemove = [
+        'conect-reminders',
+        'conect-notification-settings',
+        'conect-notifications'
+      ];
+
+      let itemsFound = [];
+
+      itemsToRemove.forEach(item => {
+        if (localStorage.getItem(item)) {
+          itemsFound.push(item);
+          localStorage.removeItem(item);
+        }
+      });
+
+      if (itemsFound.length > 0) {
+        result.innerHTML = `
+                    <p class="success">✅ Storage limpo com sucesso!</p>
+                    <div class="items">
+                        <strong>Items removidos:</strong><br>
+                        ${itemsFound.map(item => `• ${item}`).join('<br>')}
+                    </div>
+                    <p style="margin-top: 1rem; font-size: 0.875rem; color: #6B7280;">
+                        Você pode fechar esta página e recarregar o sistema.
+                    </p>
+                `;
+      } else {
+        result.innerHTML = `
+                    <p style="color: #6B7280; margin-top: 1rem;">
+                        ℹ️ Nenhum item corrompido encontrado.
+                    </p>
+                `;
+      }
+    }
+  </script>
+</body>
+
+</html>

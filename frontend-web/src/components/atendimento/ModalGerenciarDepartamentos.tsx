@@ -70,7 +70,7 @@ export const ModalGerenciarDepartamentos: React.FC<ModalGerenciarDepartamentosPr
 
       // Carregar departamentos já vinculados a este núcleo
       const vinculados = await departamentoService.listarPorNucleo(nucleo.id);
-      setDepartamentosVinculados(vinculados.map(d => d.id));
+      setDepartamentosVinculados(vinculados.map((d) => d.id));
     } catch (err: unknown) {
       console.error('Erro ao carregar dados:', err);
       setError(err instanceof Error ? err.message : 'Erro ao carregar dados');
@@ -80,9 +80,9 @@ export const ModalGerenciarDepartamentos: React.FC<ModalGerenciarDepartamentosPr
   };
 
   const handleToggleDepartamento = (departamentoId: string) => {
-    setDepartamentosVinculados(prev => {
+    setDepartamentosVinculados((prev) => {
       if (prev.includes(departamentoId)) {
-        return prev.filter(id => id !== departamentoId);
+        return prev.filter((id) => id !== departamentoId);
       } else {
         return [...prev, departamentoId];
       }
@@ -99,11 +99,9 @@ export const ModalGerenciarDepartamentos: React.FC<ModalGerenciarDepartamentosPr
 
       // Vincular departamentos selecionados
       for (const deptId of departamentosVinculados) {
-        const dept = todosDepartamentos.find(d => d.id === deptId);
+        const dept = todosDepartamentos.find((d) => d.id === deptId);
         if (dept && dept.nucleoId !== nucleo.id) {
-          promessas.push(
-            departamentoService.atualizar(deptId, { nucleoId: nucleo.id })
-          );
+          promessas.push(departamentoService.atualizar(deptId, { nucleoId: nucleo.id }));
         }
       }
 
@@ -113,9 +111,7 @@ export const ModalGerenciarDepartamentos: React.FC<ModalGerenciarDepartamentosPr
         if (!departamentosVinculados.includes(dept.id)) {
           // Remove do núcleo (define nucleoId como vazio ou outro núcleo padrão)
           // Aqui você pode decidir a lógica: deletar ou mover para núcleo "Geral"
-          promessas.push(
-            departamentoService.atualizar(dept.id, { nucleoId: '' })
-          );
+          promessas.push(departamentoService.atualizar(dept.id, { nucleoId: '' }));
         }
       }
 
@@ -143,13 +139,14 @@ export const ModalGerenciarDepartamentos: React.FC<ModalGerenciarDepartamentosPr
   // COMPUTED
   // ========================================================================
 
-  const departamentosFiltrados = todosDepartamentos.filter(dept =>
-    dept.nome.toLowerCase().includes(busca.toLowerCase()) ||
-    dept.descricao?.toLowerCase().includes(busca.toLowerCase())
+  const departamentosFiltrados = todosDepartamentos.filter(
+    (dept) =>
+      dept.nome.toLowerCase().includes(busca.toLowerCase()) ||
+      dept.descricao?.toLowerCase().includes(busca.toLowerCase()),
   );
 
-  const departamentosAtivos = departamentosFiltrados.filter(d => d.ativo);
-  const departamentosInativos = departamentosFiltrados.filter(d => !d.ativo);
+  const departamentosAtivos = departamentosFiltrados.filter((d) => d.ativo);
+  const departamentosInativos = departamentosFiltrados.filter((d) => !d.ativo);
 
   // ========================================================================
   // RENDER
@@ -251,10 +248,11 @@ export const ModalGerenciarDepartamentos: React.FC<ModalGerenciarDepartamentosPr
                       return (
                         <label
                           key={dept.id}
-                          className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-all ${isVinculado
+                          className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-all ${
+                            isVinculado
                               ? 'bg-purple-50 border-purple-300 ring-1 ring-purple-200'
                               : 'bg-white border-gray-200 hover:border-purple-200'
-                            }`}
+                          }`}
                         >
                           <input
                             type="checkbox"
@@ -303,10 +301,11 @@ export const ModalGerenciarDepartamentos: React.FC<ModalGerenciarDepartamentosPr
                       return (
                         <label
                           key={dept.id}
-                          className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-all ${isVinculado
+                          className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-all ${
+                            isVinculado
                               ? 'bg-gray-50 border-gray-300'
                               : 'bg-white border-gray-200 hover:border-gray-300'
-                            }`}
+                          }`}
                         >
                           <input
                             type="checkbox"
@@ -350,14 +349,8 @@ export const ModalGerenciarDepartamentos: React.FC<ModalGerenciarDepartamentosPr
               {/* Link para criar novo departamento */}
               {todosDepartamentos.length > 0 && (
                 <div className="mt-6 pt-4 border-t border-gray-200">
-                  <p className="text-sm text-gray-600 mb-2">
-                    💡 Não encontrou o departamento?
-                  </p>
-                  <Button
-                    onClick={handleIrParaDepartamentos}
-                    variant="outline"
-                    className="w-full"
-                  >
+                  <p className="text-sm text-gray-600 mb-2">💡 Não encontrou o departamento?</p>
+                  <Button onClick={handleIrParaDepartamentos} variant="outline" className="w-full">
                     <ExternalLink className="h-4 w-4 mr-2" />
                     Ir para Gestão de Departamentos
                   </Button>
@@ -370,7 +363,9 @@ export const ModalGerenciarDepartamentos: React.FC<ModalGerenciarDepartamentosPr
         {/* Footer */}
         <div className="p-6 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
           <p className="text-sm text-gray-600">
-            {departamentosVinculados.length} departamento{departamentosVinculados.length !== 1 ? 's' : ''} selecionado{departamentosVinculados.length !== 1 ? 's' : ''}
+            {departamentosVinculados.length} departamento
+            {departamentosVinculados.length !== 1 ? 's' : ''} selecionado
+            {departamentosVinculados.length !== 1 ? 's' : ''}
           </p>
           <div className="flex gap-3">
             <Button onClick={onClose} variant="outline" disabled={saving}>

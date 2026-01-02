@@ -52,7 +52,7 @@ const DEBUG = false;
 🔍 [AuthContext] Token presente? true
 🔍 [AuthContext] User salvo? true
 🔍 [AuthContext] Verificando validade do token...
-✅ [AuthContext] Token válido - Usuário autenticado: admin@conectcrm.com
+✅ [AuthContext] Token válido - Usuário autenticado: admin@conectsuite.com.br
 ✅ [AuthContext] empresaId restaurado: f47ac10b-58cc-4372-a567-0e02b2c3d479
 🎫 [AtendimentosSidebar] Total de tickets recebidos: 0
 🎫 [AtendimentosSidebar] Tickets recebidos: []

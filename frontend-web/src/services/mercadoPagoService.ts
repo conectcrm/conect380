@@ -1,3 +1,5 @@
+import { API_BASE_URL } from './api';
+
 interface MercadoPagoCustomer {
   id: string;
   email: string;
@@ -144,7 +146,7 @@ interface CreateSubscriptionParams {
 }
 
 class MercadoPagoService {
-  private apiBaseUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api`;
+  private apiBaseUrl = `${API_BASE_URL}/api`;
   private isProduction = process.env.NODE_ENV === 'production';
 
   constructor() {
@@ -158,7 +160,9 @@ class MercadoPagoService {
       : process.env.REACT_APP_MP_PUBLIC_KEY_TEST;
 
     if (!publicKey) {
-      console.warn('⚠️ Chave pública do Mercado Pago não encontrada. Funcionalidades de pagamento podem não funcionar.');
+      console.warn(
+        '⚠️ Chave pública do Mercado Pago não encontrada. Funcionalidades de pagamento podem não funcionar.',
+      );
       return;
     }
 
@@ -167,7 +171,7 @@ class MercadoPagoService {
       if (typeof window !== 'undefined' && (window as any).MercadoPago) {
         (window as any).MercadoPago.configure({
           public_key: publicKey,
-          locale: 'pt-BR'
+          locale: 'pt-BR',
         });
         console.log('✅ Mercado Pago SDK inicializado');
       }
@@ -193,26 +197,30 @@ class MercadoPagoService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
+          Authorization: `Bearer ${this.getAuthToken()}`,
         },
         body: JSON.stringify({
           email: dados.email,
           first_name: dados.nome,
           last_name: dados.sobrenome,
-          phone: dados.telefone ? {
-            area_code: dados.telefone.substring(0, 2),
-            number: dados.telefone.substring(2)
-          } : undefined,
+          phone: dados.telefone
+            ? {
+              area_code: dados.telefone.substring(0, 2),
+              number: dados.telefone.substring(2),
+            }
+            : undefined,
           identification: {
             type: dados.tipo_documento,
-            number: dados.documento
+            number: dados.documento,
           },
-          address: dados.endereco ? {
-            street_name: dados.endereco.rua,
-            street_number: dados.endereco.numero,
-            zip_code: dados.endereco.cep
-          } : undefined
-        })
+          address: dados.endereco
+            ? {
+              street_name: dados.endereco.rua,
+              street_number: dados.endereco.numero,
+              zip_code: dados.endereco.cep,
+            }
+            : undefined,
+        }),
       });
 
       if (!response.ok) {
@@ -239,38 +247,46 @@ class MercadoPagoService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
+          Authorization: `Bearer ${this.getAuthToken()}`,
         },
         body: JSON.stringify({
-          items: [{
-            id: params.referencia_externa,
-            title: params.descricao,
-            currency_id: 'BRL',
-            quantity: 1,
-            unit_price: params.valor
-          }],
+          items: [
+            {
+              id: params.referencia_externa,
+              title: params.descricao,
+              currency_id: 'BRL',
+              quantity: 1,
+              unit_price: params.valor,
+            },
+          ],
           payer: {
             name: params.dados_pagador?.nome || '',
             surname: params.dados_pagador?.sobrenome || '',
             email: params.email_pagador,
-            phone: params.dados_pagador?.telefone ? {
-              area_code: params.dados_pagador.telefone.substring(0, 2),
-              number: params.dados_pagador.telefone.substring(2)
-            } : undefined,
-            identification: params.dados_pagador ? {
-              type: params.dados_pagador.tipo_documento,
-              number: params.dados_pagador.documento
-            } : undefined,
-            address: params.dados_pagador?.endereco ? {
-              street_name: params.dados_pagador.endereco.rua,
-              street_number: params.dados_pagador.endereco.numero,
-              zip_code: params.dados_pagador.endereco.cep
-            } : undefined
+            phone: params.dados_pagador?.telefone
+              ? {
+                area_code: params.dados_pagador.telefone.substring(0, 2),
+                number: params.dados_pagador.telefone.substring(2),
+              }
+              : undefined,
+            identification: params.dados_pagador
+              ? {
+                type: params.dados_pagador.tipo_documento,
+                number: params.dados_pagador.documento,
+              }
+              : undefined,
+            address: params.dados_pagador?.endereco
+              ? {
+                street_name: params.dados_pagador.endereco.rua,
+                street_number: params.dados_pagador.endereco.numero,
+                zip_code: params.dados_pagador.endereco.cep,
+              }
+              : undefined,
           },
           back_urls: {
             success: `${window.location.origin}/billing/success`,
             failure: `${window.location.origin}/billing/error`,
-            pending: `${window.location.origin}/billing/pending`
+            pending: `${window.location.origin}/billing/pending`,
           },
           auto_return: 'approved',
           payment_methods: this.getPaymentMethodsConfig(params.metodo_pagamento),
@@ -279,8 +295,9 @@ class MercadoPagoService {
           external_reference: params.referencia_externa,
           expires: !!params.vencimento,
           expiration_date_from: new Date().toISOString(),
-          expiration_date_to: params.vencimento || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-        })
+          expiration_date_to:
+            params.vencimento || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        }),
       });
 
       if (!response.ok) {
@@ -307,7 +324,7 @@ class MercadoPagoService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
+          Authorization: `Bearer ${this.getAuthToken()}`,
         },
         body: JSON.stringify({
           transaction_amount: params.valor,
@@ -317,15 +334,18 @@ class MercadoPagoService {
             email: params.email_pagador,
             first_name: params.dados_pagador?.nome || '',
             last_name: params.dados_pagador?.sobrenome || '',
-            identification: params.dados_pagador ? {
-              type: params.dados_pagador.tipo_documento,
-              number: params.dados_pagador.documento
-            } : undefined
+            identification: params.dados_pagador
+              ? {
+                type: params.dados_pagador.tipo_documento,
+                number: params.dados_pagador.documento,
+              }
+              : undefined,
           },
           external_reference: params.referencia_externa,
           notification_url: `${this.apiBaseUrl}/mercadopago/webhooks`,
-          date_of_expiration: params.vencimento || new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 min
-        })
+          date_of_expiration:
+            params.vencimento || new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min
+        }),
       });
 
       if (!response.ok) {
@@ -344,7 +364,9 @@ class MercadoPagoService {
   }
 
   // Criar pagamento com cartão
-  async criarPagamentoCartao(params: CreatePaymentParams & { cardToken: string; installments: number }): Promise<MercadoPagoPayment> {
+  async criarPagamentoCartao(
+    params: CreatePaymentParams & { cardToken: string; installments: number },
+  ): Promise<MercadoPagoPayment> {
     try {
       console.log('🔄 Criando pagamento com cartão:', params);
 
@@ -352,7 +374,7 @@ class MercadoPagoService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
+          Authorization: `Bearer ${this.getAuthToken()}`,
         },
         body: JSON.stringify({
           transaction_amount: params.valor,
@@ -362,14 +384,16 @@ class MercadoPagoService {
           payment_method_id: 'visa', // Será detectado automaticamente pelo token
           payer: {
             email: params.email_pagador,
-            identification: params.dados_pagador ? {
-              type: params.dados_pagador.tipo_documento,
-              number: params.dados_pagador.documento
-            } : undefined
+            identification: params.dados_pagador
+              ? {
+                type: params.dados_pagador.tipo_documento,
+                number: params.dados_pagador.documento,
+              }
+              : undefined,
           },
           external_reference: params.referencia_externa,
-          notification_url: `${this.apiBaseUrl}/mercadopago/webhooks`
-        })
+          notification_url: `${this.apiBaseUrl}/mercadopago/webhooks`,
+        }),
       });
 
       if (!response.ok) {
@@ -392,8 +416,8 @@ class MercadoPagoService {
     try {
       const response = await fetch(`${this.apiBaseUrl}/mercadopago/payments/${paymentId}`, {
         headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
+          Authorization: `Bearer ${this.getAuthToken()}`,
+        },
       });
 
       if (!response.ok) {
@@ -417,11 +441,11 @@ class MercadoPagoService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
+          Authorization: `Bearer ${this.getAuthToken()}`,
         },
         body: JSON.stringify({
-          amount: valor // Se não informado, estorna valor total
-        })
+          amount: valor, // Se não informado, estorna valor total
+        }),
       });
 
       if (!response.ok) {
@@ -471,12 +495,8 @@ class MercadoPagoService {
     switch (metodo) {
       case 'pix':
         return {
-          excluded_payment_types: [
-            { id: 'credit_card' },
-            { id: 'debit_card' },
-            { id: 'ticket' }
-          ],
-          installments: 1
+          excluded_payment_types: [{ id: 'credit_card' }, { id: 'debit_card' }, { id: 'ticket' }],
+          installments: 1,
         };
 
       case 'boleto':
@@ -484,25 +504,22 @@ class MercadoPagoService {
           excluded_payment_types: [
             { id: 'credit_card' },
             { id: 'debit_card' },
-            { id: 'bank_transfer' }
+            { id: 'bank_transfer' },
           ],
-          installments: 1
+          installments: 1,
         };
 
       case 'cartao':
         return {
-          excluded_payment_types: [
-            { id: 'ticket' },
-            { id: 'bank_transfer' }
-          ],
-          installments: 12
+          excluded_payment_types: [{ id: 'ticket' }, { id: 'bank_transfer' }],
+          installments: 12,
         };
 
       default:
         return {
           excluded_payment_methods: [],
           excluded_payment_types: [],
-          installments: 12
+          installments: 12,
         };
     }
   }
@@ -516,27 +533,35 @@ class MercadoPagoService {
     // Disparar eventos personalizados baseados no status
     switch (pagamento.status) {
       case 'approved':
-        window.dispatchEvent(new CustomEvent('mercadopago:payment:approved', {
-          detail: { payment: pagamento }
-        }));
+        window.dispatchEvent(
+          new CustomEvent('mercadopago:payment:approved', {
+            detail: { payment: pagamento },
+          }),
+        );
         break;
 
       case 'rejected':
-        window.dispatchEvent(new CustomEvent('mercadopago:payment:rejected', {
-          detail: { payment: pagamento }
-        }));
+        window.dispatchEvent(
+          new CustomEvent('mercadopago:payment:rejected', {
+            detail: { payment: pagamento },
+          }),
+        );
         break;
 
       case 'pending':
-        window.dispatchEvent(new CustomEvent('mercadopago:payment:pending', {
-          detail: { payment: pagamento }
-        }));
+        window.dispatchEvent(
+          new CustomEvent('mercadopago:payment:pending', {
+            detail: { payment: pagamento },
+          }),
+        );
         break;
 
       case 'in_process':
-        window.dispatchEvent(new CustomEvent('mercadopago:payment:processing', {
-          detail: { payment: pagamento }
-        }));
+        window.dispatchEvent(
+          new CustomEvent('mercadopago:payment:processing', {
+            detail: { payment: pagamento },
+          }),
+        );
         break;
     }
   }
@@ -557,7 +582,7 @@ class MercadoPagoService {
   public formatarValor(valor: number): string {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(valor);
   }
 
@@ -568,23 +593,35 @@ class MercadoPagoService {
   // Status helpers
   public getStatusColor(status: string): string {
     switch (status) {
-      case 'approved': return 'green';
-      case 'rejected': return 'red';
-      case 'pending': return 'yellow';
-      case 'in_process': return 'blue';
-      case 'cancelled': return 'gray';
-      default: return 'gray';
+      case 'approved':
+        return 'green';
+      case 'rejected':
+        return 'red';
+      case 'pending':
+        return 'yellow';
+      case 'in_process':
+        return 'blue';
+      case 'cancelled':
+        return 'gray';
+      default:
+        return 'gray';
     }
   }
 
   public getStatusLabel(status: string): string {
     switch (status) {
-      case 'approved': return 'Aprovado';
-      case 'rejected': return 'Rejeitado';
-      case 'pending': return 'Pendente';
-      case 'in_process': return 'Processando';
-      case 'cancelled': return 'Cancelado';
-      default: return 'Desconhecido';
+      case 'approved':
+        return 'Aprovado';
+      case 'rejected':
+        return 'Rejeitado';
+      case 'pending':
+        return 'Pendente';
+      case 'in_process':
+        return 'Processando';
+      case 'cancelled':
+        return 'Cancelado';
+      default:
+        return 'Desconhecido';
     }
   }
 }

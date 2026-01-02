@@ -11,7 +11,7 @@ import {
   MonitorOff,
   Clock,
   Save,
-  TestTube
+  TestTube,
 } from 'lucide-react';
 
 interface NotificationSettingsProps {
@@ -20,7 +20,8 @@ interface NotificationSettingsProps {
 }
 
 export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOpen, onClose }) => {
-  const { settings, updateSettings, showSuccess, showError, showWarning, showInfo } = useNotifications();
+  const { settings, updateSettings, showSuccess, showError, showWarning, showInfo } =
+    useNotifications();
   const [localSettings, setLocalSettings] = useState(settings);
 
   if (!isOpen) return null;
@@ -60,7 +61,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
     if ('Notification' in window) {
       const permission = await Notification.requestPermission();
       if (permission === 'granted') {
-        setLocalSettings(prev => ({ ...prev, browserNotifications: true }));
+        setLocalSettings((prev) => ({ ...prev, browserNotifications: true }));
         showSuccess('Permissão Concedida', 'Notificações do navegador foram habilitadas.');
       } else {
         showError('Permissão Negada', 'Não foi possível habilitar as notificações do navegador.');
@@ -77,10 +78,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
             <Settings className="w-5 h-5 text-gray-600" />
             <h2 className="text-lg font-semibold text-gray-900">Configurações de Notificação</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             ×
           </button>
         </div>
@@ -104,7 +102,9 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
               <input
                 type="checkbox"
                 checked={localSettings.soundEnabled}
-                onChange={(e) => setLocalSettings(prev => ({ ...prev, soundEnabled: e.target.checked }))}
+                onChange={(e) =>
+                  setLocalSettings((prev) => ({ ...prev, soundEnabled: e.target.checked }))
+                }
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -125,19 +125,26 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              {!localSettings.browserNotifications && 'Notification' in window && Notification.permission !== 'granted' && (
-                <button
-                  onClick={requestBrowserPermission}
-                  className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 transition-colors"
-                >
-                  Permitir
-                </button>
-              )}
+              {!localSettings.browserNotifications &&
+                'Notification' in window &&
+                Notification.permission !== 'granted' && (
+                  <button
+                    onClick={requestBrowserPermission}
+                    className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 transition-colors"
+                  >
+                    Permitir
+                  </button>
+                )}
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
                   checked={localSettings.browserNotifications}
-                  onChange={(e) => setLocalSettings(prev => ({ ...prev, browserNotifications: e.target.checked }))}
+                  onChange={(e) =>
+                    setLocalSettings((prev) => ({
+                      ...prev,
+                      browserNotifications: e.target.checked,
+                    }))
+                  }
                   disabled={'Notification' in window && Notification.permission !== 'granted'}
                   className="sr-only peer"
                 />
@@ -163,7 +170,9 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
               <input
                 type="checkbox"
                 checked={localSettings.emailNotifications}
-                onChange={(e) => setLocalSettings(prev => ({ ...prev, emailNotifications: e.target.checked }))}
+                onChange={(e) =>
+                  setLocalSettings((prev) => ({ ...prev, emailNotifications: e.target.checked }))
+                }
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -186,7 +195,12 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
                 max="60"
                 step="5"
                 value={localSettings.reminderInterval}
-                onChange={(e) => setLocalSettings(prev => ({ ...prev, reminderInterval: parseInt(e.target.value) }))}
+                onChange={(e) =>
+                  setLocalSettings((prev) => ({
+                    ...prev,
+                    reminderInterval: parseInt(e.target.value),
+                  }))
+                }
                 className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
               />
               <span className="text-sm font-medium text-gray-700 min-w-[3rem]">

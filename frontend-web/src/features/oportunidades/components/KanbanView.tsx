@@ -1,32 +1,22 @@
 import React, { useState } from 'react';
 import { useKanbanOportunidades } from '../hooks/useOportunidades';
-import { Oportunidade, EstagioOportunidade, FiltrosOportunidade } from '../../../types/oportunidades/index';
+import {
+  Oportunidade,
+  EstagioOportunidade,
+  FiltrosOportunidade,
+} from '../../../types/oportunidades/index';
 import { KanbanCard } from './KanbanCard';
-import {
-  DragDropContext,
-  Droppable,
-  Draggable,
-  DropResult
-} from '@hello-pangea/dnd';
-import {
-  TrendingUp,
-  Users,
-  DollarSign,
-  Clock,
-  RefreshCw,
-  AlertCircle
-} from 'lucide-react';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import { TrendingUp, Users, DollarSign, Clock, RefreshCw, AlertCircle } from 'lucide-react';
 
 interface KanbanViewProps {
   onVisualizarOportunidade: (oportunidade: Oportunidade) => void;
   filtros?: Partial<FiltrosOportunidade>;
 }
 
-export const KanbanView: React.FC<KanbanViewProps> = ({
-  onVisualizarOportunidade,
-  filtros
-}) => {
-  const { dadosKanban, loading, error, moverOportunidade, recarregar } = useKanbanOportunidades(filtros);
+export const KanbanView: React.FC<KanbanViewProps> = ({ onVisualizarOportunidade, filtros }) => {
+  const { dadosKanban, loading, error, moverOportunidade, recarregar } =
+    useKanbanOportunidades(filtros);
   const [draggedItem, setDraggedItem] = useState<Oportunidade | null>(null);
 
   const handleDragStart = (start: any) => {
@@ -53,7 +43,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     if (!dadosKanban) return null;
 
     for (const estagio of dadosKanban.estagios) {
-      const oportunidade = estagio.oportunidades.find(op => op.id === id);
+      const oportunidade = estagio.oportunidades.find((op) => op.id === id);
       if (oportunidade) return oportunidade;
     }
 
@@ -66,44 +56,44 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         nome: 'Leads',
         cor: 'bg-gray-100 border-gray-300',
         corTexto: 'text-gray-700',
-        icone: Users
+        icone: Users,
       },
       [EstagioOportunidade.QUALIFICACAO]: {
         nome: 'Qualificação',
         cor: 'bg-blue-50 border-blue-200',
         corTexto: 'text-blue-700',
-        icone: Clock
+        icone: Clock,
       },
       [EstagioOportunidade.PROPOSTA]: {
         nome: 'Proposta',
         cor: 'bg-yellow-50 border-yellow-200',
         corTexto: 'text-yellow-700',
-        icone: DollarSign
+        icone: DollarSign,
       },
       [EstagioOportunidade.NEGOCIACAO]: {
         nome: 'Negociação',
         cor: 'bg-orange-50 border-orange-200',
         corTexto: 'text-orange-700',
-        icone: TrendingUp
+        icone: TrendingUp,
       },
       [EstagioOportunidade.FECHAMENTO]: {
         nome: 'Fechamento',
         cor: 'bg-purple-50 border-purple-200',
         corTexto: 'text-purple-700',
-        icone: Clock
+        icone: Clock,
       },
       [EstagioOportunidade.GANHO]: {
         nome: 'Ganho',
         cor: 'bg-green-50 border-green-200',
         corTexto: 'text-green-700',
-        icone: TrendingUp
+        icone: TrendingUp,
       },
       [EstagioOportunidade.PERDIDO]: {
         nome: 'Perdido',
         cor: 'bg-red-50 border-red-200',
         corTexto: 'text-red-700',
-        icone: AlertCircle
-      }
+        icone: AlertCircle,
+      },
     };
 
     return configs[estagio];
@@ -144,10 +134,12 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Pipeline de Vendas</h2>
             <p className="text-sm text-gray-600 mt-1">
-              {dadosKanban.totalOportunidades} oportunidades • {new Intl.NumberFormat('pt-BR', {
+              {dadosKanban.totalOportunidades} oportunidades •{' '}
+              {new Intl.NumberFormat('pt-BR', {
                 style: 'currency',
-                currency: 'BRL'
-              }).format(dadosKanban.totalValor)} em negociação
+                currency: 'BRL',
+              }).format(dadosKanban.totalValor)}{' '}
+              em negociação
             </p>
           </div>
 
@@ -178,9 +170,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
                         <Icone className={`w-5 h-5 ${config.corTexto}`} />
-                        <h3 className={`font-semibold ${config.corTexto}`}>
-                          {config.nome}
-                        </h3>
+                        <h3 className={`font-semibold ${config.corTexto}`}>{config.nome}</h3>
                       </div>
 
                       <div className="text-right">
@@ -191,7 +181,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           {new Intl.NumberFormat('pt-BR', {
                             style: 'currency',
                             currency: 'BRL',
-                            notation: 'compact'
+                            notation: 'compact',
                           }).format(estagioData?.valor || 0)}
                         </div>
                       </div>
@@ -241,9 +231,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                         {estagioData.oportunidades.length === 0 && (
                           <div className="text-center py-8 text-gray-400">
                             <div className="text-sm">Nenhuma oportunidade</div>
-                            <div className="text-xs mt-1">
-                              Arraste oportunidades para cá
-                            </div>
+                            <div className="text-xs mt-1">Arraste oportunidades para cá</div>
                           </div>
                         )}
                       </div>
@@ -261,9 +249,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         <div className="fixed bottom-4 right-4 bg-black text-white px-4 py-2 rounded-lg shadow-lg z-50">
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-[#159A9C] rounded-full animate-pulse"></div>
-            <span className="text-sm">
-              Movendo "{draggedItem.titulo}"
-            </span>
+            <span className="text-sm">Movendo "{draggedItem.titulo}"</span>
           </div>
         </div>
       )}

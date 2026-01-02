@@ -662,3 +662,5 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
     </div >
   );
 };
+
+

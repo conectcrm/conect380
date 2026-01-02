@@ -12,8 +12,16 @@ interface FluxoCompleto {
   etapas: {
     envioEmail: { status: 'pendente' | 'concluido' | 'erro'; timestamp?: Date; erro?: string };
     portalAceite: { status: 'pendente' | 'visualizado' | 'aceito' | 'rejeitado'; timestamp?: Date };
-    geracaoContrato: { status: 'pendente' | 'gerado' | 'enviado' | 'assinado'; contratoId?: string; timestamp?: Date };
-    faturamento: { status: 'pendente' | 'configurado' | 'ativo'; planoId?: string; timestamp?: Date };
+    geracaoContrato: {
+      status: 'pendente' | 'gerado' | 'enviado' | 'assinado';
+      contratoId?: string;
+      timestamp?: Date;
+    };
+    faturamento: {
+      status: 'pendente' | 'configurado' | 'ativo';
+      planoId?: string;
+      timestamp?: Date;
+    };
   };
   statusGeral: 'iniciado' | 'em_andamento' | 'concluido' | 'erro';
   logs: Array<{
@@ -26,32 +34,33 @@ interface FluxoCompleto {
 }
 
 class OrquestradorFluxo {
-
   /**
    * Inicia o fluxo completo a partir de uma proposta
    */
-  async iniciarFluxoCompleto(propostaId: string, configuracao: {
-    enviarEmail: boolean;
-    aguardarAceite: boolean;
-    gerarContrato: boolean;
-    configurarFaturamento: boolean;
-    configFaturamento?: {
-      tipoPagamento: 'vista' | 'parcelado' | 'recorrente';
-      numeroParcelas?: number;
-      diaVencimento?: number;
-    };
-  }): Promise<FluxoCompleto> {
-
+  async iniciarFluxoCompleto(
+    propostaId: string,
+    configuracao: {
+      enviarEmail: boolean;
+      aguardarAceite: boolean;
+      gerarContrato: boolean;
+      configurarFaturamento: boolean;
+      configFaturamento?: {
+        tipoPagamento: 'vista' | 'parcelado' | 'recorrente';
+        numeroParcelas?: number;
+        diaVencimento?: number;
+      };
+    },
+  ): Promise<FluxoCompleto> {
     const fluxo: FluxoCompleto = {
       propostaId,
       etapas: {
         envioEmail: { status: 'pendente' },
         portalAceite: { status: 'pendente' },
         geracaoContrato: { status: 'pendente' },
-        faturamento: { status: 'pendente' }
+        faturamento: { status: 'pendente' },
       },
       statusGeral: 'iniciado',
-      logs: []
+      logs: [],
     };
 
     try {
@@ -76,9 +85,11 @@ class OrquestradorFluxo {
       }
 
       // Etapa 4: Configurar faturamento (se contrato assinado)
-      if (configuracao.configurarFaturamento &&
+      if (
+        configuracao.configurarFaturamento &&
         fluxo.etapas.geracaoContrato.status === 'assinado' &&
-        configuracao.configFaturamento) {
+        configuracao.configFaturamento
+      ) {
         await this.executarConfiguracaoFaturamento(fluxo, configuracao.configFaturamento);
       }
 
@@ -86,7 +97,6 @@ class OrquestradorFluxo {
       this.adicionarLog(fluxo, 'conclusao', 'Fluxo concluído com sucesso', 'sucesso');
 
       return fluxo;
-
     } catch (error) {
       fluxo.statusGeral = 'erro';
       this.adicionarLog(fluxo, 'erro', `Erro no fluxo: ${error}`, 'erro');
@@ -108,21 +118,20 @@ class OrquestradorFluxo {
       await emailService.enviarEmail({
         para: ['cliente@exemplo.com'],
         assunto: 'Nova Proposta Comercial',
-        corpo: `Olá!\n\nVocê tem uma nova proposta aguardando aprovação. Acesse: ${portalClienteService.gerarURLPublica(token)}\n\nEquipe ConectCRM.`
+        corpo: `Olá!\n\nVocê tem uma nova proposta aguardando aprovação. Acesse: ${portalClienteService.gerarURLPublica(token)}\n\nEquipe ConectCRM.`,
       });
 
       fluxo.etapas.envioEmail = {
         status: 'concluido',
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
       this.adicionarLog(fluxo, 'email', 'Email enviado com sucesso', 'sucesso');
-
     } catch (error) {
       fluxo.etapas.envioEmail = {
         status: 'erro',
         timestamp: new Date(),
-        erro: String(error)
+        erro: String(error),
       };
 
       this.adicionarLog(fluxo, 'email', `Erro ao enviar email: ${error}`, 'erro');
@@ -141,11 +150,10 @@ class OrquestradorFluxo {
       // Por enquanto, simula que está aguardando
       fluxo.etapas.portalAceite = {
         status: 'visualizado',
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
       this.adicionarLog(fluxo, 'portal', 'Aguardando aceite do cliente', 'sucesso');
-
     } catch (error) {
       this.adicionarLog(fluxo, 'portal', `Erro ao configurar aceite: ${error}`, 'erro');
       throw error;
@@ -160,7 +168,7 @@ class OrquestradorFluxo {
 
     fluxo.etapas.portalAceite = {
       status: 'aceito',
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     this.adicionarLog(fluxo, 'portal', 'Aceite automático simulado', 'sucesso');
@@ -176,14 +184,13 @@ class OrquestradorFluxo {
       fluxo.etapas.geracaoContrato = {
         status: 'enviado',
         contratoId: `CONTR-${Date.now()}`,
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
       this.adicionarLog(fluxo, 'contrato', 'Contrato gerado e enviado', 'sucesso');
 
       // Para fins de demonstração, simula assinatura
       await this.simularAssinaturaContrato(fluxo, fluxo.etapas.geracaoContrato.contratoId!);
-
     } catch (error) {
       this.adicionarLog(fluxo, 'contrato', `Erro ao gerar contrato: ${error}`, 'erro');
       throw error;
@@ -198,7 +205,6 @@ class OrquestradorFluxo {
       // Simular assinatura do contratante
       fluxo.etapas.geracaoContrato.status = 'assinado';
       this.adicionarLog(fluxo, 'contrato', 'Contrato assinado pelas partes', 'sucesso');
-
     } catch (error) {
       this.adicionarLog(fluxo, 'contrato', `Erro na assinatura: ${error}`, 'erro');
       throw error;
@@ -208,11 +214,14 @@ class OrquestradorFluxo {
   /**
    * Executa configuração do faturamento
    */
-  private async executarConfiguracaoFaturamento(fluxo: FluxoCompleto, config: {
-    tipoPagamento: 'vista' | 'parcelado' | 'recorrente';
-    numeroParcelas?: number;
-    diaVencimento?: number;
-  }): Promise<void> {
+  private async executarConfiguracaoFaturamento(
+    fluxo: FluxoCompleto,
+    config: {
+      tipoPagamento: 'vista' | 'parcelado' | 'recorrente';
+      numeroParcelas?: number;
+      diaVencimento?: number;
+    },
+  ): Promise<void> {
     try {
       this.adicionarLog(fluxo, 'faturamento', 'Configurando plano de faturamento', 'sucesso');
 
@@ -221,11 +230,12 @@ class OrquestradorFluxo {
       }
 
       // Criar plano de cobrança
-      const tipoPlano = config.tipoPagamento === 'recorrente'
-        ? 'mensal'
-        : config.tipoPagamento === 'parcelado'
-          ? 'personalizado'
-          : 'unico';
+      const tipoPlano =
+        config.tipoPagamento === 'recorrente'
+          ? 'mensal'
+          : config.tipoPagamento === 'parcelado'
+            ? 'personalizado'
+            : 'unico';
 
       const plano = await faturamentoService.criarPlanoCobranca({
         nome: `Plano contrato ${fluxo.etapas.geracaoContrato.contratoId}`,
@@ -235,20 +245,19 @@ class OrquestradorFluxo {
         diasVencimento: config.diaVencimento || 10,
         formaPagamento: FormaPagamento.BOLETO,
         dataInicio: new Date().toISOString(),
-        observacoes: 'Plano configurado automaticamente'
+        observacoes: 'Plano configurado automaticamente',
       });
 
       fluxo.etapas.faturamento = {
         status: 'configurado',
         planoId: String(plano.id),
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
       this.adicionarLog(fluxo, 'faturamento', 'Plano de faturamento criado', 'sucesso');
 
       // Ativar cobrança
       await this.ativarCobranca(fluxo, String(plano.id));
-
     } catch (error) {
       this.adicionarLog(fluxo, 'faturamento', `Erro no faturamento: ${error}`, 'erro');
       throw error;
@@ -265,7 +274,6 @@ class OrquestradorFluxo {
 
       fluxo.etapas.faturamento.status = 'ativo';
       this.adicionarLog(fluxo, 'faturamento', 'Cobrança automática ativada', 'sucesso');
-
     } catch (error) {
       this.adicionarLog(fluxo, 'faturamento', `Erro ao ativar cobrança: ${error}`, 'erro');
       throw error;
@@ -280,7 +288,6 @@ class OrquestradorFluxo {
       // Implementar busca do fluxo no banco de dados
       console.log('Monitorando fluxo para proposta:', propostaId);
       return null; // Retornar fluxo real
-
     } catch (error) {
       console.error('Erro ao monitorar fluxo:', error);
       throw error;
@@ -306,9 +313,8 @@ class OrquestradorFluxo {
         fluxosEmAndamento: 25,
         fluxosComErro: 5,
         tempoMedioFluxo: 48, // 48 horas
-        taxaConversao: 80 // 80%
+        taxaConversao: 80, // 80%
       };
-
     } catch (error) {
       console.error('Erro ao obter estatísticas:', error);
       throw error;
@@ -317,13 +323,19 @@ class OrquestradorFluxo {
 
   // Métodos auxiliares
 
-  private adicionarLog(fluxo: FluxoCompleto, etapa: string, acao: string, resultado: 'sucesso' | 'erro', detalhes?: string): void {
+  private adicionarLog(
+    fluxo: FluxoCompleto,
+    etapa: string,
+    acao: string,
+    resultado: 'sucesso' | 'erro',
+    detalhes?: string,
+  ): void {
     fluxo.logs.push({
       timestamp: new Date(),
       etapa,
       acao,
       resultado,
-      detalhes
+      detalhes,
     });
   }
 
@@ -341,18 +353,18 @@ class OrquestradorFluxo {
       configFaturamento: {
         tipoPagamento: 'parcelado',
         numeroParcelas: 3,
-        diaVencimento: 10
-      }
+        diaVencimento: 10,
+      },
     });
 
     console.log('✅ Fluxo completo testado com sucesso!');
     console.log('📊 Resumo do fluxo:', {
       propostaId: resultado.propostaId,
       statusGeral: resultado.statusGeral,
-      etapas: Object.keys(resultado.etapas).map(key => ({
+      etapas: Object.keys(resultado.etapas).map((key) => ({
         etapa: key,
-        status: resultado.etapas[key as keyof typeof resultado.etapas].status
-      }))
+        status: resultado.etapas[key as keyof typeof resultado.etapas].status,
+      })),
     });
 
     return resultado;

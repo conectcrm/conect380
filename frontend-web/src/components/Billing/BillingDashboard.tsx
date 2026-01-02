@@ -13,7 +13,7 @@ import {
   CheckCircle,
   Crown,
   Calendar,
-  Settings
+  Settings,
 } from 'lucide-react';
 import { useSubscription } from '../../hooks/useSubscription';
 import { formatCurrency } from '../../utils/formatters';
@@ -26,18 +26,11 @@ interface BillingDashboardProps {
 
 export const BillingDashboard: React.FC<BillingDashboardProps> = ({
   onUpgrade,
-  onManageBilling
+  onManageBilling,
 }) => {
   const [showAdmin, setShowAdmin] = useState(false);
-  const {
-    assinatura,
-    limites,
-    loading,
-    error,
-    calcularProgresso,
-    getStatusInfo,
-    assinaturaAtiva
-  } = useSubscription();
+  const { assinatura, limites, loading, error, calcularProgresso, getStatusInfo, assinaturaAtiva } =
+    useSubscription();
 
   // TODO: Implementar verificação de permissão de administrador
   // Por enquanto, vamos mostrar para todos os usuários para teste
@@ -83,7 +76,8 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
             <Crown className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
             <h3 className="text-xl font-semibold mb-2">Bem-vindo ao ConectCRM!</h3>
             <p className="text-gray-600 mb-6">
-              Para começar a usar todas as funcionalidades, escolha um plano que se adeque às suas necessidades.
+              Para começar a usar todas as funcionalidades, escolha um plano que se adeque às suas
+              necessidades.
             </p>
             <Button onClick={onUpgrade} size="lg" className="bg-blue-600 hover:bg-blue-700">
               <Crown className="h-4 w-4 mr-2" />
@@ -98,7 +92,9 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
   const statusInfo = getStatusInfo();
   const progresso = calcularProgresso();
   const proximoVencimento = new Date(assinatura.proximoVencimento);
-  const diasParaVencimento = Math.ceil((proximoVencimento.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  const diasParaVencimento = Math.ceil(
+    (proximoVencimento.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+  );
 
   return (
     <div className="space-y-6">
@@ -129,11 +125,7 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
             </Button>
           )}
 
-          <Button
-            onClick={onManageBilling}
-            variant="outline"
-            size="sm"
-          >
+          <Button onClick={onManageBilling} variant="outline" size="sm">
             <CreditCard className="h-4 w-4 mr-2" />
             Gerenciar
           </Button>
@@ -162,7 +154,9 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
               <p className="text-lg font-semibold">
                 {proximoVencimento.toLocaleDateString('pt-BR')}
               </p>
-              <p className={`text-sm ${diasParaVencimento <= 7 ? 'text-red-600' : 'text-gray-500'}`}>
+              <p
+                className={`text-sm ${diasParaVencimento <= 7 ? 'text-red-600' : 'text-gray-500'}`}
+              >
                 {diasParaVencimento > 0 ? `${diasParaVencimento} dias restantes` : 'Vencido'}
               </p>
             </div>
@@ -290,7 +284,8 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
                   className="h-2 bg-orange-100"
                 />
                 <p className="text-xs text-gray-600">
-                  {((assinatura.apiCallsHoje / assinatura.plano.limiteApiCalls) * 100).toFixed(1)}% do limite diário
+                  {((assinatura.apiCallsHoje / assinatura.plano.limiteApiCalls) * 100).toFixed(1)}%
+                  do limite diário
                 </p>
               </div>
             </CardContent>
@@ -302,7 +297,9 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
       {progresso && (
         <div className="space-y-4">
           {/* Alerta de Limite */}
-          {(progresso.usuarios.percentual > 90 || progresso.clientes.percentual > 90 || progresso.storage.percentual > 90) && (
+          {(progresso.usuarios.percentual > 90 ||
+            progresso.clientes.percentual > 90 ||
+            progresso.storage.percentual > 90) && (
             <Card className="border-yellow-200 bg-yellow-50">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
@@ -310,7 +307,8 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
                   <div className="flex-1">
                     <h4 className="font-medium text-yellow-800">Limite Próximo</h4>
                     <p className="text-sm text-yellow-700 mt-1">
-                      Você está próximo do limite de alguns recursos. Considere fazer upgrade do seu plano.
+                      Você está próximo do limite de alguns recursos. Considere fazer upgrade do seu
+                      plano.
                     </p>
                     <Button
                       onClick={onUpgrade}
@@ -335,7 +333,8 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
                     <h4 className="font-medium text-red-800">Renovação Próxima</h4>
                     <p className="text-sm text-red-700 mt-1">
                       Sua assinatura vence em {diasParaVencimento} dias.
-                      {!assinatura.renovacaoAutomatica && ' Configure a renovação automática para evitar interrupções.'}
+                      {!assinatura.renovacaoAutomatica &&
+                        ' Configure a renovação automática para evitar interrupções.'}
                     </p>
                     <Button
                       onClick={onManageBilling}

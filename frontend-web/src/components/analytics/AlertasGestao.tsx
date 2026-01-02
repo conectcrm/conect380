@@ -10,7 +10,7 @@ import {
   CheckCircle,
   Bell,
   X,
-  ArrowRight
+  ArrowRight,
 } from 'lucide-react';
 
 interface Alerta {
@@ -30,10 +30,7 @@ interface AlertasGestaoProps {
   maxAlertas?: number;
 }
 
-const AlertasGestao: React.FC<AlertasGestaoProps> = ({
-  onAlertaClick,
-  maxAlertas = 5
-}) => {
+const AlertasGestao: React.FC<AlertasGestaoProps> = ({ onAlertaClick, maxAlertas = 5 }) => {
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -49,8 +46,8 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({
     try {
       const response = await fetch('/api/analytics/alertas-gestao', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+        },
       });
 
       if (response.ok) {
@@ -65,7 +62,7 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({
             quantidade: alerta.quantidade,
             acao_sugerida: alerta.acao_sugerida,
             timestamp: new Date().toISOString(),
-            lido: false
+            lido: false,
           })),
           ...data.alertas_atencao.map((alerta: any) => ({
             id: `atencao-${alerta.tipo}`,
@@ -75,7 +72,7 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({
             quantidade: alerta.quantidade,
             acao_sugerida: alerta.acao_sugerida,
             timestamp: new Date().toISOString(),
-            lido: false
+            lido: false,
           })),
           ...data.oportunidades.map((oportunidade: any) => ({
             id: `oportunidade-${oportunidade.tipo}`,
@@ -85,8 +82,8 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({
             quantidade: oportunidade.quantidade,
             acao_sugerida: `Potencial: ${formatarMoeda(oportunidade.potencial_receita)}`,
             timestamp: new Date().toISOString(),
-            lido: false
-          }))
+            lido: false,
+          })),
         ];
 
         setAlertas(todosAlertas.slice(0, maxAlertas));
@@ -100,46 +97,57 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({
 
   const getTituloAlerta = (tipo: string) => {
     switch (tipo) {
-      case 'prazo_vencido': return 'Propostas Vencidas';
-      case 'baixa_conversao': return 'Baixa Conversão';
-      case 'tempo_resposta': return 'Tempo de Resposta Alto';
-      default: return 'Alerta';
+      case 'prazo_vencido':
+        return 'Propostas Vencidas';
+      case 'baixa_conversao':
+        return 'Baixa Conversão';
+      case 'tempo_resposta':
+        return 'Tempo de Resposta Alto';
+      default:
+        return 'Alerta';
     }
   };
 
   const getTituloOportunidade = (tipo: string) => {
     switch (tipo) {
-      case 'upsell': return 'Oportunidades de Upsell';
-      case 'reengajamento': return 'Clientes para Reengajar';
-      default: return 'Oportunidade';
+      case 'upsell':
+        return 'Oportunidades de Upsell';
+      case 'reengajamento':
+        return 'Clientes para Reengajar';
+      default:
+        return 'Oportunidade';
     }
   };
 
   const getIconeAlerta = (tipo: string) => {
     switch (tipo) {
-      case 'critico': return <AlertTriangle className="h-5 w-5 text-red-500" />;
-      case 'atencao': return <Clock className="h-5 w-5 text-yellow-500" />;
-      case 'oportunidade': return <TrendingUp className="h-5 w-5 text-green-500" />;
-      default: return <Bell className="h-5 w-5 text-gray-500" />;
+      case 'critico':
+        return <AlertTriangle className="h-5 w-5 text-red-500" />;
+      case 'atencao':
+        return <Clock className="h-5 w-5 text-yellow-500" />;
+      case 'oportunidade':
+        return <TrendingUp className="h-5 w-5 text-green-500" />;
+      default:
+        return <Bell className="h-5 w-5 text-gray-500" />;
     }
   };
 
   const getCorAlerta = (tipo: string) => {
     switch (tipo) {
-      case 'critico': return 'border-l-red-500 bg-red-50';
-      case 'atencao': return 'border-l-yellow-500 bg-yellow-50';
-      case 'oportunidade': return 'border-l-green-500 bg-green-50';
-      default: return 'border-l-gray-500 bg-gray-50';
+      case 'critico':
+        return 'border-l-red-500 bg-red-50';
+      case 'atencao':
+        return 'border-l-yellow-500 bg-yellow-50';
+      case 'oportunidade':
+        return 'border-l-green-500 bg-green-50';
+      default:
+        return 'border-l-gray-500 bg-gray-50';
     }
   };
 
   const marcarComoLido = (alertaId: string) => {
-    setAlertas(prev =>
-      prev.map(alerta =>
-        alerta.id === alertaId
-          ? { ...alerta, lido: true }
-          : alerta
-      )
+    setAlertas((prev) =>
+      prev.map((alerta) => (alerta.id === alertaId ? { ...alerta, lido: true } : alerta)),
     );
   };
 
@@ -151,7 +159,7 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({
   const formatarMoeda = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(valor);
   };
 
@@ -181,7 +189,7 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {[1, 2, 3].map(i => (
+            {[1, 2, 3].map((i) => (
               <div key={i} className="animate-pulse">
                 <div className="h-16 bg-gray-200 rounded-lg"></div>
               </div>
@@ -200,10 +208,8 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({
             <Bell className="h-5 w-5" />
             Alertas de Gestão
           </div>
-          {alertas.filter(a => !a.lido).length > 0 && (
-            <Badge variant="destructive">
-              {alertas.filter(a => !a.lido).length}
-            </Badge>
+          {alertas.filter((a) => !a.lido).length > 0 && (
+            <Badge variant="destructive">{alertas.filter((a) => !a.lido).length}</Badge>
           )}
         </CardTitle>
       </CardHeader>
@@ -218,8 +224,9 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({
           alertas.map((alerta) => (
             <div
               key={alerta.id}
-              className={`border-l-4 p-4 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-md ${getCorAlerta(alerta.tipo)} ${!alerta.lido ? 'opacity-100' : 'opacity-60'
-                }`}
+              className={`border-l-4 p-4 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-md ${getCorAlerta(alerta.tipo)} ${
+                !alerta.lido ? 'opacity-100' : 'opacity-60'
+              }`}
               onClick={() => handleAlertaClick(alerta)}
             >
               <div className="flex items-start justify-between">
@@ -228,27 +235,19 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({
 
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-semibold text-gray-900">
-                        {alerta.titulo}
-                      </h4>
+                      <h4 className="font-semibold text-gray-900">{alerta.titulo}</h4>
                       {alerta.quantidade && (
                         <Badge variant="outline" className="text-xs">
                           {alerta.quantidade}
                         </Badge>
                       )}
-                      {!alerta.lido && (
-                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      )}
+                      {!alerta.lido && <div className="w-2 h-2 bg-blue-500 rounded-full"></div>}
                     </div>
 
-                    <p className="text-sm text-gray-700 mb-2">
-                      {alerta.descricao}
-                    </p>
+                    <p className="text-sm text-gray-700 mb-2">{alerta.descricao}</p>
 
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-gray-600 italic">
-                        💡 {alerta.acao_sugerida}
-                      </p>
+                      <p className="text-xs text-gray-600 italic">💡 {alerta.acao_sugerida}</p>
                       <span className="text-xs text-gray-500">
                         {formatarTempo(alerta.timestamp)}
                       </span>

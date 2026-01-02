@@ -256,8 +256,8 @@ npm start
 
 1. Abrir `http://localhost:3000`
 2. Usar credenciais padrão:
-   - **Email**: `admin@conectcrm.com`
-   - **Senha**: `admin123`
+  - **Email**: `admin@conectsuite.com.br`
+  - **Senha**: `admin123`
 3. Se funcionar, está tudo OK! ✅
 
 **Se não funcionar**: Consulte [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)

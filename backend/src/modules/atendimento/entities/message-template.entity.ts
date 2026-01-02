@@ -4,7 +4,10 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 @Entity('message_templates')
 export class MessageTemplate {
@@ -31,6 +34,10 @@ export class MessageTemplate {
 
   @Column({ type: 'varchar', length: 36 })
   empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresaId' })
+  empresa: Empresa;
 
   @CreateDateColumn()
   createdAt: Date;

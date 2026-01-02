@@ -1,0 +1,110 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "logs\\.305200a26c6ae98835ab9d42bc47cd0c845b5734-audit.json",
+    "files": [
+        {
+            "date": 1763150297926,
+            "name": "logs\\security-2025-11-14.log",
+            "hash": "1f44764a2dadd486de08efcaab94ad8e75926d05fb34be5c17b5e16390df4742"
+        },
+        {
+            "date": 1763178964341,
+            "name": "logs\\security-2025-11-15.log",
+            "hash": "fe67792dd6fbe733777bd6958adaa65fab7bb357583a85cf84101b85434c3659"
+        },
+        {
+            "date": 1763331007431,
+            "name": "logs\\security-2025-11-16.log",
+            "hash": "efaa92dcf391f3fc1f0e5d7ee5f3a28e15f31e7ef819060948e7ccfd3330a8fd"
+        },
+        {
+            "date": 1763378578403,
+            "name": "logs\\security-2025-11-17.log",
+            "hash": "b0bf7dd05db9c8a9c94567d1d411fcec64b9f59d0d9dc8f9808e78263f3ea06e"
+        },
+        {
+            "date": 1763463943354,
+            "name": "logs\\security-2025-11-18.log",
+            "hash": "ce8c37b7196a0126c14dd10c8472f47add7210180d0d72c0869567a41de2bb0f"
+        },
+        {
+            "date": 1763552968339,
+            "name": "logs\\security-2025-11-19.log",
+            "hash": "dd49a539c73f079f3f8a0f4fab7d50f299fc53fd1bc85afd493e81a6a371d8bc"
+        },
+        {
+            "date": 1763643504642,
+            "name": "logs\\security-2025-11-20.log",
+            "hash": "e2fb8ac45e2bf9dd034f8b75de017ed51d78a4315385870f172a2007996c49e7"
+        },
+        {
+            "date": 1763724449002,
+            "name": "logs\\security-2025-11-21.log",
+            "hash": "b6475678bc8e28e7da9d641fdfbbab20761b5797513d9533796f2a1b44c1f372"
+        },
+        {
+            "date": 1763824719491,
+            "name": "logs\\security-2025-11-22.log",
+            "hash": "3204d37b0f46bcc945a4b89f2dd87f60cfa7d00936ccbab6a6d99e438d7b3f27"
+        },
+        {
+            "date": 1763912898571,
+            "name": "logs\\security-2025-11-23.log",
+            "hash": "81dfca60fc230fcd9098e8d52f2b9f6384d21b33f24bda376ffd08b5905229d3"
+        },
+        {
+            "date": 1764094141933,
+            "name": "logs\\security-2025-11-25.log",
+            "hash": "d32990156c31fcca430d16a75ad54e5e3a13b71bd8949382fbc4f8f267eb075b"
+        },
+        {
+            "date": 1764160042217,
+            "name": "logs\\security-2025-11-26.log",
+            "hash": "956617ba13692922c501ccda9a307b2ef9450ca9ed49c817109b4e6adf34d467"
+        },
+        {
+            "date": 1764276415719,
+            "name": "logs\\security-2025-11-27.log",
+            "hash": "1d0c01d705927efa6b5d4fe9c2693e42160108948b95c824791de1b3c05a6cd7"
+        },
+        {
+            "date": 1764330152038,
+            "name": "logs\\security-2025-11-28.log",
+            "hash": "f2986a8e7651c4b8bb4e610d44ce9f354e3f9f69ea6d388ce713af0a0d15d230"
+        },
+        {
+            "date": 1764592904759,
+            "name": "logs\\security-2025-12-01.log",
+            "hash": "093684b6f297ef673b38c075b1c6b27bcec92feffe1574f7d3f4e63ae7c4d64a"
+        },
+        {
+            "date": 1764674041212,
+            "name": "logs\\security-2025-12-02.log",
+            "hash": "bb96ed5552d92e2dbbf1af1f09641b7c671a10a4b3a891cadc5248f0d1d0c1a1"
+        },
+        {
+            "date": 1764761301863,
+            "name": "logs\\security-2025-12-03.log",
+            "hash": "7926f6fadebf58a268cbe8d6db6c7dfc762c6fe684f361ac3927bd746269a0b6"
+        },
+        {
+            "date": 1764848049562,
+            "name": "logs\\security-2025-12-04.log",
+            "hash": "8525a52a2b8b63d78f24990db601c554664a7d1c01521caa287c2b821255a81e"
+        },
+        {
+            "date": 1764971232044,
+            "name": "logs\\security-2025-12-05.log",
+            "hash": "8d722c367f749c6472857e4b256154fc601c748c9b585f2fd783f6c515e4988f"
+        },
+        {
+            "date": 1764971318854,
+            "name": "logs/security-2025-12-05.log",
+            "hash": "b31bbea748435c17607b53cc425c8b3f166f8c452ee2dc37b8d72b5733b590d8"
+        }
+    ],
+    "hashType": "sha256"
+}

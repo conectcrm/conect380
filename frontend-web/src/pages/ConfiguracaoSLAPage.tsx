@@ -1,14 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Clock, Plus, Edit2, Trash2, Search, X,
-  Settings, AlertCircle, CheckCircle, Bell
+  Clock,
+  Plus,
+  Edit2,
+  Trash2,
+  Search,
+  X,
+  Settings,
+  AlertCircle,
+  CheckCircle,
+  Bell,
 } from 'lucide-react';
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
 import slaService, {
   SlaConfig,
   CreateSlaConfigDto,
   UpdateSlaConfigDto,
-  HorarioFuncionamento
+  HorarioFuncionamento,
 } from '../services/slaService';
 
 const ConfiguracaoSLAPage: React.FC = () => {
@@ -67,8 +75,8 @@ const ConfiguracaoSLAPage: React.FC = () => {
     const matchNome = config.nome.toLowerCase().includes(searchTerm.toLowerCase());
     const matchPrioridade = filterPrioridade === 'todas' || config.prioridade === filterPrioridade;
     const matchCanal = filterCanal === 'todos' || config.canal === filterCanal;
-    const matchAtivo = filterAtivo === 'todos' ||
-      (filterAtivo === 'ativo' ? config.ativo : !config.ativo);
+    const matchAtivo =
+      filterAtivo === 'todos' || (filterAtivo === 'ativo' ? config.ativo : !config.ativo);
     return matchNome && matchPrioridade && matchCanal && matchAtivo;
   });
 
@@ -175,13 +183,12 @@ const ConfiguracaoSLAPage: React.FC = () => {
     } catch (err: unknown) {
       console.error('Erro ao salvar configuração SLA:', err);
       // Extrair mensagem de erro do backend
-      const errorMessage = (err as any)?.response?.data?.message ||
+      const errorMessage =
+        (err as any)?.response?.data?.message ||
         (err instanceof Error ? err.message : 'Erro ao salvar configuração SLA');
 
       // Se for um array de mensagens, juntar em uma string
-      const finalMessage = Array.isArray(errorMessage)
-        ? errorMessage.join('\n')
-        : errorMessage;
+      const finalMessage = Array.isArray(errorMessage) ? errorMessage.join('\n') : errorMessage;
 
       alert(finalMessage);
     }
@@ -219,7 +226,9 @@ const ConfiguracaoSLAPage: React.FC = () => {
       urgente: 'bg-red-100 text-red-800',
     };
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[prioridade as keyof typeof colors]}`}>
+      <span
+        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[prioridade as keyof typeof colors]}`}
+      >
         {prioridade.charAt(0).toUpperCase() + prioridade.slice(1)}
       </span>
     );
@@ -229,10 +238,7 @@ const ConfiguracaoSLAPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header com BackToNucleus */}
       <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusName="Atendimento"
-          nucleusPath="/nuclei/atendimento"
-        />
+        <BackToNucleus nucleusName="Atendimento" nucleusPath="/nuclei/atendimento" />
       </div>
 
       <div className="p-6">
@@ -267,9 +273,7 @@ const ConfiguracaoSLAPage: React.FC = () => {
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
                     Total de Configurações
                   </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {totalConfigs}
-                  </p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">{totalConfigs}</p>
                   <p className="mt-3 text-sm text-[#002333]/70">
                     Configurações cadastradas no sistema
                   </p>
@@ -286,11 +290,10 @@ const ConfiguracaoSLAPage: React.FC = () => {
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
                     Configurações Ativas
                   </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {configsAtivas}
-                  </p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">{configsAtivas}</p>
                   <p className="mt-3 text-sm text-[#002333]/70">
-                    {totalConfigs > 0 ? Math.round((configsAtivas / totalConfigs) * 100) : 0}% do total
+                    {totalConfigs > 0 ? Math.round((configsAtivas / totalConfigs) * 100) : 0}% do
+                    total
                   </p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
@@ -306,10 +309,14 @@ const ConfiguracaoSLAPage: React.FC = () => {
                     Mais Restritiva
                   </p>
                   <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {configMaisRestritiva ? formatarTempo(configMaisRestritiva.tempoResolucaoMinutos) : '-'}
+                    {configMaisRestritiva
+                      ? formatarTempo(configMaisRestritiva.tempoResolucaoMinutos)
+                      : '-'}
                   </p>
                   <p className="mt-3 text-sm text-[#002333]/70">
-                    {configMaisRestritiva ? configMaisRestritiva.nome : 'Nenhuma configuração ativa'}
+                    {configMaisRestritiva
+                      ? configMaisRestritiva.nome
+                      : 'Nenhuma configuração ativa'}
                   </p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center shadow-sm">
@@ -390,7 +397,9 @@ const ConfiguracaoSLAPage: React.FC = () => {
             <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
               <Settings className="h-16 w-16 text-[#B4BEC9] mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-[#002333] mb-2">
-                {configs.length === 0 ? 'Nenhuma configuração cadastrada' : 'Nenhuma configuração encontrada'}
+                {configs.length === 0
+                  ? 'Nenhuma configuração cadastrada'
+                  : 'Nenhuma configuração encontrada'}
               </h3>
               <p className="text-[#002333]/70 mb-6">
                 {configs.length === 0
@@ -419,13 +428,9 @@ const ConfiguracaoSLAPage: React.FC = () => {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-[#002333] mb-1">
-                        {config.nome}
-                      </h3>
+                      <h3 className="text-lg font-semibold text-[#002333] mb-1">{config.nome}</h3>
                       {config.descricao && (
-                        <p className="text-sm text-[#002333]/70 mb-2">
-                          {config.descricao}
-                        </p>
+                        <p className="text-sm text-[#002333]/70 mb-2">{config.descricao}</p>
                       )}
                       <div className="flex items-center gap-2 mb-2">
                         {badgePrioridade(config.prioridade)}
@@ -434,7 +439,9 @@ const ConfiguracaoSLAPage: React.FC = () => {
                             {config.canal}
                           </span>
                         )}
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}
+                        >
                           {config.ativo ? 'Ativo' : 'Inativo'}
                         </span>
                       </div>
@@ -518,9 +525,7 @@ const ConfiguracaoSLAPage: React.FC = () => {
               {/* Nome e Descrição */}
               <div className="grid grid-cols-1 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#002333] mb-1">
-                    Nome *
-                  </label>
+                  <label className="block text-sm font-medium text-[#002333] mb-1">Nome *</label>
                   <input
                     type="text"
                     value={formData.nome}
@@ -530,9 +535,7 @@ const ConfiguracaoSLAPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#002333] mb-1">
-                    Descrição
-                  </label>
+                  <label className="block text-sm font-medium text-[#002333] mb-1">Descrição</label>
                   <textarea
                     value={formData.descricao}
                     onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
@@ -551,7 +554,9 @@ const ConfiguracaoSLAPage: React.FC = () => {
                   </label>
                   <select
                     value={formData.prioridade}
-                    onChange={(e) => setFormData({ ...formData, prioridade: e.target.value as any })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, prioridade: e.target.value as any })
+                    }
                     className="w-full px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
                   >
                     <option value="baixa">Baixa</option>
@@ -588,7 +593,12 @@ const ConfiguracaoSLAPage: React.FC = () => {
                     type="number"
                     min="1"
                     value={formData.tempoRespostaMinutos}
-                    onChange={(e) => setFormData({ ...formData, tempoRespostaMinutos: parseInt(e.target.value) || 0 })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        tempoRespostaMinutos: parseInt(e.target.value) || 0,
+                      })
+                    }
                     className="w-full px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
                   />
                   <p className="text-xs text-[#002333]/70 mt-1">
@@ -603,7 +613,12 @@ const ConfiguracaoSLAPage: React.FC = () => {
                     type="number"
                     min="1"
                     value={formData.tempoResolucaoMinutos}
-                    onChange={(e) => setFormData({ ...formData, tempoResolucaoMinutos: parseInt(e.target.value) || 0 })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        tempoResolucaoMinutos: parseInt(e.target.value) || 0,
+                      })
+                    }
                     className="w-full px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
                   />
                   <p className="text-xs text-[#002333]/70 mt-1">
@@ -624,10 +639,12 @@ const ConfiguracaoSLAPage: React.FC = () => {
                         <input
                           type="checkbox"
                           checked={config.ativo}
-                          onChange={(e) => setHorariosFuncionamento({
-                            ...horariosFuncionamento,
-                            [dia]: { ...config, ativo: e.target.checked }
-                          })}
+                          onChange={(e) =>
+                            setHorariosFuncionamento({
+                              ...horariosFuncionamento,
+                              [dia]: { ...config, ativo: e.target.checked },
+                            })
+                          }
                           className="rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
                         />
                         <span className="text-sm text-[#002333] capitalize">{dia}</span>
@@ -637,20 +654,24 @@ const ConfiguracaoSLAPage: React.FC = () => {
                           <input
                             type="time"
                             value={config.inicio}
-                            onChange={(e) => setHorariosFuncionamento({
-                              ...horariosFuncionamento,
-                              [dia]: { ...config, inicio: e.target.value }
-                            })}
+                            onChange={(e) =>
+                              setHorariosFuncionamento({
+                                ...horariosFuncionamento,
+                                [dia]: { ...config, inicio: e.target.value },
+                              })
+                            }
                             className="px-3 py-1 border border-[#B4BEC9] rounded-lg text-sm"
                           />
                           <span className="text-sm text-[#002333]/70">até</span>
                           <input
                             type="time"
                             value={config.fim}
-                            onChange={(e) => setHorariosFuncionamento({
-                              ...horariosFuncionamento,
-                              [dia]: { ...config, fim: e.target.value }
-                            })}
+                            onChange={(e) =>
+                              setHorariosFuncionamento({
+                                ...horariosFuncionamento,
+                                [dia]: { ...config, fim: e.target.value },
+                              })
+                            }
                             className="px-3 py-1 border border-[#B4BEC9] rounded-lg text-sm"
                           />
                         </>
@@ -671,7 +692,9 @@ const ConfiguracaoSLAPage: React.FC = () => {
                     min="0"
                     max="100"
                     value={formData.alertaPercentual}
-                    onChange={(e) => setFormData({ ...formData, alertaPercentual: parseInt(e.target.value) || 80 })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, alertaPercentual: parseInt(e.target.value) || 80 })
+                    }
                     className="w-full px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
                   />
                   <p className="text-xs text-[#002333]/70 mt-1">
@@ -683,7 +706,9 @@ const ConfiguracaoSLAPage: React.FC = () => {
                     <input
                       type="checkbox"
                       checked={formData.notificarEmail}
-                      onChange={(e) => setFormData({ ...formData, notificarEmail: e.target.checked })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, notificarEmail: e.target.checked })
+                      }
                       className="rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
                     />
                     <span className="text-sm text-[#002333]">Notificar por Email</span>
@@ -692,7 +717,9 @@ const ConfiguracaoSLAPage: React.FC = () => {
                     <input
                       type="checkbox"
                       checked={formData.notificarSistema}
-                      onChange={(e) => setFormData({ ...formData, notificarSistema: e.target.checked })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, notificarSistema: e.target.checked })
+                      }
                       className="rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
                     />
                     <span className="text-sm text-[#002333]">Notificar no Sistema</span>

@@ -42,17 +42,15 @@ export function AtendimentoPage() {
       whatsapp.carregarMensagens(activeTicketId);
       // Marcar notificações do ticket como lidas
       notifications
-        .filter(n => n.data?.ticketId === activeTicketId && !n.read)
-        .forEach(n => markAsRead(n.id));
+        .filter((n) => n.data?.ticketId === activeTicketId && !n.read)
+        .forEach((n) => markAsRead(n.id));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTicketId]);
 
   // ✅ NOVO: Recarregar tickets quando receber notificação de novo ticket
   useEffect(() => {
-    const novoTicketNotification = notifications.find(
-      n => n.type === 'novo_ticket' && !n.read
-    );
+    const novoTicketNotification = notifications.find((n) => n.type === 'novo_ticket' && !n.read);
 
     if (novoTicketNotification) {
       console.log('[Atendimento] Nova notificação de ticket, recarregando lista...');
@@ -299,21 +297,26 @@ export function AtendimentoPage() {
                   <button
                     onClick={() => setPainelContextoAberto(!painelContextoAberto)}
                     className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-md transition-colors flex items-center gap-2"
-                    title={painelContextoAberto ? 'Ocultar contexto do cliente' : 'Mostrar contexto do cliente'}
+                    title={
+                      painelContextoAberto
+                        ? 'Ocultar contexto do cliente'
+                        : 'Mostrar contexto do cliente'
+                    }
                   >
                     <span>{painelContextoAberto ? '✖️' : '📊'}</span>
                     <span>{painelContextoAberto ? 'Ocultar' : 'Contexto'}</span>
                   </button>
 
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${activeTicket.status === 'ABERTO'
-                      ? 'bg-blue-100 text-blue-800'
-                      : activeTicket.status === 'EM_ATENDIMENTO'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : activeTicket.status === 'RESOLVIDO'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      activeTicket.status === 'ABERTO'
+                        ? 'bg-blue-100 text-blue-800'
+                        : activeTicket.status === 'EM_ATENDIMENTO'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : activeTicket.status === 'RESOLVIDO'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                    }`}
                   >
                     {activeTicket.status.replace('_', ' ')}
                   </span>

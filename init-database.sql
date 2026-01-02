@@ -72,7 +72,7 @@ INSERT INTO users (id, username, email, password, nome, "primeiroAcesso", "prime
 VALUES (
   '00000000-0000-0000-0000-000000000001',
   'admin',
-  'admin@conectcrm.com',
+  'admin@conectsuite.com.br',
   -- Senha: Admin@2024 (hash bcrypt)
   '$2b$10$rH3qIz8YqXZ5Yn8U.vQjP.tT8OzXK9xJqN3R4Q6H7h/A8L1M2N3O4',
   'Administrador',

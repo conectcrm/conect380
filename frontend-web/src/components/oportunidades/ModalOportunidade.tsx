@@ -12,13 +12,14 @@ import {
   User,
   MessageSquare,
   CheckCircle,
-  Clock
+  Clock,
 } from 'lucide-react';
+import { Oportunidade, NovaOportunidade } from '../../types/oportunidades';
 import {
-  Oportunidade,
-  NovaOportunidade,
-} from '../../types/oportunidades';
-import { EstagioOportunidade, PrioridadeOportunidade, OrigemOportunidade } from '../../types/oportunidades/enums';
+  EstagioOportunidade,
+  PrioridadeOportunidade,
+  OrigemOportunidade,
+} from '../../types/oportunidades/enums';
 import { Usuario } from '../../types/usuarios';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -215,7 +216,7 @@ const ModalOportunidade: React.FC<ModalOportunidadeProps> = ({
   }, [oportunidade, estagioInicial, isOpen]);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -256,11 +257,13 @@ const ModalOportunidade: React.FC<ModalOportunidadeProps> = ({
     if (formData.probabilidade < 0 || formData.probabilidade > 100) {
       return 'Probabilidade deve estar entre 0 e 100';
     }
-    if (!formData.responsavel_id) { // ✅ Corrigido
+    if (!formData.responsavel_id) {
+      // ✅ Corrigido
       return 'Responsável é obrigatório';
     }
     // Se não tem cliente, precisa ter pelo menos nome do contato
-    if (!formData.cliente_id && !formData.nomeContato?.trim()) { // ✅ Corrigido
+    if (!formData.cliente_id && !formData.nomeContato?.trim()) {
+      // ✅ Corrigido
       return 'Informe um cliente ou pelo menos o nome do contato';
     }
     return null;
@@ -316,10 +319,11 @@ const ModalOportunidade: React.FC<ModalOportunidadeProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveTab('detalhes')}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'detalhes'
-                  ? 'border-[#159A9C] text-[#159A9C]'
-                  : 'border-transparent text-[#002333]/60 hover:text-[#002333]'
-                  }`}
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'detalhes'
+                    ? 'border-[#159A9C] text-[#159A9C]'
+                    : 'border-transparent text-[#002333]/60 hover:text-[#002333]'
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />
@@ -329,10 +333,11 @@ const ModalOportunidade: React.FC<ModalOportunidadeProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveTab('atividades')}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'atividades'
-                  ? 'border-[#159A9C] text-[#159A9C]'
-                  : 'border-transparent text-[#002333]/60 hover:text-[#002333]'
-                  }`}
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'atividades'
+                    ? 'border-[#159A9C] text-[#159A9C]'
+                    : 'border-transparent text-[#002333]/60 hover:text-[#002333]'
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <Activity className="h-4 w-4" />
@@ -503,11 +508,13 @@ const ModalOportunidade: React.FC<ModalOportunidadeProps> = ({
                     <input
                       type="date"
                       name="dataFechamentoEsperado"
-                      value={typeof formData.dataFechamentoEsperado === 'string'
-                        ? formData.dataFechamentoEsperado
-                        : formData.dataFechamentoEsperado instanceof Date
-                          ? formData.dataFechamentoEsperado.toISOString().split('T')[0]
-                          : ''}
+                      value={
+                        typeof formData.dataFechamentoEsperado === 'string'
+                          ? formData.dataFechamentoEsperado
+                          : formData.dataFechamentoEsperado instanceof Date
+                            ? formData.dataFechamentoEsperado.toISOString().split('T')[0]
+                            : ''
+                      }
                       onChange={handleChange}
                       className="w-full px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
                     />
@@ -653,9 +660,7 @@ const ModalOportunidade: React.FC<ModalOportunidadeProps> = ({
                     ))}
                   </select>
                   {usuarios.length === 0 && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Carregando usuários...
-                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Carregando usuários...</p>
                   )}
                 </div>
               </div>
@@ -666,9 +671,7 @@ const ModalOportunidade: React.FC<ModalOportunidadeProps> = ({
           {activeTab === 'atividades' && oportunidade && (
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-[#002333]">
-                  Histórico de Atividades
-                </h3>
+                <h3 className="text-lg font-semibold text-[#002333]">Histórico de Atividades</h3>
                 <p className="text-sm text-[#002333]/60">
                   {atividades.length} {atividades.length === 1 ? 'atividade' : 'atividades'}
                 </p>
@@ -688,7 +691,9 @@ const ModalOportunidade: React.FC<ModalOportunidadeProps> = ({
                     return (
                       <div key={atividade.id} className="relative flex gap-4">
                         {/* Ícone */}
-                        <div className={`flex-shrink-0 w-12 h-12 rounded-full ${cores} flex items-center justify-center relative z-10`}>
+                        <div
+                          className={`flex-shrink-0 w-12 h-12 rounded-full ${cores} flex items-center justify-center relative z-10`}
+                        >
                           <Icon className="h-5 w-5" />
                         </div>
 
@@ -744,9 +749,7 @@ const ModalOportunidade: React.FC<ModalOportunidadeProps> = ({
               {atividades.length === 0 && (
                 <div className="text-center py-12">
                   <Activity className="h-12 w-12 text-[#002333]/20 mx-auto mb-3" />
-                  <p className="text-sm text-[#002333]/60">
-                    Nenhuma atividade registrada ainda
-                  </p>
+                  <p className="text-sm text-[#002333]/60">Nenhuma atividade registrada ainda</p>
                 </div>
               )}
             </div>

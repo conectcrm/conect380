@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  FiPlus, 
-  FiSearch, 
-  FiFilter, 
-  FiDownload, 
+import {
+  FiPlus,
+  FiSearch,
+  FiFilter,
+  FiDownload,
   FiPackage,
   FiBarChart,
   FiTrendingUp,
@@ -15,7 +15,7 @@ import {
   FiCheck,
   FiX,
   FiDollarSign,
-  FiShoppingCart
+  FiShoppingCart,
 } from 'react-icons/fi';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 
@@ -47,130 +47,130 @@ const produtosMock: Produto[] = [
     id: '1',
     nome: 'Sistema ERP Básico',
     categoria: 'Software',
-    preco: 2500.00,
-    custoUnitario: 1200.00,
+    preco: 2500.0,
+    custoUnitario: 1200.0,
     estoque: {
       atual: 20,
       minimo: 10,
-      maximo: 100
+      maximo: 100,
     },
     status: 'ativo',
     vendas: {
       mes: 15,
-      total: 145
+      total: 145,
     },
     fornecedor: 'TechSoft Solutions',
     sku: 'ERP-BAS-001',
     descricao: 'Sistema ERP completo para pequenas e médias empresas',
     criadoEm: '2024-01-15T00:00:00Z',
-    atualizadoEm: '2024-12-15T00:00:00Z'
+    atualizadoEm: '2024-12-15T00:00:00Z',
   },
   {
     id: '2',
     nome: 'Consultoria em TI',
     categoria: 'Serviços',
-    preco: 5000.00,
-    custoUnitario: 3500.00,
+    preco: 5000.0,
+    custoUnitario: 3500.0,
     estoque: {
       atual: 0,
       minimo: 0,
-      maximo: 0
+      maximo: 0,
     },
     status: 'ativo',
     vendas: {
       mes: 8,
-      total: 89
+      total: 89,
     },
     fornecedor: 'Interno',
     sku: 'CONS-TI-001',
     descricao: 'Serviço de consultoria especializada em tecnologia da informação',
     criadoEm: '2024-02-01T00:00:00Z',
-    atualizadoEm: '2024-12-08T00:00:00Z'
+    atualizadoEm: '2024-12-08T00:00:00Z',
   },
   {
     id: '3',
     nome: 'Licença CRM Premium',
     categoria: 'Software',
-    preco: 800.00,
-    custoUnitario: 400.00,
+    preco: 800.0,
+    custoUnitario: 400.0,
     estoque: {
       atual: 5,
       minimo: 15,
-      maximo: 50
+      maximo: 50,
     },
     status: 'ativo',
     vendas: {
       mes: 25,
-      total: 234
+      total: 234,
     },
     fornecedor: 'CRM Tech Corp',
     sku: 'CRM-PREM-001',
     descricao: 'Licença premium do sistema CRM com funcionalidades avançadas',
     criadoEm: '2024-03-10T00:00:00Z',
-    atualizadoEm: '2024-12-11T00:00:00Z'
+    atualizadoEm: '2024-12-11T00:00:00Z',
   },
   {
     id: '4',
     nome: 'Hardware Server Rack',
     categoria: 'Hardware',
-    preco: 15000.00,
-    custoUnitario: 11000.00,
+    preco: 15000.0,
+    custoUnitario: 11000.0,
     estoque: {
       atual: 3,
       minimo: 2,
-      maximo: 10
+      maximo: 10,
     },
     status: 'inativo',
     vendas: {
       mes: 2,
-      total: 18
+      total: 18,
     },
     fornecedor: 'ServerMax Hardware',
     sku: 'HW-SERV-001',
     descricao: 'Servidor rack de alta performance para data centers',
     criadoEm: '2024-01-20T00:00:00Z',
-    atualizadoEm: '2024-11-30T00:00:00Z'
+    atualizadoEm: '2024-11-30T00:00:00Z',
   },
   {
     id: '5',
     nome: 'Suporte Técnico Premium',
     categoria: 'Serviços',
-    preco: 1200.00,
-    custoUnitario: 800.00,
+    preco: 1200.0,
+    custoUnitario: 800.0,
     estoque: {
       atual: 0,
       minimo: 0,
-      maximo: 0
+      maximo: 0,
     },
     status: 'ativo',
     vendas: {
       mes: 12,
-      total: 156
+      total: 156,
     },
     fornecedor: 'Interno',
     sku: 'SUP-PREM-001',
     descricao: 'Suporte técnico premium 24/7 com SLA de 2 horas',
     criadoEm: '2024-04-05T00:00:00Z',
-    atualizadoEm: '2024-12-12T00:00:00Z'
-  }
+    atualizadoEm: '2024-12-12T00:00:00Z',
+  },
 ];
 
 const statusConfig = {
-  ativo: { 
-    label: 'Ativo', 
+  ativo: {
+    label: 'Ativo',
     color: 'bg-green-100 text-green-800 border-green-200',
-    icon: FiCheck
+    icon: FiCheck,
   },
-  inativo: { 
-    label: 'Inativo', 
+  inativo: {
+    label: 'Inativo',
     color: 'bg-gray-100 text-gray-800 border-gray-200',
-    icon: FiX
+    icon: FiX,
   },
-  descontinuado: { 
-    label: 'Descontinuado', 
+  descontinuado: {
+    label: 'Descontinuado',
     color: 'bg-red-100 text-red-800 border-red-200',
-    icon: FiAlertTriangle
-  }
+    icon: FiAlertTriangle,
+  },
 };
 
 const ProdutosPage: React.FC = () => {
@@ -182,14 +182,15 @@ const ProdutosPage: React.FC = () => {
 
   // Filtrar produtos
   const produtosFiltrados = useMemo(() => {
-    return produtosMock.filter(produto => {
-      const matchesSearch = produto.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           produto.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           produto.fornecedor.toLowerCase().includes(searchTerm.toLowerCase());
-      
+    return produtosMock.filter((produto) => {
+      const matchesSearch =
+        produto.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        produto.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        produto.fornecedor.toLowerCase().includes(searchTerm.toLowerCase());
+
       const matchesStatus = statusFilter === 'todos' || produto.status === statusFilter;
       const matchesCategoria = categoriaFilter === 'todas' || produto.categoria === categoriaFilter;
-      
+
       return matchesSearch && matchesStatus && matchesCategoria;
     });
   }, [searchTerm, statusFilter, categoriaFilter]);
@@ -197,20 +198,22 @@ const ProdutosPage: React.FC = () => {
   // Calcular estatísticas
   const estatisticas = useMemo(() => {
     const totalProdutos = produtosMock.length;
-    const produtosAtivos = produtosMock.filter(p => p.status === 'ativo').length;
+    const produtosAtivos = produtosMock.filter((p) => p.status === 'ativo').length;
     const vendasMes = produtosMock.reduce((sum, p) => sum + p.vendas.mes, 0);
-    const valorTotal = produtosMock.reduce((sum, p) => sum + (p.preco * p.vendas.mes), 0);
-    const estoquesBaixos = produtosMock.filter(p => p.estoque.atual <= p.estoque.minimo && p.categoria !== 'Serviços').length;
+    const valorTotal = produtosMock.reduce((sum, p) => sum + p.preco * p.vendas.mes, 0);
+    const estoquesBaixos = produtosMock.filter(
+      (p) => p.estoque.atual <= p.estoque.minimo && p.categoria !== 'Serviços',
+    ).length;
 
     return { totalProdutos, produtosAtivos, vendasMes, valorTotal, estoquesBaixos };
   }, []);
 
-  const categorias = [...new Set(produtosMock.map(produto => produto.categoria))];
+  const categorias = [...new Set(produtosMock.map((produto) => produto.categoria))];
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -220,7 +223,7 @@ const ProdutosPage: React.FC = () => {
 
   const getEstoqueStatus = (produto: Produto) => {
     if (produto.categoria === 'Serviços') return null;
-    
+
     if (produto.estoque.atual <= produto.estoque.minimo) {
       return { label: 'Baixo', color: 'text-red-600', icon: FiAlertTriangle };
     } else if (produto.estoque.atual >= produto.estoque.maximo * 0.8) {
@@ -247,11 +250,7 @@ const ProdutosPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-6">
             <div className="flex-1 min-w-0">
-              <BackToNucleus 
-                title="Produtos"
-                nucleusName="CRM"
-                nucleusPath="/nuclei/crm"
-              />
+              <BackToNucleus title="Produtos" nucleusName="CRM" nucleusPath="/nuclei/crm" />
               <p className="mt-1 text-sm text-gray-500">
                 Gestão completa do catálogo de produtos e serviços
               </p>
@@ -315,7 +314,9 @@ const ProdutosPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Receita/Mês</p>
-                <p className="text-2xl font-bold text-[#002333]">{formatCurrency(estatisticas.valorTotal)}</p>
+                <p className="text-2xl font-bold text-[#002333]">
+                  {formatCurrency(estatisticas.valorTotal)}
+                </p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
                 <FiDollarSign className="w-6 h-6 text-purple-600" />
@@ -375,8 +376,10 @@ const ProdutosPage: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
               >
                 <option value="todas">Todas as Categorias</option>
-                {categorias.map(categoria => (
-                  <option key={categoria} value={categoria}>{categoria}</option>
+                {categorias.map((categoria) => (
+                  <option key={categoria} value={categoria}>
+                    {categoria}
+                  </option>
                 ))}
               </select>
             </div>
@@ -416,7 +419,7 @@ const ProdutosPage: React.FC = () => {
                 {produtosFiltrados.map((produto) => {
                   const StatusIcon = statusConfig[produto.status].icon;
                   const estoqueStatus = getEstoqueStatus(produto);
-                  
+
                   return (
                     <tr key={produto.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -432,8 +435,12 @@ const ProdutosPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-[#002333]">{formatCurrency(produto.preco)}</div>
-                          <div className="text-sm text-gray-500">Custo: {formatCurrency(produto.custoUnitario)}</div>
+                          <div className="text-sm font-medium text-[#002333]">
+                            {formatCurrency(produto.preco)}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            Custo: {formatCurrency(produto.custoUnitario)}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -441,7 +448,9 @@ const ProdutosPage: React.FC = () => {
                           <span className="text-sm text-gray-500">N/A</span>
                         ) : (
                           <div>
-                            <div className="text-sm font-medium text-[#002333]">{produto.estoque.atual}</div>
+                            <div className="text-sm font-medium text-[#002333]">
+                              {produto.estoque.atual}
+                            </div>
                             {estoqueStatus && (
                               <div className={`text-xs flex items-center ${estoqueStatus.color}`}>
                                 <estoqueStatus.icon className="w-3 h-3 mr-1" />
@@ -453,12 +462,16 @@ const ProdutosPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-[#002333]">{produto.vendas.mes}/mês</div>
+                          <div className="text-sm font-medium text-[#002333]">
+                            {produto.vendas.mes}/mês
+                          </div>
                           <div className="text-sm text-gray-500">Total: {produto.vendas.total}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusConfig[produto.status].color}`}>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusConfig[produto.status].color}`}
+                        >
                           <StatusIcon className="w-3 h-3 mr-1" />
                           {statusConfig[produto.status].label}
                         </span>
@@ -499,7 +512,9 @@ const ProdutosPage: React.FC = () => {
                 <FiPackage className="w-12 h-12 text-gray-400" />
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum produto encontrado</h3>
-              <p className="text-gray-500">Tente ajustar os filtros ou adicionar um novo produto.</p>
+              <p className="text-gray-500">
+                Tente ajustar os filtros ou adicionar um novo produto.
+              </p>
             </div>
           )}
         </div>
@@ -547,7 +562,9 @@ const ProdutosPage: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusConfig[selectedProduto.status].color}`}>
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusConfig[selectedProduto.status].color}`}
+                  >
                     {statusConfig[selectedProduto.status].label}
                   </span>
                 </div>
@@ -555,20 +572,35 @@ const ProdutosPage: React.FC = () => {
 
               {/* Valores */}
               <div className="border-t border-gray-200 pt-6">
-                <h4 className="text-base font-medium text-[#002333] mb-4">Informações Financeiras</h4>
+                <h4 className="text-base font-medium text-[#002333] mb-4">
+                  Informações Financeiras
+                </h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Preço de Venda</label>
-                    <p className="text-lg font-semibold text-[#002333]">{formatCurrency(selectedProduto.preco)}</p>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Preço de Venda
+                    </label>
+                    <p className="text-lg font-semibold text-[#002333]">
+                      {formatCurrency(selectedProduto.preco)}
+                    </p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Custo Unitário</label>
-                    <p className="text-lg font-semibold text-red-600">{formatCurrency(selectedProduto.custoUnitario)}</p>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Custo Unitário
+                    </label>
+                    <p className="text-lg font-semibold text-red-600">
+                      {formatCurrency(selectedProduto.custoUnitario)}
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Margem</label>
                     <p className="text-lg font-semibold text-green-600">
-                      {(((selectedProduto.preco - selectedProduto.custoUnitario) / selectedProduto.preco) * 100).toFixed(1)}%
+                      {(
+                        ((selectedProduto.preco - selectedProduto.custoUnitario) /
+                          selectedProduto.preco) *
+                        100
+                      ).toFixed(1)}
+                      %
                     </p>
                   </div>
                 </div>
@@ -581,15 +613,21 @@ const ProdutosPage: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Atual</label>
-                      <p className="text-lg font-semibold text-[#002333]">{selectedProduto.estoque.atual}</p>
+                      <p className="text-lg font-semibold text-[#002333]">
+                        {selectedProduto.estoque.atual}
+                      </p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Mínimo</label>
-                      <p className="text-lg font-semibold text-yellow-600">{selectedProduto.estoque.minimo}</p>
+                      <p className="text-lg font-semibold text-yellow-600">
+                        {selectedProduto.estoque.minimo}
+                      </p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Máximo</label>
-                      <p className="text-lg font-semibold text-blue-600">{selectedProduto.estoque.maximo}</p>
+                      <p className="text-lg font-semibold text-blue-600">
+                        {selectedProduto.estoque.maximo}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -600,15 +638,25 @@ const ProdutosPage: React.FC = () => {
                 <h4 className="text-base font-medium text-[#002333] mb-4">Performance de Vendas</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Vendas este Mês</label>
-                    <p className="text-lg font-semibold text-[#159A9C]">{selectedProduto.vendas.mes}</p>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Vendas este Mês
+                    </label>
+                    <p className="text-lg font-semibold text-[#159A9C]">
+                      {selectedProduto.vendas.mes}
+                    </p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Total de Vendas</label>
-                    <p className="text-lg font-semibold text-[#002333]">{selectedProduto.vendas.total}</p>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Total de Vendas
+                    </label>
+                    <p className="text-lg font-semibold text-[#002333]">
+                      {selectedProduto.vendas.total}
+                    </p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Receita este Mês</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Receita este Mês
+                    </label>
                     <p className="text-lg font-semibold text-green-600">
                       {formatCurrency(selectedProduto.preco * selectedProduto.vendas.mes)}
                     </p>
@@ -626,12 +674,18 @@ const ProdutosPage: React.FC = () => {
               <div className="border-t border-gray-200 pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Criado em</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Criado em
+                    </label>
                     <p className="text-sm text-[#002333]">{formatDate(selectedProduto.criadoEm)}</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Última atualização</label>
-                    <p className="text-sm text-[#002333]">{formatDate(selectedProduto.atualizadoEm)}</p>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Última atualização
+                    </label>
+                    <p className="text-sm text-[#002333]">
+                      {formatDate(selectedProduto.atualizadoEm)}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -644,9 +698,7 @@ const ProdutosPage: React.FC = () => {
               >
                 Fechar
               </button>
-              <button
-                className="px-4 py-2 text-sm font-medium text-white bg-[#159A9C] border border-transparent rounded-lg hover:bg-[#0d7a7d] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C] transition-colors"
-              >
+              <button className="px-4 py-2 text-sm font-medium text-white bg-[#159A9C] border border-transparent rounded-lg hover:bg-[#0d7a7d] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C] transition-colors">
                 Editar Produto
               </button>
             </div>

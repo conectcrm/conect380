@@ -4,7 +4,10 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 @Entity('atendimento_integracoes_config')
 export class IntegracoesConfig {
@@ -13,6 +16,10 @@ export class IntegracoesConfig {
 
   @Column({ name: 'empresa_id', type: 'uuid' })
   empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column({ name: 'tipo', length: 50 })
   tipo: string;

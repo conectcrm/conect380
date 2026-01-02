@@ -20,12 +20,12 @@ const defaultData = [
 
 export const SalesFunnelChart: React.FC<SalesFunnelProps> = ({
   data = defaultData,
-  isLoading = false
+  isLoading = false,
 }) => {
   // Guard: Se data for undefined/null/vazio, usar defaultData
-  const safeData = (data && data.length > 0) ? data : defaultData;
+  const safeData = data && data.length > 0 ? data : defaultData;
 
-  const maxValue = Math.max(...safeData.map(item => item.value));
+  const maxValue = Math.max(...safeData.map((item) => item.value));
 
   if (isLoading) {
     return (
@@ -54,14 +54,13 @@ export const SalesFunnelChart: React.FC<SalesFunnelProps> = ({
       role="region"
       aria-label="Funil de vendas - Conversão por etapa"
     >
-      <h3 className="text-lg font-semibold text-gray-900 mb-6">
-        Funil de Vendas
-      </h3>
+      <h3 className="text-lg font-semibold text-gray-900 mb-6">Funil de Vendas</h3>
 
       <div className="space-y-4" role="list" aria-label="Etapas do funil de vendas">
         {safeData.map((item, index) => {
           const percentage = (item.value / maxValue) * 100;
-          const conversionRate = index > 0 ? ((item.value / safeData[index - 1].value) * 100).toFixed(1) : '100.0';
+          const conversionRate =
+            index > 0 ? ((item.value / safeData[index - 1].value) * 100).toFixed(1) : '100.0';
 
           return (
             <div
@@ -77,19 +76,11 @@ export const SalesFunnelChart: React.FC<SalesFunnelProps> = ({
                     style={{ backgroundColor: item.color }}
                     aria-hidden="true"
                   ></div>
-                  <span className="text-sm font-medium text-gray-700">
-                    {item.stage}
-                  </span>
+                  <span className="text-sm font-medium text-gray-700">{item.stage}</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-sm font-semibold text-gray-900">
-                    {item.count}
-                  </span>
-                  {index > 0 && (
-                    <span className="text-xs text-gray-500">
-                      ({conversionRate}%)
-                    </span>
-                  )}
+                  <span className="text-sm font-semibold text-gray-900">{item.count}</span>
+                  {index > 0 && <span className="text-xs text-gray-500">({conversionRate}%)</span>}
                 </div>
               </div>
 
@@ -128,9 +119,7 @@ export const SalesFunnelChart: React.FC<SalesFunnelProps> = ({
 
       {/* Status das Propostas */}
       <div className="mt-8 pt-6 border-t border-gray-200">
-        <h4 className="text-sm font-semibold text-gray-900 mb-4">
-          Status das Propostas
-        </h4>
+        <h4 className="text-sm font-semibold text-gray-900 mb-4">Status das Propostas</h4>
 
         <div className="flex items-center justify-center">
           <div className="relative w-32 h-32">
@@ -217,7 +206,8 @@ export const SalesFunnelChart: React.FC<SalesFunnelProps> = ({
         </thead>
         <tbody>
           {safeData.map((item, index) => {
-            const conversionRate = index > 0 ? ((item.value / safeData[index - 1].value) * 100).toFixed(1) : '100.0';
+            const conversionRate =
+              index > 0 ? ((item.value / safeData[index - 1].value) * 100).toFixed(1) : '100.0';
             return (
               <tr key={item.stage}>
                 <td>{item.stage}</td>

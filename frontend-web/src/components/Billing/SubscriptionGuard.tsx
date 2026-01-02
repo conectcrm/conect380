@@ -2,12 +2,7 @@ import React from 'react';
 import { useSubscription } from '../../hooks/useSubscription';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
-import {
-  Lock,
-  Crown,
-  AlertTriangle,
-  Loader2
-} from 'lucide-react';
+import { Lock, Crown, AlertTriangle, Loader2 } from 'lucide-react';
 
 interface SubscriptionGuardProps {
   children: React.ReactNode;
@@ -20,7 +15,7 @@ export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({
   children,
   requiredModule,
   fallback,
-  onUpgrade
+  onUpgrade,
 }) => {
   const {
     assinatura,
@@ -29,7 +24,7 @@ export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({
     temAcessoModulo,
     temAssinatura,
     assinaturaAtiva,
-    getStatusInfo
+    getStatusInfo,
   } = useSubscription();
 
   if (loading) {
@@ -71,14 +66,12 @@ export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({
         <CardContent className="pt-6">
           <div className="text-center">
             <Crown className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-yellow-800 mb-2">
-              Assinatura Necessária
-            </h3>
+            <h3 className="text-xl font-semibold text-yellow-800 mb-2">Assinatura Necessária</h3>
             <p className="text-yellow-700 mb-6">
               Para acessar esta funcionalidade, você precisa de uma assinatura ativa.
             </p>
             <Button
-              onClick={onUpgrade || (() => window.location.href = '/billing')}
+              onClick={onUpgrade || (() => (window.location.href = '/billing'))}
               className="bg-yellow-600 hover:bg-yellow-700"
             >
               <Crown className="h-4 w-4 mr-2" />
@@ -106,11 +99,9 @@ export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({
             <h3 className="text-xl font-semibold text-red-800 mb-2">
               Assinatura {statusInfo.texto}
             </h3>
-            <p className="text-red-700 mb-6">
-              {statusInfo.descricao}
-            </p>
+            <p className="text-red-700 mb-6">{statusInfo.descricao}</p>
             <Button
-              onClick={onUpgrade || (() => window.location.href = '/billing')}
+              onClick={onUpgrade || (() => (window.location.href = '/billing'))}
               className="bg-red-600 hover:bg-red-700"
             >
               Reativar Assinatura
@@ -137,14 +128,12 @@ export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({
             <h3 className="text-xl font-semibold text-blue-800 mb-2">
               Módulo {moduleName} Não Incluído
             </h3>
-            <p className="text-blue-700 mb-2">
-              Este módulo não está incluído no seu plano atual.
-            </p>
+            <p className="text-blue-700 mb-2">Este módulo não está incluído no seu plano atual.</p>
             <p className="text-sm text-blue-600 mb-6">
               Plano Atual: <strong>{assinatura?.plano.nome}</strong>
             </p>
             <Button
-              onClick={onUpgrade || (() => window.location.href = '/billing?tab=plans')}
+              onClick={onUpgrade || (() => (window.location.href = '/billing?tab=plans'))}
               className="bg-blue-600 hover:bg-blue-700"
             >
               <Crown className="h-4 w-4 mr-2" />
@@ -164,7 +153,9 @@ export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({
 export const useSubscriptionGuard = () => {
   const subscription = useSubscription();
 
-  const checkAccess = (requiredModule?: string): {
+  const checkAccess = (
+    requiredModule?: string,
+  ): {
     hasAccess: boolean;
     reason?: 'no-subscription' | 'inactive-subscription' | 'module-not-included';
     message?: string;
@@ -173,7 +164,7 @@ export const useSubscriptionGuard = () => {
       return {
         hasAccess: false,
         reason: 'no-subscription',
-        message: 'Assinatura necessária para acessar esta funcionalidade'
+        message: 'Assinatura necessária para acessar esta funcionalidade',
       };
     }
 
@@ -181,7 +172,7 @@ export const useSubscriptionGuard = () => {
       return {
         hasAccess: false,
         reason: 'inactive-subscription',
-        message: 'Assinatura inativa'
+        message: 'Assinatura inativa',
       };
     }
 
@@ -189,7 +180,7 @@ export const useSubscriptionGuard = () => {
       return {
         hasAccess: false,
         reason: 'module-not-included',
-        message: `Módulo ${requiredModule} não incluído no plano atual`
+        message: `Módulo ${requiredModule} não incluído no plano atual`,
       };
     }
 
@@ -204,6 +195,6 @@ export const useSubscriptionGuard = () => {
   return {
     ...subscription,
     checkAccess,
-    requiresUpgrade
+    requiresUpgrade,
   };
 };

@@ -11,9 +11,11 @@ export const MenuBlock: React.FC<NodeProps<BlockData>> = ({ data, selected }) =>
   const preview = mensagem.length > 40 ? mensagem.substring(0, 40) + '...' : mensagem;
 
   return (
-    <div className={`relative bg-white rounded-lg shadow-md border-2 ${selected ? 'border-purple-500' : 'border-gray-300'
-      } transition-all hover:shadow-lg min-w-[220px] max-w-[320px]`}>
-
+    <div
+      className={`relative bg-white rounded-lg shadow-md border-2 ${
+        selected ? 'border-purple-500' : 'border-gray-300'
+      } transition-all hover:shadow-lg min-w-[220px] max-w-[320px]`}
+    >
       {/* Handle de entrada (top) */}
       <Handle
         type="target"
@@ -34,9 +36,7 @@ export const MenuBlock: React.FC<NodeProps<BlockData>> = ({ data, selected }) =>
 
       {/* Body */}
       <div className="p-3">
-        <p className="text-sm text-gray-700 mb-2 whitespace-pre-wrap break-words">
-          {preview}
-        </p>
+        <p className="text-sm text-gray-700 mb-2 whitespace-pre-wrap break-words">{preview}</p>
 
         {opcoes.length > 0 && (
           <div className="space-y-1 mt-2 border-t pt-2">
@@ -49,9 +49,7 @@ export const MenuBlock: React.FC<NodeProps<BlockData>> = ({ data, selected }) =>
               </div>
             ))}
             {opcoes.length > 3 && (
-              <p className="text-xs text-gray-400 italic">
-                +{opcoes.length - 3} opções...
-              </p>
+              <p className="text-xs text-gray-400 italic">+{opcoes.length - 3} opções...</p>
             )}
           </div>
         )}

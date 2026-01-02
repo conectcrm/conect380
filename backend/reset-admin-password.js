@@ -14,7 +14,7 @@ async function resetAdminPassword() {
     await client.connect();
     console.log('✅ Conectado ao banco de dados\n');
 
-    const email = 'admin@conectcrm.com';
+    const email = 'admin@conectsuite.com.br';
     const novaSenha = 'admin123';
 
     // Verificar se usuário existe

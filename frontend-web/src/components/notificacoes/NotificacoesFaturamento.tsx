@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, X, AlertCircle, CheckCircle, Clock, DollarSign, Calendar, TrendingUp } from 'lucide-react';
+import {
+  Bell,
+  X,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  DollarSign,
+  Calendar,
+  TrendingUp,
+} from 'lucide-react';
 import { Fatura, StatusFatura } from '../../services/faturamentoService';
 import { formatarValorMonetario } from '../../utils/formatacao';
 
@@ -23,7 +32,7 @@ interface NotificacoesFaturamentoProps {
 export default function NotificacoesFaturamento({
   faturas,
   onMarcarComoLida,
-  onAbrirFatura
+  onAbrirFatura,
 }: NotificacoesFaturamentoProps) {
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [mostrarPainel, setMostrarPainel] = useState(false);
@@ -37,9 +46,11 @@ export default function NotificacoesFaturamento({
     const novas: Notificacao[] = [];
     const hoje = new Date();
 
-    faturas.forEach(fatura => {
+    faturas.forEach((fatura) => {
       const dataVencimento = new Date(fatura.dataVencimento);
-      const diasParaVencimento = Math.ceil((dataVencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+      const diasParaVencimento = Math.ceil(
+        (dataVencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24),
+      );
 
       // Faturas vencidas
       if (diasParaVencimento < 0 && fatura.status === StatusFatura.PENDENTE) {
@@ -51,12 +62,16 @@ export default function NotificacoesFaturamento({
           faturaId: fatura.id,
           data: dataVencimento,
           lida: false,
-          prioridade: 'critica'
+          prioridade: 'critica',
         });
       }
 
       // Faturas próximas ao vencimento (7 dias)
-      if (diasParaVencimento >= 0 && diasParaVencimento <= 7 && fatura.status === StatusFatura.PENDENTE) {
+      if (
+        diasParaVencimento >= 0 &&
+        diasParaVencimento <= 7 &&
+        fatura.status === StatusFatura.PENDENTE
+      ) {
         novas.push({
           id: `vencimento-${fatura.id}`,
           tipo: 'vencimento',
@@ -65,13 +80,15 @@ export default function NotificacoesFaturamento({
           faturaId: fatura.id,
           data: dataVencimento,
           lida: false,
-          prioridade: diasParaVencimento <= 3 ? 'alta' : 'media'
+          prioridade: diasParaVencimento <= 3 ? 'alta' : 'media',
         });
       }
 
       // Pagamentos recebidos (últimos 7 dias)
       if (fatura.status === StatusFatura.PAGA) {
-        const diasDesdePagamento = Math.ceil((hoje.getTime() - new Date(fatura.atualizadoEm).getTime()) / (1000 * 60 * 60 * 24));
+        const diasDesdePagamento = Math.ceil(
+          (hoje.getTime() - new Date(fatura.atualizadoEm).getTime()) / (1000 * 60 * 60 * 24),
+        );
         if (diasDesdePagamento <= 7) {
           novas.push({
             id: `pagamento-${fatura.id}`,
@@ -81,15 +98,17 @@ export default function NotificacoesFaturamento({
             faturaId: fatura.id,
             data: new Date(fatura.atualizadoEm),
             lida: false,
-            prioridade: 'baixa'
+            prioridade: 'baixa',
           });
         }
       }
     });
 
     // Análises e metas
-    const totalVencidas = faturas.filter(f => {
-      const diasVenc = Math.ceil((new Date(f.dataVencimento).getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+    const totalVencidas = faturas.filter((f) => {
+      const diasVenc = Math.ceil(
+        (new Date(f.dataVencimento).getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24),
+      );
       return diasVenc < 0 && f.status === StatusFatura.PENDENTE;
     }).length;
 
@@ -101,13 +120,13 @@ export default function NotificacoesFaturamento({
         descricao: `${totalVencidas} faturas vencidas requerem atenção imediata`,
         data: hoje,
         lida: false,
-        prioridade: 'critica'
+        prioridade: 'critica',
       });
     }
 
     // Ordenar por prioridade e data
     novas.sort((a, b) => {
-      const prioridades = { 'critica': 4, 'alta': 3, 'media': 2, 'baixa': 1 };
+      const prioridades = { critica: 4, alta: 3, media: 2, baixa: 1 };
       const priA = prioridades[a.prioridade];
       const priB = prioridades[b.prioridade];
 
@@ -150,10 +169,9 @@ export default function NotificacoesFaturamento({
     }
   };
 
-  const notificacoesNaoLidas = notificacoes.filter(n => !n.lida).length;
-  const notificacoesFiltradas = filtroTipo === 'todas'
-    ? notificacoes
-    : notificacoes.filter(n => n.tipo === filtroTipo);
+  const notificacoesNaoLidas = notificacoes.filter((n) => !n.lida).length;
+  const notificacoesFiltradas =
+    filtroTipo === 'todas' ? notificacoes : notificacoes.filter((n) => n.tipo === filtroTipo);
 
   return (
     <div className="relative">
@@ -221,8 +239,9 @@ export default function NotificacoesFaturamento({
                 {notificacoesFiltradas.slice(0, 10).map((notificacao) => (
                   <div
                     key={notificacao.id}
-                    className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer border-l-4 ${getCorPrioridade(notificacao.prioridade)} ${!notificacao.lida ? 'bg-blue-50' : ''
-                      }`}
+                    className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer border-l-4 ${getCorPrioridade(notificacao.prioridade)} ${
+                      !notificacao.lida ? 'bg-blue-50' : ''
+                    }`}
                     onClick={() => {
                       if (notificacao.faturaId) {
                         onAbrirFatura(notificacao.faturaId);
@@ -238,20 +257,21 @@ export default function NotificacoesFaturamento({
                         {getIconeNotificacao(notificacao.tipo)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium text-gray-900 ${!notificacao.lida ? 'font-semibold' : ''
-                          }`}>
+                        <p
+                          className={`text-sm font-medium text-gray-900 ${
+                            !notificacao.lida ? 'font-semibold' : ''
+                          }`}
+                        >
                           {notificacao.titulo}
                         </p>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {notificacao.descricao}
-                        </p>
+                        <p className="text-sm text-gray-600 mt-1">{notificacao.descricao}</p>
                         <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
                           {notificacao.data.toLocaleDateString('pt-BR', {
                             day: '2-digit',
                             month: '2-digit',
                             hour: '2-digit',
-                            minute: '2-digit'
+                            minute: '2-digit',
                           })}
                         </p>
                       </div>

@@ -4,10 +4,29 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { KPICard } from '../../components/common/KPICard';
 import { useVendedorDashboard } from '../../hooks/useVendedorDashboard';
 import {
-  Target, TrendingUp, Users, Calendar, Phone, Mail, Clock,
-  AlertTriangle, CheckSquare, Star, Trophy, Zap, DollarSign,
-  FileText, UserPlus, ArrowUp, ArrowDown, Bell, RefreshCw,
-  Award, TrendingDown, Activity, Eye
+  Target,
+  TrendingUp,
+  Users,
+  Calendar,
+  Phone,
+  Mail,
+  Clock,
+  AlertTriangle,
+  CheckSquare,
+  Star,
+  Trophy,
+  Zap,
+  DollarSign,
+  FileText,
+  UserPlus,
+  ArrowUp,
+  ArrowDown,
+  Bell,
+  RefreshCw,
+  Award,
+  TrendingDown,
+  Activity,
+  Eye,
 } from 'lucide-react';
 
 const VendedorDashboard: React.FC = () => {
@@ -17,7 +36,7 @@ const VendedorDashboard: React.FC = () => {
   // Hook para dados reais do vendedor
   const { data, loading, error, refresh, insights } = useVendedorDashboard({
     autoRefresh: true,
-    refreshInterval: 5 * 60 * 1000 // 5 minutos
+    refreshInterval: 5 * 60 * 1000, // 5 minutos
   });
 
   // Loading state
@@ -104,7 +123,9 @@ const VendedorDashboard: React.FC = () => {
             </div>
             <div className="flex items-center text-sm text-green-600">
               <ArrowUp className="w-4 h-4 mr-1" />
-              <span>Faltam R$ {((kpis.meta?.mensal || 0) - (kpis.meta?.atual || 0)).toLocaleString()}</span>
+              <span>
+                Faltam R$ {((kpis.meta?.mensal || 0) - (kpis.meta?.atual || 0)).toLocaleString()}
+              </span>
             </div>
           </div>
 
@@ -136,9 +157,7 @@ const VendedorDashboard: React.FC = () => {
           <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600">
-                  Ranking
-                </h3>
+                <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600">Ranking</h3>
                 <div className="text-2xl font-bold text-gray-900 mt-1">
                   #{kpis.ranking?.posicao || 0}º lugar
                 </div>
@@ -160,11 +179,11 @@ const VendedorDashboard: React.FC = () => {
           <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600">
-                  Hoje
-                </h3>
+                <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600">Hoje</h3>
                 <div className="text-2xl font-bold text-gray-900 mt-1">
-                  {(kpis.atividades?.hoje?.calls || 0) + (kpis.atividades?.hoje?.reunioes || 0) + (kpis.atividades?.hoje?.followups || 0)}
+                  {(kpis.atividades?.hoje?.calls || 0) +
+                    (kpis.atividades?.hoje?.reunioes || 0) +
+                    (kpis.atividades?.hoje?.followups || 0)}
                 </div>
                 <div className="text-sm text-gray-500">atividades</div>
               </div>
@@ -366,7 +385,7 @@ const VendedorDashboard: React.FC = () => {
               <div className="text-3xl font-bold mb-2">9.2</div>
               <div className="text-sm opacity-90 mb-3">Nota Semanal</div>
               <div className="flex items-center justify-center space-x-1">
-                {[1, 2, 3, 4, 5].map(i => (
+                {[1, 2, 3, 4, 5].map((i) => (
                   <Star key={i} className={`w-5 h-5 ${i <= 4 ? 'fill-current' : 'opacity-30'}`} />
                 ))}
               </div>
@@ -374,7 +393,6 @@ const VendedorDashboard: React.FC = () => {
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

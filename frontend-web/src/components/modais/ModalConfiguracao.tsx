@@ -38,18 +38,23 @@ interface ModalConfiguracaoProps {
 // Schema de validação
 const configuracaoSchema = yup.object().shape({
   nome: yup.string().required('Nome é obrigatório').min(2, 'Nome deve ter pelo menos 2 caracteres'),
-  descricao: yup.string().required('Descrição é obrigatória').min(10, 'Descrição deve ter pelo menos 10 caracteres'),
+  descricao: yup
+    .string()
+    .required('Descrição é obrigatória')
+    .min(10, 'Descrição deve ter pelo menos 10 caracteres'),
   subcategoriaId: yup.string().required('Subcategoria é obrigatória'),
-  preco: yup.number()
+  preco: yup
+    .number()
     .required('Preço é obrigatório')
     .min(0, 'Preço deve ser maior ou igual a zero')
     .typeError('Preço deve ser um número válido'),
-  multiplicador: yup.number()
+  multiplicador: yup
+    .number()
     .required('Multiplicador é obrigatório')
     .min(0.1, 'Multiplicador deve ser maior que 0')
     .max(10, 'Multiplicador deve ser menor ou igual a 10')
     .typeError('Multiplicador deve ser um número válido'),
-  ativa: yup.boolean()
+  ativa: yup.boolean(),
 });
 
 const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
@@ -59,11 +64,17 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
   configuracao,
   subcategoriaAtual,
   subcategorias,
-  isLoading = false
+  isLoading = false,
 }) => {
   const [isSaving, setIsSaving] = useState(false);
 
-  const { control, handleSubmit, reset, watch, formState: { errors } } = useForm<Configuracao>({
+  const {
+    control,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors },
+  } = useForm<Configuracao>({
     resolver: yupResolver(configuracaoSchema),
     defaultValues: {
       nome: '',
@@ -71,8 +82,8 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
       subcategoriaId: subcategoriaAtual?.id || '',
       preco: 0,
       multiplicador: 1,
-      ativa: true
-    }
+      ativa: true,
+    },
   });
 
   const watchedPreco = watch('preco', 0);
@@ -87,7 +98,7 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
         subcategoriaId: configuracao.subcategoriaId,
         preco: configuracao.preco,
         multiplicador: configuracao.multiplicador,
-        ativa: configuracao.ativa
+        ativa: configuracao.ativa,
       });
     } else {
       reset({
@@ -96,7 +107,7 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
         subcategoriaId: subcategoriaAtual?.id || '',
         preco: 0,
         multiplicador: 1,
-        ativa: true
+        ativa: true,
       });
     }
   }, [configuracao, subcategoriaAtual, reset, isOpen]);
@@ -107,7 +118,7 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
 
       const configuracaoData: Configuracao = {
         ...data,
-        id: configuracao?.id
+        id: configuracao?.id,
       };
 
       await onSave(configuracaoData);
@@ -129,7 +140,7 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -160,12 +171,16 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
                     {configuracao ? 'Editar Configuração' : 'Nova Configuração'}
                   </h3>
                   <p className="text-sm text-gray-500">
-                    {configuracao ? 'Atualize as informações da configuração' : 'Crie uma nova configuração'}
+                    {configuracao
+                      ? 'Atualize as informações da configuração'
+                      : 'Crie uma nova configuração'}
                   </p>
                   {subcategoriaAtual && (
                     <div className="mt-2 flex items-center">
                       {subcategoriaAtual.categoria && (
-                        <div className={`w-3 h-3 rounded-full bg-${subcategoriaAtual.categoria.cor}-500 mr-2`}></div>
+                        <div
+                          className={`w-3 h-3 rounded-full bg-${subcategoriaAtual.categoria.cor}-500 mr-2`}
+                        ></div>
                       )}
                       <span className="text-xs text-gray-600">
                         {subcategoriaAtual.categoria?.nome} → {subcategoriaAtual.nome}
@@ -229,16 +244,12 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
                     />
                   )}
                 />
-                {errors.nome && (
-                  <p className="text-red-500 text-sm mt-1">{errors.nome.message}</p>
-                )}
+                {errors.nome && <p className="text-red-500 text-sm mt-1">{errors.nome.message}</p>}
               </div>
 
               {/* Descrição */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Descrição *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição *</label>
                 <Controller
                   name="descricao"
                   control={control}
