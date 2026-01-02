@@ -48,6 +48,32 @@
 
 **Conclusão**: **64/64 entities tenant-scoped = 100% CORRETO!** 🎉
 
+### 🔒 Progresso RLS no Database
+
+**Sessão 4 - RLS no Database**:
+- ✅ Criadas 3 migrations TypeORM para RLS
+- ✅ Executado script SQL diretamente no banco (23 tabelas)
+- ✅ **Resultado**: 18 → 11 tabelas sem RLS (+7 habilitadas)
+
+**Tabelas com RLS Ativo** (23 novas):
+```
+✅ atendimento_canais, atendimento_filas, atendimento_atendentes
+✅ atendimento_atendentes_filas, atendimento_tickets, atendimento_mensagens
+✅ atendimento_templates, atendimento_tags, atendimento_historico
+✅ atendimento_integracoes_config, atendimento_ai_insights
+✅ atendimento_base_conhecimento, atendimento_ai_respostas, atendimento_ai_metricas
+✅ nucleos_atendimento, fluxos_triagem, sessoes_triagem
+✅ templates_mensagem_triagem, metricas_nucleo
+✅ equipes, atendente_equipes, atendente_atribuicoes, equipe_atribuicoes
+```
+
+**Restam 11 tabelas** (próxima sessão):
+- Comercial/CRM: propostas, oportunidades, atividades
+- Financeiro: fornecedores, contas_pagar, faturas
+- Leads, Produtos, Clientes, etc.
+
+**Meta RLS**: 60+ tabelas com RLS → **Parcialmente Atingido** (23/60+)
+
 ### 📊 Entities Corrigidas Hoje (01/01/2026)
 
 #### Sessão Manhã: +15 entities (40 → 55)
