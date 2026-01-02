@@ -7,6 +7,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { User } from '../user.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 export enum AtividadeTipo {
   LOGIN = 'LOGIN',
@@ -32,6 +33,10 @@ export class UserActivity {
 
   @Column({ name: 'empresa_id' })
   empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column({
     type: 'enum',

@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { SessaoTriagem } from './sessao-triagem.entity';
 import { FluxoTriagem } from './fluxo-triagem.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 export type DirecaoTriagemLog = 'entrada' | 'saida' | 'sistema';
 
@@ -22,6 +23,10 @@ export class TriagemLog {
 
   @Column({ name: 'empresa_id', type: 'uuid' })
   empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column({ name: 'sessao_id', type: 'uuid', nullable: true })
   sessaoId?: string;
