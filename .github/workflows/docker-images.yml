@@ -3,9 +3,10 @@ name: Docker Images - Build & Push
 on:
   push:
     branches:
-      - main
       - production
       - release/*
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
 
 env:
