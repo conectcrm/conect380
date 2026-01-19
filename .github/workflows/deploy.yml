@@ -287,7 +287,7 @@ jobs:
         with:
           status: ${{ job.status }}
           text: |
-            Deploy do ConectSuite ${{ job.status }}!
+            Deploy do Conect360 ${{ job.status }}!
             Branch: ${{ github.ref }}
             Commit: ${{ github.sha }}
           webhook_url: ${{ secrets.SLACK_WEBHOOK }}
@@ -298,7 +298,7 @@ jobs:
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
           status: ${{ job.status }}
-          title: "Deploy ConectSuite"
+          title: "Deploy Conect360"
           description: |
             **Branch**: ${{ github.ref }}
             **Commit**: ${{ github.sha }}

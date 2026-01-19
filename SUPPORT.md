@@ -24,7 +24,7 @@ Antes de pedir ajuda, consulte nossa documentação:
 
 **GitHub Discussions** (recomendado)  
 Para dúvidas sobre uso, boas práticas, arquitetura:
-- [Abrir uma Discussion](https://github.com/Dhonleno/conectsuite/discussions)
+- [Abrir uma Discussion](https://github.com/Dhonleno/conect360/discussions)
 - Categorias:
   - 💬 **Q&A** - Perguntas e respostas
   - 💡 **Ideas** - Sugestões de melhorias
@@ -35,7 +35,7 @@ Para dúvidas sobre uso, boas práticas, arquitetura:
 
 **GitHub Issues**  
 Para reportar bugs, erros ou comportamentos inesperados:
-- [Abrir uma Issue de Bug](https://github.com/Dhonleno/conectsuite/issues/new?template=bug_report.md)
+- [Abrir uma Issue de Bug](https://github.com/Dhonleno/conect360/issues/new?template=bug_report.md)
 - Inclua:
   - Descrição clara do problema
   - Passos para reproduzir
@@ -54,7 +54,7 @@ Para reportar bugs, erros ou comportamentos inesperados:
 
 **GitHub Issues**  
 Para sugerir novas funcionalidades:
-- [Abrir uma Issue de Feature Request](https://github.com/Dhonleno/conectsuite/issues/new?template=feature_request.md)
+- [Abrir uma Issue de Feature Request](https://github.com/Dhonleno/conect360/issues/new?template=feature_request.md)
 - Inclua:
   - Problema que a feature resolve
   - Solução proposta
@@ -191,8 +191,8 @@ npm run migration:revert
 - Website: (em breve)
 
 ### Para Desenvolvedores
-- GitHub Issues: [Criar Issue](https://github.com/Dhonleno/conectsuite/issues/new/choose)
-- GitHub Discussions: [Participar](https://github.com/Dhonleno/conectsuite/discussions)
+- GitHub Issues: [Criar Issue](https://github.com/Dhonleno/conect360/issues/new/choose)
+- GitHub Discussions: [Participar](https://github.com/Dhonleno/conect360/discussions)
 
 ### Para Segurança
 - Email: security@conectsuite.com

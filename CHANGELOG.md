@@ -269,7 +269,7 @@ Este projeto segue [Conventional Commits](https://www.conventionalcommits.org/pt
 
 ## Links Úteis
 
-- [Repositório GitHub](https://github.com/Dhonleno/conectsuite)
+- [Repositório GitHub](https://github.com/Dhonleno/conect360)
 - [Documentação Completa](docs/)
 - [Guia de Contribuição](CONTRIBUTING.md)
 - [Design Guidelines](frontend-web/DESIGN_GUIDELINES.md)

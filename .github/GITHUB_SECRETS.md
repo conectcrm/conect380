@@ -4,10 +4,13 @@ Este documento descreve todos os **GitHub Secrets** necessários para os workflo
 
 ## 📍 Como Adicionar Secrets
 
-1. Acesse: `https://github.com/Dhonleno/conectsuite/settings/secrets/actions`
+1. Acesse: `https://github.com/Dhonleno/conect360/settings/secrets/actions`
 2. Clique em **"New repository secret"**
 3. Adicione `Name` e `Value`
 4. Clique em **"Add secret"**
+
+> Nota: se você estiver usando o repositório novo, ajuste para:
+> `https://github.com/Dhonleno/conect360/settings/secrets/actions`
 
 ---
 
@@ -45,7 +48,7 @@ cat conectcrm-key.pem | clip
 #### Opção 2: Azure App Service
 
 ```
-AZURE_WEBAPP_NAME=conectsuite-backend
+AZURE_WEBAPP_NAME=<nome-do-app-service-backend>
 AZURE_WEBAPP_PUBLISH_PROFILE=<xml-do-publish-profile>
 ```
 
@@ -95,7 +98,7 @@ NETLIFY_SITE_ID=<site-id>
 #### Opção 3: AWS S3 + CloudFront
 
 ```
-AWS_S3_BUCKET=conectsuite-frontend
+AWS_S3_BUCKET=<nome-do-bucket-frontend>
 AWS_ACCESS_KEY_ID=<access-key>
 AWS_SECRET_ACCESS_KEY=<secret-key>
 AWS_CLOUDFRONT_DISTRIBUTION=<distribution-id>
@@ -127,9 +130,9 @@ DATABASE_NAME=conectcrm
 ### 🔗 URLs de Health Check
 
 ```
-BACKEND_URL=https://api.conectsuite.com
-FRONTEND_URL=https://conectsuite.com
-REACT_APP_API_URL=https://api.conectsuite.com
+BACKEND_URL=<https://api.sua-dominio.com>
+FRONTEND_URL=<https://sua-dominio.com>
+REACT_APP_API_URL=<https://api.sua-dominio.com>
 ```
 
 ---
@@ -208,12 +211,7 @@ Workflow: `.github/workflows/ci.yml` vai rodar automaticamente.
 
 ### Testar CD (Deploy)
 ```powershell
-# 1. Push para main (deploy automático)
-git push origin consolidacao-atendimento:main
-
-# OU
-
-# 2. Criar tag (release)
+# 1. Criar tag (release)
 git tag -a v1.0.1 -m "Release v1.0.1"
 git push origin v1.0.1
 
@@ -265,8 +263,11 @@ Isso permite usar **mesmos nomes de secrets** mas **valores diferentes** por amb
 ## 📞 Suporte
 
 Dúvidas sobre configuração?
-- Issues: https://github.com/Dhonleno/conectsuite/issues
+- Issues: https://github.com/Dhonleno/conect360/issues
 - Docs: https://docs.github.com/en/actions/security-guides/encrypted-secrets
+
+Se você estiver usando o repo novo:
+- Issues: https://github.com/Dhonleno/conect360/issues
 
 ---
 

@@ -1,6 +1,6 @@
 # 🎯 Guia Rápido para Novos Desenvolvedores
 
-Bem-vindo ao **ConectSuite**! Este guia vai te ajudar a começar rapidamente.
+Bem-vindo ao **Conect360**! Este guia vai te ajudar a começar rapidamente.
 
 ---
 
@@ -10,8 +10,8 @@ Bem-vindo ao **ConectSuite**! Este guia vai te ajudar a começar rapidamente.
 
 ```powershell
 # Clone
-git clone https://github.com/Dhonleno/conectsuite.git
-cd conectsuite
+git clone https://github.com/Dhonleno/conect360.git
+cd conect360
 
 # Suba database e cache
 docker-compose up -d postgres redis
@@ -65,17 +65,15 @@ cd frontend-web/src/pages
 cp _TemplatePage.tsx MinhaNovaPage.tsx
 
 # 2. Buscar [PERSONALIZAR] e substituir
-# 3. Ajustar cor do módulo (ver DESIGN_GUIDELINES.md)
+# 3. Manter tema Crevasse (ver frontend-web/DESIGN_GUIDELINES.md)
 
 # 4. Registrar rota em App.tsx
 # 5. Adicionar no menuConfig.ts
 ```
 
-**Cores por módulo**:
-- Comercial: `#159A9C`
-- Atendimento: `#9333EA`
-- Financeiro: `#16A34A`
-- Gestão: `#2563EB`
+**Tema do sistema (único)**:
+- Crevasse (padrão): `#159A9C`
+- Não existe “cor por módulo”; consulte `frontend-web/DESIGN_GUIDELINES.md`.
 
 ---
 
@@ -186,8 +184,8 @@ npm run migration:run       # Rodar novamente
 
 ## 🔗 Links Úteis
 
-- **Repo**: https://github.com/Dhonleno/conectsuite
-- **Issues**: https://github.com/Dhonleno/conectsuite/issues
+- **Repo**: https://github.com/Dhonleno/conect360
+- **Issues**: https://github.com/Dhonleno/conect360/issues
 - **NestJS Docs**: https://docs.nestjs.com
 - **React Docs**: https://react.dev
 

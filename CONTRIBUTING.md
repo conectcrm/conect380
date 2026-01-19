@@ -1,6 +1,6 @@
-# 🤝 Guia de Contribuição - ConectSuite
+# 🤝 Guia de Contribuição - Conect360
 
-Obrigado por contribuir com o **ConectSuite**! Este guia ajudará você a contribuir de forma profissional e organizada.
+Obrigado por contribuir com o **Conect360**! Este guia ajudará você a contribuir de forma profissional e organizada.
 
 ## 📋 Índice
 
@@ -26,8 +26,8 @@ Obrigado por contribuir com o **ConectSuite**! Este guia ajudará você a contri
 
 ```bash
 # 1. Clonar repositório
-git clone https://github.com/Dhonleno/conectsuite.git
-cd conectsuite
+git clone https://github.com/Dhonleno/conect360.git
+cd conect360
 
 # 2. Backend
 cd backend
@@ -345,8 +345,8 @@ npm run test:coverage     # Com cobertura
 
 ## 📞 Suporte
 
-- **Issues**: [GitHub Issues](https://github.com/Dhonleno/conectsuite/issues)
-- **Discussões**: [GitHub Discussions](https://github.com/Dhonleno/conectsuite/discussions)
+- **Issues**: [GitHub Issues](https://github.com/Dhonleno/conect360/issues)
+- **Discussões**: [GitHub Discussions](https://github.com/Dhonleno/conect360/discussions)
 - **Email**: suporte@conectcrm.com
 
 ---

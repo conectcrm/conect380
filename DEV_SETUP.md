@@ -1,6 +1,6 @@
-# 💻 Guia de Desenvolvimento Local - ConectSuite
+# 💻 Guia de Desenvolvimento Local - Conect360
 
-Este guia ajuda desenvolvedores a configurar o ambiente local para trabalhar no ConectSuite.
+Este guia ajuda desenvolvedores a configurar o ambiente local para trabalhar no Conect360.
 
 ---
 
@@ -31,8 +31,8 @@ Este guia ajuda desenvolvedores a configurar o ambiente local para trabalhar no 
 
 ```powershell
 # 1. Clonar repositório
-git clone https://github.com/Dhonleno/conectsuite.git
-cd conectsuite
+git clone https://github.com/Dhonleno/conect360.git
+cd conect360
 
 # 2. Subir PostgreSQL e Redis
 docker-compose up -d postgres redis
@@ -77,12 +77,12 @@ CREATE DATABASE conectcrm;
 
 ```powershell
 # SSH (recomendado se tiver chave configurada)
-git clone git@github.com:Dhonleno/conectsuite.git
+git clone git@github.com:Dhonleno/conect360.git
 
 # HTTPS
-git clone https://github.com/Dhonleno/conectsuite.git
+git clone https://github.com/Dhonleno/conect360.git
 
-cd conectsuite
+cd conect360
 ```
 
 ### 2️⃣ Configurar Backend
@@ -665,8 +665,8 @@ npm run start:debug
 ## 🤝 Precisa de Ajuda?
 
 - **Documentação**: Leia `SUPPORT.md`
-- **Issues**: https://github.com/Dhonleno/conectsuite/issues
-- **Discussions**: https://github.com/Dhonleno/conectsuite/discussions
+- **Issues**: https://github.com/Dhonleno/conect360/issues
+- **Discussions**: https://github.com/Dhonleno/conect360/discussions
 
 ---
 

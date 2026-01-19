@@ -530,8 +530,8 @@ Total: ~35 segundos
 
 ```powershell
 # Primeiro dia no projeto
-git clone https://github.com/Dhonleno/conectsuite.git
-cd conectsuite
+git clone https://github.com/Dhonleno/conect360.git
+cd conect360
 
 # Verificar e corrigir ambiente
 .\scripts\validate-environment.ps1 -Fix
@@ -551,8 +551,8 @@ npm run start:dev
 # 3. Instalar Git
 
 # Clonar projeto
-git clone https://github.com/Dhonleno/conectsuite.git
-cd conectsuite
+git clone https://github.com/Dhonleno/conect360.git
+cd conect360
 
 # Deixar script configurar o resto
 .\scripts\validate-environment.ps1 -Fix

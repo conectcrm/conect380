@@ -1,4 +1,4 @@
-# 🎊 REPOSITÓRIO GITHUB CONECTSUITE - SETUP 100% FINALIZADO!
+# 🎊 REPOSITÓRIO GITHUB CONECT360 - SETUP 100% FINALIZADO!
 
 ## 📅 Data de Conclusão: 3 de novembro de 2025
 
@@ -339,16 +339,16 @@
 ## 🔗 Links Importantes
 
 ### Repositório
-- **GitHub**: https://github.com/Dhonleno/conectsuite
-- **Commits**: https://github.com/Dhonleno/conectsuite/commits/consolidacao-atendimento
-- **Release v1.0.0**: https://github.com/Dhonleno/conectsuite/releases/tag/v1.0.0
+- **GitHub**: https://github.com/Dhonleno/conect360
+- **Commits**: https://github.com/Dhonleno/conect360/commits/consolidacao-atendimento
+- **Release v1.0.0**: https://github.com/Dhonleno/conect360/releases/tag/v1.0.0
 
 ### GitHub
-- **Issues**: https://github.com/Dhonleno/conectsuite/issues
-- **Pull Requests**: https://github.com/Dhonleno/conectsuite/pulls
-- **Actions**: https://github.com/Dhonleno/conectsuite/actions
-- **Community**: https://github.com/Dhonleno/conectsuite/community
-- **Settings**: https://github.com/Dhonleno/conectsuite/settings
+- **Issues**: https://github.com/Dhonleno/conect360/issues
+- **Pull Requests**: https://github.com/Dhonleno/conect360/pulls
+- **Actions**: https://github.com/Dhonleno/conect360/actions
+- **Community**: https://github.com/Dhonleno/conect360/community
+- **Settings**: https://github.com/Dhonleno/conect360/settings
 
 ---
 

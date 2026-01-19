@@ -158,7 +158,7 @@ Antes de fazer deploy em produção:
 
 Para questões de segurança:
 - Email: security@conectsuite.com
-- Para issues não sensíveis: [GitHub Issues](https://github.com/Dhonleno/conectsuite/issues)
+- Para issues não sensíveis: [GitHub Issues](https://github.com/Dhonleno/conect360/issues)
 
 ---
 

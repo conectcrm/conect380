@@ -1,11 +1,11 @@
-# 🎉 Repositório GitHub ConectSuite - Setup Completo
+# 🎉 Repositório GitHub Conect360 - Setup Completo
 
 ## 📊 Status Final
 
 ✅ **Repositório profissional completamente configurado e pronto para produção!**
 
-- **Nome**: ConectSuite
-- **URL**: https://github.com/Dhonleno/conectsuite
+- **Nome**: Conect360
+- **URL**: https://github.com/Dhonleno/conect360
 - **Branch Principal**: `consolidacao-atendimento`
 - **Versão Atual**: `v1.0.0` (tagged)
 - **Total de Commits**: 8 commits
@@ -84,7 +84,7 @@ ci: adicionar GitHub Actions workflows
 ## 📂 Estrutura de Arquivos GitHub
 
 ```
-conectsuite/
+conect360/
 ├── .github/
 │   ├── workflows/
 │   │   ├── ci.yml              ✅ Testes automatizados
@@ -169,7 +169,7 @@ conectsuite/
 
 ### 1️⃣ Configurar Secrets no GitHub
 
-**Local**: https://github.com/Dhonleno/conectsuite/settings/secrets/actions
+**Local**: https://github.com/Dhonleno/conect360/settings/secrets/actions
 
 **Secrets Necessários** (ver `.github/GITHUB_SECRETS.md`):
 - [ ] Backend deploy: `AWS_EC2_HOST`, `AWS_EC2_USER`, `AWS_SSH_PRIVATE_KEY`
@@ -179,7 +179,7 @@ conectsuite/
 
 ### 2️⃣ Configurar Repositório no GitHub
 
-**Local**: https://github.com/Dhonleno/conectsuite/settings
+**Local**: https://github.com/Dhonleno/conect360/settings
 
 - [ ] **General**:
   - Descrição: "Sistema CRM omnichannel com IA para triagem inteligente"
@@ -204,10 +204,10 @@ conectsuite/
 
 ### 3️⃣ Criar Release no GitHub
 
-**Local**: https://github.com/Dhonleno/conectsuite/releases/new
+**Local**: https://github.com/Dhonleno/conect360/releases/new
 
 - Tag: `v1.0.0`
-- Title: "🎉 ConectSuite v1.0.0 - Primeiro Release Oficial"
+- Title: "🎉 Conect360 v1.0.0 - Primeiro Release Oficial"
 - Description: (copiar do CHANGELOG.md)
 - Attach binaries: (opcional - build do frontend, por exemplo)
 - ✅ Set as the latest release
@@ -221,7 +221,7 @@ git commit -m "test: verificar CI workflow"
 git push
 
 # 2. Ver resultado em:
-# https://github.com/Dhonleno/conectsuite/actions
+# https://github.com/Dhonleno/conect360/actions
 ```
 
 ### 5️⃣ Configurar Integrações (opcional)
@@ -295,17 +295,17 @@ git push origin main
 
 ## 🔗 Links Úteis
 
-- **Repositório**: https://github.com/Dhonleno/conectsuite
-- **Issues**: https://github.com/Dhonleno/conectsuite/issues
-- **Actions**: https://github.com/Dhonleno/conectsuite/actions
-- **Releases**: https://github.com/Dhonleno/conectsuite/releases
-- **Settings**: https://github.com/Dhonleno/conectsuite/settings
+- **Repositório**: https://github.com/Dhonleno/conect360
+- **Issues**: https://github.com/Dhonleno/conect360/issues
+- **Actions**: https://github.com/Dhonleno/conect360/actions
+- **Releases**: https://github.com/Dhonleno/conect360/releases
+- **Settings**: https://github.com/Dhonleno/conect360/settings
 
 ---
 
 ## 🎯 Status de Community Standards
 
-Acesse: https://github.com/Dhonleno/conectsuite/community
+Acesse: https://github.com/Dhonleno/conect360/community
 
 **Checklist GitHub** (deve estar 100% ✅):
 - ✅ Description
