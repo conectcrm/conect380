@@ -3,7 +3,6 @@ name: Deploy with Error Budget Check
 on:
   push:
     branches:
-      - main
       - production
   workflow_dispatch:
     inputs:
@@ -14,7 +13,8 @@ on:
         default: false
 
 env:
-  PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL || 'http://prometheus:9090' }}
+  # Importante: sem fallback. Se não existir secret, o workflow deve reportar misconfiguration e não falhar.
+  PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL }}
 
 jobs:
   check-error-budget:
@@ -40,12 +40,24 @@ jobs:
           OVERRIDE_DEPLOY: ${{ github.event.inputs.override_freeze }}
           OVERRIDE_DEPLOY_FREEZE: ${{ github.event.inputs.override_freeze }}
         run: |
+          # Se PROMETHEUS_URL não estiver configurado, não falhar o workflow.
+          # Apenas bloqueia o deploy e registra o motivo.
+          if [ -z "${PROMETHEUS_URL:-}" ]; then
+            echo "can_deploy=false" >> $GITHUB_OUTPUT
+            echo "status=MISCONFIGURED" >> $GITHUB_OUTPUT
+            echo "remaining=" >> $GITHUB_OUTPUT
+            echo "❌ PROMETHEUS_URL não configurado (GitHub Secret ausente)." >> $GITHUB_STEP_SUMMARY
+            echo "➡️ Configure o secret PROMETHEUS_URL ou use um runner self-hosted na mesma rede do Prometheus." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
           chmod +x scripts/can-deploy.sh
           chmod +x scripts/check-error-budget.sh
           
           # Executar verificação
           if ./scripts/can-deploy.sh; then
             echo "can_deploy=true" >> $GITHUB_OUTPUT
+            echo "status=NORMAL" >> $GITHUB_OUTPUT
             echo "✅ Deploy permitido" >> $GITHUB_STEP_SUMMARY
           else
             EXIT_CODE=$?
@@ -61,9 +73,13 @@ jobs:
               
               echo "### Error Budget Status: $STATUS" >> $GITHUB_STEP_SUMMARY
               echo "Budget Remaining: $REMAINING%" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "status=UNKNOWN" >> $GITHUB_OUTPUT
+              echo "remaining=" >> $GITHUB_OUTPUT
             fi
-            
-            exit $EXIT_CODE
+
+            # Não falhar o job — apenas bloquear as etapas seguintes.
+            exit 0
           fi
       
       - name: Upload error budget status
@@ -86,7 +102,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '22.16.0'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
       
