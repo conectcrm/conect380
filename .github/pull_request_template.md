@@ -42,6 +42,15 @@ Se aplicável, adicione screenshots ou vídeos.
 - [ ] Testei responsividade (se frontend)
 - [ ] Validei migration (se backend)
 
+## 🧱 Guardrails Conect360 (obrigatório quando aplicável)
+
+- [ ] Não expandi escopo/posicionamento sem aprovação explícita
+- [ ] Multi-tenant: entidades de negócio possuem `empresa_id` e estão protegidas por RLS
+- [ ] Migrations: tabela com `empresa_id` habilita RLS + policy `tenant_isolation_*` + índice em `empresa_id`
+- [ ] Frontend: mantive o tema Crevasse (não alterei paleta global)
+- [ ] Frontend: usei `ConfirmationModal`/`useConfirmation` para confirmações e `react-hot-toast` para feedback
+- [ ] Frontend: páginas novas partiram de `_TemplatePage.tsx` ou `_TemplateSimplePage.tsx` (sem criar do zero)
+
 ## 🗄️ Mudanças no Banco de Dados
 
 - [ ] Nenhuma mudança no banco

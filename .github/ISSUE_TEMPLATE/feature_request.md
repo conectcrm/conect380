@@ -1,6 +1,6 @@
 ---
 name: ✨ Feature Request
-about: Sugerir uma nova funcionalidade para o ConectSuite
+about: Sugerir uma nova funcionalidade para o Conect360
 title: '[FEATURE] '
 labels: enhancement
 assignees: ''
@@ -56,6 +56,8 @@ Qual módulo seria afetado?
 
 - [ ] Design/Mockup aprovado
 - [ ] Especificação técnica definida
+- [ ] Escopo e integrações do módulo definidos (sem criar feature isolada)
+- [ ] Regras multi-tenant/RLS mapeadas (se dados por empresa)
 - [ ] Backend implementado
 - [ ] Frontend implementado
 - [ ] Testes escritos

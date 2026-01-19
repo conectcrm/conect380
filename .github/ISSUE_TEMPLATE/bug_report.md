@@ -33,8 +33,10 @@ Se aplicável, adicione screenshots para ajudar a explicar o problema.
 
 - **OS**: [ex: Windows 11, Ubuntu 22.04, macOS 13]
 - **Browser**: [ex: Chrome 120, Firefox 121]
-- **Node**: [ex: 18.17.0]
-- **Version**: [ex: 1.0.0]
+- **Node**: [ex: 22.16.x]
+- **App/Commit**: [ex: v0.1.0 ou hash do commit]
+- **Tenant (empresa)**: [ex: ID/nome da empresa afetada]
+- **Canal**: [WhatsApp / Email / Chat / Telefone / N/A]
 
 ## 📋 Logs
 
