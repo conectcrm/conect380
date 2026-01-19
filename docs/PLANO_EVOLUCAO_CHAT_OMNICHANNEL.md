@@ -1,5 +1,9 @@
 # 🎯 Plano de Evolução - Chat Omnichannel ConectCRM
 
+> Escopo: plano de evolução do **Chat do módulo Atendimento (Omnichannel)**.
+>
+> Documentação geral (índice): [docs/INDICE_DOCUMENTACAO.md](INDICE_DOCUMENTACAO.md)
+
 **Data:** 09/12/2025  
 **Estratégia:** Evoluir o que funciona + Remover o que atrapalha  
 **Referência:** Zendesk, Intercom, Freshdesk

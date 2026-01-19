@@ -1,4 +1,8 @@
-# 📡 Documentação de APIs - ConectCRM Omnichannel
+# 📡 Documentação de APIs - Conect360 (Suite All-in-One)
+
+> Escopo: documentação técnica do backend. Foi consolidada durante a fase do módulo **Atendimento (Omnichannel)**, mas o backend atende múltiplos módulos da suite.
+>
+> Documentação geral (índice): [docs/INDICE_DOCUMENTACAO.md](INDICE_DOCUMENTACAO.md)
 
 ## 📋 Índice
 1. [Visão Geral](#visão-geral)
@@ -1095,4 +1099,4 @@ function Dashboard() {
 
 **Data:** 11/10/2025  
 **Versão:** 1.0.0  
-**Autor:** Equipe ConectCRM
+**Autor:** Equipe Conect360

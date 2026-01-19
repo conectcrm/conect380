@@ -1273,7 +1273,7 @@ Este plano garante:
 4. **Sistema escalável e manutenível** (arquitetura sólida)
 5. **Equipe alinhada** (treinamento + code review)
 
-**Meta final**: Sistema ConectCRM omnichannel com nota **9/10**, comparável às plataformas líderes do mercado, **SEM gambiarras**.
+**Meta final**: Módulo Atendimento (Omnichannel) do ConectCRM com nota **9/10**, comparável às plataformas líderes do mercado, **SEM gambiarras**.
 
 ---
 

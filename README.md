@@ -1,4 +1,4 @@
-# 🚀 ConectCRM - Suite All-in-One para PMEs
+# 🚀 Conect360 - Suite All-in-One para PMEs
 
 <div align="center">
 
@@ -9,7 +9,12 @@
 ![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?logo=postgresql&logoColor=white)
 
-**Suite CRM Multi-tenant que integra CRM, Vendas, Atendimento Omnichannel e Gestão Financeira**
+**Suite CRM Multi-tenant que integra CRM, Vendas, Atendimento (Omnichannel) e Gestão Financeira**
+
+> Escopo: o Conect360 é uma **suite all-in-one** (CRM, Vendas, Financeiro, Contratos, etc.).
+> **Atendimento (Omnichannel)** é um dos módulos — não o produto inteiro.
+>
+> Comece por: [VISAO_SISTEMA_2025.md](VISAO_SISTEMA_2025.md) e [docs/INDICE_DOCUMENTACAO.md](docs/INDICE_DOCUMENTACAO.md)
 
 [Visão do Sistema](VISAO_SISTEMA_2025.md) •
 [Documentação](#-documentação) •
@@ -23,24 +28,24 @@
 
 ## 📋 Sobre o Projeto
 
-ConectCRM é uma **suite CRM all-in-one** desenvolvida para PMEs brasileiras, que integra nativamente:
+Conect360 é uma **suite CRM all-in-one** desenvolvida para PMEs brasileiras, que integra nativamente:
 
 - 🎯 **CRM & Pipeline de Vendas** - Oportunidades, propostas, forecast
-- 💬 **Atendimento Omnichannel** - WhatsApp, Email, Chat em tempo real
+- 💬 **Atendimento (Omnichannel)** - WhatsApp, Email, Chat em tempo real
 - 💰 **Gestão Financeira** - Faturas, cobranças, Mercado Pago integrado
 - 📄 **Contratos** - Geração automática, templates, assinaturas
 - 🤖 **Bot de Triagem Inteligente** - IA (Anthropic Claude) para classificação
 - 🏢 **Multi-tenant** - Isolamento total de dados (RLS)
 - 📊 **Analytics** - Dashboards, relatórios, métricas de vendas e atendimento
 
-### 💡 Por que ConectCRM?
+### 💡 Por que Conect360?
 
 **Substitua 5-7 ferramentas** (Zendesk + HubSpot + Pipedrive + ContaAzul + Vindi) por uma **suite integrada**:
 
 ```
-❌ Stack Fragmentado:          ✅ ConectCRM All-in-One:
-├─ Zendesk: R$ 299/mês         ├─ Atendimento omnichannel
-├─ HubSpot: R$ 399/mês         ├─ CRM & Pipeline completo  
+❌ Stack Fragmentado:          ✅ Conect360 All-in-One:
+├─ Zendesk: R$ 299/mês         ├─ Atendimento (omnichannel)
+├─ HubSpot: R$ 399/mês         ├─ CRM & Pipeline completo
 ├─ Pipedrive: R$ 199/mês       ├─ Gestão financeira
 ├─ ContaAzul: R$ 299/mês       ├─ Cobranças (Mercado Pago)
 ├─ Vindi: R$ 149/mês           ├─ Contratos e propostas
@@ -64,7 +69,7 @@ ConectCRM é uma **suite CRM all-in-one** desenvolvida para PMEs brasileiras, qu
 - **Forecast de Receita** - Previsão de vendas por etapa
 - **Métricas de Vendas** - Dashboard executivo com KPIs
 
-### 2️⃣ Módulo Atendimento Omnichannel
+### 2️⃣ Módulo Atendimento (Omnichannel)
 
 - **Chat Real-time (WebSocket)** - Atendimento em tempo real
 - **WhatsApp Business API** - Integração nativa com botões interativos
@@ -184,8 +189,8 @@ Let's Encrypt (SSL/HTTPS)
 ### 1. Clone o Repositório
 
 ```bash
-git clone https://github.com/Dhonleno/conectsuite.git
-cd conectsuite
+git clone https://github.com/Dhonleno/conect360.git
+cd conect360
 ```
 
 ### 2. Backend
@@ -208,6 +213,7 @@ npm run start:dev
 ```
 
 **Portas**:
+
 - Backend: `http://localhost:3001`
 - WebSocket: `ws://localhost:3001`
 
@@ -228,6 +234,7 @@ npm start
 ```
 
 **Portas**:
+
 - Frontend: `http://localhost:3000`
 
 ---
@@ -398,7 +405,7 @@ npm run cypress:open
 ### Referências
 
 - 📊 [ANALISE_MODULOS_SISTEMA.md](docs/archive/2025/ANALISE_MODULOS_SISTEMA.md) - Arquitetura
-- 🏗️ [CONSOLIDACAO_*.md](.) - Histórico de implementações
+- 🏗️ [CONSOLIDACAO\_\*.md](.) - Histórico de implementações
 - 📝 [docs/](docs/) - Documentação técnica completa
 
 ---
@@ -502,11 +509,13 @@ Contribuições são bem-vindas! Por favor:
 5. Abra um Pull Request
 
 Consulte [CONTRIBUTING.md](CONTRIBUTING.md) para detalhes sobre:
+
 - Padrões de commit (Conventional Commits)
 - Code style (ESLint, Prettier)
 - Processo de revisão
 
 **📖 Antes de contribuir**:
+
 - Leia [TROUBLESHOOTING_GUIDE.md](TROUBLESHOOTING_GUIDE.md) se encontrar problemas
 - Consulte [ROADMAP_MELHORIAS.md](docs/handbook/ROADMAP_MELHORIAS.md) para ver melhorias planejadas
 - Verifique [frontend-web/DESIGN_GUIDELINES.md](frontend-web/DESIGN_GUIDELINES.md) para padrões de UI
@@ -515,13 +524,14 @@ Consulte [CONTRIBUTING.md](CONTRIBUTING.md) para detalhes sobre:
 
 ## 📊 Status do Projeto
 
-![GitHub last commit](https://img.shields.io/github/last-commit/Dhonleno/conectsuite)
-![GitHub issues](https://img.shields.io/github/issues/Dhonleno/conectsuite)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/Dhonleno/conectsuite)
+![GitHub last commit](https://img.shields.io/github/last-commit/Dhonleno/conect360)
+![GitHub issues](https://img.shields.io/github/issues/Dhonleno/conect360)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/Dhonleno/conect360)
 
 **Branch principal**: `consolidacao-atendimento`
 
 **Últimas atualizações**:
+
 - ✅ Commit inicial completo (490 arquivos, 122k linhas)
 - ✅ Sistema 100% funcional em produção
 - ✅ Documentação completa (190+ arquivos .md)
@@ -534,7 +544,7 @@ Consulte [CONTRIBUTING.md](CONTRIBUTING.md) para detalhes sobre:
 
 Este é um projeto **privado** desenvolvido para uso interno.
 
-**© 2025 ConectSuite. Todos os direitos reservados.**
+**© 2026 Conect360. Todos os direitos reservados.**
 
 ---
 
@@ -548,9 +558,9 @@ Desenvolvido com ❤️ por profissionais dedicados à excelência em atendiment
 
 Para dúvidas ou suporte:
 
-- 📧 Email: suporte@conectsuite.com
+- 📧 Email: suporte@conect360.com.br
 - 📖 Documentação: [docs/](docs/)
-- 🐛 Issues: [GitHub Issues](https://github.com/Dhonleno/conectsuite/issues)
+- 🐛 Issues: [GitHub Issues](https://github.com/Dhonleno/conect360/issues)
 
 ---
 
@@ -558,6 +568,6 @@ Para dúvidas ou suporte:
 
 **⭐ Se este projeto te ajudou, deixe uma estrela! ⭐**
 
-[⬆ Voltar ao topo](#-conectsuite---sistema-crm-omnichannel)
+[⬆ Voltar ao topo](#-conect360---suite-all-in-one-para-pmes)
 
 </div>

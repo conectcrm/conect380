@@ -1,0 +1,133 @@
+version: 2
+updates:
+  # Backend - NestJS
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Dhonleno"
+    assignees:
+      - "Dhonleno"
+    labels:
+      - "dependencies"
+      - "backend"
+      - "automated"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    versioning-strategy: increase
+    groups:
+      nestjs:
+        patterns:
+          - "@nestjs/*"
+        update-types:
+          - "minor"
+          - "patch"
+      typeorm:
+        patterns:
+          - "typeorm"
+          - "@types/typeorm"
+        update-types:
+          - "minor"
+          - "patch"
+      security:
+        dependency-type: "production"
+        update-types:
+          - "patch"
+  
+  # Frontend - React
+  - package-ecosystem: "npm"
+    directory: "/frontend-web"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Dhonleno"
+    assignees:
+      - "Dhonleno"
+    labels:
+      - "dependencies"
+      - "frontend"
+      - "automated"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    versioning-strategy: increase
+    groups:
+      react:
+        patterns:
+          - "react"
+          - "react-*"
+          - "@types/react*"
+        update-types:
+          - "minor"
+          - "patch"
+      testing:
+        patterns:
+          - "jest"
+          - "@testing-library/*"
+          - "@types/jest"
+        update-types:
+          - "minor"
+          - "patch"
+      security:
+        dependency-type: "production"
+        update-types:
+          - "patch"
+  
+  # Mobile (se aplicável)
+  - package-ecosystem: "npm"
+    directory: "/mobile"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "Dhonleno"
+    labels:
+      - "dependencies"
+      - "mobile"
+      - "automated"
+    commit-message:
+      prefix: "chore(deps)"
+  
+  # Scripts de Migration
+  - package-ecosystem: "npm"
+    directory: "/migration-scripts"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 2
+    reviewers:
+      - "Dhonleno"
+    labels:
+      - "dependencies"
+      - "scripts"
+      - "automated"
+    commit-message:
+      prefix: "chore(deps)"
+  
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Dhonleno"
+    labels:
+      - "dependencies"
+      - "ci-cd"
+      - "automated"
+    commit-message:
+      prefix: "chore(ci)"

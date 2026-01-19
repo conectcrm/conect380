@@ -1,15 +1,17 @@
-# 🚀 Quick Start - ConectCRM Omnichannel
+# 🚀 Quick Start - Conect360 (Suite All-in-One)
 
-Guia rápido para começar a usar o sistema Omnichannel em **5 minutos**.
+Guia rápido para subir o Conect360 localmente em **5–10 minutos**.
 
 ---
 
 ## 📋 Pré-requisitos
 
-- ✅ Node.js v18+ instalado
+- ✅ Node.js v22.16+ instalado
 - ✅ PostgreSQL rodando
 - ✅ Redis rodando (opcional, mas recomendado)
 - ✅ Git instalado
+
+**Nota (frontend)**: em algumas máquinas o React pode precisar de `NODE_OPTIONS=--max_old_space_size=4096`.
 
 ---
 
@@ -17,8 +19,8 @@ Guia rápido para começar a usar o sistema Omnichannel em **5 minutos**.
 
 ```bash
 # Clonar repositório
-git clone https://github.com/Dhonleno/conectcrm.git
-cd conectcrm
+git clone https://github.com/Dhonleno/conect360.git
+cd conect360
 
 # Instalar dependências do backend
 cd backend
@@ -104,6 +106,7 @@ npm run start:dev
 ```
 
 **Aguardar mensagem:**
+
 ```
 ✅ Nest application successfully started
 🚀 Servidor rodando em: http://localhost:3001
@@ -117,11 +120,12 @@ npm start
 ```
 
 **Aguardar mensagem:**
+
 ```
 webpack compiled successfully
 Compiled successfully!
 
-You can now view conectcrm-frontend in the browser.
+You can now view the app in the browser.
 
   Local:            http://localhost:3000
 ```
@@ -179,6 +183,7 @@ npx playwright test e2e/integracoes.spec.ts --headed
 ```
 
 **Resultado esperado:**
+
 ```
 ✅ 28 passed (28/28)
 ```
@@ -195,6 +200,7 @@ curl http://localhost:3001/health
 ```
 
 **Resposta esperada:**
+
 ```json
 {
   "status": "ok",
@@ -214,7 +220,7 @@ Abrir no navegador: http://localhost:3000
 
 ```javascript
 // Console do navegador (F12)
-localStorage.getItem('authToken') // Deve retornar um token
+localStorage.getItem("authToken"); // Deve retornar um token
 
 // Verificar conexão WebSocket na aba "Network" > "WS"
 // Deve haver conexão com: ws://localhost:3001/socket.io/
@@ -304,17 +310,19 @@ REACT_APP_WS_URL=ws://localhost:3001
 
 ## 📞 Suporte
 
-**Documentação Completa:** [docs/](./docs/)  
+**Documentação Geral (suite):** [docs/INDICE_DOCUMENTACAO.md](./docs/INDICE_DOCUMENTACAO.md)  
+**Documentação (pasta):** [docs/](./docs/)  
 **README Principal:** [README.md](./README.md)  
-**Resumo Completo:** [docs/RESUMO_COMPLETO_OMNICHANNEL.md](./docs/RESUMO_COMPLETO_OMNICHANNEL.md)
+**Resumo (módulo Atendimento / Omnichannel):** [docs/RESUMO_COMPLETO_OMNICHANNEL.md](./docs/RESUMO_COMPLETO_OMNICHANNEL.md)
 
 ---
 
 ## 🎉 Parabéns!
 
-Você configurou com sucesso o ConectCRM Omnichannel! 🚀
+Você configurou com sucesso o Conect360 (Suite All-in-One)! 🚀
 
 **O que você tem agora:**
+
 - ✅ Backend rodando com APIs REST + WebSocket
 - ✅ Frontend React com interface completa
 - ✅ Sistema de integrações funcionando
@@ -326,4 +334,4 @@ Você configurou com sucesso o ConectCRM Omnichannel! 🚀
 
 ---
 
-**Desenvolvido com ❤️ pela Equipe ConectCRM**
+**Desenvolvido com ❤️ pela Equipe Conect360**

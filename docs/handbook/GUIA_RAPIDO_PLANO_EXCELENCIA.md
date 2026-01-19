@@ -1,12 +1,16 @@
 # ⚡ GUIA RÁPIDO - PLANO DE EXCELÊNCIA
 
+> Escopo: plano de qualidade/refatoração com foco no módulo **Atendimento (Omnichannel)**.
+>
+> Documentação geral (índice): [docs/INDICE_DOCUMENTACAO.md](../INDICE_DOCUMENTACAO.md)
+
 **TL;DR**: Eliminar gambiarras + Implementar features enterprise em 90 dias
 
 ---
 
 ## 🎯 OBJETIVO
 
-Transformar ConectCRM de **7.5/10** para **9/10** (nível Zendesk/Intercom)
+Transformar o módulo **Atendimento (Omnichannel)** do ConectCRM de **7.5/10** para **9/10** (nível Zendesk/Intercom)
 
 ---
 
@@ -186,7 +190,7 @@ Closes #123
 
 ## 🏆 META FINAL
 
-**Sistema ConectCRM omnichannel comparável a Zendesk/Intercom, SEM gambiarras, com código limpo e manutenível.**
+**Módulo Atendimento (Omnichannel) do ConectCRM comparável a Zendesk/Intercom, SEM gambiarras, com código limpo e manutenível.**
 
 **Nota alvo**: **9/10** ⭐⭐⭐⭐⭐⭐⭐⭐⭐
 

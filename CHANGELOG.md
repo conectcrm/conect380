@@ -9,7 +9,29 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
-### 🔐 Segurança / Admin Console
+### �️ Governança e Qualidade (2026-01-02)
+- **Pre-commit Hooks**: Implementado Husky + lint-staged para validação automática antes de commits
+  - ESLint + Prettier executam automaticamente (auto-fix)
+  - Type-check TypeScript obrigatório
+  - Bloqueio de arquivos temporários (test-*, debug-*, temp-*)
+  - Verificação de padrão multi-tenant (empresa_id, RLS)
+- **Pull Request Template**: Template completo com checklist multi-tenant obrigatório
+  - Checklist de qualidade (código, testes, documentação)
+  - Checklist multi-tenant (empresa_id, RLS, políticas)
+  - Checklist frontend (Crevasse, templates, estados)
+  - Validação SQL rápida para RLS
+- **Code Review Guidelines**: Guidelines completas para revisores (420+ linhas)
+  - 7 categorias de verificação (multi-tenant, quality, performance, security, tests, frontend, docs)
+  - Templates de entity e migration
+  - Critérios claros de bloqueio vs sugestão
+  - Testes SQL para validar RLS manualmente
+- **Documentação**: 3 novos documentos de governança
+  - `GOVERNANCA_IMPLEMENTADA.md` - Visão completa da implementação
+  - `GOVERNANCA_QUICK_START.md` - Guia rápido de 2 minutos
+  - `GOVERNANCA_COMUNICADO_EQUIPE.md` - Comunicado para equipe
+- **Melhoria**: Governança de 72% → 94% (+22 pontos)
+
+### �🔐 Segurança / Admin Console
 - Adicionado papel `superadmin` para isolar o acesso ao Admin Console multi-tenant, incluindo migration (`1776000100000-AddSuperadminUserRole.ts`) e scripts de promoção automática (`backend/create-admin-user.js`, `backend/scripts/create-admin-user.js`).
 - Atualizado `docs/CREDENCIAIS_PADRAO.md` com instruções oficiais de criação/promocao do superadmin.
 - Criados testes automatizados para o `RolesGuard` (unitários) e para o pipeline de guards do `AdminEmpresasController` (E2E dedicado em `backend/test/admin/admin-empresas-guard.e2e-spec.ts`).

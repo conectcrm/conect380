@@ -1,0 +1,26 @@
+name: Multi-tenant Guardrails
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'scripts/ci/**'
+      - '.github/**'
+
+jobs:
+  guardrails:
+    name: Multi-tenant Guardrails
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Guardrails (multi-tenant)
+        shell: pwsh
+        run: |
+          ./scripts/ci/multitenant-guardrails.ps1 \
+            -BaseSha '${{ github.event.pull_request.base.sha }}' \
+            -HeadSha '${{ github.sha }}'

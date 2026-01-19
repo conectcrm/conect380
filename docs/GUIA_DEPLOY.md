@@ -1,4 +1,8 @@
-# 🚀 Guia de Deploy - ConectCRM Omnichannel
+# 🚀 Guia de Deploy - Conect360 (Suite All-in-One)
+
+> Escopo: guia de deploy da **suite Conect360**. Algumas seções citam integrações e realtime do módulo **Atendimento (Omnichannel)** quando aplicável.
+>
+> Documentação geral (índice): [docs/INDICE_DOCUMENTACAO.md](INDICE_DOCUMENTACAO.md)
 
 ## 📋 Índice
 1. [Pré-requisitos](#pré-requisitos)
@@ -684,4 +688,4 @@ curl -I https://seudominio.com.br
 
 **Data:** 11/10/2025  
 **Versão:** 1.0.0  
-**Autor:** Equipe ConectCRM
+**Autor:** Equipe Conect360

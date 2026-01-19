@@ -6,7 +6,7 @@
 
 | Campo | Valor |
 |-------|-------|
-| Email | `admin@conectsuite.com.br` |
+| Email | `admin@conect.com` |
 | Senha | `admin123` |
 | Papel | `superadmin` (acesso total, inclusive Admin Console) |
 
@@ -46,7 +46,7 @@ node scripts/create-admin-user.js
 -- Exemplo (substitua HASH_BCRYPT pela senha gerada)
 UPDATE users
 SET senha = 'HASH_BCRYPT'
-WHERE email = 'admin@conectsuite.com.br';
+WHERE email = 'admin@conect.com';
 ```
 
 > Dica: execute `npm run build` no backend apos alterar credenciais hardcoded (caso existam) para garantir que a pasta `dist/` seja atualizada.

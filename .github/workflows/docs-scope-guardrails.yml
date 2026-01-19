@@ -1,0 +1,27 @@
+name: Docs Scope Guardrails
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '*.md'
+      - 'scripts/ci/**'
+      - '.github/**'
+
+jobs:
+  guardrails:
+    name: Docs Scope Guardrails
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Guardrails (docs scope)
+        shell: pwsh
+        run: |
+          ./scripts/ci/docs-scope-guardrails.ps1 \
+            -BaseSha '${{ github.event.pull_request.base.sha }}' \
+            -HeadSha '${{ github.sha }}'

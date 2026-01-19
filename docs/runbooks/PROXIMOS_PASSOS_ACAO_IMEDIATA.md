@@ -1,6 +1,10 @@
 # 🚀 Próximos Passos - Plano de Ação Imediato
 
-**Projeto**: ConectCRM Omnichannel  
+> Escopo: runbook de qualidade/refatoração com foco no módulo **Atendimento (Omnichannel)**.
+>
+> Documentação geral (índice): [docs/INDICE_DOCUMENTACAO.md](../INDICE_DOCUMENTACAO.md)
+
+**Projeto**: ConectCRM (Suite) — foco Atendimento (Omnichannel)  
 **Sprint**: 1 - Eliminação de Gambiarras  
 **Tempo Total Estimado**: 1-2 dias
 

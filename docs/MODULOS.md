@@ -70,7 +70,6 @@ atendimento_base_conhecimento    # KB para bot
 #### 1.6 Integrações
 ```
 atendimento_integracoes_config   # Configurações de integrações
-atendimento_redmine_integrations # Integração Redmine
 ```
 
 ### Relacionamentos Chave

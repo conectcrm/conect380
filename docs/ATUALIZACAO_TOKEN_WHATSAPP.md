@@ -7,6 +7,7 @@ O token do WhatsApp Business API estava **expirado** (erro 401 Unauthorized).
 ### Verificação Realizada:
 ```
 Token atual: EAALQrbLuMHwBPoXEne7QxOP6wuoo9Wk...
+
 Status: ❌ 401 Unauthorized (EXPIRADO)
 ```
 
