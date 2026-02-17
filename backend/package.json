@@ -116,7 +116,7 @@
     "socket.io": "^4.8.1",
     "stripe": "^18.4.0",
     "twilio": "^5.10.2",
-    "typeorm": "^0.3.17",
+    "typeorm": "^0.3.28",
     "uuid": "^9.0.0",
     "whatsapp-web.js": "^1.31.0",
     "winston": "^3.18.3",
